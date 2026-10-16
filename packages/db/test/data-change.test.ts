@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
+import { copyFileSync, mkdtempSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { workerDb } from "@openokr/test-support/db";
+import {
+  connectionOptions,
+  testDbEnv,
+  workerDb,
+} from "@openokr/test-support/db";
 import pg from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -37,6 +43,24 @@ import { digestNoteDocument } from "../src/data-changes/0031_digest_note_documen
 import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
+
+/** Every migration file, in order. */
+const MIGRATIONS = join(import.meta.dirname, "../migrations");
+
+/**
+ * A directory holding every migration that sorts before `prefix`, for a test
+ * of a data change whose columns a later migration dropped: the backfills
+ * for the plain prose columns ran on 0.3, before 0144 removed them.
+ */
+function migrationsBefore(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "openokr-migrations-"));
+  for (const name of readdirSync(MIGRATIONS)) {
+    if (name.endsWith(".sql") && name < prefix) {
+      copyFileSync(join(MIGRATIONS, name), join(dir, name));
+    }
+  }
+  return dir;
+}
 
 /**
  * The data-change runner (P2-T12 test plan). Batched, resumable, idempotent
@@ -264,6 +288,76 @@ describe("runDataChanges", () => {
     await expect(runDataChanges(client, { scripts: [script] })).rejects.toThrow(
       /does_not_exist/,
     );
+  });
+
+  it("counts a script as done once the migration that retires it dropped its columns", async () => {
+    // Guided-inputs change 13 (docs/design/guided-inputs.md §4.7). A fresh
+    // instance never ran a backfill whose columns a later migration dropped,
+    // after that migration's own guard proved nothing was left to convert.
+    // Refusing it there would stop every script after it, for good.
+    let ran = false;
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        ran = true;
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    const calls = { n: 0 };
+    const later = { ...countingScript(calls), name: "0002_counting" };
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await client.query(
+      "insert into _counting_fixture (id) values (1), (2), (3)",
+    );
+    await client.query(
+      "create table _migrations (name text primary key, checksum text not null)",
+    );
+    await client.query(
+      "insert into _migrations (name, checksum) values ('0999_drop_it.sql', 'x')",
+    );
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [retired, later],
+    });
+    expect(ran).toBe(false);
+    expect(
+      outcomes.map((outcome) => [outcome.name, outcome.rowsChanged]),
+    ).toEqual([
+      ["0001_retired", 0],
+      ["0002_counting", 3],
+    ]);
+    const { rows } = await client.query<{ completed_at: Date | null }>(
+      "select completed_at from _data_changes where name = '0001_retired'",
+    );
+    expect(rows[0]?.completed_at).not.toBeNull();
+  });
+
+  it("still refuses a retired script whose migration has not run", async () => {
+    // The columns missing and the migration not recorded is a schema that
+    // moved some other way, which is exactly what the check is for.
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    await client.query("create table _counting_fixture (id int primary key)");
+
+    await expect(
+      runDataChanges(client, { scripts: [retired] }),
+    ).rejects.toThrow(/dropped/);
   });
 
   it("refuses a script whose expected column changed type", async () => {
@@ -1570,7 +1664,7 @@ describe("0027 and 0028: the monthly review's prose as documents", () => {
 
   it("writes each shifts note and decision as a document, keeps one already written, and runs again as nothing", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [migrationsBefore("0144")],
     });
     await client.query(
       `with w as (
@@ -1660,7 +1754,7 @@ describe("0027 and 0028: the monthly review's prose as documents", () => {
 describe("0029 and 0030: the quarterly review's prose as documents", () => {
   it("writes each answer as a document, turns each text stage note into one, and runs again as nothing", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [migrationsBefore("0144")],
     });
     const written = {
       type: "doc",
@@ -1734,7 +1828,7 @@ describe("0029 and 0030: the quarterly review's prose as documents", () => {
 describe("0031: the weekly coordinator note as a document", () => {
   it("writes each note as a document, leaves a digest with none, and runs again as nothing", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [migrationsBefore("0144")],
     });
     await client.query(
       `with w as (
@@ -1779,7 +1873,7 @@ describe("0031: the weekly coordinator note as a document", () => {
 describe("0032: the revalidation notes as documents", () => {
   it("fills each note still missing a document, never one already written, and runs again as nothing", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [migrationsBefore("0144")],
     });
     const written = {
       type: "doc",
@@ -1854,5 +1948,138 @@ describe("0032: the revalidation notes as documents", () => {
       scripts: [revalidationNoteDocuments],
     });
     expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0144: the plain prose columns go, but only once every row has its document", () => {
+  it("refuses while prose waits for its document, naming each column, and drops nothing", async () => {
+    // Guided-inputs change 13b. An instance that jumped from 0.2 straight to
+    // this release never ran 0.3's data changes.
+    await runMigrations(client, { dirs: [migrationsBefore("0144")] });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       )
+       insert into okr_sessions (id, workspace_id, kind, title, scheduled_for,
+                                 facilitator_id, shifts, notes)
+       select gen_random_uuid(), m.workspace_id, 'quarterly', 'Q3 review', now(),
+              m.id, 'Two people move onto activation.',
+              jsonb_build_object('open', 'Pulse was low.')
+         from m`,
+    );
+
+    await expect(runMigrations(client, { dirs: [MIGRATIONS] })).rejects.toThrow(
+      /okr_sessions\.shifts \(1\) okr_sessions\.notes \(1\)[\s\S]*pnpm db:change/,
+    );
+    const kept = await client.query(
+      `select 1 from information_schema.columns
+        where table_name = 'okr_sessions' and column_name = 'shifts'`,
+    );
+    expect(kept.rows).toHaveLength(1);
+
+    // Once the data changes have run, the drop goes through.
+    await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, stageNoteDocuments],
+    });
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    const gone = await client.query(
+      `select column_name from information_schema.columns
+        where (table_name, column_name) in
+              (('okr_sessions', 'shifts'), ('decisions', 'text'),
+               ('management_answers', 'body'), ('digests', 'note'),
+               ('cycle_revalidations', 'change_note'),
+               ('cycle_revalidations', 'focus_note'))`,
+    );
+    expect(gone.rows).toEqual([]);
+    const { rows } = await client.query<{ shifts_document: unknown }>(
+      "select shifts_document from okr_sessions",
+    );
+    expect(rows[0]?.shifts_document).toEqual(
+      plainTextDocument("Two people move onto activation."),
+    );
+  });
+
+  it("sees every workspace's rows when it runs as the table owner, under the tenant floor", async () => {
+    // FORCE ROW LEVEL SECURITY binds the owner too, and a deployment's admin
+    // role may be the owner rather than a superuser. A guard counting under
+    // the floor would see nothing and drop the prose; it lifts FORCE for its
+    // own transaction instead. The other tests here connect as a superuser,
+    // which sees every row anyway, so this one is what proves the lift.
+    const wb = await workerDb();
+    const ownerDb = `${scratchDb}_owner`;
+    await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    await wb.admin.query(
+      `create database ${ownerDb} owner ${testDbEnv.ownerRole} ` +
+        `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+    );
+    const owner = new pg.Client(
+      connectionOptions(ownerDb, testDbEnv.ownerRole),
+    );
+    await owner.connect();
+    try {
+      await runMigrations(owner, { dirs: [migrationsBefore("0144")] });
+      // Written as the application writes, inside its workspace.
+      const workspaceId = "6f1d3c2a-9b4e-4c1d-8a7f-2e5b6c7d8e9f";
+      await owner.query("select set_config('app.workspace_id', $1, false)", [
+        workspaceId,
+      ]);
+      await owner.query(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values ($1, 'Acme', 'acme') returning id
+         ), m as (
+           insert into workspace_members (id, workspace_id, name, kind, status)
+           select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+           returning id, workspace_id
+         )
+         insert into okr_sessions (id, workspace_id, kind, title, scheduled_for,
+                                   facilitator_id, shifts)
+         select gen_random_uuid(), m.workspace_id, 'monthly', 'August', now(),
+                m.id, 'Two people move onto activation.'
+           from m`,
+        [workspaceId],
+      );
+      // As a migration connects: no workspace of its own.
+      await owner.query("select set_config('app.workspace_id', '', false)");
+
+      await expect(
+        runMigrations(owner, { dirs: [MIGRATIONS] }),
+      ).rejects.toThrow(/okr_sessions\.shifts \(1\)/);
+      // And the floor is back as it was.
+      const { rows } = await owner.query<{ forced: boolean }>(
+        "select relforcerowsecurity as forced from pg_class where relname = 'okr_sessions'",
+      );
+      expect(rows[0]?.forced).toBe(true);
+    } finally {
+      await owner.end();
+      await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    }
+  });
+
+  it("on a fresh instance, counts the retired backfills done and runs the rest", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [
+        sessionShiftsDocument,
+        decisionTextDocument,
+        managementAnswerDocument,
+        stageNoteDocuments,
+        digestNoteDocument,
+        revalidationNoteDocuments,
+      ],
+    });
+    expect(outcomes.map((outcome) => outcome.rowsChanged)).toEqual([
+      0, 0, 0, 0, 0, 0,
+    ]);
+    const { rows } = await client.query<{ completed: number }>(
+      "select count(*)::int as completed from _data_changes where completed_at is not null",
+    );
+    expect(rows[0]?.completed).toBe(6);
   });
 });

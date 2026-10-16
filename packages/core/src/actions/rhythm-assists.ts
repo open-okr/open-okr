@@ -50,7 +50,6 @@ import { daysPastDue } from "../cadence/service.ts";
 import { spacePostTargets } from "../channels/space-posts.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
-import { documentOrPlainText } from "../rich-text/moving.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readKpiDetail } from "./kpis.ts";
@@ -177,7 +176,6 @@ export async function digestInputFor(
     .select({
       body: digests.body,
       periodStart: digests.periodStart,
-      note: digests.note,
       noteDocument: digests.noteDocument,
       scopeId: digests.scopeId,
     })
@@ -290,7 +288,10 @@ export async function digestInputFor(
   // channel post all carry it: each is a list of lines, and a blank line
   // between two paragraphs would read as the digest ending. No length: the
   // action already holds the note to its own.
-  const noteDocument = documentOrPlainText(row.noteDocument, row.note);
+  const noteDocument =
+    row.noteDocument !== null && typeof row.noteDocument === "object"
+      ? (row.noteDocument as RichTextDocument)
+      : null;
   const noteLine = noteDocument === null ? "" : richTextAsLine(noteDocument);
 
   return {

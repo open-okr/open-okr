@@ -268,9 +268,9 @@ The two legacy columns arrived at P6-T03a for the same reason `spaces` did. An i
 `cycle_id` to cycles, `text`, `success_statement`, `position`, `promoted_to_goal_id?` to goals.
 
 ### cycle_revalidations
-`cycle_id` to cycles, `holds bool`, `changed bool`, `change_note?`, `focus_note?`, `change_note_document jsonb?`, `change_note_document_version?`, `focus_note_document jsonb?`, `focus_note_document_version?`.
+`cycle_id` to cycles, `holds bool`, `changed bool`, `change_note_document jsonb?`, `change_note_document_version?`, `focus_note_document jsonb?`, `focus_note_document_version?`.
 
-Since guided-inputs change 12 (migration 0143) each note is editor JSON in its `_document` column, checked to be set with its version, and the plain column holds its plain text for one release so the release before reads it, and so phase 3's check reads text. Data change 0032 fills the documents and change 13 drops `change_note` and `focus_note`.
+Since guided-inputs change 12 (migration 0143) each note is editor JSON in its `_document` column, checked to be set with its version. The plain `change_note` and `focus_note` went in 0.4 (change 13b, migration 0144), once every row had its document; phase 3's check reads plain text computed from the document.
 
 ### cycle_focus_key_results
 `cycle_id` to cycles, `annual_key_result_id` to key_results.
@@ -391,11 +391,11 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 ## 10. The rhythm (domain G)
 
 ### sessions *(short_id)*
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts?`, `shifts_document jsonb?`, `shifts_document_version?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
+`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts_document jsonb?`, `shifts_document_version?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review.
 
-`shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes. Since guided-inputs change 11a (migration 0140) the note is editor JSON in `shifts_document`, and `shifts` holds its plain text for one release so the release before reads it; change 13 drops `shifts`.
+`shifts` is METHOD.md §7.5's resource or priority note, one per monthly review. Its own column rather than a key inside `notes`, which holds the facilitator's private per-stage notes. Since guided-inputs change 11a (migration 0140) the note is editor JSON in `shifts_document`. The plain `shifts` went in 0.4 (change 13b, migration 0144).
 
-`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there. It is keyed by `stage_key`, and since guided-inputs change 11b each value is editor JSON: data change 0030 rewrites a value still stored as text, and `sessions.read` wraps any it has not reached yet. Change 13 stops taking text.
+`notes` is private to the facilitator. `sessions.read` returns it only to the member the session names as facilitator and an empty object to everybody else, so nothing else may be filed in there. It is keyed by `stage_key`, and since guided-inputs change 11b each value is editor JSON: data change 0030 rewrote every value stored as text, and migration 0144 refuses to run while any string is left, so since 0.4 every value is a document.
 
 `added_minutes` is the whole minutes the facilitator added per stage (METHOD.md §8.1), keyed by `stage_key` exactly as `elapsed` is. Separate from §11's `sessions.quarterlyStageMinutes`, which is the workspace's standing agenda: one room running long on one day must not retune every future review.
 
@@ -418,14 +418,14 @@ A row is created when somebody takes part, not when the session is made. Seeding
 `session_id?` to sessions, `space_id` to spaces, `week_start date`, `text`, `owner_id` to workspace_members, `key_result_id?` to key_results, `delivered bool?`, `closed_at?`, `closing_note?` (the line on why written when it was closed, where it helps; 0130, P9-T19a-d-c).
 
 ### decisions
-`cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text`, `text_document jsonb?`, `text_document_version?`, `author_member_id` to workspace_members, `session_id?` to sessions.
+`cycle_id?` to cycles, `key_result_id?` to key_results, `goal_id?` to goals, `at date`, `text_document jsonb?`, `text_document_version?`, `author_member_id` to workspace_members, `session_id?` to sessions.
 
-Since guided-inputs change 11a (migration 0140) a decision is editor JSON in `text_document`, and `text` holds its plain text for one release so the release before reads it; change 13 drops `text`.
+Since guided-inputs change 11a (migration 0140) a decision is editor JSON in `text_document`. The plain `text` went in 0.4 (change 13b, migration 0144); the read actions' `text` field is computed from the document.
 
 ### digests
-`scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note?`, `note_document jsonb?`, `note_document_version?`, `generated_at`, `published_at?`, `channels text[]`.
+`scope` (`space` / `workspace` / `member`), `scope_id?`, `period` (`daily` / `weekly` / `cycle`), `period_start`, `body jsonb`, `note_document jsonb?`, `note_document_version?`, `generated_at`, `published_at?`, `channels text[]`.
 
-`note` is the coordinator's note for leadership. Since guided-inputs change 11c (migration 0142) it is editor JSON in `note_document`, checked to be set with its version, and `note` holds its plain text for one release so the release before reads it; data change 0031 fills the documents and change 13 drops `note`. The digest, its narration and a channel post carry it as one line.
+`note_document` is the coordinator's note for leadership, editor JSON since guided-inputs change 11c (migration 0142), checked to be set with its version. The plain `note` went in 0.4 (change 13b, migration 0144). The digest, its narration and a channel post carry it as one line.
 
 `published_at` and `channels` were written by nothing until completeness review M-23. `sessions.postDigest` now sets both when the facilitator posts a closed weekly session's digest to its space's channel: `published_at` on the first post, and the providers it went to added to `channels`.
 
@@ -446,7 +446,7 @@ Every table references `session_id` to sessions.
 | `kudos` | `from_member_id`, `to_member_id`, `text` |
 | `retro_notes` | `column_key` (`worked` / `didnt`), `text`, `votes smallint`, `author_member_id?` |
 | `retro_votes` | `note_id` to retro_notes, `member_id` |
-| `management_answers` | `question_key smallint` (1 to 4), `body`, `body_document jsonb?`, `body_document_version?`, `answered_by_id` |
+| `management_answers` | `question_key smallint` (1 to 4), `body_document jsonb?`, `body_document_version?`, `answered_by_id` |
 | `root_causes` | `key_result_id`, `cause_key smallint` (1 to 9), `secondary_cause_key smallint?` (1 to 9, never the primary; 0134), `detail?` (required where either cause is 9, "Other"), `named_by_id` |
 | `process_health_responses` | `statement_key smallint` (1 to 5), `score smallint`, `respondent_hash` |
 | `review_decisions` | `goal_id`, `decision` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `why`, `decided_by_id` |
@@ -467,7 +467,7 @@ Every table references `session_id` to sessions.
 
 `retro_notes.votes` is denormalised from `retro_votes`, recounted from the rows and rewritten inside the same transaction as every vote. TECHNICAL-PLAN §4 specifies the column and the board sorts on it; a test asserts it equals the count behind it rather than trusting that it was maintained. `column_key` rather than `column`, because `column` is a reserved word in SQL.
 
-`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read. Since guided-inputs change 11b (migration 0141) the answer is editor JSON in `body_document`, checked to be set with its version, and `body` holds its plain text for one release so the release before reads it; data change 0029 fills the documents and change 13 drops `body`.
+`management_answers` is unique on `(workspace_id, session_id, question_key)`: leadership answers out loud and the record is one answer per question. The question text is canon in `packages/method` and never stored, so a workspace cannot edit a question §11 lists as unchangeable structure and no old answer ends up quoting a question nobody asked. **Read by a space's managers and its coordinator only.** §8.7 says leadership answers, the write-access floor here is `edit` for every active member (P3-T16), and a review with no space falls back to workspace administration because there are no space roles to read. Since guided-inputs change 11b (migration 0141) the answer is editor JSON in `body_document`, checked to be set with its version. The plain `body`, and the check that kept it from being empty, went in 0.4 (change 13b, migration 0144); the action still refuses an answer with no words.
 
 `root_causes` is unique on `(workspace_id, session_id, key_result_id)` where not deleted: one primary per key result, and since P9-T20c (migration 0134) v2's "and may name a second" is `secondary_cause_key` on the same row, so a key result never carries two primaries. `cause_key` indexes the canon taxonomy in `packages/method`, never the text, so a workspace cannot edit a taxonomy §11 lists as unchangeable structure and no old row ends up naming a cause the method no longer has. The stage's list comes from `review_scores` rather than `key_results.score`, because grades do not land on the key results until the session closes and stage seven runs before that.
 

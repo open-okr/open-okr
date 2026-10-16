@@ -51,11 +51,7 @@ import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
-import {
-  documentOfInput,
-  plainTextOfDocument,
-  richTextOrPlainTextSchema,
-} from "../rich-text/moving.ts";
+import { documentOfInput } from "../rich-text/moving.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
   type RichTextDocument,
@@ -81,24 +77,20 @@ const cycleNote = richTextSchema({ maxCharacters: CYCLE_NOTE_MAX_CHARACTERS });
 export const REVALIDATION_NOTE_MAX_CHARACTERS = 2000;
 
 /**
- * A revalidation note: editor JSON, or for this release the plain text it
- * took before, which is wrapped as a document. Null or absent clears it.
+ * A revalidation note: editor JSON. Null or absent clears it. Plain text was
+ * taken until 0.4 (guided-inputs change 13b).
  */
-const revalidationNote = richTextOrPlainTextSchema({
+const revalidationNote = richTextSchema({
   maxCharacters: REVALIDATION_NOTE_MAX_CHARACTERS,
-})
-  .nullable()
-  .optional();
+}).optional();
 
-/** One note's two columns, written together for one release. */
+/** One note's document and its version, written together. */
 function revalidationNoteColumns(value: unknown): {
-  text: string | null;
   document: RichTextDocument | null;
   version: number | null;
 } {
   const document = documentOfInput(value);
   return {
-    text: document === null ? null : plainTextOfDocument(document),
     document,
     version: document === null ? null : RICH_TEXT_SCHEMA_VERSION,
   };
@@ -521,8 +513,6 @@ export const readWorkflow = defineReadAction({
           .select({
             holds: cycleRevalidations.holds,
             changed: cycleRevalidations.changed,
-            changeNote: cycleRevalidations.changeNote,
-            focusNote: cycleRevalidations.focusNote,
             changeNoteDocument: cycleRevalidations.changeNoteDocument,
             focusNoteDocument: cycleRevalidations.focusNoteDocument,
           })
@@ -1002,7 +992,7 @@ export const setRevalidation = defineWriteAction({
       cycleId: z.uuid(),
       holds: z.boolean(),
       changed: z.boolean(),
-      /** Editor JSON, or until change 13 plain text (guided-inputs change 12). */
+      /** Editor JSON (guided-inputs changes 12 and 13b). */
       changeNote: revalidationNote,
       focusNote: revalidationNote,
     })
@@ -1024,10 +1014,8 @@ export const setRevalidation = defineWriteAction({
       const values = {
         holds: input.holds,
         changed: input.changed,
-        changeNote: changeNote.text,
         changeNoteDocument: changeNote.document,
         changeNoteDocumentVersion: changeNote.version,
-        focusNote: focusNote.text,
         focusNoteDocument: focusNote.document,
         focusNoteDocumentVersion: focusNote.version,
         updatedAt: new Date(),

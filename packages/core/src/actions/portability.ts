@@ -239,6 +239,11 @@ const importDifferenceSchema = z.object({
   skipped: z.record(z.string(), z.number().int()),
   blobs: z.number().int(),
   /**
+   * Columns an earlier release's archive carries that this one dropped, by
+   * table, left out of each row. Empty for a report stored before 0.4.
+   */
+  leftOut: z.record(z.string(), z.array(z.string())).default({}),
+  /**
    * Agent proposals left behind on purpose: the run that made each one does
    * not travel. Zero for a report stored before this field existed.
    */

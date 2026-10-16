@@ -23,6 +23,7 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { localDateIn } from "../src/cycles/generation.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "monthly-facilitator";
@@ -295,7 +296,7 @@ describe("sessions.recordDecision", () => {
     await expect(
       call("sessions.recordDecision", {
         sessionId,
-        text: "We will revisit this next month",
+        text: richTextFromPlainText("We will revisit this next month"),
       }),
     ).rejects.toThrow();
   });
@@ -304,7 +305,9 @@ describe("sessions.recordDecision", () => {
     const decision = (await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation until the end of the cycle",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation until the end of the cycle",
+      ),
     })) as { id: string };
 
     const record = (await call("sessions.monthlyRecord", { sessionId })) as {
@@ -331,7 +334,7 @@ describe("the monthly review's prose as rich text (guided-inputs change 11a)", (
     ],
   };
 
-  it("keeps a decision as written, and its plain text for the release before", async () => {
+  it("keeps a decision as written, with its plain text derived from it", async () => {
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
@@ -342,61 +345,35 @@ describe("the monthly review's prose as rich text (guided-inputs change 11a)", (
       decisions: { text: string; textDocument: unknown }[];
     };
     expect(record.decisions[0]?.textDocument).toEqual(bold);
-    // What the previous release reads, during a rolling upgrade.
+    // The read field a client has always had, from the document since 0.4.
     expect(record.decisions[0]?.text).toBe("Pause self-serve\n\nuntil June.");
   });
 
-  it("still takes plain text from an API client, as a document", async () => {
-    await call("sessions.recordDecision", {
-      sessionId,
-      keyResultId,
-      text: "One line.\n\nAnother.",
-    });
-    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
-      decisions: { textDocument: { content: unknown[] } }[];
-    };
-    expect(record.decisions[0]?.textDocument.content).toHaveLength(2);
+  it("refuses plain text since 0.4, as the 0.3.0 notes announced", async () => {
+    // Guided-inputs change 13b. Editor JSON only.
+    await expect(
+      call("sessions.recordDecision", {
+        sessionId,
+        keyResultId,
+        text: "One line.",
+      }),
+    ).rejects.toThrow();
+    await expect(
+      call("sessions.setShifts", { sessionId, shifts: "Two people move." }),
+    ).rejects.toThrow();
   });
 
-  it("refuses a decision with nothing in it, as text or as a document", async () => {
-    for (const text of [
-      "   ",
-      { type: "doc", content: [{ type: "paragraph" }] },
-    ]) {
-      await expect(
-        call("sessions.recordDecision", { sessionId, keyResultId, text }),
-      ).rejects.toThrow();
-    }
+  it("refuses a decision with nothing in it", async () => {
+    await expect(
+      call("sessions.recordDecision", {
+        sessionId,
+        keyResultId,
+        text: { type: "doc", content: [{ type: "paragraph" }] },
+      }),
+    ).rejects.toThrow();
   });
 
-  it("reads a decision the backfill has not reached from its plain text", async () => {
-    await call("sessions.recordDecision", {
-      sessionId,
-      keyResultId,
-      text: "Written before the document existed",
-    });
-    const wb = await workerDb();
-    await wb.admin.query(
-      "update decisions set text_document = null, text_document_version = null where session_id = $1",
-      [sessionId],
-    );
-    const record = (await call("sessions.monthlyRecord", { sessionId })) as {
-      decisions: { textDocument: unknown }[];
-    };
-    expect(record.decisions[0]?.textDocument).toEqual({
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            { type: "text", text: "Written before the document existed" },
-          ],
-        },
-      ],
-    });
-  });
-
-  it("keeps the shifts note as written, takes plain text, and clears both when emptied", async () => {
+  it("keeps the shifts note as written, and clears it when emptied", async () => {
     const read = async () =>
       (await call("sessions.monthlyRecord", { sessionId })) as {
         shifts: string | null;
@@ -409,18 +386,11 @@ describe("the monthly review's prose as rich text (guided-inputs change 11a)", (
       shiftsDocument: bold,
     });
 
-    await call("sessions.setShifts", { sessionId, shifts: "Two people move." });
-    expect((await read()).shiftsDocument).toEqual({
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [{ type: "text", text: "Two people move." }],
-        },
-      ],
+    // What an editor hands back once everything in it is deleted.
+    await call("sessions.setShifts", {
+      sessionId,
+      shifts: { type: "doc", content: [{ type: "paragraph" }] },
     });
-
-    await call("sessions.setShifts", { sessionId, shifts: "" });
     expect(await read()).toEqual(
       expect.objectContaining({ shifts: null, shiftsDocument: null }),
     );
@@ -443,7 +413,9 @@ describe("a decision's date (P9-T22c-b-b)", () => {
     await call("sessions.recordDecision", {
       sessionId: past.id,
       keyResultId,
-      text: "Hold the hiring plan until the April numbers are in",
+      text: richTextFromPlainText(
+        "Hold the hiring plan until the April numbers are in",
+      ),
     });
     const decisions = (await call("decisions.forGoal", { goalId })) as {
       text: string;
@@ -463,7 +435,9 @@ describe("the acceptance criterion", () => {
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation until the end of the cycle",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation until the end of the cycle",
+      ),
     });
 
     const decisions = (await call("decisions.forGoal", { goalId })) as {
@@ -489,12 +463,16 @@ describe("the acceptance criterion", () => {
     await call("sessions.recordDecision", {
       sessionId,
       goalId,
-      text: "Hold the objective as written rather than rewording it mid-cycle",
+      text: richTextFromPlainText(
+        "Hold the objective as written rather than rewording it mid-cycle",
+      ),
     });
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation",
+      ),
     });
 
     const decisions = (await call("decisions.forGoal", { goalId })) as {
@@ -575,7 +553,9 @@ describe("the plan's shape, and why it is not the obvious one", () => {
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation",
+      ),
     });
 
     // A date inside the next quarter, which is what the action takes.
@@ -601,12 +581,14 @@ describe("decisions.forCycle", () => {
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation",
+      ),
     });
     await call("sessions.recordDecision", {
       sessionId,
       goalId,
-      text: "Hold the objective as written",
+      text: richTextFromPlainText("Hold the objective as written"),
     });
 
     const decisions = (await call("decisions.forCycle", { cycleId })) as {
@@ -739,7 +721,9 @@ describe("access", () => {
     await call("sessions.recordDecision", {
       sessionId,
       keyResultId,
-      text: "Move two engineers off billing onto activation",
+      text: richTextFromPlainText(
+        "Move two engineers off billing onto activation",
+      ),
     });
 
     // Not-found rather than a partial list: the access getter refuses the goal

@@ -139,12 +139,7 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
-import {
-  documentOfInput,
-  documentOrPlainText,
-  plainTextOfDocument,
-  richTextOrPlainTextSchema,
-} from "../rich-text/moving.ts";
+import { documentOfInput, plainTextOfDocument } from "../rich-text/moving.ts";
 import {
   RICH_TEXT_SCHEMA_VERSION,
   type RichTextDocument,
@@ -537,21 +532,32 @@ const sessionOutput = z.object({
 
 type SessionOutput = z.infer<typeof sessionOutput>;
 
-/** The stage notes as documents, with text the backfill has not reached wrapped. */
+/**
+ * The stage notes, each a document. Migration 0144 refused to run while any
+ * was still a string, so a value that is not a document is not a note.
+ */
 function stageNotesAsDocuments(notes: unknown): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [stageKey, note] of Object.entries(
     (notes ?? {}) as Record<string, unknown>,
   )) {
-    const document = documentOrPlainText(
-      typeof note === "string" ? null : note,
-      typeof note === "string" ? note : null,
-    );
-    if (document !== null) {
-      out[stageKey] = document;
+    if (note !== null && typeof note === "object") {
+      out[stageKey] = note;
     }
   }
   return out;
+}
+
+/**
+ * A stored document's plain text, for the read fields that have always
+ * carried text, or null where there is no document. Computed since the plain
+ * columns went in 0.4 (guided-inputs change 13b), so a client reading text
+ * keeps working.
+ */
+function plainTextOfStored(document: unknown): string | null {
+  return document !== null && typeof document === "object"
+    ? plainTextOfDocument(document as RichTextDocument)
+    : null;
 }
 
 /**
@@ -3852,11 +3858,8 @@ export const setCoordinatorNote = defineWriteAction({
   summary: "Adds the coordinator's note to the session digest.",
   input: z.object({
     sessionId: z.uuid(),
-    /**
-     * Editor JSON, or for this release the plain text it took before
-     * (guided-inputs change 11c), which is wrapped as a document.
-     */
-    note: richTextOrPlainTextSchema({
+    /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
+    note: richTextSchema({
       maxCharacters: COORDINATOR_NOTE_MAX_CHARACTERS,
     }).refine((value) => documentOfInput(value) !== null, {
       message: "A note says something for leadership.",
@@ -3886,13 +3889,11 @@ export const setCoordinatorNote = defineWriteAction({
         );
       }
 
-      // Both columns, the plain one for the previous release during a rolling
-      // upgrade. The schema has already refused a blank note.
+      // The schema has already refused a blank note.
       const document = documentOfInput(input.note) as RichTextDocument;
       await tx
         .update(digests)
         .set({
-          note: plainTextOfDocument(document),
           noteDocument: document,
           noteDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
           updatedAt: new Date(),
@@ -4168,14 +4169,12 @@ const STAGE_NOTE_MAX_CHARACTERS = 4000;
 /** The longest management retro answer, the textarea's limit before it was an editor. */
 const MANAGEMENT_ANSWER_MAX_CHARACTERS = 2000;
 
-/** A decision's two text columns, written together for one release. */
+/** A decision's document and its version, written together. */
 function decisionTextColumns(document: RichTextDocument | null): {
-  text: string;
   textDocument: RichTextDocument | null;
   textDocumentVersion: number | null;
 } {
   return {
-    text: document === null ? "" : plainTextOfDocument(document),
     textDocument: document,
     textDocumentVersion: document === null ? null : RICH_TEXT_SCHEMA_VERSION,
   };
@@ -4188,10 +4187,10 @@ export const setShifts = defineWriteAction({
   input: z.object({
     sessionId: z.uuid(),
     /**
-     * Editor JSON, or for this release the plain text it took before
-     * (guided-inputs change 11a), which is wrapped as a document.
+     * Editor JSON, or null for no shift. Plain text was taken until 0.4
+     * (guided-inputs change 13b).
      */
-    shifts: richTextOrPlainTextSchema({ maxCharacters: SHIFTS_MAX_CHARACTERS }),
+    shifts: richTextSchema({ maxCharacters: SHIFTS_MAX_CHARACTERS }),
   }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -4211,14 +4210,12 @@ export const setShifts = defineWriteAction({
       );
 
       // Empty is a real answer and means the room noted no shift, so the
-      // columns go back to null rather than holding an empty note that reads
-      // on screen as somebody having written nothing. Both are written, the
-      // plain one for the previous release during a rolling upgrade.
+      // column goes back to null rather than holding an empty note that reads
+      // on screen as somebody having written nothing.
       const document = documentOfInput(input.shifts);
       await tx
         .update(sessions)
         .set({
-          shifts: document === null ? null : plainTextOfDocument(document),
           shiftsDocument: document,
           shiftsDocumentVersion:
             document === null ? null : RICH_TEXT_SCHEMA_VERSION,
@@ -4325,11 +4322,8 @@ export const recordDecision = defineWriteAction({
       sessionId: z.uuid(),
       goalId: z.uuid().optional(),
       keyResultId: z.uuid().optional(),
-      /**
-       * Editor JSON, or for this release the plain text it took before
-       * (guided-inputs change 11a), which is wrapped as a document.
-       */
-      text: richTextOrPlainTextSchema({
+      /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
+      text: richTextSchema({
         maxCharacters: DECISION_MAX_CHARACTERS,
       }).refine((value) => documentOfInput(value) !== null, {
         message: "A decision says what was decided.",
@@ -4464,7 +4458,7 @@ export const recordDecision = defineWriteAction({
 
 const decisionOutput = z.object({
   id: z.uuid(),
-  /** The decision as plain text, as it always was. */
+  /** The decision as plain text, from its document since 0.4. */
   text: z.string(),
   /** The decision as editor JSON (guided-inputs change 11a). */
   textDocument: z.unknown(),
@@ -4483,7 +4477,6 @@ type DecisionOutput = z.infer<typeof decisionOutput>;
 /** The shared shape of a decision row wherever it is listed. */
 function decisionRow(row: {
   id: string;
-  text: string;
   textDocument: unknown;
   at: string;
   authorMemberId: string;
@@ -4496,10 +4489,8 @@ function decisionRow(row: {
 }): DecisionOutput {
   return {
     id: row.id,
-    text: row.text,
-    // The stored document, or the plain text wrapped while data change
-    // 0028 has not reached this row.
-    textDocument: documentOrPlainText(row.textDocument, row.text),
+    text: plainTextOfStored(row.textDocument) ?? "",
+    textDocument: row.textDocument ?? null,
     at: row.at,
     authorMemberId: row.authorMemberId,
     // Left-joined, so a decision by a member who has since been removed still
@@ -4515,7 +4506,6 @@ function decisionRow(row: {
 
 const decisionColumns = {
   id: decisions.id,
-  text: decisions.text,
   textDocument: decisions.textDocument,
   at: decisions.at,
   authorMemberId: decisions.authorMemberId,
@@ -4533,7 +4523,7 @@ export const readMonthlyRecord = defineReadAction({
     "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
-    /** The shifts as plain text, as they always were. */
+    /** The shifts as plain text, from their document since 0.4. */
     shifts: z.string().nullable(),
     /** The shifts as editor JSON, or null when none were noted (change 11a). */
     shiftsDocument: z.unknown(),
@@ -4875,13 +4865,8 @@ export const readMonthlyRecord = defineReadAction({
           .orderBy(desc(decisions.at));
 
         return {
-          shifts: session.shifts,
-          // The stored document, or the plain text wrapped while data
-          // change 0027 has not reached this session.
-          shiftsDocument: documentOrPlainText(
-            session.shiftsDocument,
-            session.shifts,
-          ),
+          shifts: plainTextOfStored(session.shiftsDocument),
+          shiftsDocument: session.shiftsDocument ?? null,
           trends,
           untrended,
           additions,
@@ -5126,10 +5111,10 @@ export const setStageNote = defineWriteAction({
   input: z.object({
     id: z.uuid(),
     /**
-     * Editor JSON, or for this release the plain text it took before
-     * (guided-inputs change 11b), which is wrapped as a document.
+     * Editor JSON, or null to clear the stage's note. Plain text was taken
+     * until 0.4 (guided-inputs change 13b).
      */
-    note: richTextOrPlainTextSchema({
+    note: richTextSchema({
       maxCharacters: STAGE_NOTE_MAX_CHARACTERS,
     }),
   }),
@@ -5167,9 +5152,6 @@ export const setStageNote = defineWriteAction({
         // written" from "written and then emptied".
         delete next[session.stageKey];
       } else {
-        // The map has no second column to keep text in for the previous
-        // release, and needs none: the facilitator alone reads it, and that
-        // release shows a note it cannot read as empty rather than failing.
         next[session.stageKey] = document;
       }
 
@@ -6956,12 +6938,11 @@ export const setManagementAnswer = defineWriteAction({
     // questions as unchangeable structure.
     questionKey: z.number().int().min(1).max(4),
     /**
-     * Editor JSON, or for this release the plain text it took before
-     * (guided-inputs change 11b), which is wrapped as a document. Words
-     * rather than only a mention or an attachment, because the plain column
-     * the previous release reads may not be empty.
+     * Editor JSON, holding words rather than only a mention or an
+     * attachment: an answer says what leadership said. Plain text was taken
+     * until 0.4 (guided-inputs change 13b).
      */
-    body: richTextOrPlainTextSchema({
+    body: richTextSchema({
       maxCharacters: MANAGEMENT_ANSWER_MAX_CHARACTERS,
     }).refine(
       (value) => {
@@ -6988,11 +6969,9 @@ export const setManagementAnswer = defineWriteAction({
       );
 
       const now = new Date();
-      // Both columns, the plain one for the previous release during a rolling
-      // upgrade. The schema has already refused a blank answer.
+      // The schema has already refused a blank answer.
       const document = documentOfInput(input.body) as RichTextDocument;
       const body = {
-        body: plainTextOfDocument(document),
         bodyDocument: document,
         bodyDocumentVersion: RICH_TEXT_SCHEMA_VERSION,
       };
@@ -7066,7 +7045,7 @@ export const readManagementRetro = defineReadAction({
         questionKey: z.number().int(),
         /** The canon text, from `packages/method`. Never stored on the row. */
         question: z.string(),
-        /** Plain text, as before guided-inputs change 11b. */
+        /** Plain text, from the document since 0.4. */
         body: z.string().nullable(),
         /** The answer as editor JSON, which the screen shows. */
         bodyDocument: z.unknown().nullable(),
@@ -7103,7 +7082,6 @@ export const readManagementRetro = defineReadAction({
         const rows = await tx
           .select({
             questionKey: managementAnswers.questionKey,
-            body: managementAnswers.body,
             bodyDocument: managementAnswers.bodyDocument,
             answeredByName: answerers.name,
           })
@@ -7129,10 +7107,8 @@ export const readManagementRetro = defineReadAction({
           return {
             questionKey: index + 1,
             question,
-            body: answer?.body ?? null,
-            bodyDocument: answer
-              ? documentOrPlainText(answer.bodyDocument, answer.body)
-              : null,
+            body: answer ? plainTextOfStored(answer.bodyDocument) : null,
+            bodyDocument: answer?.bodyDocument ?? null,
             answeredByName: answer?.answeredByName ?? null,
           };
         });
@@ -9209,7 +9185,6 @@ export const readMinutes = defineReadAction({
           const answers = await tx
             .select({
               questionKey: managementAnswers.questionKey,
-              body: managementAnswers.body,
               bodyDocument: managementAnswers.bodyDocument,
             })
             .from(managementAnswers)
@@ -9228,13 +9203,7 @@ export const readMinutes = defineReadAction({
             // One line, as every other row of the minutes is: the markdown
             // indents it under its question, and a blank line between two
             // paragraphs would end the list.
-            body: excerptRichText(
-              documentOrPlainText(
-                row.bodyDocument,
-                row.body,
-              ) as RichTextDocument,
-              4000,
-            ),
+            body: excerptRichText(row.bodyDocument as RichTextDocument, 4000),
           }));
         }
 

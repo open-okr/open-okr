@@ -108,12 +108,10 @@ export const sessions = pgTable("okr_sessions", {
    * private-by-design column is one refactor away from being published by
    * accident.
    *
-   * Plain text until change 11a of guided inputs (migration 0140), which
-   * added `shiftsDocument` beside it and writes both for one release. The
-   * plain column is dropped a release later (change 13).
+   * Editor JSON since guided-inputs change 11a (migration 0140). The plain
+   * `shifts` column it replaced was dropped in 0.4 (change 13b, migration
+   * 0144).
    */
-  shifts: text("shifts"),
-  /** The shifts as editor JSON, and its rich text schema version. */
   shiftsDocument: jsonb("shifts_document"),
   shiftsDocumentVersion: integer("shifts_document_version"),
   /**

@@ -452,7 +452,8 @@ async function runCycleWorkflow(
     cycleId: cycle.id,
     holds: REVALIDATION.holds,
     changed: REVALIDATION.changed,
-    focusNote: REVALIDATION.focusNote,
+    // Editor JSON since 0.4 (guided-inputs change 13b).
+    focusNote: richTextFromPlainText(REVALIDATION.focusNote),
   });
 
   return { id: cycle.id, startsOn: cycle.startsOn, endsOn: cycle.endsOn };
