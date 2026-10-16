@@ -660,8 +660,9 @@ export const Q1_PLAN_EVENTS: readonly YearEvent[] = [
         cycleId: need(context.ids.cycles, "q1", "Cycle"),
         holds: true,
         changed: false,
-        focusNote:
+        focusNote: richTextFromPlainText(
           "The first week, support load and audit readiness. Revalidated in forty minutes.",
+        ),
       });
     },
   },

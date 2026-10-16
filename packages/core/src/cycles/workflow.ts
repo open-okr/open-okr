@@ -63,10 +63,7 @@ import {
   or,
 } from "drizzle-orm";
 import { practiceFromRow } from "../practice/settings.ts";
-import {
-  documentOrPlainText,
-  plainTextOfDocument,
-} from "../rich-text/moving.ts";
+import { plainTextOfDocument } from "../rich-text/moving.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
 import { loadCycleCadence } from "../sessions/booking.ts";
 import { readRhythmRow, workspaceTimeZone } from "./service.ts";
@@ -74,16 +71,20 @@ import { readRhythmRow, workspaceTimeZone } from "./service.ts";
 type AnyTx<TSchema extends Record<string, unknown> = Record<string, never>> =
   WorkspaceTx<TSchema>;
 
+/** A stored document, or null for anything that is not one. */
+const storedDocument = (value: unknown): RichTextDocument | null =>
+  value !== null && typeof value === "object"
+    ? (value as RichTextDocument)
+    : null;
+
 /**
- * A revalidation row as its readers take it (guided-inputs change 12): each
- * note as a document, with the old column wrapped while data change 0032 has
- * not reached the row, and as the plain text phase 3's check reads.
+ * A revalidation row as its readers take it (guided-inputs changes 12 and
+ * 13b): each note as a document, and as the plain text phase 3's check reads,
+ * computed from the document since the plain columns went in 0.4.
  */
 export function revalidationOfRow(row: {
   readonly holds: boolean;
   readonly changed: boolean;
-  readonly changeNote: string | null;
-  readonly focusNote: string | null;
   readonly changeNoteDocument: unknown;
   readonly focusNoteDocument: unknown;
 }): {
@@ -94,14 +95,8 @@ export function revalidationOfRow(row: {
   readonly changeNoteDocument: RichTextDocument | null;
   readonly focusNoteDocument: RichTextDocument | null;
 } {
-  const changeNoteDocument = documentOrPlainText(
-    row.changeNoteDocument,
-    row.changeNote,
-  );
-  const focusNoteDocument = documentOrPlainText(
-    row.focusNoteDocument,
-    row.focusNote,
-  );
+  const changeNoteDocument = storedDocument(row.changeNoteDocument);
+  const focusNoteDocument = storedDocument(row.focusNoteDocument);
   return {
     holds: row.holds,
     changed: row.changed,
@@ -240,8 +235,6 @@ export async function loadWorkflowInput<
     .select({
       holds: cycleRevalidations.holds,
       changed: cycleRevalidations.changed,
-      changeNote: cycleRevalidations.changeNote,
-      focusNote: cycleRevalidations.focusNote,
       changeNoteDocument: cycleRevalidations.changeNoteDocument,
       focusNoteDocument: cycleRevalidations.focusNoteDocument,
     })

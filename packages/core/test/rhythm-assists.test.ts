@@ -20,6 +20,7 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { statesOnlyKnownNumbers } from "../src/actions/rhythm-assists.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const OWNER = "rhythm-owner";
@@ -73,15 +74,21 @@ const writeDigest = async (
     );
   }
   const { rows } = await wb.admin.query<{ id: string }>(
-    `insert into digests (id, workspace_id, scope, scope_id, period, period_start, body, note, generated_at)
-     values (gen_random_uuid(), $1, 'space', $2, 'weekly', $3, $4::jsonb, $5, now())
+    // The note as editor JSON since 0.4 dropped the plain column
+    // (guided-inputs change 13b).
+    `insert into digests (id, workspace_id, scope, scope_id, period, period_start, body,
+                          note_document, note_document_version, generated_at)
+     values (gen_random_uuid(), $1, 'space', $2, 'weekly', $3, $4::jsonb,
+             $5::jsonb, case when $5::jsonb is null then null else 1 end, now())
      returning id`,
     [
       workspaceId,
       spaceId,
       options.weekStart ?? "2026-08-24",
       JSON.stringify(body),
-      options.note ?? null,
+      options.note == null
+        ? null
+        : JSON.stringify(richTextFromPlainText(options.note)),
     ],
   );
   digestId = rows[0]?.id as string;

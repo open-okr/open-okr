@@ -25580,38 +25580,8 @@
                   "changed": {
                     "type": "boolean"
                   },
-                  "changeNote": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "maxLength": 2000
-                          },
-                          {}
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "focusNote": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "maxLength": 2000
-                          },
-                          {}
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
+                  "changeNote": {},
+                  "focusNote": {}
                 },
                 "required": [
                   "cycleId",
@@ -55559,15 +55529,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2000
-                      },
-                      {}
-                    ]
-                  }
+                  "note": {}
                 },
                 "required": [
                   "sessionId",
@@ -57828,15 +57790,7 @@
                     "minimum": 1,
                     "maximum": 4
                   },
-                  "body": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2000
-                      },
-                      {}
-                    ]
-                  }
+                  "body": {}
                 },
                 "required": [
                   "sessionId",
@@ -61304,15 +61258,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 4000
-                      },
-                      {}
-                    ]
-                  }
+                  "note": {}
                 },
                 "required": [
                   "id",
@@ -61507,15 +61453,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "shifts": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 4000
-                      },
-                      {}
-                    ]
-                  }
+                  "shifts": {}
                 },
                 "required": [
                   "sessionId",
@@ -61622,15 +61560,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "text": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2000
-                      },
-                      {}
-                    ]
-                  }
+                  "text": {}
                 },
                 "required": [
                   "sessionId",

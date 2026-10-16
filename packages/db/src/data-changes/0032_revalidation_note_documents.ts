@@ -34,6 +34,8 @@ export const revalidationNoteDocuments: DataChangeScript = {
   name: "0032_revalidation_note_documents",
   summary:
     "Writes each quarterly revalidation's change note and focus note as editor documents beside the plain text.",
+  // Its columns go in 0.4, once migration 0144 has found nothing left for it.
+  retiredBy: "0144_drop_plain_prose_columns.sql",
   expects: [
     { table: "cycle_revalidations", column: "cycle_id", dataType: "uuid" },
     { table: "cycle_revalidations", column: "change_note", dataType: "text" },

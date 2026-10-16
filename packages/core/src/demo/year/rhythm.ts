@@ -11,6 +11,7 @@ import { keyResultProgress, resolveThresholds } from "@openokr/method";
 import { eq } from "drizzle-orm";
 import { callAction } from "../../actions/registry.ts";
 import { runOperation } from "../../operations/operation.ts";
+import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { narrative } from "./okr.ts";
 import {
   YEAR_SPACES,
@@ -325,7 +326,7 @@ export const monthlyReview = (
           decision.keyResult,
           "Key result",
         ),
-        text: decision.text,
+        text: richTextFromPlainText(decision.text),
       });
     }
     await callAction(context.action, "sessions.close", { id: sessionId });

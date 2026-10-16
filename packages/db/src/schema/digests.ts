@@ -48,11 +48,10 @@ export const digests = pgTable("digests", {
   periodStart: date("period_start").notNull(),
   body: jsonb("body").$type<DigestBody>().notNull().default({}),
   /**
-   * The coordinator's note for leadership as plain text. Since guided-inputs
-   * change 11c it is the plain text of `noteDocument`, kept for one release
-   * so the release before reads it; change 13 drops it.
+   * The coordinator's note for leadership as editor JSON. The plain `note`
+   * column it replaced (guided-inputs change 11c) was dropped in 0.4 (change
+   * 13b, migration 0144).
    */
-  note: text("note"),
   noteDocument: jsonb("note_document"),
   noteDocumentVersion: integer("note_document_version"),
   generatedAt: timestamp("generated_at", { withTimezone: true })

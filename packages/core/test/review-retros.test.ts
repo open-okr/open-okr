@@ -364,7 +364,9 @@ describe("the management retro", () => {
       {
         sessionId,
         questionKey: 4,
-        body: "Between the platform space and support. Nobody owned the handover.",
+        body: richTextFromPlainText(
+          "Between the platform space and support. Nobody owned the handover.",
+        ),
       },
       MANAGER,
     );
@@ -380,7 +382,7 @@ describe("the management retro", () => {
     for (const body of ["First pass.", "Second, after the argument."]) {
       await call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 1, body },
+        { sessionId, questionKey: 1, body: richTextFromPlainText(body) },
         MANAGER,
       );
     }
@@ -427,10 +429,14 @@ describe("the management retro", () => {
     expect(first?.body).toBe("Mostly.\n\nTwo were leftovers.");
   });
 
-  it("wraps a text answer as a document, and refuses a blank one", async () => {
+  it("keeps an answer's paragraphs, and refuses a blank one", async () => {
     await call(
       "sessions.setManagementAnswer",
-      { sessionId, questionKey: 2, body: "Yes.\n\nAfter the reset." },
+      {
+        sessionId,
+        questionKey: 2,
+        body: richTextFromPlainText("Yes.\n\nAfter the reset."),
+      },
       MANAGER,
     );
     expect((await management(MANAGER)).questions[1]?.bodyDocument).toEqual(
@@ -450,28 +456,26 @@ describe("the management retro", () => {
     ).rejects.toThrow(/what leadership said/);
   });
 
-  it("reads an answer the backfill has not reached as a document", async () => {
-    await call(
-      "sessions.setManagementAnswer",
-      { sessionId, questionKey: 1, body: "Written last release." },
-      MANAGER,
-    );
-    const wb = await workerDb();
-    await wb.admin.query(
-      `update management_answers
-          set body_document = null, body_document_version = null`,
-    );
-
-    expect((await management(MANAGER)).questions[0]?.bodyDocument).toEqual(
-      richTextFromPlainText("Written last release."),
-    );
+  it("refuses an answer sent as plain text since 0.4", async () => {
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await expect(
+      call(
+        "sessions.setManagementAnswer",
+        { sessionId, questionKey: 1, body: "Plain text." },
+        MANAGER,
+      ),
+    ).rejects.toThrow();
   });
 
   it("refuses a question outside the four", async () => {
     await expect(
       call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 5, body: "There is no fifth question." },
+        {
+          sessionId,
+          questionKey: 5,
+          body: richTextFromPlainText("There is no fifth question."),
+        },
         MANAGER,
       ),
     ).rejects.toThrow();
@@ -481,7 +485,11 @@ describe("the management retro", () => {
     for (const questionKey of [1, 2, 3]) {
       await call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey, body: `Answer ${questionKey}.` },
+        {
+          sessionId,
+          questionKey,
+          body: richTextFromPlainText(`Answer ${questionKey}.`),
+        },
         MANAGER,
       );
     }
@@ -489,7 +497,7 @@ describe("the management retro", () => {
 
     await call(
       "sessions.setManagementAnswer",
-      { sessionId, questionKey: 4, body: "Answer 4." },
+      { sessionId, questionKey: 4, body: richTextFromPlainText("Answer 4.") },
       MANAGER,
     );
     expect((await management(MANAGER)).complete).toBe(true);
@@ -515,7 +523,11 @@ describe("the two retros are visible to different audiences", () => {
     await expect(
       call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 1, body: "Not mine to answer." },
+        {
+          sessionId,
+          questionKey: 1,
+          body: richTextFromPlainText("Not mine to answer."),
+        },
         MEMBER,
       ),
     ).rejects.toThrow();

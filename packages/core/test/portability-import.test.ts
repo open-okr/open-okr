@@ -501,20 +501,24 @@ describe("what a move keeps", () => {
     )) as { id: string };
     await source({ id: session.id }, "sessions.open");
     await source(
-      { id: session.id, note: "Pulse was low.\n\nName it first." },
+      {
+        id: session.id,
+        note: richTextFromPlainText("Pulse was low.\n\nName it first."),
+      },
       "sessions.setStageNote",
     );
     await source(
       {
         sessionId: session.id,
         questionKey: 1,
-        body: "Mostly.\n\nTwo were leftovers.",
+        body: richTextFromPlainText("Mostly.\n\nTwo were leftovers."),
       },
       "sessions.setManagementAnswer",
     );
 
-    // As 0.2 wrote them: no document columns, a stage note as a string, and
-    // one column this release does not have.
+    // As 0.2 wrote them: plain text and no document columns, a stage note as
+    // a string, and one column this release does not have. This release has
+    // no plain columns to export, so the plain text is put back by hand.
     const exported = await exportSource();
     const archive = readArchive(exported.bytes, { passphrase: PASSPHRASE });
     const asOlder = {
@@ -526,6 +530,9 @@ describe("what a move keeps", () => {
           if (key.endsWith("_document") || key.endsWith("_document_version")) {
             delete row[key];
           }
+        }
+        if (record.t === "management_answers") {
+          row.body = "Mostly.\n\nTwo were leftovers.";
         }
         if (record.t === "okr_sessions" && row.notes) {
           row.notes = Object.fromEntries(
@@ -552,6 +559,8 @@ describe("what a move keeps", () => {
     expect(diff.skipped.okr_sessions).toBeUndefined();
     expect(diff.skipped.management_answers).toBeUndefined();
     expect(diff.leftOut.okr_sessions).toEqual(["retired_column"]);
+    // Its plain text became the document first, then the column was left out.
+    expect(diff.leftOut.management_answers).toEqual(["body"]);
     const sessions = await wb.admin.query<{ notes: Record<string, unknown> }>(
       "select notes from okr_sessions where workspace_id = $1",
       [targetWorkspaceId],
