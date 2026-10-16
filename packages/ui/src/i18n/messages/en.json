@@ -555,6 +555,7 @@
   "admin.imports.archiveImportCard.importing": "Importing...",
   "admin.imports.archiveImportCard.leftOut": "This archive comes from an earlier release. These columns no longer exist here, so they are left out:",
   "admin.imports.archiveImportCard.leftOutColumns": "{table}: {columns}",
+  "admin.imports.archiveImportCard.proposalsLeftBehind": "{count} agent proposal(s) stay behind: the run that made each one does not move. The Coach and the Champion propose again on their next run.",
   "admin.imports.archiveImportCard.memberSWillMergeBy": "{length} member(s) will merge by email:",
   "admin.imports.archiveImportCard.passphrase": "Passphrase",
   "admin.imports.archiveImportCard.passphraseHint": "The passphrase the archive was exported with.",

@@ -96,18 +96,32 @@ test("sign in, with this year's annual cycle and a space of its own", async () =
   if (!member) {
     throw new Error("Member not found. Did the claiming spec run?");
   }
-  const annual = (
-    await pool.query<{ id: string; ends_on: string }>(
-      `select id, ends_on::text from cycles
-        where workspace_id = $1 and mode = 'annual' and status <> 'closed'
-          and deleted_at is null and ends_on >= current_date
-        order by starts_on limit 1`,
-      [member.workspace_id],
-    )
-  ).rows[0];
-  test.skip(!annual, "The instance has no open annual cycle to book.");
-  cycleId = annual?.id as string;
-  cycleEndsOn = annual?.ends_on as string;
+  const openAnnual = async () =>
+    (
+      await pool.query<{ id: string; ends_on: string }>(
+        `select id, ends_on::text from cycles
+          where workspace_id = $1 and mode = 'annual' and status <> 'closed'
+            and deleted_at is null and ends_on >= current_date
+          order by starts_on limit 1`,
+        [member.workspace_id],
+      )
+    ).rows[0];
+  // **Made here when no earlier spec made it.** `s04-annual-cycle` creates
+  // this year's annual cycle, and on a CI shard without it this spec used to
+  // skip its first test and then fail the next on an empty id. Made with what
+  // the cycle screen sends, mid-year so the workspace timezone cannot move the
+  // year.
+  if (!(await openAnnual())) {
+    await post("cycles.create", {
+      on: `${new Date().getUTCFullYear()}-06-30`,
+      mode: "annual",
+      firstCycle: false,
+    });
+  }
+  const annual = await openAnnual();
+  if (!annual) throw new Error("No open annual cycle, even after creating one.");
+  cycleId = annual.id;
+  cycleEndsOn = annual.ends_on;
 
   spaceId = (
     await post<{ id: string }>("spaces.create", { name: `Leadership ${STAMP}` })

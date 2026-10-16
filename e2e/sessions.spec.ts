@@ -141,6 +141,22 @@ test("create a session and navigate to the session screen", async () => {
        values ($1, $2, $3, 'weekly', 'Weekly check-in', now() + interval '1 hour', $4, 'scheduled')`,
       [id, member.workspace_id, space.id, member.id],
     );
+    // **A week with a figure, when no earlier spec left one.** This session
+    // has no cycle, so no key results and no average of its own (see the
+    // diagnose test below). The trend the weekly figures test reads came from
+    // weeks other specs closed in this space, and a CI shard without those
+    // specs has none. Last week's digest, in the shape `sessions.close` writes.
+    await client.query(
+      `insert into digests (id, workspace_id, scope, scope_id, period, period_start, body)
+       select gen_random_uuid(), $1, 'space', $2, 'weekly',
+              date_trunc('week', now() - interval '7 days')::date,
+              '{"averageConfidence": 0.6}'::jsonb
+        where not exists (
+          select 1 from digests
+           where scope = 'space' and scope_id = $2 and period = 'weekly'
+             and deleted_at is null and body ? 'averageConfidence')`,
+      [member.workspace_id, space.id],
+    );
     await client.query("commit");
   } finally {
     client.release();

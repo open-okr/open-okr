@@ -62,6 +62,12 @@ export interface ImportDifference {
    * (docs/design/guided-inputs.md §4.7, change 13).
    */
   readonly leftOut: Record<string, string[]>;
+  /**
+   * Agent proposals the import leaves behind on purpose: the run that made
+   * each one does not travel. The Coach and the Champion propose again on
+   * their next run, against the moved rows (docs/design/ids-across-a-move.md).
+   */
+  readonly proposalsLeftBehind: number;
 }
 
 // ── UUID detection ────────────────────────────────────────────────────────
@@ -270,6 +276,38 @@ function remapRichText(
   return result;
 }
 
+/**
+ * Every id of a moved row, rewritten wherever it sits inside a JSON value
+ * (docs/design/ids-across-a-move.md).
+ *
+ * A proposal's payload is the input of the action it proposes, an activity's
+ * payload names what it was about, and a check-in snapshot names its key
+ * results; each kept the source workspace's ids. A string that is a uuid the
+ * key map holds is that row, because two random uuids do not collide, so it
+ * is replaced; every other string, number and key is copied as it is. A uuid
+ * the archive does not carry is not in the key map and is left alone.
+ */
+function remapIdsInJson(
+  value: unknown,
+  keyMap: ReadonlyMap<string, string>,
+): unknown {
+  if (typeof value === "string") {
+    return isUuid(value) ? (keyMap.get(value) ?? value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => remapIdsInJson(item, keyMap));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        remapIdsInJson(item, keyMap),
+      ]),
+    );
+  }
+  return value;
+}
+
 // ── Key remap builder ─────────────────────────────────────────────────────
 
 interface KeyMapContext {
@@ -446,7 +484,8 @@ function remapRow(
 
     // Rewrite rich text columns
     if (isRichTextColumn(table, column) && value !== null) {
-      result[column] = remapRichText(value, keyMap);
+      // The walk below reaches an entity link's id too, which this does not.
+      result[column] = remapIdsInJson(remapRichText(value, keyMap), keyMap);
       continue;
     }
     if (
@@ -456,16 +495,19 @@ function remapRow(
     ) {
       // A note still stored as text, from before the backfill, has no node
       // to rewrite and passes through as it is.
-      result[column] = Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([key, doc]) => [
-          key,
-          remapRichText(doc, keyMap),
-        ]),
+      result[column] = remapIdsInJson(
+        Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).map(([key, doc]) => [
+            key,
+            remapRichText(doc, keyMap),
+          ]),
+        ),
+        keyMap,
       );
       continue;
     }
 
-    result[column] = value;
+    result[column] = remapIdsInJson(value, keyMap);
   }
 
   return result;
@@ -510,6 +552,7 @@ export async function importWorkspace(
   const created: Record<string, number> = {};
   const skipped: Record<string, number> = {};
   const leftOut: Record<string, string[]> = {};
+  let proposalsLeftBehind = 0;
   // Rows this run actually wrote, per indexed table, for the enqueue at the end.
   const written = new Map<string, string[]>();
   const deferredUpdates: {
@@ -553,6 +596,13 @@ export async function importWorkspace(
     let tableSkipped = 0;
 
     for (const raw of rows) {
+      // An agent's proposal names its run, which the archive does not carry,
+      // and the origin check will not let the import empty it. Left behind
+      // and counted, rather than failing the insert and counting as skipped.
+      if (table === "proposed_changes" && raw.run_id) {
+        proposalsLeftBehind += 1;
+        continue;
+      }
       const remapped = toTargetShape(
         table,
         remapRow(table, raw, keyMap),
@@ -730,5 +780,12 @@ export async function importWorkspace(
     );
   }
 
-  return { created, merged, skipped, blobs: blobCount, leftOut };
+  return {
+    created,
+    merged,
+    skipped,
+    blobs: blobCount,
+    leftOut,
+    proposalsLeftBehind,
+  };
 }
