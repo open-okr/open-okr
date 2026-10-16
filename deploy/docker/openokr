@@ -419,15 +419,24 @@ somewhere else."
     fi
 
     # The rollback path, printed before anything changes rather than in a
-    # document nobody has open at the time.
-    current="$(compose images app --format json 2>/dev/null | head -c 400 || true)"
+    # document nobody has open at the time. Both blanks are filled in, so the
+    # line can be copied as it stands: the image the app container was
+    # created from, named the way OPENOKR_IMAGE names it, and the backup just
+    # written. This printed the raw JSON of `compose images` until 15 October
+    # 2026, which had to be decoded at the worst possible moment.
+    current="$(compose ps -q app 2>/dev/null | head -n 1 | xargs -r docker inspect -f '{{.Config.Image}}' 2>/dev/null || true)"
+    just_written=""
+    if [ "${OPENOKR_SKIP_BACKUP:-}" != "1" ]; then
+      # shellcheck disable=SC2012
+      just_written="$(ls -1d "${OPENOKR_BACKUP_DIR:-./backups}"/*/ 2>/dev/null | sort | tail -n 1)"
+    fi
     log "current image: ${current:-unknown}"
     # **Not "run the previous tag"** (P7-T09c). That was wrong and was printed
     # here until 11 September 2026. Migrations are forward-only: once one has
     # applied, the previous image is looking at a schema it does not know, and
     # starting it is not a rollback but a second failure on top of the first.
-    log "to roll back: ./openokr restore <the backup directory just written>,"
-    log "then OPENOKR_IMAGE=<previous tag> ./openokr up. Restoring first is"
+    log "to roll back: ./openokr restore ${just_written:-<the backup directory just written>},"
+    log "then OPENOKR_IMAGE=${current:-<previous tag>} ./openokr up. Restoring first is"
     log "the part that matters: the schema moved, so the old image cannot read"
     log "the new database."
 

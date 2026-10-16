@@ -233,6 +233,17 @@ export function ArchiveImportCard() {
               </div>
             )}
 
+            {/* An agent's proposal stays behind with the run that made it
+                (docs/design/ids-across-a-move.md). Said, so it does not read
+                as lost. */}
+            {preview.difference.proposalsLeftBehind > 0 && (
+              <p className="rounded-md border border-line bg-raised px-3 py-2 text-xs text-ink-2">
+                {t("admin.imports.archiveImportCard.proposalsLeftBehind", {
+                  count: preview.difference.proposalsLeftBehind,
+                })}
+              </p>
+            )}
+
             <div className="flex gap-2">
               {!preview.alreadyImported && (
                 <Button

@@ -4,10 +4,11 @@
  * **Why one shared constant rather than a constant per spec.** The suite runs
  * `workers: 1, fullyParallel: false` against a single application instance that
  * `e2e/prepare-database.ts` deliberately leaves unclaimed, "so it stays open
- * until a spec claims it". Whichever spec runs first claims it, registration
- * closes behind them, and every later spec can only sign in as that same
- * person. Files run alphabetically, so today that is
- * `registration-to-dashboard.spec.ts`.
+ * until a spec claims it". `registration-to-dashboard.spec.ts` claims it,
+ * registration closes behind them, and every later spec can only sign in as
+ * that same person. It is the `claim` project in `playwright.config.ts`, which
+ * every application spec depends on, so it runs first on every shard and
+ * before a single file run on its own.
  *
  * That coupling already existed and was invisible: `sessions.spec.ts` was
  * written for a developer's own machine, where its author had run the wizard
@@ -50,10 +51,9 @@ export const INSTANCE_ACCOUNT = {
  * `copilot.spec.ts` sorted before `registration-` and broke it, which is why
  * that file is now `s39-copilot.spec.ts`.
  *
- * So a spec that runs before the claimer gets a clear failure naming the rule,
- * rather than quietly claiming and breaking a file somewhere else. Order still
- * matters and is still alphabetical; what changes is that getting it wrong says
- * so.
+ * File names no longer decide that order: the `claim` project does. A spec
+ * that still reaches an unclaimed instance gets a clear failure naming the
+ * rule, rather than quietly claiming and breaking a file somewhere else.
  *
  * Not yet used by `reviews.spec.ts` or `sessions.spec.ts`, which still carry
  * their own sign-in. Both would be better for adopting it, and neither is this
@@ -107,8 +107,8 @@ export async function signIn(
   await page.waitForURL("/", { timeout: 10_000 }).catch(() => {
     throw new Error(
       "Nobody has claimed this instance yet, so there is no account to sign " +
-        "in as. An application spec must sort after " +
-        "registration-to-dashboard.spec.ts, which is the one that registers.",
+        "in as. An application spec belongs to the chromium project, which " +
+        "depends on the claim project that registers.",
     );
   });
   await expect(page).toHaveURL("/");

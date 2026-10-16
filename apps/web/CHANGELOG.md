@@ -1,5 +1,26 @@
 # @openokr/web
 
+## 0.3.1
+
+### Patch Changes
+
+- [#128](https://github.com/open-okr/open-okr/pull/128) [`2becbe2`](https://github.com/open-okr/open-okr/commit/2becbe2c467564cd54249d61bdae5e194819cc29) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The first published 0.3 release.
+  
+  0.3.0 was tagged and never published: its release job ran every package's
+  tests at once on one machine, and a timing test failed under that load. The
+  release job now runs them one package at a time. Everything in [0.3.0's
+  notes](https://github.com/open-okr/open-okr/blob/main/apps/web/CHANGELOG.md#030)
+  ships in this release, and upgrading from 0.2 follows the "0.2 to 0.3"
+  section of `docs/runbooks/upgrade.md`, data changes included.
+- Updated dependencies []:
+  - @openokr/adapters@0.3.1
+  - @openokr/agents@0.3.1
+  - @openokr/config@0.3.1
+  - @openokr/core@0.3.1
+  - @openokr/formats@0.3.1
+  - @openokr/method@0.3.1
+  - @openokr/ui@0.3.1
+
 ## 0.3.0
 
 ### Minor Changes

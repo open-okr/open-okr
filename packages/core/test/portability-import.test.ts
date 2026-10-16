@@ -548,6 +548,124 @@ describe("what a move keeps", () => {
     expect(empty.rows[0]?.read).toEqual([]);
   });
 
+  it("rewrites a moved row's id wherever it sits inside JSON, and leaves an agent's proposal behind, saying so", async () => {
+    // docs/design/ids-across-a-move.md, decided 13 October 2026. The import
+    // rewrote ids held in a column and mentions in rich text, and nothing
+    // else inside a jsonb value; an agent's proposal was skipped because
+    // the run it names does not travel.
+    const wb = await workerDb();
+    const one = async (sql: string, values: unknown[]) =>
+      (await wb.admin.query<{ id: string }>(sql, values)).rows[0]?.id as string;
+    const owner = await one(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const space = await one(
+      "select id from spaces where workspace_id = $1 order by created_at limit 1",
+      [sourceWorkspaceId],
+    );
+    const agent = await one(
+      "select id from agents where workspace_id = $1 limit 1",
+      [sourceWorkspaceId],
+    );
+    // A uuid no row of the archive holds, which must be left as it is.
+    const foreign = "0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a";
+    const thread = await one(
+      `insert into ai_threads (id, workspace_id, member_id)
+       values (gen_random_uuid(), $1, $2) returning id`,
+      [sourceWorkspaceId, owner],
+    );
+    const payload = {
+      id: space,
+      members: [{ memberId: owner }],
+      note: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "mention", attrs: { id: owner, label: "Source Owner" } },
+            ],
+          },
+        ],
+      },
+      foreign,
+    };
+    await wb.admin.query(
+      `insert into proposed_changes (id, workspace_id, thread_id, action, payload)
+       values (gen_random_uuid(), $1, $2, 'spaces.update', $3::jsonb)`,
+      [sourceWorkspaceId, thread, JSON.stringify(payload)],
+    );
+    const run = await one(
+      `insert into agent_runs (id, workspace_id, agent_id, trigger)
+       values (gen_random_uuid(), $1, $2, 'schedule') returning id`,
+      [sourceWorkspaceId, agent],
+    );
+    await wb.admin.query(
+      `insert into proposed_changes (id, workspace_id, run_id, action, payload)
+       values (gen_random_uuid(), $1, $2, 'goals.update', '{}'::jsonb)`,
+      [sourceWorkspaceId, run],
+    );
+    await wb.admin.query(
+      `insert into activities (id, workspace_id, kind, actor_kind, subject_type, subject_id, payload)
+       values (gen_random_uuid(), $1, 'space.moved.test', 'human', 'space', $2, $3::jsonb)`,
+      [
+        sourceWorkspaceId,
+        space,
+        JSON.stringify({ spaceId: space, memberIds: [owner] }),
+      ],
+    );
+    const targetSpacesBefore = (
+      await wb.admin.query<{ id: string }>(
+        "select id from spaces where workspace_id = $1",
+        [targetWorkspaceId],
+      )
+    ).rows.map((row) => row.id);
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+
+    expect(diff.proposalsLeftBehind).toBe(1);
+    expect(diff.skipped.proposed_changes).toBeUndefined();
+    const movedMember = await one(
+      `select id from workspace_members
+        where workspace_id = $1 and lower(placeholder_email) = 'source-owner@example.com'`,
+      [targetWorkspaceId],
+    );
+    const movedSpace = (
+      await wb.admin.query<{ id: string }>(
+        "select id from spaces where workspace_id = $1",
+        [targetWorkspaceId],
+      )
+    ).rows
+      .map((row) => row.id)
+      .find((id) => !targetSpacesBefore.includes(id));
+    expect(movedSpace).toBeDefined();
+
+    const proposals = await wb.admin.query<{
+      payload: typeof payload;
+      run_id: string | null;
+    }>("select payload, run_id from proposed_changes where workspace_id = $1", [
+      targetWorkspaceId,
+    ]);
+    // The copilot's proposal, and not the agent's.
+    expect(proposals.rows).toHaveLength(1);
+    const moved = proposals.rows[0]?.payload;
+    expect(moved?.id).toBe(movedSpace);
+    expect(moved?.members[0]?.memberId).toBe(movedMember);
+    expect(JSON.stringify(moved?.note)).toContain(movedMember);
+    expect(moved?.foreign).toBe(foreign);
+
+    const activity = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from activities where workspace_id = $1 and kind = 'space.moved.test'",
+      [targetWorkspaceId],
+    );
+    expect(activity.rows[0]?.payload).toEqual({
+      spaceId: movedSpace,
+      memberIds: [movedMember],
+    });
+  });
+
   it("writes every file's bytes back, under the new workspace", async () => {
     const contents = randomBytes(48);
     const source = new Map<string, Buffer>();
