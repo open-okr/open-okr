@@ -1,6 +1,7 @@
 "use client";
 
 import { Combobox } from "@base-ui-components/react/combobox";
+import { matchListedTimezone } from "@openokr/formats";
 import { ChevronDown } from "lucide-react";
 import {
   type ReactNode,
@@ -127,27 +128,16 @@ function normaliseQuery(query: string): string {
  * This device's zone, spelled the way the server's list spells it, or null
  * when the list does not hold it. A browser may say `Asia/Kolkata` where the
  * server lists `Asia/Calcutta`; both resolve to one zone here.
+ *
+ * The rule itself is in `packages/formats`, because the default a workspace
+ * is born with is matched by the same one on the server
+ * (docs/design/browser-timezone.md).
  */
 export function matchDeviceTimezone(
   device: string,
   zones: readonly string[],
 ): string | null {
-  if (zones.includes(device)) {
-    return device;
-  }
-  const resolve = (zone: string): string | null => {
-    try {
-      return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions()
-        .timeZone;
-    } catch {
-      return null;
-    }
-  };
-  const target = resolve(device);
-  if (target === null) {
-    return null;
-  }
-  return zones.find((zone) => resolve(zone) === target) ?? null;
+  return matchListedTimezone(device, zones);
 }
 
 /**

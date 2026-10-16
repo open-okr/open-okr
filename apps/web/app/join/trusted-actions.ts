@@ -18,6 +18,7 @@ import {
 } from "@openokr/core";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { requestBrowserTimezone } from "../../lib/browser-timezone";
 import { getPool } from "../../lib/pool";
 import { requireSession } from "../../lib/session";
 import { getTranslations } from "../../lib/translations";
@@ -51,6 +52,7 @@ export async function joinTrustedWorkspace(
     return { error: t("join.trusted.notOnOffer") };
   }
 
+  const timezone = await requestBrowserTimezone();
   try {
     await callAction(
       {
@@ -59,7 +61,7 @@ export async function joinTrustedWorkspace(
         actor: { kind: "human", userId: session.user.id },
       },
       "invitations.joinByTrustedDomain",
-      {},
+      timezone ? { timezone } : {},
     );
   } catch (error) {
     // A full workspace, or one frozen between the page and the press. Worth
@@ -84,10 +86,12 @@ export async function joinTrustedWorkspace(
  */
 export async function startOwnWorkspace(): Promise<void> {
   const session = await requireSession();
-  const workspace = await provisionWorkspaceForUser(getPool(), {
-    id: session.user.id,
-    name: session.user.name,
-  });
+  const timezone = await requestBrowserTimezone();
+  const workspace = await provisionWorkspaceForUser(
+    getPool(),
+    { id: session.user.id, name: session.user.name },
+    timezone ? { timezone } : {},
+  );
   await landIn(workspace.workspaceId);
   redirect("/");
 }

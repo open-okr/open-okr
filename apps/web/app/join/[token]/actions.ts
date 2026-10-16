@@ -21,6 +21,7 @@ import {
 } from "@openokr/core";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { requestBrowserTimezone } from "../../../lib/browser-timezone";
 import { getPool } from "../../../lib/pool";
 import { requireSession } from "../../../lib/session";
 import { getTranslations } from "../../../lib/translations";
@@ -43,6 +44,7 @@ export async function acceptInvitation(
     return { error: t("join.detail.actions.invitationCannotBeUsed") };
   }
 
+  const timezone = await requestBrowserTimezone();
   try {
     await callAction(
       {
@@ -51,7 +53,7 @@ export async function acceptInvitation(
         actor: { kind: "human", userId: session.user.id },
       },
       "invitations.acceptLink",
-      { token },
+      { token, ...(timezone ? { timezone } : {}) },
     );
   } catch (error) {
     if (error instanceof OperationError) {

@@ -49,3 +49,47 @@ export function isListedTimezone(name: string): boolean {
   listTimezones();
   return listedSet?.has(name) ?? false;
 }
+
+/**
+ * The cookie a browser writes its own timezone into, and the server reads when
+ * it makes a workspace or a member (docs/design/browser-timezone.md). Named
+ * here, once, because the component that writes it runs in the browser and
+ * the hook that reads it runs on the server.
+ */
+export const BROWSER_TIMEZONE_COOKIE = "openokr_tz";
+
+const resolveZone = (zone: string): string | null => {
+  try {
+    return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions()
+      .timeZone;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * A zone a browser reports, as the name on the list, or null.
+ *
+ * A listed name comes back as it is. Otherwise the runtime is asked what the
+ * name resolves to, and the listed name resolving to the same zone is
+ * returned: a browser may say `Asia/Calcutta` where the server lists
+ * `Asia/Kolkata`. Anything else, `+08:00` and a name nobody has heard of
+ * among them, matches nothing. The picker's "use this device's zone" and the
+ * default a workspace is born with both ask this, so they cannot disagree.
+ */
+export function matchListedTimezone(
+  zone: string,
+  zones: readonly string[] = listTimezones(),
+): string | null {
+  if (zone === "") {
+    return null;
+  }
+  if (zones.includes(zone)) {
+    return zone;
+  }
+  const target = resolveZone(zone);
+  if (target === null) {
+    return null;
+  }
+  return zones.find((listed) => resolveZone(listed) === target) ?? null;
+}
