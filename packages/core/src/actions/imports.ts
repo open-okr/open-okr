@@ -33,6 +33,7 @@ import {
   type ActionCallContext,
   defineReadAction,
   defineWriteAction,
+  requireDeclaredAccess,
 } from "./define.ts";
 import { readWorkspaceSettings } from "./settings.ts";
 
@@ -451,6 +452,10 @@ async function runFromTable(
   input: ImportTableInput,
   dryRun: boolean,
 ): Promise<ImportTableOutput> {
+  // Its own declared level, checked here because a hand-written handler skips
+  // the builders. Until now only the row limit's settings read held a member
+  // back, which was an accident of ordering rather than a check.
+  await requireDeclaredAccess(context, ACCESS_LEVELS.full);
   await withinRowLimit(context, input);
   // Imported where it is used rather than at the top of the file: the engine
   // calls the registry by name, the registry imports this file, and a static

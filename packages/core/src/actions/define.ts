@@ -241,19 +241,34 @@ export function defineReadAction<TInput, TOutput>(definition: {
       // opening a transaction to confirm that a member is a member would cost
       // every read in the product a round trip for nothing.
       if (required > ACCESS_LEVELS.view) {
-        const db = drizzle(context.pool);
-        await withWorkspace(db, context.workspaceId, (tx) =>
-          requireWorkspaceLevel(
-            tx as WorkspaceTx,
-            context.workspaceId,
-            context.actor,
-            required,
-          ),
-        );
+        await requireDeclaredAccess(context, required);
       }
       return definition.handler(context, input);
     },
   };
+}
+
+/**
+ * Enforces an action's declared workspace level before its handler runs.
+ *
+ * The read builder calls it, and so must every action declared by hand rather
+ * than through a builder. A hand-written handler skips both builders, so its
+ * `access` is otherwise a label nobody checks: that is how `workspace.provision`
+ * answered an ordinary member's token on every surface (MCP UAT BUG-001).
+ */
+export async function requireDeclaredAccess(
+  context: ActionCallContext,
+  required: AccessLevel,
+): Promise<void> {
+  const db = drizzle(context.pool);
+  await withWorkspace(db, context.workspaceId, (tx) =>
+    requireWorkspaceLevel(
+      tx as WorkspaceTx,
+      context.workspaceId,
+      context.actor,
+      required,
+    ),
+  );
 }
 
 /**
