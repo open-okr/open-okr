@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { Avatar, useTranslations } from "@openokr/ui";
+import { Avatar, initialsOf, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -53,8 +53,10 @@ export function AvatarMenu({
 
   return (
     <Menu.Root>
+      {/* The initials are the trigger's whole face, so they are in its name
+       * too: a speech user says what they see (WCAG 2.5.3, label in name). */}
       <Menu.Trigger
-        aria-label={t("avatarMenu.accountMenu")}
+        aria-label={t("avatarMenu.accountMenu", { initials: initialsOf(name) })}
         className="rounded-full outline-offset-2 focus-visible:outline-2 focus-visible:outline-brand"
       >
         <Avatar name={name} />

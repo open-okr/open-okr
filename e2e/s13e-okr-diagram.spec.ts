@@ -339,12 +339,12 @@ test("U5: a team objective dragged onto another company objective moves at once,
 
 test("U9's moving half: Move under… with the keyboard, back to the key result it hung from", async () => {
   const move = card(teamId).getByRole("button", {
-    name: `Move ${TEAM} under another objective or key result`,
+    name: `Move under another objective or key result: ${TEAM}`,
   });
   await move.focus();
   await page.keyboard.press("Enter");
   const choice = card(teamId).getByRole("combobox", {
-    name: `Move ${TEAM} under another objective or key result`,
+    name: `Move under another objective or key result: ${TEAM}`,
   });
   await expect(choice).toBeFocused();
   await choose(choice, OTHER);
@@ -356,13 +356,13 @@ test("U9's moving half: Move under… with the keyboard, back to the key result 
 
   await card(teamId)
     .getByRole("button", {
-      name: `Move ${TEAM} under another objective or key result`,
+      name: `Move under another objective or key result: ${TEAM}`,
     })
     .focus();
   await page.keyboard.press("Enter");
   await choose(
     card(teamId).getByRole("combobox", {
-      name: `Move ${TEAM} under another objective or key result`,
+      name: `Move under another objective or key result: ${TEAM}`,
     }),
     `${KEY_RESULT}, a key result of ${RENAMED}`,
   );
