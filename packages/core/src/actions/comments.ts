@@ -265,6 +265,7 @@ export const previewNotifyAction = defineReadAction({
 
 export const createCommentAction = defineWriteAction({
   name: "comments.create",
+  domain: "comment",
   summary:
     "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
   input: z.object({
@@ -557,6 +558,7 @@ export const replaceImportedBodyAction = defineWriteAction({
 });
 export const updateCommentAction = defineWriteAction({
   name: "comments.update",
+  domain: "comment",
   summary: "Edit a comment (author only)",
   input: z.object({
     commentId: z.string().uuid(),
@@ -716,6 +718,7 @@ export const deleteCommentAction = defineWriteAction({
 
 export const addReactionAction = defineWriteAction({
   name: "reactions.add",
+  domain: "comment",
   summary: "Add a reaction to any subject",
   input: z.object({
     subjectType: z.string(),

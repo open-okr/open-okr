@@ -248,3 +248,114 @@ Being in the room is what says somebody may grade. The objective check is the
 right to see what is being graded, which is what it was always for. Nobody
 outside the room gains anything: `requireQuarterly` still asks for the
 session first.
+
+## 11. A write that creates in a domain asks the role for that domain
+
+Proposed and approved 23 October 2026, from MCP UAT BUG-002. Built the same
+day: `domain` on `defineWriteAction`, `resolveMemberRoleLevel` in
+`access/reads.ts`, and the floor in `operations/operation.ts`.
+
+**What the UAT found.** A member holding Viewer, which grants 10 on every
+domain, created a comment on a goal and created a KPI. Editing a goal, creating
+a goal and creating a task were refused, as the matrix says.
+
+**Why.** Every member holds `edit` on the workspace's own context, twice:
+
+| Binding | Written by | Why it exists |
+|---|---|---|
+| `workspace_standard` at `edit` | `packages/core/src/workspaces/provisioning.ts` | Self-service: own profile, notifications, tokens, reading the workspace aggregate |
+| The member's own group at `edit` | `packages/core/src/invitations/provisioning.ts` | The same, written on join |
+
+§0 lists `workspace_standard` at `view`. That row is about the objective's
+context; on the workspace context the binding is `edit`. The difference was
+never written down, and it is the whole bug.
+
+An action that names no subject is measured on the workspace context
+(TECHNICAL-PLAN §8.1, layer 3). `comments.create` asks `comment` there and its
+parent check asks `view`; `kpis.create` asks `edit` and has nothing to load. Both
+clear the floor through the self-service binding, so the role is never read.
+Goals and tasks are refused because their own getter measures the goal's or the
+space's context, where the role does apply.
+
+### The change
+
+| Today | Proposed |
+|---|---|
+| A write with no subject is measured on the workspace context | A write that **declares a domain** is measured on that domain: the level the actor's role grants for it, or the level on the subject when it names one |
+| The role reaches only aggregates that have a context | The role also decides who may create the first row of a domain |
+| No action says which domain it belongs to | `defineWriteAction` takes an optional `domain`: `goal`, `kpi`, `initiative`, `task`, `comment` or `space` |
+
+**This is not a deny rule and nothing is lowered.** The self-service binding
+keeps answering what it was written for. A KPI is not the workspace, so the
+workspace's binding was never the right thing to ask. The floor still takes the
+maximum of what reaches the actor *on the context it measures*.
+
+**Actors without a role keep today's rule.** A guest, an agent and a
+placeholder hold no role (§4). For them a domain write is measured on the
+subject when it names one, otherwise on the workspace context exactly as now,
+so an agent bound to one space keeps writing there.
+
+**No data change.** No binding is removed or rewritten, so nothing stored
+changes and a rolling upgrade is safe.
+
+### Which actions get a domain
+
+From a scan of every `defineWriteAction` that asks below `full` and names no
+subject. Writes whose own getter already measures a goal, a space, a session or
+a task are left as they are, because the role already reaches them there.
+
+| Domain | Actions |
+|---|---|
+| comment | `comments.create`, `comments.update`, `reactions.add` |
+| kpi | `kpis.create`, `kpis.createCategory`, `kpis.createTree`, `kpis.record`, `kpis.update`, `kpis.setFormula`, `kpis.launchRecovery`, `kpis.recordResponse` |
+| initiative | `initiatives.create`, `initiatives.linkKeyResult`, `initiatives.unlinkKeyResult` |
+| Unchanged (self-service on the workspace) | `people.updateOwnProfile`, `people.setLeave`, `people.finishOwnTour`, `notifications.*`, `subscriptions.toggle`, `tokens.*`, `connections.revoke`, `ai.setPersonalCredential`, `ai.removePersonalCredential`, `channels.*Link*`, `nudges.snooze`, `copilot.*`, `invitations.acceptLink`, `invitations.joinByTrustedDomain` |
+
+`comments.delete` and `reactions.remove` stay on the author's own row: taking
+back what you wrote is not creating in a domain.
+
+The list is checked by `write-floor-classification.test.ts`, which walks the
+registry: every write below `full` either declares a domain, is on the
+self-service list, or is on the list of writes measured by their own check on a
+goal, space, session, task, cycle, document or the author's own row. A new
+action fails it until somebody chooses, so none slips past by naming nothing.
+
+### Acceptance criteria
+
+```
+Given a member holding Viewer (10 on every domain)
+When they call comments.create on a goal they can read
+Then it is refused with "comments.create needs a higher access level than you hold."
+And no comment is written
+```
+
+```
+Given a member holding Viewer
+When they call kpis.create
+Then it is refused the same way
+```
+
+```
+Given a member holding Member (comment 40, kpi 70)
+When they comment on a goal and create a KPI
+Then both succeed, as today
+```
+
+```
+Given a member holding Viewer
+When they update their own profile, mark a notification read or mint a token
+Then each succeeds, because self-service still reads the workspace binding
+```
+
+```
+Given an agent with no role, bound at edit to one space
+When it creates a task in that space
+Then it succeeds, as today
+```
+
+### Open questions
+
+| Question | Proposed answer |
+|---|---|
+| Should a Viewer keep reacting to a comment? | No: a reaction is a comment-domain write. Viewer means reading |
+| Should a Viewer still use the copilot? | Yes: asking is reading, and every proposal it makes goes through the review queue, where applying it is measured on its own action |

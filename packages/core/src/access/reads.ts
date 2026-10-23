@@ -166,6 +166,44 @@ export async function resolveMemberAccessLevel<
   return Number(result.rows[0]?.level ?? 0);
 }
 
+/**
+ * The level a member's workspace role grants on one domain, or `null` when
+ * the member holds no role (docs/design/workspace-roles.md §11).
+ *
+ * Null rather than zero, because the two mean different things to the floor:
+ * a role that grants nothing refuses, and no role at all (a guest, an agent,
+ * a placeholder) keeps the rule those kinds always had.
+ */
+export async function resolveMemberRoleLevel<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly domain: string;
+  },
+): Promise<number | null> {
+  const result = await tx.execute<{ has_role: boolean; level: number }>(sql`
+    select m.role_id is not null as has_role,
+           coalesce((
+             select max(rp.level) from role_permissions rp
+              where rp.workspace_id = m.workspace_id
+                and rp.role_id = m.role_id
+                and rp.domain = ${input.domain}
+                and rp.deleted_at is null
+           ), 0)::int as level
+      from workspace_members m
+     where m.id = ${input.memberId}
+       and m.workspace_id = ${input.workspaceId}
+       and m.kind = 'human'
+       and m.status = 'active'
+       and m.deleted_at is null
+  `);
+  const row = result.rows[0];
+  return row?.has_role ? Number(row.level) : null;
+}
+
 /** Whether a member's effective level on a context meets `level`. */
 export async function can<
   TSchema extends Record<string, unknown> = Record<string, never>,

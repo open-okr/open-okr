@@ -10,7 +10,7 @@
  * reach a handler with a shape the contract does not describe.
  */
 
-import { type WorkspaceTx, withWorkspace } from "@openokr/db";
+import { type RoleDomain, type WorkspaceTx, withWorkspace } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { ZodType } from "zod";
@@ -192,6 +192,8 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
+  /** The role domain a write is measured on (workspace-roles.md §11). */
+  readonly domain?: RoleDomain;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }
 
@@ -288,6 +290,12 @@ export function defineWriteAction<
   output: ZodType<TOutput>;
   access?: AccessLevel;
   safety?: Extract<SafetyClass, "write" | "destructive">;
+  /**
+   * The role domain this write creates or changes something in. Without it a
+   * write that names no subject is measured on the workspace, where every
+   * member holds `edit` for self-service (docs/design/workspace-roles.md §11).
+   */
+  domain?: RoleDomain;
   operation(
     context: ActionCallContext,
     input: TInput,
@@ -301,6 +309,7 @@ export function defineWriteAction<
     access: definition.access ?? ACCESS_LEVELS.edit,
     safety: definition.safety ?? "write",
     runsThroughPipeline: true,
+    ...(definition.domain ? { domain: definition.domain } : {}),
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
       const spec = definition.operation(context, input);
@@ -320,6 +329,7 @@ export function defineWriteAction<
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,
+          ...(definition.domain ? { domain: definition.domain } : {}),
           // Carried from the call context, so an action reached from chat is
           // audited with the channel on it without the action knowing there
           // are channels (P5-T06a). Absent for a browser call.
