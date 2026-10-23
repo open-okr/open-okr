@@ -1226,6 +1226,7 @@ export {
   setDefaultAdmission,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
+export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
 export {
   listMembershipsForUser,
   type Membership,

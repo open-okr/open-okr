@@ -1,3 +1,8 @@
+import {
+  BROWSER_TIMEZONE_COOKIE,
+  isListedTimezone,
+  matchListedTimezone,
+} from "@openokr/formats";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -122,6 +127,90 @@ describe("the first registration provisions a workspace", () => {
               (select count(*) from workspace_members where kind = 'agent')::int as agents`,
     );
     expect(counts.rows[0]).toEqual({ w: 1, humans: 1, agents: 2 });
+  });
+});
+
+/**
+ * The registering browser's timezone (TECHNICAL-PLAN §4.14, docs/design/
+ * browser-timezone.md). The browser writes `openokr_tz`; the sign-up hook
+ * reads it. Every workspace used to start on UTC whatever the browser said.
+ */
+describe("the workspace timezone comes from the registering browser", () => {
+  const registerFrom = (cookie: string | null) =>
+    auth.handler(
+      new Request(`${BASE_URL}/api/auth/sign-up/email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(cookie === null ? {} : { cookie }),
+        },
+        body: JSON.stringify({
+          email: "ada@example.com",
+          password: PASSWORD,
+          name: "Ada Lovelace",
+        }),
+      }),
+    );
+  const zones = async () => {
+    const wb = await workerDb();
+    const workspace = await wb.admin.query(
+      "select settings ->> 'timezone' as zone from workspaces",
+    );
+    const owner = await wb.admin.query(
+      "select timezone from workspace_members where kind = 'human'",
+    );
+    return {
+      workspace: workspace.rows[0]?.zone as string | undefined,
+      owner: owner.rows[0]?.timezone as string | null | undefined,
+    };
+  };
+
+  it("puts the workspace and its owner on the browser's zone", async () => {
+    const response = await registerFrom(
+      `${BROWSER_TIMEZONE_COOKIE}=${encodeURIComponent("Asia/Kuala_Lumpur")}`,
+    );
+    expect(response.status).toBe(200);
+    expect(await zones()).toEqual({
+      workspace: "Asia/Kuala_Lumpur",
+      owner: "Asia/Kuala_Lumpur",
+    });
+  });
+
+  it("falls back to UTC with no cookie, as before", async () => {
+    expect((await registerFrom(null)).status).toBe(200);
+    expect((await zones()).workspace).toBe("UTC");
+  });
+
+  it("falls back to UTC for a cookie that is not a zone, and still signs them up", async () => {
+    const response = await registerFrom(
+      `${BROWSER_TIMEZONE_COOKIE}=${encodeURIComponent("Mars/Olympus_Mons")}; other=1`,
+    );
+    expect(response.status).toBe(200);
+    expect((await zones()).workspace).toBe("UTC");
+  });
+
+  it("stores a browser's legacy name as the listed one", async () => {
+    await registerFrom(
+      `${BROWSER_TIMEZONE_COOKIE}=${encodeURIComponent("Asia/Calcutta")}`,
+    );
+    const { workspace } = await zones();
+    expect(isListedTimezone(workspace ?? "")).toBe(true);
+    expect(workspace).toBe(matchListedTimezone("Asia/Kolkata"));
+  });
+
+  it("is honoured by the repair path too", async () => {
+    // A user the hook never provisioned, as the repair test below makes one:
+    // the state only exists when the normal path failed.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('orphan', 'Orphan', 'orphan@example.com')",
+    );
+    await provisionWorkspaceForUser(
+      wb.appPool,
+      { id: "orphan", name: "Orphan" },
+      { timezone: "Europe/Berlin" },
+    );
+    expect((await zones()).workspace).toBe("Europe/Berlin");
   });
 });
 
@@ -252,6 +341,40 @@ describe("the registration policy", () => {
          where u.email = 'invited@example.com'`,
       );
       expect(membership.rows[0].workspace_id).toBe(workspaceId);
+    });
+
+    it("gives the invitee their own browser's zone, and leaves the workspace's", async () => {
+      const { token, workspaceId } = await issuePersonalInvite(
+        "invited@example.com",
+      );
+      const response = await auth.handler(
+        new Request(`${BASE_URL}/api/auth/sign-up/email`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: `${INVITE_COOKIE}=${token}; ${BROWSER_TIMEZONE_COOKIE}=${encodeURIComponent("Europe/Lisbon")}`,
+          },
+          body: JSON.stringify({
+            email: "invited@example.com",
+            password: PASSWORD,
+            name: "Invited Person",
+          }),
+        }),
+      );
+      expect(response.status).toBe(200);
+
+      const wb = await workerDb();
+      const invitee = await wb.admin.query(
+        `select wm.timezone from workspace_members wm
+         join users u on u.id = wm.user_id
+         where u.email = 'invited@example.com'`,
+      );
+      expect(invitee.rows[0].timezone).toBe("Europe/Lisbon");
+      const workspace = await wb.admin.query(
+        "select settings ->> 'timezone' as zone from workspaces where id = $1",
+        [workspaceId],
+      );
+      expect(workspace.rows[0].zone).toBe("UTC");
     });
   });
 });

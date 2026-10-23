@@ -41,9 +41,11 @@ export {
   textOfRichTextNode,
 } from "./rich-text.ts";
 export {
+  BROWSER_TIMEZONE_COOKIE,
   isKnownTimezone,
   isListedTimezone,
   listTimezones,
+  matchListedTimezone,
 } from "./timezone.ts";
 export { isWebUrl } from "./url.ts";
 export {

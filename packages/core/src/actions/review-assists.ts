@@ -22,7 +22,6 @@
 import {
   activeOnly,
   checkIns,
-  learnings,
   okrSessions,
   retroNotes,
   withContext,
@@ -443,101 +442,5 @@ export const draftRetrospective = defineReadAction({
     return narrative === null || narrative.trim() === ""
       ? null
       : { narrative: narrative.trim() };
-  },
-});
-
-/**
- * Proposes next-cycle objectives from the learnings a room marked to carry.
- *
- * **Every proposal cites the learning it came from**, by index into the list the
- * model was shown, and one that cites nothing is dropped. §8.9 hands learnings
- * forward so the next cycle answers them; a proposal with no learning behind it
- * is just an objective somebody could have typed, and this is not the place for
- * that.
- */
-export const proposeFromLearnings = defineReadAction({
-  name: "sessions.proposeFromLearnings",
-  // Deprecated with `sessions.draftNextCycle`, whose form it filled (P9-T22d).
-  summary:
-    "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-  input: z.object({ sessionId: z.uuid() }),
-  output: z
-    .array(
-      z.object({
-        title: z.string(),
-        /** The learning it came from, by its own id. Never absent. */
-        learningId: z.uuid(),
-        learningText: z.string(),
-        why: z.string(),
-      }),
-    )
-    .nullable(),
-  access: ACCESS_LEVELS.view,
-  async handler(context, input) {
-    const drafter = context.drafter;
-    if (!drafter?.proposeObjectives) {
-      return null;
-    }
-    if (!(await allowed(context, REVIEW_ASSIST_KEYS.proposeObjectives))) {
-      return null;
-    }
-
-    const carried = await inSession(context, async (tx) =>
-      tx
-        .select({ id: learnings.id, text: learnings.text })
-        .from(learnings)
-        .where(
-          activeOnly(
-            learnings,
-            eq(learnings.workspaceId, context.workspaceId),
-            eq(learnings.sessionId, input.sessionId),
-            eq(learnings.carryForward, true),
-          ),
-        )
-        .orderBy(asc(learnings.createdAt))
-        .limit(ITEM_LIMIT),
-    );
-    if (carried.length === 0) {
-      return null;
-    }
-
-    let proposed: Awaited<
-      ReturnType<NonNullable<typeof drafter.proposeObjectives>>
-    >;
-    try {
-      proposed = await drafter.proposeObjectives({
-        learnings: carried.map((learning) => learning.text),
-      });
-    } catch {
-      return null;
-    }
-    if (!proposed || proposed.length === 0) {
-      return null;
-    }
-
-    const resolved = proposed
-      .map((objective) => {
-        const index = objective.learningNumber;
-        if (
-          !Number.isInteger(index) ||
-          index < 1 ||
-          index > carried.length ||
-          objective.title.trim() === ""
-        ) {
-          return null;
-        }
-        const learning = carried[index - 1];
-        return learning
-          ? {
-              title: objective.title.trim(),
-              learningId: learning.id,
-              learningText: learning.text,
-              why: objective.why.trim(),
-            }
-          : null;
-      })
-      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
-    return resolved.length === 0 ? null : resolved;
   },
 });
