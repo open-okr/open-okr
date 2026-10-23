@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "catalog:",
-    "@aws-sdk/client-s3": "^3.1149.0",
-    "@aws-sdk/s3-request-presigner": "^3.1149.0",
+    "@aws-sdk/client-s3": "^3.1152.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@google/genai": "catalog:",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@openokr/config": "workspace:*",
