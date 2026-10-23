@@ -144,8 +144,9 @@ describe("workspace.provision", () => {
       "workspace.provision",
       { user: { id: MEMBER, name: "Ordinary Member" } },
     );
+    // Not even a tool since mcp-toolsets.md §2.2; the handler refuses it too.
     expect(result.isError).toBe(true);
-    expect(result.text).toMatch(/signs up/);
+    expect(result.text).toBe('There is no tool called "workspace.provision".');
     expect(await count("workspaces")).toBe(before);
   });
 });

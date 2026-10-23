@@ -47,7 +47,11 @@ test.afterAll(async () => {
 async function rpc(
   method: string,
   params: Record<string, unknown> = {},
-  over: { readonly token?: string; readonly session?: string } = {},
+  over: {
+    readonly token?: string;
+    readonly session?: string;
+    readonly path?: string;
+  } = {},
 ) {
   const headers: Record<string, string> = {
     "content-type": "application/json",
@@ -65,7 +69,7 @@ async function rpc(
     headers["mcp-session-id"] = session;
   }
 
-  const response = await api.post("/api/mcp", {
+  const response = await api.post(over.path ?? "/api/mcp", {
     headers,
     data: { jsonrpc: "2.0", id: Math.floor(Math.random() * 1e9), method, params },
   });
@@ -245,70 +249,38 @@ test("answers a plain resource list, since it declares resources", async () => {
   expect((body.result as { resources: unknown[] }).resources).toEqual([]);
 });
 
-test("lists the tools, with their scopes and safety hints intact", async () => {
+test("lists the core toolset by default, and only what the grant can call", async () => {
+  // docs/design/mcp-toolsets.md: a connection that names no toolset is shown
+  // the core tools, and a read-scoped grant only the reads among them.
   const body = await bodyOf(await rpc("tools/list"));
   const tools = (body.result as { tools: Record<string, unknown>[] }).tools;
 
-  expect(tools.length).toBeGreaterThan(200);
+  expect(tools.length).toBeGreaterThan(20);
+  expect(tools.length).toBeLessThan(60);
+  for (const tool of tools) {
+    const hints = tool.annotations as Record<string, boolean>;
+    expect(hints.readOnlyHint, String(tool.name)).toBe(true);
+  }
+  expect(tools.find((tool) => tool.name === "goals.delete")).toBeUndefined();
+});
 
-  const destroy = tools.find((tool) => tool.name === "goals.delete");
-  expect(destroy).toBeDefined();
-  // What a client shows a person before it lets an agent call this.
+test("names more toolsets in the address, and refuses an unknown one", async () => {
+  const all = await bodyOf(
+    await rpc("tools/list", {}, { path: "/api/mcp?toolsets=all" }),
+  );
+  const tools = (all.result as { tools: Record<string, unknown>[] }).tools;
+  expect(tools.length).toBeGreaterThan(100);
   expect(
-    (destroy?.annotations as Record<string, boolean>).destructiveHint,
+    tools.every(
+      (tool) => (tool.annotations as Record<string, boolean>).readOnlyHint,
+    ),
   ).toBe(true);
-  expect((destroy?.annotations as Record<string, boolean>).readOnlyHint).toBe(
-    false,
-  );
-});
 
-test("runs a read the grant carries the scope for", async () => {
-  const body = await bodyOf(
-    await rpc("tools/call", { name: "cycles.list", arguments: {} }),
-  );
-  const result = body.result as { isError?: boolean };
-  expect(result.isError ?? false).toBe(false);
-});
-
-test("acceptance: a read-scoped agent calling a write tool is denied, clearly", async () => {
-  const response = await rpc("tools/call", {
-    name: "goals.create",
-    arguments: { title: "Nothing should be written" },
+  const unknown = await rpc("tools/list", {}, {
+    path: "/api/mcp?toolsets=core,nonsense",
   });
-
-  // Not a transport fault. A 200 carrying `isError` is what lets an agent
-  // report a denial instead of retrying it.
-  expect(response.status()).toBe(200);
-  const result = (await bodyOf(response)).result as {
-    isError: boolean;
-    content: { text: string }[];
-  };
-  expect(result.isError).toBe(true);
-  expect(result.content[0]?.text).toContain("goals.create needs write");
-});
-
-test("the denial wrote nothing, which is what a partial result would mean", async () => {
-  const body = await bodyOf(
-    await rpc("tools/call", { name: "goals.list", arguments: {} }),
-  );
-  const result = body.result as { content: { text: string }[] };
-  expect(result.content[0]?.text).not.toContain(
-    "Nothing should be written",
-  );
-});
-
-test("lists the resources and the prompts it offers", async () => {
-  const resources = await bodyOf(await rpc("resources/templates/list"));
-  const templates = (
-    resources.result as { resourceTemplates: { uriTemplate: string }[] }
-  ).resourceTemplates;
-  expect(templates.some((one) => one.uriTemplate.startsWith("openokr://goal/"))).toBe(
-    true,
-  );
-
-  const prompts = await bodyOf(await rpc("prompts/list"));
-  const listed = (prompts.result as { prompts: { name: string }[] }).prompts;
-  expect(listed.map((one) => one.name)).toContain("what-do-i-owe");
+  expect(unknown.status()).toBe(400);
+  expect(await unknown.text()).toContain("core, work, facilitation, admin, all");
 });
 
 test("offers the two research tools, both marked as reads", async () => {

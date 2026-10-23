@@ -350,6 +350,7 @@ export const createCommentAction = defineWriteAction({
  */
 export const importCommentAction = defineWriteAction({
   name: "comments.importComment",
+  agentSurface: false,
   summary:
     "Records a comment an import found, keeping its author and its date.",
   input: z.object({
@@ -480,6 +481,7 @@ export const importCommentAction = defineWriteAction({
  */
 export const replaceImportedBodyAction = defineWriteAction({
   name: "comments.replaceImportedBody",
+  agentSurface: false,
   summary:
     "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
   input: z.object({

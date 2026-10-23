@@ -273,6 +273,7 @@ export const setWorkspaceState = defineWriteAction({
  */
 export const provisionWorkspace = {
   name: "workspace.provision" as const,
+  agentSurface: false as const,
   summary:
     "Create a workspace and its first member for a newly registered person.",
   input: z.object({

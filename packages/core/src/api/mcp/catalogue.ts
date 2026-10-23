@@ -356,7 +356,9 @@ export const RESEARCH_TOOLS: readonly McpTool[] =
  * exactly two additions.
  */
 export const MCP_TOOLS: readonly McpTool[] = [
-  ...REST_ROUTES.map(toolFor),
+  // An action marked off the agent surface is not a tool at all, so neither
+  // the catalogue nor the dispatcher can name it (mcp-toolsets.md §2.2).
+  ...REST_ROUTES.filter((route) => route.agentSurface).map(toolFor),
   ...RESEARCH_TOOLS,
 ];
 

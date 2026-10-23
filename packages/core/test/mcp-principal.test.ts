@@ -273,8 +273,10 @@ describe("a token cannot administer tokens", () => {
       scopes: ["read", "write", "destructive"],
     });
 
+    // Not a tool at all since mcp-toolsets.md §2.2: every token is refused
+    // it, so the agent endpoint no longer offers it.
     expect(outcome.isError).toBe(true);
-    expect(outcome.text).toContain("tokens screen");
+    expect(outcome.text).toBe('There is no tool called "tokens.create".');
     expect(await tokenCount()).toBe(before);
   });
 

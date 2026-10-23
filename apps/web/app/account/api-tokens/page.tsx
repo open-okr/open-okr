@@ -208,6 +208,9 @@ export default async function ApiTokensPage() {
           <p className="text-sm text-ink-3">
             {t("account.apiTokens.agentSameRules")}
           </p>
+          <p className="text-sm text-ink-3">
+            {t("account.apiTokens.agentToolsets")}
+          </p>
         </CardBody>
       </Card>
 

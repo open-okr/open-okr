@@ -484,6 +484,7 @@ export const setWorkspaceCredential = defineWriteAction({
  */
 export const recordWorkspaceCredentialCheck = defineWriteAction({
   name: "ai.recordCredentialCheck",
+  agentSurface: false,
   summary:
     "Records the result of a live connection test on the workspace's key for a provider.",
   input: z.object({

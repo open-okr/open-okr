@@ -194,6 +194,12 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly runsThroughPipeline: boolean;
   /** The role domain a write is measured on (workspace-roles.md §11). */
   readonly domain?: RoleDomain;
+  /**
+   * False for an action no agent should be offered: the importer's, the
+   * scheduler's, the copilot's own bookkeeping, or one every token is refused
+   * (docs/design/mcp-toolsets.md §2.2). It stays on REST and the command line.
+   */
+  readonly agentSurface?: false;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }
 
@@ -218,6 +224,8 @@ export function defineReadAction<TInput, TOutput>(definition: {
   access?: AccessLevel;
   /** Declare this only if the input really takes a cursor. */
   page?: PageContract;
+  /** See `ActionDefinition.agentSurface`. */
+  agentSurface?: false;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }): ActionDefinition<TInput, TOutput> {
   return {
@@ -296,6 +304,8 @@ export function defineWriteAction<
    * member holds `edit` for self-service (docs/design/workspace-roles.md §11).
    */
   domain?: RoleDomain;
+  /** See `ActionDefinition.agentSurface`. */
+  agentSurface?: false;
   operation(
     context: ActionCallContext,
     input: TInput,
@@ -310,6 +320,9 @@ export function defineWriteAction<
     safety: definition.safety ?? "write",
     runsThroughPipeline: true,
     ...(definition.domain ? { domain: definition.domain } : {}),
+    ...(definition.agentSurface === false
+      ? { agentSurface: false as const }
+      : {}),
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
       const spec = definition.operation(context, input);

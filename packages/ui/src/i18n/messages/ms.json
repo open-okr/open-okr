@@ -32,6 +32,7 @@
   "account.apiTokens.agentHow": "Cipta token untuk ejen AI di atas. Arahkan ejen ke {endpoint} dan minta ia menghantar token itu sebagai token pembawa. Kebanyakan ejen membaca konfigurasi seperti ini:",
   "account.apiTokens.agentIntro": "Ejen yang dapat membuka pelayar bersambung sendiri: ia menghantar anda ke skrin persetujuan, kemudian muncul di bawah Ejen yang disambungkan. Ejen yang tidak dapat berbuat demikian, seperti ejen pengekodan dalam terminal atau pembantu desktop yang disediakan daripada fail, menggunakan token ejen.",
   "account.apiTokens.agentSameRules": "Token ejen membawa akses anda sendiri, disempitkan oleh skopnya, sama seperti ejen yang anda luluskan dalam pelayar. Ia berfungsi di titik akhir ejen sahaja, dan token REST tidak berfungsi di situ.",
+  "account.apiTokens.agentToolsets": "Secara lalai, ejen melihat alat teras yang digunakan ahli setiap minggu. Tambah ?toolsets=core,work,facilitation,admin (atau ?toolsets=all) pada alamat untuk menawarkan lebih banyak. Token hanya ditunjukkan alat yang boleh dipanggil oleh skopnya.",
   "account.apiTokens.apiTokens": "Token API",
   "account.apiTokens.audienceAgent": "ejen",
   "account.apiTokens.audienceRest": "REST",

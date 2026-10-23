@@ -1308,6 +1308,7 @@ export const removeTemplateMapping = defineWriteAction({
  */
 export const sweepMessageLogRetention = defineWriteAction({
   name: "channels.sweepMessageLog",
+  agentSurface: false,
   summary:
     "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
   input: z.object({

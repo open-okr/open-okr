@@ -153,6 +153,7 @@ export const listMyTokens = defineReadAction({
 
 export const createApiToken = defineWriteAction({
   name: "tokens.create",
+  agentSurface: false,
   summary: "Mint an API token, shown once, carrying your own authority.",
   input: z.object({
     name: z.string().trim().min(1).max(120),
@@ -240,6 +241,7 @@ export const createApiToken = defineWriteAction({
 
 export const revokeApiToken = defineWriteAction({
   name: "tokens.revoke",
+  agentSurface: false,
   summary: "Revoke one of your own API tokens.",
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid(), name: z.string() }),
@@ -312,6 +314,7 @@ export const revokeApiToken = defineWriteAction({
  */
 export const readPendingDevice = defineReadAction({
   name: "tokens.pendingDevice",
+  agentSurface: false,
   summary: "The terminal request one device code names, if it is still open.",
   input: z.object({ userCode: z.string().trim().min(4).max(32) }),
   output: z
@@ -349,6 +352,7 @@ export const readPendingDevice = defineReadAction({
  */
 export const decideDevice = defineWriteAction({
   name: "tokens.approveDevice",
+  agentSurface: false,
   summary: "Approve or deny a terminal that asked to sign in as you.",
   input: z.object({
     userCode: z.string().trim().min(4).max(32),

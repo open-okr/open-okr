@@ -296,6 +296,21 @@ export {
   stampSessionUse,
 } from "./api/mcp/sessions.ts";
 export {
+  ALWAYS_OFFERED,
+  DEFAULT_TOOLSETS,
+  TOOLSET_CHOICES,
+  TOOLSET_NAMES,
+  TOOLSETS,
+  type ToolsetName,
+} from "./api/mcp/toolset-data.ts";
+export {
+  offeredTools,
+  parseToolsets,
+  type ToolsetChoice,
+  toolsetOf,
+  toolsetRefusal,
+} from "./api/mcp/toolsets.ts";
+export {
   ALLOW_LISTED_CLIENTS,
   type ClientRejection,
   type ClientResolution,

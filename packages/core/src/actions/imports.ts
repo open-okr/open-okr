@@ -52,6 +52,7 @@ const report = z.record(z.string(), z.unknown());
 
 export const startImportRun = defineWriteAction({
   name: "imports.startRun",
+  agentSurface: false,
   summary: "Records an import run as it starts, before anything is loaded.",
   input: z.object({
     source: z.enum(LEGACY_SOURCES),
@@ -117,6 +118,7 @@ export const startImportRun = defineWriteAction({
 
 export const finishImportRun = defineWriteAction({
   name: "imports.finishRun",
+  agentSurface: false,
   summary: "Closes an import run with its counts and its report.",
   input: z.object({
     id: z.uuid(),

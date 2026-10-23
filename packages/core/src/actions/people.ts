@@ -1209,6 +1209,7 @@ export const possibleManagersFor = defineReadAction({
  */
 export const importMember = defineWriteAction({
   name: "people.importMember",
+  agentSurface: false,
   summary:
     "Creates a placeholder member for somebody an import found, with the address to claim it by.",
   input: z.object({
