@@ -33,7 +33,7 @@ import {
 } from "./mention-extensions.ts";
 import { SlashMenu } from "./slash-menu.ts";
 import { EditorToolbar, LINK_HREF } from "./toolbar.tsx";
-import { ReadOnlyUnderline } from "./underline.ts";
+import { Underline } from "./underline.ts";
 
 export interface UploadedFile {
   readonly blobId: string;
@@ -156,7 +156,7 @@ export const RichTextEditor = forwardRef<
       Attachment,
       createMemberMentionExtension(searchMembers ?? noSearch),
       createEntityLinkExtension(searchEntities ?? noSearch),
-      ReadOnlyUnderline,
+      Underline,
       // A heading or a table in a comment is a document's job, so the menu
       // that makes them is the full editor's only.
       ...(variant === "full" ? [SlashMenu] : []),
