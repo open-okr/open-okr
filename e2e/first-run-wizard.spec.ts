@@ -26,6 +26,11 @@ import { goTo, skipOnboarding } from "./instance-account.ts";
 // step depends on the one before it.
 test.describe.configure({ mode: "serial" });
 
+// A browser in Kuala Lumpur, so the workspace setup makes keeps the clock of
+// the browser that made it rather than UTC (TECHNICAL-PLAN §4.14,
+// docs/design/browser-timezone.md). Nothing else here reads a date.
+test.use({ timezoneId: "Asia/Kuala_Lumpur" });
+
 const ADMIN = {
   name: "Grace Hopper",
   email: "grace@example.com",
@@ -101,6 +106,12 @@ test("creating the first account finishes setup", async ({ page }) => {
   await expect(password).toHaveAttribute("type", "password");
 
   await page.getByRole("button", { name: "Finish setup" }).click();
+
+  // The first thing setup asks is the clock, and its answer is already the
+  // browser's: every workspace used to start on UTC whatever it said.
+  await expect(
+    page.getByRole("combobox", { name: "Which clock does it keep?" }),
+  ).toHaveValue(/Kuala Lumpur/, { timeout: 15_000 });
 
   /**
    * **Into onboarding first, since P6-G26.** Finishing setup provisions a

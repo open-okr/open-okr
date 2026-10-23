@@ -12,6 +12,7 @@ import {
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPool } from "./auth";
+import { requestBrowserTimezone } from "./browser-timezone";
 import { requireSession } from "./session";
 
 /**
@@ -65,10 +66,12 @@ export async function requireWorkspace(): Promise<ActiveWorkspace> {
     if ((await trustedDomainOffers(pool, session.user.id)).length > 0) {
       redirect(TRUSTED_DOMAIN_JOIN_PATH);
     }
-    await provisionWorkspaceForUser(pool, {
-      id: session.user.id,
-      name: session.user.name,
-    });
+    const timezone = await requestBrowserTimezone();
+    await provisionWorkspaceForUser(
+      pool,
+      { id: session.user.id, name: session.user.name },
+      timezone ? { timezone } : {},
+    );
     memberships = await listMembershipsForUser(pool, session.user.id);
   }
 

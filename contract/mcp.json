@@ -868,6 +868,10 @@
           "token": {
             "type": "string",
             "minLength": 1
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -889,7 +893,12 @@
       "description": "Join a workspace because it trusts the domain of your confirmed email address.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "scope": "write",
       "annotations": {

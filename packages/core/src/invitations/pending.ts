@@ -39,6 +39,18 @@ export const INVITE_COOKIE_MAX_AGE_SECONDS = 30 * 60;
  * complete.
  */
 export function inviteTokenFromCookies(header: string | null): string | null {
+  return cookieValue(header, INVITE_COOKIE);
+}
+
+/**
+ * One cookie's decoded value from a `Cookie` header, or null. The invitation
+ * token and the browser's timezone (docs/design/browser-timezone.md) are both
+ * read through it, so the two parse alike.
+ */
+export function cookieValue(
+  header: string | null,
+  name: string,
+): string | null {
   if (!header) {
     return null;
   }
@@ -47,7 +59,7 @@ export function inviteTokenFromCookies(header: string | null): string | null {
     if (eq === -1) {
       continue;
     }
-    if (part.slice(0, eq).trim() !== INVITE_COOKIE) {
+    if (part.slice(0, eq).trim() !== name) {
       continue;
     }
     const value = part.slice(eq + 1).trim();
@@ -57,8 +69,8 @@ export function inviteTokenFromCookies(header: string | null): string | null {
     try {
       return decodeURIComponent(value);
     } catch {
-      // A cookie value that is not valid percent-encoding is not a token this
-      // product issued. Refused rather than passed on raw.
+      // A cookie value that is not valid percent-encoding is not one this
+      // product wrote. Refused rather than passed on raw.
       return null;
     }
   }
