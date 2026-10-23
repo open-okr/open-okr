@@ -55,6 +55,12 @@ export interface DirectoryJoinInput {
   readonly via: "sso" | "directory_sync";
   /** The identity provider's own id for this person, when it has one. */
   readonly externalId?: string;
+  /**
+   * The signing-in browser's timezone, when there is a browser: a single
+   * sign-on callback has one, a SCIM request does not
+   * (docs/design/browser-timezone.md).
+   */
+  readonly timezone?: string;
 }
 
 export interface DirectoryJoinResult {
@@ -105,6 +111,7 @@ export async function joinWorkspaceForIdentity(
         const member = await provisionMemberForInvite(tx, {
           workspaceId,
           user: input.user,
+          ...(input.timezone ? { timezone: input.timezone } : {}),
         });
 
         return {

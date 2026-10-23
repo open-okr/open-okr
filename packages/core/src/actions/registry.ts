@@ -368,7 +368,6 @@ import {
   draftMinutes,
   draftRetrospective,
   narrateDiagnostic,
-  proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
 import {
@@ -399,7 +398,6 @@ import {
   decideObjective,
   decisionsForCycle,
   decisionsForGoal,
-  draftNextCycle,
   giveKudos,
   givePulse,
   listMySessions,
@@ -927,12 +925,10 @@ export const ACTION_MAP = {
   "sessions.clusterRetro": clusterRetroNotes,
   "sessions.narrateDiagnostic": narrateDiagnostic,
   "sessions.draftMinutes": draftMinutes,
-  "sessions.proposeFromLearnings": proposeFromLearnings,
   "goals.draftRetrospective": draftRetrospective,
   "sessions.decideObjective": decideObjective,
   "sessions.reset": readReset,
   "sessions.captureLearning": captureLearning,
-  "sessions.draftNextCycle": draftNextCycle,
   "sessions.addAction": addReviewAction,
   "sessions.completeAction": completeReviewAction,
   "sessions.forward": readForward,

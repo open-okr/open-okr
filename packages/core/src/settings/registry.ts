@@ -3,8 +3,8 @@ import {
   HEX_COLOUR_PATTERN,
   IDENTIFIER_MAX_LENGTH,
   isHostName,
-  isKnownTimezone,
   isListedTimezone,
+  matchListedTimezone,
   ONE_WORD_PATTERN,
 } from "@openokr/formats";
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
@@ -130,9 +130,13 @@ export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
  */
 const DEFAULT_SPACE_TEAM_VOTING = true;
 
+// Matched to the list rather than merely known to the runtime. A browser's
+// legacy name, `Asia/Calcutta`, was otherwise stored as a zone the settings
+// card does not offer, and `+08:00` as one it refuses
+// (docs/design/browser-timezone.md).
 const resolveTimezone = (context: ProvisioningContext): string => {
   const candidate = context.timezone?.trim();
-  return candidate && isKnownTimezone(candidate) ? candidate : "UTC";
+  return (candidate && matchListedTimezone(candidate)) || "UTC";
 };
 
 export const timezoneSchema = z

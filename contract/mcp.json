@@ -868,6 +868,10 @@
           "token": {
             "type": "string",
             "minLength": 1
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -889,7 +893,12 @@
       "description": "Join a workspace because it trusts the domain of your confirmed email address.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "scope": "write",
       "annotations": {
@@ -14910,32 +14919,6 @@
       }
     },
     {
-      "name": "sessions.proposeFromLearnings",
-      "description": "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "sessionId"
-        ]
-      },
-      "scope": "read",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true
-      },
-      "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
-      }
-    },
-    {
       "name": "goals.draftRetrospective",
       "description": "Drafts a goal's closing retrospective from its published check-ins, as plain text a person edits.",
       "inputSchema": {
@@ -15079,46 +15062,6 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "text": "…"
-      }
-    },
-    {
-      "name": "sessions.draftNextCycle",
-      "description": "Deprecated since 0.2.0 and removed in 0.4: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 280
-          },
-          "why": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1000
-          }
-        },
-        "required": [
-          "sessionId",
-          "title",
-          "why"
-        ]
-      },
-      "scope": "write",
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false
-      },
-      "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "title": "…",
-        "why": "…"
       }
     },
     {

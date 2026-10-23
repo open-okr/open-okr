@@ -33,6 +33,7 @@ import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
 import { readSetupState } from "../setup/state.ts";
+import { browserTimezoneFromCookies } from "../workspaces/browser-timezone.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import {
@@ -88,6 +89,7 @@ async function acceptPendingInvitation(
   pool: Pool,
   token: string,
   userId: string,
+  timezone: string | undefined,
 ): Promise<void> {
   const invitation = await previewInvite(pool, { token, now: new Date() });
   if (invitation.kind !== "usable") {
@@ -100,7 +102,7 @@ async function acceptPendingInvitation(
       actor: { kind: "human", userId },
     },
     "invitations.acceptLink",
-    { token },
+    { token, ...(timezone ? { timezone } : {}) },
   );
 }
 
@@ -604,11 +606,22 @@ export function createAuth(options: AuthOptions) {
             // now, and refusing to provision anything would leave somebody
             // signed up with nowhere to go; `/join` still works afterwards,
             // and the fall-through gives them their own workspace meanwhile.
-            const token = inviteTokenFromCookies(cookieHeaderFrom(hookContext));
+            const cookies = cookieHeaderFrom(hookContext);
+            // **The browser's timezone, for whatever this sign-up makes**
+            // (TECHNICAL-PLAN §4.14, docs/design/browser-timezone.md): their
+            // own workspace, or their membership of somebody else's. Read
+            // once, here, because every path below needs it and none of them
+            // sees the request. `undefined` when there is no browser behind
+            // the request, which is a SCIM call, and the fallback applies.
+            const timezone = browserTimezoneFromCookies(cookies);
+            const token = inviteTokenFromCookies(cookies);
             if (token) {
-              await acceptPendingInvitation(options.pool, token, user.id).catch(
-                () => undefined,
-              );
+              await acceptPendingInvitation(
+                options.pool,
+                token,
+                user.id,
+                timezone,
+              ).catch(() => undefined);
             }
 
             // **An identity provider vouching for somebody works the same
@@ -652,6 +665,7 @@ export function createAuth(options: AuthOptions) {
                 ...(authority?.externalId
                   ? { externalId: authority.externalId }
                   : {}),
+                ...(timezone ? { timezone } : {}),
               });
             }
 
@@ -671,10 +685,11 @@ export function createAuth(options: AuthOptions) {
               return;
             }
 
-            await provisionWorkspaceForUser(options.pool, {
-              id: user.id,
-              name: user.name,
-            });
+            await provisionWorkspaceForUser(
+              options.pool,
+              { id: user.id, name: user.name },
+              timezone ? { timezone } : {},
+            );
           },
         },
       },
