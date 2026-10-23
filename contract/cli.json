@@ -400,7 +400,7 @@
       "action": "people.erase",
       "method": "POST",
       "path": "/people/erase",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Anonymise a member: their history stays attributable to a placeholder identity, and their personal data is exported first.",
       "flags": [
         {
@@ -546,7 +546,7 @@
       "action": "invitations.revokeLink",
       "method": "POST",
       "path": "/invitations/revokeLink",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Revoke a link. Already-used memberships are unaffected.",
       "flags": [
         {
@@ -635,7 +635,7 @@
       "action": "channels.disconnect",
       "method": "POST",
       "path": "/channels/disconnect",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes a provider's connection and its stored credentials.",
       "flags": [
         {
@@ -726,7 +726,7 @@
       "action": "channels.unlinkIdentity",
       "method": "POST",
       "path": "/channels/unlinkIdentity",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Unlinks the caller's own account on a provider.",
       "flags": [
         {
@@ -917,7 +917,7 @@
       "action": "channels.removeTemplateMapping",
       "method": "POST",
       "path": "/channels/removeTemplateMapping",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Forgets which WhatsApp template a reminder rule used.",
       "flags": [
         {
@@ -2291,7 +2291,7 @@
       "action": "ai.removeWorkspaceCredential",
       "method": "POST",
       "path": "/ai/removeWorkspaceCredential",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes the workspace's own key for a provider.",
       "flags": [
         {
@@ -2347,7 +2347,7 @@
       "action": "ai.removePersonalCredential",
       "method": "POST",
       "path": "/ai/removePersonalCredential",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes the signed-in member's own key for a provider.",
       "flags": [
         {
@@ -2590,7 +2590,7 @@
       "action": "ai.removeCustomModel",
       "method": "POST",
       "path": "/ai/removeCustomModel",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes a custom model from the catalogue.",
       "flags": [
         {
@@ -2672,7 +2672,7 @@
       "action": "ai.removeTierPolicy",
       "method": "POST",
       "path": "/ai/removeTierPolicy",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes a tier's explicit policy, reverting it to the seeded default.",
       "flags": [
         {
@@ -2856,7 +2856,7 @@
       "action": "ai.removeBudget",
       "method": "POST",
       "path": "/ai/removeBudget",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes a budget.",
       "flags": [
         {
@@ -5094,7 +5094,7 @@
       "action": "attachments.detach",
       "method": "POST",
       "path": "/attachments/detach",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Takes a file off a subject. The file itself is untouched.",
       "flags": [
         {
@@ -5820,7 +5820,7 @@
       "action": "tasks.removeChecklistItem",
       "method": "POST",
       "path": "/tasks/removeChecklistItem",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes one checklist line.",
       "flags": [
         {
@@ -6173,7 +6173,7 @@
       "action": "initiatives.unlinkKeyResult",
       "method": "POST",
       "path": "/initiatives/unlinkKeyResult",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes the link between an initiative and a key result.",
       "flags": [
         {
@@ -7373,7 +7373,7 @@
       "action": "goals.unlinkKpi",
       "method": "POST",
       "path": "/goals/unlinkKpi",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Unlinks a KPI, keeping the value it last reported as a manual one.",
       "flags": [
         {
@@ -7834,7 +7834,7 @@
       "action": "goals.deleteCheckIn",
       "method": "POST",
       "path": "/goals/deleteCheckIn",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Deletes a check-in, rolling the goal's pointers and values back when it was the latest.",
       "flags": [
         {
@@ -7954,7 +7954,7 @@
       "action": "goals.removeDependency",
       "method": "POST",
       "path": "/goals/removeDependency",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes a horizontal link between two goals.",
       "flags": [
         {
@@ -8069,7 +8069,7 @@
       "action": "goals.removeKeyResultDependency",
       "method": "POST",
       "path": "/goals/removeKeyResultDependency",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes an entry from the dependency register.",
       "flags": [
         {
@@ -10347,7 +10347,7 @@
       "action": "sessions.removeRetroNote",
       "method": "POST",
       "path": "/sessions/removeRetroNote",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Removes one retro note, with the dots spent on it.",
       "flags": [
         {

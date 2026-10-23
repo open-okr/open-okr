@@ -630,10 +630,10 @@
           "memberId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -826,10 +826,10 @@
           "linkId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -954,10 +954,10 @@
           "provider"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -1069,10 +1069,10 @@
           "provider"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -1382,10 +1382,10 @@
           "ruleKey"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -3297,10 +3297,10 @@
           "provider"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -3369,10 +3369,10 @@
           "provider"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -3645,10 +3645,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -3763,10 +3763,10 @@
           "tier"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -4012,10 +4012,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -7228,10 +7228,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -8221,10 +8221,10 @@
           "itemId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -8670,10 +8670,10 @@
           "keyResultId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -10270,10 +10270,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -10943,10 +10943,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -11117,10 +11117,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -11279,10 +11279,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -14420,10 +14420,10 @@
           "noteId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {

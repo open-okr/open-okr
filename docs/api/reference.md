@@ -108,11 +108,11 @@ the machine-readable document.
 | `ai.readTierRouting`<br/>Every tier's effective route: an explicit policy, or the seeded default for whatever this workspace has enabled. | `GET /api/v1/ai/readTierRouting` | reads |
 | `ai.readUsageSummary`<br/>Total calls, tokens, cost and flagged calls for this workspace since a given date. | `GET /api/v1/ai/readUsageSummary` | reads |
 | `ai.recordCredentialCheck`<br/>Records the result of a live connection test on the workspace's key for a provider. | `POST /api/v1/ai/recordCredentialCheck` | writes |
-| `ai.removeBudget`<br/>Removes a budget. | `POST /api/v1/ai/removeBudget` | writes |
-| `ai.removeCustomModel`<br/>Removes a custom model from the catalogue. | `POST /api/v1/ai/removeCustomModel` | writes |
-| `ai.removePersonalCredential`<br/>Removes the signed-in member's own key for a provider. | `POST /api/v1/ai/removePersonalCredential` | writes |
-| `ai.removeTierPolicy`<br/>Removes a tier's explicit policy, reverting it to the seeded default. | `POST /api/v1/ai/removeTierPolicy` | writes |
-| `ai.removeWorkspaceCredential`<br/>Removes the workspace's own key for a provider. | `POST /api/v1/ai/removeWorkspaceCredential` | writes |
+| `ai.removeBudget`<br/>Removes a budget. | `POST /api/v1/ai/removeBudget` | destroys |
+| `ai.removeCustomModel`<br/>Removes a custom model from the catalogue. | `POST /api/v1/ai/removeCustomModel` | destroys |
+| `ai.removePersonalCredential`<br/>Removes the signed-in member's own key for a provider. | `POST /api/v1/ai/removePersonalCredential` | destroys |
+| `ai.removeTierPolicy`<br/>Removes a tier's explicit policy, reverting it to the seeded default. | `POST /api/v1/ai/removeTierPolicy` | destroys |
+| `ai.removeWorkspaceCredential`<br/>Removes the workspace's own key for a provider. | `POST /api/v1/ai/removeWorkspaceCredential` | destroys |
 | `ai.restorePrompt`<br/>Removes every stored version for a prompt key, so the built-in default serves again. | `POST /api/v1/ai/restorePrompt` | writes |
 | `ai.rotateCredentials`<br/>Re-wraps every credential this workspace stores onto the current root key. | `POST /api/v1/ai/rotateCredentials` | writes |
 | `ai.setBudget`<br/>Sets or replaces a budget: per user, per agent or workspace-wide. | `POST /api/v1/ai/setBudget` | writes |
@@ -139,7 +139,7 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `attachments.attach`<br/>Hangs an uploaded file on a subject. | `POST /api/v1/attachments/attach` | writes |
-| `attachments.detach`<br/>Takes a file off a subject. The file itself is untouched. | `POST /api/v1/attachments/detach` | writes |
+| `attachments.detach`<br/>Takes a file off a subject. The file itself is untouched. | `POST /api/v1/attachments/detach` | destroys |
 | `attachments.list`<br/>The files attached to one subject. | `GET /api/v1/attachments/list` | reads |
 
 ## audit
@@ -172,13 +172,13 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `channels.connect`<br/>Stores a provider's credentials and marks it connected. | `POST /api/v1/channels/connect` | writes |
-| `channels.disconnect`<br/>Removes a provider's connection and its stored credentials. | `POST /api/v1/channels/disconnect` | writes |
+| `channels.disconnect`<br/>Removes a provider's connection and its stored credentials. | `POST /api/v1/channels/disconnect` | destroys |
 | `channels.linkIdentity`<br/>Links the caller's own account on a provider. | `POST /api/v1/channels/linkIdentity` | writes |
 | `channels.listConnections`<br/>Every channel provider this workspace has connected. | `GET /api/v1/channels/listConnections` | reads |
 | `channels.listIdentities`<br/>The caller's own linked channel identities. | `GET /api/v1/channels/listIdentities` | reads |
 | `channels.listMessages`<br/>The recent outbound message log, newest first. | `GET /api/v1/channels/listMessages` | reads |
 | `channels.mySettings`<br/>The caller's own primary channel, quiet hours and linked accounts. | `GET /api/v1/channels/mySettings` | reads |
-| `channels.removeTemplateMapping`<br/>Forgets which WhatsApp template a reminder rule used. | `POST /api/v1/channels/removeTemplateMapping` | writes |
+| `channels.removeTemplateMapping`<br/>Forgets which WhatsApp template a reminder rule used. | `POST /api/v1/channels/removeTemplateMapping` | destroys |
 | `channels.saveTemplateMapping`<br/>Points one reminder rule at one approved WhatsApp template. | `POST /api/v1/channels/saveTemplateMapping` | writes |
 | `channels.send`<br/>Queues one message to a member, at most once per key. | `POST /api/v1/channels/send` | writes |
 | `channels.startLink`<br/>Issues a short code for linking the caller's own account. | `POST /api/v1/channels/startLink` | writes |
@@ -187,7 +187,7 @@ the machine-readable document.
 | `channels.templateMappings`<br/>Which WhatsApp template each reminder rule uses. | `GET /api/v1/channels/templateMappings` | reads |
 | `channels.templates`<br/>The WhatsApp templates this workspace has at Meta. | `GET /api/v1/channels/templates` | reads |
 | `channels.testSend`<br/>Queues a test message to the caller through the normal path. | `POST /api/v1/channels/testSend` | writes |
-| `channels.unlinkIdentity`<br/>Unlinks the caller's own account on a provider. | `POST /api/v1/channels/unlinkIdentity` | writes |
+| `channels.unlinkIdentity`<br/>Unlinks the caller's own account on a provider. | `POST /api/v1/channels/unlinkIdentity` | destroys |
 
 ## comments
 
@@ -294,7 +294,7 @@ the machine-readable document.
 | `goals.creationPolicy`<br/>Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not. | `GET /api/v1/goals/creationPolicy` | reads |
 | `goals.decomposeKeyResult`<br/>Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them. | `GET /api/v1/goals/decomposeKeyResult` | reads |
 | `goals.delete`<br/>Removes a goal and its key results, which is not the same as closing one. | `POST /api/v1/goals/delete` | destroys |
-| `goals.deleteCheckIn`<br/>Deletes a check-in, rolling the goal's pointers and values back when it was the latest. | `POST /api/v1/goals/deleteCheckIn` | writes |
+| `goals.deleteCheckIn`<br/>Deletes a check-in, rolling the goal's pointers and values back when it was the latest. | `POST /api/v1/goals/deleteCheckIn` | destroys |
 | `goals.draftObjective`<br/>Drafts an objective and its key results from a plain-language ambition, with the quality checks it passes. | `GET /api/v1/goals/draftObjective` | reads |
 | `goals.draftRetrospective`<br/>Drafts a goal's closing retrospective from its published check-ins, as plain text a person edits. | `GET /api/v1/goals/draftRetrospective` | reads |
 | `goals.due`<br/>The goals this member champions that are due a check-in, soonest first. Drives the session walker. | `GET /api/v1/goals/due` | reads |
@@ -319,9 +319,9 @@ the machine-readable document.
 | `goals.reassignRole`<br/>Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off. | `POST /api/v1/goals/reassignRole` | writes |
 | `goals.recordValue`<br/>Moves a key result's value and records the movement as history. | `POST /api/v1/goals/recordValue` | writes |
 | `goals.relations`<br/>The parent, children, horizontal dependencies and register entries of one goal. | `GET /api/v1/goals/relations` | reads |
-| `goals.removeDependency`<br/>Removes a horizontal link between two goals. | `POST /api/v1/goals/removeDependency` | writes |
+| `goals.removeDependency`<br/>Removes a horizontal link between two goals. | `POST /api/v1/goals/removeDependency` | destroys |
 | `goals.removeKeyResult`<br/>Removes one key result from its goal, which is not the same as closing the goal. | `POST /api/v1/goals/removeKeyResult` | destroys |
-| `goals.removeKeyResultDependency`<br/>Removes an entry from the dependency register. | `POST /api/v1/goals/removeKeyResultDependency` | writes |
+| `goals.removeKeyResultDependency`<br/>Removes an entry from the dependency register. | `POST /api/v1/goals/removeKeyResultDependency` | destroys |
 | `goals.reopen`<br/>Reopens a closed goal, clearing its outcome and keeping its retrospective. | `POST /api/v1/goals/reopen` | writes |
 | `goals.restore`<br/>Brings back a deleted goal and the key results that were deleted with it. | `POST /api/v1/goals/restore` | writes |
 | `goals.restoreKeyResult`<br/>Brings back a key result that was removed on its own, with its value history. | `POST /api/v1/goals/restoreKeyResult` | writes |
@@ -336,7 +336,7 @@ the machine-readable document.
 | `goals.suggestParent`<br/>Suggests which objective this one should align to, from the ones the reader may see. | `GET /api/v1/goals/suggestParent` | reads |
 | `goals.targetHistory`<br/>Every change to a key result's target, oldest first, with who made it and the reason given for easing it. | `GET /api/v1/goals/targetHistory` | reads |
 | `goals.tree`<br/>One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context. | `GET /api/v1/goals/tree` | reads |
-| `goals.unlinkKpi`<br/>Unlinks a KPI, keeping the value it last reported as a manual one. | `POST /api/v1/goals/unlinkKpi` | writes |
+| `goals.unlinkKpi`<br/>Unlinks a KPI, keeping the value it last reported as a manual one. | `POST /api/v1/goals/unlinkKpi` | destroys |
 | `goals.update`<br/>Edits a goal's own fields, including its alignment pointer. | `POST /api/v1/goals/update` | writes |
 | `goals.updateKeyResult`<br/>Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget. | `POST /api/v1/goals/updateKeyResult` | writes |
 | `goals.vote`<br/>A private confidence vote on one key result. Readable only by its author until the reveal. | `POST /api/v1/goals/vote` | writes |
@@ -363,7 +363,7 @@ the machine-readable document.
 | `initiatives.list`<br/>Initiatives in a space, or the ones serving one key result. Drives screen S-26. | `GET /api/v1/initiatives/list` | reads |
 | `initiatives.read`<br/>One initiative with the key results it serves. | `GET /api/v1/initiatives/read` | reads |
 | `initiatives.restore`<br/>Brings back a deleted initiative and the key result links that were deleted with it. | `POST /api/v1/initiatives/restore` | writes |
-| `initiatives.unlinkKeyResult`<br/>Removes the link between an initiative and a key result. | `POST /api/v1/initiatives/unlinkKeyResult` | writes |
+| `initiatives.unlinkKeyResult`<br/>Removes the link between an initiative and a key result. | `POST /api/v1/initiatives/unlinkKeyResult` | destroys |
 | `initiatives.update`<br/>Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. | `POST /api/v1/initiatives/update` | writes |
 
 ## invitations
@@ -375,7 +375,7 @@ the machine-readable document.
 | `invitations.createWorkspaceLink`<br/>Create a reusable link anyone holding it may join through. | `POST /api/v1/invitations/createWorkspaceLink` | writes |
 | `invitations.joinByTrustedDomain`<br/>Join a workspace because it trusts the domain of your confirmed email address. | `POST /api/v1/invitations/joinByTrustedDomain` | writes |
 | `invitations.list`<br/>Every invitation link this workspace has issued, without their tokens. | `GET /api/v1/invitations/list` | reads |
-| `invitations.revokeLink`<br/>Revoke a link. Already-used memberships are unaffected. | `POST /api/v1/invitations/revokeLink` | writes |
+| `invitations.revokeLink`<br/>Revoke a link. Already-used memberships are unaffected. | `POST /api/v1/invitations/revokeLink` | destroys |
 
 ## kpis
 
@@ -428,7 +428,7 @@ the machine-readable document.
 |---|---|---|
 | `people.convertToGuest`<br/>Convert a member to a guest, stripping their prior bindings. | `POST /api/v1/people/convertToGuest` | writes |
 | `people.directory`<br/>Every active member of the workspace. | `GET /api/v1/people/directory` | reads |
-| `people.erase`<br/>Anonymise a member: their history stays attributable to a placeholder identity, and their personal data is exported first. | `POST /api/v1/people/erase` | writes |
+| `people.erase`<br/>Anonymise a member: their history stays attributable to a placeholder identity, and their personal data is exported first. | `POST /api/v1/people/erase` | destroys |
 | `people.exportMine`<br/>Everything this workspace holds about the signed-in member, as one document. | `GET /api/v1/people/exportMine` | reads |
 | `people.finishOwnTour`<br/>Mark the first-visit tour as finished for the signed-in member, on every machine. | `POST /api/v1/people/finishOwnTour` | writes |
 | `people.importMember`<br/>Creates a placeholder member for somebody an import found, with the address to claim it by. | `POST /api/v1/people/importMember` | writes |
@@ -555,7 +555,7 @@ the machine-readable document.
 | `sessions.recognition`<br/>Stage four's entries, oldest first (METHOD.md §8.1 stage 4). | `GET /api/v1/sessions/recognition` | reads |
 | `sessions.recordDecision`<br/>Records a decision against the key result or goal it affects (METHOD.md §7.5). | `POST /api/v1/sessions/recordDecision` | writes |
 | `sessions.recordDiagnostic`<br/>Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6). | `POST /api/v1/sessions/recordDiagnostic` | writes |
-| `sessions.removeRetroNote`<br/>Removes one retro note, with the dots spent on it. | `POST /api/v1/sessions/removeRetroNote` | writes |
+| `sessions.removeRetroNote`<br/>Removes one retro note, with the dots spent on it. | `POST /api/v1/sessions/removeRetroNote` | destroys |
 | `sessions.reset`<br/>Stage nine's state: every objective in the review and how it was closed. | `GET /api/v1/sessions/reset` | reads |
 | `sessions.resolveBlocker`<br/>Marks a blocker as resolved. | `POST /api/v1/sessions/resolveBlocker` | writes |
 | `sessions.retro`<br/>The team retro board: both columns, their notes and the reader's dots. | `GET /api/v1/sessions/retro` | reads |
@@ -637,7 +637,7 @@ the machine-readable document.
 | `tasks.list`<br/>Tasks, optionally only the caller's own or only the ones due by a date. | `GET /api/v1/tasks/list` | reads |
 | `tasks.move`<br/>Moves a card to a column and a slot, under a lock so two drags cannot lose one. | `POST /api/v1/tasks/move` | writes |
 | `tasks.read`<br/>One task with its assignees and its checklist. Drives screen S-28. | `GET /api/v1/tasks/read` | reads |
-| `tasks.removeChecklistItem`<br/>Removes one checklist line. | `POST /api/v1/tasks/removeChecklistItem` | writes |
+| `tasks.removeChecklistItem`<br/>Removes one checklist line. | `POST /api/v1/tasks/removeChecklistItem` | destroys |
 | `tasks.restore`<br/>Brings back a deleted task with the assignments and checklist lines deleted with it. | `POST /api/v1/tasks/restore` | writes |
 | `tasks.setChecklistItem`<br/>Ticks or unticks one checklist line. | `POST /api/v1/tasks/setChecklistItem` | writes |
 | `tasks.unassign`<br/>Removes an assignment and the edit access it granted. | `POST /api/v1/tasks/unassign` | writes |

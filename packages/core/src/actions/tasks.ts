@@ -1312,6 +1312,7 @@ export const removeChecklistItem = defineWriteAction({
   input: z.object({ id: z.uuid(), itemId: z.uuid() }),
   output: z.object({ itemId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
       return requireTask(

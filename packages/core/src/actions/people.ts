@@ -815,6 +815,7 @@ export const eraseMember = defineWriteAction({
     }),
   }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (context, input) => ({
     async load({ tx, workspaceId }) {
       const [before] = await tx

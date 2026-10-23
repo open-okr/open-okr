@@ -541,6 +541,7 @@ export const removeWorkspaceCredential = defineWriteAction({
   input: z.object({ provider: providerSchema }),
   output: z.object({ provider: providerSchema }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [existing] = await tx
@@ -652,6 +653,7 @@ export const removePersonalCredential = defineWriteAction({
   input: z.object({ provider: providerSchema }),
   output: z.object({ provider: providerSchema }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (!actor.memberId) {

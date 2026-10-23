@@ -784,6 +784,7 @@ export const unlinkInitiativeKeyResult = defineWriteAction({
   input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
   output: z.object({ unlinked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
       return requireInitiative(

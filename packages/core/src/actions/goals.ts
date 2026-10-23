@@ -2859,6 +2859,7 @@ export const unlinkKeyResultKpi = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(

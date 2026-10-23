@@ -290,6 +290,7 @@ export const removeCustomModel = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [existing] = await tx
@@ -473,6 +474,7 @@ export const removeTierPolicy = defineWriteAction({
   input: z.object({ tier: tierSchema }),
   output: z.object({ tier: tierSchema }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [existing] = await tx

@@ -500,6 +500,7 @@ export const deleteCheckIn = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid(), rolledBack: z.boolean() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(

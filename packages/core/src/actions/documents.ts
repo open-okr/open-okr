@@ -1328,6 +1328,7 @@ export const detachFile = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
       const [row] = await tx

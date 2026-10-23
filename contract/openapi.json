@@ -2363,8 +2363,8 @@
         "tags": [
           "people"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -3628,8 +3628,8 @@
         "tags": [
           "invitations"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -4159,8 +4159,8 @@
         "tags": [
           "channels"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -4588,8 +4588,8 @@
         "tags": [
           "channels"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -5772,8 +5772,8 @@
         "tags": [
           "channels"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -12251,8 +12251,8 @@
         "tags": [
           "ai"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -12473,8 +12473,8 @@
         "tags": [
           "ai"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -13443,8 +13443,8 @@
         "tags": [
           "ai"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -13856,8 +13856,8 @@
         "tags": [
           "ai"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -14790,8 +14790,8 @@
         "tags": [
           "ai"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -27100,8 +27100,8 @@
         "tags": [
           "attachments"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -30489,8 +30489,8 @@
         "tags": [
           "tasks"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -31887,8 +31887,8 @@
         "tags": [
           "initiatives"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -41961,8 +41961,8 @@
         "tags": [
           "goals"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -44095,8 +44095,8 @@
         "tags": [
           "goals"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -44685,8 +44685,8 @@
         "tags": [
           "goals"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -45175,8 +45175,8 @@
         "tags": [
           "goals"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -57132,8 +57132,8 @@
         "tags": [
           "sessions"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
