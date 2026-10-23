@@ -60,6 +60,18 @@ export interface DataChangeScript {
    * conventions doc's own worked example is this field, not a comment. */
   readonly summary: string;
   readonly expects: readonly ColumnExpectation[];
+  /**
+   * The migration file that drops what this script reads, once a guard in
+   * that migration has proved nothing was left for it to do
+   * (docs/design/guided-inputs.md §4.7, change 13).
+   *
+   * With its columns gone and that migration recorded as applied, the
+   * script is complete with nothing changed, rather than refused: a fresh
+   * instance never ran it, and refusing would stop every script after it.
+   * Not part of the checksum, so naming it does not stop a script that
+   * started under an earlier release from resuming.
+   */
+  readonly retiredBy?: string;
   /** Processes one batch starting after `cursor` (null on the first call),
    * inside a transaction the runner opens and commits around this call. */
   runBatch(
@@ -80,6 +92,42 @@ const scriptChecksum = (script: DataChangeScript): string =>
   createHash("sha256")
     .update(JSON.stringify({ name: script.name, expects: script.expects }))
     .digest("hex");
+
+/** Whether any column the script expects is gone from the schema. */
+async function anyColumnMissing(
+  client: DataChangeClient,
+  script: DataChangeScript,
+): Promise<boolean> {
+  for (const expectation of script.expects) {
+    const { rows } = await client.query(
+      `select 1 from information_schema.columns
+        where table_name = $1 and column_name = $2`,
+      [expectation.table, expectation.column],
+    );
+    if (rows.length === 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Whether the migration runner has recorded this file as applied. */
+async function migrationApplied(
+  client: DataChangeClient,
+  file: string,
+): Promise<boolean> {
+  const { rows } = await client.query(
+    `select 1 where to_regclass('_migrations') is not null`,
+  );
+  if (rows.length === 0) {
+    return false;
+  }
+  const applied = await client.query(
+    "select 1 from _migrations where name = $1",
+    [file],
+  );
+  return applied.rows.length > 0;
+}
 
 async function assertColumnsExist(
   client: DataChangeClient,
@@ -178,6 +226,19 @@ export async function runDataChanges(
             `started running. Finish it as written, or start a new script ` +
             `for the new expectations — never edit one mid-run.`,
         );
+      }
+
+      if (
+        script.retiredBy !== undefined &&
+        (await anyColumnMissing(client, script)) &&
+        (await migrationApplied(client, script.retiredBy))
+      ) {
+        await client.query(
+          "update _data_changes set completed_at = now() where name = $1",
+          [script.name],
+        );
+        outcomes.push({ name: script.name, batches: 0, rowsChanged: 0 });
+        continue;
       }
 
       await assertColumnsExist(client, script);

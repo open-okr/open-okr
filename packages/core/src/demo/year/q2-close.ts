@@ -390,7 +390,7 @@ const Q2_RETROSPECTIVE: YearEvent = {
       await callAction(context.action, "sessions.setManagementAnswer", {
         sessionId,
         questionKey,
-        body,
+        body: richTextFromPlainText(body),
       });
     }
     for (const cause of ROOT_CAUSES) {
@@ -521,7 +521,7 @@ export const Q2_CLOSE_EVENTS: readonly YearEvent[] = [
         await callAction(context.action, "sessions.recordDecision", {
           sessionId,
           keyResultId: need(context.ids.keyResults, keyResult, "Key result"),
-          text,
+          text: richTextFromPlainText(text),
         });
       }
       await callAction(context.action, "sessions.close", { id: sessionId });
@@ -558,7 +558,9 @@ export const Q2_CLOSE_EVENTS: readonly YearEvent[] = [
       await callAction(context.action, "sessions.recordDecision", {
         sessionId,
         keyResultId: c32,
-        text: "One sales engineer moves to questionnaires for six weeks, and a trust-centre page goes up. C3 stays committed.",
+        text: richTextFromPlainText(
+          "One sales engineer moves to questionnaires for six weeks, and a trust-centre page goes up. C3 stays committed.",
+        ),
       });
       await callAction(context.action, "sessions.close", { id: sessionId });
       await callAction(context.action, "initiatives.create", {
@@ -637,10 +639,12 @@ export const Q2_CLOSE_EVENTS: readonly YearEvent[] = [
         cycleId: need(context.ids.cycles, "q3", "Cycle"),
         holds: true,
         changed: true,
-        changeNote:
+        changeNote: richTextFromPlainText(
           "A4's win-rate target eases from 35% to 32% for Brightline's entry on 10 May, with a key result against Brightline added; \"No pricing rebuild before July\" comes off the not-doing list.",
-        focusNote:
+        ),
+        focusNote: richTextFromPlainText(
           "The mid-year revalidation: A4's win rate eased for Brightline, and the pricing review starts.",
+        ),
       });
       const winRate = need(context.ids.keyResults, "a4.winRate", "Key result");
       await callAction(context.action, "goals.changeTarget", {

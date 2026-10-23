@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
+  BROWSER_TIMEZONE_COOKIE,
   DEVICE_CODE_ALPHABET,
   DEVICE_USER_CODE_GROUPS,
   DOMAIN_PATTERN,
@@ -23,6 +24,7 @@ import {
   listTimezones,
   localDateTimeInstant,
   localDayBounds,
+  matchListedTimezone,
   normaliseWallClock,
   parseWallClock,
   zonedInstant,
@@ -263,6 +265,44 @@ describe("a timezone", () => {
       expect(isKnownTimezone(timezone)).toBe(false);
     },
   );
+});
+
+/**
+ * A zone a browser reports, matched to the server's list (docs/design/
+ * browser-timezone.md). The browser and the server ask the same function, so
+ * the picker's "use this device's zone" and the default a workspace is born
+ * with cannot disagree.
+ */
+describe("a browser's zone, matched to the list", () => {
+  it("takes a listed name as it is", () => {
+    expect(matchListedTimezone("Asia/Kuala_Lumpur")).toBe("Asia/Kuala_Lumpur");
+    expect(matchListedTimezone("UTC")).toBe("UTC");
+  });
+
+  it("finds the listed spelling of a zone the browser names differently", () => {
+    // One zone with two names. Whichever this runtime lists, the other one
+    // resolves to it, and what comes back is always a name on the list.
+    const matched = matchListedTimezone("Asia/Calcutta");
+    expect(matched === null || isListedTimezone(matched)).toBe(true);
+    expect(matched).toBe(matchListedTimezone("Asia/Kolkata"));
+  });
+
+  it("matches against a list it is given", () => {
+    expect(matchListedTimezone("Asia/Kuala_Lumpur", ["UTC"])).toBeNull();
+  });
+
+  // `+08:00` is a zone the runtime accepts and no listed name resolves to, so
+  // it is refused here as the settings card refuses it.
+  it.each(["Mars/Olympus_Mons", "", "not a zone", "+08:00"])(
+    "offers nothing for %j",
+    (zone) => {
+      expect(matchListedTimezone(zone)).toBeNull();
+    },
+  );
+
+  it("names the cookie once, for the browser that writes it and the server that reads it", () => {
+    expect(BROWSER_TIMEZONE_COOKIE).toBe("openokr_tz");
+  });
 });
 
 describe("a terminal login code", () => {

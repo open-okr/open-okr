@@ -24,6 +24,8 @@ export const managementAnswerDocument: DataChangeScript = {
   name: "0029_management_answer_document",
   summary:
     "Writes each quarterly review management retro answer as an editor document beside the plain text.",
+  // Its columns go in 0.4, once migration 0144 has found nothing left for it.
+  retiredBy: "0144_drop_plain_prose_columns.sql",
   expects: [
     { table: "management_answers", column: "id", dataType: "uuid" },
     { table: "management_answers", column: "body", dataType: "text" },

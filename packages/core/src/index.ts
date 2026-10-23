@@ -1035,9 +1035,7 @@ export {
 } from "./rich-text/from-text.ts";
 export {
   documentOfInput,
-  documentOrPlainText,
   plainTextOfDocument,
-  richTextOrPlainTextSchema,
 } from "./rich-text/moving.ts";
 export type { RichTextResolvers } from "./rich-text/render.ts";
 export { renderRichTextToHtml } from "./rich-text/render.ts";
@@ -1228,6 +1226,7 @@ export {
   setDefaultAdmission,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
+export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
 export {
   listMembershipsForUser,
   type Membership,

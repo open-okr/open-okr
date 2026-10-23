@@ -108,10 +108,15 @@ test("a weekly session has reached step 4", async () => {
 
   const digest = (
     await pool.query<{ id: string }>(
+      // The note as editor JSON, which is all 0.4 stores (guided-inputs
+      // change 13b).
       `insert into digests
-         (id, workspace_id, scope, scope_id, period, period_start, body, note, generated_at)
+         (id, workspace_id, scope, scope_id, period, period_start, body,
+          note_document, note_document_version, generated_at)
        values (gen_random_uuid(), $1, 'space', $2, 'weekly', '2026-08-24',
-               $3::jsonb, 'Billing is the whole story this week.', now())
+               $3::jsonb,
+               '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Billing is the whole story this week."}]}]}'::jsonb,
+               1, now())
        returning id`,
       [
         workspaceId,
