@@ -138,8 +138,8 @@ describe("the competitor (NW-Q2-09 to NW-Q2-17)", () => {
     if (!by("2027-05-17")) {
       return;
     }
-    const [decision] = await rows<{ text: string; on: string }>(
-      `select d.text, to_char(d.at, 'YYYY-MM-DD') as on from decisions d
+    const [decision] = await rows<{ on: string }>(
+      `select to_char(d.at, 'YYYY-MM-DD') as on from decisions d
          join key_results k on k.id = d.key_result_id
         where d.workspace_id = $1 and k.title like 'Cut security questionnaire turnaround%'`,
     );

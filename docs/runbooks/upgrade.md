@@ -76,6 +76,40 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.3 to 0.4: session prose is stored as documents only
+
+0.3 wrote each piece of session prose twice: as a document, and as its
+plain text for the release before. 0.4 drops the plain text. The six
+columns are the monthly review's shifts and decisions, the quarterly
+review's management answers, the weekly note for leadership, and the
+revalidation's two notes; the private stage notes are documents too.
+
+**If the upgrade stops at migration 0144, nothing has been lost.** The
+migration first checks that every piece of prose already has its document.
+An instance that came straight from 0.2, or skipped `pnpm db:change` on 0.3,
+has some that do not, and the migration refuses before it drops anything,
+naming each column and how many rows wait:
+
+```text
+Migration 0144_drop_plain_prose_columns.sql failed. Nothing was applied.
+Session prose is still waiting to be written as a document, so nothing was
+dropped. Rows waiting: decisions.text (12) management_answers.body (4). ...
+```
+
+Run the data changes against the database, with the admin role, then start
+again:
+
+```sh
+DATABASE_ADMIN_URL=... OPENOKR_ENCRYPTION_KEY=... pnpm db:change
+```
+
+What an API client meets: the six actions (`sessions.setShifts`,
+`sessions.recordDecision`, `sessions.setManagementAnswer`,
+`sessions.setStageNote`, `sessions.setCoordinatorNote` and
+`workflow.setRevalidation`) take editor JSON only, as the 0.3 notes
+announced, and refuse a string. The read actions still return the plain
+text fields they always had, computed from the document.
+
 ## 0.2 to 0.3: fields that guide, and prose written with the editor
 
 0.3 changes how fields look and what they accept. Nothing about the

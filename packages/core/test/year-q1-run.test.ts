@@ -11,6 +11,8 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { buildNorthwindYear } from "../src/demo/year/build.ts";
+import { plainTextOfDocument } from "../src/rich-text/moving.ts";
+import type { RichTextDocument } from "../src/rich-text/schema.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 import { placeYear } from "./year-placement.ts";
 
@@ -170,13 +172,16 @@ describe("running Q1 (NW-Q1-15 to NW-Q1-25)", () => {
     if (!by("2027-03-01")) {
       return;
     }
-    const decisions = await rows<{ text: string }>(
-      `select d.text from decisions d join okr_sessions s on s.id = d.session_id
+    // The decision is editor JSON only since 0.4 (guided-inputs change 13b).
+    const decisions = await rows<{ text_document: RichTextDocument }>(
+      `select d.text_document from decisions d join okr_sessions s on s.id = d.session_id
         where d.workspace_id = $1 and s.cycle_id = $2 and d.deleted_at is null
         order by d.created_at`,
       [q1Id],
     );
-    expect(decisions.map((one) => one.text)).toEqual([
+    expect(
+      decisions.map((one) => plainTextOfDocument(one.text_document)),
+    ).toEqual([
       "C2.3 added against C2 for the January release regression; everything else continues.",
       "Activation is behind pace and trending off track: one engineer moves to the activation checklist for four weeks.",
     ]);
@@ -300,8 +305,8 @@ describe("Q1 as of 10 February, inside its sixth week", () => {
     expect(bulk?.done).toBe(false);
 
     // One monthly review held, and no quarterly review yet.
-    const decisions = await inside<{ text: string }>(
-      "select text from decisions where workspace_id = $1 and deleted_at is null",
+    const decisions = await inside<{ id: string }>(
+      "select id from decisions where workspace_id = $1 and deleted_at is null",
     );
     expect(decisions).toHaveLength(1);
     const reviewed = await inside<{ count: string }>(

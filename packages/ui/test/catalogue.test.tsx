@@ -102,6 +102,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "session.detail.quarterlyReview.actRetro",
   "sessions.schedule.kind",
   // Only holes and punctuation.
+  // A table and the columns an older archive carried, both named as stored.
+  "admin.imports.archiveImportCard.leftOutColumns",
   // The label for the caution status is the "At risk" term's own hole, so a
   // workspace's rename reaches it (METHOD.md §3.5, P9-T15b-a).
   "common.caution",

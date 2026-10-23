@@ -14,7 +14,7 @@
  */
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { callAction } from "../src/actions/registry.ts";
+import { ACTIONS, callAction } from "../src/actions/registry.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "forward-facilitator";
@@ -271,28 +271,29 @@ describe("promoting a retro theme", () => {
 });
 
 describe("next-cycle drafts", () => {
-  it("records a title with its why", async () => {
-    await call("sessions.draftNextCycle", {
-      sessionId,
-      title: "Make the platform something a team can adopt without us",
-      why: "Three of five losses last quarter were onboarding, not features.",
-    });
+  it("still reads a draft an earlier release wrote, and nothing writes one now", async () => {
+    // `sessions.draftNextCycle` was deprecated in 0.2.0 and removed in 0.4.
+    // Its table stays, read-only, so a past review's drafts still show
+    // (decided 13 October 2026).
+    expect(ACTIONS.map((action) => action.name)).not.toContain(
+      "sessions.draftNextCycle",
+    );
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into next_cycle_drafts (id, workspace_id, session_id, title, why, created_by_id)
+       values (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+      [
+        workspaceId,
+        sessionId,
+        "Make the platform something a team can adopt without us",
+        "Three of five losses last quarter were onboarding, not features.",
+        facilitatorMemberId,
+      ],
+    );
 
     const status = await forward();
     expect(status.drafts).toHaveLength(1);
-    // A draft is a candidate, not a commitment: §8.9 has carried work
-    // re-entering as an issue and earning its place.
     expect(status.drafts[0]?.promoted).toBe(false);
-  });
-
-  it("refuses a draft with no why", async () => {
-    await expect(
-      call("sessions.draftNextCycle", {
-        sessionId,
-        title: "Something we liked the sound of",
-        why: "  ",
-      }),
-    ).rejects.toThrow();
   });
 });
 

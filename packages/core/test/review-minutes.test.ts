@@ -14,6 +14,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "minutes-facilitator";
@@ -227,7 +228,9 @@ const runTheReview = async () => {
       sessionId,
       questionKey: 4,
       // Two paragraphs, which the minutes give back as one line.
-      body: "Between the platform space and support.\n\nNobody owned the handover.",
+      body: richTextFromPlainText(
+        "Between the platform space and support.\n\nNobody owned the handover.",
+      ),
     },
     MANAGER,
   );
@@ -256,11 +259,19 @@ const runTheReview = async () => {
     text: "We learned that a dependency nobody owns is a dependency nobody clears.",
     carryForward: true,
   });
-  await call("sessions.draftNextCycle", {
-    sessionId,
-    title: "Make onboarding something a team finishes in one sitting",
-    why: "Three of five losses were onboarding, not features.",
-  });
+  // A draft as an earlier release wrote it: nothing writes one since 0.4,
+  // and the minutes still read the ones there are.
+  await (await workerDb()).admin.query(
+    `insert into next_cycle_drafts (id, workspace_id, session_id, title, why, created_by_id)
+     values (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+    [
+      workspaceId,
+      sessionId,
+      "Make onboarding something a team finishes in one sitting",
+      "Three of five losses were onboarding, not features.",
+      facilitatorMemberId,
+    ],
+  );
   await call("sessions.addAction", {
     sessionId,
     what: "Write the dependency contract with the platform space",
@@ -407,7 +418,9 @@ describe("every stage's record", () => {
   it("leaves the facilitator's private notes out", async () => {
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Pulse was low. Do not put this in the minutes.",
+      note: richTextFromPlainText(
+        "Pulse was low. Do not put this in the minutes.",
+      ),
     });
     await runTheReview();
 

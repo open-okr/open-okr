@@ -189,11 +189,11 @@ describe("private facilitator notes", () => {
     await call("sessions.open", { id: sessionId });
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Ask Dita about the activation number before stage two.",
+      note: richTextFromPlainText(
+        "Ask Dita about the activation number before stage two.",
+      ),
     });
 
-    // Text is still taken until change 13, and comes back as the document
-    // it was wrapped into (guided-inputs change 11b).
     const mine = await read();
     expect(mine.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(
       richTextFromPlainText(
@@ -228,20 +228,13 @@ describe("private facilitator notes", () => {
     expect((await read()).notes).toEqual({});
   });
 
-  it("reads a note stored as text before the backfill as a document", async () => {
+  it("refuses a note sent as plain text since 0.4", async () => {
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
     await call("sessions.open", { id: sessionId });
-    const wb = await workerDb();
-    await wb.admin.query(
-      `update okr_sessions set notes = jsonb_build_object($2::text, $3::text)
-        where id = $1`,
-      [sessionId, REVIEW_STAGE_KEYS[0], "Written last release."],
-    );
-
-    expect((await read()).notes).toEqual({
-      [REVIEW_STAGE_KEYS[0] as string]: richTextFromPlainText(
-        "Written last release.",
-      ),
-    });
+    await expect(
+      call("sessions.setStageNote", { id: sessionId, note: "Plain text." }),
+    ).rejects.toThrow();
+    expect((await read()).notes).toEqual({});
   });
 
   it("are never visible to a participant", async () => {
@@ -252,7 +245,9 @@ describe("private facilitator notes", () => {
     await call("sessions.open", { id: sessionId });
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Watch for polite scoring. The pulse was 2.6.",
+      note: richTextFromPlainText(
+        "Watch for polite scoring. The pulse was 2.6.",
+      ),
     });
 
     const theirs = await read(PARTICIPANT);
@@ -266,7 +261,10 @@ describe("private facilitator notes", () => {
     await expect(
       call(
         "sessions.setStageNote",
-        { id: sessionId, note: "Anybody could write this." },
+        {
+          id: sessionId,
+          note: richTextFromPlainText("Anybody could write this."),
+        },
         PARTICIPANT,
       ),
     ).rejects.toThrow(/facilitator/i);
@@ -274,9 +272,15 @@ describe("private facilitator notes", () => {
 
   it("keeps one note per stage rather than one per session", async () => {
     await call("sessions.open", { id: sessionId });
-    await call("sessions.setStageNote", { id: sessionId, note: "Stage one." });
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: richTextFromPlainText("Stage one."),
+    });
     await call("sessions.advanceStage", { id: sessionId });
-    await call("sessions.setStageNote", { id: sessionId, note: "Stage two." });
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: richTextFromPlainText("Stage two."),
+    });
 
     const after = await read();
     expect(after.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(

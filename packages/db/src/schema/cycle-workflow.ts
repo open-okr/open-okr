@@ -154,12 +154,10 @@ export const cycleRevalidations = pgTable("cycle_revalidations", {
   holds: boolean("holds").notNull().default(false),
   changed: boolean("changed").notNull().default(false),
   /**
-   * The two notes as plain text. Since guided-inputs change 12 each is the
-   * plain text of its document beside it, kept for one release so the
-   * release before reads it; change 13 drops both.
+   * The two notes as editor JSON. The plain `change_note` and `focus_note`
+   * columns they replaced (guided-inputs change 12) were dropped in 0.4
+   * (change 13b, migration 0144).
    */
-  changeNote: text("change_note"),
-  focusNote: text("focus_note"),
   changeNoteDocument: jsonb("change_note_document"),
   changeNoteDocumentVersion: integer("change_note_document_version"),
   focusNoteDocument: jsonb("focus_note_document"),
