@@ -157,7 +157,7 @@ describe("imports.previewTable and imports.runTable", () => {
     for (const name of ["imports.previewTable", "imports.runTable"] as const) {
       await expect(
         callAction({ ...context(MEMBER), pool: wb.appPool }, name, TABLE),
-      ).rejects.toThrow(/No such workspace/);
+      ).rejects.toThrow(`${name} needs a higher access level than you hold.`);
     }
     expect(await count("import_runs")).toBe(0);
     expect(await count("goals")).toBe(0);

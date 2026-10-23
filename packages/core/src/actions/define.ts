@@ -251,7 +251,7 @@ export function defineReadAction<TInput, TOutput>(definition: {
       // opening a transaction to confirm that a member is a member would cost
       // every read in the product a round trip for nothing.
       if (required > ACCESS_LEVELS.view) {
-        await requireDeclaredAccess(context, required);
+        await requireDeclaredAccess(context, required, definition.name);
       }
       return definition.handler(context, input);
     },
@@ -269,6 +269,7 @@ export function defineReadAction<TInput, TOutput>(definition: {
 export async function requireDeclaredAccess(
   context: ActionCallContext,
   required: AccessLevel,
+  action: string,
 ): Promise<void> {
   const db = drizzle(context.pool);
   await withWorkspace(db, context.workspaceId, (tx) =>
@@ -277,6 +278,7 @@ export async function requireDeclaredAccess(
       context.workspaceId,
       context.actor,
       required,
+      action,
     ),
   );
 }

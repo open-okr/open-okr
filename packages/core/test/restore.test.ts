@@ -626,6 +626,8 @@ describe("workspace.deletedItems", () => {
   });
 
   it("is refused below full, as every read on an admin screen is", async () => {
-    await expect(list(OTHER)).rejects.toThrow(/No such workspace/);
+    await expect(list(OTHER)).rejects.toThrow(
+      "workspace.deletedItems needs a higher access level than you hold.",
+    );
   });
 });
