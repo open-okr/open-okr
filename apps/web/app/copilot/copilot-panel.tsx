@@ -329,7 +329,7 @@ function ProposalCard({
  * it: every visible word inside a button has to be part of its name (WCAG
  * 2.5.3, label in name), so a speech user who says what they see reaches it,
  * and "⌘J" inside a button named "Ask the copilot" broke that. The button
- * still announces the shortcut, through `aria-keyshortcuts`.
+ * also announces the shortcut itself, through `aria-keyshortcuts`.
  */
 function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
   const { t } = useTranslations();
@@ -347,7 +347,7 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
           {t("copilot.copilotPanel.ask")}
         </span>
       </Button>
-      <Kbd aria-hidden="true">⌘J</Kbd>
+      <Kbd>⌘J</Kbd>
     </span>
   );
 }

@@ -63,14 +63,21 @@ test("the topbar offers the copilot with its shortcut", async () => {
   // The slot in `Topbar` was deliberately left empty until S-39 existed. This
   // is the assertion that it no longer is.
   //
+  // The hint sits beside the button, not inside it: every visible word inside
+  // a button has to be part of its name (WCAG 2.5.3), so "⌘J" inside "Ask the
+  // copilot" failed axe's label-in-name check. The button announces the
+  // shortcut itself.
+  await expect(ask).toHaveAttribute("aria-keyshortcuts", "Control+J Meta+J");
+  //
   // "Command J" and not "⌘J": the modifier is a Lucide icon now, because U+2318
   // is absent from the self-hosted Geist subset and the browser was drawing it
   // from a system symbol font at 11.4px of advance against the letter's 6.9px,
   // differently on every operating system. The hidden label is what a screen
   // reader announces, so it is the right thing to assert, and the icon is
   // checked separately so a silent return to a font glyph fails here.
-  await expect(ask).toContainText("Command J");
-  await expect(ask.locator("kbd svg")).toBeVisible();
+  const hint = ask.locator("xpath=following-sibling::kbd[1]");
+  await expect(hint).toContainText("Command J");
+  await expect(hint.locator("svg")).toBeVisible();
 });
 
 test("⌘J opens the panel, and it says the copilot cannot write prose", async () => {
