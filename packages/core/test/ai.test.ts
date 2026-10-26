@@ -425,7 +425,11 @@ describe("ai.readAvailability", () => {
 
     await expect(
       callAction(actor, "ai.readProviderConfig", {}),
-    ).rejects.toMatchObject({ code: "not_found" });
+    ).rejects.toMatchObject({
+      code: "forbidden",
+      message:
+        "ai.readProviderConfig needs a higher access level than you hold.",
+    });
 
     await expect(callAction(actor, "ai.readAvailability", {})).resolves.toEqual(
       { available: false },

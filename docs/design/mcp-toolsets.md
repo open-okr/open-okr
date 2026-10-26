@@ -80,8 +80,8 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 |---|---|---|
 | `core` | What a member does every week: search and fetch, goals and key results, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites | 57 (36 read-only) |
 | `work` | The rest of everyday work: drafts and approvals, targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 89 |
-| `facilitation` | Running the rhythm: sessions, the planning workflow, cycles, alignment, votes, dependencies, decisions, closing | 115 |
-| `admin` | Workspace, people, spaces, roles, invitations, settings, single sign-on, audit, channels, AI, agents, practice, nudges, exports | 134 |
+| `facilitation` | Running the rhythm: sessions, the planning workflow, cycles, alignment, votes, dependencies, decisions, closing | 113 |
+| `admin` | Workspace, people, spaces, roles, invitations, settings, single sign-on, audit, channels, AI, agents, practice, nudges, exports | 135 |
 | `all` | Every agent-surface tool | 395 |
 
 Chosen in the address the client is configured with, so it works with every
@@ -112,7 +112,7 @@ The token screen's configuration snippet gains one line explaining
 | Full token, no toolsets named | 415 | 57 |
 | Read-only token, no toolsets named | 415 | 36 |
 | Full token, `core,work` | 415 | 146 |
-| Full token, `all` | 415 | 395 |
+| Full token, `all` | 415 | 394 |
 
 `core` is about 41 KB instead of 280 KB.
 

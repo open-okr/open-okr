@@ -115,7 +115,6 @@ const OWN_CHECK = new Set([
   "sessions.create",
   "sessions.createBlocker",
   "sessions.decideObjective",
-  "sessions.draftNextCycle",
   "sessions.giveKudos",
   "sessions.givePulse",
   "sessions.open",

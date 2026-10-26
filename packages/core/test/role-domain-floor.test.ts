@@ -5,6 +5,7 @@ import { ACCESS_LEVELS } from "../src/access/levels.ts";
 import { resolveSubjectContext } from "../src/access/reads.ts";
 import { callAction } from "../src/actions/registry.ts";
 import { runOperation } from "../src/operations/operation.ts";
+import type { RichTextDocument } from "../src/rich-text/schema.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -80,13 +81,15 @@ async function addMember(role: "member" | "viewer"): Promise<void> {
   );
 }
 
+const hi: RichTextDocument = {
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text: "Hi" }] }],
+};
+
 const comment = () => ({
   subjectType: "cycle" as const,
   subjectId: cycleId,
-  body: {
-    type: "doc",
-    content: [{ type: "paragraph", content: [{ type: "text", text: "Hi" }] }],
-  },
+  body: hi,
 });
 
 const kpi = {
