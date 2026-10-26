@@ -5,9 +5,11 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  CopyButton,
   NumberInput,
   TextInput,
 } from "@openokr/ui";
+import { agentSetupPrompt } from "../../../lib/agent-setup-prompt";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -195,6 +197,20 @@ export default async function ApiTokensPage() {
           <p className="text-sm text-ink-3">
             {t("account.apiTokens.agentIntro")}
           </p>
+          {/* docs/design/agent-setup-prompt.md §4: the OAuth prompt, so an
+              agent that can open a browser needs no token at all. */}
+          <div className="flex flex-col gap-1">
+            <CopyButton
+              text={agentSetupPrompt({ endpoint: agentEndpoint })}
+              variant="primary"
+              size="sm"
+            >
+              {t("account.apiTokens.copySetupPrompt")}
+            </CopyButton>
+            <p className="text-xs text-ink-3">
+              {t("account.apiTokens.copySetupPromptHint")}
+            </p>
+          </div>
           <p className="text-sm text-ink-3">
             {t("account.apiTokens.agentHow", { endpoint: agentEndpoint })}
           </p>
