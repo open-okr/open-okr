@@ -4,6 +4,7 @@ import {
   type AIContextEgressLevel,
   type AIPrivacySettings,
   ASSIST_FEATURE_KEYS,
+  MAX_ALLOWED_HOSTS,
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
@@ -11,10 +12,21 @@ import {
   type AIProviderKind,
   BUDGET_METRICS,
   BUDGET_PERIODS,
-  BUDGET_SCOPES,
   MODEL_TIERS,
 } from "@openokr/db";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  NumberInput,
+  SelectInput,
+  TextArea,
+  TokenInput,
+} from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import {
   ASSIST_NAME_KEYS,
   PROMPT_NAME_KEYS,
@@ -29,6 +41,7 @@ import {
   savePrompt,
 } from "./actions.ts";
 import { AIForm } from "./ai-form.tsx";
+import { budgetOwnerValue } from "./choices.ts";
 
 /**
  * The AI console's second half: features, prompts, budgets and usage
@@ -168,10 +181,35 @@ export async function UsageCard({
 
 export async function BudgetsCard({
   budgets,
+  people,
+  agents,
 }: {
   readonly budgets: readonly Budget[];
+  /** The people a budget can bound, by their member id. */
+  readonly people: readonly MemberLike[];
+  /** The agents a budget can bound, by their agent id. */
+  readonly agents: readonly { readonly id: string; readonly name: string }[];
 }) {
   const { t } = await getTranslations();
+  const agentWord = t("common.agent");
+  // One picker says whose a budget is, and so its scope (guided-inputs
+  // §4.10), where a scope select stood beside a pasted id.
+  const owners = [
+    ...people.map((person) => ({
+      ...memberOption(person, agentWord),
+      id: budgetOwnerValue("user", person.id),
+    })),
+    ...agents.map((agent) => ({
+      id: budgetOwnerValue("agent", agent.id),
+      label: agent.name,
+      avatar: true,
+      badge: agentWord,
+    })),
+  ];
+  const nameOf = (scope: string, ref: string) =>
+    (scope === "agent"
+      ? agents.find((agent) => agent.id === ref)?.name
+      : people.find((person) => person.id === ref)?.name) ?? ref.slice(0, 8);
 
   return (
     <Card>
@@ -216,8 +254,8 @@ export async function BudgetsCard({
                     <td className="py-1.5 pr-3 text-ink">
                       {budget.scope}
                       {budget.scopeRef ? (
-                        <span className="ml-1.5 font-mono text-ink-3">
-                          {budget.scopeRef.slice(0, 8)}
+                        <span className="ml-1.5 text-ink-3">
+                          {nameOf(budget.scope, budget.scopeRef)}
                         </span>
                       ) : null}
                     </td>
@@ -245,64 +283,38 @@ export async function BudgetsCard({
           action={saveBudget}
           className="flex flex-wrap items-end gap-2 border-t border-line pt-3"
         >
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.scope")}
-            <select
-              name="scope"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_SCOPES.map((scope) => (
-                <option key={scope} value={scope}>
-                  {scope}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.whoseForAUser")}
-            <input
-              name="scopeRef"
-              placeholder={t("admin.ai.governance.leaveEmptyForThe")}
-              className="w-64 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.metric")}
-            <select
-              name="metric"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_METRICS.map((metric) => (
-                <option key={metric} value={metric}>
-                  {metric}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.period")}
-            <select
-              name="period"
-              className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            >
-              {BUDGET_PERIODS.map((period) => (
-                <option key={period} value={period}>
-                  {period}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("admin.ai.governance.limit")}
-            <input
-              name="limitValue"
-              type="number"
-              min={0}
-              step="0.01"
-              required
-              className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <EntityPicker
+            label={t("admin.ai.governance.whoseForAUser")}
+            name="owner"
+            defaultValue={null}
+            options={owners}
+            noneLabel={t("admin.ai.governance.wholeWorkspace")}
+            className="w-64"
+          />
+          <SelectInput label={t("admin.ai.governance.metric")} name="metric">
+            {BUDGET_METRICS.map((metric) => (
+              <option key={metric} value={metric}>
+                {metric}
+              </option>
+            ))}
+          </SelectInput>
+          <SelectInput label={t("common.period")} name="period">
+            {BUDGET_PERIODS.map((period) => (
+              <option key={period} value={period}>
+                {period}
+              </option>
+            ))}
+          </SelectInput>
+          {/* Above 0, as the server holds it: a budget of nothing would
+              stop every call (guided-inputs §4.11). */}
+          <NumberInput
+            label={t("admin.ai.governance.limit")}
+            name="limitValue"
+            min={0.01}
+            step={0.01}
+            required
+            inputClassName="w-32"
+          />
           <Button type="submit" variant="default" size="sm">
             {t("common.set")}
           </Button>
@@ -358,23 +370,22 @@ export async function FeaturesCard({
                   {named === undefined ? featureKey : t(named)}
                 </span>
               </label>
-              <label className="flex items-center gap-1.5 text-xs text-ink-3">
-                {t("admin.ai.governance.tier")}
-                <select
-                  name="tierOverride"
-                  defaultValue={setting?.tierOverride ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink"
-                >
-                  <option value="">
-                    {t("admin.ai.governance.whateverTheAssistAsks")}
+              <SelectInput
+                label={t("admin.ai.governance.tier")}
+                name="tierOverride"
+                defaultValue={setting?.tierOverride ?? ""}
+                className="flex-row items-center gap-1.5"
+                inputClassName="w-auto"
+              >
+                <option value="">
+                  {t("admin.ai.governance.whateverTheAssistAsks")}
+                </option>
+                {MODEL_TIERS.map((tier) => (
+                  <option key={tier} value={tier}>
+                    {TIER_WORDS[tier] ?? tier}
                   </option>
-                  {MODEL_TIERS.map((tier) => (
-                    <option key={tier} value={tier}>
-                      {TIER_WORDS[tier] ?? tier}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                ))}
+              </SelectInput>
               <Button type="submit" variant="ghost" size="sm">
                 {t("common.save")}
               </Button>
@@ -431,11 +442,15 @@ export async function PromptsCard({
             </span>
             <AIForm action={savePrompt} className="flex flex-col gap-1.5">
               <input type="hidden" name="promptKey" value={prompt.promptKey} />
-              <textarea
+              <TextArea
+                label={t("admin.ai.governance.systemPromptFor", {
+                  prompt: promptName(prompt.promptKey, t),
+                })}
+                hideLabel
                 name="systemPrompt"
                 rows={4}
                 defaultValue={prompt.systemPrompt}
-                className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
+                inputClassName="font-mono text-xs"
               />
               <Button type="submit" variant="ghost" size="sm">
                 {t("admin.ai.governance.saveANewVersion")}
@@ -658,26 +673,19 @@ export async function PrivacyCard({
               </span>
             </label>
 
-            <div className="flex flex-col gap-1">
-              <label
-                htmlFor="ai-privacy-hosts"
-                className="text-xs font-semibold text-ink-2"
-              >
-                {t("admin.ai.privacy.allowedHosts")}
-              </label>
-              <textarea
-                id="ai-privacy-hosts"
-                name="allowedHosts"
-                rows={3}
-                defaultValue={privacy.allowedHosts.join("\n")}
-                placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
-                aria-describedby="ai-privacy-hosts-help"
-                className="rounded-md border border-line bg-surface px-2 py-1.5 font-mono text-xs text-ink"
-              />
-              <p id="ai-privacy-hosts-help" className="text-xs text-ink-3">
-                {t("admin.ai.privacy.allowedHostsHelp")}
-              </p>
-            </div>
+            {/* A chip each, checked as it is made by the rule the action
+                applies, a pasted address reduced to its host (§4.11). */}
+            <TokenInput
+              id="ai-privacy-hosts"
+              label={t("admin.ai.privacy.allowedHosts")}
+              name="allowedHosts"
+              joiner={"\n"}
+              rule="host"
+              max={MAX_ALLOWED_HOSTS}
+              defaultValue={privacy.allowedHosts}
+              placeholder={t("admin.ai.privacy.allowedHostsPlaceholder")}
+              description={t("admin.ai.privacy.allowedHostsHelp")}
+            />
 
             <div>
               <Button type="submit" variant="default" size="sm">

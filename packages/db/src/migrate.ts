@@ -207,8 +207,12 @@ export async function runMigrations(
         await client.query("commit");
       } catch (error) {
         await client.query("rollback");
+        // The database's own sentence in the message, not only in the cause:
+        // a migration that refuses on purpose (0144's guard) says what to do,
+        // and an operator reads the first line of a failed boot.
+        const reason = error instanceof Error ? ` ${error.message}` : "";
         throw new MigrationError(
-          `Migration ${file.name} failed. Nothing was applied.`,
+          `Migration ${file.name} failed. Nothing was applied.${reason}`,
           {
             cause: error,
           },

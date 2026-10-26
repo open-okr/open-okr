@@ -5,11 +5,13 @@ import {
   Card,
   CardBody,
   CardHeader,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { namedOption } from "../../../lib/entity-options.ts";
 import type { KpiOption } from "../../../lib/kpi-options.ts";
 import {
   linkKeyResultKpi,
@@ -104,22 +106,19 @@ export function GoalWrites({
         </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
-        <label className="flex flex-col gap-1 text-xs text-ink-3">
+        <div className="flex flex-col gap-1 text-xs text-ink-3">
           {t("goal.writes.moveLabel")}
           <div className="flex flex-wrap items-center gap-2.5">
-            <select
-              value={target}
+            <EntityPicker
+              label={t("goal.writes.moveTarget")}
+              hideLabel
+              value={target === "" ? null : target}
+              options={cycles.map(namedOption)}
               disabled={pending}
-              aria-label={t("goal.writes.moveTarget")}
-              onChange={(event) => setTarget(event.target.value)}
-              className="rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
-            >
-              {cycles.map((cycle) => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(next) => setTarget(next ?? "")}
+              className="w-56"
+              inputClassName="text-xs"
+            />
             <Button
               type="button"
               size="sm"
@@ -133,7 +132,7 @@ export function GoalWrites({
             </Button>
           </div>
           <span className="text-ink-4">{t("goal.writes.moveHelp")}</span>
-        </label>
+        </div>
 
         {unlinkedKeyResults.length > 0 ? (
           <div className="flex flex-col gap-1.5">
@@ -154,32 +153,35 @@ export function GoalWrites({
             ) : (
               <>
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <select
-                    value={linking}
+                  <EntityPicker
+                    label={t("goal.writes.linkKeyResult")}
+                    hideLabel
+                    value={linking === "" ? null : linking}
+                    options={unlinkedKeyResults.map((keyResult) => ({
+                      id: keyResult.id,
+                      label: keyResult.title,
+                    }))}
                     disabled={pending}
-                    aria-label={t("goal.writes.linkKeyResult")}
-                    onChange={(event) => setPickedKeyResult(event.target.value)}
-                    className="max-w-64 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
-                  >
-                    {unlinkedKeyResults.map((keyResult) => (
-                      <option key={keyResult.id} value={keyResult.id}>
-                        {keyResult.title}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={kpiId}
+                    onValueChange={(next) => setPickedKeyResult(next ?? "")}
+                    className="w-64"
+                    inputClassName="text-xs"
+                  />
+                  <EntityPicker
+                    label={t("goal.writes.linkKpi")}
+                    hideLabel
+                    value={kpiId === "" ? null : kpiId}
+                    options={kpis.map((kpi) => ({
+                      id: kpi.id,
+                      label: kpi.title,
+                      detail: kpi.unit
+                        ? `${kpi.shortId} · ${kpi.unit}`
+                        : kpi.shortId,
+                    }))}
                     disabled={pending}
-                    aria-label={t("goal.writes.linkKpi")}
-                    onChange={(event) => setPickedKpi(event.target.value)}
-                    className="max-w-64 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
-                  >
-                    {kpis.map((kpi) => (
-                      <option key={kpi.id} value={kpi.id}>
-                        {kpi.unit ? `${kpi.title} (${kpi.unit})` : kpi.title}
-                      </option>
-                    ))}
-                  </select>
+                    onValueChange={(next) => setPickedKpi(next ?? "")}
+                    className="w-64"
+                    inputClassName="text-xs"
+                  />
                   <Button
                     type="button"
                     size="sm"

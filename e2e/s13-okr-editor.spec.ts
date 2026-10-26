@@ -36,6 +36,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -170,7 +171,7 @@ test("a title changed in one tab shows in another without a reload", async () =>
 });
 
 test("a value typed into the table is recorded and moves the progress", async () => {
-  const value = page.getByRole("spinbutton", {
+  const value = page.getByRole("textbox", {
     name: `Current value for ${KEY_RESULT}`,
   });
   await expect(value).toHaveValue("0");
@@ -200,7 +201,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
   await page.keyboard.type(retitled);
   await page.keyboard.press("Enter");
 
-  const value = page.getByRole("spinbutton", {
+  const value = page.getByRole("textbox", {
     name: `Current value for ${retitled}`,
   });
   await expect(value).toBeVisible({ timeout: 15_000 });
@@ -221,7 +222,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
       page.locator(`input[aria-label="Key result title"][value="${retitled}"]`),
     ).toBeVisible({ timeout: 5_000 });
     await expect(
-      page.getByRole("spinbutton", { name: `Current value for ${retitled}` }),
+      page.getByRole("textbox", { name: `Current value for ${retitled}` }),
     ).toHaveValue("55");
     await expect(page.getByLabel(`Due date for ${retitled}`)).toHaveValue(
       "2030-03-31",
@@ -250,7 +251,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
  */
 test("easing a target asks why, and saves with the reason", async () => {
   await goTo(page, "/goals");
-  const target = page.getByRole("spinbutton", {
+  const target = page.getByRole("textbox", {
     name: `Target for ${KEY_RESULT}`,
   });
   await expect(target).toHaveValue("100", { timeout: 15_000 });
@@ -269,7 +270,7 @@ test("easing a target asks why, and saves with the reason", async () => {
   await expect(async () => {
     await page.reload();
     await expect(
-      page.getByRole("spinbutton", { name: `Target for ${KEY_RESULT}` }),
+      page.getByRole("textbox", { name: `Target for ${KEY_RESULT}` }),
     ).toHaveValue("80", { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
 });
@@ -372,21 +373,22 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   await expect(page).not.toHaveURL(/scope=/);
   await expect(ours).toBeVisible({ timeout: 15_000 });
 
-  // A champion is a select, and choosing one is a navigation like a tab.
+  // A champion is found by typing, and choosing one is a navigation like a
+  // tab (guided-inputs §4.10).
   await scope.getByRole("link", { name: "All" }).click();
   // Scoped to the page's own content: the screen just left can still be in
   // the document, hidden, while the next one renders.
   const champion = page
     .locator("#main-content")
-    .getByLabel("Champion", { exact: true });
+    .getByRole("combobox", { name: "Champion", exact: true });
   const me = await page
     .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
     .first()
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]")
-    .getByLabel(`Champion of ${OBJECTIVE}`)
-    .evaluate((select) => (select as HTMLSelectElement).value);
-  await champion.selectOption(me);
-  await expect(page).toHaveURL(new RegExp(`champion=${me}`));
+    .getByRole("combobox", { name: `Champion of ${OBJECTIVE}` })
+    .inputValue();
+  await choose(champion, me);
+  await expect(page).toHaveURL(/champion=[0-9a-f-]{36}/);
   await expect(ours).toBeVisible({ timeout: 15_000 });
 
   await goTo(page, "/goals");

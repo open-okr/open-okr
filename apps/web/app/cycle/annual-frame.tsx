@@ -1,4 +1,15 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  RichTextField,
+  RichTextView,
+  TextArea,
+  TextInput,
+} from "@openokr/ui";
+import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { setFrame } from "./frame-actions.ts";
@@ -29,36 +40,6 @@ import { setFrame } from "./frame-actions.ts";
  * because refusing a sixth mid-conversation would stop a workshop rather than
  * coach it. The Coach's own check is where that judgement belongs.
  */
-
-/** The plain text of one rich-text field, for a textarea. */
-function asText(value: unknown): string {
-  if (value === null || value === undefined) {
-    return "";
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  // Editor JSON. Only the paragraph text is offered back, which is what a
-  // plain textarea can honestly round-trip; a member wanting formatting uses
-  // the editor on a document instead.
-  const walk = (node: unknown): string => {
-    if (!node || typeof node !== "object") {
-      return "";
-    }
-    const record = node as { text?: unknown; content?: unknown };
-    if (typeof record.text === "string") {
-      return record.text;
-    }
-    if (Array.isArray(record.content)) {
-      return record.content.map(walk).join("");
-    }
-    return "";
-  };
-  const doc = value as { content?: unknown };
-  return Array.isArray(doc.content)
-    ? doc.content.map((node) => walk(node)).join("\n")
-    : "";
-}
 
 interface FrameRevision {
   readonly id: string;
@@ -135,26 +116,25 @@ export async function AnnualFrame({
           {canEdit ? (
             <ActionForm action={setFrame} className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-2">
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.year")}
-                  <input
-                    name="yearLabel"
-                    required
-                    defaultValue={
-                      frame?.yearLabel ?? String(new Date().getFullYear())
-                    }
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.horizonTheMidTerm")}
-                  <input
-                    name="horizonLabel"
-                    defaultValue={frame?.horizonLabel ?? ""}
-                    placeholder={t("cycle.annualFrame.threeYearsOutSay")}
-                    className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                {/* The server's 40 and 80 (cycles.setAnnualFrame). */}
+                <TextInput
+                  label={t("cycle.annualFrame.year")}
+                  name="yearLabel"
+                  required
+                  maxLength={40}
+                  defaultValue={
+                    frame?.yearLabel ?? String(new Date().getFullYear())
+                  }
+                  className="w-32"
+                />
+                <TextInput
+                  label={t("cycle.annualFrame.horizonTheMidTerm")}
+                  name="horizonLabel"
+                  maxLength={80}
+                  defaultValue={frame?.horizonLabel ?? ""}
+                  placeholder={t("cycle.annualFrame.threeYearsOutSay")}
+                  className="w-72"
+                />
                 <label className="flex items-end gap-2 pb-1.5 text-sm text-ink">
                   <input
                     type="checkbox"
@@ -190,19 +170,16 @@ export async function AnnualFrame({
                   ],
                 ] as const
               ).map(([name, label, hint]) => (
-                <label
+                // The compact editor (guided-inputs §4.7), sent on every save
+                // as it stands, so the frame keeps what nobody touched.
+                <RichTextField
                   key={name}
-                  className="flex flex-col gap-1 text-xs text-ink-3"
-                >
-                  {label}
-                  <span className="text-ink-4">{hint}</span>
-                  <textarea
-                    name={name}
-                    rows={3}
-                    defaultValue={asText(frame?.[name])}
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                  label={label}
+                  name={name}
+                  content={frame?.[name] ?? null}
+                  description={hint}
+                  sendUnchanged
+                />
               ))}
 
               <fieldset className="flex flex-col gap-2 rounded-lg border border-line p-3">
@@ -213,37 +190,40 @@ export async function AnnualFrame({
                   {t("cycle.annualFrame.twoToFiveEach")}
                 </p>
                 {[0, 1, 2, 3, 4].map((index) => (
-                  <div key={index} className="flex flex-wrap gap-2">
-                    <input
-                      name="strategyText"
-                      defaultValue={strategies[index]?.text ?? ""}
-                      placeholder={t("cycle.annualFrame.strategyNumber", {
+                  <div key={index} className="flex flex-wrap items-start gap-2">
+                    {/* Labelled, where a placeholder named them and went
+                        away as soon as anything was typed (§4.11). */}
+                    <TextInput
+                      label={t("cycle.annualFrame.strategyNumber", {
                         number: index + 1,
                       })}
-                      className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                      name="strategyText"
+                      maxLength={280}
+                      defaultValue={strategies[index]?.text ?? ""}
+                      className="w-72"
                     />
-                    <input
+                    <TextArea
+                      label={t("cycle.annualFrame.strategyNoteLabel", {
+                        number: index + 1,
+                      })}
                       name="strategyNote"
+                      maxLength={1000}
+                      rows={1}
                       defaultValue={strategies[index]?.note ?? ""}
-                      placeholder={t("cycle.annualFrame.whatItMeansIn")}
-                      className="w-96 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+                      className="w-96"
                     />
                   </div>
                 ))}
               </fieldset>
 
               {frame?.agreed ? (
-                <label className="flex flex-col gap-1 text-xs text-ink-3">
-                  {t("cycle.annualFrame.revisionReason")}
-                  <span className="text-ink-4">
-                    {t("cycle.annualFrame.revisionReasonHint")}
-                  </span>
-                  <input
-                    name="reason"
-                    maxLength={500}
-                    className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                  />
-                </label>
+                <TextArea
+                  label={t("cycle.annualFrame.revisionReason")}
+                  description={t("cycle.annualFrame.revisionReasonHint")}
+                  name="reason"
+                  maxLength={500}
+                  rows={2}
+                />
               ) : null}
 
               <Button type="submit" variant="default" size="sm">
@@ -328,20 +308,25 @@ async function ReadOnlyFrame({ frame }: { readonly frame: Frame | null }) {
       </p>
     );
   }
-  const fields: readonly (readonly [string, string])[] = [
-    [t("common.mission"), asText(frame.mission)],
-    [t("cycle.annualFrame.vision"), asText(frame.vision)],
-    [t("cycle.annualFrame.midTermStrategy"), asText(frame.strategy)],
-    [t("cycle.annualFrame.notDoingThisYear"), asText(frame.notDoing)],
+  // As written, formatting and all, where this was the paragraph text alone.
+  const fields: readonly (readonly [string, string | null])[] = [
+    [t("common.mission"), richTextHtml(frame.mission)],
+    [t("cycle.annualFrame.vision"), richTextHtml(frame.vision)],
+    [t("cycle.annualFrame.midTermStrategy"), richTextHtml(frame.strategy)],
+    [t("cycle.annualFrame.notDoingThisYear"), richTextHtml(frame.notDoing)],
   ];
   return (
     <div className="flex flex-col gap-2.5">
-      {fields.map(([label, text]) => (
+      {fields.map(([label, html]) => (
         <div key={label} className="flex flex-col gap-0.5">
           <span className="text-xs font-semibold text-ink-3">{label}</span>
-          <p className="whitespace-pre-line text-sm text-ink-2">
-            {text === "" ? t("cycle.annualFrame.notWrittenYet") : text}
-          </p>
+          {html === null ? (
+            <p className="text-sm text-ink-2">
+              {t("cycle.annualFrame.notWrittenYet")}
+            </p>
+          ) : (
+            <RichTextView html={html} className="text-sm text-ink-2" />
+          )}
         </div>
       ))}
       {frame.strategies.length > 0 ? (

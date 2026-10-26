@@ -1,8 +1,21 @@
 import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  NumberInput,
+  SelectInput,
+  TextInput,
+  UnitInput,
+} from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
+import { memberOption } from "../../lib/entity-options.ts";
+import { searchHumans } from "../../lib/member-search.ts";
 import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -254,71 +267,72 @@ export default async function KpisPage({
             </CardHeader>
             <CardBody>
               <ActionForm action={addKpi} className="flex flex-col gap-2">
-                <label
-                  className="text-xs font-semibold text-ink-2"
-                  htmlFor="title"
-                >
-                  {t("kpis.whatIsBeingMeasured")}
-                </label>
-                <input
+                <TextInput
                   id="title"
+                  label={t("kpis.whatIsBeingMeasured")}
                   name="title"
                   required
+                  maxLength={500}
                   placeholder={t("kpis.mobileActivationRate")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="text-xs text-ink-3" htmlFor="frequency">
-                    {t("common.frequency")}
-                  </label>
-                  <select
+                  <SelectInput
                     id="frequency"
+                    label={t("common.frequency")}
                     name="frequency"
                     defaultValue="monthly"
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                    className="flex-row items-center gap-2.5"
+                    inputClassName="h-6.5 w-auto text-xs text-ink-2"
                   >
                     <option value="daily">{t("common.daily")}</option>
                     <option value="weekly">{t("common.weekly")}</option>
                     <option value="monthly">{t("common.monthly")}</option>
                     <option value="quarterly">{t("common.quarterly")}</option>
                     <option value="yearly">{t("common.yearly")}</option>
-                  </select>
-                  <label className="text-xs text-ink-3" htmlFor="targetDefault">
-                    {t("common.standingTarget")}
-                  </label>
-                  <input
+                  </SelectInput>
+                </div>
+                {/* guided-inputs §4.8: the target as a number, and the unit
+                    it is measured in, which the form did not ask for. */}
+                <div className="flex flex-wrap items-end gap-2.5">
+                  <NumberInput
                     id="targetDefault"
+                    label={t("common.standingTarget")}
                     name="targetDefault"
-                    type="number"
-                    step="any"
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+                    inputClassName="h-auto w-24 py-1 text-xs"
+                  />
+                  <UnitInput
+                    id="kpi-unit"
+                    label={t("kpis.unit")}
+                    name="unit"
+                    known={grid.kpis.flatMap((kpi) =>
+                      kpi.unit ? [kpi.unit] : [],
+                    )}
+                    inputClassName="h-auto w-28 py-1 text-xs"
                   />
                 </div>
                 <JudgedBy idPrefix="add" />
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="text-xs text-ink-3" htmlFor="ownerMemberId">
-                    {t("kpis.rule.owner")}
-                  </label>
-                  <select
+                  <EntityPicker
                     id="ownerMemberId"
+                    label={t("kpis.rule.owner")}
                     name="ownerMemberId"
+                    required
                     defaultValue={workspace.memberId}
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
-                  >
-                    {people.map((person) => (
-                      <option key={person.id} value={person.id}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="text-xs text-ink-3" htmlFor="tier">
-                    {t("kpis.rule.tier")}
-                  </label>
-                  <select
+                    options={people.map((person) =>
+                      memberOption(person, t("common.agent")),
+                    )}
+                    search={searchHumans}
+                    className="w-56"
+                    inputClassName="text-xs"
+                  />
+                  <SelectInput
                     id="tier"
+                    label={t("kpis.rule.tier")}
                     name="tier"
                     defaultValue=""
-                    className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2"
+                    className="flex-row items-center gap-2.5"
+                    inputClassName="h-6.5 w-auto text-xs text-ink-2"
                   >
                     <option value="">{t("kpis.rule.noTier")}</option>
                     <option value="input">{t("kpis.rule.tierInput")}</option>
@@ -327,7 +341,7 @@ export default async function KpisPage({
                       {t("kpis.rule.tierOutcome")}
                     </option>
                     <option value="impact">{t("kpis.rule.tierImpact")}</option>
-                  </select>
+                  </SelectInput>
                 </div>
                 <Button type="submit" variant="primary" className="self-start">
                   {t("common.add")}
@@ -348,15 +362,15 @@ export default async function KpisPage({
             </CardHeader>
             <CardBody>
               <ActionForm action={addCategory} className="flex flex-col gap-2">
-                <label className="sr-only" htmlFor="name">
-                  {t("kpis.categoryName")}
-                </label>
-                <input
+                <TextInput
                   id="name"
+                  label={t("kpis.categoryName")}
+                  hideLabel
                   name="name"
                   required
+                  maxLength={120}
                   placeholder={t("kpis.revenue")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
                 <Button type="submit" className="self-start">
                   {t("common.add")}

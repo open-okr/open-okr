@@ -1,5 +1,12 @@
 import { SUGGESTED_TIMELINE } from "@openokr/method";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  TextInput,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { distributePack, savePackNote, togglePackItem } from "./actions.ts";
@@ -126,14 +133,17 @@ export async function InputPack({
                         name="gathered"
                         value={String(item.gathered)}
                       />
-                      <input
+                      <TextInput
                         name="note"
                         defaultValue={item.note ?? ""}
                         placeholder={t("cycle.inputPack.whereItIsOr")}
-                        aria-label={t("cycle.inputPack.noteFor", {
+                        label={t("cycle.inputPack.noteFor", {
                           label: item.label,
                         })}
-                        className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink-2 placeholder:text-ink-4"
+                        hideLabel
+                        maxLength={2000}
+                        className="min-w-0 flex-1"
+                        inputClassName="h-6.5 px-2 text-xs text-ink-2 placeholder:text-ink-4"
                       />
                       <Button
                         type="submit"

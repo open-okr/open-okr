@@ -1,4 +1,12 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  TextInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -101,23 +109,21 @@ async function Objective({
           className="flex flex-wrap items-center gap-2"
         >
           <input type="hidden" name="goalId" value={objective.id} />
-          <select
-            name="strategyId"
-            defaultValue={objective.strategyId ?? ""}
-            aria-label={t("cycle.annualObjectives.theStrategyItServes", {
+          <EntityPicker
+            label={t("cycle.annualObjectives.theStrategyItServes", {
               title: objective.title,
             })}
-            className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-          >
-            <option value="">
-              {t("cycle.annualObjectives.servingNoStrategy")}
-            </option>
-            {strategies.map((strategy) => (
-              <option key={strategy.id} value={strategy.id}>
-                {strategy.text}
-              </option>
-            ))}
-          </select>
+            hideLabel
+            name="strategyId"
+            defaultValue={objective.strategyId}
+            options={strategies.map((strategy) => ({
+              id: strategy.id,
+              label: strategy.text,
+            }))}
+            noneLabel={t("cycle.annualObjectives.servingNoStrategy")}
+            className="w-96"
+            inputClassName="text-xs"
+          />
           <Button type="submit" variant="ghost" size="sm">
             {t("common.link")}
           </Button>
@@ -132,13 +138,16 @@ async function Objective({
           <input type="hidden" name="goalId" value={objective.id} />
           <input type="hidden" name="championId" value={championId} />
           <input type="hidden" name="reviewerId" value={reviewerId} />
-          <input
+          <TextInput
             name="title"
             defaultValue={objective.title}
-            aria-label={t("cycle.annualObjectives.thisQuarterObjectiveUnder", {
+            label={t("cycle.annualObjectives.thisQuarterObjectiveUnder", {
               title: objective.title,
             })}
-            className="w-96 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
+            hideLabel
+            maxLength={500}
+            className="w-96"
+            inputClassName="h-6.5 px-2 text-xs"
           />
           <Button type="submit" variant="default" size="sm">
             {t("cycle.annualObjectives.sendIntoThisQuarter")}

@@ -17,6 +17,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -93,7 +94,7 @@ test("a member marks their own leave, with the colleague standing in", async () 
   // Nobody is chosen for you.
   const mark = card.getByRole("button", { name: "Mark the leave" });
   await expect(mark).toBeDisabled();
-  await card.getByLabel("Who stands in").selectOption({ label: DELEGATE });
+  await choose(card.getByLabel("Who stands in"), DELEGATE);
   await mark.click();
 
   await expect(card.getByTestId("member-leave-saved")).toBeVisible({

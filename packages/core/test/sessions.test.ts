@@ -11,6 +11,8 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
+import type { RichTextDocument } from "../src/rich-text/schema.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "session-facilitator";
@@ -1550,7 +1552,12 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     await callAction(
       { pool: wb.appPool, ...context() },
       "sessions.setCoordinatorNote",
-      { sessionId, note: "Hiring is the constraint, not the roadmap." },
+      {
+        sessionId,
+        note: richTextFromPlainText(
+          "Hiring is the constraint, not the roadmap.",
+        ),
+      },
     );
 
     const digest = (await callAction(
@@ -1563,6 +1570,68 @@ describe("sessions.digest carries the coordinator's note (P6-G19b)", () => {
     // not return it, so a surface could show the note it had just written only
     // by reloading somebody else's page.
     expect(digest?.note).toBe("Hiring is the constraint, not the roadmap.");
+  });
+
+  it("keeps a note written as a document, and carries it on one line", async () => {
+    // Guided-inputs change 11c. The digest, its narration and a channel post
+    // are lists of lines, so two paragraphs become one line there.
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await holdAWeek(0.6);
+    const note: RichTextDocument = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Hiring is the " },
+            { type: "text", text: "constraint", marks: [{ type: "bold" }] },
+            { type: "text", text: "." },
+          ],
+        },
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Not the roadmap." }],
+        },
+      ],
+    };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.setCoordinatorNote",
+      { sessionId, note },
+    );
+
+    const digest = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.digest",
+      { sessionId },
+    )) as { note: string | null; noteDocument: unknown; lines: string[] };
+    expect(digest.noteDocument).toEqual(note);
+    expect(digest.note).toBe("Hiring is the constraint. Not the roadmap.");
+    expect(digest.lines).toContain(
+      "For leadership: Hiring is the constraint. Not the roadmap.",
+    );
+  });
+
+  it("refuses a blank note, and plain text since 0.4", async () => {
+    const wb = await workerDb();
+    await createGoalWithKr();
+    const sessionId = await holdAWeek(0.6);
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.setCoordinatorNote",
+        { sessionId, note: { type: "doc", content: [{ type: "paragraph" }] } },
+      ),
+    ).rejects.toThrow(/something for leadership/);
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "sessions.setCoordinatorNote",
+        { sessionId, note: "Plain text." as never },
+      ),
+    ).rejects.toThrow();
   });
 });
 

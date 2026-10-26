@@ -153,8 +153,15 @@ export const cycleRevalidations = pgTable("cycle_revalidations", {
     .references(() => workspaces.id, { onDelete: "cascade" }),
   holds: boolean("holds").notNull().default(false),
   changed: boolean("changed").notNull().default(false),
-  changeNote: text("change_note"),
-  focusNote: text("focus_note"),
+  /**
+   * The two notes as editor JSON. The plain `change_note` and `focus_note`
+   * columns they replaced (guided-inputs change 12) were dropped in 0.4
+   * (change 13b, migration 0144).
+   */
+  changeNoteDocument: jsonb("change_note_document"),
+  changeNoteDocumentVersion: integer("change_note_document_version"),
+  focusNoteDocument: jsonb("focus_note_document"),
+  focusNoteDocumentVersion: integer("focus_note_document_version"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

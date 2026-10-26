@@ -11,7 +11,15 @@
  * two answers about one dependency. The resource or priority shifts are one
  * note per meeting, so they sit on the session.
  */
-import { date, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  date,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { cycles } from "./cycles.ts";
 import { goals, keyResults } from "./goals.ts";
@@ -82,7 +90,13 @@ export const decisions = pgTable("decisions", {
   }),
   /** §7.5 dates a decision to the day. Ordering within one falls to `created_at`. */
   at: date("at").notNull(),
-  text: text("text").notNull(),
+  /**
+   * The decision as editor JSON, and its rich text schema version. The plain
+   * `text` column it replaced (guided-inputs change 11a) was dropped in 0.4
+   * (change 13b, migration 0144).
+   */
+  textDocument: jsonb("text_document"),
+  textDocumentVersion: integer("text_document_version"),
   authorMemberId: uuid("author_member_id")
     .notNull()
     .references(() => workspaceMembers.id),

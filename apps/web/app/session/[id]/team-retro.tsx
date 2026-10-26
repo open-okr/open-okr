@@ -26,6 +26,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextArea,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -229,18 +230,17 @@ function Column({
 
       {canWrite ? (
         <div className="flex flex-col gap-1.5">
-          <label className="flex flex-col gap-1" htmlFor={`note-${columnKey}`}>
-            <span className="sr-only">{title}</span>
-            <textarea
-              id={`note-${columnKey}`}
-              rows={2}
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={text}
-              disabled={pending}
-              placeholder={t("session.detail.teamRetro.oneThingInOne")}
-              onChange={(event) => setText(event.target.value)}
-            />
-          </label>
+          <TextArea
+            label={title}
+            hideLabel
+            id={`note-${columnKey}`}
+            rows={2}
+            value={text}
+            disabled={pending}
+            placeholder={t("session.detail.teamRetro.oneThingInOne")}
+            onChange={(event) => setText(event.target.value)}
+            maxLength={500}
+          />
           <span className="flex flex-wrap items-center gap-2">
             <Button type="button" size="sm" disabled={pending} onClick={add}>
               {t("session.detail.teamRetro.addIt")}

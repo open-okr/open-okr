@@ -22,6 +22,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { choose, chooseAt, chooseContaining, offered } from "./pickers.ts";
 import pg from "pg";
 
 // **Not an address of this spec's own.** The application instance is claimed by
@@ -62,6 +63,18 @@ const CONNECTION = process.env.DATABASE_URL
     );
 
 const NEWLINE = String.fromCharCode(10);
+
+/**
+ * Resolves once the next server action has answered. Started before the
+ * click that sends it, so an answer that arrives first is not missed.
+ */
+function serverActionDone(target: Page) {
+  return target.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.request().headers()["next-action"] !== undefined,
+  );
+}
 
 // Serial, and one shared context: these tests build on each other's state the
 // way the session specs do, and the database connection is opened once.
@@ -212,24 +225,42 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
   await page.getByRole("button", { name: "Declining" }).first().click();
   await expect(unrecorded).toHaveCount(before - 1, { timeout: 10_000 });
 
+  // The shifts note, rich text since guided-inputs change 11a: typed, saved,
+  // and there again once the page is read again.
+  const shiftsBox = () =>
+    page.getByRole("textbox", {
+      name: "Resource or priority shifts",
+      exact: true,
+    });
+  await shiftsBox().click();
+  await shiftsBox().pressSequentially("Two people move onto activation");
+  // **The save is waited for before the reload.** A reload straight after the
+  // click can abort the server action in flight, and the note then reads back
+  // empty for a reason that has nothing to do with the product.
+  const shiftsSaved = serverActionDone(page);
+  await page.getByRole("button", { name: "Save the note" }).click();
+  await shiftsSaved;
+  await page.reload();
+  await expect(shiftsBox()).toContainText("Two people move onto activation", {
+    timeout: 15_000,
+  });
+
   // A decision against this goal's own key result, named rather than picked by
   // position: the panel lists every objective in the space, so "the first
   // option with a separator" was landing the decision on whichever objective
   // happened to sort first and then checking a different goal's page.
-  const subject = page.getByLabel("What it affects");
-  const options = await subject.locator("option").allTextContents();
-  const keyResultOption = options.find((label) =>
-    label.endsWith(`· ${keyResult.title}`),
+  // Found by typing its title into the picker, which offers it as
+  // "objective · key result".
+  await chooseContaining(page.getByLabel("What it affects"), keyResult.title);
+  // The compact editor since guided-inputs change 11a.
+  const decision = page.getByRole("textbox", {
+    name: "The decision",
+    exact: true,
+  });
+  await decision.click();
+  await decision.pressSequentially(
+    "Move two engineers off billing onto activation",
   );
-  if (!keyResultOption) {
-    throw new Error(
-      `The review offered no option for "${keyResult.title}". Offered: ${options.join(" | ")}`,
-    );
-  }
-  await subject.selectOption({ label: keyResultOption });
-  await page
-    .getByLabel("The decision")
-    .fill("Move two engineers off billing onto activation");
   await page.getByRole("button", { name: "Record the decision" }).click();
   // **Scoped to the list, not the page.** A bare `getByText` here also matched
   // the textarea the sentence was just typed into, so it went green the moment
@@ -454,14 +485,24 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(room).toContainText("The room has energy");
   await expect(room).toContainText("relieved");
 
-  // The private note, written and read back by the facilitator.
-  await page
-    .getByLabel("Private note for Open and check-in")
-    .fill("Pulse was low. Name it before scoring.");
+  // The private note, written and read back by the facilitator. Rich text
+  // since guided-inputs change 11b, so it is read back after a reload: the
+  // editor holds what was typed whether or not it was stored.
+  const privateNote = () =>
+    page.getByRole("textbox", {
+      name: "Private note for Open and check-in",
+      exact: true,
+    });
+  await privateNote().click();
+  await privateNote().pressSequentially("Pulse was low. Name it before scoring.");
+  const noteSaved = serverActionDone(page);
   await page.getByRole("button", { name: "Save the note" }).click();
-  await expect(page.getByText("Pulse was low. Name it before scoring.")).toBeVisible({
-    timeout: 10_000,
-  });
+  await noteSaved;
+  await page.reload();
+  await expect(privateNote()).toContainText(
+    "Pulse was low. Name it before scoring.",
+    { timeout: 15_000 },
+  );
 
   // Add a minute: stage one's budget moves from 5 to 6 and nothing else does.
   await expect(page.getByText(/of 5:00/)).toBeVisible();
@@ -678,9 +719,10 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .first()
     .getByRole("button", { name: "Add what the number does not show" })
     .click();
+  // The compact editor (guided-inputs §4.7), named by its own label.
   await micRows
     .first()
-    .getByLabel("What the number does not show")
+    .getByRole("textbox", { name: "What the number does not show" })
     .fill("Activation held. The funnel above it never did.");
   await micRows.first().getByRole("button", { name: "Save the note" }).click();
   await expect(
@@ -744,14 +786,11 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   });
   // The agents are members of every workspace and are deliberately not offered:
   // recognition names a person's effort, not a scheduler's.
-  await expect(withColleague.getByRole("combobox")).toContainText(
-    "Priya Raman",
-  );
-  await expect(withColleague.getByRole("combobox")).not.toContainText(
-    "OKR Coach",
-  );
+  const names = await offered(withColleague.getByLabel("Who"));
+  expect(names.some((name) => name.includes("Priya Raman"))).toBe(true);
+  expect(names.some((name) => name.includes("OKR Coach"))).toBe(false);
 
-  await withColleague.getByLabel("Who").selectOption({ label: "Priya Raman" });
+  await choose(withColleague.getByLabel("Who"), "Priya Raman");
   await withColleague
     .getByLabel("What they did")
     .fill("Rewrote the onboarding emails twice in a week and said nothing.");
@@ -836,17 +875,25 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     .getByRole("button", { name: "Answer it" })
     .first()
     .click();
-  await managementRetro
-    .getByRole("textbox")
-    .first()
-    .fill("Mostly. Two of the five were the previous quarter's leftovers.");
+  // Rich text since guided-inputs change 11b: two paragraphs, which come
+  // back as two once the answer is stored and the editor has closed.
+  const answer = managementRetro.getByRole("textbox").first();
+  await answer.click();
+  await answer.pressSequentially("Mostly.");
+  await answer.press("Enter");
+  await answer.pressSequentially(
+    "Two of the five were the previous quarter's leftovers.",
+  );
   await managementRetro.getByRole("button", { name: "Save the answer" }).click();
   await expect(managementRetro).toContainText("1 of 4 answered", {
     timeout: 10_000,
   });
   await expect(
+    managementRetro.getByRole("paragraph").filter({ hasText: /^Mostly\.$/ }),
+  ).toBeVisible();
+  await expect(
     managementRetro.getByText(
-      "Mostly. Two of the five were the previous quarter's leftovers.",
+      "Two of the five were the previous quarter's leftovers.",
     ),
   ).toBeVisible();
 
@@ -962,7 +1009,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     name: "Make it an action",
   });
   await expect(makeIt).toBeDisabled();
-  await processHealth.getByLabel("Who owns it").selectOption({ index: 1 });
+  // The first person offered: the picker has no "choose" row to skip.
+  await chooseAt(processHealth.getByLabel("Who owns it"), 0);
   await processHealth.getByLabel("By when").fill("2026-12-15");
   await makeIt.click();
   await expect(processHealth).toContainText("Added to the actions", {
@@ -1068,7 +1116,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await actions.getByRole("button", { name: "Agree it" }).click();
   await expect(actions).toContainText("or it is a wish");
 
-  await actions.getByLabel("Owner").selectOption({ index: 1 });
+  await chooseAt(actions.getByLabel("Owner"), 0);
   await actions.getByLabel("By", { exact: true }).fill("2026-12-31");
   await actions.getByRole("button", { name: "Agree it" }).click();
   await expect(actions).toContainText("2 actions", { timeout: 10_000 });

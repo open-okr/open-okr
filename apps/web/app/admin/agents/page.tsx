@@ -116,6 +116,15 @@ export default async function AgentsPage() {
   };
   const agents = await callAction(context, "agents.list", {});
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
+  // What a scope can name, by name rather than by a pasted id: every space,
+  // and every KPI tree (`kpis.tree` lists them all beside its first).
+  const bindable = {
+    spaces: (await callAction(context, "spaces.list", {})).map((space) => ({
+      id: space.id,
+      name: space.name,
+    })),
+    trees: (await callAction(context, "kpis.tree", {})).trees,
+  };
   // The review queue (P6-G13a). Pending only: an applied or dismissed proposal
   // is history, and the run log already carries it.
   //
@@ -206,6 +215,8 @@ export default async function AgentsPage() {
                       value: one.value,
                       label: t(one.labelKey),
                     }))}
+                    spaces={bindable.spaces}
+                    trees={bindable.trees}
                   />
                 </li>
               ))}

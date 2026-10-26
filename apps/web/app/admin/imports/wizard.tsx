@@ -26,6 +26,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  SelectInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -167,22 +168,19 @@ export function ImportWizard({
 
         {step === "upload" ? (
           <form action={upload} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ink-2">
-              {t("admin.imports.wizard.whatIsInThe")}
-              <select
-                name="entity"
-                value={entity}
-                onChange={(event) => setEntity(event.target.value)}
-                data-testid="import-entity"
-                className="h-7.5 rounded-control border border-line-2 bg-surface px-2 text-sm font-normal text-ink"
-              >
-                {entities.map((choice) => (
-                  <option key={choice.entity} value={choice.entity}>
-                    {choice.entity}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectInput
+              label={t("admin.imports.wizard.whatIsInThe")}
+              name="entity"
+              value={entity}
+              onChange={(event) => setEntity(event.target.value)}
+              data-testid="import-entity"
+            >
+              {entities.map((choice) => (
+                <option key={choice.entity} value={choice.entity}>
+                  {choice.entity}
+                </option>
+              ))}
+            </SelectInput>
             {template ? (
               <p className="text-xs text-ink-3">{template.describe}</p>
             ) : null}
@@ -259,10 +257,11 @@ export function ImportWizard({
                       {t("admin.imports.wizard.proposed")}
                     </Chip>
                   ) : null}
-                  <select
-                    aria-label={t("admin.imports.wizard.whatColumnIs", {
+                  <SelectInput
+                    label={t("admin.imports.wizard.whatColumnIs", {
                       header: column.header,
                     })}
+                    hideLabel
                     value={column.field ?? ""}
                     onChange={(event) => {
                       const field = event.target.value || null;
@@ -278,7 +277,7 @@ export function ImportWizard({
                         ),
                       );
                     }}
-                    className="h-7.5 w-56 rounded-control border border-line-2 bg-surface px-2 text-sm text-ink"
+                    inputClassName="w-56"
                   >
                     <option value="">
                       {t("admin.imports.wizard.ignoreThisColumn")}
@@ -292,7 +291,7 @@ export function ImportWizard({
                           : field.field}
                       </option>
                     ))}
-                  </select>
+                  </SelectInput>
                 </li>
               ))}
             </ul>
@@ -530,10 +529,19 @@ function RowTable({ report }: { readonly report: ReportView }) {
                     })}
                   </span>
                 ) : (
-                  <span className="text-ink-2">
+                  <span className="flex flex-col gap-0.5 text-ink-2">
                     {row.outcome === "created"
                       ? t("admin.imports.wizard.created")
                       : t("admin.imports.wizard.updated")}
+                    {(row.notes ?? []).map((note) => (
+                      <span
+                        key={note}
+                        className="text-warn"
+                        data-testid="import-row-note"
+                      >
+                        {note}
+                      </span>
+                    ))}
                   </span>
                 )}
               </td>

@@ -15,6 +15,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -140,7 +141,7 @@ test("acceptance: a stop made from the review carries its reason and the record 
   const stop = moves.getByRole("button", { name: "Stop the objective" });
   await expect(stop).toBeDisabled();
 
-  await moves.getByLabel("Objective to stop").selectOption({ label: OBJECTIVE });
+  await choose(moves.getByLabel("Objective to stop"), OBJECTIVE);
   await expect(stop).toBeDisabled();
   await moves.getByLabel("Why it no longer matters").fill(REASON);
   await stop.click();
@@ -168,9 +169,15 @@ test("acceptance: a stop made from the review carries its reason and the record 
 
   // A stopped objective has nowhere to go, so the review asks no trend of it
   // and offers it to nobody to stop twice.
-  await expect(
-    moves.getByLabel("Objective to stop").locator("option", {
-      hasText: OBJECTIVE,
-    }),
-  ).toHaveCount(0);
+  // A picker draws its options only while open. With nothing left to stop
+  // it is not drawn at all, which says the same.
+  const stopPicker = moves.getByLabel("Objective to stop");
+  if ((await stopPicker.count()) > 0) {
+    await stopPicker.click();
+    await expect(stopPicker).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      page.getByRole("option").filter({ hasText: OBJECTIVE }),
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+  }
 });

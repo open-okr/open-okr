@@ -93,6 +93,17 @@ describe("the precedence resolver: user, then workspace, then deployment, then o
     expect(resolved.source).toBe("off");
   });
 
+  it("refuses a base URL that is not a whole address (guided-inputs §4.11)", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context(OWNER) },
+        "ai.updateProviderConfig",
+        { provider: "ollama", baseUrl: "ollama.internal:11434" },
+      ),
+    ).rejects.toThrow(/whole address starting with https:\/\/ or http:\/\//);
+  });
+
   it("resolves an enabled local Ollama that has no key, which it never needs (H-27)", async () => {
     // Every lookup used to require a stored key, so the one provider the
     // product promises works air-gapped resolved to off and never ran.

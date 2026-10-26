@@ -25,6 +25,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -192,33 +193,25 @@ function MissedRow({
               </span>
             </span>
           )}
-          <label
-            className="flex flex-col gap-1"
-            htmlFor={`detail-${keyResult.keyResultId}`}
-          >
-            <span className="text-xs font-medium text-ink-3">
-              {t("session.detail.rootCause.askWhyUntilIt")}
-            </span>
-            <input
-              id={`detail-${keyResult.keyResultId}`}
-              type="text"
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={detail}
-              disabled={pending}
-              placeholder={t("session.detail.rootCause.theSystemNotThe")}
-              onChange={(event) => setDetail(event.target.value)}
-              onBlur={() => {
-                // Saved with the cause rather than on its own, because a detail
-                // with no cause behind it explains nothing.
-                if (
-                  chosen !== null &&
-                  detail.trim() !== (keyResult.detail ?? "")
-                ) {
-                  save(chosen, second);
-                }
-              }}
-            />
-          </label>
+          <TextInput
+            label={t("session.detail.rootCause.askWhyUntilIt")}
+            id={`detail-${keyResult.keyResultId}`}
+            value={detail}
+            disabled={pending}
+            placeholder={t("session.detail.rootCause.theSystemNotThe")}
+            onChange={(event) => setDetail(event.target.value)}
+            onBlur={() => {
+              // Saved with the cause rather than on its own, because a detail
+              // with no cause behind it explains nothing.
+              if (
+                chosen !== null &&
+                detail.trim() !== (keyResult.detail ?? "")
+              ) {
+                save(chosen, second);
+              }
+            }}
+            maxLength={1000}
+          />
           {needsLine(chosen, second) ? (
             <span role="alert" className="text-xs text-warn">
               {t("session.detail.rootCause.otherNeedsItsLine")}

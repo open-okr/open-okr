@@ -17,6 +17,7 @@ import { REVIEW_STAGE_KEYS } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "quarterly-facilitator";
@@ -188,13 +189,52 @@ describe("private facilitator notes", () => {
     await call("sessions.open", { id: sessionId });
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Ask Dita about the activation number before stage two.",
+      note: richTextFromPlainText(
+        "Ask Dita about the activation number before stage two.",
+      ),
     });
 
     const mine = await read();
-    expect(mine.notes[REVIEW_STAGE_KEYS[0] as string]).toBe(
-      "Ask Dita about the activation number before stage two.",
+    expect(mine.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(
+      richTextFromPlainText(
+        "Ask Dita about the activation number before stage two.",
+      ),
     );
+  });
+
+  it("keeps a document as it was written, and a blank one clears the stage", async () => {
+    await call("sessions.open", { id: sessionId });
+    const note = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            { type: "text", text: "Dita", marks: [{ type: "bold" }] },
+            { type: "text", text: " first." },
+          ],
+        },
+      ],
+    };
+    await call("sessions.setStageNote", { id: sessionId, note });
+    expect((await read()).notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(note);
+
+    // What an editor hands back once everything in it is deleted.
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: { type: "doc", content: [{ type: "paragraph" }] },
+    });
+    expect((await read()).notes).toEqual({});
+  });
+
+  it("refuses a note sent as plain text since 0.4", async () => {
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await call("sessions.open", { id: sessionId });
+    await expect(
+      call("sessions.setStageNote", { id: sessionId, note: "Plain text." }),
+    ).rejects.toThrow();
+    expect((await read()).notes).toEqual({});
   });
 
   it("are never visible to a participant", async () => {
@@ -205,7 +245,9 @@ describe("private facilitator notes", () => {
     await call("sessions.open", { id: sessionId });
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Watch for polite scoring. The pulse was 2.6.",
+      note: richTextFromPlainText(
+        "Watch for polite scoring. The pulse was 2.6.",
+      ),
     });
 
     const theirs = await read(PARTICIPANT);
@@ -219,7 +261,10 @@ describe("private facilitator notes", () => {
     await expect(
       call(
         "sessions.setStageNote",
-        { id: sessionId, note: "Anybody could write this." },
+        {
+          id: sessionId,
+          note: richTextFromPlainText("Anybody could write this."),
+        },
         PARTICIPANT,
       ),
     ).rejects.toThrow(/facilitator/i);
@@ -227,13 +272,23 @@ describe("private facilitator notes", () => {
 
   it("keeps one note per stage rather than one per session", async () => {
     await call("sessions.open", { id: sessionId });
-    await call("sessions.setStageNote", { id: sessionId, note: "Stage one." });
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: richTextFromPlainText("Stage one."),
+    });
     await call("sessions.advanceStage", { id: sessionId });
-    await call("sessions.setStageNote", { id: sessionId, note: "Stage two." });
+    await call("sessions.setStageNote", {
+      id: sessionId,
+      note: richTextFromPlainText("Stage two."),
+    });
 
     const after = await read();
-    expect(after.notes[REVIEW_STAGE_KEYS[0] as string]).toBe("Stage one.");
-    expect(after.notes[REVIEW_STAGE_KEYS[1] as string]).toBe("Stage two.");
+    expect(after.notes[REVIEW_STAGE_KEYS[0] as string]).toEqual(
+      richTextFromPlainText("Stage one."),
+    );
+    expect(after.notes[REVIEW_STAGE_KEYS[1] as string]).toEqual(
+      richTextFromPlainText("Stage two."),
+    );
   });
 });
 

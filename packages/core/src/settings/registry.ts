@@ -1,3 +1,12 @@
+import {
+  DOMAIN_PATTERN,
+  HEX_COLOUR_PATTERN,
+  IDENTIFIER_MAX_LENGTH,
+  isHostName,
+  isListedTimezone,
+  matchListedTimezone,
+  ONE_WORD_PATTERN,
+} from "@openokr/formats";
 import type { CheckInFrequency, CoachStrictness } from "@openokr/method";
 import { CHECK_IN_FREQUENCIES, COACH_STRICTNESS } from "@openokr/method";
 import { z } from "zod";
@@ -121,36 +130,22 @@ export const DEFAULT_DAILY_SUMMARY_TIME = "08:00";
  */
 const DEFAULT_SPACE_TEAM_VOTING = true;
 
-/**
- * Is this a timezone the runtime actually knows?
- *
- * The value arrives from the browser, so it is untrusted input reaching a
- * stored field. Asking `Intl` is the only honest check: a hand-written list
- * would rot, and a regular expression would accept plausible nonsense.
- */
-export function isKnownTimezone(timezone: string): boolean {
-  try {
-    new Intl.DateTimeFormat("en-GB", { timeZone: timezone });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
+// Matched to the list rather than merely known to the runtime. A browser's
+// legacy name, `Asia/Calcutta`, was otherwise stored as a zone the settings
+// card does not offer, and `+08:00` as one it refuses
+// (docs/design/browser-timezone.md).
 const resolveTimezone = (context: ProvisioningContext): string => {
   const candidate = context.timezone?.trim();
-  return candidate && isKnownTimezone(candidate) ? candidate : "UTC";
+  return (candidate && matchListedTimezone(candidate)) || "UTC";
 };
-
-/** A DNS-shaped domain, lower-cased: `mail.example.co`, not an email address. */
-const DOMAIN_PATTERN =
-  /^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$/;
 
 export const timezoneSchema = z
   .string()
   .trim()
   .min(1)
-  .refine(isKnownTimezone, { message: "not a timezone the runtime knows" });
+  // On the list the card offers, exactly as written. The runtime alone also
+  // takes `EST`, `+08:00` and a name in the wrong case, and each was stored.
+  .refine(isListedTimezone, { message: "not a timezone on the list" });
 
 export const languageSchema = z.string().trim().min(2).max(35);
 
@@ -158,7 +153,7 @@ export const brandingSchema = z
   .object({
     primaryColor: z
       .string()
-      .regex(/^#[0-9a-fA-F]{6}$/, "not a hex colour")
+      .regex(HEX_COLOUR_PATTERN, "not a hex colour")
       // Refused here rather than by the card, so the REST surface, the
       // command line and an agent cannot store one either (M-14). A green
       // brand puts a green pixel that does not mean on track on every screen.
@@ -286,31 +281,8 @@ export type AIContextEgressLevel = (typeof AI_CONTEXT_EGRESS_LEVELS)[number];
 
 export const aiContextEgressSchema = z.enum(AI_CONTEXT_EGRESS_LEVELS);
 
-/** One DNS label: letters, digits and inner hyphens, 63 at most. */
-const isHostLabel = (label: string): boolean =>
-  /^[a-z0-9-]{1,63}$/.test(label) &&
-  !label.startsWith("-") &&
-  !label.endsWith("-");
-
-/**
- * A host an AI call may reach: a name, or an address written as one.
- *
- * Checked label by label rather than with one pattern over the whole name,
- * which is the shape a backtracking engine takes polynomial time over. An
- * IPv6 address is accepted as its own characters, without brackets.
- */
-function isHostName(value: string): boolean {
-  if (value.length === 0 || value.length > 253) {
-    return false;
-  }
-  if (value.includes(":")) {
-    return /^[0-9a-f:.]{2,45}$/.test(value);
-  }
-  return value.split(".").every(isHostLabel);
-}
-
 /** Fifty hosts is past any real list, and a list is read on every AI call. */
-const MAX_ALLOWED_HOSTS = 50;
+export const MAX_ALLOWED_HOSTS = 50;
 
 export const aiEgressAllowListSchema = z
   .array(
@@ -355,8 +327,8 @@ export const spaceChannelSchema = z
   .string()
   .trim()
   .min(1)
-  .max(200)
-  .regex(/^\S+$/)
+  .max(IDENTIFIER_MAX_LENGTH)
+  .regex(ONE_WORD_PATTERN)
   .nullable();
 
 /**

@@ -1,6 +1,12 @@
 import { randomBytes } from "node:crypto";
+import { copyFileSync, mkdtempSync, readdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { workerDb } from "@openokr/test-support/db";
+import {
+  connectionOptions,
+  testDbEnv,
+  workerDb,
+} from "@openokr/test-support/db";
 import pg from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -29,7 +35,32 @@ import { blockerClockToCheckIn } from "../src/data-changes/0023_blocker_clock_to
 import { retireRhythmScoreThreshold } from "../src/data-changes/0024_retire_rhythm_score_threshold.ts";
 import { verifyFirstAccount } from "../src/data-changes/0025_verify_first_account.ts";
 import { kpiCorridorFollowsWorkspace } from "../src/data-changes/0026_kpi_corridor_follows_workspace.ts";
+import { sessionShiftsDocument } from "../src/data-changes/0027_session_shifts_document.ts";
+import { decisionTextDocument } from "../src/data-changes/0028_decision_text_document.ts";
+import { managementAnswerDocument } from "../src/data-changes/0029_management_answer_document.ts";
+import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
+import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
+import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
+import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { runMigrations } from "../src/migrate.ts";
+
+/** Every migration file, in order. */
+const MIGRATIONS = join(import.meta.dirname, "../migrations");
+
+/**
+ * A directory holding every migration that sorts before `prefix`, for a test
+ * of a data change whose columns a later migration dropped: the backfills
+ * for the plain prose columns ran on 0.3, before 0144 removed them.
+ */
+function migrationsBefore(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), "openokr-migrations-"));
+  for (const name of readdirSync(MIGRATIONS)) {
+    if (name.endsWith(".sql") && name < prefix) {
+      copyFileSync(join(MIGRATIONS, name), join(dir, name));
+    }
+  }
+  return dir;
+}
 
 /**
  * The data-change runner (P2-T12 test plan). Batched, resumable, idempotent
@@ -257,6 +288,76 @@ describe("runDataChanges", () => {
     await expect(runDataChanges(client, { scripts: [script] })).rejects.toThrow(
       /does_not_exist/,
     );
+  });
+
+  it("counts a script as done once the migration that retires it dropped its columns", async () => {
+    // Guided-inputs change 13 (docs/design/guided-inputs.md §4.7). A fresh
+    // instance never ran a backfill whose columns a later migration dropped,
+    // after that migration's own guard proved nothing was left to convert.
+    // Refusing it there would stop every script after it, for good.
+    let ran = false;
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        ran = true;
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    const calls = { n: 0 };
+    const later = { ...countingScript(calls), name: "0002_counting" };
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await client.query(
+      "insert into _counting_fixture (id) values (1), (2), (3)",
+    );
+    await client.query(
+      "create table _migrations (name text primary key, checksum text not null)",
+    );
+    await client.query(
+      "insert into _migrations (name, checksum) values ('0999_drop_it.sql', 'x')",
+    );
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [retired, later],
+    });
+    expect(ran).toBe(false);
+    expect(
+      outcomes.map((outcome) => [outcome.name, outcome.rowsChanged]),
+    ).toEqual([
+      ["0001_retired", 0],
+      ["0002_counting", 3],
+    ]);
+    const { rows } = await client.query<{ completed_at: Date | null }>(
+      "select completed_at from _data_changes where name = '0001_retired'",
+    );
+    expect(rows[0]?.completed_at).not.toBeNull();
+  });
+
+  it("still refuses a retired script whose migration has not run", async () => {
+    // The columns missing and the migration not recorded is a schema that
+    // moved some other way, which is exactly what the check is for.
+    const retired: DataChangeScript = {
+      name: "0001_retired",
+      summary: "Read a column a later migration dropped.",
+      expects: [
+        { table: "_counting_fixture", column: "dropped", dataType: "text" },
+      ],
+      retiredBy: "0999_drop_it.sql",
+      async runBatch() {
+        return { done: true, rowsChanged: 0 };
+      },
+    };
+    await client.query("create table _counting_fixture (id int primary key)");
+
+    await expect(
+      runDataChanges(client, { scripts: [retired] }),
+    ).rejects.toThrow(/dropped/);
   });
 
   it("refuses a script whose expected column changed type", async () => {
@@ -1541,5 +1642,444 @@ describe("0026: a KPI's corridor follows the workspace", () => {
       // 85 now, so 87% is healthy.
       { short_id: "K-4", healthy_pct: null, watch_pct: null, state: "healthy" },
     ]);
+  });
+});
+
+describe("0027 and 0028: the monthly review's prose as documents", () => {
+  it("splits plain text the way richTextFromPlainText does", () => {
+    // packages/core's rule, held here by example because packages/db cannot
+    // import it: blank lines split, each block trimmed, empties dropped, and
+    // nothing interpreted.
+    expect(
+      plainTextDocument("  One *line*\r\n\r\n\n Two \nlines\n\n\n"),
+    ).toEqual({
+      type: "doc",
+      content: [
+        { type: "paragraph", content: [{ type: "text", text: "One *line*" }] },
+        { type: "paragraph", content: [{ type: "text", text: "Two \nlines" }] },
+      ],
+    });
+    expect(plainTextDocument("   \n\n  ").content).toEqual([]);
+  });
+
+  it("writes each shifts note and decision as a document, keeps one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [migrationsBefore("0144")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe)
+         select gen_random_uuid(), m.workspace_id, 'Keep customers', 'company',
+                'workspace', m.id, m.id,
+                '{"start": "2026-07-01", "end": "2026-09-30"}'::jsonb
+           from m
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, shifts,
+                                   shifts_document, shifts_document_version)
+         select gen_random_uuid(), m.workspace_id, 'monthly', d.title, now(),
+                m.id, d.shifts, d.document, d.version
+           from m,
+                (values ('Noted', 'Two people to support.\n\nThe rest stays.',
+                         null::jsonb, null::int),
+                        ('Silent', null, null, null),
+                        ('Blank', '   ', null, null),
+                        ('Edited', 'old words',
+                         '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Written in the editor"}]}]}'::jsonb,
+                         1))
+                  as d(title, shifts, document, version)
+         returning id
+       )
+       insert into decisions (id, workspace_id, goal_id, at, text,
+                              author_member_id)
+       select gen_random_uuid(), g.workspace_id, g.id, '2026-08-01',
+              'Pause the self-serve tier', m.id
+         from g, m`,
+    );
+
+    const [shifts, decisionsRun] = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(shifts?.rowsChanged).toBe(1);
+    expect(decisionsRun?.rowsChanged).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      title: string;
+      shifts_document: unknown;
+      shifts_document_version: number | null;
+    }>(
+      "select title, shifts_document, shifts_document_version from okr_sessions order by title",
+    );
+    const byTitle = Object.fromEntries(
+      sessionRows.map((row) => [row.title, row]),
+    );
+    expect(byTitle.Noted?.shifts_document).toEqual(
+      plainTextDocument("Two people to support.\n\nThe rest stays."),
+    );
+    expect(byTitle.Noted?.shifts_document_version).toBe(1);
+    expect(byTitle.Silent?.shifts_document).toBeNull();
+    expect(byTitle.Blank?.shifts_document).toBeNull();
+    // Already written in the editor: left alone, not rewritten from the
+    // plain column.
+    expect(JSON.stringify(byTitle.Edited?.shifts_document)).toContain(
+      "Written in the editor",
+    );
+
+    const { rows: decisionRows } = await client.query<{
+      text_document: unknown;
+      text_document_version: number | null;
+    }>("select text_document, text_document_version from decisions");
+    expect(decisionRows[0]?.text_document).toEqual(
+      plainTextDocument("Pause the self-serve tier"),
+    );
+    expect(decisionRows[0]?.text_document_version).toBe(1);
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, decisionTextDocument],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0029 and 0030: the quarterly review's prose as documents", () => {
+  it("writes each answer as a document, turns each text stage note into one, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [migrationsBefore("0144")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       ), s as (
+         insert into okr_sessions (id, workspace_id, kind, title,
+                                   scheduled_for, facilitator_id, notes)
+         select gen_random_uuid(), m.workspace_id, 'quarterly', 'Q3 review',
+                now(), m.id,
+                jsonb_build_object(
+                  'open', 'Pulse was low.\n\nName it first.',
+                  'score', '   ',
+                  'retro', $1::jsonb)
+           from m
+         returning id, workspace_id
+       )
+       insert into management_answers (id, workspace_id, session_id,
+                                       question_key, body, answered_by_id)
+       select gen_random_uuid(), s.workspace_id, s.id, 1,
+              'Mostly. Two were leftovers.', m.id
+         from s, m`,
+      [JSON.stringify(written)],
+    );
+
+    const [answers, notes] = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
+    });
+    expect(answers?.rowsChanged).toBe(1);
+    expect(notes?.rowsChanged).toBe(1);
+
+    const { rows: answerRows } = await client.query<{
+      body_document: unknown;
+      body_document_version: number | null;
+    }>("select body_document, body_document_version from management_answers");
+    expect(answerRows[0]?.body_document).toEqual(
+      plainTextDocument("Mostly. Two were leftovers."),
+    );
+    expect(answerRows[0]?.body_document_version).toBe(1);
+
+    const { rows: sessionRows } = await client.query<{
+      notes: Record<string, unknown>;
+    }>("select notes from okr_sessions");
+    expect(sessionRows[0]?.notes).toEqual({
+      open: plainTextDocument("Pulse was low.\n\nName it first."),
+      // Whitespace alone was a note nobody wrote, and its key goes.
+      retro: written,
+    });
+
+    await client.query("delete from _data_changes");
+    const again = await runDataChanges(client, {
+      scripts: [managementAnswerDocument, stageNoteDocuments],
+    });
+    expect(again.map((outcome) => outcome.rowsChanged)).toEqual([0, 0]);
+  });
+});
+
+describe("0031: the weekly coordinator note as a document", () => {
+  it("writes each note as a document, leaves a digest with none, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [migrationsBefore("0144")],
+    });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       )
+       insert into digests (id, workspace_id, scope, period, period_start, note)
+       select gen_random_uuid(), w.id, 'space', 'weekly', d.week, d.note
+         from w,
+              (values ('2026-08-24'::date, 'Hiring is the constraint.\n\nNot the roadmap.'),
+                      ('2026-08-31'::date, null)) as d(week, note)`,
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      note_document: unknown;
+      note_document_version: number | null;
+    }>(
+      "select note_document, note_document_version from digests order by period_start",
+    );
+    expect(rows[0]?.note_document).toEqual(
+      plainTextDocument("Hiring is the constraint.\n\nNot the roadmap."),
+    );
+    expect(rows[0]?.note_document_version).toBe(1);
+    expect(rows[1]).toEqual({
+      note_document: null,
+      note_document_version: null,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [digestNoteDocument],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0032: the revalidation notes as documents", () => {
+  it("fills each note still missing a document, never one already written, and runs again as nothing", async () => {
+    await runMigrations(client, {
+      dirs: [migrationsBefore("0144")],
+    });
+    const written = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Already rich" }],
+        },
+      ],
+    };
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), c as (
+         insert into cycles (id, workspace_id, name, mode, starts_on, ends_on)
+         select gen_random_uuid(), w.id, n.name, 'quarterly', n.starts, n.ends
+           from w,
+                (values ('Q1', '2026-01-01'::date, '2026-03-31'::date),
+                        ('Q2', '2026-04-01'::date, '2026-06-30'::date)) as n(name, starts, ends)
+         returning id, workspace_id, name
+       )
+       insert into cycle_revalidations
+         (cycle_id, workspace_id, holds, changed, change_note, focus_note,
+          focus_note_document, focus_note_document_version)
+       select c.id, c.workspace_id, c.name = 'Q2', c.name = 'Q1',
+              case when c.name = 'Q1' then 'Dropped the ASEAN thrust.\n\nMobile first.' end,
+              case when c.name = 'Q1' then 'Mobile activation' else 'Old text' end,
+              case when c.name = 'Q2' then $1::jsonb end,
+              case when c.name = 'Q2' then 1 end
+         from c`,
+      [JSON.stringify(written)],
+    );
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
+    });
+    // Q1 gains both. Q2 has its focus document already and no change note.
+    expect(outcome?.rowsChanged).toBe(1);
+
+    const { rows } = await client.query<{
+      name: string;
+      change_note_document: unknown;
+      change_note_document_version: number | null;
+      focus_note_document: unknown;
+      focus_note_document_version: number | null;
+    }>(
+      `select c.name, r.change_note_document, r.change_note_document_version,
+              r.focus_note_document, r.focus_note_document_version
+         from cycle_revalidations r join cycles c on c.id = r.cycle_id
+        order by c.name`,
+    );
+    expect(rows[0]).toEqual({
+      name: "Q1",
+      change_note_document: plainTextDocument(
+        "Dropped the ASEAN thrust.\n\nMobile first.",
+      ),
+      change_note_document_version: 1,
+      focus_note_document: plainTextDocument("Mobile activation"),
+      focus_note_document_version: 1,
+    });
+    expect(rows[1]).toEqual({
+      name: "Q2",
+      change_note_document: null,
+      change_note_document_version: null,
+      focus_note_document: written,
+      focus_note_document_version: 1,
+    });
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [revalidationNoteDocuments],
+    });
+    expect(again?.rowsChanged).toBe(0);
+  });
+});
+
+describe("0144: the plain prose columns go, but only once every row has its document", () => {
+  it("refuses while prose waits for its document, naming each column, and drops nothing", async () => {
+    // Guided-inputs change 13b. An instance that jumped from 0.2 straight to
+    // this release never ran 0.3's data changes.
+    await runMigrations(client, { dirs: [migrationsBefore("0144")] });
+    await client.query(
+      `with w as (
+         insert into workspaces (id, name, slug)
+         values (gen_random_uuid(), 'Acme', 'acme') returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+         returning id, workspace_id
+       )
+       insert into okr_sessions (id, workspace_id, kind, title, scheduled_for,
+                                 facilitator_id, shifts, notes)
+       select gen_random_uuid(), m.workspace_id, 'quarterly', 'Q3 review', now(),
+              m.id, 'Two people move onto activation.',
+              jsonb_build_object('open', 'Pulse was low.')
+         from m`,
+    );
+
+    await expect(runMigrations(client, { dirs: [MIGRATIONS] })).rejects.toThrow(
+      /okr_sessions\.shifts \(1\) okr_sessions\.notes \(1\)[\s\S]*pnpm db:change/,
+    );
+    const kept = await client.query(
+      `select 1 from information_schema.columns
+        where table_name = 'okr_sessions' and column_name = 'shifts'`,
+    );
+    expect(kept.rows).toHaveLength(1);
+
+    // Once the data changes have run, the drop goes through.
+    await runDataChanges(client, {
+      scripts: [sessionShiftsDocument, stageNoteDocuments],
+    });
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    const gone = await client.query(
+      `select column_name from information_schema.columns
+        where (table_name, column_name) in
+              (('okr_sessions', 'shifts'), ('decisions', 'text'),
+               ('management_answers', 'body'), ('digests', 'note'),
+               ('cycle_revalidations', 'change_note'),
+               ('cycle_revalidations', 'focus_note'))`,
+    );
+    expect(gone.rows).toEqual([]);
+    const { rows } = await client.query<{ shifts_document: unknown }>(
+      "select shifts_document from okr_sessions",
+    );
+    expect(rows[0]?.shifts_document).toEqual(
+      plainTextDocument("Two people move onto activation."),
+    );
+  });
+
+  it("sees every workspace's rows when it runs as the table owner, under the tenant floor", async () => {
+    // FORCE ROW LEVEL SECURITY binds the owner too, and a deployment's admin
+    // role may be the owner rather than a superuser. A guard counting under
+    // the floor would see nothing and drop the prose; it lifts FORCE for its
+    // own transaction instead. The other tests here connect as a superuser,
+    // which sees every row anyway, so this one is what proves the lift.
+    const wb = await workerDb();
+    const ownerDb = `${scratchDb}_owner`;
+    await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    await wb.admin.query(
+      `create database ${ownerDb} owner ${testDbEnv.ownerRole} ` +
+        `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+    );
+    const owner = new pg.Client(
+      connectionOptions(ownerDb, testDbEnv.ownerRole),
+    );
+    await owner.connect();
+    try {
+      await runMigrations(owner, { dirs: [migrationsBefore("0144")] });
+      // Written as the application writes, inside its workspace.
+      const workspaceId = "6f1d3c2a-9b4e-4c1d-8a7f-2e5b6c7d8e9f";
+      await owner.query("select set_config('app.workspace_id', $1, false)", [
+        workspaceId,
+      ]);
+      await owner.query(
+        `with w as (
+           insert into workspaces (id, name, slug)
+           values ($1, 'Acme', 'acme') returning id
+         ), m as (
+           insert into workspace_members (id, workspace_id, name, kind, status)
+           select gen_random_uuid(), w.id, 'Hugo', 'human', 'active' from w
+           returning id, workspace_id
+         )
+         insert into okr_sessions (id, workspace_id, kind, title, scheduled_for,
+                                   facilitator_id, shifts)
+         select gen_random_uuid(), m.workspace_id, 'monthly', 'August', now(),
+                m.id, 'Two people move onto activation.'
+           from m`,
+        [workspaceId],
+      );
+      // As a migration connects: no workspace of its own.
+      await owner.query("select set_config('app.workspace_id', '', false)");
+
+      await expect(
+        runMigrations(owner, { dirs: [MIGRATIONS] }),
+      ).rejects.toThrow(/okr_sessions\.shifts \(1\)/);
+      // And the floor is back as it was.
+      const { rows } = await owner.query<{ forced: boolean }>(
+        "select relforcerowsecurity as forced from pg_class where relname = 'okr_sessions'",
+      );
+      expect(rows[0]?.forced).toBe(true);
+    } finally {
+      await owner.end();
+      await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    }
+  });
+
+  it("on a fresh instance, counts the retired backfills done and runs the rest", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+
+    const outcomes = await runDataChanges(client, {
+      scripts: [
+        sessionShiftsDocument,
+        decisionTextDocument,
+        managementAnswerDocument,
+        stageNoteDocuments,
+        digestNoteDocument,
+        revalidationNoteDocuments,
+      ],
+    });
+    expect(outcomes.map((outcome) => outcome.rowsChanged)).toEqual([
+      0, 0, 0, 0, 0, 0,
+    ]);
+    const { rows } = await client.query<{ completed: number }>(
+      "select count(*)::int as completed from _data_changes where completed_at is not null",
+    );
+    expect(rows[0]?.completed).toBe(6);
   });
 });

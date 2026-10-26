@@ -131,7 +131,11 @@ describe("a member who already has a workspace", () => {
 
 describe("the general card", () => {
   test("says what a trusted domain does and the mail it depends on", () => {
-    expect(general).toContain('aria-describedby="trustedEmailDomainsHint"');
+    // The hint is the field's own description, which the token field links
+    // to its box (guided-inputs §4.11).
+    expect(general).toMatch(
+      /description=\{t\(\s*"admin\.general\.generalSettingsForm\.trustedEmailDomainsHint"/,
+    );
     expect(generalText).toContain(
       "is offered this workspace when they sign in, and can join without an invitation",
     );

@@ -34,6 +34,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -130,7 +131,7 @@ test("a role is added, held, refused removal, then removed", async () => {
   // did not remove is still there on the replay. Clearing it first is what
   // makes the replay mean the same thing as a first run.
   if ((await page.getByRole("rowheader", { name: added }).count()) > 0) {
-    await assign.selectOption({ label: "No role" });
+    await choose(assign, "No role");
     await expect(page.getByRole("rowheader", { name: added })).toContainText(
       "Held by 0",
       { timeout: 15_000 },
@@ -151,8 +152,8 @@ test("a role is added, held, refused removal, then removed", async () => {
 
   // Give it to somebody, and the removal is refused with the action's own
   // sentence rather than failing silently.
-  await assign.selectOption({ label: ADDED_ROLE });
-  await expect(assign).toHaveValue(/.+/);
+  await choose(assign, ADDED_ROLE);
+  await expect(assign).toHaveValue(ADDED_ROLE);
   await expect(page.getByRole("rowheader", { name: added })).toContainText(
     "Held by 1",
     { timeout: 15_000 },
@@ -167,12 +168,12 @@ test("a role is added, held, refused removal, then removed", async () => {
   // **Wait for the unassignment to land before removing.** Selecting "No
   // role" starts a transition; pressing Delete before it commits asks the
   // server to remove a role somebody still holds, which is refused, and the
-  // test then reads a role that is still there. The select's own empty value
-  // said nothing about the server, since it changes the moment it is chosen,
+  // test then reads a role that is still there. The picker's own value says
+  // nothing about the server, since it changes the moment it is chosen,
   // which is how this failed twice in a row in continuous integration on
   // 5 October 2026; the row's "Held by 0" is the server's answer.
-  await assign.selectOption({ label: "No role" });
-  await expect(assign).toHaveValue("");
+  await choose(assign, "No role");
+  await expect(assign).toHaveValue("No role");
   await expect(page.getByRole("rowheader", { name: added })).toContainText(
     "Held by 0",
     { timeout: 15_000 },

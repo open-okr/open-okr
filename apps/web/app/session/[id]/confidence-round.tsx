@@ -25,6 +25,9 @@ import {
   Card,
   CardBody,
   CardHeader,
+  type ConfidenceDisplay,
+  formatConfidence,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -61,6 +64,8 @@ interface ConfidenceRoundProps {
   readonly thresholds: ResolvedThresholds;
   /** Participants' names, for the revealed votes. */
   readonly names: Readonly<Record<string, string>>;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }
 
 export function ConfidenceRound({
@@ -69,6 +74,7 @@ export function ConfidenceRound({
   isFacilitator,
   thresholds,
   names,
+  display,
 }: ConfidenceRoundProps) {
   const { t } = useTranslations();
   const teamVoting = krStatuses[0]?.teamVoting ?? true;
@@ -93,6 +99,7 @@ export function ConfidenceRound({
               isFacilitator={isFacilitator}
               thresholds={thresholds}
               names={names}
+              display={display}
             />
           ))}
         </div>
@@ -107,14 +114,18 @@ function KrVoteCard({
   isFacilitator,
   thresholds,
   names,
+  display,
 }: {
   sessionId: string;
   kr: KrConfidenceStatus;
   isFacilitator: boolean;
   thresholds: ResolvedThresholds;
   names: Readonly<Record<string, string>>;
+  display: ConfidenceDisplay;
 }) {
   const { t } = useTranslations();
+  const shown = (confidence: number) =>
+    formatConfidence(confidence, display, t);
 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -152,7 +163,11 @@ function KrVoteCard({
           <h4 className="text-sm font-medium text-ink">{kr.title}</h4>
           <span className="text-sm font-semibold text-good">
             {t("common.confirmed2", {
-              confirmedConfidence: kr.confirmedConfidence?.toFixed(1) ?? "",
+              confirmedConfidence:
+                kr.confirmedConfidence === null ||
+                kr.confirmedConfidence === undefined
+                  ? ""
+                  : shown(kr.confirmedConfidence),
             })}
           </span>
         </div>
@@ -182,14 +197,14 @@ function KrVoteCard({
             {kr.votes.map((vote) => (
               <li key={vote.memberId}>
                 {names[vote.memberId] ?? t("activity.aMember")}:{" "}
-                {vote.confidence.toFixed(1)}
+                {shown(vote.confidence)}
               </li>
             ))}
           </ul>
           {kr.average !== null ? (
             <p className="text-sm font-semibold text-ink">
               {t("session.detail.confidenceRound.teamAverage", {
-                average: kr.average.toFixed(2),
+                average: shown(kr.average),
               })}
             </p>
           ) : null}
@@ -202,6 +217,7 @@ function KrVoteCard({
           onChange={setDialValue}
           disabled={isPending}
           thresholds={thresholds}
+          display={display}
         />
       ) : null}
 
@@ -220,7 +236,7 @@ function KrVoteCard({
             <p className="text-xs text-ink-2">
               {t("session.detail.confidenceRound.voteCastWaitingFor")}{" "}
               {t("session.detail.confidenceRound.yourVote", {
-                confidence: kr.myVote.toFixed(1),
+                confidence: shown(kr.myVote),
               })}
             </p>
           </div>
@@ -253,20 +269,14 @@ function KrVoteCard({
 
       {canConfirm ? (
         <div className="space-y-2 border-t border-line pt-3">
-          <label
-            htmlFor={`what-changed-${kr.keyResultId}`}
-            className="block text-xs font-medium text-ink-2"
-          >
-            {t("session.detail.confidenceRound.whatChangedThisWeek")}
-          </label>
-          <input
+          <TextInput
+            label={t("session.detail.confidenceRound.whatChangedThisWeek")}
             id={`what-changed-${kr.keyResultId}`}
-            type="text"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t("common.factsNotFeelings")}
-            className="w-full rounded-md border border-line bg-surface px-3 py-1.5 text-sm text-ink"
             disabled={isPending}
+            maxLength={500}
           />
           <Button
             type="button"

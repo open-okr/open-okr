@@ -18,6 +18,7 @@ import {
   recomputeGateState,
 } from "../src/cycles/workflow.ts";
 import { runOperation } from "../src/operations/operation.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -347,9 +348,10 @@ describe("opening phase 4 against real rows", () => {
       );
     }
     await wb.admin.query(
-      `insert into cycle_revalidations (cycle_id, workspace_id, holds, focus_note)
-       values ($1, $2, true, 'Mobile')`,
-      [cycleId, workspaceId],
+      `insert into cycle_revalidations (cycle_id, workspace_id, holds,
+                                        focus_note_document, focus_note_document_version)
+       values ($1, $2, true, $3::jsonb, 1)`,
+      [cycleId, workspaceId, JSON.stringify(richTextFromPlainText("Mobile"))],
     );
 
     const { phases } = await snapshot();
@@ -399,9 +401,10 @@ describe("opening phase 4 against real rows", () => {
       );
     }
     await wb.admin.query(
-      `insert into cycle_revalidations (cycle_id, workspace_id, holds, focus_note)
-       values ($1, $2, true, 'Mobile')`,
-      [cycleId, workspaceId],
+      `insert into cycle_revalidations (cycle_id, workspace_id, holds,
+                                        focus_note_document, focus_note_document_version)
+       values ($1, $2, true, $3::jsonb, 1)`,
+      [cycleId, workspaceId, JSON.stringify(richTextFromPlainText("Mobile"))],
     );
 
     const { phases } = await snapshot();
@@ -679,7 +682,12 @@ describe("the workflow actions", () => {
     await callAction(
       { pool: wb.appPool, ...context() },
       "workflow.setRevalidation",
-      { cycleId, holds: true, changed: false, focusNote: "Mobile activation" },
+      {
+        cycleId,
+        holds: true,
+        changed: false,
+        focusNote: richTextFromPlainText("Mobile activation"),
+      },
     );
     const read = await callAction(
       { pool: wb.appPool, ...context() },
@@ -687,6 +695,91 @@ describe("the workflow actions", () => {
       { cycleId },
     );
     expect(read.phases[3]?.state).toBe("pass");
+  });
+
+  it("keeps both notes written as documents, with their plain text beside them", async () => {
+    // Guided-inputs change 12. The plain text is what the release before
+    // reads during an upgrade, and what phase 3's check reads.
+    const wb = await workerDb();
+    const changeNote = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Dropped the ASEAN thrust." }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Mobile first" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.setRevalidation",
+      {
+        cycleId,
+        holds: false,
+        changed: true,
+        changeNote: changeNote as never,
+        focusNote: richTextFromPlainText("Mobile activation"),
+      },
+    );
+    const read = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "workflow.read",
+      { cycleId },
+    )) as {
+      revalidation: { changeNote: string | null; focusNote: string | null };
+      revalidationDocuments: { changeNote: unknown; focusNote: unknown };
+      phases: { state: string }[];
+    };
+    expect(read.revalidationDocuments.changeNote).toEqual(changeNote);
+    expect(read.revalidationDocuments.focusNote).toEqual(
+      richTextFromPlainText("Mobile activation"),
+    );
+    expect(read.revalidation.changeNote).toBe(
+      "Dropped the ASEAN thrust.\n\nMobile first",
+    );
+    expect(read.phases[3]?.state).toBe("pass");
+  });
+
+  it("refuses a change recorded with a blank note, and plain text since 0.4", async () => {
+    const wb = await workerDb();
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.setRevalidation",
+        {
+          cycleId,
+          holds: false,
+          changed: true,
+          changeNote: {
+            type: "doc",
+            content: [{ type: "paragraph" }],
+          } as never,
+        },
+      ),
+    ).rejects.toThrow(/what changed/);
+
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...context() },
+        "workflow.setRevalidation",
+        { cycleId, holds: true, changed: false, focusNote: "Plain" as never },
+      ),
+    ).rejects.toThrow();
   });
 
   it("records no calibration any more: a target moves under §2.9's one rule instead", () => {

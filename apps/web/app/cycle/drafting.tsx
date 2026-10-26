@@ -11,11 +11,25 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
+  EntityPicker,
   formatMeasure,
+  MetricInput,
+  NumberInput,
+  SelectInput,
+  TextInput,
+  UnitInput,
 } from "@openokr/ui";
+import {
+  type MemberLike,
+  memberOption,
+  namedOption,
+} from "../../lib/entity-options.ts";
 import { healthWord } from "../../lib/health-words.ts";
 import type { KpiOption } from "../../lib/kpi-options.ts";
+import { searchPeople } from "../../lib/member-search.ts";
 import { getTranslations } from "../../lib/translations";
+import { unitsInUse } from "../../lib/units-in-use.ts";
 import { ActionForm } from "./action-form.tsx";
 import {
   DraftFromAmbition,
@@ -146,7 +160,7 @@ export async function Drafting({
   /** Why drafting waits, in the policy's words. Empty when it does not. */
   readonly draftingReasons: readonly string[];
   readonly goals: readonly DraftGoal[];
-  readonly members: readonly { readonly id: string; readonly name: string }[];
+  readonly members: readonly MemberLike[];
   /**
    * What a new key result can be measured by, besides a hand-typed value
    * (TECHNICAL-PLAN §6.2, M-07). Null when the list could not be read, which
@@ -190,6 +204,13 @@ export async function Drafting({
   readonly defaultSpaceId: string | null;
 }) {
   const { t } = await getTranslations();
+  // Every person picker on the step offers the same people (H-09).
+  const people = members.map((member) =>
+    memberOption(member, t("common.agent")),
+  );
+  // The units the cycle's key results already use, most used first, for the
+  // unit field to offer (guided-inputs §4.8).
+  const units = unitsInUse(goals);
   const canDraft = canEdit && draftingAllowed;
 
   return (
@@ -364,20 +385,21 @@ export async function Drafting({
                         className="flex items-center gap-1.5"
                       >
                         <input type="hidden" name="id" value={keyResult.id} />
-                        <label
-                          className="sr-only"
-                          htmlFor={`value-${keyResult.id}`}
-                        >
-                          {t("common.newValueFor3", { title: keyResult.title })}
-                        </label>
-                        <input
+                        {/* guided-inputs §4.8: the unit beside it, and
+                            nothing sent from an empty field, which the
+                            action refuses in words. */}
+                        <MetricInput
                           id={`value-${keyResult.id}`}
+                          label={t("common.newValueFor3", {
+                            title: keyResult.title,
+                          })}
+                          hideLabel
                           name="value"
-                          type="number"
-                          step="any"
-                          required
+                          unit={keyResult.unit}
+                          baseline={keyResult.baselineValue}
+                          target={keyResult.targetValue}
                           placeholder={t("cycle.drafting.whereIsItNow")}
-                          className="w-36 rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink placeholder:text-ink-4"
+                          inputClassName="h-auto w-36 px-2 py-1 text-xs"
                         />
                         <Button
                           type="submit"
@@ -399,45 +421,29 @@ export async function Drafting({
                         className="flex flex-wrap items-center gap-1.5"
                       >
                         <input type="hidden" name="id" value={keyResult.id} />
-                        <label
-                          className="sr-only"
-                          htmlFor={`owner-${keyResult.id}`}
-                        >
-                          {t("cycle.drafting.ownerOf", {
-                            title: keyResult.title,
-                          })}
-                        </label>
-                        <select
+                        <EntityPicker
                           id={`owner-${keyResult.id}`}
-                          name="ownerId"
-                          defaultValue={keyResult.ownerId ?? ""}
-                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
-                        >
-                          <option value="">
-                            {t("cycle.drafting.noOwner")}
-                          </option>
-                          {members.map((member) => (
-                            <option key={member.id} value={member.id}>
-                              {t("cycle.drafting.ownedBy", {
-                                name: member.name,
-                              })}
-                            </option>
-                          ))}
-                        </select>
-                        <label
-                          className="sr-only"
-                          htmlFor={`due-${keyResult.id}`}
-                        >
-                          {t("cycle.drafting.dueDateOf", {
+                          label={t("cycle.drafting.ownerOf", {
                             title: keyResult.title,
                           })}
-                        </label>
-                        <input
+                          hideLabel
+                          name="ownerId"
+                          defaultValue={keyResult.ownerId}
+                          options={people}
+                          noneLabel={t("cycle.drafting.noOwner")}
+                          search={searchPeople}
+                          className="w-44"
+                          inputClassName="text-xs"
+                        />
+                        <DateInput
                           id={`due-${keyResult.id}`}
-                          type="date"
+                          label={t("cycle.drafting.dueDateOf", {
+                            title: keyResult.title,
+                          })}
+                          hideLabel
                           name="dueOn"
-                          defaultValue={keyResult.dueOn ?? ""}
-                          className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                          defaultValue={keyResult.dueOn}
+                          inputClassName="h-auto px-1.5 py-1 text-xs"
                         />
                         <Button
                           type="submit"
@@ -462,141 +468,121 @@ export async function Drafting({
                 className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
               >
                 <input type="hidden" name="goalId" value={goal.id} />
-                <label className="sr-only" htmlFor={`kr-title-${goal.id}`}>
-                  {t("cycle.drafting.theKeyResult")}
-                </label>
-                <input
+                <TextInput
                   id={`kr-title-${goal.id}`}
+                  label={t("cycle.drafting.theKeyResult")}
+                  hideLabel
                   name="title"
                   required
                   maxLength={500}
                   placeholder={t("cycle.drafting.whatChangesMeasuredHow")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
                   {kpis && kpis.length > 0 ? (
                     <>
-                      <label className="sr-only" htmlFor={`kr-kpi-${goal.id}`}>
-                        {t("cycle.drafting.measuredBy")}
-                      </label>
                       {/*
                        * By hand unless somebody chooses otherwise, because
                        * that is what every key result was before a KPI could
                        * be named here, and a default that quietly wired a
                        * measure to a metric would be a decision nobody made.
                        */}
-                      <select
+                      <EntityPicker
                         id={`kr-kpi-${goal.id}`}
+                        label={t("cycle.drafting.measuredBy")}
+                        hideLabel
                         name="kpiId"
-                        defaultValue=""
-                        className="max-w-56 rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                      >
-                        <option value="">
-                          {t("cycle.drafting.measuredByHand")}
-                        </option>
-                        {kpis.map((kpi) => (
-                          <option key={kpi.id} value={kpi.id}>
-                            {t("cycle.drafting.readFromKpi", {
-                              title: kpi.unit
-                                ? `${kpi.title} (${kpi.unit})`
-                                : kpi.title,
-                            })}
-                          </option>
-                        ))}
-                      </select>
+                        defaultValue={null}
+                        options={kpis.map((kpi) => ({
+                          id: kpi.id,
+                          label: kpi.title,
+                          detail: kpi.unit
+                            ? `${kpi.shortId} · ${kpi.unit}`
+                            : kpi.shortId,
+                        }))}
+                        noneLabel={t("cycle.drafting.measuredByHand")}
+                        className="w-56"
+                        inputClassName="text-xs"
+                      />
                     </>
                   ) : null}
-                  <label className="sr-only" htmlFor={`kr-dir-${goal.id}`}>
-                    {t("cycle.drafting.direction")}
-                  </label>
-                  <select
+                  <SelectInput
                     id={`kr-dir-${goal.id}`}
+                    label={t("cycle.drafting.direction")}
+                    hideLabel
                     name="direction"
                     defaultValue="increase"
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
                   >
                     {["increase", "reduce", "maintain", "move"].map((value) => (
                       <option key={value} value={value}>
                         {value}
                       </option>
                     ))}
-                  </select>
-                  <label className="sr-only" htmlFor={`kr-ind-${goal.id}`}>
-                    {t("common.indicator")}
-                  </label>
-                  <select
+                  </SelectInput>
+                  <SelectInput
                     id={`kr-ind-${goal.id}`}
+                    label={t("common.indicator")}
+                    hideLabel
                     name="indicatorType"
                     defaultValue="leading"
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
                   >
                     {["leading", "lagging"].map((value) => (
                       <option key={value} value={value}>
                         {value}
                       </option>
                     ))}
-                  </select>
-                  <label className="sr-only" htmlFor={`kr-base-${goal.id}`}>
-                    {t("cycle.drafting.baseline")}
-                  </label>
-                  <input
+                  </SelectInput>
+                  {/* `w-32`, because a measure in rupiah or impressions
+                      runs to nine digits. No `max`: the ceiling on a measure
+                      is the unit's, not the product's. */}
+                  <NumberInput
                     id={`kr-base-${goal.id}`}
+                    label={t("cycle.drafting.baseline")}
+                    hideLabel
                     name="baselineValue"
-                    type="number"
-                    step="any"
                     required
                     placeholder={t("cycle.drafting.baseline")}
-                    // `w-24` held five digits, and a measure in rupiah or
-                    // impressions runs to nine. No `max`: the ceiling on a
-                    // measure is the unit's, not the product's.
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-32 text-xs"
                   />
-                  <label className="sr-only" htmlFor={`kr-target-${goal.id}`}>
-                    {t("common.target")}
-                  </label>
-                  <input
+                  <NumberInput
                     id={`kr-target-${goal.id}`}
+                    label={t("common.target")}
+                    hideLabel
                     name="targetValue"
-                    type="number"
-                    step="any"
                     required
                     placeholder={t("common.target")}
-                    className="w-32 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-32 text-xs"
                   />
-                  <label className="sr-only" htmlFor={`kr-owner-${goal.id}`}>
-                    {t("cycle.drafting.owner")}
-                  </label>
-                  <select
+                  <EntityPicker
                     id={`kr-owner-${goal.id}`}
+                    label={t("cycle.drafting.owner")}
+                    hideLabel
                     name="ownerId"
+                    required
                     defaultValue={goal.champion.id}
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                  >
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {t("cycle.drafting.ownedBy", { name: member.name })}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="sr-only" htmlFor={`kr-due-${goal.id}`}>
-                    {t("cycle.drafting.dueOn")}
-                  </label>
-                  <input
+                    options={people}
+                    search={searchPeople}
+                    className="w-44"
+                    inputClassName="text-xs"
+                  />
+                  <DateInput
                     id={`kr-due-${goal.id}`}
-                    type="date"
+                    label={t("cycle.drafting.dueOn")}
+                    hideLabel
                     name="dueOn"
                     defaultValue={endsOn}
-                    className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                    inputClassName="h-auto px-1.5 py-1.5 text-xs"
                   />
-                  <label className="sr-only" htmlFor={`kr-unit-${goal.id}`}>
-                    {t("cycle.drafting.unit")}
-                  </label>
-                  <input
+                  <UnitInput
                     id={`kr-unit-${goal.id}`}
+                    label={t("cycle.drafting.unit")}
+                    hideLabel
                     name="unit"
-                    maxLength={60}
+                    known={units}
                     placeholder={t("cycle.drafting.unit")}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
+                    inputClassName="w-24 text-xs"
                   />
                   <Button type="submit">
                     {t("cycle.drafting.addKeyResult")}
@@ -638,80 +624,75 @@ export async function Drafting({
           <CardBody>
             <ActionForm action={createGoal} className="flex flex-col gap-1.5">
               <input type="hidden" name="cycleId" value={cycleId} />
-              <label className="sr-only" htmlFor="goal-title">
-                {t("common.theObjective")}
-              </label>
-              <input
+              <TextInput
                 id="goal-title"
+                label={t("common.theObjective")}
+                hideLabel
                 name="title"
                 required
                 maxLength={500}
                 placeholder={t("cycle.drafting.whatIsDifferentAt")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
-              <label className="sr-only" htmlFor="goal-contribution">
-                {t("common.whatItContributesTo")}
-              </label>
-              <input
+              <TextInput
                 id="goal-contribution"
+                label={t("common.whatItContributesTo")}
+                hideLabel
                 name="contributionStatement"
                 maxLength={1000}
                 placeholder={t("common.thePriorityThisMoves")}
-                className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                inputClassName="placeholder:text-ink-4"
               />
               <div className="flex flex-wrap items-center gap-1.5">
-                <label className="sr-only" htmlFor="goal-level">
-                  {t("common.level")}
-                </label>
-                <select
+                <SelectInput
                   id="goal-level"
+                  label={t("common.level")}
+                  hideLabel
                   name="level"
                   defaultValue={levels[0] ?? "company"}
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  inputClassName="w-auto px-1.5 text-xs text-ink-2"
                 >
                   {levels.map((value) => (
                     <option key={value} value={value}>
                       {value}
                     </option>
                   ))}
-                </select>
-                <label className="sr-only" htmlFor="goal-champion">
-                  {t("common.champion")}
-                </label>
-                <select
+                </SelectInput>
+                {/* Opens on whoever is drafting, where the select it replaced
+                 * opened on whoever came first in the directory. */}
+                <EntityPicker
                   id="goal-champion"
+                  label={t("common.champion")}
+                  hideLabel
                   name="championId"
                   required
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                >
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {t("cycle.drafting.champion", { name: member.name })}
-                    </option>
-                  ))}
-                </select>
+                  defaultValue={
+                    members.some((member) => member.id === memberId)
+                      ? memberId
+                      : null
+                  }
+                  options={people}
+                  search={searchPeople}
+                  className="w-44"
+                  inputClassName="text-xs"
+                />
                 {/* The kind of promise (METHOD.md §2.8, P9-T11b-a), offered
                  * only where the workspace uses both, and starting at its
                  * default (decision D2). */}
                 {okrKindsInUse(practice).length > 1 ? (
-                  <>
-                    <label className="sr-only" htmlFor="goal-kind">
-                      {t("okrKind.label")}
-                    </label>
-                    <select
-                      id="goal-kind"
-                      name="kind"
-                      defaultValue={defaultOkrKind(practice)}
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                    >
-                      <option value="aspirational">
-                        {t("okrKind.aspirational")}
-                      </option>
-                      <option value="committed">
-                        {t("okrKind.committed")}
-                      </option>
-                    </select>
-                  </>
+                  <SelectInput
+                    id="goal-kind"
+                    label={t("okrKind.label")}
+                    hideLabel
+                    name="kind"
+                    defaultValue={defaultOkrKind(practice)}
+                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
+                  >
+                    <option value="aspirational">
+                      {t("okrKind.aspirational")}
+                    </option>
+                    <option value="committed">{t("okrKind.committed")}</option>
+                  </SelectInput>
                 ) : null}
                 {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
                  * off asks for none, so there is no picker; optional offers
@@ -719,51 +700,43 @@ export async function Drafting({
                  * only, and the server refuses a goal without one either way. */}
                 {practice.reviewer === "off" ? null : (
                   <>
-                    <label className="sr-only" htmlFor="goal-reviewer">
-                      {t("common.reviewer")}
-                    </label>
-                    <select
+                    {/* Opens on nobody, where the select it replaced opened on
+                     * whoever came first in the directory: a reviewer is
+                     * somebody chosen, and "No reviewer" is offered only where
+                     * the practice makes one optional. */}
+                    <EntityPicker
                       id="goal-reviewer"
+                      label={t("common.reviewer")}
+                      hideLabel
                       name="reviewerId"
                       required={practice.reviewer === "required"}
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                    >
-                      {members.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {t("cycle.drafting.reviewer", { name: member.name })}
-                        </option>
-                      ))}
-                      {practice.reviewer === "optional" ? (
-                        <option value="">
-                          {t("cycle.drafting.noReviewer")}
-                        </option>
-                      ) : null}
-                    </select>
+                      defaultValue={null}
+                      options={people}
+                      {...(practice.reviewer === "optional"
+                        ? { noneLabel: t("cycle.drafting.noReviewer") }
+                        : {})}
+                      search={searchPeople}
+                      className="w-44"
+                      inputClassName="text-xs"
+                    />
                   </>
                 )}
                 {spaces.length > 0 ? (
-                  <>
-                    <label className="sr-only" htmlFor="goal-space">
-                      {t("cycle.drafting.space")}
-                    </label>
-                    <select
-                      id="goal-space"
-                      name="spaceId"
-                      defaultValue={
-                        spaces.some((space) => space.id === defaultSpaceId)
-                          ? (defaultSpaceId ?? "")
-                          : ""
-                      }
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                    >
-                      <option value="">{t("cycle.drafting.noSpace")}</option>
-                      {spaces.map((space) => (
-                        <option key={space.id} value={space.id}>
-                          {t("cycle.drafting.inSpace", { name: space.name })}
-                        </option>
-                      ))}
-                    </select>
-                  </>
+                  <EntityPicker
+                    id="goal-space"
+                    label={t("cycle.drafting.space")}
+                    hideLabel
+                    name="spaceId"
+                    defaultValue={
+                      spaces.some((space) => space.id === defaultSpaceId)
+                        ? defaultSpaceId
+                        : null
+                    }
+                    options={spaces.map(namedOption)}
+                    noneLabel={t("cycle.drafting.noSpace")}
+                    className="w-44"
+                    inputClassName="text-xs"
+                  />
                 ) : null}
                 <Button type="submit" variant="primary">
                   {t("cycle.drafting.addObjective")}

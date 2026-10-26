@@ -9,9 +9,22 @@ import {
   type OkrKind,
   type QualityStatus,
 } from "@openokr/method";
-import { Chip, cn, useTranslations } from "@openokr/ui";
+import {
+  Chip,
+  cn,
+  DateInput,
+  EntityPicker,
+  formatMeasure,
+  NumberInput,
+  SelectInput,
+  TextInput,
+  UnitInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
+import { searchMembers } from "../../lib/member-search.ts";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
@@ -73,11 +86,14 @@ export function InlineText({
   bold,
   allowEmpty,
   placeholder,
+  maxLength,
   onDraft,
   onSave,
 }: {
   readonly value: string;
   readonly label: string;
+  /** The server's limit for what this cell holds. */
+  readonly maxLength: number;
   readonly readOnly: boolean;
   readonly bold?: boolean;
   /** For a unit, where nothing is a real answer. */
@@ -107,10 +123,12 @@ export function InlineText({
   };
 
   return (
-    <input
+    <TextInput
       ref={field}
       value={draft}
-      aria-label={label}
+      label={label}
+      hideLabel
+      maxLength={maxLength}
       placeholder={placeholder}
       onChange={(event) => {
         setDraft(event.target.value);
@@ -121,17 +139,29 @@ export function InlineText({
         setDraft(value);
         onDraft?.(null);
       })}
-      className={cn("w-full truncate", FIELD, size)}
+      className="w-full min-w-0"
+      inputClassName={cn("h-auto w-full truncate", FIELD, size)}
     />
   );
 }
 
-/** A number: a value, a target or a baseline. */
+/**
+ * A number: a value, a target, a baseline or a weight.
+ *
+ * `NumberInput` (guided-inputs §4.8) with the cell's own behaviour on top:
+ * grouped as the reader reads numbers, stepped by the arrow keys, the unit
+ * beside it, and held to `min` and `max` where the contract has them, as a
+ * weight's 0 to 100. Emptied, it puts the stored value back rather than
+ * sending 0.
+ */
 export function InlineNumber({
   value,
   label,
   readOnly,
   wide,
+  unit,
+  min,
+  max,
   onSave,
 }: {
   /** Null for a number nobody has recorded yet, such as a baseline's. */
@@ -139,57 +169,135 @@ export function InlineNumber({
   readonly label: string;
   readonly readOnly: boolean;
   readonly wide?: boolean;
+  /** The measure's unit, drawn beside the number. */
+  readonly unit?: string | null;
+  readonly min?: number;
+  readonly max?: number;
   readonly onSave: (next: number) => void;
 }) {
-  const shown = value === null ? "" : String(value);
-  const { draft, setDraft, field } = useDraft(shown);
+  const { draft, setDraft, field } = useDraft<number | null>(value);
 
   if (readOnly) {
     return (
       <span className="px-1 text-xs font-semibold tabular-nums text-ink">
-        {value ?? "–"}
+        {value === null ? "–" : formatMeasure(value, unit)}
       </span>
     );
   }
 
   const commit = () => {
-    const next = Number(draft);
-    if (draft.trim() === "" || Number.isNaN(next) || next === value) {
-      setDraft(shown);
+    // Held to its bounds here as well as by the field, whose own clamp on
+    // leaving may come after this handler has already sent the number.
+    const next =
+      draft === null
+        ? null
+        : Math.min(max ?? draft, Math.max(min ?? draft, draft));
+    if (next === null || next === value) {
+      setDraft(value);
+      return;
+    }
+    setDraft(next);
+    onSave(next);
+  };
+
+  return (
+    <NumberInput
+      label={label}
+      hideLabel
+      value={draft}
+      onValueChange={setDraft}
+      unit={unit}
+      min={min}
+      max={max}
+      inputRef={field}
+      onBlur={commit}
+      onKeyDown={keys(() => setDraft(value))}
+      inputClassName={cn(
+        FIELD,
+        "h-auto text-right text-xs font-semibold",
+        wide ? "w-20" : "w-14",
+      )}
+    />
+  );
+}
+
+/**
+ * A measure's unit (guided-inputs §4.8): `UnitInput`, offering the units the
+ * cycle already uses and the common ones, with the cell's own behaviour on
+ * top. Empty is a real answer for a unit, so it is sent.
+ */
+export function InlineUnit({
+  value,
+  label,
+  readOnly,
+  known,
+  placeholder,
+  onSave,
+}: {
+  readonly value: string;
+  readonly label: string;
+  readonly readOnly: boolean;
+  /** The units already in use where this cell is drawn. */
+  readonly known: readonly string[];
+  readonly placeholder?: string;
+  readonly onSave: (next: string) => void;
+}) {
+  const { draft, setDraft, field } = useDraft(value);
+
+  if (readOnly) {
+    return <span className="truncate px-1.5 text-xs text-ink">{value}</span>;
+  }
+  const revert = keys(() => setDraft(value));
+
+  const commit = () => {
+    const next = draft.trim();
+    if (next === value) {
+      setDraft(value);
       return;
     }
     onSave(next);
   };
 
   return (
-    <input
-      ref={field}
-      type="number"
-      step="any"
+    <UnitInput
+      label={label}
+      hideLabel
       value={draft}
-      aria-label={label}
-      onChange={(event) => setDraft(event.target.value)}
+      onValueChange={setDraft}
+      known={known}
+      placeholder={placeholder}
+      inputRef={field}
       onBlur={commit}
-      onKeyDown={keys(() => setDraft(shown))}
-      className={cn(
-        "text-right text-xs font-semibold tabular-nums",
-        wide ? "w-20" : "w-14",
-        FIELD,
-      )}
+      onKeyDown={(event) => {
+        // With the suggestions open, Enter and Escape are the list's: Enter
+        // takes the highlighted unit and Escape closes it.
+        if (event.currentTarget.getAttribute("aria-expanded") !== "true") {
+          revert(event);
+        }
+      }}
+      inputClassName={cn(FIELD, "h-auto w-full truncate text-xs")}
     />
   );
 }
 
-/** A due date, or none. */
+/**
+ * A due date, or none (guided-inputs §4.9): `DateInput`, with the date in
+ * words beside it, and a warning, not a refusal, when it falls outside the
+ * cycle. METHOD.md has no rule against that, and adding one would be a
+ * practice change.
+ */
 export function InlineDate({
   value,
   label,
   readOnly,
+  cycle,
   onSave,
 }: {
   readonly value: string | null;
   readonly label: string;
   readonly readOnly: boolean;
+  /** The cycle the key result sits in, for the warning. */
+  readonly cycle?: { readonly startsOn: string; readonly endsOn: string };
   readonly onSave: (next: string | null) => void;
 }) {
   const { t } = useTranslations();
@@ -210,17 +318,27 @@ export function InlineDate({
     }
     onSave(next);
   };
+  // `YYYY-MM-DD` compares as text in calendar order.
+  const warning =
+    cycle && draft !== ""
+      ? draft > cycle.endsOn
+        ? t("okrList.dueAfterCycle", { date: cycle.endsOn })
+        : draft < cycle.startsOn
+          ? t("okrList.dueBeforeCycle", { date: cycle.startsOn })
+          : undefined
+      : undefined;
 
   return (
-    <input
-      ref={field}
-      type="date"
+    <DateInput
+      label={label}
+      hideLabel
       value={draft}
-      aria-label={label}
-      onChange={(event) => setDraft(event.target.value)}
+      onValueChange={(next) => setDraft(next ?? "")}
+      warning={warning}
+      inputRef={field}
       onBlur={commit}
       onKeyDown={keys(() => setDraft(value ?? ""))}
-      className={cn("w-32 text-xs tabular-nums", FIELD)}
+      inputClassName={cn("h-auto w-32 text-xs", FIELD)}
     />
   );
 }
@@ -228,11 +346,20 @@ export function InlineDate({
 export interface Person {
   readonly id: string;
   readonly name: string;
+  /** Their job title, read with their name in the picker. */
+  readonly title?: string | null;
 }
 
+/** A champion or an owner is a person: the search never offers an agent. */
+const PEOPLE_ONLY = ["human", "guest"] as const;
+
+/** The cell's own skin on the picker: no border until it is reached. */
+const PICKER_CELL = cn("h-auto w-36 text-xs", FIELD);
+
 /**
- * A champion or a key result owner. Saved as soon as it changes: a choice
- * from a list has no half-typed state to protect.
+ * A champion or a key result owner (docs/design/guided-inputs.md §4.10).
+ * Saved as soon as it changes: a choice from a list has no half-typed state
+ * to protect. Typing finds somebody by name or title.
  */
 export function MemberPicker({
   value,
@@ -258,32 +385,26 @@ export function MemberPicker({
       </span>
     );
   }
-  // Somebody no longer in the directory still shows as who they are.
-  const options =
-    value && !members.some((member) => member.id === value.id)
-      ? [value, ...members]
-      : members;
+  const agent = t("common.agent");
   return (
-    <select
-      aria-label={label}
-      value={value?.id ?? ""}
-      onChange={(event) => {
-        const next = event.target.value === "" ? null : event.target.value;
+    <EntityPicker
+      label={label}
+      hideLabel
+      value={value?.id ?? null}
+      options={members.map((member) => memberOption(member, agent))}
+      // Somebody no longer in the directory still shows as who they are.
+      current={value ? memberOption(value, agent) : null}
+      {...(allowNone || value === null
+        ? { noneLabel: t("okrList.nobody") }
+        : {})}
+      search={(text) => searchMembers(text, PEOPLE_ONLY)}
+      onValueChange={(next) => {
         if (next !== (value?.id ?? null)) {
           onSave(next);
         }
       }}
-      className={cn("max-w-36 truncate text-xs", FIELD)}
-    >
-      {allowNone || value === null ? (
-        <option value="">{t("okrList.nobody")}</option>
-      ) : null}
-      {options.map((member) => (
-        <option key={member.id} value={member.id}>
-          {member.name}
-        </option>
-      ))}
-    </select>
+      inputClassName={PICKER_CELL}
+    />
   );
 }
 
@@ -319,25 +440,19 @@ export function SpacePicker({
     return <span className="truncate px-1 text-xs text-ink-2">{current}</span>;
   }
   return (
-    <select
-      aria-label={label}
+    <EntityPicker
+      label={label}
+      hideLabel
       value={value}
-      onChange={(event) => {
-        if (event.target.value !== value) {
-          onSave(event.target.value);
+      options={spaces.map(namedOption)}
+      current={{ id: value, label: current }}
+      onValueChange={(next) => {
+        if (next !== null && next !== value) {
+          onSave(next);
         }
       }}
-      className={cn("max-w-36 truncate text-xs", FIELD)}
-    >
-      {spaces.some((space) => space.id === value) ? null : (
-        <option value={value}>{current}</option>
-      )}
-      {spaces.map((space) => (
-        <option key={space.id} value={space.id}>
-          {space.name}
-        </option>
-      ))}
-    </select>
+      inputClassName={PICKER_CELL}
+    />
   );
 }
 
@@ -413,16 +528,17 @@ export function KindControl({
         floating && "nodrag relative normal-case tracking-normal",
       )}
     >
-      <select
-        aria-label={t("okrKind.kindOf", { title })}
+      <SelectInput
+        label={t("okrKind.kindOf", { title })}
+        hideLabel
         data-kind={kind}
         value={shown}
         onChange={(event) => {
           const next = event.target.value as OkrKind;
           setPending(next === kind ? null : next);
         }}
-        className={cn(
-          "h-4.5 rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand",
+        inputClassName={cn(
+          "h-4.5 w-auto rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-brand",
           KIND_TONE[shown],
         )}
       >
@@ -431,7 +547,7 @@ export function KindControl({
             {name(entry)}
           </option>
         ))}
-      </select>
+      </SelectInput>
       {pending ? (
         <span
           data-testid="kind-reason"
@@ -440,12 +556,14 @@ export function KindControl({
             floating && "absolute top-full left-0 z-10 mt-1 w-64 shadow-md",
           )}
         >
-          <input
+          <TextInput
             ref={focusOnMount}
             value={reason}
-            aria-label={t("okrKind.why", {
+            label={t("okrKind.why", {
               kind: name(pending).toLowerCase(),
             })}
+            hideLabel
+            maxLength={500}
             placeholder={t("okrKind.whyPlaceholder")}
             onChange={(event) => setReason(event.target.value)}
             onKeyDown={(event) => {
@@ -456,7 +574,8 @@ export function KindControl({
                 cancel();
               }
             }}
-            className="min-w-40 flex-1 rounded-control border border-line bg-surface px-2 py-0.5 text-ink outline-none focus:border-brand"
+            className="min-w-40 flex-1"
+            inputClassName="h-6 px-2 text-xs"
           />
           <button
             type="button"
@@ -515,8 +634,9 @@ export function KeyResultKindPicker({
   }
   const offered = kinds.includes(kind) ? kinds : [kind, ...kinds];
   return (
-    <select
-      aria-label={t("keyResultKind.kindOf", { title })}
+    <SelectInput
+      label={t("keyResultKind.kindOf", { title })}
+      hideLabel
       data-key-result-kind={kind}
       value={kind}
       onChange={(event) => {
@@ -525,14 +645,14 @@ export function KeyResultKindPicker({
           onSave(next);
         }
       }}
-      className={cn("text-[11px]", FIELD)}
+      inputClassName={cn("h-auto w-auto text-[11px]", FIELD)}
     >
       {offered.map((entry) => (
         <option key={entry} value={entry}>
           {t(KEY_RESULT_KIND_LABEL[entry])}
         </option>
       ))}
-    </select>
+    </SelectInput>
   );
 }
 
@@ -736,12 +856,16 @@ export function ReasonField({
         inset ? "border-b border-line px-3.5 pl-14" : "rounded-control px-2",
       )}
     >
-      <label className="flex min-w-0 flex-1 items-center gap-2">
-        <span className="text-ink-2">{label}</span>
-        <input
+      <div className="flex min-w-0 flex-1 items-center gap-2">
+        <span aria-hidden className="text-ink-2">
+          {label}
+        </span>
+        <TextInput
           ref={focusOnMount}
           value={reason}
-          aria-label={label}
+          label={label}
+          hideLabel
+          maxLength={500}
           placeholder={t("okrList.reasonPlaceholder")}
           onChange={(event) => setReason(event.target.value)}
           onKeyDown={(event) => {
@@ -752,9 +876,10 @@ export function ReasonField({
               onCancel();
             }
           }}
-          className="min-w-0 flex-1 rounded-control border border-line bg-surface px-2 py-1 text-ink outline-none focus:border-brand"
+          className="min-w-0 flex-1"
+          inputClassName="h-6.5 px-2 text-xs"
         />
-      </label>
+      </div>
       <button
         type="button"
         disabled={reason.trim() === ""}

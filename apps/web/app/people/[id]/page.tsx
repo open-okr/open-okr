@@ -1,11 +1,23 @@
-import { ACCESS_LEVELS, callAction, renderRichTextToHtml } from "@openokr/core";
-import { Avatar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { listTimezones } from "@openokr/formats";
+import {
+  Avatar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  RichTextView,
+  TextInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppearanceControl } from "../../../lib/appearance.tsx";
+import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { getPool } from "../../../lib/pool";
+import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
@@ -17,6 +29,7 @@ import {
 import { AvatarForm } from "./avatar-form.tsx";
 import { LeaveCard } from "./leave-card.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
+import { MemberFieldsForm } from "./member-fields-form.tsx";
 import { ProfileForm } from "./profile-form.tsx";
 
 /**
@@ -96,6 +109,12 @@ export default async function MemberProfilePage({
   );
   const isAdmin = level >= ACCESS_LEVELS.full;
   const isSelf = id === workspace.memberId;
+  // The member's own window, so the profile form shows it. Its boxes were
+  // empty, and an empty pair means "off", so saving a new timezone here
+  // deleted the quiet hours set on /account/channels.
+  const ownDelivery = isSelf
+    ? await callAction(context, "channels.mySettings", {})
+    : null;
   // Whether the member on this page is an administrator, for the handover
   // control (completeness review H-14). Only read for somebody who could act
   // on the answer.
@@ -121,7 +140,7 @@ export default async function MemberProfilePage({
     ? (directory.find((m) => m.id === member.managerId) ?? null)
     : null;
 
-  const bioHtml = member.bio ? renderRichTextToHtml(member.bio as never) : null;
+  const bioHtml = richTextHtml(member.bio);
   // The thumbnail, through the same access check as the file itself. A reader
   // the picture is not shared with gets a 404 and the initials instead.
   const avatarUrl = member.avatarBlobId
@@ -208,13 +227,7 @@ export default async function MemberProfilePage({
               <h3 className="mb-1 text-xs font-semibold text-ink-3">
                 {t("people.detail.bio")}
               </h3>
-              <div
-                className="prose prose-sm max-w-none text-ink"
-                // The HTML is produced by renderRichTextToHtml, which is a
-                // sanitising allow-list at every surface (CLAUDE.md).
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: sanitised by renderRichTextToHtml
-                dangerouslySetInnerHTML={{ __html: bioHtml }}
-              />
+              <RichTextView html={bioHtml} className="text-ink" />
             </div>
           ) : null}
 
@@ -331,7 +344,9 @@ export default async function MemberProfilePage({
         <ProfileForm
           memberId={id}
           timezone={member.timezone}
+          zones={listTimezones()}
           primaryChannel={member.primaryChannel}
+          quietHours={ownDelivery?.quietHours ?? null}
           bio={member.bio}
           updateProfile={updateProfile}
         />
@@ -345,7 +360,11 @@ export default async function MemberProfilePage({
         // People, not agents: an agent cannot read a review it is handed.
         delegates={directory
           .filter((person) => person.id !== id && person.kind === "human")
-          .map((person) => ({ id: person.id, name: person.name }))}
+          .map((person) => ({
+            id: person.id,
+            name: person.name,
+            title: person.title,
+          }))}
       />
 
       {/* Admin org-field edit */}
@@ -357,55 +376,33 @@ export default async function MemberProfilePage({
             </h2>
           </CardHeader>
           <CardBody>
-            <form
-              action={async (form: FormData) => {
-                "use server";
-                await updateMemberFields(null, form);
-              }}
-              className="flex flex-col gap-2"
-            >
+            <MemberFieldsForm action={updateMemberFields}>
               <input type="hidden" name="memberId" value={id} />
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.name")}
-                <input
-                  name="name"
-                  defaultValue={member.name}
-                  required
-                  maxLength={200}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("people.detail.title")}
-                <input
-                  name="title"
-                  defaultValue={member.title ?? ""}
-                  maxLength={200}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-xs text-ink-3">
-                {t("common.manager")}
-                <select
-                  name="managerId"
-                  defaultValue={member.managerId ?? ""}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  <option value="">{t("people.detail.noManager")}</option>
-                  {possibleManagers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button
-                type="submit"
-                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("common.save")}
-              </button>
-            </form>
+              <TextInput
+                label={t("common.name")}
+                name="name"
+                defaultValue={member.name}
+                required
+                maxLength={200}
+              />
+              <TextInput
+                label={t("people.detail.title")}
+                name="title"
+                defaultValue={member.title ?? ""}
+                maxLength={200}
+              />
+              {/* The managers who would not close a loop, so no directory
+               * search, which would offer the others back. */}
+              <EntityPicker
+                label={t("common.manager")}
+                name="managerId"
+                defaultValue={member.managerId}
+                options={possibleManagers.map((one) =>
+                  memberOption(one, t("common.agent")),
+                )}
+                noneLabel={t("people.detail.noManager")}
+              />
+            </MemberFieldsForm>
           </CardBody>
         </Card>
       ) : null}

@@ -337,6 +337,8 @@ export default async function SpacePage({
         candidates={candidates.map((member) => ({
           id: member.id,
           name: member.name,
+          title: member.title,
+          kind: member.kind,
         }))}
         canManage={canManage}
         canArchive={level >= ACCESS_LEVELS.full}

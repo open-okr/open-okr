@@ -6,7 +6,15 @@ import {
   callAction,
 } from "@openokr/core";
 import { TRIGGER_CATALOGUE } from "@openokr/method";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  IdentifierInput,
+  SecretInput,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -47,26 +55,26 @@ const PROVIDERS = [
   {
     id: "slack" as const,
     label: "Slack",
-    /** What the fields are called on the provider's own app page. */
-    hint: "Bot User OAuth Token, Signing Secret and Workspace ID, all on the app's Basic Information and OAuth pages.",
+    /** Where the provider shows what its fields ask for. */
+    hint: "admin.channels.hint.slack",
     ready: true,
   },
   {
     id: "teams" as const,
     label: "Microsoft Teams",
-    hint: "The Application (client) ID and a client secret from the Azure bot registration, and the Directory (tenant) ID in the workspace id field. Point the bot's messaging endpoint at /api/channels/teams. The manifest to upload is in deploy/teams.",
+    hint: "admin.channels.hint.teams",
     ready: true,
   },
   {
     id: "whatsapp" as const,
     label: "WhatsApp",
-    hint: "The permanent access token in the bot token box, the app secret in the signing secret box, and the Phone number ID in the workspace id field. Choose a verify token of your own and put it after the app secret, separated by a space. Point the webhook at /api/channels/whatsapp?phone_number_id=<your phone number id>. deploy/whatsapp has the runbook.",
+    hint: "admin.channels.hint.whatsapp",
     ready: true,
   },
   {
     id: "telegram" as const,
     label: "Telegram",
-    hint: "The bot token from BotFather, and a webhook secret you choose. Register the webhook at /api/channels/telegram/<your bot id>, and put that bot id in the workspace id field.",
+    hint: "admin.channels.hint.telegram",
     ready: true,
   },
 ];
@@ -460,8 +468,101 @@ export default async function ChannelsPage() {
   );
 }
 
+/** One box of a provider's connect form, named as the provider names it. */
+interface ConnectField {
+  /** What the action reads, the same four names for every provider. */
+  readonly name: "botToken" | "signingSecret" | "verifyToken" | "teamId";
+  /** Its catalogue key, written out so the catalogue gate can find it. */
+  readonly label: string;
+  /** A secret is masked with a reveal; an id is shown, monospace. */
+  readonly secret: boolean;
+}
+
 /**
- * The three fields, empty every time.
+ * Each provider's boxes (guided-inputs §4.11). One set of three labels used
+ * to mean four things: Teams' App ID, which is not a secret, was masked, and
+ * WhatsApp's app secret and verify token went in one box split on a space.
+ */
+const CONNECT_FIELDS: Readonly<
+  Record<(typeof PROVIDERS)[number]["id"], readonly ConnectField[]>
+> = {
+  slack: [
+    {
+      name: "botToken",
+      label: "admin.channels.fields.slack.botToken",
+      secret: true,
+    },
+    {
+      name: "signingSecret",
+      label: "admin.channels.fields.slack.signingSecret",
+      secret: true,
+    },
+    {
+      name: "teamId",
+      label: "admin.channels.fields.slack.teamId",
+      secret: false,
+    },
+  ],
+  teams: [
+    {
+      name: "botToken",
+      label: "admin.channels.fields.teams.botToken",
+      secret: false,
+    },
+    {
+      name: "signingSecret",
+      label: "admin.channels.fields.teams.signingSecret",
+      secret: true,
+    },
+    {
+      name: "teamId",
+      label: "admin.channels.fields.teams.teamId",
+      secret: false,
+    },
+  ],
+  whatsapp: [
+    {
+      name: "botToken",
+      label: "admin.channels.fields.whatsapp.botToken",
+      secret: true,
+    },
+    {
+      name: "signingSecret",
+      label: "admin.channels.fields.whatsapp.signingSecret",
+      secret: true,
+    },
+    {
+      name: "verifyToken",
+      label: "admin.channels.fields.whatsapp.verifyToken",
+      secret: true,
+    },
+    {
+      name: "teamId",
+      label: "admin.channels.fields.whatsapp.teamId",
+      secret: false,
+    },
+  ],
+  telegram: [
+    {
+      name: "botToken",
+      label: "admin.channels.fields.telegram.botToken",
+      secret: true,
+    },
+    {
+      name: "signingSecret",
+      label: "admin.channels.fields.telegram.signingSecret",
+      secret: true,
+    },
+    {
+      name: "teamId",
+      label: "admin.channels.fields.telegram.teamId",
+      secret: false,
+    },
+  ],
+};
+
+/**
+ * The provider's fields, empty every time.
  *
  * Never pre-filled from the stored connection, which is the point: the
  * credential went in once and the product cannot read it back, so neither can
@@ -471,7 +572,7 @@ async function ConnectFields({
   provider,
   hint,
 }: {
-  readonly provider: string;
+  readonly provider: (typeof PROVIDERS)[number]["id"];
   readonly hint: string;
 }) {
   const { t } = await getTranslations();
@@ -479,37 +580,23 @@ async function ConnectFields({
   return (
     <ChannelForm action={connectProvider} className="mt-2 flex flex-col gap-2">
       <input type="hidden" name="provider" value={provider} />
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {t("admin.channels.botToken")}
-        <input
-          name="botToken"
-          type="password"
-          autoComplete="off"
-          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {/* Slack signs the body; Telegram echoes a secret it was given. Two
-            different claims, one field, because both are a string the
-            product compares an inbound request against. */}
-        {t("admin.channels.signingOrWebhookSecret")}
-        <input
-          name="signingSecret"
-          type="password"
-          autoComplete="off"
-          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-        />
-      </label>
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {t("admin.channels.providerWorkspaceId")}
-        <input
-          name="teamId"
-          type="text"
-          autoComplete="off"
-          className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
-        />
-      </label>
-      {hint ? <p className="text-xs text-ink-3">{hint}</p> : null}
+      {CONNECT_FIELDS[provider].map((field) =>
+        field.secret ? (
+          <SecretInput
+            key={field.name}
+            label={t(field.label)}
+            name={field.name}
+            autoComplete="off"
+          />
+        ) : (
+          <IdentifierInput
+            key={field.name}
+            label={t(field.label)}
+            name={field.name}
+          />
+        ),
+      )}
+      <p className="text-xs text-ink-3">{t(hint)}</p>
       <Button type="submit" variant="primary" size="sm" className="w-fit">
         {t("common.connect")}
       </Button>

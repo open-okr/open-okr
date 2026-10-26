@@ -1,6 +1,13 @@
-import { render, waitFor } from "@testing-library/react";
+import { render as renderBare, waitFor } from "@testing-library/react";
+import type { ReactElement } from "react";
 import { describe, expect, test } from "vitest";
+import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 import { RichTextEditor } from "../src/rich-text/editor.tsx";
+
+// The full editor has a toolbar since guided-inputs change 5b, and its labels
+// are translated, so it is drawn inside the provider every page has.
+const render = (node: ReactElement) =>
+  renderBare(<TranslationsProvider locale="en">{node}</TranslationsProvider>);
 
 const SIMPLE_DOC = {
   type: "doc",

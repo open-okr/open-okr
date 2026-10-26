@@ -71,7 +71,9 @@ describe("the AI console", () => {
     // you can check it" would be a screen that displays a provider key.
     expect(pageSource).toContain("workspaceKeyHint");
     expect(pageSource).not.toMatch(/defaultValue=\{[^}]*apiKey/);
-    expect(pageSource).toMatch(/name="apiKey"[\s\S]{0,120}type="password"/);
+    // A secret field, masked until its own reveal is pressed (guided-inputs
+    // §4.11), where a raw password box stood.
+    expect(pageSource).toMatch(/<SecretInput\b[^>]*name="apiKey"/);
   });
 
   test("offers every provider and every tier the schema declares", () => {
@@ -159,11 +161,20 @@ describe("the AI console's second half (P6-G12b)", () => {
     expect(
       BUDGET_SCOPES.length + BUDGET_METRICS.length + BUDGET_PERIODS.length,
     ).toBeGreaterThan(5);
-    for (const name of ["BUDGET_SCOPES", "BUDGET_METRICS", "BUDGET_PERIODS"]) {
+    for (const name of ["BUDGET_METRICS", "BUDGET_PERIODS"]) {
       expect(governanceSource, `${name} is not read`).toContain(
         `{${name}.map(`,
       );
     }
+    // The scope is said by whose budget it is, one picker where a scope
+    // select stood beside a pasted id (guided-inputs §4.10): nobody for the
+    // workspace, a person, or an agent. A scope the schema gains and the
+    // picker does not offer fails here rather than going unoffered.
+    expect([...BUDGET_SCOPES].sort()).toEqual(["agent", "user", "workspace"]);
+    expect(governanceSource).toContain('budgetOwnerValue("user"');
+    expect(governanceSource).toContain('budgetOwnerValue("agent"');
+    // The screen is read with its messages in English.
+    expect(governanceSource).toContain("noneLabel={The whole workspace}");
   });
 
   test("reads every prompt the package ships a default for", () => {

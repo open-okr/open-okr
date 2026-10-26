@@ -4,6 +4,7 @@ import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { decide } from "./actions.ts";
+import { DeviceCodeEntry } from "./code-entry.tsx";
 import { DecisionForm } from "./decision-form.tsx";
 
 /**
@@ -78,6 +79,12 @@ export default async function DevicePage({
                     command: "okr login",
                   })}
             </p>
+            {/* The link is the easy way, and a typed code the way when the
+                terminal is on another machine or its link would not copy. */}
+            <p className="pt-1 text-sm text-ink">
+              {t("account.device.codeEntry.youCanAlsoType")}
+            </p>
+            <DeviceCodeEntry />
           </CardBody>
         </Card>
       ) : (

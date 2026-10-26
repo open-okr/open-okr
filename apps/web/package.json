@@ -1,6 +1,6 @@
 {
   "name": "@openokr/web",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -17,16 +17,17 @@
     "@openokr/agents": "workspace:*",
     "@openokr/config": "workspace:*",
     "@openokr/core": "workspace:*",
+    "@openokr/formats": "workspace:*",
     "@openokr/method": "workspace:*",
     "@openokr/ui": "workspace:*",
     "@react-pdf/renderer": "^4.9.0",
     "@xyflow/react": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "next": "16.3.8",
+    "next": "16.4.2",
     "pg": "catalog:",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@opentelemetry/api": "^1.9.1",

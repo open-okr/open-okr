@@ -4,31 +4,19 @@
  * yet — built ahead of its consumer, the same position several Phase 2
  * utilities already sit in).
  */
-import type { RichTextDocument, RichTextNode } from "./schema.ts";
+import { richTextAsLine, textOfRichTextNode } from "@openokr/formats";
+import type { RichTextDocument } from "./schema.ts";
 
 export interface ExcerptResolvers {
   resolveMention?(id: string): { readonly name: string } | undefined;
 }
 
-function textOf(node: RichTextNode, resolvers: ExcerptResolvers): string {
-  if (node.type === "text") {
-    return node.text;
-  }
-  if (node.type === "mention") {
-    const id = String(node.attrs?.id ?? "");
-    const label = String(node.attrs?.label ?? "");
-    return `@${resolvers.resolveMention?.(id)?.name ?? label}`;
-  }
-  if (node.type === "entityLink") {
-    return String(node.attrs?.label ?? "");
-  }
-  if (node.type === "attachment") {
-    return String(node.attrs?.filename ?? "");
-  }
-  if (node.type === "hardBreak" || node.type === "horizontalRule") {
-    return "";
-  }
-  return (node.content ?? []).map((child) => textOf(child, resolvers)).join("");
+/** The member's current name for a mention, where the caller resolves it.
+ * The walk itself lives in `@openokr/formats`, so the length limit and the
+ * editor's counter read a document exactly as an excerpt does
+ * (docs/design/guided-inputs.md §4.7). */
+function mentionNameFrom(resolvers: ExcerptResolvers) {
+  return (id: string) => resolvers.resolveMention?.(id)?.name;
 }
 
 /** Truncates on a word boundary rather than mid-word, so a name or a
@@ -47,12 +35,7 @@ export function excerptRichText(
   maxLength: number,
   resolvers: ExcerptResolvers = {},
 ): string {
-  const text = doc.content
-    .map((node) => textOf(node, resolvers))
-    .join(" ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return truncate(text, maxLength);
+  return truncate(richTextAsLine(doc, mentionNameFrom(resolvers)), maxLength);
 }
 
 /**
@@ -65,7 +48,7 @@ export function excerptRichText(
  * found by publishing two versions of a two-paragraph document in a browser and
  * getting one line back.
  *
- * The same `textOf` walk, applied per top-level node instead of once over all
+ * The same walk, applied per top-level node instead of once over all
  * of them, so this is the same parser rather than a second one.
  */
 export function plainTextLines(
@@ -73,6 +56,10 @@ export function plainTextLines(
   resolvers: ExcerptResolvers = {},
 ): string[] {
   return doc.content
-    .map((node) => textOf(node, resolvers).replace(/\s+/g, " ").trim())
+    .map((node) =>
+      textOfRichTextNode(node, mentionNameFrom(resolvers))
+        .replace(/\s+/g, " ")
+        .trim(),
+    )
     .filter((line) => line !== "");
 }

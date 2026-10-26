@@ -1,8 +1,10 @@
 import { requestSupportSession } from "@openokr/core";
+import { TextArea } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
+import { refusalOf } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -32,14 +34,14 @@ async function ask(formData: FormData): Promise<void> {
     });
   } catch (error) {
     // A blank reason, a request that already exists and an operator who is
-    // already a member all arrive as errors, and none should show a stack
+    // already a member all arrive as refusals, and none should show a stack
     // trace. They used to vanish, so the page looked as if the request had
     // gone and nothing had (UAT BUG-020). The sentence is carried back to the
-    // form instead.
-    if (!(error instanceof Error)) {
+    // form instead, and a schema's is its sentence rather than its JSON.
+    refused = refusalOf(error);
+    if (refused === null) {
       throw error;
     }
-    refused = error.message;
   }
   if (refused !== null) {
     redirect(
@@ -84,20 +86,14 @@ export async function SupportRequest({
         {/* Distinct from the lifecycle form's own reason field, which sits
          * on this same page. Two controls sharing an id make every `for`
          * ambiguous and a screen reader announce the wrong label. */}
-        <label
-          className="font-medium text-ink text-sm"
-          htmlFor="support-reason"
-        >
-          {t("operator.supportRequest.why")}
-        </label>
-        <input
-          className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+        <TextArea
+          label={t("operator.supportRequest.why")}
           id="support-reason"
           maxLength={500}
           name="reason"
           placeholder={t("operator.supportRequest.placeholder")}
           required
-          type="text"
+          rows={2}
         />
         <p className="text-ink-3 text-xs">
           {t("operator.supportRequest.adminDecides")}

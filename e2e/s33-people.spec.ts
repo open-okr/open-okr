@@ -83,6 +83,34 @@ test("the directory lists the two agents as members, badged", async () => {
   }
 });
 
+/**
+ * guided-inputs §5, F5: an administrator's edit of somebody else threw its
+ * answer away, so a refused save and a saved one looked the same. On the
+ * Coach's profile, and put back as it was.
+ */
+test("an administrator's edit of somebody else says what happened", async () => {
+  await goTo(page, "/people");
+  await page.locator("a[href^='/people/']", { hasText: "OKR Coach" }).click();
+  await page.waitForURL(/\/people\/[0-9a-f-]{36}/);
+  const card = page.getByTestId("member-fields");
+  const name = card.getByLabel("Name", { exact: true });
+  await expect(name).toHaveValue("OKR Coach", { timeout: 15_000 });
+
+  // Spaces pass the browser's `required` and not the action's trim.
+  await name.fill("   ");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByRole("alert")).toHaveText("A member needs a name.", {
+    timeout: 15_000,
+  });
+  await expect(name).toHaveValue("   ");
+
+  await name.fill("OKR Coach");
+  await card.getByRole("button", { name: "Save" }).click();
+  await expect(card.getByRole("status")).toHaveText("Member updated.", {
+    timeout: 15_000,
+  });
+});
+
 test("search filters the member list", async () => {
   await goTo(page, "/people");
   const searchInput = page.getByPlaceholder("Search by name or title");
@@ -126,9 +154,11 @@ test("the profile page loads for the signed-in member", async () => {
 });
 
 test("the profile has a timezone field", async () => {
-  // Already on the profile page from the previous test.
-  const timezone = page.locator("input[name='timezone']");
-  await expect(timezone).toBeVisible();
+  // Already on the profile page from the previous test. A list to choose from
+  // since the field kit (guided-inputs §4.6): the name the form submits is the
+  // list's hidden field, and the box a person sees is labelled.
+  await expect(page.getByLabel("Timezone")).toBeVisible();
+  await expect(page.locator("input[name='timezone']")).toHaveCount(1);
 });
 
 /**
@@ -288,9 +318,15 @@ test("erasure asks for the name typed, and a wrong one erases nothing", async ()
   // depending on the machine, and fails on strict mode rather than on the
   // behaviour. Two refusals for two refused actions is correct; what this
   // line means is that the erase card is one of them.
+  // The innermost block holding both the confirm box and the erase button:
+  // the box sits in a field wrapper of its own since guided-inputs 10d, so
+  // the innermost block holding the box alone is that wrapper.
   const eraseCard = page
     .locator("div")
     .filter({ has: page.getByLabel(`Type ${INSTANCE_ACCOUNT.name} to confirm`) })
+    .filter({
+      has: page.getByRole("button", { name: "Erase this member", exact: true }),
+    })
     .last();
   await expect(
     eraseCard.getByText(

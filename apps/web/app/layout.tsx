@@ -12,6 +12,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
+import { BrowserTimezoneCookie } from "../lib/browser-timezone-cookie";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
@@ -118,6 +119,13 @@ export default async function RootLayout({
         {brandStyle === null ? null : <style nonce={nonce}>{brandStyle}</style>}
       </head>
       <body>
+        {/*
+         * The browser's timezone, for the server to read when it makes a
+         * workspace or a member (docs/design/browser-timezone.md). On every
+         * page because sign-up, setup and joining each start on a different
+         * one.
+         */}
+        <BrowserTimezoneCookie />
         <ThemeProvider>
           <TranslationsProvider locale={locale} renamed={renamed}>
             {/*

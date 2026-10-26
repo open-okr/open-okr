@@ -5,6 +5,8 @@ import {
   Card,
   CardBody,
   CardHeader,
+  DateRangeInput,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -108,41 +110,23 @@ export function SpaceHolidaysCard({
 
         {canManage ? (
           <div className="flex flex-wrap items-end gap-2 rounded-md border border-line p-2.5">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("spaces.detail.holidays.from")}
-              </span>
-              <input
-                type="date"
-                value={startsOn}
-                onChange={(event) => setStartsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("spaces.detail.holidays.to")}
-              </span>
-              <input
-                type="date"
-                value={endsOn}
-                min={startsOn || undefined}
-                onChange={(event) => setEndsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("spaces.detail.holidays.label")}
-              </span>
-              <input
-                value={label}
-                maxLength={80}
-                placeholder={t("spaces.detail.holidays.labelPlaceholder")}
-                onChange={(event) => setLabel(event.target.value)}
-                className="w-48 rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
+            <DateRangeInput
+              startLabel={t("spaces.detail.holidays.from")}
+              endLabel={t("spaces.detail.holidays.to")}
+              value={{ start: startsOn || null, end: endsOn || null }}
+              onValueChange={(range) => {
+                setStartsOn(range.start ?? "");
+                setEndsOn(range.end ?? "");
+              }}
+            />
+            <TextInput
+              label={t("spaces.detail.holidays.label")}
+              value={label}
+              maxLength={80}
+              placeholder={t("spaces.detail.holidays.labelPlaceholder")}
+              onChange={(event) => setLabel(event.target.value)}
+              className="w-48"
+            />
             <Button
               type="button"
               disabled={
@@ -171,11 +155,8 @@ export function SpaceHolidaysCard({
           </div>
         ) : null}
 
-        {backwards ? (
-          <p role="alert" className="text-xs text-bad">
-            {t("spaces.detail.holidays.endsBeforeItStarts")}
-          </p>
-        ) : state.error ? (
+        {/* An end before the start is said under the end date itself. */}
+        {state.error ? (
           <p role="alert" className="text-xs text-bad">
             {state.error}
           </p>

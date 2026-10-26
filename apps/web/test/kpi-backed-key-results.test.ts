@@ -37,8 +37,12 @@ describe("drafting a key result on the cycle's phase 4", () => {
   test("defaults to a key result measured by hand", () => {
     // A default that wired every new key result to the first KPI in the list
     // would be a decision nobody made.
-    expect(drafting).toContain('name="kpiId"');
-    expect(drafting).toContain('defaultValue=""');
+    // A picker that opens on nothing chosen, which reads as "Measured by
+    // hand" (guided-inputs §4.10).
+    expect(drafting).toMatch(/name="kpiId"\s+defaultValue=\{null\}/);
+    expect(drafting).toContain(
+      'noneLabel={t("cycle.drafting.measuredByHand")}',
+    );
     expect(withMessages(drafting)).toContain("Measured by hand");
   });
 

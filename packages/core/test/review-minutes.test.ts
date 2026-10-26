@@ -14,6 +14,7 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "minutes-facilitator";
@@ -226,7 +227,10 @@ const runTheReview = async () => {
     {
       sessionId,
       questionKey: 4,
-      body: "Between the platform space and support. Nobody owned the handover.",
+      // Two paragraphs, which the minutes give back as one line.
+      body: richTextFromPlainText(
+        "Between the platform space and support.\n\nNobody owned the handover.",
+      ),
     },
     MANAGER,
   );
@@ -255,11 +259,19 @@ const runTheReview = async () => {
     text: "We learned that a dependency nobody owns is a dependency nobody clears.",
     carryForward: true,
   });
-  await call("sessions.draftNextCycle", {
-    sessionId,
-    title: "Make onboarding something a team finishes in one sitting",
-    why: "Three of five losses were onboarding, not features.",
-  });
+  // A draft as an earlier release wrote it: nothing writes one since 0.4,
+  // and the minutes still read the ones there are.
+  await (await workerDb()).admin.query(
+    `insert into next_cycle_drafts (id, workspace_id, session_id, title, why, created_by_id)
+     values (gen_random_uuid(), $1, $2, $3, $4, $5)`,
+    [
+      workspaceId,
+      sessionId,
+      "Make onboarding something a team finishes in one sitting",
+      "Three of five losses were onboarding, not features.",
+      facilitatorMemberId,
+    ],
+  );
   await call("sessions.addAction", {
     sessionId,
     what: "Write the dependency contract with the platform space",
@@ -406,7 +418,9 @@ describe("every stage's record", () => {
   it("leaves the facilitator's private notes out", async () => {
     await call("sessions.setStageNote", {
       id: sessionId,
-      note: "Pulse was low. Do not put this in the minutes.",
+      note: richTextFromPlainText(
+        "Pulse was low. Do not put this in the minutes.",
+      ),
     });
     await runTheReview();
 
@@ -423,8 +437,11 @@ describe("the management retro's audience survives the export", () => {
   it("is in the minutes for a manager and the coordinator", async () => {
     await runTheReview();
 
-    expect((await minutes(MANAGER)).management?.[0]?.body).toContain(
-      "Nobody owned the handover",
+    // One line, as every row of the minutes is: the markdown indents it
+    // under its question, and a blank line inside would end the list
+    // (guided-inputs change 11b).
+    expect((await minutes(MANAGER)).management?.[0]?.body).toBe(
+      "Between the platform space and support. Nobody owned the handover.",
     );
     // The facilitator here is the founding member and the space's coordinator.
     expect((await minutes(FACILITATOR)).management).not.toBeNull();

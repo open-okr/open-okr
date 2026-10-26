@@ -6,9 +6,14 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  type ConfidenceDisplay,
+  EntityPicker,
+  formatConfidence,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import { setNextActionAction } from "./blocker-actions.ts";
 import type { Option } from "./blocker-panel.tsx";
 import { NO_ERROR } from "./commitment-state.ts";
@@ -65,25 +70,22 @@ function NextActionForm({
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="keyResultId" value={score.keyResultId} />
       <div className="flex flex-wrap gap-2">
-        <input
+        <TextInput
+          label={t("session.detail.nextActions.theNextAction")}
+          hideLabel
           name="nextAction"
-          aria-label={t("session.detail.nextActions.theNextAction")}
           placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
+          maxLength={500}
+          className="min-w-0 flex-1"
         />
-        <select
+        <EntityPicker
+          label={t("session.detail.nextActions.whoOwnsIt")}
+          hideLabel
           name="ownerId"
-          defaultValue=""
-          aria-label={t("session.detail.nextActions.whoOwnsIt")}
-          className="w-48 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-        >
-          <option value="">{t("session.detail.nextActions.whoOwnsIt")}</option>
-          {owners.map((owner) => (
-            <option key={owner.id} value={owner.id}>
-              {owner.label}
-            </option>
-          ))}
-        </select>
+          placeholder={t("session.detail.nextActions.whoOwnsIt")}
+          options={peopleOptions(owners)}
+          className="w-48"
+        />
         <Button type="submit" variant="primary" size="sm" disabled={pending}>
           {t("session.detail.nextActions.setIt")}
         </Button>
@@ -102,11 +104,14 @@ export function NextActionPanel({
   scores,
   owners,
   canWrite,
+  display,
 }: {
   readonly sessionId: string;
   readonly scores: readonly LowScore[];
   readonly owners: readonly Option[];
   readonly canWrite: boolean;
+  /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
+  readonly display: ConfidenceDisplay;
 }) {
   const { t } = useTranslations();
   const waiting = scores.filter(
@@ -147,12 +152,16 @@ export function NextActionPanel({
               <div className="flex flex-wrap items-baseline gap-2">
                 <span className="text-sm text-ink">{score.title}</span>
                 <Chip tone={score.low ? "bad" : "warn"}>
-                  {score.confidence.toFixed(1)}
+                  {formatConfidence(score.confidence, display, t)}
                 </Chip>
                 {score.dropped && score.previousConfidence !== null ? (
                   <span className="text-xs text-ink-3">
                     {t("session.detail.nextActions.fellFrom", {
-                      from: score.previousConfidence.toFixed(1),
+                      from: formatConfidence(
+                        score.previousConfidence,
+                        display,
+                        t,
+                      ),
                     })}
                   </span>
                 ) : null}

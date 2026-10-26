@@ -31,7 +31,7 @@ import { goTo, signIn, skipOnboarding } from "./instance-account.ts";
 
 const DOMAIN = "trusted.example";
 const PASSWORD = "correct-horse-battery-staple-9";
-const DOMAIN_FIELD = "Trusted email domains (comma-separated)";
+const DOMAIN_FIELD = "Trusted email domains";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }

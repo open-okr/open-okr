@@ -7,6 +7,7 @@ import {
   resolveWorkspaceSettings,
   SETTINGS_REGISTRY,
   settingsByCard,
+  timezoneSchema,
 } from "../src/settings/registry.ts";
 
 /**
@@ -218,4 +219,26 @@ describe("member settings", () => {
       end: "08:00",
     });
   });
+});
+
+/**
+ * The workspace timezone a settings card may write is one on the list the
+ * card offers (docs/design/guided-inputs.md §4.6). Registration still falls
+ * back to UTC for anything it cannot use, above; this is the stricter
+ * question of what an administrator may save.
+ */
+describe("the workspace timezone a card may save", () => {
+  it.each(["UTC", "Asia/Kuala_Lumpur", "America/New_York"])(
+    "accepts %s",
+    (zone) => {
+      expect(timezoneSchema.safeParse(zone).success).toBe(true);
+    },
+  );
+
+  it.each(["EST", "asia/kuala_lumpur", "+08:00", "Mars/Olympus", ""])(
+    "refuses %j",
+    (zone) => {
+      expect(timezoneSchema.safeParse(zone).success).toBe(false);
+    },
+  );
 });

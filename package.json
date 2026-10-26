@@ -11,6 +11,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "test:ci": "vitest run --config vitest.ci.config.ts --retry=2",
+    "test:changed": "vitest run --config vitest.ci.config.ts --changed origin/main",
+    "check:fast": "node --experimental-strip-types --no-warnings scripts/check-fast.ts",
     "typecheck": "turbo run typecheck --concurrency=4",
     "lint": "biome check --max-diagnostics=400 .",
     "lint:fix": "biome check --write --max-diagnostics=400 .",
@@ -54,17 +56,17 @@
     "gen:docs": "node --experimental-strip-types --no-warnings scripts/gen-api-reference.ts"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
+    "@axe-core/playwright": "^4.14.0",
     "@biomejs/biome": "2.5.15",
     "@changesets/changelog-github": "^1.0.1",
     "@changesets/cli": "^3.0.3",
     "@openokr/db": "workspace:*",
     "@openokr/test-support": "workspace:*",
-    "@playwright/test": "1.63.0",
+    "@playwright/test": "1.64.1",
     "@types/pg": "catalog:",
-    "knip": "6.39.0",
+    "knip": "6.42.1",
     "pg": "catalog:",
-    "turbo": "2.11.7",
+    "turbo": "2.11.9",
     "typescript5": "catalog:",
     "vitest": "catalog:"
   }

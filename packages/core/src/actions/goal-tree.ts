@@ -18,6 +18,7 @@
  * stored needs nothing of any other write path and conflicts only on the
  * fields that actually moved.
  */
+
 import {
   activeOnly,
   activities,
@@ -58,6 +59,7 @@ import {
   reassignRoleInTx,
   requireActiveMember,
 } from "../goals/service.ts";
+import { weightSchema } from "../goals/weight.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
   midCycleInTx,
@@ -73,10 +75,7 @@ import { recomputeForGoal } from "../scoring/recompute.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
-
-const localDate = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/, "Give the date as YYYY-MM-DD.");
+import { localDate } from "./local-date.ts";
 
 const person = z.object({ id: z.uuid(), name: z.string() });
 
@@ -955,7 +954,7 @@ async function requireUnchanged(
 const goalFields = z.object({
   title: z.string().trim().min(1).max(500),
   contributionStatement: z.string().trim().max(1000).nullable(),
-  weight: z.number(),
+  weight: weightSchema,
   championId: z.uuid(),
 });
 
@@ -965,7 +964,7 @@ const keyResultFields = z.object({
   baselineValue: z.number(),
   dueOn: localDate.nullable(),
   ownerId: z.uuid().nullable(),
-  weight: z.number(),
+  weight: weightSchema,
   /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
   kind: z.enum(KEY_RESULT_KINDS),
   /** A milestone done or a baseline recorded; false undoes it. */

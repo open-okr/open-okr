@@ -1,4 +1,12 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  SelectInput,
+  TextInput,
+} from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { addIssue, rankIssue } from "./actions.ts";
@@ -94,21 +102,22 @@ export async function Diagnose({
                   >
                     <input type="hidden" name="cycleId" value={cycleId} />
                     <input type="hidden" name="issueId" value={issue.id} />
-                    <label className="sr-only" htmlFor={`impact-${issue.id}`}>
-                      {t("cycle.diagnose.impactFor", { text: issue.text })}
-                    </label>
-                    <select
+                    <SelectInput
                       id={`impact-${issue.id}`}
+                      label={t("cycle.diagnose.impactFor", {
+                        text: issue.text,
+                      })}
+                      hideLabel
                       name="impact"
                       defaultValue={String(issue.impact)}
-                      className="rounded-md border border-line bg-surface px-1.5 py-1 text-xs text-ink-2"
+                      inputClassName="h-6.5 w-auto px-1.5 text-xs text-ink-2"
                     >
                       {[1, 2, 3, 4, 5].map((value) => (
                         <option key={value} value={value}>
                           {t("common.impact2", { value })}
                         </option>
                       ))}
-                    </select>
+                    </SelectInput>
                     <Button
                       type="submit"
                       variant="ghost"
@@ -131,32 +140,31 @@ export async function Diagnose({
           <ActionForm action={addIssue} className="flex flex-col gap-1.5">
             <input type="hidden" name="cycleId" value={cycleId} />
             <div className="flex items-center gap-1.5">
-              <label className="sr-only" htmlFor="new-issue">
-                {t("cycle.diagnose.theIssue")}
-              </label>
-              <input
+              <TextInput
                 id="new-issue"
+                label={t("cycle.diagnose.theIssue")}
+                hideLabel
                 name="text"
                 required
                 maxLength={500}
                 placeholder={t("cycle.diagnose.whatIsStandingBetween")}
-                className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                className="min-w-0 flex-1"
+                inputClassName="placeholder:text-ink-4"
               />
-              <label className="sr-only" htmlFor="new-issue-impact">
-                {t("common.impact")}
-              </label>
-              <select
+              <SelectInput
                 id="new-issue-impact"
+                label={t("common.impact")}
+                hideLabel
                 name="impact"
                 defaultValue="3"
-                className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                inputClassName="w-auto px-1.5 text-xs text-ink-2"
               >
                 {[1, 2, 3, 4, 5].map((value) => (
                   <option key={value} value={value}>
                     {t("common.impact4", { value })}
                   </option>
                 ))}
-              </select>
+              </SelectInput>
               <Button type="submit">{t("common.add")}</Button>
             </div>
           </ActionForm>

@@ -268,11 +268,11 @@
                 "properties": {
                   "start": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   },
                   "end": {
                     "type": "string",
-                    "pattern": "^\\d{1,2}:\\d{2}$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   }
                 },
                 "required": [
@@ -537,6 +537,29 @@
         "properties": {
           "includeSuspended": {
             "type": "boolean"
+          },
+          "search": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "human",
+                "guest",
+                "agent",
+                "placeholder"
+              ]
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
           }
         }
       },
@@ -644,13 +667,13 @@
           "expiresInDays": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 365
           },
           "allowedDomains": {
             "type": "array",
             "items": {
               "type": "string",
-              "minLength": 1
+              "pattern": "^(?!-)[a-z0-9-]{1,63}(?<!-)(\\.(?!-)[a-z0-9-]{1,63}(?<!-))+$"
             }
           }
         }
@@ -677,7 +700,7 @@
           "expiresInDays": {
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 365
           },
           "guestSpaceId": {
             "type": "string",
@@ -734,6 +757,10 @@
           "token": {
             "type": "string",
             "minLength": 1
+          },
+          "timezone": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
@@ -755,7 +782,12 @@
       "description": "Join a workspace because it trusts the domain of your confirmed email address.",
       "inputSchema": {
         "type": "object",
-        "properties": {}
+        "properties": {
+          "timezone": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
       },
       "scope": "write",
       "annotations": {
@@ -1817,7 +1849,7 @@
           },
           "dailySummaryTime": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "routing": {
             "type": "object",
@@ -2285,6 +2317,21 @@
       "example": {}
     },
     {
+      "name": "audit.names",
+      "description": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "settings.readWorkspaceSettings",
       "description": "The workspace's own settings map, for the admin cards.",
       "inputSchema": {
@@ -2705,7 +2752,9 @@
           },
           "modelId": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S+$"
           },
           "displayName": {
             "type": "string",
@@ -2808,7 +2857,9 @@
           },
           "modelId": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^\\S+$"
           },
           "displayName": {
             "type": "string",
@@ -5943,28 +5994,8 @@
           "changed": {
             "type": "boolean"
           },
-          "changeNote": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "focusNote": {
-            "anyOf": [
-              {
-                "type": "string",
-                "maxLength": 2000
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
+          "changeNote": {},
+          "focusNote": {}
         },
         "required": [
           "cycleId",
@@ -6581,6 +6612,25 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 20
+          },
+          "kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "goal",
+                "key_result",
+                "kpi",
+                "space",
+                "person",
+                "initiative",
+                "task",
+                "document",
+                "session",
+                "cycle"
+              ]
+            }
           }
         },
         "required": [
@@ -7019,7 +7069,8 @@
             ]
           },
           "dueOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "assigneeIds": {
             "maxItems": 20,
@@ -7095,9 +7146,14 @@
             ]
           },
           "dueOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "initiativeId": {
@@ -7549,10 +7605,12 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "startsOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "endsOn": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           },
           "status": {
             "type": "string",
@@ -7648,15 +7706,25 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
           "startsOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "endsOn": {
-            "type": [
-              "string",
-              "null"
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "status": {
@@ -8063,7 +8131,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "type": "string",
@@ -8145,7 +8215,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "contributionStatement": {
             "anyOf": [
@@ -8580,7 +8652,9 @@
           },
           "weight": {
             "default": 1,
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "kpiId": {
             "type": "string",
@@ -8733,7 +8807,9 @@
             ]
           },
           "weight": {
-            "type": "number"
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
           },
           "capacity": {
             "anyOf": [
@@ -8946,7 +9022,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "championId": {
                 "type": "string",
@@ -9045,7 +9123,9 @@
                 ]
               },
               "weight": {
-                "type": "number"
+                "type": "number",
+                "minimum": 0,
+                "maximum": 100
               },
               "kind": {
                 "type": "string",
@@ -11849,7 +11929,7 @@
           },
           "time": {
             "type": "string",
-            "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
           },
           "facilitatorId": {
             "type": "string",
@@ -12769,11 +12849,7 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "note": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
+          "note": {}
         },
         "required": [
           "sessionId",
@@ -12788,7 +12864,7 @@
       },
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
-        "note": "…"
+        "note": {}
       }
     },
     {
@@ -13415,11 +13491,7 @@
             "minimum": 1,
             "maximum": 4
           },
-          "body": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
+          "body": {}
         },
         "required": [
           "sessionId",
@@ -13436,7 +13508,7 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "questionKey": 0,
-        "body": "…"
+        "body": {}
       }
     },
     {
@@ -13756,32 +13828,6 @@
       }
     },
     {
-      "name": "sessions.proposeFromLearnings",
-      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          }
-        },
-        "required": [
-          "sessionId"
-        ]
-      },
-      "scope": "read",
-      "annotations": {
-        "readOnlyHint": true,
-        "destructiveHint": false,
-        "idempotentHint": true
-      },
-      "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
-      }
-    },
-    {
       "name": "goals.draftRetrospective",
       "description": "Drafts a goal's closing retrospective from its published check-ins, as plain text a person edits.",
       "inputSchema": {
@@ -13925,46 +13971,6 @@
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
         "text": "…"
-      }
-    },
-    {
-      "name": "sessions.draftNextCycle",
-      "description": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "sessionId": {
-            "type": "string",
-            "format": "uuid",
-            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 280
-          },
-          "why": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 1000
-          }
-        },
-        "required": [
-          "sessionId",
-          "title",
-          "why"
-        ]
-      },
-      "scope": "write",
-      "annotations": {
-        "readOnlyHint": false,
-        "destructiveHint": false,
-        "idempotentHint": false
-      },
-      "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "title": "…",
-        "why": "…"
       }
     },
     {
@@ -14166,10 +14172,7 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "note": {
-            "type": "string",
-            "maxLength": 4000
-          }
+          "note": {}
         },
         "required": [
           "id",
@@ -14184,7 +14187,7 @@
       },
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
-        "note": "…"
+        "note": {}
       }
     },
     {
@@ -14241,10 +14244,7 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "shifts": {
-            "type": "string",
-            "maxLength": 4000
-          }
+          "shifts": {}
         },
         "required": [
           "sessionId",
@@ -14259,7 +14259,7 @@
       },
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
-        "shifts": "…"
+        "shifts": {}
       }
     },
     {
@@ -14283,11 +14283,7 @@
             "format": "uuid",
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           },
-          "text": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 2000
-          }
+          "text": {}
         },
         "required": [
           "sessionId",
@@ -14302,7 +14298,7 @@
       },
       "example": {
         "sessionId": "00000000-0000-4000-8000-000000000000",
-        "text": "…"
+        "text": {}
       }
     },
     {

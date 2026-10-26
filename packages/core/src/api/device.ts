@@ -29,6 +29,11 @@ import {
   type TokenScope,
   withDeviceCode,
 } from "@openokr/db";
+import {
+  DEVICE_CODE_ALPHABET,
+  DEVICE_USER_CODE_GROUPS,
+  formatDeviceUserCode,
+} from "@openokr/formats";
 import { eq, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -49,8 +54,10 @@ export const DEVICE_CODE_TTL_SECONDS = 600;
 /** How often a terminal may poll. RFC 8628's `interval`. */
 export const DEVICE_POLL_INTERVAL_SECONDS = 5;
 
-/** No 0/O and no 1/I/L, so a code read off a screen cannot be mistyped. */
-const CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+// No 0/O and no 1/I/L, so a code read off a screen cannot be mistyped. In
+// `packages/formats`, because the field a person types it into drops the same
+// characters.
+const CODE_ALPHABET = DEVICE_CODE_ALPHABET;
 
 /**
  * Both codes hash through here, and both are normalised first.
@@ -83,14 +90,12 @@ export function generateDeviceCode(): string {
 
 /** The short code a person sees: `ABCD-EFGH`. */
 export function generateUserCode(): string {
-  const half = (): string => {
-    let text = "";
-    for (let index = 0; index < 4; index += 1) {
-      text += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
-    }
-    return text;
-  };
-  return `${half()}-${half()}`;
+  let text = "";
+  const total = DEVICE_USER_CODE_GROUPS.reduce((sum, size) => sum + size, 0);
+  for (let index = 0; index < total; index += 1) {
+    text += CODE_ALPHABET[randomInt(CODE_ALPHABET.length)];
+  }
+  return formatDeviceUserCode(text);
 }
 
 export interface StartedDevice {

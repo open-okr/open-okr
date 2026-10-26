@@ -34,6 +34,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
+import { richTextAsLine } from "@openokr/formats";
 import {
   type WeeklyDigestInput,
   weeklyDigestLines,
@@ -49,6 +50,7 @@ import { daysPastDue } from "../cadence/service.ts";
 import { spacePostTargets } from "../channels/space-posts.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import type { RichTextDocument } from "../rich-text/schema.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
 import { readKpiDetail } from "./kpis.ts";
 
@@ -141,7 +143,13 @@ export async function digestInputFor(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
-): Promise<WeeklyDigestInput | null> {
+): Promise<
+  | (WeeklyDigestInput & {
+      /** The note as written, editor JSON since guided-inputs change 11c. */
+      readonly coordinatorNoteDocument: RichTextDocument | null;
+    })
+  | null
+> {
   const [session] = await tx
     .select({
       id: okrSessions.id,
@@ -168,7 +176,7 @@ export async function digestInputFor(
     .select({
       body: digests.body,
       periodStart: digests.periodStart,
-      note: digests.note,
+      noteDocument: digests.noteDocument,
       scopeId: digests.scopeId,
     })
     .from(digests)
@@ -276,6 +284,16 @@ export async function digestInputFor(
       pastCheckIn: (daysPastDue(blocker.dueAt, now, timeZone) ?? 0) > 0,
     }));
 
+  // The note as one line, which is how the digest, its narration and a
+  // channel post all carry it: each is a list of lines, and a blank line
+  // between two paragraphs would read as the digest ending. No length: the
+  // action already holds the note to its own.
+  const noteDocument =
+    row.noteDocument !== null && typeof row.noteDocument === "object"
+      ? (row.noteDocument as RichTextDocument)
+      : null;
+  const noteLine = noteDocument === null ? "" : richTextAsLine(noteDocument);
+
   return {
     spaceName: "This space",
     weekStart: row.periodStart,
@@ -289,7 +307,8 @@ export async function digestInputFor(
     // The week's wins, as the session named them (§7.2 step 3, P9-T19a-d-c).
     wins: (session.wins ?? []) as string[],
     staleGoals,
-    coordinatorNote: row.note ?? null,
+    coordinatorNote: noteLine === "" ? null : noteLine,
+    coordinatorNoteDocument: noteDocument,
   };
 }
 
@@ -356,8 +375,12 @@ export const readDigest = defineReadAction({
        * The digest lines have carried this since P4-T15b and the read did not
        * return it, so the surface that writes it could not show what was
        * already there and offered "add" over an existing note.
+       *
+       * As one line of plain text, as the digest line carries it.
        */
       note: z.string().nullable(),
+      /** The note as editor JSON, which the screen edits (change 11c). */
+      noteDocument: z.unknown().nullable(),
       /**
        * The providers this digest has been posted to on its space's channel
        * (completeness review M-23), from `digests.channels`. Empty until the
@@ -395,6 +418,7 @@ export const readDigest = defineReadAction({
           lines: [...weeklyDigestLines(assembled)],
           numbers: [...weeklyDigestNumbers(assembled)],
           note: assembled.coordinatorNote,
+          noteDocument: assembled.coordinatorNoteDocument,
           ...(await digestChannelsFor(
             tx,
             context.workspaceId,

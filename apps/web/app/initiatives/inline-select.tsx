@@ -1,5 +1,6 @@
 "use client";
 
+import { SelectInput } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../cycle/write-state.ts";
 
@@ -39,9 +40,9 @@ export function InlineSelect({
 
   return (
     <span className="inline-flex flex-col gap-1">
-      <select
-        aria-label={label}
-        className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink disabled:text-ink-3"
+      <SelectInput
+        label={label}
+        hideLabel
         value={current}
         disabled={disabled || pending}
         onChange={(event) => {
@@ -57,13 +58,14 @@ export function InlineSelect({
             }
           });
         }}
+        inputClassName="h-6.5 w-auto px-2 text-xs disabled:text-ink-3"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
             {option.label}
           </option>
         ))}
-      </select>
+      </SelectInput>
       {error ? (
         <span role="alert" className="text-xs text-bad">
           {error}

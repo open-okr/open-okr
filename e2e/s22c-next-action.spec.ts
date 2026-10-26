@@ -17,6 +17,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -174,9 +175,7 @@ test("acceptance: a next action and its owner move the session on with no blocke
   await row
     .getByLabel("The next action", { exact: true })
     .fill(NEXT_ACTION);
-  await row
-    .getByLabel("Who owns it", { exact: true })
-    .selectOption({ index: 1 });
+  await chooseAt(row.getByLabel("Who owns it", { exact: true }), 0);
   await row.getByRole("button", { name: "Set it" }).click();
 
   await expect(row).toContainText(NEXT_ACTION, { timeout: 15_000 });

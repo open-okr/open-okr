@@ -20,6 +20,7 @@ export async function addDriver(
   const direction = String(formData.get("direction") ?? "higher_better");
   const frequency = String(formData.get("frequency") ?? "monthly");
   const targetRaw = String(formData.get("targetDefault") ?? "").trim();
+  const unit = String(formData.get("unit") ?? "").trim();
   const treeId = String(formData.get("treeId") ?? "").trim();
   if (title === "" || parentKpiId === "") {
     const { t } = await getTranslations();
@@ -53,6 +54,7 @@ export async function addDriver(
       ...(targetRaw !== "" && Number.isFinite(target)
         ? { targetDefault: target }
         : {}),
+      ...(unit === "" ? {} : { unit }),
     });
     if (treeId !== "") {
       // A driver belongs to the tree it hangs in. Saying so here means nobody

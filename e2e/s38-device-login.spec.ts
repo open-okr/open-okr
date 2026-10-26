@@ -230,3 +230,42 @@ test("refusing one in the browser ends the terminal's login", async () => {
   expect(result.err).toContain("refused");
   expect(storedProfiles().refused).toBeUndefined();
 });
+
+test("a code typed instead of followed reaches the same request", async () => {
+  // For a terminal on another machine, or a link that would not copy: the
+  // page opened with no code offers one cell per character, drops what the
+  // alphabet leaves out and upper-cases the rest (guided-inputs §4.5).
+  const login = startLogin([
+    "--url",
+    base,
+    "--profile",
+    "typed",
+    "--no-browser",
+  ]);
+  const printed = await login.link;
+  const code = new URL(printed).searchParams.get("code") ?? "";
+  expect(code).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+
+  await goTo(page, "/account/device");
+  const field = page.getByLabel("The code your terminal printed");
+  // Typed as somebody reading it off another screen might: lower case, with
+  // the hyphen.
+  await expect(async () => {
+    await field.fill("");
+    await field.pressSequentially(code.toLowerCase());
+    await expect(field).toHaveValue(code.replace("-", ""), { timeout: 1_000 });
+  }).toPass({ timeout: 20_000 });
+
+  // Nothing is decided by filling the cells: the next page says who is asking.
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByTestId("device-client")).toContainText("okr on ", {
+    timeout: 10_000,
+  });
+  expect(new URL(page.url()).searchParams.get("code")).toBe(code);
+
+  await page.getByRole("button", { name: "Refuse" }).click();
+  await expect(page.getByRole("status")).toContainText("was refused", {
+    timeout: 15_000,
+  });
+  expect((await login.finished).code).toBe(1);
+});

@@ -14,7 +14,7 @@
  * the four filters cannot express comes back with the reason, and the reader is
  * left exactly where they were with their manual filters intact.
  */
-import { Button, Chip, useTranslations } from "@openokr/ui";
+import { Button, Chip, TextInput, useTranslations } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
@@ -82,25 +82,23 @@ export function FilterAssist() {
           <Sparkles className="size-3" />
           {t("common.ai")}
         </Chip>
-        <label className="min-w-0 flex-1">
-          <span className="sr-only">
-            {t("goals.filterAssist.describeTheListYou")}
-          </span>
-          <input
-            value={sentence}
-            disabled={busy}
-            maxLength={300}
-            onChange={(event) => setSentence(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                void run();
-              }
-            }}
-            placeholder={t("goals.filterAssist.myOffTrackGoals")}
-            className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-          />
-        </label>
+        <TextInput
+          label={t("goals.filterAssist.describeTheListYou")}
+          hideLabel
+          className="min-w-0 flex-1"
+          value={sentence}
+          disabled={busy}
+          maxLength={300}
+          onChange={(event) => setSentence(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void run();
+            }
+          }}
+          placeholder={t("goals.filterAssist.myOffTrackGoals")}
+          inputClassName="placeholder:text-ink-4"
+        />
         <Button
           variant="ai"
           disabled={busy || sentence.trim() === ""}

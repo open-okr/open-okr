@@ -21,6 +21,12 @@ import { defineConfig, devices } from "@playwright/test";
 const APP_PORT = Number(process.env.E2E_PORT ?? 3210);
 const WIZARD_PORT = Number(process.env.E2E_WIZARD_PORT ?? 3211);
 
+// Each CI shard writes its own flakiness report, or the four uploads would
+// land on one file name and overwrite each other when they are merged.
+const FLAKY_REPORT = `.flaky/report-e2e${
+  process.env.SHARD_INDEX ? `-${process.env.SHARD_INDEX}` : ""
+}.json`;
+
 const APP_URL = `http://127.0.0.1:${APP_PORT}`;
 const WIZARD_URL = `http://127.0.0.1:${WIZARD_PORT}`;
 
@@ -66,8 +72,12 @@ export default defineConfig({
    * a report nobody can check before pushing.
    */
   reporter: process.env.CI
-    ? [["github"], ["list"], ["./e2e/flaky-reporter.ts"]]
-    : [["list"], ["./e2e/flaky-reporter.ts"]],
+    ? [
+        ["github"],
+        ["list"],
+        ["./e2e/flaky-reporter.ts", { outFile: FLAKY_REPORT }],
+      ]
+    : [["list"], ["./e2e/flaky-reporter.ts", { outFile: FLAKY_REPORT }]],
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
@@ -77,6 +87,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
 
+  /**
+   * **Registration is a setup project, so it runs first everywhere.** Every
+   * application spec signs in as the account `registration-to-dashboard`
+   * creates. Playwright runs a dependency project in full before its
+   * dependents and never splits it across shards, so each CI shard claims its
+   * own fresh instance before its share of the specs. The same rule is what
+   * lets one spec file run on its own locally: the claim comes first.
+   */
   projects: [
     {
       name: "wizard",
@@ -84,8 +102,14 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], baseURL: WIZARD_URL },
     },
     {
+      name: "claim",
+      testMatch: /registration-to-dashboard\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
+    },
+    {
       name: "chromium",
-      testIgnore: /first-run-wizard\.spec\.ts/,
+      testIgnore: /(first-run-wizard|registration-to-dashboard)\.spec\.ts/,
+      dependencies: ["claim"],
       use: { ...devices["Desktop Chrome"], baseURL: APP_URL },
     },
   ],

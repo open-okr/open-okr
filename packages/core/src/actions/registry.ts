@@ -101,7 +101,12 @@ import {
   readPendingDevice,
   revokeApiToken,
 } from "./api-tokens.ts";
-import { exportAudit, listAudit, verifyAudit } from "./audit.ts";
+import {
+  exportAudit,
+  listAudit,
+  listAuditNamesAction,
+  verifyAudit,
+} from "./audit.ts";
 import {
   claimUpload,
   getBlobForDownload,
@@ -363,7 +368,6 @@ import {
   draftMinutes,
   draftRetrospective,
   narrateDiagnostic,
-  proposeFromLearnings,
 } from "./review-assists.ts";
 import { narrateDigest, narrateTrend, readDigest } from "./rhythm-assists.ts";
 import {
@@ -394,7 +398,6 @@ import {
   decideObjective,
   decisionsForCycle,
   decisionsForGoal,
-  draftNextCycle,
   giveKudos,
   givePulse,
   listMySessions,
@@ -599,6 +602,8 @@ export const ACTION_MAP = {
   "audit.verify": verifyAudit,
   // Completeness review L-19. The trail read a page at a time, for the screen.
   "audit.list": listAudit,
+  // guided-inputs §4.11. The names the filter offers, read from the trail.
+  "audit.names": listAuditNamesAction,
   "settings.readWorkspaceSettings": readWorkspaceSettings,
   // P8-G05. The member-visible half, so an ordinary member is not refused on
   // their own Overview by an admin read.
@@ -920,12 +925,10 @@ export const ACTION_MAP = {
   "sessions.clusterRetro": clusterRetroNotes,
   "sessions.narrateDiagnostic": narrateDiagnostic,
   "sessions.draftMinutes": draftMinutes,
-  "sessions.proposeFromLearnings": proposeFromLearnings,
   "goals.draftRetrospective": draftRetrospective,
   "sessions.decideObjective": decideObjective,
   "sessions.reset": readReset,
   "sessions.captureLearning": captureLearning,
-  "sessions.draftNextCycle": draftNextCycle,
   "sessions.addAction": addReviewAction,
   "sessions.completeAction": completeReviewAction,
   "sessions.forward": readForward,

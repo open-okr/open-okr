@@ -109,7 +109,10 @@ test.beforeAll(async ({ browser }) => {
      on conflict (key) do update set value = excluded.value`,
   );
   customer = await browser.newContext();
-  operator = await browser.newContext();
+  // The operator's browser is in São Paulo: UTC-3 all year since Brazil
+  // dropped summer time, and the zone of neither the machine running this
+  // nor continuous integration, so a time read in the server's zone fails.
+  operator = await browser.newContext({ timezoneId: "America/Sao_Paulo" });
   customerPage = await customer.newPage();
   operatorPage = await operator.newPage();
 });
@@ -209,6 +212,10 @@ test("the operator suspends the workspace with a reason, and lifts it again", as
   await expect(
     operatorPage.getByText("This workspace is suspended"),
   ).toBeVisible({ timeout: 15_000 });
+  // And the form says it was done, rather than simply being there again.
+  await expect(
+    operatorPage.getByText("Applied. The workspace's members see the change now."),
+  ).toBeVisible();
 
   // The last step puts it back, so the tenant this file made is left active.
   await moveTo.selectOption("active");
@@ -217,6 +224,32 @@ test("the operator suspends the workspace with a reason, and lifts it again", as
   await expect(
     operatorPage.getByText("This workspace is suspended"),
   ).toHaveCount(0, { timeout: 15_000 });
+});
+
+/**
+ * guided-inputs §5, F5: a refused lifecycle change left the form as it was
+ * and said nothing, which read as a change still on its way.
+ */
+test("a lifecycle change with no real reason is refused in words, and nothing moves", async () => {
+  await goTo(operatorPage, `/operator/${workspaceId}`);
+  const moveTo = operatorPage.locator("#lifecycle-state");
+  const lifecycle = operatorPage.locator("form").filter({ has: moveTo });
+  await moveTo.selectOption("suspended");
+  // Spaces pass the browser's `required` and not the domain's trim.
+  await operatorPage.locator("#lifecycle-reason").fill("   ");
+  await operatorPage
+    .getByRole("button", { name: `Apply to ${CUSTOMER_WORKSPACE}` })
+    .click();
+
+  await expect(lifecycle.getByRole("alert")).toHaveText(
+    "A lifecycle change needs a reason.",
+    { timeout: 15_000 },
+  );
+  await expect(operatorPage.getByText("This workspace is suspended")).toHaveCount(
+    0,
+  );
+  // What was chosen is still chosen, to be corrected rather than redone.
+  await expect(moveTo).toHaveValue("suspended");
 });
 
 test("the instance page says what is true of the deployment", async () => {
@@ -228,4 +261,60 @@ test("the instance page says what is true of the deployment", async () => {
   await expect(
     operatorPage.getByRole("heading", { name: "Messages" }),
   ).toBeVisible();
+});
+
+/**
+ * guided-inputs §7: a site message's window is read on the operator's own
+ * clock. The form posts the browser's zone beside each time, where it used to
+ * post the time alone and the server read it in its own zone.
+ */
+test("a site message's window is read on the operator's own clock", async () => {
+  await goTo(operatorPage, "/operator/instance");
+  const body = `Planned maintenance ${Date.now()}`;
+  await operatorPage.getByLabel("Message", { exact: true }).fill(body);
+  // Years ahead, so the message is never live for a later spec.
+  await operatorPage.getByLabel("Shows from").fill("2031-03-04T09:00");
+  await operatorPage.getByLabel("Stops at").fill("2031-03-04T10:30");
+  await expect(
+    operatorPage.getByText("In America/Sao_Paulo time.").first(),
+  ).toBeVisible();
+  await operatorPage.getByRole("button", { name: "Show this message" }).click();
+  await expect(
+    operatorPage.getByText("Saved. It shows in the window you set."),
+  ).toBeVisible({ timeout: 15_000 });
+
+  await expect(async () => {
+    const { rows } = await pool.query<{ starts: string; ends: string }>(
+      `select to_char(starts_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as starts,
+              to_char(ends_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI') as ends
+         from site_messages where body = $1`,
+      [body],
+    );
+    expect(rows).toEqual([
+      { starts: "2031-03-04T12:00", ends: "2031-03-04T13:30" },
+    ]);
+  }).toPass({ timeout: 15_000 });
+  await pool.query("delete from site_messages where body = $1", [body]);
+});
+
+test("a site message that ends before it starts is refused in words, and keeps what was typed", async () => {
+  await goTo(operatorPage, "/operator/instance");
+  const body = `Refused window ${Date.now()}`;
+  const message = operatorPage.getByLabel("Message", { exact: true });
+  await message.fill(body);
+  await operatorPage.getByLabel("Shows from").fill("2031-03-04T10:00");
+  await operatorPage.getByLabel("Stops at").fill("2031-03-04T09:00");
+  await operatorPage.getByRole("button", { name: "Show this message" }).click();
+
+  const form = operatorPage.locator("form").filter({ has: message });
+  await expect(form.getByRole("alert")).toHaveText(
+    "The message has to end after it starts.",
+    { timeout: 15_000 },
+  );
+  await expect(message).toHaveValue(body);
+  const { rows } = await pool.query(
+    "select 1 from site_messages where body = $1",
+    [body],
+  );
+  expect(rows).toHaveLength(0);
 });

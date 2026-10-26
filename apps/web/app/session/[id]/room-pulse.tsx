@@ -19,6 +19,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -121,20 +122,21 @@ export function RoomPulsePanel({
               </Button>
             ))}
           </span>
-          <label className="flex flex-col gap-1" htmlFor="pulse-word">
-            <span className="text-xs font-medium text-ink-3">
-              {t("session.detail.roomPulse.oneWordForThe")}
-            </span>
-            <input
-              id="pulse-word"
-              type="text"
-              className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-              value={word}
-              disabled={!canGive}
-              placeholder={t("session.detail.roomPulse.relieved")}
-              onChange={(event) => setWord(event.target.value)}
-            />
-          </label>
+          <TextInput
+            label={t("session.detail.roomPulse.oneWordForThe")}
+            id="pulse-word"
+            value={word}
+            disabled={!canGive}
+            placeholder={t("session.detail.roomPulse.relieved")}
+            onChange={(event) => setWord(event.target.value)}
+            maxLength={40}
+            // One word, the rule `sessions.givePulse` refuses a sentence by.
+            check={(value) =>
+              /\s/.test(value.trim())
+                ? t("session.detail.roomPulse.oneWordNotASentence")
+                : null
+            }
+          />
           {canGive ? (
             <span className="flex flex-wrap items-center gap-2">
               <Button type="button" disabled={pending} onClick={submit}>

@@ -129,10 +129,25 @@ async function importInitiatives(
       continue;
     }
 
+    // A deadline before the start is one the product cannot hold, so the
+    // start stays, the end is left out, and the report says which and why.
+    // Said in the dry run too, so nobody meets it first in the real one.
+    const startsOn = row.start_date?.slice(0, 10);
+    const deadline = row.deadline?.slice(0, 10);
+    const endsOn =
+      startsOn && deadline && deadline < startsOn ? undefined : deadline;
+    const windowNote =
+      deadline && endsOn === undefined
+        ? `The source's deadline, ${deadline}, is before its start, ${startsOn}. Imported with the start and no end date.`
+        : undefined;
+
     if (!options.write) {
       const already = await options.resolver.resolve("projects", row.id);
       if (already === undefined) {
         options.resolver.plan("projects", row.id);
+        if (windowNote) {
+          tally.flag(source, windowNote);
+        }
       }
       tally.wrote(already === undefined);
       continue;
@@ -140,6 +155,9 @@ async function importInitiatives(
     if (await options.resolver.resolve("projects", row.id)) {
       tally.wrote(false);
       continue;
+    }
+    if (windowNote) {
+      tally.flag(source, windowNote);
     }
 
     const status = PROJECT_STATUS[(row.status ?? "").toLowerCase().trim()];
@@ -158,8 +176,8 @@ async function importInitiatives(
           ? { description: richTextFromPlainText(row.project_summary) }
           : {}),
         ownerId: owner,
-        ...(row.start_date ? { startsOn: row.start_date.slice(0, 10) } : {}),
-        ...(row.deadline ? { endsOn: row.deadline.slice(0, 10) } : {}),
+        ...(startsOn ? { startsOn } : {}),
+        ...(endsOn ? { endsOn } : {}),
         status: (status ?? "planned") as
           | "planned"
           | "active"

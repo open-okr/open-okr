@@ -19,6 +19,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -90,13 +91,11 @@ test("drafting names the KPI, and the key result starts where it stands", async 
   goalId = await form.locator('input[name="goalId"]').inputValue();
 
   // By hand unless somebody chooses otherwise.
-  await expect(form.getByLabel("Measured by")).toHaveValue("");
+  await expect(form.getByLabel("Measured by")).toHaveValue("Measured by hand");
   await form.getByRole("textbox", { name: "The key result" }).fill(READ_FROM_KPI);
-  await form
-    .getByLabel("Measured by")
-    .selectOption({ label: `Read from ${KPI}` });
-  await form.getByRole("spinbutton", { name: "Baseline" }).fill("40");
-  await form.getByRole("spinbutton", { name: "Target" }).fill("200");
+  await choose(form.getByLabel("Measured by"), KPI);
+  await form.getByRole("textbox", { name: "Baseline" }).fill("40");
+  await form.getByRole("textbox", { name: "Target" }).fill("200");
   await form.getByRole("button", { name: "Add key result" }).click();
 
   await expect(page.getByText(READ_FROM_KPI, { exact: true })).toBeVisible({
@@ -114,8 +113,8 @@ test("a second key result, measured by hand", async () => {
   });
   await form.getByRole("textbox", { name: "The key result" }).fill(BY_HAND);
   await form.getByLabel("Direction").selectOption("reduce");
-  await form.getByRole("spinbutton", { name: "Baseline" }).fill("9");
-  await form.getByRole("spinbutton", { name: "Target" }).fill("3");
+  await form.getByRole("textbox", { name: "Baseline" }).fill("9");
+  await form.getByRole("textbox", { name: "Target" }).fill("3");
   await form.getByRole("button", { name: "Add key result" }).click();
   await expect(page.getByText(BY_HAND, { exact: true })).toBeVisible({
     timeout: 15_000,
@@ -143,7 +142,7 @@ test("the goal page links the key result drafted by hand", async () => {
 
   // The only key result left to link is the one measured by hand.
   await expect(page.getByLabel("Key result to link")).toHaveValue(/.+/);
-  await page.getByLabel("KPI it reads from").selectOption({ label: KPI });
+  await choose(page.getByRole("combobox", { name: "KPI it reads from" }), KPI);
   await page.getByTestId("link-kpi").click();
 
   await expect(page.getByText("from a KPI", { exact: true })).toHaveCount(2, {

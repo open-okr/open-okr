@@ -20,7 +20,10 @@ import { exportWorkspace } from "../src/portability/export.ts";
 import {
   type ImportDifference,
   importWorkspace,
+  postgresArrayLiteral,
 } from "../src/portability/import.ts";
+import { EXPORTED_TABLES } from "../src/portability/policy.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
@@ -304,6 +307,475 @@ describe("what a move keeps", () => {
       user_id: OWNER_A,
       placeholder_email: null,
       status: "active",
+    });
+  });
+
+  it("points a mention in a stage note, a management answer, a revalidation note or the annual frame at the member's new id", async () => {
+    // Guided-inputs changes 11b and 12. The stage notes, and what a
+    // revision of an agreed frame held before, are maps of documents, which
+    // the import walks key by key.
+    const source = (input: unknown, name: string) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      );
+    const [space] = (await source({}, "spaces.list")) as { id: string }[];
+    const wb = await workerDb();
+    const owner = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const ownerMemberId = owner.rows[0]?.id as string;
+    const session = (await source(
+      {
+        // No cycle: the target's own current cycle has the same dates, so
+        // the source's is skipped on import and a session naming it would
+        // be skipped with it.
+        spaceId: space?.id,
+        kind: "quarterly",
+        title: "Q1 review",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+        facilitatorId: ownerMemberId,
+      },
+      "sessions.create",
+    )) as { id: string };
+    await source({ id: session.id }, "sessions.open");
+    const mentioning = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Ask " },
+            {
+              type: "mention",
+              attrs: { id: ownerMemberId, label: "Source Owner" },
+            },
+          ],
+        },
+      ],
+    };
+    await source({ id: session.id, note: mentioning }, "sessions.setStageNote");
+    await source(
+      { sessionId: session.id, questionKey: 1, body: mentioning },
+      "sessions.setManagementAnswer",
+    );
+    // A quarter the target has no cycle for, so the cycle and its
+    // revalidation are not skipped on import.
+    const later = (await source(
+      { on: "2030-02-15", mode: "quarterly" },
+      "cycles.create",
+    )) as { id: string };
+    await source(
+      {
+        cycleId: later.id,
+        holds: false,
+        changed: true,
+        changeNote: mentioning,
+        focusNote: mentioning,
+      },
+      "workflow.setRevalidation",
+    );
+    // An agreed frame whose mission is then revised, so the revision keeps
+    // the mentioning mission in its `before`, and the vision mentions too.
+    const strategies = [
+      { text: "Activation first" },
+      { text: "Fewer markets" },
+    ];
+    await source(
+      { yearLabel: "FY2030", agreed: true, mission: mentioning, strategies },
+      "frame.set",
+    );
+    await source(
+      {
+        yearLabel: "FY2030",
+        agreed: true,
+        mission: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Activation, everywhere." }],
+            },
+          ],
+        },
+        vision: mentioning,
+        strategies,
+        reason: "The board narrowed the mission.",
+      },
+      "frame.set",
+    );
+
+    const exported = await exportSource();
+    await importIntoTarget(exported.bytes, false);
+
+    const moved = await wb.admin.query<{ id: string }>(
+      `select id from workspace_members
+        where workspace_id = $1 and lower(placeholder_email) = 'source-owner@example.com'`,
+      [targetWorkspaceId],
+    );
+    const movedMemberId = moved.rows[0]?.id as string;
+    expect(movedMemberId).not.toBe(ownerMemberId);
+
+    const notes = await wb.admin.query<{ notes: Record<string, unknown> }>(
+      "select notes from okr_sessions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    const answers = await wb.admin.query<{ body_document: unknown }>(
+      "select body_document from management_answers where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    const revalidations = await wb.admin.query<{
+      change_note_document: unknown;
+      focus_note_document: unknown;
+    }>(
+      `select change_note_document, focus_note_document
+         from cycle_revalidations where workspace_id = $1`,
+      [targetWorkspaceId],
+    );
+    const frames = await wb.admin.query<{ vision: unknown }>(
+      "select vision from annual_frames where workspace_id = $1 and year_label = 'FY2030'",
+      [targetWorkspaceId],
+    );
+    // The revision arrives too, since its array column is written as one,
+    // and what the mission held before is a document in a map.
+    const revisions = await wb.admin.query<{
+      fields: string[];
+      before: Record<string, unknown>;
+    }>(
+      "select fields, before from annual_frame_revisions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(revisions.rows).toHaveLength(1);
+    expect([...(revisions.rows[0]?.fields ?? [])].sort()).toEqual([
+      "mission",
+      "vision",
+    ]);
+    for (const document of [
+      Object.values(notes.rows[0]?.notes ?? {})[0],
+      answers.rows[0]?.body_document,
+      revalidations.rows[0]?.change_note_document,
+      revalidations.rows[0]?.focus_note_document,
+      frames.rows[0]?.vision,
+      revisions.rows[0]?.before.mission,
+    ]) {
+      expect(JSON.stringify(document)).toContain(movedMemberId);
+      expect(JSON.stringify(document)).not.toContain(ownerMemberId);
+    }
+  });
+
+  it("takes an older archive's plain prose as documents, and leaves out a column this release lacks", async () => {
+    // Guided-inputs change 13 (docs/design/guided-inputs.md §4.7). An archive
+    // from 0.2 has the plain text alone, and 0.4 has no plain column, so the
+    // import writes the document itself rather than lose the prose.
+    const source = (input: unknown, name: string) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      );
+    const [space] = (await source({}, "spaces.list")) as { id: string }[];
+    const wb = await workerDb();
+    const owner = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const session = (await source(
+      {
+        spaceId: space?.id,
+        kind: "quarterly",
+        title: "Q1 review",
+        scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+        facilitatorId: owner.rows[0]?.id,
+      },
+      "sessions.create",
+    )) as { id: string };
+    await source({ id: session.id }, "sessions.open");
+    await source(
+      {
+        id: session.id,
+        note: richTextFromPlainText("Pulse was low.\n\nName it first."),
+      },
+      "sessions.setStageNote",
+    );
+    await source(
+      {
+        sessionId: session.id,
+        questionKey: 1,
+        body: richTextFromPlainText("Mostly.\n\nTwo were leftovers."),
+      },
+      "sessions.setManagementAnswer",
+    );
+
+    // As 0.2 wrote them: plain text and no document columns, a stage note as
+    // a string, and one column this release does not have. This release has
+    // no plain columns to export, so the plain text is put back by hand.
+    const exported = await exportSource();
+    const archive = readArchive(exported.bytes, { passphrase: PASSPHRASE });
+    const asOlder = {
+      ...archive,
+      records: archive.records.map((record) => {
+        if (record.r !== "row") return record;
+        const row = { ...(record.d as Record<string, unknown>) };
+        for (const key of Object.keys(row)) {
+          if (key.endsWith("_document") || key.endsWith("_document_version")) {
+            delete row[key];
+          }
+        }
+        if (record.t === "management_answers") {
+          row.body = "Mostly.\n\nTwo were leftovers.";
+        }
+        if (record.t === "okr_sessions" && row.notes) {
+          row.notes = Object.fromEntries(
+            Object.keys(row.notes as object).map((stage) => [
+              stage,
+              "Pulse was low.\n\nName it first.",
+            ]),
+          );
+          row.retired_column = "from an older release";
+        }
+        return { ...record, d: row };
+      }),
+    };
+    const diff = await withWorkspace(drizzle(pool), targetWorkspaceId, (tx) =>
+      importWorkspace({
+        tx,
+        workspaceId: targetWorkspaceId,
+        archive: asOlder as typeof archive,
+        dryRun: false,
+        actorMemberId: targetMemberId,
+      }),
+    );
+
+    expect(diff.skipped.okr_sessions).toBeUndefined();
+    expect(diff.skipped.management_answers).toBeUndefined();
+    expect(diff.leftOut.okr_sessions).toEqual(["retired_column"]);
+    // Its plain text became the document first, then the column was left out.
+    expect(diff.leftOut.management_answers).toEqual(["body"]);
+    const sessions = await wb.admin.query<{ notes: Record<string, unknown> }>(
+      "select notes from okr_sessions where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(Object.values(sessions.rows[0]?.notes ?? {})).toEqual([
+      richTextFromPlainText("Pulse was low.\n\nName it first."),
+    ]);
+    const answers = await wb.admin.query<{
+      body_document: unknown;
+      body_document_version: number | null;
+    }>(
+      "select body_document, body_document_version from management_answers where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(answers.rows[0]).toEqual({
+      body_document: richTextFromPlainText("Mostly.\n\nTwo were leftovers."),
+      body_document_version: 1,
+    });
+  });
+
+  it("keeps a row with a Postgres array column, which it used to skip", async () => {
+    // The import sent an array as JSON, which a `text[]` column refuses, and
+    // counted the row as skipped: a workspace's own AI models and every
+    // revision of an agreed annual frame were lost in a move.
+    await callAction(
+      {
+        pool,
+        workspaceId: sourceWorkspaceId,
+        actor: { kind: "human", userId: OWNER_A },
+      },
+      "ai.addCustomModel",
+      {
+        provider: "ollama",
+        modelId: "my-fine-tune:latest",
+        displayName: "My Fine-Tune",
+        contextWindow: 32_000,
+        costInPerMillion: 0,
+        costOutPerMillion: 0,
+        supportsTools: false,
+        supportsVision: false,
+        supportsJsonMode: false,
+        supportsStreaming: true,
+        embeddingDimensions: null,
+        tiers: ["balanced", "fast"],
+      },
+    );
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.ai_models).toBeUndefined();
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ tiers: string[] }>(
+      "select tiers from ai_models where workspace_id = $1 and model_id = 'my-fine-tune:latest'",
+      [targetWorkspaceId],
+    );
+    expect(rows[0]?.tiers).toEqual(["balanced", "fast"]);
+  });
+
+  it("moves a row in every exported table with an array column", async () => {
+    // The two above are the tests that move one. A third such table fails
+    // here, so whoever adds it adds a row to move as well.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ table_name: string }>(
+      `select distinct table_name from information_schema.columns
+        where table_schema = 'public' and data_type = 'ARRAY'
+        order by table_name`,
+    );
+    expect(
+      rows
+        .map((row) => row.table_name)
+        .filter((table) => EXPORTED_TABLES.includes(table)),
+    ).toEqual(["ai_models", "annual_frame_revisions"]);
+  });
+
+  it("writes an array literal Postgres reads back as it was", async () => {
+    const wb = await workerDb();
+    const values = [
+      "plain",
+      "two words",
+      'a "quoted" one',
+      "a, comma",
+      "{braces}",
+      "back\\slash",
+      "",
+      "NULL",
+      null,
+    ];
+    const { rows } = await wb.admin.query<{ read: (string | null)[] }>(
+      "select $1::text[] as read",
+      [postgresArrayLiteral(values)],
+    );
+    expect(rows[0]?.read).toEqual(values);
+    const empty = await wb.admin.query<{ read: string[] }>(
+      "select $1::text[] as read",
+      [postgresArrayLiteral([])],
+    );
+    expect(empty.rows[0]?.read).toEqual([]);
+  });
+
+  it("rewrites a moved row's id wherever it sits inside JSON, and leaves an agent's proposal behind, saying so", async () => {
+    // docs/design/ids-across-a-move.md, decided 13 October 2026. The import
+    // rewrote ids held in a column and mentions in rich text, and nothing
+    // else inside a jsonb value; an agent's proposal was skipped because
+    // the run it names does not travel.
+    const wb = await workerDb();
+    const one = async (sql: string, values: unknown[]) =>
+      (await wb.admin.query<{ id: string }>(sql, values)).rows[0]?.id as string;
+    const owner = await one(
+      "select id from workspace_members where workspace_id = $1",
+      [sourceWorkspaceId],
+    );
+    const space = await one(
+      "select id from spaces where workspace_id = $1 order by created_at limit 1",
+      [sourceWorkspaceId],
+    );
+    const agent = await one(
+      "select id from agents where workspace_id = $1 limit 1",
+      [sourceWorkspaceId],
+    );
+    // A uuid no row of the archive holds, which must be left as it is.
+    const foreign = "0d9e8f7a-6b5c-4d3e-9f2a-1b0c9d8e7f6a";
+    const thread = await one(
+      `insert into ai_threads (id, workspace_id, member_id)
+       values (gen_random_uuid(), $1, $2) returning id`,
+      [sourceWorkspaceId, owner],
+    );
+    const payload = {
+      id: space,
+      members: [{ memberId: owner }],
+      note: {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "mention", attrs: { id: owner, label: "Source Owner" } },
+            ],
+          },
+        ],
+      },
+      foreign,
+    };
+    await wb.admin.query(
+      `insert into proposed_changes (id, workspace_id, thread_id, action, payload)
+       values (gen_random_uuid(), $1, $2, 'spaces.update', $3::jsonb)`,
+      [sourceWorkspaceId, thread, JSON.stringify(payload)],
+    );
+    const run = await one(
+      `insert into agent_runs (id, workspace_id, agent_id, trigger)
+       values (gen_random_uuid(), $1, $2, 'schedule') returning id`,
+      [sourceWorkspaceId, agent],
+    );
+    await wb.admin.query(
+      `insert into proposed_changes (id, workspace_id, run_id, action, payload)
+       values (gen_random_uuid(), $1, $2, 'goals.update', '{}'::jsonb)`,
+      [sourceWorkspaceId, run],
+    );
+    await wb.admin.query(
+      `insert into activities (id, workspace_id, kind, actor_kind, subject_type, subject_id, payload)
+       values (gen_random_uuid(), $1, 'space.moved.test', 'human', 'space', $2, $3::jsonb)`,
+      [
+        sourceWorkspaceId,
+        space,
+        JSON.stringify({ spaceId: space, memberIds: [owner] }),
+      ],
+    );
+    const targetSpacesBefore = (
+      await wb.admin.query<{ id: string }>(
+        "select id from spaces where workspace_id = $1",
+        [targetWorkspaceId],
+      )
+    ).rows.map((row) => row.id);
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+
+    expect(diff.proposalsLeftBehind).toBe(1);
+    expect(diff.skipped.proposed_changes).toBeUndefined();
+    const movedMember = await one(
+      `select id from workspace_members
+        where workspace_id = $1 and lower(placeholder_email) = 'source-owner@example.com'`,
+      [targetWorkspaceId],
+    );
+    const movedSpace = (
+      await wb.admin.query<{ id: string }>(
+        "select id from spaces where workspace_id = $1",
+        [targetWorkspaceId],
+      )
+    ).rows
+      .map((row) => row.id)
+      .find((id) => !targetSpacesBefore.includes(id));
+    expect(movedSpace).toBeDefined();
+
+    const proposals = await wb.admin.query<{
+      payload: typeof payload;
+      run_id: string | null;
+    }>("select payload, run_id from proposed_changes where workspace_id = $1", [
+      targetWorkspaceId,
+    ]);
+    // The copilot's proposal, and not the agent's.
+    expect(proposals.rows).toHaveLength(1);
+    const moved = proposals.rows[0]?.payload;
+    expect(moved?.id).toBe(movedSpace);
+    expect(moved?.members[0]?.memberId).toBe(movedMember);
+    expect(JSON.stringify(moved?.note)).toContain(movedMember);
+    expect(moved?.foreign).toBe(foreign);
+
+    const activity = await wb.admin.query<{ payload: Record<string, unknown> }>(
+      "select payload from activities where workspace_id = $1 and kind = 'space.moved.test'",
+      [targetWorkspaceId],
+    );
+    expect(activity.rows[0]?.payload).toEqual({
+      spaceId: movedSpace,
+      memberIds: [movedMember],
     });
   });
 

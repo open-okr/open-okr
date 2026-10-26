@@ -1,6 +1,6 @@
 {
   "name": "@openokr/ui",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {
+    "@openokr/formats": "workspace:*",
     "@openokr/method": "workspace:*",
     "@base-ui-components/react": "catalog:",
     "@tanstack/query-sync-storage-persister": "catalog:",
@@ -40,8 +41,8 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "jsdom": "catalog:",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

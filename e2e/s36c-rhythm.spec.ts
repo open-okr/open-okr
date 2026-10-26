@@ -36,14 +36,20 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { setTokens } from "./tokens.ts";
 
 test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
 
-/** The staleness grace field, which is a plain scalar in the registry. */
-const GRACE = "input[name='threshold:cadence.stalenessGraceDays']";
+/**
+ * The staleness grace field, which is a plain scalar in the registry. Found
+ * by its box's name: a number field posts through a hidden input of its own,
+ * so the box a person types in carries no `name`.
+ */
+const grace = () =>
+  page.getByRole("textbox", { name: "Staleness grace", exact: true });
 /**
  * One rung of a ladder, which was read-only until P6-G20. The check-in
  * ladder's, since the blocker ladder became one rung at P9-T19a-a.
@@ -92,13 +98,13 @@ test("the card renders the registry, not a fixed list of fields", async () => {
   // A scalar and a composite. **The METHOD §x chip used to be asserted here
   // and is gone since P8-G11b**: 53 of them on this one screen, which Agung
   // asked to be rid of. The sentence under each label stays.
-  await expect(page.locator(GRACE)).toBeVisible();
+  await expect(grace()).toBeVisible();
   await expect(page.locator(LADDER_OWNER)).toBeVisible();
   await expect(page.getByText("METHOD §")).toHaveCount(0);
 });
 
 test("an impossible value is refused in words", async () => {
-  await page.locator(GRACE).fill("99999");
+  await grace().fill("99999");
   await save(page).click();
 
   const refusal = outcome(page, "bad");
@@ -110,14 +116,15 @@ test("an impossible value is refused in words", async () => {
   // P8-G11a the typed value was gone the moment it was refused: you were told
   // 500 was too big while the box had already gone back to 200. This line is
   // the one the comment here used to claim and never checked.
-  await expect(page.locator(GRACE)).toHaveValue("99999");
+  // Shown as the reader's locale writes it, grouped.
+  await expect(grace()).toHaveValue(/^99,?999$/);
   await expect(refusal).not.toContainText("Saved.");
 
   // **The half a toast cannot carry.** The method named a parameter, so the
   // sentence is under that parameter's own field and the field says it is the
   // invalid one. Without this you are told something was refused and left to
   // find which of twenty boxes it was.
-  await expect(page.locator(GRACE)).toHaveAttribute("aria-invalid", "true");
+  await expect(grace()).toHaveAttribute("aria-invalid", "true");
   // The method's own words, minus the key that the toast already carries.
   // Asserted as non-empty rather than by wording, because the sentence comes
   // from the §11 schema's bound, and changing that bound is a method decision
@@ -128,14 +135,14 @@ test("an impossible value is refused in words", async () => {
 });
 
 test("a grace this workspace asked for is written, and nothing else moves", async () => {
-  await page.locator(GRACE).fill("5");
+  await grace().fill("5");
   await save(page).click();
   await expect(outcome(page, "ok")).toContainText("Saved.", {
     timeout: 15_000,
   });
 
   await goTo(page, "/admin/rhythm");
-  await expect(page.locator(GRACE)).toHaveValue("5");
+  await expect(grace()).toHaveValue("5");
   // The ladder beside it was not touched, so it still shows the method's own
   // value as a placeholder rather than a stored one.
   await expect(page.locator(LADDER_OWNER)).toHaveValue("");
@@ -184,7 +191,7 @@ test("reset puts the whole card back to its defaults", async () => {
 
   await goTo(page, "/admin/rhythm");
   // Blank means "no opinion", and the placeholder is the method's number.
-  await expect(page.locator(GRACE)).toHaveValue("");
+  await expect(grace()).toHaveValue("");
   await expect(page.locator(LADDER_OWNER)).toHaveValue("");
 });
 
@@ -195,7 +202,9 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
   // than replaces, because replacing would let a workspace switch a quality
   // rule off by storing an empty list.
   await goTo(page, "/admin/rhythm");
-  const field = page.locator(
+  // The list's own box, and what the form posts for it (guided-inputs §4.11).
+  const field = page.getByLabel("Your own output verbs terms", { exact: true });
+  const posted = page.locator(
     "input[name='words:quality.wordLists:outputVerbs']",
   );
   await expect(field).toBeVisible();
@@ -206,7 +215,7 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
     .textContent();
   expect(before).toContain("launch");
 
-  await field.fill("luncurkan, terbitkan");
+  await setTokens(field, ["luncurkan", "terbitkan"]);
   await page
     .getByTestId("rhythm-card-quality")
     .getByRole("button", { name: "Save" })
@@ -216,12 +225,12 @@ test("a word list takes this workspace's own terms, and keeps the method's", asy
   });
 
   await goTo(page, "/admin/rhythm");
-  await expect(field).toHaveValue("luncurkan, terbitkan");
+  await expect(posted).toHaveValue("luncurkan, terbitkan");
   // The method's own terms are still there, and still not editable.
   await expect(page.getByText(/^launch, build, ship/).first()).toBeVisible();
 
   // Put it back, so no later spec inherits this workspace's vocabulary.
-  await field.fill("");
+  await setTokens(field, []);
   await page
     .getByTestId("rhythm-card-quality")
     .getByRole("button", { name: "Save" })

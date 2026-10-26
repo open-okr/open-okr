@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  RichTextField,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState } from "react";
@@ -30,8 +31,8 @@ export function CoordinatorNote({
   note,
 }: {
   readonly sessionId: string;
-  /** What is stored, or null before anybody wrote one. */
-  readonly note: string | null;
+  /** What is stored as editor JSON, or null before anybody wrote one. */
+  readonly note: unknown;
 }) {
   const { t } = useTranslations();
 
@@ -59,12 +60,19 @@ export function CoordinatorNote({
           className="flex flex-col gap-2"
         >
           <input type="hidden" name="sessionId" value={sessionId} />
-          <textarea
-            name="note"
-            rows={3}
-            defaultValue={note ?? ""}
-            className="w-full max-w-prose rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-          />
+          {/* Rich text since guided-inputs change 11c, up to the server's
+              2000 (sessions.setCoordinatorNote). The card's heading names
+              it, so the field draws no legend of its own. */}
+          <div className="w-full max-w-prose">
+            <RichTextField
+              label={t("session.detail.coordinatorNote.theCoordinatorSNote")}
+              hideLabel
+              name="note"
+              content={note}
+              maxCharacters={2000}
+              sendUnchanged
+            />
+          </div>
           <Button
             type="submit"
             variant="default"

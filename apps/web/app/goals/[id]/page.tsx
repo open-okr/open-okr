@@ -2,12 +2,16 @@ import {
   ACCESS_LEVELS,
   ASSIST_FEATURE_KEYS,
   callAction,
-  excerptRichText,
   OperationError,
   REVIEW_ASSIST_KEYS,
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
-import type { ResolvedThresholds } from "@openokr/method";
+import {
+  type ResolvedPractice,
+  type ResolvedThresholds,
+  WEIGHT_MAX,
+  WEIGHT_MIN,
+} from "@openokr/method";
 import {
   Bar,
   Button,
@@ -16,7 +20,13 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  EntityPicker,
   formatMeasure,
+  NumberInput,
+  RichTextView,
+  SelectInput,
+  TextArea,
+  TextInput,
 } from "@openokr/ui";
 
 import Link from "next/link";
@@ -27,9 +37,12 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
+import { DecisionText } from "../../../lib/decision-text.tsx";
+import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
+import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -145,6 +158,7 @@ export default async function GoalPage({
   })) as Array<{
     id: string;
     text: string;
+    textDocument: unknown;
     at: string;
     authorName: string;
     keyResultTitle: string | null;
@@ -171,6 +185,11 @@ export default async function GoalPage({
   const pageThresholds = (await callAction(context, "rhythm.read", {}))
     .thresholds as unknown as ResolvedThresholds;
   const strengthBands = pageThresholds["quality.strengthScoreBands"];
+  // How the workspace shows a confidence (METHOD.md §12, guided-inputs §4.8).
+  const confidenceDisplay = (
+    (await callAction(context, "practice.read", {}))
+      .practice as unknown as ResolvedPractice
+  )["confidence.display"];
   const { available: drafting } = await callAction(
     context,
     "ai.readAvailability",
@@ -216,6 +235,10 @@ export default async function GoalPage({
       : [];
   const kpiOptions =
     unlinkedKeyResults.length > 0 ? await readKpiOptions(context) : [];
+
+  const retrospectiveHtml = goal.retrospective
+    ? richTextHtml(goal.retrospective.body)
+    : null;
 
   // The assists this page can offer (completeness review M-09), each asked
   // whether a provider may run it here and each only where it has something
@@ -470,8 +493,13 @@ export default async function GoalPage({
                             title: keyResult.title,
                             currentValue: keyResult.currentValue,
                             confidence: keyResult.confidence,
+                            unit: keyResult.unit,
+                            baselineValue: keyResult.baselineValue,
+                            targetValue: keyResult.targetValue,
                           }}
                           lastStatus={lastStatus}
+                          display={confidenceDisplay}
+                          thresholds={pageThresholds}
                         />
                       ) : keyResult.kpiId ? (
                         <Chip tone="info">{t("common.fromAKpi")}</Chip>
@@ -501,45 +529,38 @@ export default async function GoalPage({
             <CardBody>
               <ActionForm action={editGoal} className="flex flex-col gap-1.5">
                 <input type="hidden" name="id" value={goal.id} />
-                <label className="sr-only" htmlFor="edit-title">
-                  {t("common.theObjective")}
-                </label>
-                <input
+                <TextInput
                   id="edit-title"
+                  label={t("common.theObjective")}
+                  hideLabel
                   name="title"
                   required
                   maxLength={500}
                   defaultValue={goal.title}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
                 />
-                <label className="sr-only" htmlFor="edit-contribution">
-                  {t("common.whatItContributesTo")}
-                </label>
-                <input
+                <TextInput
                   id="edit-contribution"
+                  label={t("common.whatItContributesTo")}
+                  hideLabel
                   name="contributionStatement"
                   maxLength={1000}
                   defaultValue={goal.contributionStatement ?? ""}
                   placeholder={t("common.thePriorityThisMoves")}
-                  className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
+                  inputClassName="placeholder:text-ink-4"
                 />
-                <div className="flex items-center gap-1.5">
-                  <label className="text-xs text-ink-3" htmlFor="edit-weight">
-                    {t("goals.detail.weight")}
-                  </label>
-                  <input
+                <div className="flex items-end gap-1.5">
+                  {/* guided-inputs §4.8: held to the method's 0 to 100,
+                      which the action now refuses outside of too. */}
+                  <NumberInput
                     id="edit-weight"
+                    label={t("goals.detail.weight")}
                     name="weight"
-                    type="number"
-                    step="any"
-                    min={0}
-                    max={100}
                     defaultValue={goal.weight}
-                    className="w-24 rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink"
+                    min={WEIGHT_MIN}
+                    max={WEIGHT_MAX}
+                    description={t("goals.detail.0MeansTrackedBut")}
+                    inputClassName="w-24"
                   />
-                  <span className="text-xs text-ink-4">
-                    {t("goals.detail.0MeansTrackedBut")}
-                  </span>
                   <Button type="submit" className="ml-auto">
                     {t("common.save")}
                   </Button>
@@ -565,38 +586,37 @@ export default async function GoalPage({
                 className="flex flex-wrap items-center gap-1.5"
               >
                 <input type="hidden" name="id" value={goal.id} />
-                <label className="sr-only" htmlFor="reassign-role">
-                  {t("goals.detail.role")}
-                </label>
-                <select
+                <SelectInput
                   id="reassign-role"
+                  label={t("goals.detail.role")}
+                  hideLabel
                   name="role"
                   defaultValue="champion"
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                  inputClassName="w-auto px-1.5 text-xs text-ink-2"
                 >
                   <option value="champion">{t("common.champion")}</option>
                   <option value="reviewer">{t("common.reviewer")}</option>
-                </select>
-                <label className="sr-only" htmlFor="reassign-member">
-                  {t("goals.detail.member")}
-                </label>
-                <select
+                </SelectInput>
+                {/* Opens on the champion, as the role beside it does, so a
+                 * press with nothing chosen names somebody rather than
+                 * whoever came first in the directory. "Nobody" takes the
+                 * reviewer off (P9-T04); it is refused for the champion,
+                 * who is always somebody, and where the workspace requires
+                 * reviewers, each with the reason. */}
+                <EntityPicker
+                  label={t("goals.detail.member")}
+                  hideLabel
                   id="reassign-member"
                   name="memberId"
-                  className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
-                >
-                  {members.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.name}
-                    </option>
-                  ))}
-                  {/* Takes the reviewer off (P9-T04). Refused for the
-                   * champion, who is always somebody, and where the
-                   * workspace requires reviewers, each with the reason. */}
-                  <option value="">
-                    {t("goals.detail.nobodyReviewerOnly")}
-                  </option>
-                </select>
+                  defaultValue={goal.champion.id}
+                  options={members.map((member) =>
+                    memberOption(member, t("common.agent")),
+                  )}
+                  current={memberOption(goal.champion, t("common.agent"))}
+                  noneLabel={t("goals.detail.nobodyReviewerOnly")}
+                  className="w-56"
+                  inputClassName="text-xs"
+                />
                 <Button type="submit" variant="ghost">
                   {t("common.reassign")}
                 </Button>
@@ -624,7 +644,10 @@ export default async function GoalPage({
                     key={decision.id}
                     className="flex flex-col gap-1 rounded-md border border-line p-2.5"
                   >
-                    <span className="text-sm text-ink">{decision.text}</span>
+                    <DecisionText
+                      document={decision.textDocument}
+                      text={decision.text}
+                    />
                     {/* The criterion names the date and the author, and the
                         key result when one was named, because a decision
                         about one number is not a decision about the goal. */}
@@ -653,10 +676,18 @@ export default async function GoalPage({
               </h2>
             </CardHeader>
             <CardBody className="flex flex-col gap-1.5">
-              <p className="text-sm text-ink-2">
-                {excerptRichText(goal.retrospective.body as never, 2000) ||
-                  t("goals.detail.writtenButEmpty")}
-              </p>
+              {/* As it was written (guided-inputs §4.7), where it was a
+                  one-line excerpt. */}
+              {retrospectiveHtml === null ? (
+                <p className="text-sm text-ink-3 italic">
+                  {t("goals.detail.writtenButEmpty")}
+                </p>
+              ) : (
+                <RichTextView
+                  html={retrospectiveHtml}
+                  className="text-sm text-ink-2"
+                />
+              )}
               <p className="text-xs text-ink-4">
                 {t("goals.detail.keptWhetherTheGoal")}
               </p>
@@ -692,28 +723,26 @@ export default async function GoalPage({
                 >
                   <input type="hidden" name="id" value={goal.id} />
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <label className="sr-only" htmlFor="close-outcome">
-                      {t("goals.detail.outcome")}
-                    </label>
-                    <select
+                    <SelectInput
                       id="close-outcome"
+                      label={t("goals.detail.outcome")}
+                      hideLabel
                       name="successStatus"
                       defaultValue="achieved"
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
                     >
                       <option value="achieved">
                         {t("goals.detail.achieved")}
                       </option>
                       <option value="missed">{t("goals.detail.missed")}</option>
-                    </select>
-                    <label className="sr-only" htmlFor="close-decision">
-                      {t("goals.detail.decision")}
-                    </label>
-                    <select
+                    </SelectInput>
+                    <SelectInput
                       id="close-decision"
+                      label={t("goals.detail.decision")}
+                      hideLabel
                       name="closeDecision"
                       defaultValue="keep"
-                      className="rounded-md border border-line bg-surface px-1.5 py-1.5 text-xs text-ink-2"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
                     >
                       {/* §8.8's five, in its order (P9-T20e-a). */}
                       <option value="achieved">
@@ -725,15 +754,16 @@ export default async function GoalPage({
                       <option value="abandon">
                         {t("goals.detail.abandon")}
                       </option>
-                    </select>
-                    <input
-                      name="closeReason"
-                      maxLength={2000}
-                      placeholder={t("goals.detail.whyThatDecision")}
-                      aria-label={t("goals.detail.whyThatDecision")}
-                      className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink placeholder:text-ink-4"
-                    />
+                    </SelectInput>
                   </div>
+                  {/* Up to the server's 2000, on lines of its own rather
+                      than one box that scrolled sideways (§4.3). */}
+                  <TextArea
+                    name="closeReason"
+                    label={t("goals.detail.whyThatDecision")}
+                    maxLength={2000}
+                    rows={2}
+                  />
                   <RetrospectiveField
                     goalId={goal.id}
                     offered={retrospectiveOffered}

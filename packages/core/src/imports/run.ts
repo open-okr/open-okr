@@ -77,6 +77,11 @@ export interface RowOutcome {
   readonly externalId?: string;
   /** Why it was skipped. Present only for a skip. */
   readonly reason?: string;
+  /**
+   * What the import changed from what the file said, for a row it wrote.
+   * Absent when it wrote the row as the file has it.
+   */
+  readonly notes?: readonly string[];
 }
 
 export interface RunReport {
@@ -277,6 +282,9 @@ async function loadRows(
         references,
       });
 
+      const notes =
+        plan.notes && plan.notes.length > 0 ? { notes: plan.notes } : {};
+
       if (about.dryRun) {
         // Planned and not written. The plan is what proves the row is
         // writable: it resolved every reference and coerced every value.
@@ -289,6 +297,7 @@ async function loadRows(
           line,
           outcome: plan.kind === "update" ? "updated" : "created",
           ...(externalId ? { externalId } : {}),
+          ...notes,
         });
         continue;
       }
@@ -308,6 +317,7 @@ async function loadRows(
         line,
         outcome: plan.kind === "update" ? "updated" : "created",
         ...(externalId ? { externalId } : {}),
+        ...notes,
       });
     } catch (error) {
       skip(messageOf(error));

@@ -14,7 +14,7 @@ import {
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
-import { useTranslations } from "@openokr/ui";
+import { TextInput, useTranslations } from "@openokr/ui";
 import { useId, useMemo, useState } from "react";
 import {
   RuleVerdict,
@@ -212,11 +212,17 @@ export function DraftCoach({
             aria-hidden="true"
             className={`size-2.25 flex-none rounded-full ${WORST_DOT[worst]}`}
           />
-          <input
+          {/* Named by the label above, which it also carries, and drawn
+              borderless inside the card that holds the dot and the count. */}
+          <TextInput
             id={fieldId}
+            label={t("cycle.draftCoach.objectiveCheckedAsYou")}
+            hideLabel
+            maxLength={500}
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-lg font-semibold tracking-tight text-ink outline-none"
+            className="min-w-0 flex-1"
+            inputClassName="h-auto border-0 bg-transparent px-0 text-lg font-semibold tracking-tight focus:ring-0"
           />
           {firing > 0 ? (
             <span className="inline-flex h-5 flex-none items-center rounded-full bg-bad-bg px-2 text-xs font-bold text-bad">

@@ -4,6 +4,7 @@ import {
   isCloudEnabled,
   readInstanceName,
 } from "@openokr/core";
+import { listTimezones } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
 import { getMailSettings } from "../../../lib/mail";
 import { schedulerState } from "../../../lib/scheduler";
@@ -67,7 +68,7 @@ export default async function GeneralSettingsPage() {
         schedulerFailed={schedulerState() === "failed"}
       />
       {mail.transport === "console" ? <ConsoleMailNotice /> : null}
-      <GeneralSettingsForm settings={read.settings} />
+      <GeneralSettingsForm settings={read.settings} zones={listTimezones()} />
       {instanceName ? (
         <InstanceNameCard
           name={instanceName.value}

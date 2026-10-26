@@ -15,6 +15,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { chooseAt } from "./pickers.ts";
 import pg from "pg";
 
 // **Not an address of this spec's own.** The application instance is claimed by
@@ -139,6 +140,22 @@ test("create a session and navigate to the session screen", async () => {
          (id, workspace_id, space_id, kind, title, scheduled_for, facilitator_id, state)
        values ($1, $2, $3, 'weekly', 'Weekly check-in', now() + interval '1 hour', $4, 'scheduled')`,
       [id, member.workspace_id, space.id, member.id],
+    );
+    // **A week with a figure, when no earlier spec left one.** This session
+    // has no cycle, so no key results and no average of its own (see the
+    // diagnose test below). The trend the weekly figures test reads came from
+    // weeks other specs closed in this space, and a CI shard without those
+    // specs has none. Last week's digest, in the shape `sessions.close` writes.
+    await client.query(
+      `insert into digests (id, workspace_id, scope, scope_id, period, period_start, body)
+       select gen_random_uuid(), $1, 'space', $2, 'weekly',
+              date_trunc('week', now() - interval '7 days')::date,
+              '{"averageConfidence": 0.6}'::jsonb
+        where not exists (
+          select 1 from digests
+           where scope = 'space' and scope_id = $2 and period = 'weekly'
+             and deleted_at is null and body ? 'averageConfidence')`,
+      [member.workspace_id, space.id],
     );
     await client.query("commit");
   } finally {
@@ -325,16 +342,23 @@ test("the commitment stage closes last week and sets this week", async () => {
   // Three or four since P9-T19a-d-c.
   await expect(page.getByText("3 to 4 a week")).toBeVisible();
 
-  // Three commitments, each with an owner. The owner select lists the
-  // session's participants.
+  // Three commitments, each with an owner. The owner picker offers the
+  // session's participants; scoped to the commitments form, because the
+  // blocker panel on the same page has an "Owner" too.
   const texts = page.locator("input[name='text']");
-  const owners = page.locator("select[name='ownerId']");
+  const commitments = page
+    .locator("form")
+    .filter({ has: page.locator("input[name='text']") });
+  const owners = commitments.getByRole("combobox", {
+    name: "Owner",
+    exact: true,
+  });
   await texts.nth(0).fill("Ship the onboarding flow");
-  await owners.nth(0).selectOption({ index: 1 });
+  await chooseAt(owners.nth(0), 0);
   await texts.nth(1).fill("Review the pipeline");
-  await owners.nth(1).selectOption({ index: 1 });
+  await chooseAt(owners.nth(1), 0);
   await texts.nth(2).fill("Call the two stalled accounts");
-  await owners.nth(2).selectOption({ index: 1 });
+  await chooseAt(owners.nth(2), 0);
 
   await page
     .getByRole("button", { name: "Set this week's commitments" })
@@ -467,7 +491,11 @@ test("the coordinator's note reaches the digest once the session is closed", asy
     page.getByRole("heading", { name: "The coordinator's note" }),
   ).toBeVisible();
 
-  await page.locator("textarea[name='note']").fill(note);
+  // The compact editor since guided-inputs change 11c.
+  const noteBox = () =>
+    page.getByRole("textbox", { name: "The coordinator's note", exact: true });
+  await noteBox().click();
+  await noteBox().pressSequentially(note);
   await page.getByRole("button", { name: "Add the note" }).click();
 
   // Written, and read back: the form now offers to replace it, which it can
@@ -475,6 +503,13 @@ test("the coordinator's note reaches the digest once the session is closed", asy
   await expect(
     page.getByRole("button", { name: "Replace the note" }),
   ).toBeVisible({ timeout: 10_000 });
+  // And the digest says it, on its own line for leadership.
+  await expect(page.getByRole("list", { name: "The digest" })).toContainText(
+    `For leadership: ${note}`,
+  );
+  // The editor opens on what is stored once the page is read again.
+  await page.reload();
+  await expect(noteBox()).toContainText(note, { timeout: 15_000 });
 });
 
 /**

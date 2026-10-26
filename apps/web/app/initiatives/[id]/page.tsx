@@ -1,5 +1,5 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -271,20 +271,19 @@ export default async function InitiativePage({
               className="flex flex-wrap items-end gap-2"
             >
               <input type="hidden" name="id" value={initiative.id} />
-              <label className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
+              <div className="flex flex-1 flex-col gap-1 text-xs font-semibold text-ink-2">
                 {t("initiatives.detail.recordThisWorkAgainst")}
-                <select
+                <EntityPicker
+                  label={t("initiatives.detail.keyResultToLink")}
+                  hideLabel
                   name="keyResultId"
-                  aria-label={t("initiatives.detail.keyResultToLink")}
-                  className="rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-                >
-                  {linkable.map((one) => (
-                    <option key={one.id} value={one.id}>
-                      {one.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  required
+                  options={linkable.map((one) => ({
+                    id: one.id,
+                    label: one.title,
+                  }))}
+                />
+              </div>
               <button
                 type="submit"
                 className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"

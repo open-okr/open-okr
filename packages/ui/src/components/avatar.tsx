@@ -84,7 +84,12 @@ export interface AvatarProps extends HTMLAttributes<HTMLSpanElement> {
   readonly tone?: AvatarTone;
 }
 
-function initialsOf(name: string): string {
+/**
+ * The letters an avatar draws when it has no picture. Exported because a
+ * control whose face is an avatar shows these letters, and a visible label
+ * has to be part of the control's name (WCAG 2.5.3).
+ */
+export function initialsOf(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
     return "?";

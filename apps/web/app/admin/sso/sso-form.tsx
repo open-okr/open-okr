@@ -1,10 +1,18 @@
 "use client";
 
 import type { SSOConnectionDetails } from "@openokr/core";
-import { Button, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  IdentifierInput,
+  SelectInput,
+  TextArea,
+  TokenInput,
+  UrlInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { Field, fieldInputClass } from "../../(auth)/auth-card";
+import { Field } from "../../(auth)/auth-card";
 import { updateSSOConnectionAction } from "./actions";
 
 /**
@@ -162,13 +170,11 @@ export function SSOForm({
     }
   };
 
-  /** The refusal, under the field it is about, or nothing. */
-  const problem = (name: string) =>
-    field === name ? (
-      <p className="text-sm text-bad" role="alert">
-        {error}
-      </p>
-    ) : null;
+  /**
+   * The refusal, on the field it is about, linked to it (guided-inputs
+   * §4.11). Three of the four OIDC addresses had nowhere to show one.
+   */
+  const errorFor = (name: string) => (field === name ? error : null);
 
   const protocolName =
     kind === "saml"
@@ -194,16 +200,10 @@ export function SSOForm({
         </p>
       ) : (
         <div className="flex flex-col gap-1">
-          <label
-            htmlFor={idFor("kind")}
-            className="text-sm font-medium text-ink-2"
-          >
-            {t("admin.sso.ssoForm.protocol")}
-          </label>
-          <select
+          <SelectInput
+            label={t("admin.sso.ssoForm.protocol")}
             id={idFor("kind")}
             name="kind"
-            className={fieldInputClass}
             value={kind}
             onChange={(event) =>
               setKind(event.target.value === "saml" ? "saml" : "oidc")
@@ -213,20 +213,26 @@ export function SSOForm({
               {t("admin.sso.ssoForm.oidcOpenIdConnect")}
             </option>
             <option value="saml">{t("admin.sso.saml2")}</option>
-          </select>
+          </SelectInput>
         </div>
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field
+        {/* The server's own rule as it is typed: capitals lowered, and
+            anything else marked (guided-inputs §4.11). */}
+        <IdentifierInput
           id={idFor("providerId")}
           label={t("admin.sso.ssoForm.providerId")}
           name="providerId"
+          rule="slug"
           placeholder={t("admin.sso.ssoForm.providerIdPlaceholder")}
           defaultValue={connection?.providerId}
           readOnly={editing}
-          aria-describedby={editing ? idFor("providerIdFixed") : undefined}
+          description={
+            editing ? t("admin.sso.ssoForm.providerIdFixed") : undefined
+          }
           required={!editing}
+          error={errorFor("providerId")}
         />
         <Field
           id={idFor("displayName")}
@@ -235,56 +241,54 @@ export function SSOForm({
           placeholder={t("admin.sso.ssoForm.displayNamePlaceholder")}
           defaultValue={connection?.displayName}
           required
+          error={errorFor("displayName")}
         />
       </div>
-      {editing ? (
-        <p id={idFor("providerIdFixed")} className="text-xs text-ink-3">
-          {t("admin.sso.ssoForm.providerIdFixed")}
-        </p>
-      ) : null}
-      {problem("providerId")}
-      {problem("displayName")}
 
       {kind === "oidc" ? (
         <>
-          <Field
+          {/* Each a whole https address, the rule the server applies. */}
+          <UrlInput
             id={idFor("discoveryUrl")}
             label={t("admin.sso.ssoForm.discoveryUrl")}
             name="discoveryUrl"
+            secure
             placeholder={t("admin.sso.ssoForm.discoveryUrlPlaceholder")}
-            type="url"
             defaultValue={connection?.discoveryUrl ?? undefined}
+            error={errorFor("discoveryUrl")}
           />
-          {problem("discoveryUrl")}
 
           <p className="text-xs text-ink-3">
             {t("admin.sso.ssoForm.ifADiscoveryUrlIsSet")}
           </p>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Field
+            <UrlInput
               id={idFor("authorizationUrl")}
               label={t("admin.sso.ssoForm.authorizationUrl")}
               name="authorizationUrl"
-              type="url"
+              secure
               placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
               defaultValue={connection?.authorizationUrl ?? undefined}
+              error={errorFor("authorizationUrl")}
             />
-            <Field
+            <UrlInput
               id={idFor("tokenUrl")}
               label={t("admin.sso.ssoForm.tokenUrl")}
               name="tokenUrl"
-              type="url"
+              secure
               placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
               defaultValue={connection?.tokenUrl ?? undefined}
+              error={errorFor("tokenUrl")}
             />
-            <Field
+            <UrlInput
               id={idFor("userInfoUrl")}
               label={t("admin.sso.ssoForm.userInfoUrl")}
               name="userInfoUrl"
-              type="url"
+              secure
               placeholder={t("admin.sso.ssoForm.urlPlaceholder")}
               defaultValue={connection?.userInfoUrl ?? undefined}
+              error={errorFor("userInfoUrl")}
             />
           </div>
 
@@ -295,6 +299,7 @@ export function SSOForm({
               name="clientId"
               defaultValue={connection?.clientId ?? undefined}
               required
+              error={errorFor("clientId")}
             />
             {/* Never filled in. The stored secret is sealed and stays on the
              * server; blank on an edit keeps it. */}
@@ -308,31 +313,32 @@ export function SSOForm({
               placeholder={
                 editing ? t("admin.sso.ssoForm.leaveBlankToKeep") : undefined
               }
+              error={errorFor("clientSecret")}
             />
           </div>
-          {problem("clientId")}
-          {problem("clientSecret")}
 
-          <Field
+          {/* A chip each, posted space-separated as the provider reads
+              them (guided-inputs §4.11). */}
+          <TokenInput
             id={idFor("scopes")}
             label={t("account.apiTokens.scopes")}
             name="scopes"
+            joiner=" "
             placeholder={t("admin.sso.ssoForm.scopesPlaceholder")}
-            defaultValue={connection?.scopes}
+            defaultValue={(connection?.scopes ?? "").split(" ").filter(Boolean)}
           />
         </>
       ) : (
         <>
-          <Field
+          <UrlInput
             id={idFor("samlEntryPoint")}
             label={t("admin.sso.ssoForm.signOnUrl")}
             name="samlEntryPoint"
-            type="url"
             placeholder={t("admin.sso.ssoForm.signOnUrlPlaceholder")}
             defaultValue={connection?.samlEntryPoint ?? undefined}
             required
+            error={errorFor("samlEntryPoint")}
           />
-          {problem("samlEntryPoint")}
 
           <Field
             id={idFor("samlIssuer")}
@@ -341,27 +347,22 @@ export function SSOForm({
             placeholder={t("admin.sso.ssoForm.issuerPlaceholder")}
             defaultValue={connection?.samlIssuer ?? undefined}
             required
+            error={errorFor("samlIssuer")}
           />
-          {problem("samlIssuer")}
 
           <div className="flex flex-col gap-1">
-            <label
-              htmlFor={idFor("samlCertificate")}
-              className="text-sm font-medium text-ink-2"
-            >
-              {t("admin.sso.ssoForm.signingCertificate")}
-            </label>
-            <textarea
+            <TextArea
+              label={t("admin.sso.ssoForm.signingCertificate")}
               id={idFor("samlCertificate")}
               name="samlCertificate"
               rows={5}
               required
-              className={`${fieldInputClass} h-auto py-2 font-mono text-xs`}
               placeholder={t("admin.sso.ssoForm.certificatePlaceholder")}
               defaultValue={connection?.samlCertificate ?? undefined}
+              inputClassName="font-mono text-xs"
+              error={errorFor("samlCertificate")}
             />
           </div>
-          {problem("samlCertificate")}
 
           <p className="text-xs text-ink-3">
             {t("admin.sso.ssoForm.pasteTheCertificate")}
@@ -377,14 +378,19 @@ export function SSOForm({
         </>
       )}
 
-      <Field
+      {/* Each a domain, on the rule the server now applies (§4.11). */}
+      <TokenInput
         id={idFor("emailDomains")}
         label={t("admin.sso.ssoForm.emailDomains")}
         name="emailDomains"
+        rule="domain"
         placeholder={t("admin.sso.ssoForm.emailDomainsPlaceholder")}
-        defaultValue={connection?.emailDomains}
+        defaultValue={(connection?.emailDomains ?? "")
+          .split(",")
+          .map((one) => one.trim())
+          .filter(Boolean)}
+        error={errorFor("emailDomains")}
       />
-      {problem("emailDomains")}
 
       <label className="flex items-center gap-2 text-sm text-ink-2">
         <input

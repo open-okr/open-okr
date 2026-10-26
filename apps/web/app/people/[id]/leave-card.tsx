@@ -5,9 +5,12 @@ import {
   Card,
   CardBody,
   CardHeader,
+  DateRangeInput,
+  EntityPicker,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import { type MemberLike, memberOption } from "../../../lib/entity-options.ts";
 import { type ProfileResult, setLeaveAction } from "../actions.ts";
 
 /**
@@ -42,7 +45,7 @@ export function LeaveCard({
   readonly canEdit: boolean;
   readonly leave: readonly LeaveSpan[];
   /** Who may stand in: active people other than the member. */
-  readonly delegates: readonly { readonly id: string; readonly name: string }[];
+  readonly delegates: readonly MemberLike[];
 }) {
   const { t } = useTranslations();
   const [list, setList] = useState<readonly LeaveSpan[]>(leave);
@@ -111,48 +114,25 @@ export function LeaveCard({
 
         {canEdit ? (
           <div className="flex flex-wrap items-end gap-2 rounded-md border border-line p-2.5">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.from")}
-              </span>
-              <input
-                type="date"
-                value={startsOn}
-                onChange={(event) => setStartsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.to")}
-              </span>
-              <input
-                type="date"
-                value={endsOn}
-                min={startsOn || undefined}
-                onChange={(event) => setEndsOn(event.target.value)}
-                className="rounded-md border border-line bg-bg px-2 py-1"
-              />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-ink-3">
-                {t("people.detail.leave.delegate")}
-              </span>
-              <select
-                value={delegateId}
-                onChange={(event) => setDelegateId(event.target.value)}
-                className="w-56 rounded-md border border-line bg-bg px-2 py-1"
-              >
-                <option value="">
-                  {t("people.detail.leave.chooseADelegate")}
-                </option>
-                {delegates.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <DateRangeInput
+              startLabel={t("people.detail.leave.from")}
+              endLabel={t("people.detail.leave.to")}
+              value={{ start: startsOn || null, end: endsOn || null }}
+              onValueChange={(range) => {
+                setStartsOn(range.start ?? "");
+                setEndsOn(range.end ?? "");
+              }}
+            />
+            <EntityPicker
+              label={t("people.detail.leave.delegate")}
+              value={delegateId === "" ? null : delegateId}
+              onValueChange={(next) => setDelegateId(next ?? "")}
+              placeholder={t("people.detail.leave.chooseADelegate")}
+              options={delegates.map((person) =>
+                memberOption(person, t("common.agent")),
+              )}
+              className="w-56"
+            />
             <Button
               type="button"
               disabled={
@@ -188,11 +168,8 @@ export function LeaveCard({
           </div>
         ) : null}
 
-        {backwards ? (
-          <p role="alert" className="text-xs text-bad">
-            {t("people.detail.leave.endsBeforeItStarts")}
-          </p>
-        ) : result && !result.ok ? (
+        {/* An end before the start is said under the end date itself. */}
+        {result && !result.ok ? (
           <p role="alert" className="text-xs text-bad">
             {result.message}
           </p>

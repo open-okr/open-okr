@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  DateInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -85,18 +86,18 @@ export function CycleAdmin({
         </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-3.5">
-        <label className="flex flex-col gap-1 text-xs text-ink-3">
+        <div className="flex flex-col gap-1 text-xs text-ink-3">
           {mode === "annual"
             ? t("cycle.admin.createAnnualLabel")
             : t("cycle.admin.createLabel")}
           <div className="flex flex-wrap items-center gap-2.5">
-            <input
-              type="date"
+            <DateInput
+              label={t("cycle.admin.createDate")}
+              hideLabel
               value={on}
               disabled={pending}
-              aria-label={t("cycle.admin.createDate")}
-              onChange={(event) => setOn(event.target.value)}
-              className="rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+              onValueChange={(next) => setOn(next ?? "")}
+              inputClassName="h-auto px-2 py-1 text-xs"
             />
             <Button
               type="button"
@@ -113,20 +114,21 @@ export function CycleAdmin({
               ? t("cycle.admin.createAnnualHelp")
               : t("cycle.admin.createHelp")}
           </span>
-        </label>
+        </div>
 
         {currentCycleId ? (
           <>
-            <label className="flex flex-col gap-1 text-xs text-ink-3">
-              {t("cycle.admin.deadlineLabel")}
+            <div className="flex flex-col gap-1 text-xs text-ink-3">
+              <span aria-hidden="true">{t("cycle.admin.deadlineLabel")}</span>
               <div className="flex flex-wrap items-center gap-2.5">
-                <input
-                  type="date"
-                  value={deadline}
+                {/* The kit's date, which change 7a's list missed. */}
+                <DateInput
+                  label={t("cycle.admin.deadlineField")}
+                  hideLabel
+                  value={deadline === "" ? null : deadline}
                   disabled={pending}
-                  aria-label={t("cycle.admin.deadlineField")}
-                  onChange={(event) => setDeadline(event.target.value)}
-                  className="rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink"
+                  onValueChange={(next) => setDeadline(next ?? "")}
+                  inputClassName="h-6.5 text-xs"
                 />
                 <Button
                   type="button"
@@ -148,7 +150,7 @@ export function CycleAdmin({
               <span className="text-ink-4">
                 {t("cycle.admin.deadlineHelp")}
               </span>
-            </label>
+            </div>
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs text-ink-3">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { EntityPicker, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { assignRoleAction } from "./actions.ts";
@@ -61,22 +61,21 @@ export function MemberRoles({
             className="flex flex-wrap items-center justify-between gap-2 py-2"
           >
             <span className="min-w-0 text-sm text-ink">{member.name}</span>
-            <select
-              value={member.roleId ?? ""}
-              aria-label={t("admin.roles.roleFor", { name: member.name })}
+            <EntityPicker
+              label={t("admin.roles.roleFor", { name: member.name })}
+              hideLabel
+              value={member.roleId}
               disabled={pending}
-              onChange={(event) =>
-                assign(member.id, event.target.value || null)
-              }
-              className="h-7 w-48 rounded-control border border-line-2 bg-surface px-1.5 text-xs text-ink outline-none focus:border-brand"
-            >
-              <option value="">{t("admin.roles.noRole")}</option>
-              {roles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {role.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(next) => {
+                if (next !== member.roleId) {
+                  assign(member.id, next);
+                }
+              }}
+              options={roles.map((role) => ({ id: role.id, label: role.name }))}
+              noneLabel={t("admin.roles.noRole")}
+              className="w-48"
+              inputClassName="h-7 text-xs"
+            />
           </li>
         ))}
       </ul>

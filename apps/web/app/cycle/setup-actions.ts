@@ -14,14 +14,10 @@
  * Same shape as the other cycle writes: one registry call per form, and a
  * refusal returned as a sentence.
  */
-import {
-  callAction,
-  isBlankText,
-  OperationError,
-  richTextFromPlainText,
-} from "@openokr/core";
+import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { documentOrNull } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
@@ -86,23 +82,28 @@ export async function saveBaselineHealth(
   formData: FormData,
 ): Promise<WriteState> {
   const { t } = await getTranslations();
-  const columns = {
-    stable: text(formData, "stable"),
-    declining: text(formData, "declining"),
-    businessAsUsual: text(formData, "businessAsUsual"),
-  };
-  if (Object.values(columns).every(isBlankText)) {
+  // The compact editor's documents, every column sent as it stands
+  // (guided-inputs §4.7), so an empty column is null and a kept one is kept.
+  const stable = documentOrNull(formData, "stable");
+  const declining = documentOrNull(formData, "declining");
+  const businessAsUsual = documentOrNull(formData, "businessAsUsual");
+  if (
+    stable === "malformed" ||
+    declining === "malformed" ||
+    businessAsUsual === "malformed"
+  ) {
+    return { error: t("fields.richTextUnreadable") };
+  }
+  if (stable === null && declining === null && businessAsUsual === null) {
     // A row with three empty columns would read as "recorded" to phase 2.
     return { error: t("cycle.baseline.writeOne") };
   }
-  const rich = (value: string) =>
-    isBlankText(value) ? null : richTextFromPlainText(value);
   return run((context) =>
     callAction(context, "workflow.setBaselineHealth", {
       cycleId: text(formData, "cycleId"),
-      stable: rich(columns.stable),
-      declining: rich(columns.declining),
-      businessAsUsual: rich(columns.businessAsUsual),
+      stable,
+      declining,
+      businessAsUsual,
     }),
   );
 }
@@ -112,15 +113,21 @@ export async function saveRevalidation(
   formData: FormData,
 ): Promise<WriteState> {
   const changed = text(formData, "verdict") === "changed";
-  const changeNote = text(formData, "changeNote");
-  const focusNote = text(formData, "focusNote");
+  // The compact editor's documents since guided-inputs change 12, both sent
+  // as they stand, so an empty note is null and a kept one is kept.
+  const changeNote = documentOrNull(formData, "changeNote");
+  const focusNote = documentOrNull(formData, "focusNote");
+  if (changeNote === "malformed" || focusNote === "malformed") {
+    const { t } = await getTranslations();
+    return { error: t("fields.richTextUnreadable") };
+  }
   return run((context) =>
     callAction(context, "workflow.setRevalidation", {
       cycleId: text(formData, "cycleId"),
       holds: !changed,
       changed,
-      changeNote: changeNote === "" ? null : changeNote,
-      focusNote: focusNote === "" ? null : focusNote,
+      changeNote,
+      focusNote,
     }),
   );
 }
@@ -144,15 +151,18 @@ export async function saveCapacityCuts(
   formData: FormData,
 ): Promise<WriteState> {
   const { t } = await getTranslations();
-  const cuts = text(formData, "cuts");
-  if (isBlankText(cuts)) {
+  const cuts = documentOrNull(formData, "cuts");
+  if (cuts === "malformed") {
+    return { error: t("fields.richTextUnreadable") };
+  }
+  if (cuts === null) {
     // §5.5: "If the answer is nothing, capacity was not checked."
     return { error: t("cycle.cuts.writeSomething") };
   }
   return run((context) =>
     callAction(context, "workflow.setCapacityNotes", {
       cycleId: text(formData, "cycleId"),
-      cuts: richTextFromPlainText(cuts),
+      cuts,
     }),
   );
 }

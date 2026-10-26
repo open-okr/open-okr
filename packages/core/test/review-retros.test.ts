@@ -19,6 +19,7 @@ import { resolveThresholds } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "retro-facilitator";
@@ -68,6 +69,7 @@ const management = async (userId = FACILITATOR) =>
       questionKey: number;
       question: string;
       body: string | null;
+      bodyDocument: unknown;
       answeredByName: string | null;
     }[];
     answered: number;
@@ -362,7 +364,9 @@ describe("the management retro", () => {
       {
         sessionId,
         questionKey: 4,
-        body: "Between the platform space and support. Nobody owned the handover.",
+        body: richTextFromPlainText(
+          "Between the platform space and support. Nobody owned the handover.",
+        ),
       },
       MANAGER,
     );
@@ -378,7 +382,7 @@ describe("the management retro", () => {
     for (const body of ["First pass.", "Second, after the argument."]) {
       await call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 1, body },
+        { sessionId, questionKey: 1, body: richTextFromPlainText(body) },
         MANAGER,
       );
     }
@@ -388,11 +392,90 @@ describe("the management retro", () => {
     expect(status.answered).toBe(1);
   });
 
+  it("keeps an answer written as a document, with its plain text beside it", async () => {
+    // Guided-inputs change 11b. The plain column is what the previous
+    // release reads during a rolling upgrade.
+    const answer = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "Mostly." }],
+        },
+        {
+          type: "bulletList",
+          content: [
+            {
+              type: "listItem",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [{ type: "text", text: "Two were leftovers." }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    await call(
+      "sessions.setManagementAnswer",
+      { sessionId, questionKey: 1, body: answer },
+      MANAGER,
+    );
+
+    const first = (await management(MANAGER)).questions[0];
+    expect(first?.bodyDocument).toEqual(answer);
+    expect(first?.body).toBe("Mostly.\n\nTwo were leftovers.");
+  });
+
+  it("keeps an answer's paragraphs, and refuses a blank one", async () => {
+    await call(
+      "sessions.setManagementAnswer",
+      {
+        sessionId,
+        questionKey: 2,
+        body: richTextFromPlainText("Yes.\n\nAfter the reset."),
+      },
+      MANAGER,
+    );
+    expect((await management(MANAGER)).questions[1]?.bodyDocument).toEqual(
+      richTextFromPlainText("Yes.\n\nAfter the reset."),
+    );
+
+    await expect(
+      call(
+        "sessions.setManagementAnswer",
+        {
+          sessionId,
+          questionKey: 3,
+          body: { type: "doc", content: [{ type: "paragraph" }] },
+        },
+        MANAGER,
+      ),
+    ).rejects.toThrow(/what leadership said/);
+  });
+
+  it("refuses an answer sent as plain text since 0.4", async () => {
+    // Guided-inputs change 13b: editor JSON only, as the 0.3.0 notes said.
+    await expect(
+      call(
+        "sessions.setManagementAnswer",
+        { sessionId, questionKey: 1, body: "Plain text." },
+        MANAGER,
+      ),
+    ).rejects.toThrow();
+  });
+
   it("refuses a question outside the four", async () => {
     await expect(
       call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 5, body: "There is no fifth question." },
+        {
+          sessionId,
+          questionKey: 5,
+          body: richTextFromPlainText("There is no fifth question."),
+        },
         MANAGER,
       ),
     ).rejects.toThrow();
@@ -402,7 +485,11 @@ describe("the management retro", () => {
     for (const questionKey of [1, 2, 3]) {
       await call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey, body: `Answer ${questionKey}.` },
+        {
+          sessionId,
+          questionKey,
+          body: richTextFromPlainText(`Answer ${questionKey}.`),
+        },
         MANAGER,
       );
     }
@@ -410,7 +497,7 @@ describe("the management retro", () => {
 
     await call(
       "sessions.setManagementAnswer",
-      { sessionId, questionKey: 4, body: "Answer 4." },
+      { sessionId, questionKey: 4, body: richTextFromPlainText("Answer 4.") },
       MANAGER,
     );
     expect((await management(MANAGER)).complete).toBe(true);
@@ -436,7 +523,11 @@ describe("the two retros are visible to different audiences", () => {
     await expect(
       call(
         "sessions.setManagementAnswer",
-        { sessionId, questionKey: 1, body: "Not mine to answer." },
+        {
+          sessionId,
+          questionKey: 1,
+          body: richTextFromPlainText("Not mine to answer."),
+        },
         MEMBER,
       ),
     ).rejects.toThrow();

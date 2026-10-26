@@ -1,4 +1,22 @@
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  CYCLE_NOTE_MAX_CHARACTERS,
+  REVALIDATION_NOTE_MAX_CHARACTERS,
+} from "@openokr/core";
+import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  DateInput,
+  EntityPicker,
+  RichTextField,
+  RichTextView,
+  SelectInput,
+} from "@openokr/ui";
+import { type MemberLike, memberOption } from "../../lib/entity-options.ts";
+import { searchPeople } from "../../lib/member-search.ts";
+import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import {
@@ -19,12 +37,6 @@ import {
  * override. One card per missing piece, beside the phase that reads it.
  */
 
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink";
-const LABEL = "flex flex-col gap-1 text-xs text-ink-3";
-
-type Person = { readonly id: string; readonly name: string };
-
 const SESSIONS = [
   { key: "diagnose", label: "cycle.setup.session.diagnose" },
   { key: "set-direction", label: "cycle.setup.session.setDirection" },
@@ -42,7 +54,7 @@ export async function CycleSetup({
   sessionDates,
 }: {
   readonly cycleId: string;
-  readonly people: readonly Person[];
+  readonly people: readonly MemberLike[];
   readonly sponsorId: string | null;
   readonly facilitatorId: string | null;
   readonly firstCycle: boolean;
@@ -52,17 +64,14 @@ export async function CycleSetup({
   const dateOf = (key: string) =>
     sessionDates.find((entry) => entry.key === key)?.on ?? "";
   const picker = (name: string, label: string, value: string | null) => (
-    <label className={LABEL}>
-      {label}
-      <select name={name} defaultValue={value ?? ""} className={FIELD}>
-        <option value="">{t("cycle.setup.nobody")}</option>
-        {people.map((person) => (
-          <option key={person.id} value={person.id}>
-            {person.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <EntityPicker
+      label={label}
+      name={name}
+      defaultValue={value}
+      options={people.map((person) => memberOption(person, t("common.agent")))}
+      noneLabel={t("cycle.setup.nobody")}
+      search={searchPeople}
+    />
   );
 
   return (
@@ -88,15 +97,13 @@ export async function CycleSetup({
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {SESSIONS.map((session) => (
-              <label key={session.key} className={LABEL}>
-                {t(session.label)}
-                <input
-                  type="date"
-                  name={`session-${session.key}`}
-                  defaultValue={dateOf(session.key)}
-                  className={FIELD}
-                />
-              </label>
+              <DateInput
+                key={session.key}
+                label={t(session.label)}
+                name={`session-${session.key}`}
+                defaultValue={dateOf(session.key) || null}
+                inputClassName="h-auto py-1.5 text-xs"
+              />
             ))}
           </div>
           <label className="flex items-center gap-2 text-sm text-ink-2">
@@ -123,10 +130,11 @@ export async function BaselineHealth({
   canEdit,
 }: {
   readonly cycleId: string;
+  /** The three columns as stored, editor JSON or null. */
   readonly saved: {
-    readonly stable: string | null;
-    readonly declining: string | null;
-    readonly businessAsUsual: string | null;
+    readonly stable: unknown;
+    readonly declining: unknown;
+    readonly businessAsUsual: unknown;
   } | null;
   readonly canEdit: boolean;
 }) {
@@ -159,16 +167,16 @@ export async function BaselineHealth({
             <input type="hidden" name="cycleId" value={cycleId} />
             <div className="grid gap-2 md:grid-cols-3">
               {columns.map((column) => (
-                <label key={column.name} className={LABEL}>
-                  {column.label}
-                  <textarea
-                    name={column.name}
-                    rows={4}
-                    maxLength={4000}
-                    defaultValue={saved?.[column.name] ?? ""}
-                    className={FIELD}
-                  />
-                </label>
+                // The compact editor (guided-inputs §4.7), each column sent
+                // as it stands, so a column nobody touched is kept.
+                <RichTextField
+                  key={column.name}
+                  label={column.label}
+                  name={column.name}
+                  content={saved?.[column.name] ?? null}
+                  maxCharacters={CYCLE_NOTE_MAX_CHARACTERS}
+                  sendUnchanged
+                />
               ))}
             </div>
             <Button type="submit" className="self-start">
@@ -177,14 +185,23 @@ export async function BaselineHealth({
           </ActionForm>
         ) : (
           <dl className="grid gap-2 text-sm md:grid-cols-3">
-            {columns.map((column) => (
-              <div key={column.name} className="flex flex-col gap-0.5">
-                <dt className="text-xs font-bold text-ink-3">{column.label}</dt>
-                <dd className="whitespace-pre-line text-ink-2">
-                  {saved?.[column.name] ?? t("cycle.baseline.notRecorded")}
-                </dd>
-              </div>
-            ))}
+            {columns.map((column) => {
+              const html = richTextHtml(saved?.[column.name]);
+              return (
+                <div key={column.name} className="flex flex-col gap-0.5">
+                  <dt className="text-xs font-bold text-ink-3">
+                    {column.label}
+                  </dt>
+                  <dd className="text-ink-2">
+                    {html === null ? (
+                      t("cycle.baseline.notRecorded")
+                    ) : (
+                      <RichTextView html={html} />
+                    )}
+                  </dd>
+                </div>
+              );
+            })}
           </dl>
         )}
       </CardBody>
@@ -203,8 +220,9 @@ export async function Revalidation({
   readonly saved: {
     readonly holds: boolean;
     readonly changed: boolean;
-    readonly changeNote: string | null;
-    readonly focusNote: string | null;
+    /** Editor JSON, or null for none. */
+    readonly changeNote: unknown;
+    readonly focusNote: unknown;
   } | null;
   readonly focus: {
     readonly chosen: readonly string[];
@@ -231,56 +249,84 @@ export async function Revalidation({
           </div>
         </CardHeader>
         <CardBody>
-          <ActionForm
-            action={saveRevalidation}
-            className="flex flex-col gap-2.5"
-          >
-            <input type="hidden" name="cycleId" value={cycleId} />
-            <label className={LABEL}>
-              {t("cycle.revalidation.verdict")}
-              <select
+          {canEdit ? (
+            <ActionForm
+              action={saveRevalidation}
+              className="flex flex-col gap-2.5"
+            >
+              <input type="hidden" name="cycleId" value={cycleId} />
+              <SelectInput
+                label={t("cycle.revalidation.verdict")}
                 name="verdict"
-                disabled={!canEdit}
                 defaultValue={saved?.changed ? "changed" : "holds"}
-                className={FIELD}
               >
                 <option value="holds">{t("cycle.revalidation.holds")}</option>
                 <option value="changed">
                   {t("cycle.revalidation.changed")}
                 </option>
-              </select>
-            </label>
-            <label className={LABEL}>
-              {t("cycle.revalidation.changeNote")}
-              <textarea
+              </SelectInput>
+              {/* The compact editor since guided-inputs change 12, each note
+                  sent as it stands, so a note nobody touched is kept. */}
+              <RichTextField
+                label={t("cycle.revalidation.changeNote")}
                 name="changeNote"
-                rows={2}
-                maxLength={2000}
-                disabled={!canEdit}
-                defaultValue={saved?.changeNote ?? ""}
-                className={FIELD}
+                content={saved?.changeNote ?? null}
+                maxCharacters={REVALIDATION_NOTE_MAX_CHARACTERS}
+                sendUnchanged
               />
-            </label>
-            <label className={LABEL}>
-              {t("cycle.revalidation.focusNote")}
-              <textarea
+              <RichTextField
+                label={t("cycle.revalidation.focusNote")}
+                description={t("cycle.revalidation.focusNoteHint")}
                 name="focusNote"
-                rows={2}
-                maxLength={2000}
-                disabled={!canEdit}
-                defaultValue={saved?.focusNote ?? ""}
-                className={FIELD}
+                content={saved?.focusNote ?? null}
+                maxCharacters={REVALIDATION_NOTE_MAX_CHARACTERS}
+                sendUnchanged
               />
-              <span className="text-ink-4">
-                {t("cycle.revalidation.focusNoteHint")}
-              </span>
-            </label>
-            {canEdit ? (
               <Button type="submit" className="self-start">
                 {t("common.save")}
               </Button>
-            ) : null}
-          </ActionForm>
+            </ActionForm>
+          ) : (
+            // Read, not a form somebody cannot submit, as the baseline card
+            // does: an editor has no disabled state worth drawing.
+            <dl className="flex flex-col gap-2 text-sm">
+              {[
+                {
+                  key: "verdict",
+                  label: t("cycle.revalidation.verdict"),
+                  html: null,
+                  text: saved
+                    ? saved.changed
+                      ? t("cycle.revalidation.changed")
+                      : t("cycle.revalidation.holds")
+                    : null,
+                },
+                {
+                  key: "changeNote",
+                  label: t("cycle.revalidation.changeNote"),
+                  html: richTextHtml(saved?.changeNote),
+                  text: null,
+                },
+                {
+                  key: "focusNote",
+                  label: t("cycle.revalidation.focusNote"),
+                  html: richTextHtml(saved?.focusNote),
+                  text: null,
+                },
+              ].map((row) => (
+                <div key={row.key} className="flex flex-col gap-0.5">
+                  <dt className="text-xs font-bold text-ink-3">{row.label}</dt>
+                  <dd className="text-ink-2">
+                    {row.html !== null ? (
+                      <RichTextView html={row.html} />
+                    ) : (
+                      (row.text ?? t("cycle.baseline.notRecorded"))
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
         </CardBody>
       </Card>
 
@@ -347,10 +393,12 @@ export async function CapacityCuts({
   canEdit,
 }: {
   readonly cycleId: string;
-  readonly saved: string | null;
+  /** What was cut, as stored: editor JSON or null. */
+  readonly saved: unknown;
   readonly canEdit: boolean;
 }) {
   const { t } = await getTranslations();
+  const savedHtml = richTextHtml(saved);
   return (
     <Card>
       <CardHeader className="justify-between">
@@ -360,33 +408,32 @@ export async function CapacityCuts({
           </h2>
           <p className="text-xs text-ink-3">{t("cycle.cuts.hint")}</p>
         </div>
-        <Chip tone={saved ? "ok" : "warn"}>
-          {saved ? t("cycle.cuts.recorded") : t("cycle.cuts.missing")}
+        <Chip tone={savedHtml === null ? "warn" : "ok"}>
+          {savedHtml === null
+            ? t("cycle.cuts.missing")
+            : t("cycle.cuts.recorded")}
         </Chip>
       </CardHeader>
       <CardBody>
         {canEdit ? (
           <ActionForm action={saveCapacityCuts} className="flex flex-col gap-2">
             <input type="hidden" name="cycleId" value={cycleId} />
-            <label className={LABEL}>
-              {t("cycle.cuts.label")}
-              <textarea
-                name="cuts"
-                rows={3}
-                maxLength={4000}
-                defaultValue={saved ?? ""}
-                placeholder={t("cycle.cuts.placeholder")}
-                className={FIELD}
-              />
-            </label>
+            <RichTextField
+              label={t("cycle.cuts.label")}
+              name="cuts"
+              content={saved ?? null}
+              placeholder={t("cycle.cuts.placeholder")}
+              maxCharacters={CYCLE_NOTE_MAX_CHARACTERS}
+              sendUnchanged
+            />
             <Button type="submit" className="self-start">
               {t("common.save")}
             </Button>
           </ActionForm>
+        ) : savedHtml === null ? (
+          <p className="text-sm text-ink-2">{t("cycle.cuts.missing")}</p>
         ) : (
-          <p className="whitespace-pre-line text-sm text-ink-2">
-            {saved ?? t("cycle.cuts.missing")}
-          </p>
+          <RichTextView html={savedHtml} className="text-sm text-ink-2" />
         )}
       </CardBody>
     </Card>

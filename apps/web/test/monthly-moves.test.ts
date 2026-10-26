@@ -31,10 +31,12 @@ describe("the monthly review's moves", () => {
 
   test("choose no objective for the room", () => {
     // A stop closes an objective. The first in the list is not one anybody
-    // chose, so the select starts empty and the button stays off until both
-    // an objective and a reason are given.
+    // chose, so the picker starts on nothing, saying so, and the button stays
+    // off until both an objective and a reason are given.
     expect(panel).toContain('useState("")');
-    expect(panel).toContain('<option value="">');
+    expect(panel).toMatch(
+      /placeholder=\{t\(\s*"session\.detail\.monthlyReview\.chooseAnObjective"/,
+    );
     expect(panel).toContain('stopGoalId === ""');
     expect(panel).toContain("stopReason.trim().length === 0");
   });

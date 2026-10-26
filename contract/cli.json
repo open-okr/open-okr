@@ -425,6 +425,24 @@
           "field": "includeSuspended",
           "type": "boolean",
           "required": false
+        },
+        {
+          "name": "search",
+          "field": "search",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "limit",
+          "field": "limit",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false
@@ -571,6 +589,12 @@
           "field": "token",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "timezone",
+          "field": "timezone",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -582,7 +606,14 @@
       "path": "/invitations/joinByTrustedDomain",
       "scope": "write",
       "summary": "Join a workspace because it trusts the domain of your confirmed email address.",
-      "flags": [],
+      "flags": [
+        {
+          "name": "timezone",
+          "field": "timezone",
+          "type": "string",
+          "required": false
+        }
+      ],
       "pages": false
     },
     {
@@ -2074,6 +2105,16 @@
         }
       ],
       "pages": true
+    },
+    {
+      "name": "audit names",
+      "action": "audit.names",
+      "method": "GET",
+      "path": "/audit/names",
+      "scope": "read",
+      "summary": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+      "flags": [],
+      "pages": false
     },
     {
       "name": "settings readWorkspaceSettings",
@@ -5170,6 +5211,12 @@
           "name": "limit",
           "field": "limit",
           "type": "integer",
+          "required": false
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
           "required": false
         }
       ],
@@ -10635,23 +10682,6 @@
       "pages": false
     },
     {
-      "name": "sessions proposeFromLearnings",
-      "action": "sessions.proposeFromLearnings",
-      "method": "GET",
-      "path": "/sessions/proposeFromLearnings",
-      "scope": "read",
-      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-      "flags": [
-        {
-          "name": "session-id",
-          "field": "sessionId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "pages": false
-    },
-    {
       "name": "goals draftRetrospective",
       "action": "goals.draftRetrospective",
       "method": "GET",
@@ -10758,35 +10788,6 @@
           "field": "retroNoteId",
           "type": "string",
           "required": false
-        }
-      ],
-      "pages": false
-    },
-    {
-      "name": "sessions draftNextCycle",
-      "action": "sessions.draftNextCycle",
-      "method": "POST",
-      "path": "/sessions/draftNextCycle",
-      "scope": "write",
-      "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
-      "flags": [
-        {
-          "name": "session-id",
-          "field": "sessionId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "title",
-          "field": "title",
-          "type": "string",
-          "required": true
-        },
-        {
-          "name": "why",
-          "field": "why",
-          "type": "string",
-          "required": true
         }
       ],
       "pages": false

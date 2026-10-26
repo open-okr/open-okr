@@ -21,6 +21,8 @@ import { enqueueOutbox, type WorkspaceTx } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { generateStorageKey } from "../blobs/provisioning.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { INDEX_TOPIC } from "../search/subjects.ts";
 import type { ReadArchiveResult } from "./archive.ts";
 import { EXPORTED_TABLES, isDeferred } from "./policy.ts";
@@ -54,6 +56,18 @@ export interface ImportDifference {
   readonly merged: readonly MergedMember[];
   readonly skipped: Record<string, number>;
   readonly blobs: number;
+  /**
+   * Columns an archive from an earlier release carries that this release no
+   * longer has, by table. Left out of each row rather than failing it
+   * (docs/design/guided-inputs.md §4.7, change 13).
+   */
+  readonly leftOut: Record<string, string[]>;
+  /**
+   * Agent proposals the import leaves behind on purpose: the run that made
+   * each one does not travel. The Coach and the Champion propose again on
+   * their next run, against the moved rows (docs/design/ids-across-a-move.md).
+   */
+  readonly proposalsLeftBehind: number;
 }
 
 // ── UUID detection ────────────────────────────────────────────────────────
@@ -69,9 +83,11 @@ function isUuid(value: unknown): value is string {
 
 /**
  * Columns that hold rich text and need uuid rewriting. Identified by
- * having a companion `*_version` column in the schema.
+ * having a companion `*_version` column in the schema, which
+ * `portability-policy.test.ts` checks against the database, so a rich text
+ * column added to an exported table without a line here fails the build.
  */
-const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
+export const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "workspace_members.bio",
   "goals.description",
   "comments.body",
@@ -80,10 +96,142 @@ const RICH_TEXT_COLUMNS: ReadonlySet<string> = new Set([
   "tasks.description",
   "initiatives.description",
   "kpis.description",
-  "kpi_categories.description",
+  "kpi_trees.description",
   "review_narratives.body",
   "goal_retrospectives.body",
+  "check_ins.narrative",
+  // The cycle's planning prose: the annual frame and phases 2 and 5.
+  "annual_frames.mission",
+  "annual_frames.vision",
+  "annual_frames.strategy",
+  "annual_frames.open_issues",
+  "annual_frames.not_doing",
+  "cycle_baseline_health.stable",
+  "cycle_baseline_health.declining",
+  "cycle_baseline_health.business_as_usual",
+  "cycle_capacity_notes.cuts",
+  // Guided inputs change 11a: the monthly review's prose as documents.
+  "okr_sessions.shifts_document",
+  "decisions.text_document",
+  // Change 11b: the quarterly review's prose.
+  "management_answers.body_document",
+  // Change 12: the quarterly revalidation's two notes.
+  "cycle_revalidations.change_note_document",
+  "cycle_revalidations.focus_note_document",
 ]);
+
+/**
+ * Columns that hold a map of rich text documents, one per key: the
+ * facilitator's private stage notes since guided-inputs change 11b, and what
+ * an agreed annual frame's revised fields held before. The walk above
+ * reaches a document's nodes, not the documents inside a map, and leaves a
+ * value that is not a document, such as the strategies list, as it is.
+ */
+export const RICH_TEXT_MAP_COLUMNS: ReadonlySet<string> = new Set([
+  "okr_sessions.notes",
+  "annual_frame_revisions.before",
+]);
+
+/**
+ * A one-dimensional Postgres array literal, `{"a","b"}`, for an array column.
+ * Every element is quoted, so a comma, a brace or the word NULL inside one
+ * stays text, and a null element is written as NULL.
+ */
+export function postgresArrayLiteral(values: readonly unknown[]): string {
+  const elements = values.map((value) =>
+    value === null || value === undefined
+      ? "NULL"
+      : `"${String(value).replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`,
+  );
+  return `{${elements.join(",")}}`;
+}
+
+/**
+ * Prose an earlier release stored as plain text, beside the document a later
+ * one writes (guided-inputs changes 11 and 12). An archive from 0.2 has the
+ * plain text alone, and one from 0.3 may have both; 0.4 has no plain column.
+ */
+const PLAIN_PROSE: readonly {
+  readonly table: string;
+  readonly plain: string;
+  readonly document: string;
+}[] = [
+  { table: "okr_sessions", plain: "shifts", document: "shifts_document" },
+  { table: "decisions", plain: "text", document: "text_document" },
+  { table: "management_answers", plain: "body", document: "body_document" },
+  { table: "digests", plain: "note", document: "note_document" },
+  {
+    table: "cycle_revalidations",
+    plain: "change_note",
+    document: "change_note_document",
+  },
+  {
+    table: "cycle_revalidations",
+    plain: "focus_note",
+    document: "focus_note_document",
+  },
+];
+
+/**
+ * A row from an archive as this release's table takes it.
+ *
+ * Plain prose with no document beside it becomes one, by the same rule the
+ * data changes used, so prose from an older archive is not lost when its
+ * plain column is gone; a stage note stored as a string does too. Then any
+ * column the table no longer has is left out and recorded, rather than
+ * failing the whole row's insert.
+ */
+function toTargetShape(
+  table: string,
+  row: Record<string, unknown>,
+  targetColumns: ReadonlySet<string>,
+  leftOut: Record<string, string[]>,
+): Record<string, unknown> {
+  const shaped = { ...row };
+  for (const prose of PLAIN_PROSE) {
+    if (prose.table !== table || !targetColumns.has(prose.document)) {
+      continue;
+    }
+    const plain = shaped[prose.plain];
+    const document = shaped[prose.document];
+    if (
+      (document === null || document === undefined) &&
+      typeof plain === "string" &&
+      plain.trim() !== ""
+    ) {
+      shaped[prose.document] = richTextFromPlainText(plain);
+      shaped[`${prose.document}_version`] = RICH_TEXT_SCHEMA_VERSION;
+    }
+  }
+  if (
+    table === "okr_sessions" &&
+    typeof shaped.notes === "object" &&
+    shaped.notes !== null
+  ) {
+    const notes: Record<string, unknown> = {};
+    for (const [stage, note] of Object.entries(
+      shaped.notes as Record<string, unknown>,
+    )) {
+      if (typeof note !== "string") {
+        notes[stage] = note;
+      } else if (note.trim() !== "") {
+        notes[stage] = richTextFromPlainText(note);
+      }
+    }
+    shaped.notes = notes;
+  }
+  for (const column of Object.keys(shaped)) {
+    if (!targetColumns.has(column)) {
+      delete shaped[column];
+      const list = leftOut[table] ?? [];
+      if (!list.includes(column)) {
+        list.push(column);
+        leftOut[table] = list;
+      }
+    }
+  }
+  return shaped;
+}
 
 function isRichTextColumn(table: string, column: string): boolean {
   return RICH_TEXT_COLUMNS.has(`${table}.${column}`);
@@ -126,6 +274,38 @@ function remapRichText(
     }
   }
   return result;
+}
+
+/**
+ * Every id of a moved row, rewritten wherever it sits inside a JSON value
+ * (docs/design/ids-across-a-move.md).
+ *
+ * A proposal's payload is the input of the action it proposes, an activity's
+ * payload names what it was about, and a check-in snapshot names its key
+ * results; each kept the source workspace's ids. A string that is a uuid the
+ * key map holds is that row, because two random uuids do not collide, so it
+ * is replaced; every other string, number and key is copied as it is. A uuid
+ * the archive does not carry is not in the key map and is left alone.
+ */
+function remapIdsInJson(
+  value: unknown,
+  keyMap: ReadonlyMap<string, string>,
+): unknown {
+  if (typeof value === "string") {
+    return isUuid(value) ? (keyMap.get(value) ?? value) : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => remapIdsInJson(item, keyMap));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        remapIdsInJson(item, keyMap),
+      ]),
+    );
+  }
+  return value;
 }
 
 // ── Key remap builder ─────────────────────────────────────────────────────
@@ -304,11 +484,30 @@ function remapRow(
 
     // Rewrite rich text columns
     if (isRichTextColumn(table, column) && value !== null) {
-      result[column] = remapRichText(value, keyMap);
+      // The walk below reaches an entity link's id too, which this does not.
+      result[column] = remapIdsInJson(remapRichText(value, keyMap), keyMap);
+      continue;
+    }
+    if (
+      RICH_TEXT_MAP_COLUMNS.has(`${table}.${column}`) &&
+      typeof value === "object" &&
+      value !== null
+    ) {
+      // A note still stored as text, from before the backfill, has no node
+      // to rewrite and passes through as it is.
+      result[column] = remapIdsInJson(
+        Object.fromEntries(
+          Object.entries(value as Record<string, unknown>).map(([key, doc]) => [
+            key,
+            remapRichText(doc, keyMap),
+          ]),
+        ),
+        keyMap,
+      );
       continue;
     }
 
-    result[column] = value;
+    result[column] = remapIdsInJson(value, keyMap);
   }
 
   return result;
@@ -352,6 +551,8 @@ export async function importWorkspace(
 
   const created: Record<string, number> = {};
   const skipped: Record<string, number> = {};
+  const leftOut: Record<string, string[]> = {};
+  let proposalsLeftBehind = 0;
   // Rows this run actually wrote, per indexed table, for the enqueue at the end.
   const written = new Map<string, string[]>();
   const deferredUpdates: {
@@ -375,11 +576,39 @@ export async function importWorkspace(
     const rows = rowsByTable.get(table);
     if (!rows || rows.length === 0) continue;
 
+    // The table's columns as this release has them, asked of the database
+    // rather than listed: an array column takes an array literal, and a
+    // column an older archive carries that this release dropped is left out.
+    const columnTypes = (
+      await tx.execute<{ column_name: string; data_type: string }>(
+        sql`select column_name, data_type from information_schema.columns
+             where table_schema = 'public' and table_name = ${table}`,
+      )
+    ).rows;
+    const targetColumns = new Set(columnTypes.map((row) => row.column_name));
+    const arrayColumns = new Set(
+      columnTypes
+        .filter((row) => row.data_type === "ARRAY")
+        .map((row) => row.column_name),
+    );
+
     let tableCreated = 0;
     let tableSkipped = 0;
 
     for (const raw of rows) {
-      const remapped = remapRow(table, raw, keyMap);
+      // An agent's proposal names its run, which the archive does not carry,
+      // and the origin check will not let the import empty it. Left behind
+      // and counted, rather than failing the insert and counting as skipped.
+      if (table === "proposed_changes" && raw.run_id) {
+        proposalsLeftBehind += 1;
+        continue;
+      }
+      const remapped = toTargetShape(
+        table,
+        remapRow(table, raw, keyMap),
+        targetColumns,
+        leftOut,
+      );
       const remappedId = String(remapped.id);
 
       // Collect deferred column values for the second pass
@@ -419,15 +648,21 @@ export async function importWorkspace(
         continue;
       }
 
-      // Serialise array/object values as JSON strings before interpolation.
-      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`
-      // instead of Postgres array literals, which breaks array columns
-      // like `session_dates` and `levels`. JSON strings let Postgres cast
-      // to the column's own type.
+      // Serialise array/object values as strings before interpolation.
+      // Drizzle's sql template tag treats JS arrays as SQL tuples `(a, b)`.
+      // A `jsonb` column, `session_dates` and `levels` among them, takes the
+      // value as JSON. A Postgres array column takes an array literal: sent
+      // as JSON it refused the insert, and the row was counted as skipped,
+      // which lost every revision of an agreed annual frame and a
+      // workspace's own AI models in a move.
       const columns = Object.keys(remapped);
-      const values = Object.values(remapped).map((v) =>
-        v !== null && typeof v === "object" ? JSON.stringify(v) : v,
-      );
+      const values = columns.map((column) => {
+        const v = remapped[column];
+        if (Array.isArray(v) && arrayColumns.has(column)) {
+          return postgresArrayLiteral(v);
+        }
+        return v !== null && typeof v === "object" ? JSON.stringify(v) : v;
+      });
 
       const columnList = columns
         .map((c) => sql.identifier(c))
@@ -545,5 +780,12 @@ export async function importWorkspace(
     );
   }
 
-  return { created, merged, skipped, blobs: blobCount };
+  return {
+    created,
+    merged,
+    skipped,
+    blobs: blobCount,
+    leftOut,
+    proposalsLeftBehind,
+  };
 }

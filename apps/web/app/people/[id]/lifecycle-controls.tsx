@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useActionState, useState } from "react";
@@ -144,14 +145,12 @@ function EraseControl({
           className="flex flex-col gap-2"
         >
           <input type="hidden" name="memberId" value={memberId} />
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
-            {t("common.typeToConfirm", { memberName })}
-            <input
-              name="confirmName"
-              autoComplete="off"
-              className="w-72 rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink"
-            />
-          </label>
+          <TextInput
+            label={t("common.typeToConfirm", { memberName })}
+            name="confirmName"
+            autoComplete="off"
+            className="w-72"
+          />
           <div className="flex items-center gap-2">
             <Button
               type="submit"

@@ -3,6 +3,7 @@ import {
   endSupportSession,
   grantSupportSession,
 } from "@openokr/core";
+import { SelectInput } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
@@ -87,11 +88,8 @@ export async function GrantDecision({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="level">
-            {t("admin.support.grant.theyMay")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("admin.support.grant.theyMay")}
             defaultValue={String(ACCESS_LEVELS.view)}
             id="level"
             name="level"
@@ -105,18 +103,15 @@ export async function GrantDecision({
             <option value={ACCESS_LEVELS.edit}>
               {t("admin.support.grant.readAndChange")}
             </option>
-          </select>
+          </SelectInput>
           {/* Said here so nobody goes looking for the option. */}
           <p className="text-ink-3 text-xs">
             {t("admin.support.grant.neverAccessControl")}
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="hours">
-            {t("admin.support.grant.for")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("admin.support.grant.for")}
             defaultValue="4"
             id="hours"
             name="hours"
@@ -127,7 +122,7 @@ export async function GrantDecision({
             <option value="24">
               {t("admin.support.grant.twentyFourHours")}
             </option>
-          </select>
+          </SelectInput>
           <p className="text-ink-3 text-xs">
             {t("admin.support.grant.endsOnItsOwn")}
           </p>

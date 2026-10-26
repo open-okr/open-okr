@@ -18,6 +18,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -338,15 +339,15 @@ test("U5: a team objective dragged onto another company objective moves at once,
 
 test("U9's moving half: Move under… with the keyboard, back to the key result it hung from", async () => {
   const move = card(teamId).getByRole("button", {
-    name: `Move ${TEAM} under another objective or key result`,
+    name: `Move under another objective or key result: ${TEAM}`,
   });
   await move.focus();
   await page.keyboard.press("Enter");
   const choice = card(teamId).getByRole("combobox", {
-    name: `Move ${TEAM} under another objective or key result`,
+    name: `Move under another objective or key result: ${TEAM}`,
   });
   await expect(choice).toBeFocused();
-  await choice.selectOption({ label: OTHER });
+  await choose(choice, OTHER);
   await expect(teamLine()).toHaveAttribute(
     "aria-label",
     `${TEAM} aligns to ${OTHER}`,
@@ -355,15 +356,16 @@ test("U9's moving half: Move under… with the keyboard, back to the key result 
 
   await card(teamId)
     .getByRole("button", {
-      name: `Move ${TEAM} under another objective or key result`,
+      name: `Move under another objective or key result: ${TEAM}`,
     })
     .focus();
   await page.keyboard.press("Enter");
-  await card(teamId)
-    .getByRole("combobox", {
-      name: `Move ${TEAM} under another objective or key result`,
-    })
-    .selectOption({ label: `${KEY_RESULT}, a key result of ${RENAMED}` });
+  await choose(
+    card(teamId).getByRole("combobox", {
+      name: `Move under another objective or key result: ${TEAM}`,
+    }),
+    `${KEY_RESULT}, a key result of ${RENAMED}`,
+  );
   await expect(teamLine()).toHaveAttribute(
     "aria-label",
     `${TEAM} aligns to ${RENAMED}`,

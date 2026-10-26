@@ -2,7 +2,7 @@
 
 import type { GoalLevel } from "@openokr/db";
 import type { OkrKind } from "@openokr/method";
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, SelectInput, TextInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
@@ -117,23 +117,26 @@ export function NewObjectiveButton({
     <div className="flex min-w-0 flex-col gap-1">
       <div className="flex min-w-0 items-center gap-2">
         {kinds.length > 1 ? (
-          <select
-            aria-label={t("okrKind.label")}
+          <SelectInput
+            label={t("okrKind.label")}
+            hideLabel
             value={kind}
             disabled={pending}
             onChange={(event) => setKind(event.target.value as OkrKind)}
-            className="h-7.5 rounded-control border border-line bg-surface px-1.5 text-xs text-ink outline-none focus:border-brand"
+            inputClassName="w-auto px-1.5 text-xs"
           >
             <option value="aspirational">{t("okrKind.aspirational")}</option>
             <option value="committed">{t("okrKind.committed")}</option>
-          </select>
+          </SelectInput>
         ) : null}
-        <input
+        <TextInput
           // Focused through a ref rather than `autoFocus`, which also steals
           // focus when a page loads with one of these already open.
           ref={focusOnMount}
           value={title}
-          aria-label={t("goals.editor.newObjective")}
+          label={t("goals.editor.newObjective")}
+          hideLabel
+          maxLength={500}
           placeholder={t("goals.editor.objectivePlaceholder")}
           disabled={pending}
           onChange={(event) => setTitle(event.target.value)}
@@ -146,7 +149,8 @@ export function NewObjectiveButton({
               setOpen(false);
             }
           }}
-          className="h-7.5 w-64 min-w-0 rounded-control border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-brand"
+          className="w-64 min-w-0"
+          inputClassName="px-2 text-xs"
         />
         <Button
           type="button"
@@ -168,17 +172,20 @@ export function NewObjectiveButton({
         </Button>
       </div>
       {askReason ? (
-        <input
+        <TextInput
           value={reason}
-          aria-label={
+          label={
             askReason === "required"
               ? t("midCycle.whyNowRequired")
               : t("midCycle.whyNowOptional")
           }
+          hideLabel
+          maxLength={500}
           placeholder={t("midCycle.whyNowPlaceholder")}
           disabled={pending}
           onChange={(event) => setReason(event.target.value)}
-          className="h-7.5 w-full min-w-0 rounded-control border border-line bg-surface px-2 text-xs text-ink outline-none focus:border-brand"
+          className="w-full min-w-0"
+          inputClassName="px-2 text-xs"
         />
       ) : null}
       {problem ? (

@@ -394,6 +394,66 @@ describe("browsing the trail", () => {
     expect(Object.keys(page.rows[0] ?? {})).not.toContain("payload");
   });
 
+  it("offers the names the trail holds, each once and in order", async () => {
+    // guided-inputs §4.11: the filter was two free-text boxes against names
+    // nobody could know.
+    await write("one");
+    await write("two");
+
+    const names = await callAction(await asAdmin(), "audit.names", {});
+
+    expect(names.actions.filter((name) => name === "test.note")).toHaveLength(
+      1,
+    );
+    expect(names.targetTypes).toContain("workspace");
+    expect(names.actions).toEqual([...names.actions].sort());
+    expect(names.targetTypes).toEqual([...names.targetTypes].sort());
+    // A read writes no row, so the registry's reads are not offered.
+    expect(names.actions).not.toContain("audit.list");
+  });
+
+  it("offers no name from another workspace's trail", async () => {
+    const wb = await workerDb();
+    const stranger = newId();
+    await wb.appPool.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [stranger, "Stranger", `${stranger.slice(0, 13)}@example.com`],
+    );
+    const elsewhere = await provisionWorkspaceForUser(wb.appPool, {
+      id: stranger,
+      name: `Elsewhere ${stranger.slice(0, 8)}`,
+    });
+    await runOperation(
+      { pool: wb.appPool },
+      {
+        action: "elsewhere.only",
+        workspaceId: elsewhere.workspaceId,
+        actor: { kind: "human", userId: stranger },
+        async execute() {
+          return {
+            result: undefined,
+            activity: {
+              kind: "workspace.branding_updated" as const,
+              subjectType: "workspace" as const,
+              subjectId: elsewhere.workspaceId,
+              payload: {},
+            },
+            audit: {
+              action: "elsewhere.only",
+              targetType: "elsewhere_thing",
+              targetId: elsewhere.workspaceId,
+            },
+          };
+        },
+      },
+    );
+
+    const names = await callAction(await asAdmin(), "audit.names", {});
+
+    expect(names.actions).not.toContain("elsewhere.only");
+    expect(names.targetTypes).not.toContain("elsewhere_thing");
+  });
+
   it("is refused to a member below full, the way every admin read is", async () => {
     const wb = await workerDb();
     const plain = newId();

@@ -250,6 +250,130 @@ describe("a single-use personal link", () => {
   });
 });
 
+/**
+ * A joining member's own timezone, from the browser they joined in
+ * (TECHNICAL-PLAN §4.14, docs/design/browser-timezone.md). The web layer reads
+ * `openokr_tz` and passes it; the action checks it like any other timezone
+ * write. Absent, the member has none and reads the workspace's.
+ */
+describe("a joining member's timezone", () => {
+  async function zoneOf(userId: string) {
+    const wb = await workerDb();
+    const rows = await wb.admin.query(
+      "select timezone from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, userId],
+    );
+    return rows.rows[0]?.timezone as string | null | undefined;
+  }
+  async function workspaceZone() {
+    const wb = await workerDb();
+    const rows = await wb.admin.query(
+      "select settings ->> 'timezone' as zone from workspaces where id = $1",
+      [workspaceId],
+    );
+    return rows.rows[0]?.zone as string | undefined;
+  }
+  async function link() {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      {},
+    );
+  }
+
+  it("takes the browser's zone through a link, and leaves the workspace's alone", async () => {
+    const wb = await workerDb();
+    const { token } = await link();
+    await createUser("berlin", "berlin@example.com", "Berlin");
+    await callAction(
+      { pool: wb.appPool, ...actingAs("berlin") },
+      "invitations.acceptLink",
+      { token, timezone: "Europe/Berlin" },
+    );
+    expect(await zoneOf("berlin")).toBe("Europe/Berlin");
+    expect(await workspaceZone()).toBe("UTC");
+  });
+
+  it("has none of its own without one, and so reads the workspace's", async () => {
+    const wb = await workerDb();
+    const { token } = await link();
+    await createUser("plain", "plain@example.com", "Plain");
+    await callAction(
+      { pool: wb.appPool, ...actingAs("plain") },
+      "invitations.acceptLink",
+      { token },
+    );
+    expect(await zoneOf("plain")).toBeNull();
+  });
+
+  it("refuses a zone off the list, and writes nothing", async () => {
+    const wb = await workerDb();
+    const { token } = await link();
+    await createUser("mars", "mars@example.com", "Mars");
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...actingAs("mars") },
+        "invitations.acceptLink",
+        { token, timezone: "Mars/Olympus_Mons" },
+      ),
+    ).rejects.toThrow();
+    expect(await memberRow("mars")).toBeUndefined();
+  });
+
+  it("takes it when joining by a trusted domain too", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `update workspaces set settings = settings || '{"trustedEmailDomains": ["trusted.example"]}'::jsonb where id = $1`,
+      [workspaceId],
+    );
+    await createUser("tokyo", "tokyo@trusted.example", "Tokyo");
+    await wb.admin.query(
+      "update users set email_verified = true where id = $1",
+      ["tokyo"],
+    );
+    await callAction(
+      { pool: wb.appPool, ...actingAs("tokyo") },
+      "invitations.joinByTrustedDomain",
+      { timezone: "Asia/Tokyo" },
+    );
+    expect(await zoneOf("tokyo")).toBe("Asia/Tokyo");
+  });
+
+  it("gives a waiting imported member the zone it lacks, and keeps one it has", async () => {
+    const wb = await workerDb();
+    const owner = { pool: wb.appPool, ...ownerContext() };
+    await callAction(owner, "people.importMember", {
+      name: "Waiting Without",
+      email: "without@example.com",
+      legacy: { type: "csv", id: "without" },
+    });
+    await callAction(owner, "people.importMember", {
+      name: "Waiting With",
+      email: "with@example.com",
+      timezone: "America/New_York",
+      legacy: { type: "csv", id: "with" },
+    });
+    const { token } = await link();
+
+    await createUser("without", "without@example.com", "Waiting Without");
+    await callAction(
+      { pool: wb.appPool, ...actingAs("without") },
+      "invitations.acceptLink",
+      { token, timezone: "Asia/Kuala_Lumpur" },
+    );
+    await createUser("with", "with@example.com", "Waiting With");
+    await callAction(
+      { pool: wb.appPool, ...actingAs("with") },
+      "invitations.acceptLink",
+      { token, timezone: "Asia/Kuala_Lumpur" },
+    );
+
+    expect(await zoneOf("without")).toBe("Asia/Kuala_Lumpur");
+    expect(await zoneOf("with")).toBe("America/New_York");
+  });
+});
+
 describe("trusted-domain automatic joining", () => {
   it("joins without a link when the email domain is trusted", async () => {
     const wb = await workerDb();
@@ -444,5 +568,38 @@ describe("listing invitations", () => {
       {},
     );
     expect(link?.allowedDomains).toEqual(["example.com"]);
+  });
+
+  it("refuses an allowed domain that is not a domain, as a trusted domain is", async () => {
+    // guided-inputs §4.11: one domain rule. This took any word, so a link
+    // bounded by "@example.com" or "example" let nobody in.
+    const wb = await workerDb();
+    for (const entry of ["@example.com", "example", "https://example.com"]) {
+      await expect(
+        callAction(
+          { pool: wb.appPool, ...ownerContext() },
+          "invitations.createWorkspaceLink",
+          { allowedDomains: [entry] },
+        ),
+      ).rejects.toThrow("An allowed domain is written like example.com");
+    }
+  });
+
+  it("opens a link for a year at most", async () => {
+    // guided-inputs §6: no limit on either side, so a link could stay open
+    // for as long as somebody typed.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...ownerContext() },
+      "invitations.createWorkspaceLink",
+      { expiresInDays: 365 },
+    );
+    await expect(
+      callAction(
+        { pool: wb.appPool, ...ownerContext() },
+        "invitations.createWorkspaceLink",
+        { expiresInDays: 366 },
+      ),
+    ).rejects.toThrow();
   });
 });

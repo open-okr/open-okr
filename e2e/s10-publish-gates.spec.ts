@@ -25,6 +25,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { choose } from "./pickers.ts";
 
 const REASON =
   "The board approved this set on Tuesday; the dependency owners confirm next week.";
@@ -111,7 +112,7 @@ test("a set with red gates is published past them, and the trail says why", asyn
   // An override is its own action in the trail, so "has anybody published past
   // a red gate" is a filter rather than a search through payloads.
   await goTo(page, "/admin/audit");
-  await page.getByLabel("Action").fill("workflow.override");
+  await choose(page.getByLabel("Action", { exact: true }), "workflow.override");
   await page.getByRole("button", { name: "Show matching rows" }).click();
   const rows = page.getByTestId("audit-row");
   await expect(rows.first()).toContainText("workflow.override", {

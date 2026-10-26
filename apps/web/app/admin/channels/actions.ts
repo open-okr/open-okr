@@ -52,11 +52,18 @@ export async function connectProvider(
   const botToken = String(form.get("botToken") ?? "").trim();
   const signingSecret = String(form.get("signingSecret") ?? "").trim();
   const teamId = String(form.get("teamId") ?? "").trim();
+  // WhatsApp's alone, in a box of its own since guided-inputs 9c.
+  const verifyToken = String(form.get("verifyToken") ?? "").trim();
 
-  if (!botToken || !signingSecret || !teamId) {
+  if (
+    !botToken ||
+    !signingSecret ||
+    !teamId ||
+    (provider === "whatsapp" && !verifyToken)
+  ) {
     return {
       ok: false,
-      message: t("admin.channels.actions.allThreeAreNeeded"),
+      message: t("admin.channels.actions.everyFieldIsNeeded"),
     };
   }
 
@@ -72,16 +79,9 @@ export async function connectProvider(
         provider === "telegram"
           ? { botToken, webhookSecret: signingSecret }
           : provider === "whatsapp"
-            ? // Three credentials, and one form with two secret boxes. The
-              // second holds the app secret and the verify token, in that
-              // order, because they are set together and a third box for a
-              // value only this provider has would be a box every other
-              // provider's card had to explain away.
-              (() => {
-                const [appSecret = "", verifyToken = ""] =
-                  signingSecret.split(/\s+/);
-                return { accessToken: botToken, appSecret, verifyToken };
-              })()
+            ? // Three credentials, each in its own box: the card is drawn per
+              // provider, so a box only WhatsApp has is WhatsApp's to explain.
+              { accessToken: botToken, appSecret: signingSecret, verifyToken }
             : provider === "teams"
               ? // Teams calls them an application id and a client secret, and the
                 // first is also the audience its inbound tokens are issued for.

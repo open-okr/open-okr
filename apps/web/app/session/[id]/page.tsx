@@ -20,12 +20,7 @@
  * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
-import {
-  ACCESS_LEVELS,
-  callAction,
-  excerptRichText,
-  OperationError,
-} from "@openokr/core";
+import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -44,6 +39,8 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
+import { confidenceDisplay } from "../../../lib/confidence-display.ts";
+import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -402,8 +399,10 @@ export default async function SessionPage({ params }: SessionPageProps) {
   interface WeeklyDigestRead {
     weekStart: string;
     lines: string[];
-    /** What the coordinator added for leadership (P6-G19b). */
+    /** What the coordinator added for leadership (P6-G19b), as one line. */
     note: string | null;
+    /** The same note as editor JSON, which the form edits (change 11c). */
+    noteDocument: unknown;
     /** Where it has been posted, and where it could be now (M-23). */
     postedTo: string[];
     postableTo: string[];
@@ -458,13 +457,16 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // room will be looking at before they open it.
   interface MonthlyRecord {
     shifts: string | null;
+    shiftsDocument: unknown;
     trends: MonthlyTrend[];
     untrended: MonthlyUntrended[];
     additions: MonthlyAddition[];
     stops: MonthlyStop[];
     updates: MonthlyUpdate[];
     dependencies: MonthlyDependency[];
-    decisions: MonthlyDecision[];
+    decisions: (Omit<MonthlyDecision, "textHtml"> & {
+      readonly textDocument: unknown;
+    })[];
   }
   let monthly: MonthlyRecord | null = null;
   const decisionSubjects: DecisionSubject[] = [];
@@ -488,10 +490,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
   }
   // Stage three: the mic and the narratives (METHOD.md §8.1, P4-T10c).
   //
-  // The stored body is turned into a plain-text excerpt here, on the server,
-  // through the one shared rich text module. The panel is a client component and
-  // handing it editor JSON would mean a second renderer in the browser for a
-  // stage that shows two lines.
+  // The stored body is rendered here, on the server, through the one shared
+  // rich text renderer, so the panel shows it as written without a second
+  // renderer in the browser. The document goes too, for the editor to open on.
   let narratives: Narratives | null = null;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[2]) {
     const read = (await callAction(context, "sessions.narratives", {
@@ -519,10 +520,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
         championName: objective.championName,
         hasMic: objective.hasMic,
         spokenAt: objective.spokenAt,
-        excerpt:
-          objective.body === null
-            ? null
-            : excerptRichText(objective.body as never, 2000) || null,
+        body: objective.body,
+        html: richTextHtml(objective.body),
         authorName: objective.authorName,
       })),
     };
@@ -556,9 +555,20 @@ export default async function SessionPage({ params }: SessionPageProps) {
   let managementWithheld = false;
   if (isQuarterly && sessionRow.stageKey === REVIEW_STAGE_KEYS[5]) {
     try {
-      managementRetro = (await callAction(context, "sessions.managementRetro", {
+      const read = (await callAction(context, "sessions.managementRetro", {
         sessionId: id,
-      })) as ManagementRetro;
+      })) as Omit<ManagementRetro, "questions"> & {
+        questions: (Omit<ManagementRetro["questions"][number], "bodyHtml"> & {
+          bodyDocument: unknown;
+        })[];
+      };
+      managementRetro = {
+        ...read,
+        questions: read.questions.map((question) => ({
+          ...question,
+          bodyHtml: richTextHtml(question.bodyDocument),
+        })),
+      };
     } catch {
       managementWithheld = true;
     }
@@ -822,6 +832,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           names={Object.fromEntries(
             participants.map((one) => [one.memberId, one.name]),
           )}
+          display={await confidenceDisplay()}
         />
       )}
 
@@ -840,6 +851,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           scores={diagnoseStage.scores}
           owners={diagnoseStage.owners}
           canWrite={isFacilitator}
+          display={await confidenceDisplay()}
         />
       )}
 
@@ -861,7 +873,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {sessionRow.state === "closed" &&
         isFacilitator &&
         weeklyDigest !== null && (
-          <CoordinatorNote sessionId={id} note={weeklyDigest.note} />
+          <CoordinatorNote sessionId={id} note={weeklyDigest.noteDocument} />
         )}
 
       {isRunning &&
@@ -929,11 +941,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           addedMinutes={sessionRow.addedMinutes}
           // Empty for everybody but the facilitator: `sessions.read` refuses to
           // hand the notes over, so this is not the screen deciding.
-          note={
-            typeof sessionRow.notes[sessionRow.stageKey ?? ""] === "string"
-              ? (sessionRow.notes[sessionRow.stageKey ?? ""] as string)
-              : ""
-          }
+          // A document, which `sessions.read` hands back even for a note
+          // stored as text before guided-inputs change 11b.
+          note={sessionRow.notes[sessionRow.stageKey ?? ""] ?? null}
           isFacilitator={isFacilitator}
           isRunning={isRunning}
         />
@@ -1054,14 +1064,17 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {monthly ? (
         <MonthlyReview
           sessionId={id}
-          shifts={monthly.shifts}
+          shiftsDocument={monthly.shiftsDocument}
           trends={monthly.trends}
           untrended={monthly.untrended}
           additions={monthly.additions}
           stops={monthly.stops}
           updates={monthly.updates}
           dependencies={monthly.dependencies}
-          decisions={monthly.decisions}
+          decisions={monthly.decisions.map((decision) => ({
+            ...decision,
+            textHtml: richTextHtml(decision.textDocument),
+          }))}
           subjects={decisionSubjects}
           canEdit={isRunning}
         />

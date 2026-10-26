@@ -43,6 +43,8 @@ packages/
   method/              The METHOD.md canon as data and pure functions: the quality
                        rule catalogue, bands, corridors, taxonomies, gates,
                        session definitions, diagnostics
+  formats/             The format rules the browser and the server share: email,
+                       domain, date, colour, timezone. Pure, no dependencies
   db/                  Drizzle schema, migrations, row-level security policies,
                        seed, data-change runner
   adapters/            Ports and drivers (jobs, realtime, storage, mail, cache,
@@ -65,6 +67,8 @@ docs/
 ```
 
 `packages/method` is deliberately separate from `packages/core`. It has no database access and no framework. It is a pure library of the OKR canon, which means every rule is unit-testable in isolation, the agents and the browser share one implementation, and a change to practice is a change to one package.
+
+`packages/formats` is pure for a smaller reason. A field in the browser and an action on the server check a value with the same function, so the screen can say before a save what the server would refuse after it.
 
 ### Runtime profile
 

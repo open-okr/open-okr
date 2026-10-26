@@ -4,8 +4,12 @@ import { loadEnv } from "@openokr/config";
 import {
   callAction,
   OperationError,
+  parseRichText,
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
   richTextFromPlainText,
 } from "@openokr/core";
+import { isBlankDocument } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getInstanceName } from "../../../lib/instance-name";
@@ -134,7 +138,8 @@ export async function setTrendAction(
   revalidatePath(`/session/${sessionId}`);
 }
 
-export async function setShiftsAction(sessionId: string, shifts: string) {
+/** The shifts as editor JSON, which the action validates (change 11a). */
+export async function setShiftsAction(sessionId: string, shifts: unknown) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
     {
@@ -143,14 +148,15 @@ export async function setShiftsAction(sessionId: string, shifts: string) {
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setShifts",
-    { sessionId, shifts },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, shifts: shifts as RichTextDocument | null },
   );
   revalidatePath(`/session/${sessionId}`);
 }
 
 export async function recordDecisionAction(
   sessionId: string,
-  input: { goalId?: string; keyResultId?: string; text: string },
+  input: { goalId?: string; keyResultId?: string; text: unknown },
 ) {
   const { session, workspace } = await requireWorkspace();
   const { goalId } = (await callAction(
@@ -160,7 +166,8 @@ export async function recordDecisionAction(
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.recordDecision",
-    { sessionId, ...input },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, ...input, text: input.text as RichTextDocument },
   )) as { goalId: string };
   revalidatePath(`/session/${sessionId}`);
   // §7.5 calls the decision log the artifact that survives the meeting, and
@@ -220,7 +227,7 @@ export async function addMinuteAction(sessionId: string) {
   revalidatePath(`/session/${sessionId}`);
 }
 
-export async function setStageNoteAction(sessionId: string, note: string) {
+export async function setStageNoteAction(sessionId: string, note: unknown) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
     {
@@ -229,7 +236,8 @@ export async function setStageNoteAction(sessionId: string, note: string) {
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setStageNote",
-    { id: sessionId, note },
+    // Editor JSON from the field, checked by the action's own schema.
+    { id: sessionId, note: note as RichTextDocument | null },
   );
   revalidatePath(`/session/${sessionId}`);
 }
@@ -545,7 +553,7 @@ export async function castRetroVoteAction(sessionId: string, noteId: string) {
 export async function setManagementAnswerAction(
   sessionId: string,
   questionKey: number,
-  body: string,
+  body: unknown,
 ) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
@@ -555,7 +563,8 @@ export async function setManagementAnswerAction(
       actor: { kind: "human", userId: session.user.id },
     },
     "sessions.setManagementAnswer",
-    { sessionId, questionKey, body },
+    // Editor JSON from the field, checked by the action's own schema.
+    { sessionId, questionKey, body: body as RichTextDocument },
   );
   revalidatePath(`/session/${sessionId}`);
 }
@@ -584,14 +593,14 @@ export async function passMicAction(sessionId: string, goalId: string | null) {
  * What the number does not show, for one objective (METHOD.md §8.1 stage 3,
  * P4-T10c).
  *
- * Collected as plain text and stored as editor JSON through the one shared rich
- * text module, the same path the check-in composer uses. An empty line clears the
- * note, which is a real act and does not undo that the objective was spoken for.
+ * The compact editor's document (docs/design/guided-inputs.md §4.7), which
+ * `sessions.setNarrative` holds to the rich text schema. Null clears the note,
+ * which is a real act and does not undo that the objective was spoken for.
  */
 export async function setNarrativeAction(
   sessionId: string,
   goalId: string,
-  text: string,
+  body: unknown,
 ) {
   const { session, workspace } = await requireWorkspace();
   await callAction(
@@ -604,7 +613,10 @@ export async function setNarrativeAction(
     {
       sessionId,
       goalId,
-      body: text.trim().length === 0 ? null : richTextFromPlainText(text),
+      // A body that is not a document is refused here, in words, rather
+      // than stored or quietly cleared.
+      body:
+        body === null ? null : parseRichText(body, RICH_TEXT_SCHEMA_VERSION),
     },
   );
   revalidatePath(`/session/${sessionId}`);
@@ -780,12 +792,25 @@ export async function clusterRetroAction(sessionId: string) {
   );
 }
 
-/** The review written up as prose from its own record, or null (M-09). */
+/**
+ * The review written up as prose from its own record, or null (M-09).
+ *
+ * With the draft as a document too, since the field it opens in is the full
+ * editor and `richTextFromPlainText` runs on the server only.
+ */
 export async function draftMinutesAction(sessionId: string) {
   const { assistContext } = await import("../../../lib/assists");
-  return callAction(await assistContext(), "sessions.draftMinutes", {
-    sessionId,
-  });
+  const drafted = await callAction(
+    await assistContext(),
+    "sessions.draftMinutes",
+    { sessionId },
+  );
+  return drafted === null
+    ? null
+    : {
+        narrative: drafted.narrative,
+        document: richTextFromPlainText(drafted.narrative),
+      };
 }
 
 /**
@@ -801,10 +826,11 @@ export async function draftMinutesAction(sessionId: string) {
 export async function saveMinutesWriteUpAction(
   sessionId: string,
   title: string,
-  text: string,
+  body: unknown,
 ): Promise<{ readonly documentId: string } | { readonly error: string }> {
   const { t } = await getTranslations();
-  if (text.trim() === "") {
+  // The full editor's document (guided-inputs §4.7), headings and all.
+  if (isBlankDocument(body)) {
     return { error: t("session.detail.minutes.writeUp.nothingToSave") };
   }
   const { session, workspace } = await requireWorkspace();
@@ -822,7 +848,8 @@ export async function saveMinutesWriteUpAction(
         title:
           title.trim().slice(0, 300) ||
           t("session.detail.minutes.writeUp.title"),
-        body: richTextFromPlainText(text),
+        // A body that is not a document is refused here rather than stored.
+        body: parseRichText(body, RICH_TEXT_SCHEMA_VERSION),
       },
     );
     revalidatePath(`/session/${sessionId}/minutes`);

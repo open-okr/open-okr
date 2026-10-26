@@ -12,3 +12,14 @@ export interface BrandingState {
 }
 
 export const NOTHING_SAVED: BrandingState = { error: null, saved: null };
+
+/**
+ * Why each status family is refused, one whole sentence per family. Shared
+ * by the field, which says it as the colour is picked, and the action, which
+ * says it again for a request that did not come from the field.
+ */
+export const REFUSED_HUE = {
+  red: "admin.branding.brandingSettingsForm.refusedRed",
+  amber: "admin.branding.brandingSettingsForm.refusedAmber",
+  green: "admin.branding.brandingSettingsForm.refusedGreen",
+} as const;

@@ -7,6 +7,7 @@
  */
 import {
   date,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -46,7 +47,13 @@ export const digests = pgTable("digests", {
   period: text("period", { enum: DIGEST_PERIODS }).notNull(),
   periodStart: date("period_start").notNull(),
   body: jsonb("body").$type<DigestBody>().notNull().default({}),
-  note: text("note"),
+  /**
+   * The coordinator's note for leadership as editor JSON. The plain `note`
+   * column it replaced (guided-inputs change 11c) was dropped in 0.4 (change
+   * 13b, migration 0144).
+   */
+  noteDocument: jsonb("note_document"),
+  noteDocumentVersion: integer("note_document_version"),
   generatedAt: timestamp("generated_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

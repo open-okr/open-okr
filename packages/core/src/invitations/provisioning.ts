@@ -31,6 +31,12 @@ export interface ProvisionMemberInput {
   readonly workspaceId: string;
   readonly user: { readonly id: string; readonly name: string };
   /**
+   * The joining browser's timezone, already matched to the list
+   * (docs/design/browser-timezone.md). TECHNICAL-PLAN §4.14 makes it the
+   * member's default; absent, the member has none and reads the workspace's.
+   */
+  readonly timezone?: string;
+  /**
    * No invite carries its own level today — TECHNICAL-PLAN's `invite_links`
    * row has no such column — so every joining path defaults to the same
    * level `defineWriteAction` itself defaults to. Recorded in STATUS.md as a
@@ -143,6 +149,7 @@ export async function provisionMemberForInvite<
       name: input.user.name,
       kind: input.kind ?? "human",
       status: "active",
+      timezone: input.timezone ?? null,
       ...(roleId ? { roleId } : {}),
       primaryChannel:
         memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,
@@ -230,6 +237,13 @@ async function claimWaitingMember<
       kind: "human",
       status: "active",
       placeholderEmail: null,
+      // The first sign-in of somebody an import left waiting: their browser's
+      // zone, unless the import already gave them one.
+      ...(input.timezone
+        ? {
+            timezone: sql`coalesce(${workspaceMembers.timezone}, ${input.timezone})`,
+          }
+        : {}),
       updatedAt: new Date(),
     })
     .where(activeOnly(workspaceMembers, eq(workspaceMembers.id, waiting.id)));

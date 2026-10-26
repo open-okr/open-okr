@@ -8,6 +8,7 @@ import {
   deleteCommentAction,
   editComment,
   postComment,
+  searchMentionable,
   toggleReaction,
 } from "./comment-actions.ts";
 import {
@@ -89,8 +90,11 @@ export function SubjectComments({
         comments={comments}
         currentMemberId={currentMemberId}
         onPost={async (body) => {
-          said(await postComment({ subjectType, subjectId, body }));
+          const result = await postComment({ subjectType, subjectId, body });
+          said(result);
+          return result.error === null;
         }}
+        searchMembers={searchMentionable}
         onEdit={async (commentId, body) => {
           said(await editComment(commentId, body));
         }}

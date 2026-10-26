@@ -1,6 +1,11 @@
 "use client";
 
-import { Button, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  EntityPicker,
+  SelectInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useState } from "react";
 import { saveTemplateMapping } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
@@ -36,9 +41,6 @@ export interface BindingChoice {
   readonly label: string;
 }
 
-const FIELD =
-  "rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink";
-
 export function TemplateMappingForm({
   rules,
   templates,
@@ -73,38 +75,34 @@ export function TemplateMappingForm({
       action={saveTemplateMapping}
       className="flex flex-col gap-2 rounded-lg border border-line p-3"
     >
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {t("admin.channels.templateMappingForm.reminder")}
-        <select name="ruleKey" className={FIELD} defaultValue="">
-          <option value="" disabled>
-            {t("admin.channels.templateMappingForm.chooseAReminder")}
+      <SelectInput
+        label={t("admin.channels.templateMappingForm.reminder")}
+        name="ruleKey"
+        defaultValue=""
+      >
+        <option value="" disabled>
+          {t("admin.channels.templateMappingForm.chooseAReminder")}
+        </option>
+        {rules.map((rule) => (
+          <option key={rule.key} value={rule.key}>
+            {rule.key} ({rule.fires})
           </option>
-          {rules.map((rule) => (
-            <option key={rule.key} value={rule.key}>
-              {rule.key} ({rule.fires})
-            </option>
-          ))}
-        </select>
-      </label>
+        ))}
+      </SelectInput>
 
-      <label className="flex flex-col gap-1 text-xs text-ink-2">
-        {t("admin.channels.templateMappingForm.template")}
-        <select
-          name="templateId"
-          className={FIELD}
-          value={templateId}
-          onChange={(event) => setTemplateId(event.target.value)}
-        >
-          <option value="" disabled>
-            {t("admin.channels.templateMappingForm.chooseATemplate")}
-          </option>
-          {templates.map((template) => (
-            <option key={template.id} value={template.id}>
-              {template.name} ({template.language})
-            </option>
-          ))}
-        </select>
-      </label>
+      <EntityPicker
+        label={t("admin.channels.templateMappingForm.template")}
+        name="templateId"
+        required
+        value={templateId === "" ? null : templateId}
+        onValueChange={(next) => setTemplateId(next ?? "")}
+        placeholder={t("admin.channels.templateMappingForm.chooseATemplate")}
+        options={templates.map((template) => ({
+          id: template.id,
+          label: template.name,
+          detail: template.language,
+        }))}
+      />
 
       {chosen?.bodyText ? (
         <p className="whitespace-pre-wrap rounded-md bg-raised px-2.5 py-1.5 text-xs text-ink-3">
@@ -113,25 +111,20 @@ export function TemplateMappingForm({
       ) : null}
 
       {fields.map((field) => (
-        <label
-          key={field.name}
-          className="flex flex-col gap-1 text-xs text-ink-2"
-        >
-          {t("admin.channels.templateMappingForm.whatFills", {
+        <SelectInput
+          label={t("admin.channels.templateMappingForm.whatFills", {
             placeholder: field.placeholder,
           })}
-          <select
-            name={field.name}
-            className={FIELD}
-            defaultValue={sources[0]?.value ?? ""}
-          >
-            {sources.map((source) => (
-              <option key={source.value} value={source.value}>
-                {source.label}
-              </option>
-            ))}
-          </select>
-        </label>
+          name={field.name}
+          defaultValue={sources[0]?.value ?? ""}
+          key={field.name}
+        >
+          {sources.map((source) => (
+            <option key={source.value} value={source.value}>
+              {source.label}
+            </option>
+          ))}
+        </SelectInput>
       ))}
 
       {chosen && fields.length === 0 ? (

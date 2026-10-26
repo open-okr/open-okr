@@ -13,6 +13,7 @@ import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
+import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -179,6 +180,7 @@ export default async function CyclePage({
   })) as Array<{
     id: string;
     text: string;
+    textDocument: unknown;
     at: string;
     authorName: string;
     goalId: string | null;
@@ -329,7 +331,11 @@ export default async function CyclePage({
             .filter(
               (member) => member.kind === "human" || member.kind === "guest",
             )
-            .map((member) => ({ id: member.id, name: member.name })),
+            .map((member) => ({
+              id: member.id,
+              name: member.name,
+              title: member.title,
+            })),
           // The coach runs in the browser and cannot read the settings row, so
           // the resolved thresholds travel with the page. Sending them rather
           // than letting the client fall back to the canon is what keeps a
@@ -366,7 +372,11 @@ export default async function CyclePage({
           .filter(
             (member) => member.kind === "human" || member.kind === "guest",
           )
-          .map((member) => ({ id: member.id, name: member.name }))
+          .map((member) => ({
+            id: member.id,
+            name: member.name,
+            title: member.title,
+          }))
       : [];
 
   // Only phase 5 needs the capacity check, and only phase 5 pays for reading
@@ -399,6 +409,8 @@ export default async function CyclePage({
       ? (await callAction(context, "people.directory", {})).map((member) => ({
           id: member.id,
           name: member.name,
+          title: member.title,
+          kind: member.kind,
         }))
       : null;
 
@@ -523,7 +535,7 @@ export default async function CyclePage({
           {viewing === 2 ? (
             <BaselineHealth
               cycleId={workflow.cycleId}
-              saved={workflow.baselineHealth}
+              saved={workflow.baselineHealthDocuments}
               canEdit={canEdit}
             />
           ) : null}
@@ -540,7 +552,20 @@ export default async function CyclePage({
           {viewing === 3 && workflow.mode === "quarterly" ? (
             <Revalidation
               cycleId={workflow.cycleId}
-              saved={workflow.revalidation}
+              // The verdict, with each note as editor JSON for the editors
+              // to open on (guided-inputs change 12).
+              saved={
+                workflow.revalidation
+                  ? {
+                      holds: workflow.revalidation.holds,
+                      changed: workflow.revalidation.changed,
+                      changeNote:
+                        workflow.revalidationDocuments?.changeNote ?? null,
+                      focusNote:
+                        workflow.revalidationDocuments?.focusNote ?? null,
+                    }
+                  : null
+              }
               focus={workflow.focus}
               canEdit={canEdit}
             />
@@ -588,7 +613,7 @@ export default async function CyclePage({
           {viewing === 5 ? (
             <CapacityCuts
               cycleId={workflow.cycleId}
-              saved={workflow.capacityCuts}
+              saved={workflow.capacityCutsDocument}
               canEdit={canEdit}
             />
           ) : null}
@@ -753,7 +778,10 @@ export default async function CyclePage({
                 <ul className="flex flex-col gap-2">
                   {cycleDecisions.map((decision) => (
                     <li key={decision.id} className="flex flex-col gap-0.5">
-                      <span className="text-sm text-ink">{decision.text}</span>
+                      <DecisionText
+                        document={decision.textDocument}
+                        text={decision.text}
+                      />
                       <span className="text-xs text-ink-3">
                         {decision.goalId ? (
                           <a

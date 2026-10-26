@@ -26,6 +26,7 @@ import {
   Button,
   Chip,
   Kbd,
+  TextArea,
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
@@ -323,6 +324,34 @@ function ProposalCard({
   );
 }
 
+/**
+ * The topbar's trigger. The shortcut hint sits beside the button, not inside
+ * it: every visible word inside a button has to be part of its name (WCAG
+ * 2.5.3, label in name), so a speech user who says what they see reaches it,
+ * and "⌘J" inside a button named "Ask the copilot" broke that. The button
+ * also announces the shortcut itself, through `aria-keyshortcuts`.
+ */
+function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
+  const { t } = useTranslations();
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Button
+        variant="ghost"
+        onClick={onClick}
+        aria-label={t("copilot.copilotPanel.askTheCopilot")}
+        aria-keyshortcuts="Control+J Meta+J"
+      >
+        <MessageSquare className="size-4" />
+        <span className="hidden sm:inline">
+          {t("copilot.copilotPanel.ask")}
+        </span>
+      </Button>
+      <Kbd>⌘J</Kbd>
+    </span>
+  );
+}
+
 export function CopilotPanel({
   initialAvailability,
 }: {
@@ -576,36 +605,14 @@ export function CopilotPanel({
   }, [busy, loadThread, question, t, threadId]);
 
   if (!open) {
-    return (
-      <Button
-        variant="ghost"
-        onClick={() => setOpen(true)}
-        aria-label={t("copilot.copilotPanel.askTheCopilot")}
-      >
-        <MessageSquare className="size-4" />
-        <span className="hidden sm:inline">
-          {t("copilot.copilotPanel.ask")}
-        </span>
-        <Kbd>⌘J</Kbd>
-      </Button>
-    );
+    return <CopilotTrigger onClick={() => setOpen(true)} />;
   }
 
   const canAsk = availability.available;
 
   return (
     <>
-      <Button
-        variant="ghost"
-        onClick={() => setOpen(false)}
-        aria-label={t("copilot.copilotPanel.askTheCopilot")}
-      >
-        <MessageSquare className="size-4" />
-        <span className="hidden sm:inline">
-          {t("copilot.copilotPanel.ask")}
-        </span>
-        <Kbd>⌘J</Kbd>
-      </Button>
+      <CopilotTrigger onClick={() => setOpen(false)} />
       {/* **Portalled to the body, and it has to be.** The trigger above lives in
           `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes an
           element the containing block for every `position: fixed` descendant, so
@@ -724,30 +731,29 @@ export function CopilotPanel({
               </p>
             )}
             <div className="flex items-end gap-2">
-              <label className="flex-1">
-                <span className="sr-only">
-                  {t("copilot.copilotPanel.yourQuestion")}
-                </span>
-                <textarea
-                  ref={inputRef}
-                  rows={2}
-                  value={question}
-                  disabled={busy}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void send();
-                    }
-                  }}
-                  placeholder={
-                    canAsk
-                      ? t("copilot.copilotPanel.askAQuestion")
-                      : t("copilot.copilotPanel.searchForMatchingPassages")
+              <TextArea
+                label={t("copilot.copilotPanel.yourQuestion")}
+                hideLabel
+                ref={inputRef}
+                rows={2}
+                value={question}
+                disabled={busy}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    void send();
                   }
-                  className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
-                />
-              </label>
+                }}
+                placeholder={
+                  canAsk
+                    ? t("copilot.copilotPanel.askAQuestion")
+                    : t("copilot.copilotPanel.searchForMatchingPassages")
+                }
+                maxLength={4000}
+                className="flex-1"
+                inputClassName="resize-none placeholder:text-ink-4"
+              />
               {busy && availability.streaming ? (
                 <Button
                   variant="ghost"

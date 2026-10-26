@@ -1,7 +1,13 @@
 "use client";
 
 import type { CycleCadence } from "@openokr/db";
-import { Button, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  DateInput,
+  SelectInput,
+  TextInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { addCycle } from "./editor-actions.ts";
@@ -107,12 +113,14 @@ export function CyclePicker({
 
         {open ? (
           <div className="absolute left-0 top-9 z-30 w-64 rounded-lg border border-line bg-surface p-1.5 shadow-popover">
-            <input
+            <TextInput
+              type="search"
               value={query}
-              aria-label={t("goals.editor.searchCycle")}
+              label={t("goals.editor.searchCycle")}
+              hideLabel
               placeholder={t("goals.editor.searchCycle")}
               onChange={(event) => setQuery(event.target.value)}
-              className="w-full rounded-control border border-line bg-bg px-2 py-1 text-xs text-ink outline-none focus:border-brand focus:bg-surface"
+              inputClassName="h-6.5 bg-bg px-2 text-xs focus:bg-surface"
             />
             <ul className="mt-1.5 max-h-52 overflow-auto">
               {matches.map((cycle) => (
@@ -169,54 +177,49 @@ export function CyclePicker({
               {t("goals.editor.addCycle")}
             </h2>
             <div className="flex flex-col gap-3 px-4 py-3.5">
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-3">
-                {t("goals.editor.cycleName")}
-                <input
-                  value={form.name}
-                  placeholder={t("goals.editor.cycleNameHint")}
-                  onChange={(event) =>
-                    setForm((value) => ({ ...value, name: event.target.value }))
-                  }
-                  className="rounded-control border border-line-2 bg-surface px-2 py-1.5 text-xs font-normal text-ink outline-none focus:border-brand"
-                />
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-3">
-                {t("goals.editor.cycleCadence")}
-                <select
-                  value={form.cadence}
-                  onChange={(event) =>
-                    setForm((value) => ({
-                      ...value,
-                      cadence: event.target.value as CycleCadence,
-                    }))
-                  }
-                  className="rounded-control border border-line-2 bg-surface px-2 py-1.5 text-xs font-normal text-ink outline-none focus:border-brand"
-                >
-                  <option value="quarterly">
-                    {t("goals.editor.cadenceQuarterly")}
-                  </option>
-                  <option value="annual">
-                    {t("goals.editor.cadenceAnnual")}
-                  </option>
-                  <option value="semiannual">
-                    {t("goals.editor.cadenceSemiannual")}
-                  </option>
-                  <option value="monthly">
-                    {t("goals.editor.cadenceMonthly")}
-                  </option>
-                </select>
-              </label>
-              <label className="flex flex-col gap-1 text-[11px] font-semibold text-ink-3">
-                {t("goals.editor.cycleOn")}
-                <input
-                  type="date"
-                  value={form.on}
-                  onChange={(event) =>
-                    setForm((value) => ({ ...value, on: event.target.value }))
-                  }
-                  className="rounded-control border border-line-2 bg-surface px-2 py-1.5 text-xs font-normal text-ink outline-none focus:border-brand"
-                />
-              </label>
+              {/* The server's 120 (cycles.create's name). */}
+              <TextInput
+                label={t("goals.editor.cycleName")}
+                maxLength={120}
+                value={form.name}
+                placeholder={t("goals.editor.cycleNameHint")}
+                onChange={(event) =>
+                  setForm((value) => ({ ...value, name: event.target.value }))
+                }
+                inputClassName="text-xs"
+              />
+              <SelectInput
+                label={t("goals.editor.cycleCadence")}
+                value={form.cadence}
+                onChange={(event) =>
+                  setForm((value) => ({
+                    ...value,
+                    cadence: event.target.value as CycleCadence,
+                  }))
+                }
+                inputClassName="text-xs"
+              >
+                <option value="quarterly">
+                  {t("goals.editor.cadenceQuarterly")}
+                </option>
+                <option value="annual">
+                  {t("goals.editor.cadenceAnnual")}
+                </option>
+                <option value="semiannual">
+                  {t("goals.editor.cadenceSemiannual")}
+                </option>
+                <option value="monthly">
+                  {t("goals.editor.cadenceMonthly")}
+                </option>
+              </SelectInput>
+              <DateInput
+                label={t("goals.editor.cycleOn")}
+                value={form.on}
+                onValueChange={(next) =>
+                  setForm((value) => ({ ...value, on: next ?? "" }))
+                }
+                inputClassName="h-auto py-1.5 text-xs"
+              />
               <p className="text-[11px] text-ink-4">
                 {t("goals.editor.cycleHelp")}
               </p>

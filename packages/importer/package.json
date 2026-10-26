@@ -1,6 +1,6 @@
 {
   "name": "@openokr/importer",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -17,7 +17,7 @@
     "@openokr/adapters": "workspace:*",
     "@openokr/core": "workspace:*",
     "@openokr/method": "workspace:*",
-    "mysql2": "^3.24.5",
+    "mysql2": "^3.24.6",
     "pg": "catalog:"
   },
   "devDependencies": {

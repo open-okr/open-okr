@@ -1,8 +1,19 @@
-import { createSiteMessage } from "@openokr/core";
-import { revalidatePath } from "next/cache";
-import { requireOperator } from "../../../lib/operator";
-import { getPool } from "../../../lib/pool";
-import { getTranslations } from "../../../lib/translations";
+"use client";
+
+import {
+  DateTimeInput,
+  SelectInput,
+  TextArea,
+  useTranslations,
+} from "@openokr/ui";
+import {
+  type FormEvent,
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+} from "react";
+import type { SiteMessageState } from "./site-message-actions";
 
 /**
  * Writing a site message, on S-47 (P8-T03c).
@@ -12,62 +23,50 @@ import { getTranslations } from "../../../lib/translations";
  * refusal. A message with no end is a banner everybody learns to ignore, and
  * the next one is ignored with it.
  *
- * The grant is re-checked here rather than trusted from the page that
- * rendered the form, for the same reason the lifecycle control re-checks it: a
- * page rendered ten minutes ago is not evidence that the person is still an
- * operator.
+ * A refusal is said under the button and what was typed stays to be
+ * corrected (guided-inputs §5, F5), submitted through a transition as the plan
+ * form is. The form clears itself only once the message is saved.
  */
-async function publish(formData: FormData): Promise<void> {
-  "use server";
-  const operator = await requireOperator();
-
-  const targets = formData
-    .getAll("target")
-    .map(String)
-    .filter((one) => one.length > 0);
-
-  try {
-    await createSiteMessage(getPool(), operator.userId, {
-      body: String(formData.get("body") ?? ""),
-      level: String(formData.get("level") ?? "info") as "info" | "warn" | "bad",
-      startsAt: String(formData.get("startsAt") ?? ""),
-      endsAt: String(formData.get("endsAt") ?? ""),
-      targetWorkspaceIds: targets,
-      dismissible: formData.get("dismissible") !== null,
-    });
-  } catch (error) {
-    // A refusal is not a crash. An empty body or a backwards window reaches
-    // here as a ZodError; the form re-renders with nothing written, which is
-    // the honest result.
-    if (error instanceof Error) {
-      return;
-    }
-    throw error;
-  }
-  revalidatePath("/operator/instance");
-}
-
-export async function SiteMessageForm({
+export function SiteMessageForm({
+  action,
   workspaces,
 }: {
+  readonly action: (formData: FormData) => Promise<SiteMessageState>;
   readonly workspaces: readonly {
     readonly id: string;
     readonly name: string;
   }[];
 }) {
-  const { t } = await getTranslations();
+  const { t } = useTranslations();
+  const [state, formAction, pending] = useActionState(
+    async (_previous: SiteMessageState | null, formData: FormData) =>
+      action(formData),
+    null,
+  );
+  // `action` stays on the form, so it still works before the page hydrates.
+  const form = useRef<HTMLFormElement>(null);
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  };
+  useEffect(() => {
+    if (state?.done) {
+      form.current?.reset();
+    }
+  }, [state]);
 
   return (
     <form
-      action={publish}
+      action={formAction}
+      onSubmit={submit}
+      ref={form}
+      aria-busy={pending}
       className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4"
     >
       <div className="flex flex-col gap-1.5">
-        <label className="font-medium text-ink text-sm" htmlFor="body">
-          {t("operator.siteMessage.message")}
-        </label>
-        <textarea
-          className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+        <TextArea
+          label={t("operator.siteMessage.message")}
           id="body"
           maxLength={1000}
           name="body"
@@ -82,11 +81,8 @@ export async function SiteMessageForm({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="level">
-            {t("operator.siteMessage.tone")}
-          </label>
-          <select
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <SelectInput
+            label={t("operator.siteMessage.tone")}
             defaultValue="info"
             id="level"
             name="level"
@@ -100,30 +96,22 @@ export async function SiteMessageForm({
             <option value="bad">
               {t("operator.siteMessage.toneIncident")}
             </option>
-          </select>
+          </SelectInput>
         </div>
+        <DateTimeInput
+          label={t("operator.siteMessage.showsFrom")}
+          id="startsAt"
+          name="startsAt"
+          zoneName="startsAtZone"
+          required
+        />
         <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="startsAt">
-            {t("operator.siteMessage.showsFrom")}
-          </label>
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
-            id="startsAt"
-            name="startsAt"
-            required
-            type="datetime-local"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="font-medium text-ink text-sm" htmlFor="endsAt">
-            {t("operator.siteMessage.stopsAt")}
-          </label>
-          <input
-            className="rounded-md border border-line bg-bg px-3 py-2 text-ink text-sm"
+          <DateTimeInput
+            label={t("operator.siteMessage.stopsAt")}
             id="endsAt"
             name="endsAt"
+            zoneName="endsAtZone"
             required
-            type="datetime-local"
           />
           {/* Said once, here, rather than left for somebody to meet as a
            * refusal after typing everything else. */}
@@ -175,11 +163,24 @@ export async function SiteMessageForm({
       </label>
 
       <button
-        className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong"
+        className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"
+        disabled={pending}
         type="submit"
       >
         {t("operator.siteMessage.submit")}
       </button>
+      {state?.error ? (
+        <p
+          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-bad text-sm"
+          role="alert"
+        >
+          {state.error}
+        </p>
+      ) : state?.done ? (
+        <p className="text-ok text-sm" role="status">
+          {t("operator.siteMessage.done")}
+        </p>
+      ) : null}
     </form>
   );
 }

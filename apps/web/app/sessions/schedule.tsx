@@ -1,6 +1,17 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  DateTimeInput,
+  EntityPicker,
+  SelectInput,
+  TextInput,
+  TimeInput,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import { searchPeople } from "../../lib/member-search.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -37,10 +48,6 @@ const WEEKDAYS = [
   { id: 4, key: "sessions.schedule.weekday.thursday" },
   { id: 5, key: "sessions.schedule.weekday.friday" },
 ] as const;
-
-const FIELD =
-  "rounded-md border border-line bg-surface px-2 py-1.5 text-sm text-ink";
-const LABEL = "flex flex-col gap-1 text-xs text-ink-3";
 
 export async function ScheduleSessions({
   spaceId,
@@ -84,37 +91,33 @@ export async function ScheduleSessions({
   const spaceField = spaceId ? (
     <input type="hidden" name="spaceId" value={spaceId} />
   ) : (
-    <label className={LABEL}>
-      {t("sessions.schedule.space")}
-      <select name="spaceId" required className={FIELD}>
-        {choices.map((space) => (
-          <option key={space.id} value={space.id}>
-            {/* The first space's review grades every objective in the cycle,
-                the workspace's own included, so it says so (UAT M18-03). */}
-            {space.isCompany
-              ? t("sessions.schedule.companySpace", { name: space.name })
-              : space.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    // Opens on the first space, as the select it replaced did. That space's
+    // review grades every objective in the cycle, the workspace's own
+    // included, so it says so (UAT M18-03).
+    <EntityPicker
+      label={t("sessions.schedule.space")}
+      name="spaceId"
+      required
+      defaultValue={choices[0]?.id ?? null}
+      options={choices.map((space) =>
+        namedOption({
+          id: space.id,
+          name: space.isCompany
+            ? t("sessions.schedule.companySpace", { name: space.name })
+            : space.name,
+        }),
+      )}
+    />
   );
   const facilitatorField = (
-    <label className={LABEL}>
-      {t("sessions.schedule.facilitator")}
-      <select
-        name="facilitatorId"
-        required
-        defaultValue={workspace.memberId}
-        className={FIELD}
-      >
-        {people.map((member) => (
-          <option key={member.id} value={member.id}>
-            {member.name}
-          </option>
-        ))}
-      </select>
-    </label>
+    <EntityPicker
+      label={t("sessions.schedule.facilitator")}
+      name="facilitatorId"
+      required
+      defaultValue={workspace.memberId}
+      options={people.map((member) => memberOption(member, t("common.agent")))}
+      search={searchPeople}
+    />
   );
 
   return (
@@ -150,31 +153,26 @@ export async function ScheduleSessions({
               <input type="hidden" name="cycleId" value={openCycle.id} />
               {spaceField}
               <div className="flex flex-wrap gap-2">
-                <label className={LABEL}>
-                  {t("sessions.schedule.weekday")}
-                  <select name="weekday" defaultValue="1" className={FIELD}>
-                    {WEEKDAYS.map((day) => (
-                      <option key={day.id} value={day.id}>
-                        {t(day.key)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={LABEL}>
-                  {t("sessions.schedule.time")}
-                  <input
-                    type="time"
-                    name="time"
-                    required
-                    defaultValue="09:00"
-                    className={FIELD}
-                  />
-                </label>
+                <SelectInput
+                  label={t("sessions.schedule.weekday")}
+                  name="weekday"
+                  defaultValue="1"
+                >
+                  {WEEKDAYS.map((day) => (
+                    <option key={day.id} value={day.id}>
+                      {t(day.key)}
+                    </option>
+                  ))}
+                </SelectInput>
+                <TimeInput
+                  label={t("sessions.schedule.time")}
+                  name="time"
+                  required
+                  defaultValue="09:00"
+                  description={t("sessions.schedule.inTimezone", { timezone })}
+                />
               </div>
               {facilitatorField}
-              <p className="text-xs text-ink-4">
-                {t("sessions.schedule.inTimezone", { timezone })}
-              </p>
               <button
                 type="submit"
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
@@ -210,38 +208,32 @@ export async function ScheduleSessions({
               <input type="hidden" name="cycleId" value={openCycle.id} />
             ) : null}
             {spaceField}
-            <label className={LABEL}>
-              {t("sessions.schedule.kind")}
-              <select name="kind" defaultValue="weekly" className={FIELD}>
-                {KINDS.map((kind) => (
-                  <option key={kind.id} value={kind.id}>
-                    {t(kind.key)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className={LABEL}>
-              {t("sessions.schedule.titleLabel")}
-              <input
-                name="title"
-                maxLength={200}
-                placeholder={t("sessions.schedule.titlePlaceholder")}
-                className={FIELD}
-              />
-            </label>
-            <label className={LABEL}>
-              {t("sessions.schedule.when")}
-              <input
-                type="datetime-local"
-                name="scheduledFor"
-                required
-                className={FIELD}
-              />
-            </label>
+            <SelectInput
+              label={t("sessions.schedule.kind")}
+              name="kind"
+              defaultValue="weekly"
+            >
+              {KINDS.map((kind) => (
+                <option key={kind.id} value={kind.id}>
+                  {t(kind.key)}
+                </option>
+              ))}
+            </SelectInput>
+            <TextInput
+              label={t("sessions.schedule.titleLabel")}
+              name="title"
+              maxLength={200}
+              placeholder={t("sessions.schedule.titlePlaceholder")}
+            />
+            {/* The local time alone: the action reads a time with no offset
+                in the workspace's zone, which is the one named here. */}
+            <DateTimeInput
+              label={t("sessions.schedule.when")}
+              name="scheduledFor"
+              required
+              timeZone={timezone}
+            />
             {facilitatorField}
-            <p className="text-xs text-ink-4">
-              {t("sessions.schedule.inTimezone", { timezone })}
-            </p>
             <button
               type="submit"
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"

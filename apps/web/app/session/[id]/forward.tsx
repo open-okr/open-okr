@@ -36,10 +36,14 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  DateInput,
+  EntityPicker,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { peopleOptions } from "../../../lib/entity-options.ts";
 import {
   addActionAction,
   captureLearningAction,
@@ -224,20 +228,15 @@ export function ForwardPanel({
 
           {canEdit ? (
             <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1" htmlFor="learning-text">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("session.detail.forward.whatWeNowKnow")}
-                </span>
-                <input
-                  id="learning-text"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={learning}
-                  disabled={pending}
-                  placeholder={t("session.detail.forward.weLearnedThat")}
-                  onChange={(event) => setLearning(event.target.value)}
-                />
-              </label>
+              <TextInput
+                label={t("session.detail.forward.whatWeNowKnow")}
+                id="learning-text"
+                value={learning}
+                disabled={pending}
+                placeholder={t("session.detail.forward.weLearnedThat")}
+                onChange={(event) => setLearning(event.target.value)}
+                maxLength={1000}
+              />
               <span className="flex flex-wrap items-center gap-2">
                 <Button
                   type="button"
@@ -357,54 +356,39 @@ export function ForwardPanel({
 
           {canEdit && forward.owners.length > 0 ? (
             <div className="flex flex-col gap-1.5">
-              <label className="flex flex-col gap-1" htmlFor="action-what">
-                <span className="text-xs font-medium text-ink-3">
-                  {t("common.whatHappens")}
-                </span>
-                <input
-                  id="action-what"
-                  type="text"
-                  className="w-full rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                  value={what}
-                  disabled={pending}
-                  onChange={(event) => setWhat(event.target.value)}
-                />
-              </label>
+              <TextInput
+                label={t("common.whatHappens")}
+                id="action-what"
+                value={what}
+                disabled={pending}
+                onChange={(event) => setWhat(event.target.value)}
+                maxLength={500}
+              />
               <span className="flex flex-wrap items-end gap-2">
-                <label className="flex flex-col gap-1" htmlFor="action-owner">
-                  <span className="text-xs font-medium text-ink-3">
-                    {t("common.owner")}
-                  </span>
-                  <select
-                    id="action-owner"
-                    className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                    value={ownerId}
-                    disabled={pending}
-                    onChange={(event) => setOwnerId(event.target.value)}
-                  >
-                    {/* No default owner. An action assigned by the form is an
-                        action nobody in the room accepted. */}
-                    <option value="">{t("common.chooseSomebody")}</option>
-                    {forward.owners.map((person) => (
-                      <option key={person.memberId} value={person.memberId}>
-                        {person.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="flex flex-col gap-1" htmlFor="action-due">
-                  <span className="text-xs font-medium text-ink-3">
-                    {t("session.detail.forward.by")}
-                  </span>
-                  <input
-                    id="action-due"
-                    type="date"
-                    className="rounded-md border border-line bg-surface p-2 text-sm text-ink"
-                    value={dueOn}
-                    disabled={pending}
-                    onChange={(event) => setDueOn(event.target.value)}
-                  />
-                </label>
+                {/* No default owner. An action assigned by the form is an
+                    action nobody in the room accepted. */}
+                <EntityPicker
+                  id="action-owner"
+                  label={t("common.owner")}
+                  value={ownerId === "" ? null : ownerId}
+                  disabled={pending}
+                  onValueChange={(next) => setOwnerId(next ?? "")}
+                  placeholder={t("common.chooseSomebody")}
+                  options={peopleOptions(
+                    forward.owners.map((person) => ({
+                      id: person.memberId,
+                      label: person.name,
+                    })),
+                  )}
+                  className="w-56"
+                />
+                <DateInput
+                  id="action-due"
+                  label={t("session.detail.forward.by")}
+                  value={dueOn}
+                  disabled={pending}
+                  onValueChange={(next) => setDueOn(next ?? "")}
+                />
                 <Button
                   type="button"
                   size="sm"

@@ -64,7 +64,7 @@ export interface ColumnSpec {
 }
 
 /** What a template asks the runner to do with one row. */
-export type RowPlan =
+export type RowPlan = (
   | {
       /** The row does not exist yet: create it, carrying its legacy identity. */
       readonly kind: "create";
@@ -86,7 +86,14 @@ export type RowPlan =
       readonly kind: "upsert";
       readonly action: string;
       readonly input: Record<string, unknown>;
-    };
+    }
+) & {
+  /**
+   * What the template changed from what the file said, one sentence each,
+   * for a row it still writes. An end date before the start is the one.
+   */
+  readonly notes?: readonly string[];
+};
 
 /** Everything a template needs to plan one row. */
 export interface PlanContext {

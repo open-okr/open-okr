@@ -18,6 +18,7 @@ import {
   dueWeeklyDigestNudges,
 } from "../src/nudges/rhythm-triggers.ts";
 import type { DueNudge } from "../src/nudges/service.ts";
+import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -587,7 +588,7 @@ describe("the Coach's seven", () => {
       cycleId: planningCycleId,
       holds: true,
       changed: false,
-      focusNote: "Mobile activation",
+      focusNote: richTextFromPlainText("Mobile activation"),
     });
     // Sponsor and facilitator are the same person here, so one message.
     expect(said(await cycleRead(), "quality.no_not_doing")).toEqual([

@@ -20,6 +20,9 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  SelectInput,
+  TextArea,
+  TextInput,
   useTranslations,
 } from "@openokr/ui";
 import { Sparkles } from "lucide-react";
@@ -183,35 +186,30 @@ export function DraftFromAmbition({
         <p className="text-xs text-ink-3">
           {t("cycle.assists.sayWhatYouWant")}
         </p>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-ink-4">
-            {t("cycle.assists.theAmbition")}
-          </span>
-          <textarea
-            rows={2}
-            value={ambition}
-            disabled={busy}
-            onChange={(event) => setAmbition(event.target.value)}
-            placeholder={t("cycle.assists.weShouldBeThe")}
-            className="w-full resize-none rounded-md border border-line bg-surface px-2.5 py-2 text-sm text-ink outline-none placeholder:text-ink-4"
-          />
-        </label>
+        <TextArea
+          label={t("cycle.assists.theAmbition")}
+          rows={2}
+          maxLength={2000}
+          value={ambition}
+          disabled={busy}
+          onChange={(event) => setAmbition(event.target.value)}
+          placeholder={t("cycle.assists.weShouldBeThe")}
+        />
         <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1.5 text-xs text-ink-4">
-            {t("common.level")}
-            <select
-              value={level}
-              disabled={busy}
-              onChange={(event) => setLevel(event.target.value as Level)}
-              className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink"
-            >
-              {LEVELS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
+          <SelectInput
+            label={t("common.level")}
+            value={level}
+            disabled={busy}
+            onChange={(event) => setLevel(event.target.value as Level)}
+            className="flex-row items-center gap-1.5"
+            inputClassName="h-6.5 w-auto px-2 text-xs"
+          >
+            {LEVELS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </SelectInput>
           <Button
             variant="ai"
             disabled={busy || ambition.trim() === ""}
@@ -328,19 +326,15 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="flex flex-col gap-1">
-        <span className="text-xs text-ink-4">
-          {t("cycle.assists.whatIsMeasuredAnd")}
-        </span>
-        <input
-          value={title}
-          disabled={busy}
-          maxLength={500}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder={t("cycle.assists.trialToPaidConversion")}
-          className="w-full rounded-md border border-line bg-surface px-2 py-1.5 text-xs text-ink placeholder:text-ink-4"
-        />
-      </label>
+      <TextInput
+        label={t("cycle.assists.whatIsMeasuredAnd")}
+        value={title}
+        disabled={busy}
+        maxLength={500}
+        onChange={(event) => setTitle(event.target.value)}
+        placeholder={t("cycle.assists.trialToPaidConversion")}
+        inputClassName="text-xs placeholder:text-ink-4"
+      />
       <Button variant="ai" disabled={busy} onClick={() => void run()}>
         <Sparkles className="size-3" />
         {t("cycle.assists.suggestNumbers")}

@@ -1352,11 +1352,11 @@
                         "properties": {
                           "start": {
                             "type": "string",
-                            "pattern": "^\\d{1,2}:\\d{2}$"
+                            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                           },
                           "end": {
                             "type": "string",
-                            "pattern": "^\\d{1,2}:\\d{2}$"
+                            "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                           }
                         },
                         "required": [
@@ -2759,6 +2759,44 @@
             "schema": {
               "type": "boolean"
             }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "human",
+                  "guest",
+                  "agent",
+                  "placeholder"
+                ]
+              }
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
           }
         ]
       }
@@ -3448,13 +3486,13 @@
                   "expiresInDays": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 365
                   },
                   "allowedDomains": {
                     "type": "array",
                     "items": {
                       "type": "string",
-                      "minLength": 1
+                      "pattern": "^(?!-)[a-z0-9-]{1,63}(?<!-)(\\.(?!-)[a-z0-9-]{1,63}(?<!-))+$"
                     }
                   }
                 }
@@ -3604,7 +3642,7 @@
                   "expiresInDays": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
+                    "maximum": 365
                   },
                   "guestSpaceId": {
                     "type": "string",
@@ -3791,6 +3829,10 @@
                   "token": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": [
@@ -3875,7 +3917,12 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {}
+                "properties": {
+                  "timezone": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
               }
             }
           }
@@ -9358,7 +9405,7 @@
                   },
                   "dailySummaryTime": {
                     "type": "string",
-                    "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   },
                   "routing": {
                     "type": "object",
@@ -10586,13 +10633,34 @@
                               "type": "integer",
                               "minimum": -9007199254740991,
                               "maximum": 9007199254740991
+                            },
+                            "leftOut": {
+                              "default": {},
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string"
+                              },
+                              "additionalProperties": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              }
+                            },
+                            "proposalsLeftBehind": {
+                              "default": 0,
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
                             }
                           },
                           "required": [
                             "created",
                             "merged",
                             "skipped",
-                            "blobs"
+                            "blobs",
+                            "leftOut",
+                            "proposalsLeftBehind"
                           ],
                           "additionalProperties": false
                         },
@@ -11173,6 +11241,83 @@
             }
           }
         ]
+      }
+    },
+    "/audit/names": {
+      "get": {
+        "operationId": "audit.names",
+        "summary": "The action and target type names this workspace's audit trail holds, so a filter offers only names it finds rows for.",
+        "tags": [
+          "audit"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "actions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "targetTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      },
+                      "required": [
+                        "actions",
+                        "targetTypes"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
       }
     },
     "/settings/readWorkspaceSettings": {
@@ -13106,7 +13251,9 @@
                   },
                   "modelId": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^\\S+$"
                   },
                   "displayName": {
                     "type": "string",
@@ -13358,7 +13505,9 @@
                   },
                   "modelId": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "pattern": "^\\S+$"
                   },
                   "displayName": {
                     "type": "string",
@@ -24519,6 +24668,25 @@
                             }
                           ]
                         },
+                        "revalidationDocuments": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "changeNote": {},
+                                "focusNote": {}
+                              },
+                              "required": [
+                                "changeNote",
+                                "focusNote"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "focus": {
                           "type": "object",
                           "properties": {
@@ -24568,6 +24736,28 @@
                             "null"
                           ]
                         },
+                        "baselineHealthDocuments": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "stable": {},
+                                "declining": {},
+                                "businessAsUsual": {}
+                              },
+                              "required": [
+                                "stable",
+                                "declining",
+                                "businessAsUsual"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "capacityCutsDocument": {},
                         "calibration": {
                           "anyOf": [
                             {
@@ -24718,8 +24908,11 @@
                         "sessionDates",
                         "baselineHealth",
                         "revalidation",
+                        "revalidationDocuments",
                         "focus",
                         "capacityCuts",
+                        "baselineHealthDocuments",
+                        "capacityCutsDocument",
                         "calibration",
                         "closure"
                       ],
@@ -25396,28 +25589,8 @@
                   "changed": {
                     "type": "boolean"
                   },
-                  "changeNote": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2000
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "focusNote": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "maxLength": 2000
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  }
+                  "changeNote": {},
+                  "focusNote": {}
                 },
                 "required": [
                   "cycleId",
@@ -27527,6 +27700,30 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 20
+            }
+          },
+          {
+            "name": "kinds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "goal",
+                  "key_result",
+                  "kpi",
+                  "space",
+                  "person",
+                  "initiative",
+                  "task",
+                  "document",
+                  "session",
+                  "cycle"
+                ]
+              }
             }
           }
         ]
@@ -29781,7 +29978,8 @@
                     ]
                   },
                   "dueOn": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                   },
                   "assigneeIds": {
                     "maxItems": 20,
@@ -29919,9 +30117,14 @@
                     ]
                   },
                   "dueOn": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "initiativeId": {
@@ -31386,10 +31589,12 @@
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "startsOn": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                   },
                   "endsOn": {
-                    "type": "string"
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
                   },
                   "status": {
                     "type": "string",
@@ -31546,15 +31751,25 @@
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
                   "startsOn": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "endsOn": {
-                    "type": [
-                      "string",
-                      "null"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "status": {
@@ -33648,7 +33863,9 @@
                   },
                   "weight": {
                     "default": 1,
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
                   },
                   "contributionStatement": {
                     "type": "string",
@@ -33792,7 +34009,9 @@
                     ]
                   },
                   "weight": {
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
                   },
                   "contributionStatement": {
                     "anyOf": [
@@ -34832,7 +35051,9 @@
                   },
                   "weight": {
                     "default": 1,
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
                   },
                   "kpiId": {
                     "type": "string",
@@ -35046,7 +35267,9 @@
                     ]
                   },
                   "weight": {
-                    "type": "number"
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100
                   },
                   "capacity": {
                     "anyOf": [
@@ -37242,7 +37465,9 @@
                         ]
                       },
                       "weight": {
-                        "type": "number"
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
                       },
                       "championId": {
                         "type": "string",
@@ -37902,7 +38127,9 @@
                         ]
                       },
                       "weight": {
-                        "type": "number"
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
                       },
                       "kind": {
                         "type": "string",
@@ -51866,7 +52093,7 @@
                   },
                   "time": {
                     "type": "string",
-                    "pattern": "^([01]\\d|2[0-3]):([0-5]\\d)$"
+                    "pattern": "^([01]?\\d|2[0-3]):([0-5]\\d)$"
                   },
                   "facilitatorId": {
                     "type": "string",
@@ -55311,11 +55538,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
-                  }
+                  "note": {}
                 },
                 "required": [
                   "sessionId",
@@ -55569,6 +55792,14 @@
                                 "null"
                               ]
                             },
+                            "noteDocument": {
+                              "anyOf": [
+                                {},
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
                             "postedTo": {
                               "type": "array",
                               "items": {
@@ -55587,6 +55818,7 @@
                             "lines",
                             "numbers",
                             "note",
+                            "noteDocument",
                             "postedTo",
                             "postableTo"
                           ],
@@ -57567,11 +57799,7 @@
                     "minimum": 1,
                     "maximum": 4
                   },
-                  "body": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
-                  }
+                  "body": {}
                 },
                 "required": [
                   "sessionId",
@@ -57623,6 +57851,14 @@
                                   "null"
                                 ]
                               },
+                              "bodyDocument": {
+                                "anyOf": [
+                                  {},
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
                               "answeredByName": {
                                 "type": [
                                   "string",
@@ -57634,6 +57870,7 @@
                               "questionKey",
                               "question",
                               "body",
+                              "bodyDocument",
                               "answeredByName"
                             ],
                             "additionalProperties": false
@@ -58863,109 +59100,6 @@
         ]
       }
     },
-    "/sessions/proposeFromLearnings": {
-      "get": {
-        "operationId": "sessions.proposeFromLearnings",
-        "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Proposes next-cycle objectives from the learnings marked to carry forward, each citing its learning.",
-        "tags": [
-          "sessions"
-        ],
-        "x-openokr-scope": "read",
-        "x-openokr-safety": "read",
-        "responses": {
-          "200": {
-            "description": "The action's own output, under `data`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "anyOf": [
-                        {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "title": {
-                                "type": "string"
-                              },
-                              "learningId": {
-                                "type": "string",
-                                "format": "uuid",
-                                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                              },
-                              "learningText": {
-                                "type": "string"
-                              },
-                              "why": {
-                                "type": "string"
-                              }
-                            },
-                            "required": [
-                              "title",
-                              "learningId",
-                              "learningText",
-                              "why"
-                            ],
-                            "additionalProperties": false
-                          }
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/E400"
-          },
-          "401": {
-            "$ref": "#/components/responses/E401"
-          },
-          "403": {
-            "$ref": "#/components/responses/E403"
-          },
-          "404": {
-            "$ref": "#/components/responses/E404"
-          },
-          "405": {
-            "$ref": "#/components/responses/E405"
-          },
-          "409": {
-            "$ref": "#/components/responses/E409"
-          },
-          "422": {
-            "$ref": "#/components/responses/E422"
-          },
-          "429": {
-            "$ref": "#/components/responses/E429"
-          },
-          "500": {
-            "$ref": "#/components/responses/E500"
-          }
-        },
-        "parameters": [
-          {
-            "name": "sessionId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-            }
-          }
-        ]
-      }
-    },
     "/goals/draftRetrospective": {
       "get": {
         "operationId": "goals.draftRetrospective",
@@ -59431,107 +59565,6 @@
                 "required": [
                   "sessionId",
                   "text"
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
-    "/sessions/draftNextCycle": {
-      "post": {
-        "operationId": "sessions.draftNextCycle",
-        "summary": "Deprecated since 0.2.0 and removed in 0.3: the review no longer drafts the next cycle. Notes an objective the next cycle might carry; capture a learning marked to carry forward instead.",
-        "tags": [
-          "sessions"
-        ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
-        "responses": {
-          "200": {
-            "description": "The action's own output, under `data`.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "format": "uuid",
-                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                        }
-                      },
-                      "required": [
-                        "id"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "$ref": "#/components/responses/E400"
-          },
-          "401": {
-            "$ref": "#/components/responses/E401"
-          },
-          "403": {
-            "$ref": "#/components/responses/E403"
-          },
-          "404": {
-            "$ref": "#/components/responses/E404"
-          },
-          "405": {
-            "$ref": "#/components/responses/E405"
-          },
-          "409": {
-            "$ref": "#/components/responses/E409"
-          },
-          "422": {
-            "$ref": "#/components/responses/E422"
-          },
-          "429": {
-            "$ref": "#/components/responses/E429"
-          },
-          "500": {
-            "$ref": "#/components/responses/E500"
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "sessionId": {
-                    "type": "string",
-                    "format": "uuid",
-                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-                  },
-                  "title": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 280
-                  },
-                  "why": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 1000
-                  }
-                },
-                "required": [
-                  "sessionId",
-                  "title",
-                  "why"
                 ]
               }
             }
@@ -61030,10 +61063,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {
-                    "type": "string",
-                    "maxLength": 4000
-                  }
+                  "note": {}
                 },
                 "required": [
                   "id",
@@ -61228,10 +61258,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "shifts": {
-                    "type": "string",
-                    "maxLength": 4000
-                  }
+                  "shifts": {}
                 },
                 "required": [
                   "sessionId",
@@ -61338,11 +61365,7 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "text": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 2000
-                  }
+                  "text": {}
                 },
                 "required": [
                   "sessionId",
@@ -61380,6 +61403,7 @@
                             "null"
                           ]
                         },
+                        "shiftsDocument": {},
                         "trends": {
                           "type": "array",
                           "items": {
@@ -61643,6 +61667,7 @@
                               "text": {
                                 "type": "string"
                               },
+                              "textDocument": {},
                               "at": {
                                 "type": "string"
                               },
@@ -61706,6 +61731,7 @@
                             "required": [
                               "id",
                               "text",
+                              "textDocument",
                               "at",
                               "authorMemberId",
                               "authorName",
@@ -61721,6 +61747,7 @@
                       },
                       "required": [
                         "shifts",
+                        "shiftsDocument",
                         "trends",
                         "untrended",
                         "additions",
@@ -61811,6 +61838,7 @@
                           "text": {
                             "type": "string"
                           },
+                          "textDocument": {},
                           "at": {
                             "type": "string"
                           },
@@ -61874,6 +61902,7 @@
                         "required": [
                           "id",
                           "text",
+                          "textDocument",
                           "at",
                           "authorMemberId",
                           "authorName",
@@ -61966,6 +61995,7 @@
                           "text": {
                             "type": "string"
                           },
+                          "textDocument": {},
                           "at": {
                             "type": "string"
                           },
@@ -62029,6 +62059,7 @@
                         "required": [
                           "id",
                           "text",
+                          "textDocument",
                           "at",
                           "authorMemberId",
                           "authorName",

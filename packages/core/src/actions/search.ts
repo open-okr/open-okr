@@ -55,8 +55,11 @@ async function actingMember(
   return member.id;
 }
 
+/** The longest phrase a search takes, which the search box holds it to. */
+export const SEARCH_TEXT_MAX_LENGTH = 500;
+
 const searchInput = z.object({
-  text: z.string().trim().min(1).max(500),
+  text: z.string().trim().min(1).max(SEARCH_TEXT_MAX_LENGTH),
   entityTypes: z.array(z.string().trim().min(1).max(60)).max(20).optional(),
   limit: z.number().int().min(1).max(50).optional(),
 });
@@ -139,6 +142,8 @@ export const runSearch = defineReadAction({
 const entitiesInput = z.object({
   text: z.string().trim().min(1).max(200),
   limit: z.number().int().min(1).max(20).optional(),
+  /** Only these kinds; every kind when absent. */
+  kinds: z.array(z.enum(NAMED_KINDS)).min(1).optional(),
 });
 
 export const findEntities = defineReadAction({
@@ -179,6 +184,7 @@ export const findEntities = defineReadAction({
       memberId,
       text: input.text,
       ...(input.limit ? { limit: input.limit } : {}),
+      ...(input.kinds ? { kinds: input.kinds } : {}),
     });
   },
 });
