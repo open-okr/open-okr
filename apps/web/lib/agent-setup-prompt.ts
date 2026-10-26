@@ -17,7 +17,6 @@ export const AGENT_PROMPT_AGENTS = [
   { id: "claude-code", name: "Claude Code" },
   { id: "hermes", name: "Hermes Agent" },
   { id: "chatgpt", name: "ChatGPT" },
-  { id: "gemini-cli", name: "Gemini CLI" },
 ] as const;
 
 export type AgentPromptAgent = (typeof AGENT_PROMPT_AGENTS)[number]["id"];
@@ -82,19 +81,11 @@ export function agentSetupPrompt({
         ]),
   ];
 
-  const gemini = [
-    "Gemini CLI",
-    `  Run: gemini mcp add --transport http ${SERVER_NAME} ${endpoint}${headerFlag}`,
-    header
-      ? "  Then run /mcp and check that openokr is connected."
-      : `  Then run /mcp auth ${SERVER_NAME} and sign in.`,
-  ];
-
   const close = [
     "When the connection works, call the workspace.overview tool once and tell me the workspace name and my name, so I know it worked.",
   ];
 
-  return [intro, claudeCode, hermes, chatGpt, gemini, close]
+  return [intro, claudeCode, hermes, chatGpt, close]
     .map((section) => section.join("\n"))
     .join("\n\n");
 }

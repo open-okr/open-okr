@@ -38,7 +38,7 @@
   "account.apiTokens.audienceRest": "REST",
   "account.apiTokens.connectAnAgent": "Connect an agent that cannot sign in",
   "account.apiTokens.copySetupPrompt": "Copy setup prompt",
-  "account.apiTokens.copySetupPromptHint": "Paste it into Claude Code, Hermes Agent, ChatGPT or Gemini CLI. Your agent connects itself and you approve it in the browser, so no token is needed.",
+  "account.apiTokens.copySetupPromptHint": "Paste it into Claude Code, Hermes Agent or ChatGPT. Your agent connects itself and you approve it in the browser, so no token is needed.",
   "account.apiTokens.copyTokenPrompt": "Copy setup prompt with this token",
   "account.apiTokens.createToken": "Create token",
   "account.apiTokens.deployScript": "Deploy script",

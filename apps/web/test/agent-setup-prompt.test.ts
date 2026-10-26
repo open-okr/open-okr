@@ -25,9 +25,7 @@ describe("the OAuth setup prompt", () => {
     );
     expect(prompt).toContain(`url: "${endpoint}"`);
     expect(prompt).toContain("auth: oauth");
-    expect(prompt).toContain(
-      `gemini mcp add --transport http openokr ${endpoint}`,
-    );
+    expect(prompt).not.toContain("Gemini");
     expect(prompt).toContain("Developer mode");
     for (const agent of AGENT_PROMPT_AGENTS) {
       expect(prompt).toContain(agent.name);
@@ -52,16 +50,13 @@ describe("the token setup prompt", () => {
       `claude mcp add --transport http openokr ${endpoint} --header "Authorization: Bearer ${token}"`,
     );
     expect(prompt).toContain(`Authorization: "Bearer ${token}"`);
-    expect(prompt).toContain(
-      `gemini mcp add --transport http openokr ${endpoint} --header "Authorization: Bearer ${token}"`,
-    );
   });
 
   it("says ChatGPT takes OAuth only, and never puts the token in its step", () => {
     expect(prompt).toContain("ChatGPT connectors accept OAuth only");
     const chatGpt = prompt.slice(
       prompt.indexOf("ChatGPT"),
-      prompt.indexOf("Gemini CLI"),
+      prompt.indexOf("When the connection works"),
     );
     expect(chatGpt).not.toContain(token);
   });

@@ -42,7 +42,6 @@ each supported agent, and asks the agent to do the step for its own runtime.
 | Claude Code | `claude mcp add --transport http openokr <endpoint>`, then `/mcp` to sign in | Same, with `--header "Authorization: Bearer <token>"` |
 | Hermes Agent | Add to `~/.hermes/config.yaml` under `mcp_servers.openokr`: `url: <endpoint>` and `auth: oauth` | `url` plus `headers.Authorization: Bearer <token>` |
 | ChatGPT, developer mode | Settings, Apps and Connectors, Advanced, developer mode on, then create a connector with the endpoint and OAuth | Not supported: ChatGPT connectors take OAuth only. The token prompt says so |
-| Gemini CLI | `gemini mcp add --transport http openokr <endpoint>`, then `/mcp auth openokr` | Same, with `--header "Authorization: Bearer <token>"` |
 
 The prompt closes with: "When the connection is added, call
 `workspace.overview` once and report the workspace name, so I know it
@@ -54,16 +53,13 @@ token and with no `?toolsets=` parameter.
 back as instructions for the person. That is acceptable and the prompt does
 not pretend otherwise.
 
-**Gemini CLI is listed as untested** by the product owner. It stays in the
-prompt; the changeset says it was not verified against a live client.
-
 ## 3. The Work Map pill
 
 | Element | Rule |
 |---|---|
 | Place | S-01, directly below the Work Map header, above the first-visit tour and the scope tabs |
-| Content | "Connect your AI agent to {instanceName}", four generic icons (one per agent), and a close button. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
-| Icons | Generic lucide icons, no brand marks: `Terminal` Claude Code, `Bot` Hermes Agent, `MessageSquare` ChatGPT, `Sparkles` Gemini CLI. Each has an accessible name with the agent's name |
+| Content | "Connect your AI agent to {instanceName}", three generic icons (one per agent), and a close button. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
+| Icons | Generic lucide icons, no brand marks: `Terminal` Claude Code, `Bot` Hermes Agent, `MessageSquare` ChatGPT. Each has an accessible name with the agent's name |
 | Click | Copies the OAuth prompt. The label changes to "Copied" for two seconds, announced through `aria-live="polite"` |
 | Tooltip | "Copies a setup prompt for your AI agent", as the button's `title` |
 | Close | Hides the pill for the rest of the login session |
@@ -147,6 +143,7 @@ each header step and naming ChatGPT as OAuth-only.
 ## 8. What this change does not do
 
 - No brand logos. Generic icons until the product owner decides on marks.
+- No Gemini CLI step. Left out by the product owner on 26 October 2026; it was never checked against a live client.
 - No per-agent deep links or one-click installers.
 - No server-side record of the dismissal.
 - No change to the agent endpoint, the token model or the OAuth flow.

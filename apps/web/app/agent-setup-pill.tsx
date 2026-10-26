@@ -1,7 +1,7 @@
 "use client";
 
 import { Button, CopyButton, useTranslations } from "@openokr/ui";
-import { Bot, MessageSquare, Sparkles, Terminal, X } from "lucide-react";
+import { Bot, MessageSquare, Terminal, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   dismissAgentPrompt,
@@ -31,7 +31,6 @@ const ICONS: Record<AgentPromptAgent, typeof Terminal> = {
   "claude-code": Terminal,
   hermes: Bot,
   chatgpt: MessageSquare,
-  "gemini-cli": Sparkles,
 };
 
 const storage = (): Storage | null => {

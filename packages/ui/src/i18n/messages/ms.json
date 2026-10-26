@@ -38,7 +38,7 @@
   "account.apiTokens.audienceRest": "REST",
   "account.apiTokens.connectAnAgent": "Sambungkan ejen yang tidak dapat log masuk",
   "account.apiTokens.copySetupPrompt": "Salin gesaan persediaan",
-  "account.apiTokens.copySetupPromptHint": "Tampalkannya ke dalam Claude Code, Hermes Agent, ChatGPT atau Gemini CLI. Ejen anda menyambung sendiri dan anda meluluskannya dalam pelayar, jadi tiada token diperlukan.",
+  "account.apiTokens.copySetupPromptHint": "Tampalkannya ke dalam Claude Code, Hermes Agent atau ChatGPT. Ejen anda menyambung sendiri dan anda meluluskannya dalam pelayar, jadi tiada token diperlukan.",
   "account.apiTokens.copyTokenPrompt": "Salin gesaan persediaan dengan token ini",
   "account.apiTokens.createToken": "Cipta token",
   "account.apiTokens.deployScript": "Skrip atur letak",
