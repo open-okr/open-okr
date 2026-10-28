@@ -2166,7 +2166,7 @@
   "inbox.reason.invited": "Dijemput",
   "inbox.reason.joined": "Menyertai",
   "inbox.reason.mentioned": "Disebut",
-  "inbox.reason.review": "Untuk disemak",
+  "inbox.reason.review": "Sebagai penyemak",
   "inbox.reason.role": "Perubahan peranan",
   "inbox.reminder": "Peringatan: {rule}",
   "inbox.snooze.nextWeek": "Minggu depan",

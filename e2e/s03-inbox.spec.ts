@@ -102,8 +102,8 @@ test("a notification is listed, links to its goal, and clears the badge", async 
   // The goal the first spec drafted. The subject is what the row links to, so
   // a real one is what makes the link assertable.
   const goal = (
-    await pool.query<{ id: string }>(
-      `select id from goals
+    await pool.query<{ id: string; title: string }>(
+      `select id, title from goals
         where workspace_id = $1 and deleted_at is null
         order by created_at asc
         limit 1`,
@@ -153,6 +153,12 @@ test("a notification is listed, links to its goal, and clears the badge", async 
   // badge reads `notifications.unreadCount` rather than a second query.
   const nav = page.getByRole("navigation", { name: "Primary" });
   await expect(nav.getByRole("link", { name: /Inbox/ })).toContainText("1");
+
+  // The group heading names the goal, not only that it is a goal: a heading
+  // reading "Goal" over every group left the reader unable to tell them apart.
+  await expect(
+    list.getByRole("heading", { level: 2 }).filter({ hasText: goal.title }),
+  ).toBeVisible();
 
   // The deep link: the group heading and the row both point at the goal.
   await expect(
@@ -241,7 +247,7 @@ test("a row arrives in an open inbox without a reload", async () => {
   await page.goto("/inbox");
   const list = page.getByRole("region", { name: "Notifications" });
   await expect(list).toBeVisible({ timeout: 15_000 });
-  const before = await list.getByText("To review").count();
+  const before = await list.getByText("As reviewer").count();
 
   const inserted = (
     await pool.query<{ id: string }>(
@@ -278,7 +284,7 @@ test("a row arrives in an open inbox without a reload", async () => {
   await expect(page.getByTestId("inbox-live")).toBeVisible({
     timeout: 30_000,
   });
-  await expect(list.getByText("To review")).toHaveCount(before + 1, {
+  await expect(list.getByText("As reviewer")).toHaveCount(before + 1, {
     timeout: 15_000,
   });
 

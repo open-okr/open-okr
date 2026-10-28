@@ -2166,7 +2166,7 @@
   "inbox.reason.invited": "Invited",
   "inbox.reason.joined": "Joined",
   "inbox.reason.mentioned": "Mentioned",
-  "inbox.reason.review": "To review",
+  "inbox.reason.review": "As reviewer",
   "inbox.reason.role": "Role change",
   "inbox.reminder": "Reminder: {rule}",
   "inbox.snooze.nextWeek": "Next week",

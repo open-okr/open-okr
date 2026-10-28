@@ -8,16 +8,33 @@
 import {
   activeOnly,
   activities,
+  cycles,
+  goals,
+  initiatives,
+  kpis,
   NOTIFICATION_REASONS,
   notifications,
   nudges,
+  okrSessions,
+  spaces,
   subscriptionLists,
   subscriptions,
+  tasks,
   type WorkspaceTx,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, count, desc, eq, isNull, lt, lte, or } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  lt,
+  lte,
+  or,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -67,6 +84,12 @@ const notificationRow = z.object({
    */
   subjectType: z.string().nullable(),
   subjectId: z.string().nullable(),
+  /**
+   * The subject's own title or name, so a group heading can say which goal it
+   * is rather than only that it is a goal. Null for a subject type with no
+   * title of its own, such as a check-in, and for one that no longer exists.
+   */
+  subjectTitle: z.string().nullable(),
   /**
    * What happened, in the activity renderer's words: the same sentence the
    * feed shows, so the inbox and the feed can never describe one event
@@ -264,6 +287,7 @@ export const listNotifications = defineReadAction({
           createdAt: row.createdAt.toISOString(),
           subjectType,
           subjectId,
+          subjectTitle: null,
           rendered: row.activityKind
             ? renderActivity(row.activityKind, row.activityPayload ?? {})
             : null,
@@ -275,10 +299,93 @@ export const listNotifications = defineReadAction({
             watched.has(`${subjectType}:${subjectId}`),
         });
       }
-      return visible;
+      // Titled after the access filter, so a subject the reader cannot see
+      // never has its title read, let alone returned.
+      const titles = await subjectTitles(tx, context.workspaceId, visible);
+      return visible.map((row) => ({
+        ...row,
+        subjectTitle: titles.get(`${row.subjectType}:${row.subjectId}`) ?? null,
+      }));
     });
   },
 });
+
+/**
+ * Where each titled subject type keeps its title. A type missing here has no
+ * title of its own and its rows carry null.
+ */
+const TITLE_SOURCES = {
+  goal: {
+    table: goals,
+    id: goals.id,
+    ws: goals.workspaceId,
+    title: goals.title,
+  },
+  initiative: {
+    table: initiatives,
+    id: initiatives.id,
+    ws: initiatives.workspaceId,
+    title: initiatives.title,
+  },
+  task: {
+    table: tasks,
+    id: tasks.id,
+    ws: tasks.workspaceId,
+    title: tasks.title,
+  },
+  kpi: { table: kpis, id: kpis.id, ws: kpis.workspaceId, title: kpis.title },
+  space: {
+    table: spaces,
+    id: spaces.id,
+    ws: spaces.workspaceId,
+    title: spaces.name,
+  },
+  cycle: {
+    table: cycles,
+    id: cycles.id,
+    ws: cycles.workspaceId,
+    title: cycles.name,
+  },
+  session: {
+    table: okrSessions,
+    id: okrSessions.id,
+    ws: okrSessions.workspaceId,
+    title: okrSessions.title,
+  },
+} as const;
+
+/** One query per subject type on the page, keyed `type:id`. */
+async function subjectTitles(
+  tx: OperationTx,
+  workspaceId: string,
+  rows: readonly { subjectType: string | null; subjectId: string | null }[],
+): Promise<ReadonlyMap<string, string>> {
+  const idsByType = new Map<keyof typeof TITLE_SOURCES, Set<string>>();
+  for (const row of rows) {
+    if (!row.subjectType || !row.subjectId) {
+      continue;
+    }
+    if (!(row.subjectType in TITLE_SOURCES)) {
+      continue;
+    }
+    const type = row.subjectType as keyof typeof TITLE_SOURCES;
+    const held = idsByType.get(type) ?? new Set<string>();
+    held.add(row.subjectId);
+    idsByType.set(type, held);
+  }
+  const titles = new Map<string, string>();
+  for (const [type, ids] of idsByType) {
+    const source = TITLE_SOURCES[type];
+    const found = await tx
+      .select({ id: source.id, title: source.title })
+      .from(source.table)
+      .where(and(eq(source.ws, workspaceId), inArray(source.id, [...ids])));
+    for (const one of found) {
+      titles.set(`${type}:${one.id}`, one.title);
+    }
+  }
+  return titles;
+}
 
 /**
  * Which of these subjects the member holds a live subscription to.

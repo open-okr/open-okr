@@ -216,6 +216,65 @@ describe("notifications.list", () => {
     expect(rows[0]?.subjectType).toBe("check_in");
   });
 
+  it("names the subject so a group heading can say which one", async () => {
+    // A heading that read "Goal" over every group left the reader unable to
+    // tell one objective's notifications from another's.
+    const call = <T>(name: string, input: unknown) =>
+      pool().then(
+        (p) =>
+          callAction(
+            { pool: p, ...context(OWNER) },
+            name as "notifications.list",
+            input as never,
+          ) as unknown as Promise<T>,
+      );
+    const cycleId = (
+      await call<{ id: string }>("cycles.current", { mode: "quarterly" })
+    ).id;
+    const spaceId = (
+      await call<{ id: string }>("spaces.create", { name: "Customer Success" })
+    ).id;
+    const goalId = (
+      await call<{ id: string }>("goals.create", {
+        title: "New accounts reach value faster",
+        cycleId,
+        level: "company",
+      })
+    ).id;
+    await writeNotification({
+      recipientMemberId: ownerMemberId,
+      subjectType: "goal",
+      subjectId: goalId,
+      reason: "review",
+    });
+    await writeNotification({
+      recipientMemberId: ownerMemberId,
+      subjectType: "space",
+      subjectId: spaceId,
+      reason: "joined",
+    });
+    await writeNotification({
+      recipientMemberId: ownerMemberId,
+      subjectType: "check_in",
+      subjectId: "66666666-6666-4666-8666-666666666666",
+      reason: "check_in",
+    });
+
+    const rows = await callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "notifications.list",
+      {},
+    );
+
+    const titleOf = (type: string) =>
+      rows.find((row) => row.subjectType === type)?.subjectTitle;
+    expect(titleOf("goal")).toBe("New accounts reach value faster");
+    expect(titleOf("space")).toBe("Customer Success");
+    // A check-in has no title of its own, and inventing one is worse than
+    // saying nothing.
+    expect(titleOf("check_in")).toBeNull();
+  });
+
   it("parses every reason the table allows", async () => {
     // The output schema listed four of the six until P6-G07a. Nothing
     // validated it, so a `review` or `check_in` row passed through a schema

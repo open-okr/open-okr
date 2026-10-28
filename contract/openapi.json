@@ -8799,6 +8799,12 @@
                               "null"
                             ]
                           },
+                          "subjectTitle": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "rendered": {
                             "type": [
                               "string",
@@ -8830,6 +8836,7 @@
                           "createdAt",
                           "subjectType",
                           "subjectId",
+                          "subjectTitle",
                           "rendered",
                           "actorName",
                           "ruleKey",

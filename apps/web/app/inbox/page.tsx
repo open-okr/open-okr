@@ -75,6 +75,19 @@ export default async function InboxPage({
     const key = subjectNameKey(subjectType);
     return key ? t(key) : (subjectType ?? "");
   };
+  // The type alone ("Goal") over every group left the reader unable to tell
+  // one objective's notifications from another's, so the title follows it, in
+  // its own case: an uppercased sentence is hard to read.
+  const heading = (subjectType: string | null, subjectTitle: string | null) => (
+    <>
+      <span>{headingFor(subjectType)}</span>
+      {subjectTitle ? (
+        <span className="min-w-0 truncate text-sm font-semibold normal-case tracking-normal text-ink">
+          {subjectTitle}
+        </span>
+      ) : null}
+    </>
+  );
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -205,11 +218,16 @@ export default async function InboxPage({
               <section key={key} className="flex flex-col gap-1.5">
                 <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
                   {href ? (
-                    <Link href={href} className="hover:text-ink">
-                      {headingFor(first.subjectType)}
+                    <Link
+                      href={href}
+                      className="flex min-w-0 items-center gap-2 hover:text-ink hover:underline"
+                    >
+                      {heading(first.subjectType, first.subjectTitle)}
                     </Link>
                   ) : (
-                    headingFor(first.subjectType)
+                    <span className="flex min-w-0 items-center gap-2">
+                      {heading(first.subjectType, first.subjectTitle)}
+                    </span>
                   )}
                   <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
                     {held.length}
