@@ -80,6 +80,7 @@ The stance: the product's edge is **installed opinion and an active coach**, not
 | Drafts | Comment, description and check-in editors autosave locally per entity and user, fingerprinted against the base content with an expiry, restored on return, cleared on submit |
 | Empty states | Icon, one sentence, primary action, documentation link. First-run empties may carry a three-step checklist |
 | Loading | Skeletons matching the final layout. Stale content stays visible while revalidating, with a subtle refresh indicator |
+| Navigating | A shell link answers the click at once: a thin bar across the top while the next page is on its way. If it has not arrived after ten seconds, or the browser is offline, a message says so and offers a reload. A skeleton only appears once the server answers, so without this a slow or unreachable server looked like an ignored click |
 | Errors | Inline field errors, a surface-level error card with retry, never a blank screen, an error boundary per route segment |
 | Keyboard | Global: ⌘K palette, `/` search, ⌘J Ask AI, `c` create. Lists: `j`/`k` move, `x` select, `e` edit, `⌘⏎` save. Detail: `[` and `]` previous and next. `?` opens the shortcut overlay |
 | Presence | A realtime avatar stack on detail, board, map and session surfaces. A typing indicator on comments |
