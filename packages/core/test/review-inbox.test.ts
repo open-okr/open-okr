@@ -1,6 +1,10 @@
+import { withWorkspace } from "@openokr/db";
+import { canonThresholds } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { dueAcknowledgementNudges } from "../src/nudges/service.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -234,6 +238,147 @@ describe("an acknowledgement obligation", () => {
         (item) => item.kind === "acknowledgement",
       ),
     ).toHaveLength(0);
+  });
+});
+
+/** Back-dates a check-in's publication by `days`, so its age can be chosen. */
+async function publishedDaysAgo(checkInId: string, days: number) {
+  const wb = await workerDb();
+  await wb.admin.query(
+    "update check_ins set published_at = now() - make_interval(days => $2) where id = $1",
+    [checkInId, days],
+  );
+}
+
+const acknowledgementsOf = async (userId: string) =>
+  (await inbox(userId)).obligations.filter(
+    (item) => item.kind === "acknowledgement",
+  );
+
+describe("one acknowledgement per goal (METHOD.md §2.5)", () => {
+  it("lists only the latest open check-in on a goal and says how many earlier ones it covers", async () => {
+    const goalId = await makeGoal("New accounts reach value faster");
+    const first = await publish(goalId);
+    const second = await publish(goalId);
+    const latest = await publish(goalId);
+    await publishedDaysAgo(first, 14);
+    await publishedDaysAgo(second, 7);
+
+    const owed = await acknowledgementsOf(REVIEWER);
+    expect(owed).toHaveLength(1);
+    expect(owed[0]?.checkInId).toBe(latest);
+    expect(owed[0]?.meta).toContain("2 earlier");
+  });
+
+  it("closes every earlier open check-in on the goal when the latest is acknowledged", async () => {
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    const first = await publish(goalId);
+    const latest = await publish(goalId);
+    await publishedDaysAgo(first, 7);
+
+    const result = await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "goals.acknowledgeCheckIn",
+      { id: latest },
+    );
+    expect(result.settledEarlier).toBe(1);
+
+    const rows = await wb.admin.query<{
+      id: string;
+      acknowledged_by_id: string | null;
+    }>("select id, acknowledged_by_id from check_ins where subject_id = $1", [
+      goalId,
+    ]);
+    expect(
+      rows.rows.every((row) => row.acknowledged_by_id === reviewerId),
+    ).toBe(true);
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(0);
+  });
+
+  it("leaves a later check-in open when an earlier one is acknowledged", async () => {
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    const earlier = await publish(goalId);
+    const later = await publish(goalId);
+    await publishedDaysAgo(earlier, 7);
+
+    await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "goals.acknowledgeCheckIn",
+      { id: earlier },
+    );
+
+    const owed = await acknowledgementsOf(REVIEWER);
+    expect(owed.map((item) => item.checkInId)).toEqual([later]);
+  });
+
+  it("owes nothing on a goal whose latest check-in is already acknowledged", async () => {
+    // Rows left open before this rule existed: the latest one says where the
+    // goal stands, so a backlog behind it is not a debt.
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    const old = await publish(goalId);
+    const latest = await publish(goalId);
+    await publishedDaysAgo(old, 7);
+    await wb.admin.query(
+      "update check_ins set acknowledged_at = now(), acknowledged_by_id = $2 where id = $1",
+      [latest, reviewerId],
+    );
+
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(0);
+  });
+
+  it("owes nothing on a closed goal", async () => {
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    await publish(goalId);
+    await callAction({ pool: wb.appPool, ...context() }, "goals.close", {
+      id: goalId,
+      successStatus: "achieved",
+      closeDecision: "keep",
+      retrospectiveBody: richText("It worked, and the next cycle keeps it."),
+    });
+
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(0);
+  });
+
+  it("owes nothing on a goal in a closed cycle", async () => {
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    await publish(goalId);
+    await wb.admin.query("update cycles set status = 'closed' where id = $1", [
+      cycleId,
+    ]);
+
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(0);
+  });
+
+  it("nudges about the latest check-in only, and never about a closed cycle", async () => {
+    const wb = await workerDb();
+    const goalId = await makeGoal("New accounts reach value faster");
+    const old = await publish(goalId);
+    const latest = await publish(goalId);
+    await publishedDaysAgo(old, 9);
+    await publishedDaysAgo(latest, 2);
+
+    const due = () =>
+      withWorkspace(drizzle(wb.appPool), workspaceId, (tx) =>
+        dueAcknowledgementNudges(tx, {
+          workspaceId,
+          now: new Date(),
+          thresholds: canonThresholds(),
+        }),
+      );
+
+    const open = await due();
+    expect(open.length).toBeGreaterThan(0);
+    expect(open.every((nudge) => nudge.subjectId === latest)).toBe(true);
+
+    await wb.admin.query("update cycles set status = 'closed' where id = $1", [
+      cycleId,
+    ]);
+    expect(await due()).toHaveLength(0);
   });
 });
 

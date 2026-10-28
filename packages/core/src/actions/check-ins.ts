@@ -23,7 +23,7 @@ import {
   workspaceMembers,
 } from "@openokr/db";
 import { standInFor } from "@openokr/method";
-import { desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -549,7 +549,12 @@ export const acknowledgeCheckIn = defineWriteAction({
   name: "goals.acknowledgeCheckIn",
   summary: "The reviewer of record closes the loop. Nobody else can.",
   input: z.object({ id: z.uuid() }),
-  output: z.object({ id: z.uuid(), alreadyAcknowledged: z.boolean() }),
+  output: z.object({
+    id: z.uuid(),
+    alreadyAcknowledged: z.boolean(),
+    /** Earlier open check-ins on the goal this one also closed (METHOD.md §2.5). */
+    settledEarlier: z.number().int(),
+  }),
   // Edit, because acknowledging is a write and §14 requires edit for every write.
   // That is why the reviewer holds edit on the goal they review rather than
   // comment: the alternative was an action that writes on view-level terms, and
@@ -574,6 +579,7 @@ export const acknowledgeCheckIn = defineWriteAction({
         .select({
           state: checkIns.state,
           acknowledgedAt: checkIns.acknowledgedAt,
+          publishedAt: checkIns.publishedAt,
           reviewerMemberId: checkIns.reviewerMemberId,
         })
         .from(checkIns)
@@ -619,7 +625,11 @@ export const acknowledgeCheckIn = defineWriteAction({
       if (checkIn.acknowledgedAt) {
         // Idempotent, not an error (§6.5).
         return {
-          result: { id: input.id, alreadyAcknowledged: true },
+          result: {
+            id: input.id,
+            alreadyAcknowledged: true,
+            settledEarlier: 0,
+          },
           activity: {
             kind: "check_in.acknowledged",
             subjectType: "goal",
@@ -645,21 +655,52 @@ export const acknowledgeCheckIn = defineWriteAction({
         })
         .where(activeOnly(checkIns, eq(checkIns.id, input.id)));
 
+      // METHOD.md §2.5: one acknowledgement per goal. This check-in says where
+      // the goal stands now, so every earlier one still open on the goal is
+      // closed with it, by the same member at the same instant. A later one
+      // stays open: it says something this one could not have.
+      const settled = checkIn.publishedAt
+        ? await tx
+            .update(checkIns)
+            .set({
+              acknowledgedById: memberId,
+              acknowledgedAt: now,
+              updatedAt: now,
+            })
+            .where(
+              activeOnly(
+                checkIns,
+                and(
+                  eq(checkIns.workspaceId, workspaceId),
+                  eq(checkIns.subjectId, goalId),
+                  eq(checkIns.state, "published"),
+                  isNull(checkIns.acknowledgedAt),
+                  lt(checkIns.publishedAt, checkIn.publishedAt),
+                ),
+              ),
+            )
+            .returning({ id: checkIns.id })
+        : [];
+
       // Acknowledgement never changes health (§6.5). It closes a loop; it is not
       // a second opinion on the status, so there is no recompute here.
       return {
-        result: { id: input.id, alreadyAcknowledged: false },
+        result: {
+          id: input.id,
+          alreadyAcknowledged: false,
+          settledEarlier: settled.length,
+        },
         activity: {
           kind: "check_in.acknowledged",
           subjectType: "goal",
           subjectId: goalId,
-          payload: { repeat: false },
+          payload: { repeat: false, settledEarlier: settled.length },
         },
         audit: {
           action: "goals.acknowledgeCheckIn",
           targetType: "check_in",
           targetId: input.id,
-          payload: {},
+          payload: { settledCheckInIds: settled.map((row) => row.id) },
         },
       };
     },

@@ -68,6 +68,10 @@ import {
 } from "../agents/scope.ts";
 import { spaceHolidaysInTx } from "../cadence/holidays.ts";
 import { daysPastDue } from "../cadence/service.ts";
+import {
+  goalStillOpen,
+  isLatestPublishedOnGoal,
+} from "../check-ins/acknowledgement-owed.ts";
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { OperationError } from "../operations/errors.ts";
@@ -985,6 +989,8 @@ export async function dueAcknowledgementNudges(
       reviewerMemberId: checkIns.reviewerMemberId,
     })
     .from(checkIns)
+    .innerJoin(goals, eq(goals.id, checkIns.subjectId))
+    .leftJoin(cycles, eq(cycles.id, goals.cycleId))
     .where(
       activeOnly(
         checkIns,
@@ -992,6 +998,12 @@ export async function dueAcknowledgementNudges(
         isNotNull(checkIns.publishedAt),
         // An acknowledged check-in is a closed loop and owes nobody anything.
         isNull(checkIns.acknowledgedAt),
+        // The same rule the review inbox lists by (METHOD.md §2.5): one per
+        // goal, on its latest check-in, and none once the goal or its cycle
+        // is closed. The ladder must not chase what Review no longer lists.
+        isNull(goals.deletedAt),
+        goalStillOpen(),
+        isLatestPublishedOnGoal(),
         input.scope ? agentSeesCheckIn(input.scope) : undefined,
       ),
     );
