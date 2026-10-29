@@ -72,21 +72,27 @@ describe("useKeyboardShortcut", () => {
   });
 });
 
+function TwoRegistrations() {
+  useKeyboardShortcut(
+    { id: "same", keys: "c", description: "First", group: "Global" },
+    vi.fn(),
+    { key: "c" },
+  );
+  useKeyboardShortcut(
+    { id: "same", keys: "c", description: "Second", group: "Global" },
+    vi.fn(),
+    { key: "c" },
+  );
+  return <RegistryProbe />;
+}
+
+function Orphan() {
+  useKeyboardRegistry();
+  return null;
+}
+
 describe("KeyboardRegistryProvider", () => {
   test("registering the same id twice replaces the entry rather than duplicating it", () => {
-    function TwoRegistrations() {
-      useKeyboardShortcut(
-        { id: "same", keys: "c", description: "First", group: "Global" },
-        vi.fn(),
-        { key: "c" },
-      );
-      useKeyboardShortcut(
-        { id: "same", keys: "c", description: "Second", group: "Global" },
-        vi.fn(),
-        { key: "c" },
-      );
-      return <RegistryProbe />;
-    }
     render(
       <KeyboardRegistryProvider>
         <TwoRegistrations />
@@ -96,10 +102,6 @@ describe("KeyboardRegistryProvider", () => {
   });
 
   test("useKeyboardRegistry throws outside its provider — a screen cannot silently register nowhere", () => {
-    function Orphan() {
-      useKeyboardRegistry();
-      return null;
-    }
     expect(() => render(<Orphan />)).toThrow();
   });
 });
