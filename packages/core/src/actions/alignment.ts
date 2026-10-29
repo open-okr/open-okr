@@ -285,6 +285,7 @@ export const removeGoalDependency = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
@@ -838,6 +839,7 @@ export const removeKeyResultDependency = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(

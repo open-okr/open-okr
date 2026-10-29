@@ -74,6 +74,8 @@ export interface RestRoute {
   readonly outputSchema: ZodType;
   /** Set when the action takes a cursor and this surface can build the next. */
   readonly page: PageContract | null;
+  /** False when the agent endpoint leaves this action out (mcp-toolsets.md). */
+  readonly agentSurface: boolean;
 }
 
 /** A read is a GET; a write of either kind is a POST. */
@@ -105,6 +107,7 @@ function routeFor(action: ActionDefinition): RestRoute {
     inputSchema: action.input,
     outputSchema: action.output,
     page: action.page ?? null,
+    agentSurface: action.agentSurface !== false,
   };
 }
 

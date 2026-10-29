@@ -479,8 +479,8 @@ describe("browsing the trail", () => {
         {},
       ),
     ).rejects.toMatchObject({
-      code: "not_found",
-      message: "No such workspace, or you do not have access to it.",
+      code: "forbidden",
+      message: "audit.list needs a higher access level than you hold.",
     });
   });
 });

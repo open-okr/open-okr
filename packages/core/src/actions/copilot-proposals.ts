@@ -85,6 +85,7 @@ const previewSchema = z.array(
  */
 export const recordProposal = defineWriteAction({
   name: "copilot.recordProposal",
+  agentSurface: false,
   summary: "Records a proposal the copilot made in a conversation.",
   input: z.object({
     threadId: z.uuid(),

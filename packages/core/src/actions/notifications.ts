@@ -853,6 +853,7 @@ export const toggleSubscription = defineWriteAction({
  */
 export const importWatcher = defineWriteAction({
   name: "subscriptions.importWatcher",
+  agentSurface: false,
   summary: "Subscribes a member an import found watching something.",
   input: z.object({
     subjectType: z.string().min(1),
@@ -941,6 +942,7 @@ async function countSubscribers(
  */
 export const drainNotificationBatches = defineWriteAction({
   name: "notifications.drainBatches",
+  agentSurface: false,
   summary:
     "Claims every notification batch whose window has closed and enqueues its digest.",
   input: z.object({

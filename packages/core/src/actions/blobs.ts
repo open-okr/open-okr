@@ -154,6 +154,7 @@ export const prepareUpload = defineWriteAction({
  */
 export const prepareImport = defineWriteAction({
   name: "blobs.prepareImport",
+  agentSurface: false,
   summary:
     "Reserves a storage key for a file an import found, keeping its uploader.",
   input: z.object({
@@ -466,6 +467,7 @@ export const getBlobForDownload = defineReadAction({
  */
 export const reapOrphanedBlobs = defineWriteAction({
   name: "blobs.reapOrphans",
+  agentSurface: false,
   summary:
     "Discards every upload prepared longer ago than the workspace's orphan window and never claimed.",
   input: z.object({

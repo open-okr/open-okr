@@ -325,6 +325,7 @@ function shortId(): string {
 
 export const createKpiCategory = defineWriteAction({
   name: "kpis.createCategory",
+  domain: "kpi",
   summary: "Adds a KPI category, which is how the grid groups its rows.",
   input: z.object({
     name: z.string().trim().min(1).max(120),
@@ -374,6 +375,7 @@ export const createKpiCategory = defineWriteAction({
 
 export const createKpi = defineWriteAction({
   name: "kpis.create",
+  domain: "kpi",
   summary:
     "Adds a KPI with its frequency, unit, direction, tier and corridor thresholds.",
   input: z.object({
@@ -509,6 +511,7 @@ export const createKpi = defineWriteAction({
 
 export const recordKpiValue = defineWriteAction({
   name: "kpis.record",
+  domain: "kpi",
   summary:
     "Records a value for the period a date falls in. Re-recording updates rather than duplicating.",
   input: z.object({
@@ -907,6 +910,7 @@ export const listKpis = defineReadAction({
 
 export const setKpiFormulaAction = defineWriteAction({
   name: "kpis.setFormula",
+  domain: "kpi",
   summary:
     "Makes a KPI calculated from a formula over other KPIs, refusing self-reference and cycles.",
   input: z.object({
@@ -998,6 +1002,7 @@ export const setKpiFormulaAction = defineWriteAction({
 
 export const updateKpi = defineWriteAction({
   name: "kpis.update",
+  domain: "kpi",
   summary:
     "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
   input: z.object({
@@ -1207,6 +1212,7 @@ export const updateKpi = defineWriteAction({
 
 export const createKpiTree = defineWriteAction({
   name: "kpis.createTree",
+  domain: "kpi",
   summary:
     "Names a driver tree. The parent pointers shape it; this row is the tree itself.",
   input: z.object({
@@ -1262,6 +1268,7 @@ export const createKpiTree = defineWriteAction({
 
 export const launchKpiRecovery = defineWriteAction({
   name: "kpis.launchRecovery",
+  domain: "kpi",
   summary:
     "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
   input: z.object({
@@ -1349,6 +1356,7 @@ export const launchKpiRecovery = defineWriteAction({
  */
 export const recordKpiResponse = defineWriteAction({
   name: "kpis.recordResponse",
+  domain: "kpi",
   summary:
     "Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective.",
   input: z.object({

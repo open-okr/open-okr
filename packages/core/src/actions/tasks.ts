@@ -1307,6 +1307,7 @@ export const removeChecklistItem = defineWriteAction({
   input: z.object({ id: z.uuid(), itemId: z.uuid() }),
   output: z.object({ itemId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
       return requireTask(
@@ -1357,16 +1358,27 @@ export const deleteTask = defineWriteAction({
   access: ACCESS_LEVELS.full,
   safety: "destructive",
   operation: (_context, input) => ({
+    // At `view` here, because the load runs before the floor: asking `full`
+    // here answered a member who can read and edit the task "No such task"
+    // instead of the floor's "needs a higher access level", which is what
+    // goals.delete says (MCP UAT BUG-006). The second gate is in `execute`.
     async load({ tx, workspaceId, actor }) {
       return requireTask(
         tx,
         workspaceId,
         requireMemberId(actor.memberId),
         input.id,
-        ACCESS_LEVELS.full,
+        ACCESS_LEVELS.view,
       );
     },
-    async execute({ tx, workspaceId, loaded }) {
+    async execute({ tx, workspaceId, actor, loaded }) {
+      await requireTask(
+        tx,
+        workspaceId,
+        requireMemberId(actor.memberId),
+        input.id,
+        ACCESS_LEVELS.full,
+      );
       const now = new Date();
       for (const table of [taskAssignees, checklistItems] as const) {
         // openokr:allow-mutation: the calling Operation's own transaction.
@@ -1441,13 +1453,14 @@ export const restoreTask = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
+    // `view` before the floor and `full` after it, as tasks.delete does.
     async load({ tx, workspaceId, actor }) {
       await getAccessScoped(tx, {
         workspaceId,
         memberId: requireMemberId(actor.memberId),
         resourceType: "task",
         resourceId: input.id,
-        requires: ACCESS_LEVELS.full,
+        requires: ACCESS_LEVELS.view,
       });
       // `includeDeleted` on purpose: this reads the row the default scope
       // hides.
@@ -1481,7 +1494,14 @@ export const restoreTask = defineWriteAction({
       }
       return { ...row, deletedAt: row.deletedAt };
     },
-    async execute({ tx, workspaceId, loaded }) {
+    async execute({ tx, workspaceId, actor, loaded }) {
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        resourceType: "task",
+        resourceId: input.id,
+        requires: ACCESS_LEVELS.full,
+      });
       if (loaded.initiativeId) {
         const [parent] = await tx
           .select({

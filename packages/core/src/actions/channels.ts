@@ -317,6 +317,7 @@ export const disconnect = defineWriteAction({
   input: z.object({ provider: connectionProviderSchema }),
   output: z.object({ provider: connectionProviderSchema }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [existing] = await tx
@@ -547,6 +548,7 @@ export const unlinkIdentity = defineWriteAction({
   input: z.object({ provider: connectionProviderSchema }),
   output: z.object({ provider: connectionProviderSchema }),
   access: ACCESS_LEVELS.comment,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = requireMember(actor);
@@ -1260,6 +1262,7 @@ export const removeTemplateMapping = defineWriteAction({
   input: z.object({ ruleKey: z.string().min(1) }),
   output: z.object({ removed: z.boolean() }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const removed = await removeMapping(tx, {
@@ -1305,6 +1308,7 @@ export const removeTemplateMapping = defineWriteAction({
  */
 export const sweepMessageLogRetention = defineWriteAction({
   name: "channels.sweepMessageLog",
+  agentSurface: false,
   summary:
     "Deletes channel message log rows older than the workspace's retention window. Does nothing when retention is off, which is the default.",
   input: z.object({

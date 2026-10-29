@@ -92,7 +92,9 @@ function plausibleInput(name: string): Record<string, unknown> {
  * from also matching `getAccessScoped`'s refusals for other resource types,
  * which are worded "No such goal", "No such space" and so on.
  */
-const LEVEL_REFUSAL = "No such workspace, or you do not have access to it.";
+const STRANGER_REFUSAL = "No such workspace, or you do not have access to it.";
+const levelRefusal = (name: string) =>
+  `${name} needs a higher access level than you hold.`;
 
 /**
  * Runs the read and reports only whether the level check was what stopped it.
@@ -114,7 +116,7 @@ async function refusedByLevel(
     );
     return false;
   } catch (error) {
-    return (error as Error).message === LEVEL_REFUSAL;
+    return (error as Error).message === levelRefusal(name);
   }
 }
 
@@ -162,25 +164,26 @@ describe("a read that declares more than view", () => {
     expect(ordinaryReads().length).toBeGreaterThan(0);
   });
 
-  it("refuses the way a read refuses, not the way a write does", async () => {
-    // The first version of this check raised `forbidden` and named the action
-    // and the level. Two existing specs caught it, and both were right: a read
-    // refuses like the access getter, so that a stranger with no member row,
-    // a suspended member and a member below the level cannot tell each other's
-    // answer apart. Naming the action in the message would undo that on its
-    // own, which is why the wording carries neither.
+  it("tells a member what a write tells them, and a stranger nothing", async () => {
+    // A member already knows the workspace exists, so they are told which
+    // action needs more, as every write tells them (MCP UAT BUG-005). A
+    // caller with no member row still hears the getter's own words, which
+    // confirm nothing.
     const wb = await workerDb();
+    const asUser = (userId: string) => ({
+      pool: wb.appPool,
+      workspaceId,
+      actor: { kind: "human" as const, userId },
+    });
     await expect(
-      callAction(
-        {
-          pool: wb.appPool,
-          workspaceId,
-          actor: { kind: "human", userId: PLAIN },
-        },
-        "ai.readBudgets",
-        {},
-      ),
-    ).rejects.toMatchObject({ code: "not_found", message: LEVEL_REFUSAL });
+      callAction(asUser(PLAIN), "ai.readBudgets", {}),
+    ).rejects.toMatchObject({
+      code: "forbidden",
+      message: levelRefusal("ai.readBudgets"),
+    });
+    await expect(
+      callAction(asUser("read-access-stranger"), "ai.readBudgets", {}),
+    ).rejects.toMatchObject({ code: "not_found", message: STRANGER_REFUSAL });
   });
 
   it("refuses the admin half to an ordinary member", async () => {

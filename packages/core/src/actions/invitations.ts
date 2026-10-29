@@ -413,6 +413,7 @@ export const revokeLink = defineWriteAction({
   input: z.object({ linkId: z.uuid() }),
   output: z.object({ id: z.uuid(), revokedAt: z.string() }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const revokedAt = new Date();

@@ -832,6 +832,7 @@ export const eraseMember = defineWriteAction({
     }),
   }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (context, input) => ({
     async load({ tx, workspaceId }) {
       const [before] = await tx
@@ -1272,6 +1273,7 @@ export const possibleManagersFor = defineReadAction({
  */
 export const importMember = defineWriteAction({
   name: "people.importMember",
+  agentSurface: false,
   summary:
     "Creates a placeholder member for somebody an import found, with the address to claim it by.",
   input: z.object({
