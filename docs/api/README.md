@@ -99,9 +99,12 @@ notifications, comments, KPIs, tasks, initiatives, documents, `search` and
 | Address | Tools |
 |---|---|
 | `https://okr.example.com/api/mcp` | `core` |
-| `https://okr.example.com/api/mcp?toolsets=core,work` | Everyday work, including drafts, KPI trees, checklists and the copilot |
-| `https://okr.example.com/api/mcp?toolsets=core,facilitation` | Running sessions, the planning workflow, cycles and alignment |
-| `https://okr.example.com/api/mcp?toolsets=all` | Every agent tool: `core`, `work`, `facilitation` and `admin` |
+| `https://okr.example.com/api/mcp?toolsets=core,work` | Everyday work, including KPI trees, checklists and the copilot |
+| `https://okr.example.com/api/mcp?toolsets=core,facilitation` | Preparing, running and following up sessions, the planning workflow, cycles and alignment |
+| `https://okr.example.com/api/mcp?toolsets=core,facilitation,room` | The same, plus the live room's votes, reveals, pulse and kudos |
+| `https://okr.example.com/api/mcp?toolsets=core,admin` | Workspace, people, spaces, roles, settings, agents and practice |
+| `https://okr.example.com/api/mcp?toolsets=core,integrations` | AI providers, chat channels, single sign-on and spreadsheet imports |
+| `https://okr.example.com/api/mcp?toolsets=all` | Every agent tool: `core`, `work`, `facilitation`, `room`, `admin` and `integrations` |
 
 A token is shown only the tools its scopes can call, and a call to a tool
 outside the chosen toolsets is refused with the toolset that holds it. The
