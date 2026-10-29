@@ -352,6 +352,48 @@ describe("the prompts an agent can ask for", () => {
     }
   });
 
+  it("names every required input of every tool it tells the agent to call", () => {
+    // A prompt that calls a tool without saying where its required input comes
+    // from sends the agent into a refusal (mcp-audit-2026-10-29, finding 4).
+    for (const prompt of MCP_PROMPTS) {
+      const text = prompt.render({});
+      const mentioned = [...text.matchAll(/\b([a-z]+\.[a-zA-Z]+)\b/g)].map(
+        (match) => match[1] as string,
+      );
+      for (const name of mentioned) {
+        const required = (toolNamed(name)?.inputSchema.required ??
+          []) as string[];
+        for (const field of required) {
+          expect(text, `${prompt.name}: ${name} needs ${field}`).toContain(
+            field,
+          );
+        }
+      }
+    }
+  });
+
+  it("asks for check-in values on the scale and with the labels the tool takes", () => {
+    const text =
+      MCP_PROMPTS.find((prompt) => prompt.name === "weekly-check-in")?.render(
+        {},
+      ) ?? "";
+    const properties = toolNamed("goals.publishCheckIn")?.inputSchema
+      .properties as Record<string, { enum?: string[] }> | undefined;
+    const status = properties?.status;
+    for (const value of status?.enum ?? []) {
+      expect(text).toContain(value);
+    }
+    expect(text).toContain("0 to 1");
+    expect(text).not.toContain("0 to 10");
+    // Due check-ins come from the one read built for it, not a scan of goals.
+    expect(text).toContain("goals.due");
+    expect(text).toContain("goals.startCheckIn");
+    // METHOD.md §3: a low confidence gets a next action, and a blocker where
+    // something is actually blocked.
+    expect(text).toContain("next action");
+    expect(text).toContain("blocked");
+  });
+
   it("uses the argument it was given", () => {
     const review = MCP_PROMPTS.find(
       (prompt) => prompt.name === "review-against-the-canon",
