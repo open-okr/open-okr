@@ -244,12 +244,12 @@ describe("renamedTerms", () => {
   });
 });
 
-describe("in a component", () => {
-  function AddObjective() {
-    const { t } = useTranslations();
-    return <button type="button">{t("cycle.drafting.addObjective")}</button>;
-  }
+function AddObjective() {
+  const { t } = useTranslations();
+  return <button type="button">{t("cycle.drafting.addObjective")}</button>;
+}
 
+describe("in a component", () => {
   test("reads the rename the provider was handed", () => {
     const { container } = render(
       <TranslationsProvider locale="en" renamed={AMBITION}>
