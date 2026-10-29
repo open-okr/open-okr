@@ -24,7 +24,7 @@ import { type ActionName, callAction } from "../../actions/registry.ts";
 import { OperationError } from "../../operations/errors.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
 import { errorFor } from "../errors.ts";
-import { toolNamed } from "./catalogue.ts";
+import { SERVER_SET_FIELDS, toolNamed } from "./catalogue.ts";
 import { isResearchTool, runResearchTool } from "./research.ts";
 import type { ToolsetName } from "./toolset-data.ts";
 import { toolsetRefusal } from "./toolsets.ts";
@@ -88,6 +88,15 @@ export async function dispatchTool(
     // needs to know which scope to ask for next time.
     return refusal(
       `That connection has ${principal.scopes.join(" and ")} scope, and ${name} needs ${tool.scope}.`,
+    );
+  }
+
+  const serverSet = SERVER_SET_FIELDS.filter((field) => field in input);
+  if (serverSet.length > 0) {
+    // Not in the schema the agent was shown, so sending one is a mistake or a
+    // probe; either way nothing runs.
+    return refusal(
+      `${serverSet.join(" and ")} is set by the server, not by an agent. Leave it out.`,
     );
   }
 

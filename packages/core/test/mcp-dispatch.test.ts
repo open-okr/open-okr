@@ -169,6 +169,33 @@ describe("the two gates, and neither substituting for the other", () => {
   });
 });
 
+describe("fields only the server sets", () => {
+  it("refuses an import identity from an agent, before anything is written", async () => {
+    // `legacy` is the importer's key, unique per workspace; an agent that set
+    // one could take an imported row's identity (mcp-audit-2026-10-29, 17).
+    const outcome = await run("spaces.create", {
+      name: "Borrowed identity",
+      legacy: { type: "flowyteam", id: "42" },
+    });
+    expect(outcome.isError).toBe(true);
+    expect(outcome.text).toContain("legacy");
+    const wb = await workerDb();
+    const rows = await wb.admin.query(
+      "select 1 from spaces where name = 'Borrowed identity'",
+    );
+    expect(rows.rowCount).toBe(0);
+  });
+
+  it("refuses the AI provenance flag, which the copilot sets and an agent may not", async () => {
+    const outcome = await run("goals.create", {
+      title: "Anything",
+      aiGenerated: true,
+    });
+    expect(outcome.isError).toBe(true);
+    expect(outcome.text).toContain("aiGenerated");
+  });
+});
+
 describe("what a refusal says, and what it does not", () => {
   it("answers a tool it does not have by name", async () => {
     const outcome = await run("goals.nonsense");

@@ -4113,27 +4113,6 @@
           "managerMemberId": {
             "type": "string",
             "format": "uuid"
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -4853,27 +4832,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -6887,27 +6845,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -7122,27 +7059,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 300
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -7426,27 +7342,6 @@
               "type": "string",
               "format": "uuid"
             }
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -7901,30 +7796,6 @@
           "contributionStatement": {
             "type": "string",
             "maxLength": 1000
-          },
-          "aiGenerated": {
-            "type": "boolean"
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           },
           "guided": {
             "type": "boolean"
@@ -8413,27 +8284,6 @@
               "fits",
               "tight",
               "exceeds"
-            ]
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
             ]
           },
           "guided": {
@@ -9983,27 +9833,6 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [
@@ -10171,27 +10000,6 @@
             "type": "number",
             "minimum": 0,
             "maximum": 200
-          },
-          "legacy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string",
-                "enum": [
-                  "csv",
-                  "flowyteam"
-                ]
-              },
-              "id": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              }
-            },
-            "required": [
-              "type",
-              "id"
-            ]
           }
         },
         "required": [

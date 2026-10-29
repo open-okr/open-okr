@@ -200,6 +200,14 @@ describe("what a tool tells an agent", () => {
     }
   });
 
+  it("never offers an agent a field only the server sets", () => {
+    for (const tool of MCP_TOOLS) {
+      const properties = (tool.inputSchema.properties ?? {}) as object;
+      expect(Object.keys(properties), tool.name).not.toContain("legacy");
+      expect(Object.keys(properties), tool.name).not.toContain("aiGenerated");
+    }
+  });
+
   it("builds an example holding exactly the required fields", () => {
     const tool = toolNamed("goals.delete");
     expect(Object.keys(tool?.example ?? {})).toEqual(["id"]);

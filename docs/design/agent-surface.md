@@ -233,10 +233,16 @@ Generated from the registry. Each tool carries:
 
 **The catalogue is per connection since 23 October 2026** (docs/design/mcp-toolsets.md).
 A connection is offered the toolsets its address names, `core` by default,
-intersected with what its scopes can call. Twenty actions marked
+intersected with what its scopes can call. Thirty-seven actions marked
 `agentSurface: false` (the importer's, the scheduler's, the copilot's own
-bookkeeping, and the token administration every token is refused) are not
-tools at all. Every other tool is in exactly one toolset, which a test holds.
+bookkeeping, the token administration every token is refused, and the AI
+assists that need a provider the agent path never has) are not tools at all.
+Every other tool is in exactly one toolset, which a test holds.
+
+**Fields only the server sets are not in a tool's schema.** `legacy`, the
+import identity, and `aiGenerated`, the copilot's provenance label, stay in
+the action for the importer and the copilot. The catalogue leaves them out and
+the dispatcher refuses a call that sends either, before anything runs.
 
 **Lifecycle and destructive actions are included.** Hiding them would not make
 an agent safer; it would make the agent's user do the same thing by hand with

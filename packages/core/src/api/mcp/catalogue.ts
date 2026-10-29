@@ -113,7 +113,45 @@ function jsonSchema(schema: ZodType): JsonObject {
   // one such tool made the whole list unreadable to those clients (found by
   // the MCP test against the UAT instance, 9 October 2026). The union stays
   // as it is, under an object type it already satisfies.
-  return rest.type === "object" ? rest : { type: "object", ...rest };
+  const object = rest.type === "object" ? rest : { type: "object", ...rest };
+  return withoutServerSetFields(object);
+}
+
+/**
+ * Input fields an action accepts from the importer or the copilot, never from
+ * an external agent.
+ *
+ * `legacy` is the import identity, unique on the workspace, the source and the
+ * source id; an agent that set one could take an imported row's place in the
+ * next run. `aiGenerated` is the copilot's provenance label on a goal. Both
+ * stay in the action's own schema for the callers that own them. The
+ * dispatcher refuses either when an agent sends it (mcp-audit-2026-10-29,
+ * finding 17).
+ */
+export const SERVER_SET_FIELDS: readonly string[] = ["legacy", "aiGenerated"];
+
+function withoutServerSetFields(schema: JsonObject): JsonObject {
+  const properties = schema.properties as Record<string, unknown> | undefined;
+  if (!properties) {
+    return schema;
+  }
+  const kept = Object.fromEntries(
+    Object.entries(properties).filter(
+      ([field]) => !SERVER_SET_FIELDS.includes(field),
+    ),
+  );
+  const required = schema.required as string[] | undefined;
+  return {
+    ...schema,
+    properties: kept,
+    ...(required
+      ? {
+          required: required.filter(
+            (field) => !SERVER_SET_FIELDS.includes(field),
+          ),
+        }
+      : {}),
+  };
 }
 
 /**
