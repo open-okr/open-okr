@@ -17,8 +17,17 @@
  * the one that puts it back, and it is deliberately the acceptance case's own
  * second half rather than a cleanup hook: an administrator lifting it *is* what
  * the criterion asks to see.
+ *
+ * **It makes the goal it edits, and lifts the freeze whatever happens.** A
+ * shard that held no goal used to fail the write case, skip the lift, and leave
+ * the workspace frozen for every spec after it on that shard (CI run
+ * 40891870917). A spec may rely on the claim and nothing else.
  */
-import type { BrowserContext, Page } from "@playwright/test";
+import type {
+  APIRequestContext,
+  BrowserContext,
+  Page,
+} from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
@@ -26,14 +35,57 @@ test.describe.configure({ mode: "serial" });
 
 let context: BrowserContext;
 let page: Page;
+let api: APIRequestContext;
+let token = "";
+let goalId = "";
 
-test.beforeAll(async ({ browser }) => {
+const authed = () => ({ authorization: `Bearer ${token}` });
+
+test.beforeAll(async ({ browser, playwright, baseURL }) => {
   context = await browser.newContext();
   page = await context.newPage();
+  api = await playwright.request.newContext({ baseURL });
   await signIn(page);
+
+  await goTo(page, "/account/api-tokens");
+  await page.getByLabel("Name").fill("Workspace state e2e");
+  await page.getByRole("checkbox", { name: "Write" }).check();
+  // Destructive only so afterAll can delete the goal it made.
+  await page.getByRole("checkbox", { name: "Destructive" }).check();
+  await page.getByRole("button", { name: "Create token" }).click();
+  const shown = page.getByTestId("minted-token");
+  await expect(shown).toBeVisible({ timeout: 10_000 });
+  token = ((await shown.textContent()) ?? "").trim();
+
+  const cycle = await api.get("/api/v1/cycles/current?mode=quarterly", {
+    headers: authed(),
+  });
+  const cycleId = ((await cycle.json()).data as { id: string }).id;
+  const created = await api.post("/api/v1/goals/create", {
+    headers: authed(),
+    data: {
+      title: `A goal a frozen workspace keeps ${Date.now().toString(36)}`,
+      cycleId,
+      level: "company",
+    },
+  });
+  expect(created.status(), await created.text()).toBe(200);
+  goalId = ((await created.json()).data as { id: string }).id;
 });
 
 test.afterAll(async () => {
+  // Whatever failed above, the shard's later specs need an active workspace.
+  if (token) {
+    await api.post("/api/v1/workspace/setState", {
+      headers: authed(),
+      data: { state: "active" },
+    });
+    await api.post("/api/v1/goals/delete", {
+      headers: authed(),
+      data: { id: goalId },
+    });
+  }
+  await api?.dispose();
   await context?.close();
 });
 
@@ -74,16 +126,7 @@ test("freezing it explains itself on a screen that is not the admin one", async 
 test("a write is refused while it is frozen", async () => {
   // The pipeline's own refusal, seen from a screen. `people.` is on the
   // recovery list and goals are not, so a goal edit is the honest thing to try.
-  await goTo(page, "/goals");
-  const goalHref = await page
-    .locator("a[href^='/goals/']")
-    .evaluateAll((links) => {
-      const match = links
-        .map((link) => link.getAttribute("href") ?? "")
-        .find((href) => /^\/goals\/[0-9a-f-]{36}$/.test(href));
-      return match ?? "";
-    });
-  expect(goalHref, "no goal link on /goals").not.toBe("");
+  const goalHref = `/goals/${goalId}`;
   await goTo(page, goalHref);
 
   // The banner followed us here, which is the point of putting it in the shell.
