@@ -9943,6 +9943,69 @@
       "pages": false
     },
     {
+      "name": "goals checkDraft",
+      "action": "goals.checkDraft",
+      "method": "GET",
+      "path": "/goals/checkDraft",
+      "scope": "read",
+      "summary": "Checks an unsaved objective and its key results against the quality checks, with each check's condition and coaching prompt. Saves nothing.",
+      "flags": [
+        {
+          "name": "title",
+          "field": "title",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "level",
+          "field": "level",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "company",
+            "department",
+            "team",
+            "individual"
+          ]
+        },
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "committed",
+            "aspirational"
+          ]
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "reviewer-id",
+          "field": "reviewerId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "key-results",
+          "field": "keyResults",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blockers summarise",
       "action": "blockers.summarise",
       "method": "GET",

@@ -11946,6 +11946,120 @@
       }
     },
     {
+      "name": "goals.checkDraft",
+      "description": "Checks an unsaved objective and its key results against the quality checks, with each check's condition and coaching prompt. Saves nothing.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "company",
+              "department",
+              "team",
+              "individual"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "committed",
+              "aspirational"
+            ]
+          },
+          "cycleId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "reviewerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "keyResults": {
+            "default": [],
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 500
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "metric",
+                    "maintain",
+                    "milestone",
+                    "baseline"
+                  ]
+                },
+                "direction": {
+                  "type": "string",
+                  "enum": [
+                    "increase",
+                    "reduce",
+                    "maintain",
+                    "move"
+                  ]
+                },
+                "indicatorType": {
+                  "type": "string",
+                  "enum": [
+                    "leading",
+                    "lagging"
+                  ]
+                },
+                "baselineValue": {
+                  "type": "number"
+                },
+                "targetValue": {
+                  "type": "number"
+                },
+                "dueOn": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "ownerId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              },
+              "required": [
+                "title"
+              ]
+            }
+          }
+        },
+        "required": [
+          "title",
+          "level"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "title": "…",
+        "level": "company"
+      }
+    },
+    {
       "name": "sessions.setCommitments",
       "description": "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
       "inputSchema": {

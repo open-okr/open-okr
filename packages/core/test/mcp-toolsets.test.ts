@@ -16,7 +16,7 @@ import {
  * A catalogue an agent can hold (docs/design/mcp-toolsets.md, MCP UAT BUG-004).
  *
  * The agent endpoint offered all 415 tools to every connection. These hold the
- * design's acceptance criteria: the default is the 60 `core` tools, a token is
+ * design's acceptance criteria: the default is the 61 `core` tools, a token is
  * shown only what its scopes can call, the importer's and the scheduler's
  * actions are not tools, and the list and the call agree.
  */
@@ -156,7 +156,7 @@ describe("what a connection is offered", () => {
     const offered = offeredTools(MCP_TOOLS, FULL, chosen(null)).map(
       (tool) => tool.name,
     );
-    expect(offered).toHaveLength(60);
+    expect(offered).toHaveLength(61);
     expect(offered).toEqual(expect.arrayContaining(["search", "fetch"]));
   });
 

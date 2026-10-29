@@ -36,6 +36,7 @@ import {
   evaluateObjective,
   type KeyResultInput,
   type KeyResultVerdict,
+  type ObjectiveInput,
   type QualityVerdict,
   type ResolvedPractice,
   type ResolvedThresholds,
@@ -172,6 +173,70 @@ export interface GoalVerdicts {
 }
 
 /**
+ * The verdicts and the score for one objective and its key results, as typed,
+ * under the practice and strictness in force for its space.
+ *
+ * One function for a stored goal and for an unsaved draft, so the draft an
+ * agent checks and the flags the goal later carries are judged to one
+ * standard.
+ */
+async function judgeInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly thresholds: ResolvedThresholds;
+    readonly spaceId: string | null;
+    readonly objective: Omit<ObjectiveInput, "reviewerRequired">;
+    readonly keyResults: readonly KeyResultInput[];
+  },
+): Promise<{
+  readonly objective: readonly QualityVerdict[];
+  readonly keyResultVerdicts: readonly KeyResultVerdict[];
+  readonly score: number | null;
+}> {
+  const thresholds = input.thresholds;
+  // A space's own strictness wins for its own goals, and nowhere else
+  // (P6-G18b). The thresholds object is rebuilt rather than mutated, because
+  // the caller may have passed it in and a unit recompute shares one across
+  // several goals in different spaces.
+  const override = await spaceStrictnessInTx(
+    tx,
+    input.workspaceId,
+    input.spaceId,
+  );
+  const inForce: ResolvedThresholds =
+    override === null
+      ? thresholds
+      : { ...thresholds, "quality.coachStrictness": override };
+  // Each check's level from the practice (METHOD.md §4, §12, P9-T03a).
+  // "Coach strictness" at strict, for the workspace or this space, still
+  // means every check at block, which is what strict mode is.
+  const practice = practiceFromRow(
+    await readRhythmRow(tx, input.workspaceId),
+  ).practice;
+  const options = { strict: inForce["quality.coachStrictness"] === "strict" };
+  const objective = applyEnforcement(
+    evaluateObjective(
+      {
+        ...input.objective,
+        reviewerRequired: practice.reviewer === "required",
+      },
+      inForce,
+    ),
+    practice,
+    options,
+  );
+  const keyResultVerdicts = applyEnforcement(
+    evaluateKeyResults({ keyResults: [...input.keyResults] }, inForce),
+    practice,
+    options,
+  );
+
+  const score = strengthScore([...objective, ...keyResultVerdicts], inForce);
+  return { objective, keyResultVerdicts, score };
+}
+
+/**
  * Evaluate one goal and return the verdicts, writing nothing (P4-T06a).
  *
  * `recomputeGoalQualityInTx` is this plus two updates, and it was one function
@@ -272,50 +337,21 @@ export async function evaluateGoalInTx(
     keyResultKind: row.keyResultKind,
   }));
 
-  // A space's own strictness wins for its own goals, and nowhere else
-  // (P6-G18b). The thresholds object is rebuilt rather than mutated, because
-  // the caller may have passed it in and a unit recompute shares one across
-  // several goals in different spaces.
-  const override = await spaceStrictnessInTx(
-    tx,
-    input.workspaceId,
-    goal.spaceId,
-  );
-  const inForce: ResolvedThresholds =
-    override === null
-      ? thresholds
-      : { ...thresholds, "quality.coachStrictness": override };
-  // Each check's level from the practice (METHOD.md §4, §12, P9-T03a).
-  // "Coach strictness" at strict, for the workspace or this space, still
-  // means every check at block, which is what strict mode is.
-  const practice = practiceFromRow(
-    await readRhythmRow(tx, input.workspaceId),
-  ).practice;
-  const options = { strict: inForce["quality.coachStrictness"] === "strict" };
-  const objective = applyEnforcement(
-    evaluateObjective(
-      {
-        title: goal.title,
-        hasCycle: goal.cycleId !== null,
-        hasTimeframe: goal.timeframe !== null,
-        championId: goal.championId,
-        reviewerId: goal.reviewerId,
-        reviewerRequired: practice.reviewer === "required",
-        objectivesInUnit: Math.max(unit.length, 1),
-        level: goal.level,
-      },
-      inForce,
-    ),
-    practice,
-    options,
-  );
-  const keyResultVerdicts = applyEnforcement(
-    evaluateKeyResults({ keyResults: set }, inForce),
-    practice,
-    options,
-  );
-
-  const score = strengthScore([...objective, ...keyResultVerdicts], inForce);
+  const { objective, keyResultVerdicts, score } = await judgeInTx(tx, {
+    workspaceId: input.workspaceId,
+    thresholds,
+    spaceId: goal.spaceId,
+    objective: {
+      title: goal.title,
+      hasCycle: goal.cycleId !== null,
+      hasTimeframe: goal.timeframe !== null,
+      championId: goal.championId,
+      reviewerId: goal.reviewerId,
+      objectivesInUnit: Math.max(unit.length, 1),
+      level: goal.level,
+    },
+    keyResults: set,
+  });
   const flags = [...flagsOf(objective), ...flagsOf(keyResultVerdicts)];
 
   // Which key result tripped which check, so a surface can put the flag beside
@@ -343,6 +379,62 @@ export async function evaluateGoalInTx(
     score,
     flags,
     keyResultFlags: perKeyResult,
+  };
+}
+
+/**
+ * Evaluate an objective that has not been saved, writing nothing.
+ *
+ * An agent drafting with its own model needs the product's verdicts before
+ * the draft becomes real: by default (METHOD.md §2.9) a mid-cycle objective
+ * goes live once it passes the block checks, so creating it to check it
+ * publishes it (mcp-audit-2026-10-29, §10.2 Q16). The caller authorised the
+ * space, if it names one.
+ */
+export async function evaluateDraftInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly spaceId: string | null;
+    readonly objective: Omit<
+      ObjectiveInput,
+      "reviewerRequired" | "objectivesInUnit"
+    >;
+    readonly keyResults: readonly KeyResultInput[];
+  },
+): Promise<{
+  readonly objective: readonly QualityVerdict[];
+  readonly keyResults: readonly KeyResultVerdict[];
+  readonly score: number | null;
+}> {
+  // OBJ-5's unit, as evaluateGoalInTx counts it, plus the draft itself.
+  const unit = await tx
+    .select({ id: goals.id })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        and(
+          eq(goals.workspaceId, input.workspaceId),
+          eq(goals.level, input.objective.level),
+          input.spaceId
+            ? eq(goals.spaceId, input.spaceId)
+            : isNull(goals.spaceId),
+          isNull(goals.closedAt),
+        ),
+      ),
+    );
+  const judged = await judgeInTx(tx, {
+    workspaceId: input.workspaceId,
+    thresholds: await loadThresholdsInTx(tx, input.workspaceId),
+    spaceId: input.spaceId,
+    objective: { ...input.objective, objectivesInUnit: unit.length + 1 },
+    keyResults: input.keyResults,
+  });
+  return {
+    objective: judged.objective,
+    keyResults: judged.keyResultVerdicts,
+    score: judged.score,
   };
 }
 

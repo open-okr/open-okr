@@ -233,6 +233,7 @@ import {
   suggestMeasure,
   suggestParent,
 } from "./goal-assists.ts";
+import { checkDraft } from "./goal-check.ts";
 import { approveDraft, publishDraft } from "./goal-drafts.ts";
 import { setGoalKind } from "./goal-kind.ts";
 import { moveGoalToSpace } from "./goal-move.ts";
@@ -891,6 +892,7 @@ export const ACTION_MAP = {
   "sessions.blockerStatus": sessionBlockerStatus,
   "blockers.board": readBlockerBoard,
   "blockers.raise": raiseBlocker,
+  "goals.checkDraft": checkDraft,
   "blockers.summarise": summariseBlockers,
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,

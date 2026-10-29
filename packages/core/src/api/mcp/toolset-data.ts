@@ -84,6 +84,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "sessions.mine",
     "blockers.board",
     "blockers.raise",
+    "goals.checkDraft",
     "decisions.forGoal",
     "search",
     "fetch",

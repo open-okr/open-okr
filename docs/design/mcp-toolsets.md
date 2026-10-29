@@ -79,7 +79,7 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 
 | Toolset | Holds | Tools |
 |---|---|---|
-| `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites | 60 |
+| `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites, and checking an unsaved draft | 61 |
 | `work` | The rest of everyday work: targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 77 |
 | `facilitation` | Running the rhythm: preparing, running remotely and following up sessions, the planning workflow, cycles, alignment, dependencies, decisions, closing | 91 |
 | `room` | The live room's own moves: private votes and their reveal, the mic, pulse, kudos, retro notes, anonymous process-health answers | 16 |
@@ -119,6 +119,7 @@ From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 1
 | `integrations` split from `admin` | `admin` held 137 tools, over the 128 cap |
 | `goals.publishDraft` and `goals.approveDraft` move to `core` | Publishing your own draft and approving it as reviewer are weekly acts beside `goals.create` and `review.inbox` (METHOD.md §2.9) |
 | Seventeen AI assists leave the agent surface (§2.2) | They answer null on the agent path, which has no provider |
+| `goals.checkDraft` joins `core` | The §4 verdicts on an unsaved draft, with each check's prompt, so an agent drafting with its own model can check before `goals.create` publishes |
 | `blockers.raise` joins `core` | An owner raises a blocker at check-in time, outside any session (METHOD.md §3, §7.3) |
 
 ## 3. What it measures after

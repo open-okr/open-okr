@@ -405,7 +405,8 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
           ? `1. Call workflow.read with ${args.cycleId} as cycleId.`
           : "1. Call cycles.current, then workflow.read with that cycle's id as cycleId.",
         "2. Publish gate 2 names every objective and key result that fails a check. For each, call goals.read with the goal's id as id and quote the failing checks as the product names them.",
-        "3. Suggest one rewrite per failure, and list the failures by objective, the ones that block publishing first.",
+        "3. Suggest one rewrite per failure. Before you show a rewrite, call goals.checkDraft with it as title, the goal's level and its key results, and keep only a rewrite that passes the check it failed.",
+        "4. List the failures by objective, the ones that block publishing first.",
         "",
         "Change nothing. This is a review.",
       ].join("\n"),

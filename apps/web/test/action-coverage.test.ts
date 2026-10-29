@@ -54,6 +54,10 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "an owner's agent raises a blocker at check-in time; the browser raises one in the weekly session (mcp-audit-2026-10-29, finding 10)",
   },
+  "goals.checkDraft": {
+    apiOnly: true,
+    why: "an agent checks a draft before creating it; the browser's composer runs the same checks as the person types",
+  },
   "workspace.provision": {
     caller: "packages/core/src/workspaces/provisioning.ts",
     why: "the pipeline calls it, from registration and the setup wizard",
