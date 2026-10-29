@@ -106,7 +106,7 @@ function jsonSchema(schema: ZodType): JsonObject {
     unrepresentable: "any",
     target: "draft-2020-12",
   }) as JsonObject;
-  const { $schema, ...rest } = converted;
+  const { $schema, ...rest } = withoutUuidPatterns(converted) as JsonObject;
   // **The protocol requires an object at the top** (`type: "object"`), and a
   // client built on the official SDK validates every tool of a list against
   // that. An input that is a union of objects converts to a bare `anyOf`, and
@@ -114,6 +114,33 @@ function jsonSchema(schema: ZodType): JsonObject {
   // the MCP test against the UAT instance, 9 October 2026). The union stays
   // as it is, under an object type it already satisfies.
   return rest.type === "object" ? rest : { type: "object", ...rest };
+}
+
+/**
+ * Drops the regular expression Zod writes beside every `format: "uuid"`.
+ *
+ * Every client loads every schema into the model's context, and that one
+ * pattern, repeated on each identifier, was 60 KB of a 429 KB catalogue and
+ * nearly a third of the default toolset (mcp-tool-review, 29 October 2026). The
+ * format already says what the field is, and the server still validates every
+ * call against the action's Zod schema, so nothing is accepted that was not.
+ */
+function withoutUuidPatterns(node: unknown): unknown {
+  if (Array.isArray(node)) {
+    return node.map(withoutUuidPatterns);
+  }
+  if (node === null || typeof node !== "object") {
+    return node;
+  }
+  const record = node as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key === "pattern" && record.format === "uuid") {
+      continue;
+    }
+    out[key] = withoutUuidPatterns(value);
+  }
+  return out;
 }
 
 /**

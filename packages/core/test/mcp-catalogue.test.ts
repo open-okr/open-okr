@@ -171,6 +171,26 @@ describe("what a tool tells an agent", () => {
     }
   });
 
+  it("names an identifier by its format, not by a regular expression", () => {
+    const properties = toolNamed("goals.delete")?.inputSchema.properties as
+      | Record<string, object>
+      | undefined;
+    const id = properties?.id;
+    expect(id).toMatchObject({ type: "string", format: "uuid" });
+    expect(id).not.toHaveProperty("pattern");
+  });
+
+  it("carries no identifier pattern anywhere in the catalogue", () => {
+    // Every client loads every schema into the model's context, and the
+    // pattern was a third of the default toolset (mcp-tool-review, 29 October
+    // 2026). The server still validates each call against the Zod schema.
+    for (const tool of MCP_TOOLS) {
+      expect(JSON.stringify(tool.inputSchema), tool.name).not.toContain(
+        "[0-9a-fA-F]{8}-",
+      );
+    }
+  });
+
   it("builds an example holding exactly the required fields", () => {
     const tool = toolNamed("goals.delete");
     expect(Object.keys(tool?.example ?? {})).toEqual(["id"]);
