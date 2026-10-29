@@ -129,6 +129,25 @@ describe("placement", () => {
     expect(TOOLSETS.core.has("goals.approveDraft")).toBe(true);
   });
 
+  it("describes every input field of every core tool", () => {
+    // An agent guesses a field nobody described (mcp-audit-2026-10-29, 6).
+    const bare = offeredTools(
+      MCP_TOOLS,
+      FULL,
+      new Set(["core" as const]),
+    ).flatMap((tool) =>
+      Object.entries(
+        (tool.inputSchema.properties ?? {}) as Record<
+          string,
+          { description?: string }
+        >,
+      )
+        .filter(([, node]) => !node.description)
+        .map(([field]) => `${tool.name}.${field}`),
+    );
+    expect(bare).toEqual([]);
+  });
+
   it("names no tool that does not exist", () => {
     const known = new Set(MCP_TOOLS.map((tool) => tool.name));
     const stale = TOOLSET_NAMES.flatMap((toolset) => [

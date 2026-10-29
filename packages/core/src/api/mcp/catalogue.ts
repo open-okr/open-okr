@@ -25,6 +25,7 @@ import { type ZodType, z } from "zod";
 import { RICH_TEXT_MARKER } from "../../rich-text/field-schema.ts";
 import type { JsonObject } from "../openapi.ts";
 import { REST_ROUTES, type RestRoute } from "../surface.ts";
+import { fieldDescription } from "./field-descriptions.ts";
 import { RESEARCH_TOOL_SPECS, type ResearchToolSpec } from "./research.ts";
 
 /** The catalogue's own version, bumped when its shape changes. */
@@ -290,8 +291,28 @@ function forAgents(summary: string): string {
     .trim();
 }
 
+/** Fills in a description for each top-level field the schema leaves bare. */
+function withFieldDescriptions(tool: string, schema: JsonObject): JsonObject {
+  const properties = schema.properties as
+    | Record<string, JsonObject>
+    | undefined;
+  if (!properties) {
+    return schema;
+  }
+  const described = Object.fromEntries(
+    Object.entries(properties).map(([field, node]) => {
+      const description = node.description ?? fieldDescription(tool, field);
+      return [field, description ? { ...node, description } : node];
+    }),
+  );
+  return { ...schema, properties: described };
+}
+
 function toolFor(route: RestRoute): McpTool {
-  const schema = jsonSchema(route.inputSchema);
+  const schema = withFieldDescriptions(
+    route.action,
+    jsonSchema(route.inputSchema),
+  );
   return {
     name: route.action,
     description: forAgents(route.summary),
@@ -454,7 +475,7 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
  * from a route, because neither has a route: both are reads and both say so.
  */
 function researchToolFor(spec: ResearchToolSpec): McpTool {
-  const schema = jsonSchema(spec.input);
+  const schema = withFieldDescriptions(spec.name, jsonSchema(spec.input));
   return {
     name: spec.name,
     description: spec.description,

@@ -349,7 +349,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "name": {
             "type": "string",
@@ -365,7 +366,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A short title, as a person would read it in a list."
           },
           "managerId": {
             "anyOf": [
@@ -401,7 +403,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "administrator": {
             "type": "boolean"
@@ -431,7 +434,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -456,7 +460,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -481,7 +486,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -506,7 +512,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -530,12 +537,14 @@
         "type": "object",
         "properties": {
           "includeSuspended": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to include suspended members."
           },
           "search": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "Words to match against names."
           },
           "kinds": {
             "minItems": 1,
@@ -548,12 +557,14 @@
                 "agent",
                 "placeholder"
               ]
-            }
+            },
+            "description": "Only these kinds. Every kind when left out."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -573,7 +584,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -613,7 +625,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -998,7 +1011,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "text": {
             "type": "string",
@@ -1062,7 +1076,8 @@
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -1348,11 +1363,13 @@
           "subjectType": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 40
+            "maxLength": 40,
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "question": {
             "type": "string",
@@ -1412,17 +1429,20 @@
           "subjectType": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 40
+            "maxLength": 40,
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "limit": {
             "default": 20,
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -1663,7 +1683,8 @@
         "type": "object",
         "properties": {
           "unreadOnly": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True for unread notifications only."
           },
           "reason": {
             "type": "string",
@@ -1674,7 +1695,8 @@
               "role",
               "review",
               "check_in"
-            ]
+            ],
+            "description": "One line on why, where the workspace asks for one."
           },
           "cursor": {
             "type": "object",
@@ -1690,7 +1712,8 @@
             "required": [
               "createdAt",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           }
         }
       },
@@ -1725,7 +1748,8 @@
         "properties": {
           "notificationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The notification's id, from notifications.list."
           }
         },
         "required": [
@@ -1750,7 +1774,8 @@
         "properties": {
           "notificationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The notification's id, from notifications.list."
           },
           "untilMinutes": {
             "type": "integer",
@@ -1853,11 +1878,13 @@
         "properties": {
           "subjectType": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           }
         },
         "required": [
@@ -1884,11 +1911,13 @@
         "properties": {
           "subjectType": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "subscribe": {
             "type": "boolean"
@@ -1920,7 +1949,8 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "cursor": {
             "type": "object",
@@ -1936,7 +1966,8 @@
             "required": [
               "at",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           }
         },
         "required": [
@@ -1961,7 +1992,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "cursor": {
             "type": "object",
@@ -1977,7 +2009,8 @@
             "required": [
               "at",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           }
         },
         "required": [
@@ -2002,7 +2035,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "cursor": {
             "type": "object",
@@ -2018,7 +2052,8 @@
             "required": [
               "at",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           }
         },
         "required": [
@@ -2055,7 +2090,8 @@
             "required": [
               "at",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           }
         }
       },
@@ -2167,7 +2203,8 @@
             "default": 10000,
             "type": "integer",
             "exclusiveMinimum": 0,
-            "maximum": 10000
+            "maximum": 10000,
+            "description": "The most rows to return."
           }
         }
       },
@@ -2244,12 +2281,14 @@
             "required": [
               "at",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 200
+            "maximum": 200,
+            "description": "The most rows to return."
           }
         }
       },
@@ -3196,7 +3235,8 @@
               "user",
               "agent",
               "workspace"
-            ]
+            ],
+            "description": "all for everything visible, mine for what the caller owns or reviews."
           },
           "scopeRef": {
             "anyOf": [
@@ -3547,7 +3587,8 @@
               "coach",
               "champion",
               "custom"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "persona": {
             "default": "",
@@ -3719,7 +3760,8 @@
           "level": {
             "type": "integer",
             "minimum": 10,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The level of the goal: company, department, team or individual."
           }
         },
         "required": [
@@ -3912,7 +3954,8 @@
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -3937,7 +3980,8 @@
               "pending",
               "applied",
               "dismissed"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           }
         }
       },
@@ -4080,7 +4124,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -4139,7 +4184,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "name": {
             "type": "string",
@@ -4180,7 +4226,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "teamVoting": {
             "type": "boolean"
@@ -4266,7 +4313,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "holidays": {
             "maxItems": 60,
@@ -4320,7 +4368,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -4394,7 +4443,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "leave": {
             "maxItems": 200,
@@ -4449,7 +4499,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -4474,7 +4525,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -4499,11 +4551,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "role": {
             "default": "member",
@@ -4539,11 +4593,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "role": {
             "type": "string",
@@ -4580,11 +4636,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -4611,7 +4669,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -4636,7 +4695,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -4676,7 +4736,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -4701,7 +4762,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -4730,7 +4792,8 @@
             "enum": [
               "annual",
               "quarterly"
-            ]
+            ],
+            "description": "annual or quarterly cycles."
           }
         }
       },
@@ -4775,7 +4838,8 @@
         "properties": {
           "on": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Any date inside the period being recorded, as YYYY-MM-DD."
           },
           "cadence": {
             "type": "string",
@@ -4791,7 +4855,8 @@
             "enum": [
               "annual",
               "quarterly"
-            ]
+            ],
+            "description": "annual or quarterly cycles."
           },
           "firstCycle": {
             "default": false,
@@ -4858,7 +4923,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.list or cycles.current."
           },
           "phase": {
             "type": "integer",
@@ -4970,7 +5036,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.list or cycles.current."
           }
         },
         "required": [
@@ -4995,7 +5062,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5051,7 +5119,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5142,7 +5211,8 @@
                 "type": "number",
                 "const": 100
               }
-            ]
+            ],
+            "description": "The level of the goal: company, department, team or individual."
           }
         },
         "required": [
@@ -5270,7 +5340,8 @@
         "properties": {
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "roleId": {
             "anyOf": [
@@ -5582,7 +5653,8 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -5607,7 +5679,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5632,7 +5705,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "itemKey": {
             "type": "integer",
@@ -5651,7 +5725,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A short note kept with the change."
           }
         },
         "required": [
@@ -5680,7 +5755,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5705,7 +5781,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "text": {
             "type": "string",
@@ -5753,7 +5830,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "issueId": {
             "type": "string",
@@ -5791,7 +5869,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "text": {
             "type": "string",
@@ -5838,7 +5917,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "holds": {
             "type": "boolean"
@@ -5881,7 +5961,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "stable": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -5918,7 +5999,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "cuts": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -5949,7 +6031,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "keyResultIds": {
             "maxItems": 50,
@@ -5957,7 +6040,8 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "description": "Key result ids, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -5984,7 +6068,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "step": {
             "type": "string",
@@ -6036,11 +6121,13 @@
               "initiative",
               "cycle",
               "session"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           }
         },
         "required": [
@@ -6067,7 +6154,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           }
         },
         "required": [
@@ -6092,7 +6180,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           },
           "from": {
             "type": "integer",
@@ -6134,16 +6223,19 @@
               "initiative",
               "cycle",
               "session"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 300
+            "maxLength": 300,
+            "description": "A short title, as a person would read it in a list."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6176,12 +6268,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 300
+            "maxLength": 300,
+            "description": "A short title, as a person would read it in a list."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6210,7 +6304,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           }
         },
         "required": [
@@ -6235,7 +6330,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           }
         },
         "required": [
@@ -6260,7 +6356,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The document's id, from documents.list."
           }
         },
         "required": [
@@ -6295,11 +6392,13 @@
               "task",
               "document",
               "check_in"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           }
         },
         "required": [
@@ -6336,11 +6435,13 @@
               "task",
               "document",
               "check_in"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "blobId": {
             "type": "string",
@@ -6408,12 +6509,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 60
-            }
+            },
+            "description": "Only these kinds of results. Every kind when left out."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 50
+            "maximum": 50,
+            "description": "The most rows to return."
           }
         },
         "required": [
@@ -6470,7 +6573,8 @@
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 20
+            "maximum": 20,
+            "description": "The most rows to return."
           },
           "kinds": {
             "minItems": 1,
@@ -6489,7 +6593,8 @@
                 "session",
                 "cycle"
               ]
-            }
+            },
+            "description": "Only these kinds. Every kind when left out."
           }
         },
         "required": [
@@ -6523,11 +6628,13 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "format": {
             "default": "csv",
@@ -6562,7 +6669,8 @@
             "default": 20,
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -6584,7 +6692,8 @@
             "default": 20,
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -6754,20 +6863,24 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 200
+            "maximum": 200,
+            "description": "The most rows to return."
           }
         }
       },
@@ -6786,10 +6899,12 @@
         "type": "object",
         "properties": {
           "mine": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True for only the caller's own."
           },
           "dueBy": {
-            "type": "string"
+            "type": "string",
+            "description": "Only items due on or before this date, as YYYY-MM-DD."
           },
           "status": {
             "type": "string",
@@ -6798,11 +6913,13 @@
               "todo",
               "in_progress",
               "done"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           }
         }
       },
@@ -6822,7 +6939,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -6847,12 +6965,14 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6860,11 +6980,13 @@
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "status": {
             "type": "string",
@@ -6873,11 +6995,13 @@
               "todo",
               "in_progress",
               "done"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "dueOn": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The due date, as YYYY-MM-DD."
           },
           "assigneeIds": {
             "maxItems": 20,
@@ -6885,7 +7009,8 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "description": "Members to assign, by id from people.directory."
           }
         },
         "required": [
@@ -6912,12 +7037,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6930,7 +7057,8 @@
               "todo",
               "in_progress",
               "done"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "dueOn": {
             "anyOf": [
@@ -6941,7 +7069,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The due date, as YYYY-MM-DD."
           },
           "initiativeId": {
             "anyOf": [
@@ -6952,7 +7081,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The initiative's id, from initiatives.list."
           },
           "keyResultId": {
             "anyOf": [
@@ -6963,7 +7093,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -6988,7 +7119,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "status": {
             "type": "string",
@@ -6997,7 +7129,8 @@
               "todo",
               "in_progress",
               "done"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "afterTaskId": {
             "anyOf": [
@@ -7008,7 +7141,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The card it lands after in the column. Leave out for the top of the column."
           }
         },
         "required": [
@@ -7035,11 +7169,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -7066,11 +7202,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -7097,12 +7235,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 300
+            "maxLength": 300,
+            "description": "A short title, as a person would read it in a list."
           }
         },
         "required": [
@@ -7129,14 +7269,16 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "itemId": {
             "type": "string",
             "format": "uuid"
           },
           "done": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when a milestone is done or a baseline is recorded."
           }
         },
         "required": [
@@ -7165,7 +7307,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           },
           "itemId": {
             "type": "string",
@@ -7196,7 +7339,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -7221,7 +7365,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The task's id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -7246,7 +7391,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -7271,11 +7417,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "status": {
             "type": "string",
@@ -7284,7 +7432,8 @@
               "active",
               "done",
               "dropped"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "capacity": {
             "type": "string",
@@ -7292,7 +7441,8 @@
               "fits",
               "tight",
               "exceeds"
-            ]
+            ],
+            "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
           }
         }
       },
@@ -7312,7 +7462,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           }
         },
         "required": [
@@ -7337,12 +7488,14 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -7350,15 +7503,18 @@
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "startsOn": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The start date, as YYYY-MM-DD."
           },
           "endsOn": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The end date, as YYYY-MM-DD."
           },
           "status": {
             "type": "string",
@@ -7367,12 +7523,14 @@
               "active",
               "done",
               "dropped"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "capacity": {
             "type": "string",
@@ -7380,7 +7538,8 @@
               "fits",
               "tight",
               "exceeds"
-            ]
+            ],
+            "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
           },
           "keyResultIds": {
             "maxItems": 50,
@@ -7388,7 +7547,8 @@
             "items": {
               "type": "string",
               "format": "uuid"
-            }
+            },
+            "description": "Key result ids, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -7417,12 +7577,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -7430,7 +7592,8 @@
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "startsOn": {
             "anyOf": [
@@ -7441,7 +7604,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The start date, as YYYY-MM-DD."
           },
           "endsOn": {
             "anyOf": [
@@ -7452,7 +7616,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The end date, as YYYY-MM-DD."
           },
           "status": {
             "type": "string",
@@ -7461,7 +7626,8 @@
               "active",
               "done",
               "dropped"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "confidence": {
             "anyOf": [
@@ -7473,7 +7639,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "capacity": {
             "anyOf": [
@@ -7488,7 +7655,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
           }
         },
         "required": [
@@ -7513,7 +7681,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           }
         },
         "required": [
@@ -7538,7 +7707,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           }
         },
         "required": [
@@ -7563,11 +7733,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -7594,11 +7766,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The initiative's id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -7625,7 +7799,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -7650,11 +7825,13 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "includeClosed": {
             "default": false,
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to include closed goals."
           },
           "level": {
             "type": "string",
@@ -7663,11 +7840,13 @@
               "department",
               "team",
               "individual"
-            ]
+            ],
+            "description": "The level of the goal: company, department, team or individual."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "health": {
             "type": "string",
@@ -7680,10 +7859,12 @@
               "achieved",
               "missed",
               "abandoned"
-            ]
+            ],
+            "description": "Only goals with this health."
           },
           "mine": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True for only the caller's own."
           },
           "cursor": {
             "type": "object",
@@ -7701,12 +7882,14 @@
             "required": [
               "position",
               "id"
-            ]
+            ],
+            "description": "The cursor from the previous page's answer, for the next page."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 500
+            "maximum": 500,
+            "description": "The most rows to return."
           }
         }
       },
@@ -7726,7 +7909,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -7752,7 +7936,8 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -7760,7 +7945,8 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "timeframe": {
             "type": "object",
@@ -7778,7 +7964,8 @@
             "required": [
               "startsOn",
               "endsOn"
-            ]
+            ],
+            "description": "Start and end dates (YYYY-MM-DD) when the goal does not follow its cycle."
           },
           "level": {
             "type": "string",
@@ -7787,14 +7974,16 @@
               "department",
               "team",
               "individual"
-            ]
+            ],
+            "description": "The level of the goal: company, department, team or individual."
           },
           "kind": {
             "type": "string",
             "enum": [
               "committed",
               "aspirational"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "ownerKind": {
             "default": "workspace",
@@ -7803,19 +7992,23 @@
               "workspace",
               "space",
               "member"
-            ]
+            ],
+            "description": "Who owns the goal: the workspace, a space (needs spaceId) or a member (needs memberId)."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "championId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member accountable for the goal, by id from people.directory. Defaults to the caller."
           },
           "reviewerId": {
             "anyOf": [
@@ -7826,37 +8019,45 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The member who reviews the goal's check-ins, by id from people.directory."
           },
           "parentGoalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal this one aligns up to, by id."
           },
           "parentKeyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result this goal contributes to, by id."
           },
           "strategyId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The strategic thrust this goal serves, by id from frame.read."
           },
           "weight": {
             "default": 1,
             "type": "number",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 100,
+            "description": "Relative weight in its parent's progress. 1 is a normal weight."
           },
           "contributionStatement": {
             "type": "string",
-            "maxLength": 1000
+            "maxLength": 1000,
+            "description": "One sentence on how this goal contributes to the one it aligns to."
           },
           "guided": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Accepted and ignored. Leave it out."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -7883,12 +8084,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "description": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -7901,12 +8104,14 @@
               "department",
               "team",
               "individual"
-            ]
+            ],
+            "description": "The level of the goal: company, department, team or individual."
           },
           "weight": {
             "type": "number",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 100,
+            "description": "Relative weight in its parent's progress. 1 is a normal weight."
           },
           "contributionStatement": {
             "anyOf": [
@@ -7917,7 +8122,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "One sentence on how this goal contributes to the one it aligns to."
           },
           "parentGoalId": {
             "anyOf": [
@@ -7928,7 +8134,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The goal this one aligns up to, by id."
           },
           "parentKeyResultId": {
             "anyOf": [
@@ -7939,7 +8146,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The key result this goal contributes to, by id."
           },
           "standaloneReason": {
             "anyOf": [
@@ -7950,7 +8158,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Why the goal stands alone instead of aligning to another, when it does."
           },
           "strategyId": {
             "anyOf": [
@@ -7961,7 +8170,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The strategic thrust this goal serves, by id from frame.read."
           },
           "checkInFrequency": {
             "anyOf": [
@@ -7977,7 +8187,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "How often the goal is checked in."
           }
         },
         "required": [
@@ -8002,7 +8213,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "successStatus": {
             "type": "string",
@@ -8059,7 +8271,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8084,7 +8297,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8109,7 +8323,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8134,7 +8349,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8159,12 +8375,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 280
+            "maxLength": 280,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -8191,7 +8409,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "role": {
             "type": "string",
@@ -8209,7 +8428,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -8238,16 +8458,19 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -8274,16 +8497,19 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "unit": {
             "type": "string",
-            "maxLength": 60
+            "maxLength": 60,
+            "description": "The unit the value is measured in, such as %, customers or days."
           },
           "kind": {
             "type": "string",
@@ -8292,7 +8518,8 @@
               "maintain",
               "milestone",
               "baseline"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "direction": {
             "type": "string",
@@ -8301,41 +8528,50 @@
               "reduce",
               "maintain",
               "move"
-            ]
+            ],
+            "description": "Which way success moves: increase, reduce, maintain or move to a value."
           },
           "indicatorType": {
             "type": "string",
             "enum": [
               "leading",
               "lagging"
-            ]
+            ],
+            "description": "Leading (moves early and predicts) or lagging (confirms the result)."
           },
           "baselineValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure starts."
           },
           "targetValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure should be at the end."
           },
           "currentValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure is today, when it differs from the baseline."
           },
           "dueOn": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The due date, as YYYY-MM-DD."
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "weight": {
             "default": 1,
             "type": "number",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 100,
+            "description": "Relative weight in its parent's progress. 1 is a normal weight."
           },
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "capacity": {
             "type": "string",
@@ -8343,15 +8579,18 @@
               "fits",
               "tight",
               "exceeds"
-            ]
+            ],
+            "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
           },
           "guided": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Accepted and ignored. Leave it out."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -8380,12 +8619,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "unit": {
             "anyOf": [
@@ -8396,7 +8637,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The unit the value is measured in, such as %, customers or days."
           },
           "kind": {
             "type": "string",
@@ -8405,10 +8647,12 @@
               "maintain",
               "milestone",
               "baseline"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "done": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when a milestone is done or a baseline is recorded."
           },
           "direction": {
             "type": "string",
@@ -8417,25 +8661,30 @@
               "reduce",
               "maintain",
               "move"
-            ]
+            ],
+            "description": "Which way success moves: increase, reduce, maintain or move to a value."
           },
           "indicatorType": {
             "type": "string",
             "enum": [
               "leading",
               "lagging"
-            ]
+            ],
+            "description": "Leading (moves early and predicts) or lagging (confirms the result)."
           },
           "baselineValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure starts."
           },
           "targetValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure should be at the end."
           },
           "targetReason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "Why the target moved, kept with the change."
           },
           "dueOn": {
             "anyOf": [
@@ -8446,7 +8695,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The due date, as YYYY-MM-DD."
           },
           "ownerId": {
             "anyOf": [
@@ -8457,12 +8707,14 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The member who owns it, by id from people.directory."
           },
           "weight": {
             "type": "number",
             "minimum": 0,
-            "maximum": 100
+            "maximum": 100,
+            "description": "Relative weight in its parent's progress. 1 is a normal weight."
           },
           "capacity": {
             "anyOf": [
@@ -8477,10 +8729,12 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
           },
           "carryForward": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to carry the key result into the next cycle."
           }
         },
         "required": [
@@ -8505,21 +8759,25 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "scope": {
             "type": "string",
             "enum": [
               "all",
               "mine"
-            ]
+            ],
+            "description": "all for everything visible, mine for what the caller owns or reviews."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "includeClosed": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to include closed goals."
           }
         },
         "required": [
@@ -8544,7 +8802,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -8569,7 +8828,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "afterId": {
             "anyOf": [
@@ -8607,7 +8867,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "afterId": {
             "anyOf": [
@@ -8645,7 +8906,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "set": {
             "type": "object",
@@ -8718,7 +8980,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "set": {
             "type": "object",
@@ -8824,15 +9087,18 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "targetValue": {
-            "type": "number"
+            "type": "number",
+            "description": "Where the measure should be at the end."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -8859,19 +9125,22 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "kind": {
             "type": "string",
             "enum": [
               "committed",
               "aspirational"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -8898,11 +9167,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -8929,7 +9200,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8954,7 +9226,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8979,7 +9252,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9004,7 +9278,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9029,14 +9304,17 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "value": {
-            "type": "number"
+            "type": "number",
+            "description": "The new value, in the key result's unit."
           },
           "note": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short note kept with the change."
           }
         },
         "required": [
@@ -9063,7 +9341,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9088,11 +9367,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           }
         },
         "required": [
@@ -9119,7 +9400,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9144,13 +9426,15 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "limit": {
             "default": 100,
             "type": "integer",
             "minimum": 1,
-            "maximum": 500
+            "maximum": 500,
+            "description": "The most rows to return."
           }
         },
         "required": [
@@ -9177,7 +9461,8 @@
             "default": 2,
             "type": "integer",
             "minimum": 0,
-            "maximum": 30
+            "maximum": 30,
+            "description": "Days ahead to count as due. 0 is due today or overdue only."
           }
         }
       },
@@ -9197,11 +9482,13 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "includeDrafts": {
             "default": true,
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to include unpublished draft check-ins."
           }
         },
         "required": [
@@ -9226,7 +9513,8 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9251,7 +9539,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9259,12 +9548,14 @@
               "on_track",
               "caution",
               "off_track"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "narrative": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -9295,7 +9586,8 @@
               "required": [
                 "keyResultId"
               ]
-            }
+            },
+            "description": "One entry per key result being updated: keyResultId and the new value, optionally a confidence or done."
           }
         },
         "required": [
@@ -9326,7 +9618,8 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9334,12 +9627,14 @@
               "on_track",
               "caution",
               "off_track"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "narrative": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -9370,7 +9665,8 @@
               "required": [
                 "keyResultId"
               ]
-            }
+            },
+            "description": "One entry per key result being updated: keyResultId and the new value, optionally a confidence or done."
           }
         },
         "required": [
@@ -9401,7 +9697,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9409,12 +9706,14 @@
               "on_track",
               "caution",
               "off_track"
-            ]
+            ],
+            "description": "The state to set or to filter by."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "narrative": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -9445,7 +9744,8 @@
               "required": [
                 "keyResultId"
               ]
-            }
+            },
+            "description": "One entry per key result being updated: keyResultId and the new value, optionally a confidence or done."
           }
         },
         "required": [
@@ -9470,7 +9770,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9495,7 +9796,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9520,12 +9822,14 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           }
         },
         "required": [
@@ -9552,7 +9856,8 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -9577,7 +9882,8 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -9610,7 +9916,8 @@
           },
           "note": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short note kept with the change."
           }
         },
         "required": [
@@ -9637,7 +9944,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9662,7 +9970,8 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "providerSpaceId": {
             "type": "string",
@@ -9674,7 +9983,8 @@
           },
           "note": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short note kept with the change."
           },
           "riskOwnerId": {
             "type": "string",
@@ -9703,7 +10013,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9728,7 +10039,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "memberId": {
             "anyOf": [
@@ -9739,7 +10051,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A member's id, from people.directory."
           }
         },
         "required": [
@@ -9766,7 +10079,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9791,7 +10105,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9816,11 +10131,13 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "includeDismissed": {
             "default": false,
@@ -9849,7 +10166,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -9874,7 +10192,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9926,7 +10245,8 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "frequency": {
             "type": "string",
@@ -9943,7 +10263,8 @@
             "enum": [
               "higher_better",
               "lower_better"
-            ]
+            ],
+            "description": "Which way success moves: increase, reduce, maintain or move to a value."
           },
           "targetType": {
             "type": "string",
@@ -9985,7 +10306,8 @@
             "enum": [
               "leading",
               "lagging"
-            ]
+            ],
+            "description": "Leading (moves early and predicts) or lagging (confirms the result)."
           },
           "tier": {
             "anyOf": [
@@ -10023,15 +10345,18 @@
               "workspace",
               "space",
               "member"
-            ]
+            ],
+            "description": "Who owns the goal: the workspace, a space (needs spaceId) or a member (needs memberId)."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "memberId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "A member's id, from people.directory."
           },
           "ownerMemberId": {
             "anyOf": [
@@ -10054,7 +10379,8 @@
           },
           "unit": {
             "type": "string",
-            "maxLength": 60
+            "maxLength": 60,
+            "description": "The unit the value is measured in, such as %, customers or days."
           },
           "targetDefault": {
             "type": "number"
@@ -10094,23 +10420,27 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "on": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Any date inside the period being recorded, as YYYY-MM-DD."
           },
           "actualValue": {
             "type": [
               "number",
               "null"
-            ]
+            ],
+            "description": "The value measured for the period."
           },
           "targetValue": {
             "type": [
               "number",
               "null"
-            ]
+            ],
+            "description": "Where the measure should be at the end."
           },
           "remark": {
             "anyOf": [
@@ -10121,7 +10451,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "A short remark kept with the record."
           }
         },
         "required": [
@@ -10150,7 +10481,8 @@
             "default": 12,
             "type": "integer",
             "minimum": 1,
-            "maximum": 48
+            "maximum": 48,
+            "description": "How many periods to return, newest first."
           }
         }
       },
@@ -10185,12 +10517,14 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "formula": {},
           "on": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Any date inside the period being recorded, as YYYY-MM-DD."
           }
         },
         "required": [
@@ -10249,11 +10583,13 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "objectiveTitle": {
             "type": "string",
@@ -10285,14 +10621,16 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "kind": {
             "type": "string",
             "enum": [
               "fix_now",
               "key_result"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "taskId": {
             "type": "string",
@@ -10300,7 +10638,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -10327,7 +10666,8 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           }
         },
         "required": [
@@ -10394,7 +10734,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -10419,13 +10760,15 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "periods": {
             "default": 24,
             "type": "integer",
             "minimum": 1,
-            "maximum": 48
+            "maximum": 48,
+            "description": "How many periods to return, newest first."
           }
         },
         "required": [
@@ -10450,12 +10793,14 @@
         "properties": {
           "kpiId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The KPI's id, from kpis.list."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "unit": {
             "anyOf": [
@@ -10466,14 +10811,16 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The unit the value is measured in, such as %, customers or days."
           },
           "direction": {
             "type": "string",
             "enum": [
               "higher_better",
               "lower_better"
-            ]
+            ],
+            "description": "Which way success moves: increase, reduce, maintain or move to a value."
           },
           "targetType": {
             "type": "string",
@@ -10514,7 +10861,8 @@
             "enum": [
               "leading",
               "lagging"
-            ]
+            ],
+            "description": "Leading (moves early and predicts) or lagging (confirms the result)."
           },
           "tier": {
             "anyOf": [
@@ -10702,11 +11050,13 @@
               "document",
               "task",
               "initiative"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           }
         },
         "required": [
@@ -10741,11 +11091,13 @@
               "document",
               "task",
               "initiative"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -10778,7 +11130,8 @@
         "properties": {
           "commentId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The comment's id, from comments.list."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -10809,7 +11162,8 @@
         "properties": {
           "commentId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The comment's id, from comments.list."
           }
         },
         "required": [
@@ -10842,11 +11196,13 @@
               "document",
               "task",
               "initiative"
-            ]
+            ],
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "body": {}
         },
@@ -10977,7 +11333,8 @@
             "default": 50,
             "type": "integer",
             "minimum": 1,
-            "maximum": 200
+            "maximum": 200,
+            "description": "The most rows to return."
           }
         }
       },
@@ -11048,11 +11405,13 @@
         "type": "object",
         "properties": {
           "subjectType": {
-            "type": "string"
+            "type": "string",
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           }
         },
         "required": [
@@ -11078,11 +11437,13 @@
         "type": "object",
         "properties": {
           "subjectType": {
-            "type": "string"
+            "type": "string",
+            "description": "What the item is attached to."
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The id of the item it is attached to, matching subjectType."
           },
           "emoji": {
             "type": "string",
@@ -11141,11 +11502,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "kind": {
             "type": "string",
@@ -11154,12 +11517,14 @@
               "weekly",
               "monthly",
               "quarterly"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "A short title, as a person would read it in a list."
           },
           "scheduledFor": {
             "type": "string",
@@ -11207,11 +11572,13 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "weekday": {
             "type": "integer",
@@ -11255,7 +11622,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11280,7 +11648,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11305,7 +11674,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11330,7 +11700,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11355,7 +11726,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11380,7 +11752,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -11404,12 +11777,14 @@
         "type": "object",
         "properties": {
           "includeFinished": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to include sessions that have finished."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 100
+            "maximum": 100,
+            "description": "The most rows to return."
           }
         }
       },
@@ -11429,7 +11804,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11458,12 +11834,14 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           }
         },
         "required": [
@@ -11496,7 +11874,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -11527,12 +11906,14 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
             "minimum": 0,
-            "maximum": 1
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
           },
           "whatChanged": {
             "type": "string",
@@ -11572,7 +11953,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -11628,16 +12010,19 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "nextAction": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "The next concrete step that would unblock it, due by the goal's next check-in."
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           }
         },
         "required": [
@@ -11733,7 +12118,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "type": {
             "type": "string",
@@ -11745,20 +12131,24 @@
               "external",
               "approach_not_working",
               "other"
-            ]
+            ],
+            "description": "The type, from the listed values."
           },
           "description": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A longer explanation, in plain words."
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "nextAction": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "The next concrete step that would unblock it, due by the goal's next check-in."
           }
         },
         "required": [
@@ -11791,7 +12181,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -11816,11 +12207,13 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           }
         },
         "required": [
@@ -11872,7 +12265,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -11897,7 +12291,8 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "type": {
             "type": "string",
@@ -11909,20 +12304,24 @@
               "external",
               "approach_not_working",
               "other"
-            ]
+            ],
+            "description": "The type, from the listed values."
           },
           "description": {
             "type": "string",
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A longer explanation, in plain words."
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "nextAction": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "The next concrete step that would unblock it, due by the goal's next check-in."
           }
         },
         "required": [
@@ -11954,7 +12353,8 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "A short title, as a person would read it in a list."
           },
           "level": {
             "type": "string",
@@ -11963,26 +12363,31 @@
               "department",
               "team",
               "individual"
-            ]
+            ],
+            "description": "The level of the goal: company, department, team or individual."
           },
           "kind": {
             "type": "string",
             "enum": [
               "committed",
               "aspirational"
-            ]
+            ],
+            "description": "The kind, from the listed values."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "reviewerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who reviews the goal's check-ins, by id from people.directory."
           },
           "keyResults": {
             "default": [],
@@ -12040,7 +12445,8 @@
               "required": [
                 "title"
               ]
-            }
+            },
+            "description": "The key results, in order. Verdicts refer to them by index."
           }
         },
         "required": [
@@ -12188,7 +12594,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           },
           "weeks": {
             "default": 12,
@@ -12300,7 +12707,8 @@
         "properties": {
           "spaceId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -12350,7 +12758,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           }
         },
         "required": [
@@ -12418,7 +12827,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "score": {
             "type": "number",
@@ -12428,7 +12838,8 @@
           "reason": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "One line on why, where the workspace asks for one."
           }
         },
         "required": [
@@ -12463,7 +12874,8 @@
           },
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -12501,7 +12913,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -12532,7 +12945,8 @@
           },
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -12852,7 +13266,8 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "causeKey": {
             "type": "integer",
@@ -13057,7 +13472,8 @@
           },
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "decision": {
             "type": "string",
@@ -13137,7 +13553,8 @@
           },
           "carryForward": {
             "default": false,
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True to carry the key result into the next cycle."
           },
           "retroNoteId": {
             "type": "string",
@@ -13177,11 +13594,13 @@
           },
           "ownerId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The member who owns it, by id from people.directory."
           },
           "dueOn": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "The due date, as YYYY-MM-DD."
           }
         },
         "required": [
@@ -13219,7 +13638,8 @@
             "format": "uuid"
           },
           "done": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "True when a milestone is done or a baseline is recorded."
           }
         },
         "required": [
@@ -13348,7 +13768,8 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The session's id, from sessions.mine."
           },
           "note": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -13383,7 +13804,8 @@
           },
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "trend": {
             "type": "string",
@@ -13455,11 +13877,13 @@
           },
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The key result's id, from the keyResults of goals.read or goals.list."
           },
           "text": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -13515,7 +13939,8 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -13540,7 +13965,8 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -13566,7 +13992,8 @@
           "query": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 500
+            "maxLength": 500,
+            "description": "Words to search for."
           },
           "entityTypes": {
             "maxItems": 20,
@@ -13575,12 +14002,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 60
-            }
+            },
+            "description": "Only these kinds of results. Every kind when left out."
           },
           "limit": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 25
+            "maximum": 25,
+            "description": "The most rows to return."
           }
         },
         "required": [
@@ -13606,7 +14035,8 @@
           "url": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 2048
+            "maxLength": 2048,
+            "description": "An OpenOKR address: a browser path or a URL on this instance."
           }
         },
         "required": [
