@@ -508,6 +508,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `Named ${asCount(p.count)} wins for the week`,
   "session.nextActionSet": () => "Named the next action for a low score",
   "session.blockerCreated": (p) => `Opened a ${asString(p.type)} blocker`,
+  "goal.blocker_raised": (p) => `Raised a ${asString(p.type)} blocker`,
   "session.blockerResolved": (p) => `Resolved a ${asString(p.type)} blocker`,
   "session.blockerReassigned": (p) =>
     `A ${asString(p.type, "blocker")} blocker was handed to ${asString(p.ownerName, "somebody else")}`,

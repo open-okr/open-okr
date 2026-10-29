@@ -47,6 +47,7 @@ const SELF_SERVICE = new Set([
  * document or the author's own row, where the role already applies.
  */
 const OWN_CHECK = new Set([
+  "blockers.raise",
   "alignment.applyFinding",
   "alignment.dismissFinding",
   "attachments.attach",

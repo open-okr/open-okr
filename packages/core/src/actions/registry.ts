@@ -114,7 +114,11 @@ import {
   prepareUpload,
   reapOrphanedBlobs,
 } from "./blobs.ts";
-import { readBlockerBoard, summariseBlockers } from "./blocker-board.ts";
+import {
+  raiseBlocker,
+  readBlockerBoard,
+  summariseBlockers,
+} from "./blocker-board.ts";
 import {
   connect as connectChannel,
   disconnect as disconnectChannel,
@@ -886,6 +890,7 @@ export const ACTION_MAP = {
   "sessions.reassignBlocker": reassignSessionBlocker,
   "sessions.blockerStatus": sessionBlockerStatus,
   "blockers.board": readBlockerBoard,
+  "blockers.raise": raiseBlocker,
   "blockers.summarise": summariseBlockers,
   // Commitments, digest, streaks (P4-T08)
   "sessions.setCommitments": setSessionCommitments,

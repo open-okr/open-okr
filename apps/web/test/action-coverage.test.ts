@@ -50,6 +50,10 @@ type Reason =
   | { readonly apiOnly: true; readonly why: string };
 
 const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
+  "blockers.raise": {
+    apiOnly: true,
+    why: "an owner's agent raises a blocker at check-in time; the browser raises one in the weekly session (mcp-audit-2026-10-29, finding 10)",
+  },
   "workspace.provision": {
     caller: "packages/core/src/workspaces/provisioning.ts",
     why: "the pipeline calls it, from registration and the setup wizard",

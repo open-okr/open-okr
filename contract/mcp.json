@@ -11890,6 +11890,62 @@
       }
     },
     {
+      "name": "blockers.raise",
+      "description": "Raises a blocker on a key result outside a session, with an owner and a next action due by the goal's next check-in.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "keyResultId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "resource",
+              "dependency",
+              "clarity",
+              "priority_conflict",
+              "external",
+              "approach_not_working",
+              "other"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nextAction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "keyResultId",
+          "type",
+          "ownerId",
+          "nextAction"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "type": "resource",
+        "ownerId": "00000000-0000-4000-8000-000000000000",
+        "nextAction": "…"
+      }
+    },
+    {
       "name": "sessions.setCommitments",
       "description": "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
       "inputSchema": {

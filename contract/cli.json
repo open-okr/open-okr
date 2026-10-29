@@ -9893,6 +9893,56 @@
       "pages": false
     },
     {
+      "name": "blockers raise",
+      "action": "blockers.raise",
+      "method": "POST",
+      "path": "/blockers/raise",
+      "scope": "write",
+      "summary": "Raises a blocker on a key result outside a session, with an owner and a next action due by the goal's next check-in.",
+      "flags": [
+        {
+          "name": "key-result-id",
+          "field": "keyResultId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "type",
+          "field": "type",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "resource",
+            "dependency",
+            "clarity",
+            "priority_conflict",
+            "external",
+            "approach_not_working",
+            "other"
+          ]
+        },
+        {
+          "name": "description",
+          "field": "description",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "owner-id",
+          "field": "ownerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "next-action",
+          "field": "nextAction",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blockers summarise",
       "action": "blockers.summarise",
       "method": "GET",

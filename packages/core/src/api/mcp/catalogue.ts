@@ -379,7 +379,7 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
         "1. Call goals.due with withinDays set to 7 to find the goals I champion that are due.",
         "2. For each one, call goals.read with the goal's id as id, for its key results and their current values.",
         "3. Ask me for every key result's new value, my confidence that it will land, a status and one or two sentences on what changed. Confidence is a number from 0 to 1: 7 in 10 is 0.7. The status is on_track, caution (shown to people as at risk) or off_track.",
-        "4. When my confidence is low, ask me for a next action with an owner, due by my next check-in, and whether something is actually blocked. Put both in the narrative.",
+        "4. When my confidence is low, ask me for a next action with an owner, due by my next check-in, and whether something is actually blocked. Put the next action in the narrative. For a blocked key result, call blockers.raise with its keyResultId, a type, the ownerId and the nextAction.",
         "5. Call goals.startCheckIn with the goal's id as goalId. It answers with the draft's id.",
         "6. Show me the check-in, and wait for my yes. Then call goals.publishCheckIn with that draft id as id, the status, the confidence, the narrative and one entry in values per key result (keyResultId and value).",
         "",
