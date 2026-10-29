@@ -57,7 +57,9 @@ import {
   MCP_TOOLS,
   negotiateVersion,
   newSessionId,
+  offeredTools,
   originAllowed,
+  parseToolsets,
   recordSessionFor,
   resolveAgentPrincipal,
   resourceIdentifier,
@@ -190,6 +192,18 @@ async function answer(request: NextRequest): Promise<Response> {
     });
   }
 
+  // 3b. The toolsets the client's address names (docs/design/mcp-toolsets.md).
+  // After the token, so a stranger learns nothing about what exists.
+  const chosen = parseToolsets(
+    new URL(request.url).searchParams.get("toolsets"),
+  );
+  if (chosen.kind === "unknown") {
+    return problem(400, {
+      error: "unknown_toolset",
+      error_description: chosen.message,
+    });
+  }
+
   // The body is read here and handed on as a fresh request: deciding whether
   // this is an `initialize` needs to see it, and a stream reads once.
   let body: unknown = null;
@@ -269,6 +283,7 @@ async function answer(request: NextRequest): Promise<Response> {
     workspaceId: resolved.workspaceId,
     userId: resolved.userId,
     scopes: resolved.scopes,
+    toolsets: chosen.toolsets,
     // Only the transport knows which instance it is serving, and a citation
     // worth quoting is one a person can open (P5-T09c).
     instanceUrl: issuer,
@@ -280,12 +295,14 @@ async function answer(request: NextRequest): Promise<Response> {
     // (completeness review M-33).
     name: await getInstanceName(),
     version: SERVER_VERSION,
-    tools: MCP_TOOLS.map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      annotations: tool.annotations,
-    })),
+    tools: offeredTools(MCP_TOOLS, resolved.scopes, chosen.toolsets).map(
+      (tool) => ({
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        annotations: tool.annotations,
+      }),
+    ),
     resources: MCP_RESOURCES.map((resource) => ({
       uriTemplate: resource.uriTemplate,
       name: resource.name,

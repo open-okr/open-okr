@@ -265,6 +265,7 @@ export const previewNotifyAction = defineReadAction({
 
 export const createCommentAction = defineWriteAction({
   name: "comments.create",
+  domain: "comment",
   summary:
     "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
   input: z.object({
@@ -349,6 +350,7 @@ export const createCommentAction = defineWriteAction({
  */
 export const importCommentAction = defineWriteAction({
   name: "comments.importComment",
+  agentSurface: false,
   summary:
     "Records a comment an import found, keeping its author and its date.",
   input: z.object({
@@ -479,6 +481,7 @@ export const importCommentAction = defineWriteAction({
  */
 export const replaceImportedBodyAction = defineWriteAction({
   name: "comments.replaceImportedBody",
+  agentSurface: false,
   summary:
     "Rewrites an imported comment's body, for the second phase of a reference rewrite.",
   input: z.object({
@@ -557,6 +560,7 @@ export const replaceImportedBodyAction = defineWriteAction({
 });
 export const updateCommentAction = defineWriteAction({
   name: "comments.update",
+  domain: "comment",
   summary: "Edit a comment (author only)",
   input: z.object({
     commentId: z.string().uuid(),
@@ -716,6 +720,7 @@ export const deleteCommentAction = defineWriteAction({
 
 export const addReactionAction = defineWriteAction({
   name: "reactions.add",
+  domain: "comment",
   summary: "Add a reaction to any subject",
   input: z.object({
     subjectType: z.string(),

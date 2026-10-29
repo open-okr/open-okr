@@ -6578,6 +6578,7 @@ export const removeRetroNote = defineWriteAction({
   input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;

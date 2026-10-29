@@ -10,7 +10,7 @@
  * reach a handler with a shape the contract does not describe.
  */
 
-import { type WorkspaceTx, withWorkspace } from "@openokr/db";
+import { type RoleDomain, type WorkspaceTx, withWorkspace } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { ZodType } from "zod";
@@ -192,6 +192,14 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
+  /** The role domain a write is measured on (workspace-roles.md §11). */
+  readonly domain?: RoleDomain;
+  /**
+   * False for an action no agent should be offered: the importer's, the
+   * scheduler's, the copilot's own bookkeeping, or one every token is refused
+   * (docs/design/mcp-toolsets.md §2.2). It stays on REST and the command line.
+   */
+  readonly agentSurface?: false;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }
 
@@ -216,6 +224,8 @@ export function defineReadAction<TInput, TOutput>(definition: {
   access?: AccessLevel;
   /** Declare this only if the input really takes a cursor. */
   page?: PageContract;
+  /** See `ActionDefinition.agentSurface`. */
+  agentSurface?: false;
   handler(context: ActionCallContext, input: TInput): Promise<TOutput>;
 }): ActionDefinition<TInput, TOutput> {
   return {
@@ -241,19 +251,36 @@ export function defineReadAction<TInput, TOutput>(definition: {
       // opening a transaction to confirm that a member is a member would cost
       // every read in the product a round trip for nothing.
       if (required > ACCESS_LEVELS.view) {
-        const db = drizzle(context.pool);
-        await withWorkspace(db, context.workspaceId, (tx) =>
-          requireWorkspaceLevel(
-            tx as WorkspaceTx,
-            context.workspaceId,
-            context.actor,
-            required,
-          ),
-        );
+        await requireDeclaredAccess(context, required, definition.name);
       }
       return definition.handler(context, input);
     },
   };
+}
+
+/**
+ * Enforces an action's declared workspace level before its handler runs.
+ *
+ * The read builder calls it, and so must every action declared by hand rather
+ * than through a builder. A hand-written handler skips both builders, so its
+ * `access` is otherwise a label nobody checks: that is how `workspace.provision`
+ * answered an ordinary member's token on every surface (MCP UAT BUG-001).
+ */
+export async function requireDeclaredAccess(
+  context: ActionCallContext,
+  required: AccessLevel,
+  action: string,
+): Promise<void> {
+  const db = drizzle(context.pool);
+  await withWorkspace(db, context.workspaceId, (tx) =>
+    requireWorkspaceLevel(
+      tx as WorkspaceTx,
+      context.workspaceId,
+      context.actor,
+      required,
+      action,
+    ),
+  );
 }
 
 /**
@@ -273,6 +300,14 @@ export function defineWriteAction<
   output: ZodType<TOutput>;
   access?: AccessLevel;
   safety?: Extract<SafetyClass, "write" | "destructive">;
+  /**
+   * The role domain this write creates or changes something in. Without it a
+   * write that names no subject is measured on the workspace, where every
+   * member holds `edit` for self-service (docs/design/workspace-roles.md §11).
+   */
+  domain?: RoleDomain;
+  /** See `ActionDefinition.agentSurface`. */
+  agentSurface?: false;
   operation(
     context: ActionCallContext,
     input: TInput,
@@ -286,6 +321,10 @@ export function defineWriteAction<
     access: definition.access ?? ACCESS_LEVELS.edit,
     safety: definition.safety ?? "write",
     runsThroughPipeline: true,
+    ...(definition.domain ? { domain: definition.domain } : {}),
+    ...(definition.agentSurface === false
+      ? { agentSurface: false as const }
+      : {}),
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
       const spec = definition.operation(context, input);
@@ -305,6 +344,7 @@ export function defineWriteAction<
           action: definition.name,
           workspaceId: context.workspaceId,
           actor: context.actor,
+          ...(definition.domain ? { domain: definition.domain } : {}),
           // Carried from the call context, so an action reached from chat is
           // audited with the channel on it without the action knowing there
           // are channels (P5-T06a). Absent for a browser call.

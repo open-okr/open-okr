@@ -47,14 +47,20 @@ describe("every tool is an action, and every action is a tool", () => {
     );
   });
 
-  it("offers every action the REST surface offers", () => {
+  it("offers every action the REST surface offers, except those not for agents", () => {
     // One projection cannot quietly hold back what another exposes: an agent
-    // and a REST client reach the same product.
+    // and a REST client reach the same product. The one exception is declared
+    // on the action itself, for the importer's and the scheduler's actions
+    // (docs/design/mcp-toolsets.md §2.2), so it cannot happen by accident.
     expect(
       MCP_TOOLS.filter((tool) => !isResearchTool(tool.name))
         .map((tool) => tool.name)
         .sort(),
-    ).toEqual(REST_ROUTES.map((route) => route.action).sort());
+    ).toEqual(
+      REST_ROUTES.filter((route) => route.agentSurface)
+        .map((route) => route.action)
+        .sort(),
+    );
   });
 
   it("marks both research tools as reads that no grant may widen", () => {

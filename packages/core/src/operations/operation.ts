@@ -39,6 +39,7 @@ import {
   enqueueOutbox,
   notifications,
   type OutboxMessage,
+  type RoleDomain,
   withContext,
   workspaceMembers,
   workspaces,
@@ -50,6 +51,7 @@ import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import {
   hasSubjectResolver,
   resolveMemberAccessLevel,
+  resolveMemberRoleLevel,
   resolveSubjectContext,
 } from "../access/reads.ts";
 import { validateActivityPayload } from "../activities/catalogue.ts";
@@ -221,6 +223,18 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
     readonly id: string;
   };
   /**
+   * The role domain this write creates or changes something in
+   * (docs/design/workspace-roles.md §11).
+   *
+   * A write that names no subject is otherwise measured on the workspace's own
+   * context, where every member holds `edit` for self-service, so the role was
+   * never read: a Viewer created comments and KPIs (MCP UAT BUG-002). With a
+   * domain, an actor who holds a role is measured by what that role grants on
+   * the domain instead of by the workspace binding. An actor with no role keeps
+   * the old rule. A named subject still raises the floor as before.
+   */
+  readonly domain?: RoleDomain;
+  /**
    * Where this write came from, when it did not come from the browser
    * (P5-T06a).
    *
@@ -293,37 +307,31 @@ async function floorLevel(
   spec: {
     readonly workspaceId: string;
     readonly subject?: { readonly type: string; readonly id: string };
+    readonly domain?: RoleDomain;
   },
   actor: ResolvedActor,
 ): Promise<number> {
-  if (!spec.subject || actor.memberId === null) {
-    // No subject to measure against, or an actor with no member row: a
-    // system or bootstrap actor already holds `full` and a human without a
-    // member row was refused in `resolveActor`.
+  if (spec.domain && actor.memberId !== null) {
+    const roleLevel = await resolveMemberRoleLevel(tx, {
+      workspaceId: spec.workspaceId,
+      memberId: actor.memberId,
+      domain: spec.domain,
+    });
+    if (roleLevel !== null) {
+      // The role replaces the workspace binding here rather than joining it
+      // in a maximum, because that binding exists for self-service and says
+      // nothing about this domain. A subject still adds its own level.
+      return Math.max(
+        roleLevel,
+        await subjectLevel(tx, spec, actor.memberId, 0),
+      );
+    }
+  }
+  if (actor.memberId === null) {
+    // An actor with no member row: a system or bootstrap actor already holds
+    // `full` and a human without a member row was refused in `resolveActor`.
     return actor.level;
   }
-  if (!hasSubjectResolver(spec.subject.type)) {
-    return actor.level;
-  }
-
-  const context = await resolveSubjectContext(
-    tx,
-    spec.subject.type,
-    spec.subject.id,
-    spec.workspaceId,
-  );
-  if (!context) {
-    // The subject does not exist, or is not this workspace's. The action's own
-    // load or execute answers that with not-found, which is the right answer
-    // and a better message than the floor's.
-    return actor.level;
-  }
-
-  const onSubject = await resolveMemberAccessLevel(tx, {
-    workspaceId: spec.workspaceId,
-    memberId: actor.memberId,
-    contextId: context.contextId,
-  });
 
   // **The higher of the two, not the subject's instead of the workspace's.**
   //
@@ -339,7 +347,44 @@ async function floorLevel(
   // agent bound to one space at 100 now clears it for a write in that space;
   // every actor who cleared it before still does; and the real check inside
   // is unchanged and remains the one that decides.
-  return Math.max(actor.level, onSubject);
+  return Math.max(
+    actor.level,
+    await subjectLevel(tx, spec, actor.memberId, actor.level),
+  );
+}
+
+/**
+ * The actor's level on the subject the operation names, or `fallback` when it
+ * names none, nothing resolves its type, or the row is not this workspace's.
+ * The action's own load answers a missing row with not-found, which is a
+ * better message than the floor's.
+ */
+async function subjectLevel(
+  tx: OperationTx,
+  spec: {
+    readonly workspaceId: string;
+    readonly subject?: { readonly type: string; readonly id: string };
+  },
+  memberId: string,
+  fallback: number,
+): Promise<number> {
+  if (!spec.subject || !hasSubjectResolver(spec.subject.type)) {
+    return fallback;
+  }
+  const context = await resolveSubjectContext(
+    tx,
+    spec.subject.type,
+    spec.subject.id,
+    spec.workspaceId,
+  );
+  if (!context) {
+    return fallback;
+  }
+  return resolveMemberAccessLevel(tx, {
+    workspaceId: spec.workspaceId,
+    memberId,
+    contextId: context.contextId,
+  });
 }
 
 async function resolveActor(

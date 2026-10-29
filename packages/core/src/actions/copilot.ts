@@ -364,6 +364,7 @@ export const ask = defineWriteAction({
  */
 export const completeRun = defineWriteAction({
   name: "copilot.completeRun",
+  agentSurface: false,
   summary: "Records the answer a background copilot run produced.",
   input: z.object({
     answerMessageId: z.uuid(),
@@ -516,6 +517,7 @@ export const completeRun = defineWriteAction({
  */
 export const recordAnswer = defineWriteAction({
   name: "copilot.recordAnswer",
+  agentSurface: false,
   summary:
     "Records the copilot's answer to the last question in a conversation.",
   input: z.object({

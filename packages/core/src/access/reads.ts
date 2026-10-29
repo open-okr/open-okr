@@ -166,6 +166,44 @@ export async function resolveMemberAccessLevel<
   return Number(result.rows[0]?.level ?? 0);
 }
 
+/**
+ * The level a member's workspace role grants on one domain, or `null` when
+ * the member holds no role (docs/design/workspace-roles.md §11).
+ *
+ * Null rather than zero, because the two mean different things to the floor:
+ * a role that grants nothing refuses, and no role at all (a guest, an agent,
+ * a placeholder) keeps the rule those kinds always had.
+ */
+export async function resolveMemberRoleLevel<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly domain: string;
+  },
+): Promise<number | null> {
+  const result = await tx.execute<{ has_role: boolean; level: number }>(sql`
+    select m.role_id is not null as has_role,
+           coalesce((
+             select max(rp.level) from role_permissions rp
+              where rp.workspace_id = m.workspace_id
+                and rp.role_id = m.role_id
+                and rp.domain = ${input.domain}
+                and rp.deleted_at is null
+           ), 0)::int as level
+      from workspace_members m
+     where m.id = ${input.memberId}
+       and m.workspace_id = ${input.workspaceId}
+       and m.kind = 'human'
+       and m.status = 'active'
+       and m.deleted_at is null
+  `);
+  const row = result.rows[0];
+  return row?.has_role ? Number(row.level) : null;
+}
+
 /** Whether a member's effective level on a context meets `level`. */
 export async function can<
   TSchema extends Record<string, unknown> = Record<string, never>,
@@ -979,21 +1017,15 @@ export async function visibleResourceIds<
  * rows are themselves access-scoped goes through `getAccessScoped` per row
  * instead and declares `view`, because the getter is what decides there.
  *
- * **`not_found`, in the getter's own words, and not `forbidden`.** A read
- * refuses the way `getAccessScoped` refuses, so that a stranger, a suspended
- * member and a member below the level are told the same thing. `forbidden`
- * would have been defensible for a caller who is already a member and knows
- * the workspace exists, and it is what the write actions beside these reads
- * raise; it is not defensible for a caller with no member row at all, because
- * "you hold too little access in this workspace" confirms the workspace.
- * One check cannot tell the two apart without handing back the oracle it is
- * there to close, so it says the safer thing to both. Two existing specs, in
- * `settings-actions.test.ts` and `import-table.test.ts`, already required
- * this, and they are what caught the first version of this function.
- *
- * The action's own name is not in the message, for the same reason: it would
- * name the thing the caller may not reach. The caller knows which read it
- * called, so nothing is lost that the caller did not already have.
+ * **`not_found` for anybody who is not an active member, `forbidden` for a
+ * member below the level.** A stranger and a suspended member are told the
+ * getter's own words, because "you hold too little access here" would confirm
+ * the workspace to them. An active member already knows it exists:
+ * `workspace.overview` names it to them, and every write already tells them
+ * when they hold too little. Telling them the workspace does not exist was the
+ * first version of this function, and it read as a fault on the agent surface
+ * (MCP UAT BUG-005), so a member is told what a write tells them, naming the
+ * action they called, which names nothing they did not already have.
  *
  * A `system` or `operator` actor passes, matching `runOperation`: a clock and a
  * maintenance command have no member to resolve and full trust by construction.
@@ -1007,6 +1039,7 @@ export async function requireWorkspaceLevel(
     readonly memberId?: string;
   },
   required: number,
+  action?: string,
 ): Promise<void> {
   if (actor.kind === "system" || actor.kind === "operator") {
     return;
@@ -1041,7 +1074,10 @@ export async function requireWorkspaceLevel(
     contextId: (context as { contextId: string }).contextId,
   });
   if (level < required) {
-    refuse();
+    throw new OperationError(
+      "forbidden",
+      `${action ?? "This"} needs a higher access level than you hold.`,
+    );
   }
 }
 
