@@ -440,6 +440,7 @@ export const readDigest = defineReadAction({
  */
 export const narrateDigest = defineReadAction({
   name: "sessions.narrateDigest",
+  agentSurface: false,
   summary:
     "Rewrites the weekly digest as prose, refusing any narration that states a number the product did not compute.",
   input: z.object({ sessionId: z.uuid() }),
@@ -495,6 +496,7 @@ export const narrateDigest = defineReadAction({
  */
 export const narrateTrend = defineReadAction({
   name: "kpis.narrateTrend",
+  agentSurface: false,
   summary:
     "Narrates a KPI's trend and its anomalies, refusing any narration that states a number the series does not hold.",
   input: z.object({ kpiId: z.uuid() }),

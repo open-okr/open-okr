@@ -3159,6 +3159,7 @@ export const restoreGoal = defineWriteAction({
  */
 export const rewriteKeyResult = defineReadAction({
   name: "goals.rewriteKeyResult",
+  agentSurface: false,
   summary:
     "Suggests a corrected key result for one failing check, and reports which checks the suggestion actually passes.",
   input: z.object({

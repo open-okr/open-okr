@@ -206,6 +206,7 @@ export const readBlockerBoard = defineReadAction({
  */
 export const summariseBlockers = defineReadAction({
   name: "blockers.summarise",
+  agentSurface: false,
   summary:
     "Summarises a space's open blockers, over the product's own ranking, refusing a summary that names one not on the board.",
   input: z.object({ spaceId: z.uuid() }),

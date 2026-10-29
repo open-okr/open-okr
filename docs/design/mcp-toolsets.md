@@ -56,8 +56,8 @@ them. It is not listing what the server would refuse anyway.
 
 ### 2.2 Tools that are not for agents leave the agent surface
 
-Twenty actions exist for the importer, the scheduler, the copilot's own
-bookkeeping, or the token screen, and an agent can only misuse or be refused
+Thirty-seven actions exist for the importer, the scheduler, the copilot's own
+bookkeeping, the token screen, or an AI provider the agent path never has, and an agent can only misuse or be refused
 by them.
 
 | Kind | Actions |
@@ -67,6 +67,7 @@ by them.
 | The copilot's own bookkeeping | `copilot.recordAnswer`, `copilot.completeRun`, `copilot.recordProposal` |
 | Registration and the key check | `workspace.provision`, `ai.recordCredentialCheck` |
 | Refused to every token by design (§8.2 "a token cannot administer tokens") | `tokens.create`, `tokens.revoke`, `tokens.approveDevice`, `tokens.pendingDevice` |
+| AI assists, which answer null to every agent because the agent path carries no drafter (agent-surface.md §5.1). Added 30 October 2026, MCP audit finding 16 | `goals.draftObjective`, `goals.rewriteKeyResult`, `goals.decomposeKeyResult`, `goals.suggestMeasure`, `goals.suggestParent`, `goals.draftRetrospective`, `goals.parseFilter`, `kpis.suggest`, `kpis.narrateTrend`, `comments.summarise`, `blockers.summarise`, `sessions.clusterRetro`, `sessions.draftMinutes`, `sessions.narrateDiagnostic`, `sessions.narrateDigest`, `imports.proposeMapping`, `copilot.availability` |
 
 The action gains `agentSurface: false`. The catalogue generator skips it and
 the dispatcher refuses it by name. It stays on REST and the command line for

@@ -43,6 +43,26 @@ const NOT_FOR_AGENTS = [
   "tokens.revoke",
   "tokens.approveDevice",
   "tokens.pendingDevice",
+  // AI assists. The agent path carries no drafter, because the MCP server
+  // makes no outbound AI calls (agent-surface.md §5.1), so each of these
+  // answers null to every agent (mcp-audit-2026-10-29, finding 16).
+  "goals.draftObjective",
+  "goals.rewriteKeyResult",
+  "goals.decomposeKeyResult",
+  "goals.suggestMeasure",
+  "goals.suggestParent",
+  "goals.draftRetrospective",
+  "goals.parseFilter",
+  "kpis.suggest",
+  "kpis.narrateTrend",
+  "comments.summarise",
+  "blockers.summarise",
+  "sessions.clusterRetro",
+  "sessions.draftMinutes",
+  "sessions.narrateDiagnostic",
+  "sessions.narrateDigest",
+  "imports.proposeMapping",
+  "copilot.availability",
 ];
 
 const chosen = (raw: string | null): ReadonlySet<ToolsetName> => {

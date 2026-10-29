@@ -828,6 +828,7 @@ export const readThreads = defineReadAction({
  */
 export const readAvailability = defineReadAction({
   name: "copilot.availability",
+  agentSurface: false,
   summary: "Whether the copilot can answer, and why not when it cannot.",
   input: z.object({}),
   output: z.object({

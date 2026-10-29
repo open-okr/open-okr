@@ -93,6 +93,7 @@ const draftedKeyResult = z.object({
  */
 export const draftObjective = defineReadAction({
   name: "goals.draftObjective",
+  agentSurface: false,
   summary:
     "Drafts an objective and its key results from a plain-language ambition, with the quality checks it passes.",
   input: z.object({
@@ -244,6 +245,7 @@ async function thresholdsFor(context: ActionCallContext) {
 /** Suggests the numbers a key result needs, and reports what they pass. */
 export const suggestMeasure = defineReadAction({
   name: "goals.suggestMeasure",
+  agentSurface: false,
   summary:
     "Suggests a unit, a direction, a baseline and a target for a key result, with the checks they pass.",
   input: z.object({
@@ -338,6 +340,7 @@ export const suggestMeasure = defineReadAction({
  */
 export const suggestParent = defineReadAction({
   name: "goals.suggestParent",
+  agentSurface: false,
   summary:
     "Suggests which objective this one should align to, from the ones the reader may see.",
   input: z.object({ goalId: z.uuid() }),
