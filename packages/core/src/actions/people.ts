@@ -65,6 +65,7 @@ import {
   requireAvatarImage,
   shareAvatar,
 } from "../people/profile.ts";
+import { markedAsRichText } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
@@ -75,17 +76,18 @@ import { wallClock } from "./wall-clock.ts";
  * document (docs/design/rich-text-editor.md). Validated at the input
  * boundary, same as the timezone below, rather than inside
  * `execute()` — a bad document is refused before the transaction opens. */
-const bioInputSchema = z
-  .unknown()
-  .nullable()
-  .refine(
-    (value) =>
-      value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
-    {
-      message: "bio must be a valid rich text document.",
-    },
-  )
-  .optional();
+const bioInputSchema = markedAsRichText(
+  z
+    .unknown()
+    .nullable()
+    .refine(
+      (value) =>
+        value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
+      {
+        message: "bio must be a valid rich text document.",
+      },
+    ),
+).optional();
 
 const memberSummary = z.object({
   id: z.uuid(),

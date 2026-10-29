@@ -22,9 +22,10 @@ import type { Pool } from "pg";
 import { ZodError } from "zod";
 import { type ActionName, callAction } from "../../actions/registry.ts";
 import { OperationError } from "../../operations/errors.ts";
+import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
 import { errorFor } from "../errors.ts";
-import { SERVER_SET_FIELDS, toolNamed } from "./catalogue.ts";
+import { isRichTextField, SERVER_SET_FIELDS, toolNamed } from "./catalogue.ts";
 import { isResearchTool, runResearchTool } from "./research.ts";
 import type { ToolsetName } from "./toolset-data.ts";
 import { toolsetRefusal } from "./toolsets.ts";
@@ -99,6 +100,19 @@ export async function dispatchTool(
       `${serverSet.join(" and ")} is set by the server, not by an agent. Leave it out.`,
     );
   }
+
+  // An agent writes a sentence where a document is wanted, and the catalogue
+  // told it that it may. Only this path converts; REST and the command line
+  // refuse plain text (guided-inputs.md change 13b).
+  const converted = Object.fromEntries(
+    Object.entries(input).map(([field, value]) => [
+      field,
+      typeof value === "string" && isRichTextField(tool.inputSchema, field)
+        ? richTextFromPlainText(value)
+        : value,
+    ]),
+  );
+  input = converted;
 
   try {
     // The two tools that are not registry actions run here, after the same

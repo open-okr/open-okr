@@ -22,6 +22,7 @@
  * the scope is separate, the grant has to carry it, and the client is told.
  */
 import { type ZodType, z } from "zod";
+import { RICH_TEXT_MARKER } from "../../rich-text/field-schema.ts";
 import type { JsonObject } from "../openapi.ts";
 import { REST_ROUTES, type RestRoute } from "../surface.ts";
 import { RESEARCH_TOOL_SPECS, type ResearchToolSpec } from "./research.ts";
@@ -114,7 +115,48 @@ function jsonSchema(schema: ZodType): JsonObject {
   // the MCP test against the UAT instance, 9 October 2026). The union stays
   // as it is, under an object type it already satisfies.
   const object = rest.type === "object" ? rest : { type: "object", ...rest };
-  return withoutServerSetFields(object);
+  return withoutServerSetFields(describingPlainText(object) as JsonObject);
+}
+
+/** What an agent is told about a rich text field it may fill. */
+const AGENT_RICH_TEXT_DESCRIPTION =
+  'Plain text, or editor JSON: {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"..."}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.';
+
+/**
+ * Tells an agent a rich text field takes plain text, because on this path it
+ * does: the dispatcher turns the string into a document before the action
+ * runs (mcp-audit-2026-10-29, finding 1). REST and the command line still
+ * refuse it (guided-inputs.md change 13b), so only this projection says so.
+ */
+function describingPlainText(node: unknown): unknown {
+  if (Array.isArray(node)) {
+    return node.map(describingPlainText);
+  }
+  if (node === null || typeof node !== "object") {
+    return node;
+  }
+  const record = node as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[key] = describingPlainText(value);
+  }
+  if (record[RICH_TEXT_MARKER] === true) {
+    out.description = AGENT_RICH_TEXT_DESCRIPTION;
+  }
+  return out;
+}
+
+/** True when a property of a tool's schema is a rich text field. */
+export function isRichTextField(schema: JsonObject, field: string): boolean {
+  const properties = (schema.properties ?? {}) as Record<string, JsonObject>;
+  const node = properties[field];
+  if (!node) {
+    return false;
+  }
+  const alternatives = (node.anyOf ?? []) as JsonObject[];
+  return [node, ...alternatives].some(
+    (candidate) => candidate[RICH_TEXT_MARKER] === true,
+  );
 }
 
 /**

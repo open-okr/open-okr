@@ -208,6 +208,16 @@ describe("what a tool tells an agent", () => {
     }
   });
 
+  it("tells an agent a rich text field takes plain text", () => {
+    const body = (
+      toolNamed("comments.create")?.inputSchema.properties as
+        | Record<string, { description?: string }>
+        | undefined
+    )?.body;
+    expect(body?.description).toMatch(/plain text/i);
+    expect(body?.description).toMatch(/editor JSON/i);
+  });
+
   it("builds an example holding exactly the required fields", () => {
     const tool = toolNamed("goals.delete");
     expect(Object.keys(tool?.example ?? {})).toEqual(["id"]);

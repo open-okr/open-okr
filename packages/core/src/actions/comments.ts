@@ -40,17 +40,20 @@ import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { extractMentionIds } from "../rich-text/extract.ts";
+import { markedAsRichText } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** The same validator every other rich-text write uses: an imported body is
  * held to the schema exactly as a typed one is. */
-const richText = z
-  .unknown()
-  .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
-    message: "not valid editor JSON for the current rich text schema",
-  });
+const richText = markedAsRichText(
+  z
+    .unknown()
+    .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
+      message: "not valid editor JSON for the current rich text schema",
+    }),
+);
 
 function requireMemberId(memberId: string | null | undefined): string {
   if (!memberId) {

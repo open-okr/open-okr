@@ -169,6 +169,22 @@ describe("the two gates, and neither substituting for the other", () => {
   });
 });
 
+describe("rich text from an agent", () => {
+  it("accepts a plain sentence where a document is expected", async () => {
+    const cycles = JSON.parse((await run("cycles.list")).text) as {
+      id: string;
+    }[];
+    const cycleId = cycles[0]?.id;
+    expect(cycleId).toBeDefined();
+    const outcome = await run("comments.create", {
+      subjectType: "cycle",
+      subjectId: cycleId,
+      body: "Looks good to me.",
+    });
+    expect(outcome.isError, outcome.text).toBe(false);
+  });
+});
+
 describe("fields only the server sets", () => {
   it("refuses an import identity from an agent, before anything is written", async () => {
     // `legacy` is the importer's key, unique per workspace; an agent that set

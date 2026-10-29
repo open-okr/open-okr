@@ -12,7 +12,34 @@ import { z } from "zod";
 import { RICH_TEXT_SCHEMA_VERSION } from "./schema.ts";
 import { isValidRichText } from "./validate.ts";
 
+/**
+ * The JSON Schema keyword that marks a rich text field.
+ *
+ * The converted schema of an `unknown` field is empty, so nothing else tells a
+ * reader of the contract that the field wants editor JSON. The agent catalogue
+ * reads the marker to describe the field, and its dispatcher to turn an
+ * agent's plain text into a document (mcp-audit-2026-10-29, finding 1). REST
+ * and the command line still refuse plain text, as 0.4 decided
+ * (guided-inputs.md change 13b).
+ */
+export const RICH_TEXT_MARKER = "x-openokr-rich-text";
+
+const RICH_TEXT_DESCRIPTION =
+  'Editor JSON: {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"..."}]}]}.';
+
+/** Marks a schema as a rich text field, for the contract's readers. */
+export function markedAsRichText<T extends z.ZodType>(schema: T): T {
+  return schema.meta({
+    description: RICH_TEXT_DESCRIPTION,
+    [RICH_TEXT_MARKER]: true,
+  });
+}
+
 export function richTextSchema(options: { maxCharacters?: number } = {}) {
+  return markedAsRichText(documentSchema(options));
+}
+
+function documentSchema(options: { maxCharacters?: number }) {
   const { maxCharacters } = options;
   return z
     .unknown()

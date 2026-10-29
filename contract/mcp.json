@@ -204,7 +204,9 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
           },
           "primaryChannel": {
             "type": "string",
@@ -5506,7 +5508,10 @@
           },
           "mission": {
             "anyOf": [
-              {},
+              {
+                "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+                "x-openokr-rich-text": true
+              },
               {
                 "type": "null"
               }
@@ -5514,7 +5519,10 @@
           },
           "vision": {
             "anyOf": [
-              {},
+              {
+                "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+                "x-openokr-rich-text": true
+              },
               {
                 "type": "null"
               }
@@ -5522,7 +5530,10 @@
           },
           "strategy": {
             "anyOf": [
-              {},
+              {
+                "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+                "x-openokr-rich-text": true
+              },
               {
                 "type": "null"
               }
@@ -5530,7 +5541,10 @@
           },
           "notDoing": {
             "anyOf": [
-              {},
+              {
+                "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+                "x-openokr-rich-text": true
+              },
               {
                 "type": "null"
               }
@@ -5832,8 +5846,14 @@
           "changed": {
             "type": "boolean"
           },
-          "changeNote": {},
-          "focusNote": {}
+          "changeNote": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
+          "focusNote": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "cycleId",
@@ -5863,9 +5883,18 @@
             "type": "string",
             "format": "uuid"
           },
-          "stable": {},
-          "declining": {},
-          "businessAsUsual": {}
+          "stable": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
+          "declining": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
+          "businessAsUsual": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "cycleId"
@@ -5891,7 +5920,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "cuts": {}
+          "cuts": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "cycleId",
@@ -6113,7 +6145,10 @@
             "minLength": 1,
             "maxLength": 300
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "subjectType",
@@ -6148,7 +6183,10 @@
             "minLength": 1,
             "maxLength": 300
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "id"
@@ -6816,7 +6854,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "initiativeId": {
             "type": "string",
             "format": "uuid"
@@ -6878,7 +6919,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -7300,7 +7344,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "ownerId": {
             "type": "string",
             "format": "uuid"
@@ -7377,7 +7424,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "ownerId": {
             "type": "string",
             "format": "uuid"
@@ -7704,7 +7754,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "cycleId": {
             "type": "string",
             "format": "uuid"
@@ -7837,7 +7890,10 @@
             "minLength": 1,
             "maxLength": 500
           },
-          "description": {},
+          "description": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "level": {
             "type": "string",
             "enum": [
@@ -7970,7 +8026,10 @@
             "type": "string",
             "maxLength": 2000
           },
-          "retrospectiveBody": {}
+          "retrospectiveBody": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "id",
@@ -9207,7 +9266,10 @@
             "minimum": 0,
             "maximum": 1
           },
-          "narrative": {},
+          "narrative": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "values": {
             "default": [],
             "type": "array",
@@ -9279,7 +9341,10 @@
             "minimum": 0,
             "maximum": 1
           },
-          "narrative": {},
+          "narrative": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "values": {
             "default": [],
             "type": "array",
@@ -9351,7 +9416,10 @@
             "minimum": 0,
             "maximum": 1
           },
-          "narrative": {},
+          "narrative": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          },
           "values": {
             "default": [],
             "type": "array",
@@ -10679,7 +10747,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "subjectType",
@@ -10709,7 +10780,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "commentId",
@@ -12002,7 +12076,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "note": {}
+          "note": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "sessionId",
@@ -12287,7 +12364,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "sessionId",
@@ -12542,7 +12622,10 @@
             "minimum": 1,
             "maximum": 4
           },
-          "body": {}
+          "body": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "sessionId",
@@ -13097,7 +13180,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "note": {}
+          "note": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "id",
@@ -13166,7 +13252,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "shifts": {}
+          "shifts": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "sessionId",
@@ -13202,7 +13291,10 @@
             "type": "string",
             "format": "uuid"
           },
-          "text": {}
+          "text": {
+            "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
+            "x-openokr-rich-text": true
+          }
         },
         "required": [
           "sessionId",

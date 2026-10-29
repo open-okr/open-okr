@@ -1289,7 +1289,9 @@
                       {
                         "type": "null"
                       }
-                    ]
+                    ],
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
                   },
                   "primaryChannel": {
                     "type": "string",
@@ -24042,7 +24044,10 @@
                   },
                   "mission": {
                     "anyOf": [
-                      {},
+                      {
+                        "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                        "x-openokr-rich-text": true
+                      },
                       {
                         "type": "null"
                       }
@@ -24050,7 +24055,10 @@
                   },
                   "vision": {
                     "anyOf": [
-                      {},
+                      {
+                        "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                        "x-openokr-rich-text": true
+                      },
                       {
                         "type": "null"
                       }
@@ -24058,7 +24066,10 @@
                   },
                   "strategy": {
                     "anyOf": [
-                      {},
+                      {
+                        "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                        "x-openokr-rich-text": true
+                      },
                       {
                         "type": "null"
                       }
@@ -24066,7 +24077,10 @@
                   },
                   "notDoing": {
                     "anyOf": [
-                      {},
+                      {
+                        "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                        "x-openokr-rich-text": true
+                      },
                       {
                         "type": "null"
                       }
@@ -25596,8 +25610,14 @@
                   "changed": {
                     "type": "boolean"
                   },
-                  "changeNote": {},
-                  "focusNote": {}
+                  "changeNote": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
+                  "focusNote": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "cycleId",
@@ -25689,9 +25709,18 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "stable": {},
-                  "declining": {},
-                  "businessAsUsual": {}
+                  "stable": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
+                  "declining": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
+                  "businessAsUsual": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "cycleId"
@@ -25781,7 +25810,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "cuts": {}
+                  "cuts": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "cycleId",
@@ -26634,7 +26666,10 @@
                     "minLength": 1,
                     "maxLength": 300
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "subjectType",
@@ -26731,7 +26766,10 @@
                     "minLength": 1,
                     "maxLength": 300
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "id"
@@ -29964,7 +30002,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "initiativeId": {
                     "type": "string",
                     "format": "uuid",
@@ -30113,7 +30154,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "status": {
                     "type": "string",
                     "enum": [
@@ -31589,7 +31633,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "ownerId": {
                     "type": "string",
                     "format": "uuid",
@@ -31751,7 +31798,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "ownerId": {
                     "type": "string",
                     "format": "uuid",
@@ -33777,7 +33827,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "cycleId": {
                     "type": "string",
                     "format": "uuid",
@@ -34005,7 +34058,10 @@
                     "minLength": 1,
                     "maxLength": 500
                   },
-                  "description": {},
+                  "description": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "level": {
                     "type": "string",
                     "enum": [
@@ -34209,7 +34265,10 @@
                     "type": "string",
                     "maxLength": 2000
                   },
-                  "retrospectiveBody": {}
+                  "retrospectiveBody": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "id",
@@ -43823,7 +43882,10 @@
                     "minimum": 0,
                     "maximum": 1
                   },
-                  "narrative": {},
+                  "narrative": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "values": {
                     "default": [],
                     "type": "array",
@@ -43968,7 +44030,10 @@
                     "minimum": 0,
                     "maximum": 1
                   },
-                  "narrative": {},
+                  "narrative": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "values": {
                     "default": [],
                     "type": "array",
@@ -44149,7 +44214,10 @@
                     "minimum": 0,
                     "maximum": 1
                   },
-                  "narrative": {},
+                  "narrative": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "values": {
                     "default": [],
                     "type": "array",
@@ -44283,7 +44351,10 @@
                     "minimum": 0,
                     "maximum": 1
                   },
-                  "narrative": {},
+                  "narrative": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "values": {
                     "default": [],
                     "type": "array",
@@ -50189,7 +50260,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "subjectType",
@@ -50298,7 +50372,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "body": {},
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "createdAt": {
                     "type": "string"
                   },
@@ -50423,7 +50500,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "body": {},
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  },
                   "attachments": {
                     "default": 0,
                     "type": "integer",
@@ -50511,7 +50591,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "commentId",
@@ -55551,7 +55634,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {}
+                  "note": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "sessionId",
@@ -56862,7 +56948,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "sessionId",
@@ -57812,7 +57901,10 @@
                     "minimum": 1,
                     "maximum": 4
                   },
-                  "body": {}
+                  "body": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "sessionId",
@@ -61076,7 +61168,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "note": {}
+                  "note": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "id",
@@ -61271,7 +61366,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "shifts": {}
+                  "shifts": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "sessionId",
@@ -61378,7 +61476,10 @@
                     "format": "uuid",
                     "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                   },
-                  "text": {}
+                  "text": {
+                    "description": "Editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}.",
+                    "x-openokr-rich-text": true
+                  }
                 },
                 "required": [
                   "sessionId",
