@@ -5125,7 +5125,7 @@
     },
     {
       "name": "cycles.scorecard",
-      "description": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard.",
+      "description": "Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -6086,7 +6086,7 @@
     },
     {
       "name": "documents.read",
-      "description": "One document with its body and its version list. Drives screen S-29.",
+      "description": "One document with its body and its version list.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6411,7 +6411,7 @@
     },
     {
       "name": "search.query",
-      "description": "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+      "description": "Everything in this workspace matching a phrase that the caller may read.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6451,7 +6451,7 @@
     },
     {
       "name": "search.jump",
-      "description": "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+      "description": "The entity one short identifier means, for the palette's jump.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6477,7 +6477,7 @@
     },
     {
       "name": "search.entities",
-      "description": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "description": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6812,7 +6812,7 @@
     },
     {
       "name": "tasks.board",
-      "description": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
+      "description": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6880,7 +6880,7 @@
     },
     {
       "name": "tasks.read",
-      "description": "One task with its assignees and its checklist. Drives screen S-28.",
+      "description": "One task with its assignees and its checklist.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7365,7 +7365,7 @@
     },
     {
       "name": "initiatives.list",
-      "description": "Initiatives in a space, or the ones serving one key result. Drives screen S-26.",
+      "description": "Initiatives in a space, or the ones serving one key result.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9289,7 +9289,7 @@
     },
     {
       "name": "goals.keyResultHistory",
-      "description": "One key result's value history, newest first. Drives the sparkline.",
+      "description": "One key result's value history, newest first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9320,7 +9320,7 @@
     },
     {
       "name": "goals.due",
-      "description": "The goals this member champions that are due a check-in, soonest first. Drives the session walker.",
+      "description": "The goals this member champions that are due a check-in, soonest first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10182,7 +10182,7 @@
     },
     {
       "name": "alignment.graph",
-      "description": "The cascade as nodes and edges, for the alignment studio canvas (S-16).",
+      "description": "The cascade as nodes and edges, for the alignment studio canvas.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10523,7 +10523,7 @@
     },
     {
       "name": "kpis.grid",
-      "description": "Every KPI with its recent periods, grouped by category. Drives screen S-20.",
+      "description": "Every KPI with its recent periods, grouped by category.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10545,7 +10545,7 @@
     },
     {
       "name": "kpis.list",
-      "description": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "description": "Every KPI by title, with its unit, state and achievement.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -10727,7 +10727,7 @@
     },
     {
       "name": "kpis.recoveryBoard",
-      "description": "Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19.",
+      "description": "Every unhealthy or recovering KPI across every tree, with its recovery objective.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -10742,7 +10742,7 @@
     },
     {
       "name": "kpis.tree",
-      "description": "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
+      "description": "One driver tree as nodes with their corridor state and recovery progress.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10769,7 +10769,7 @@
     },
     {
       "name": "kpis.spaceTrees",
-      "description": "One space's KPIs, grouped by the driver tree each is filed in. Drives the space home.",
+      "description": "One space's KPIs, grouped by the driver tree each is filed in.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10794,7 +10794,7 @@
     },
     {
       "name": "kpis.detail",
-      "description": "One KPI with its periods, its place in the tree and its formula. Drives screen S-21.",
+      "description": "One KPI with its periods, its place in the tree and its formula.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11054,7 +11054,7 @@
     },
     {
       "name": "review.inbox",
-      "description": "What this member owes right now, overdue first. Drives screen S-02 and the sidebar badge.",
+      "description": "What this member owes right now, overdue first.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -13703,7 +13703,7 @@
     },
     {
       "name": "sessions.minutes",
-      "description": "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+      "description": "§8.10's minutes: the executive summary and every stage's record.",
       "inputSchema": {
         "type": "object",
         "properties": {

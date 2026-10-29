@@ -196,11 +196,25 @@ function placeholderFor(field: JsonObject): unknown {
  */
 const idempotent = (route: RestRoute) => route.safety === "read";
 
+/**
+ * The summary as an agent should read it: without the screen it drives.
+ *
+ * The registry's summaries serve REST and the command line too, where "Drives
+ * screen S-28" tells a developer where to look. A model has never seen S-28,
+ * and the sentence only costs context (mcp-audit-2026-10-29, finding 8).
+ */
+function forAgents(summary: string): string {
+  return summary
+    .replace(/\s*Drives [^.]*\./g, "")
+    .replace(/\s*\((?:screen )?S-\d{2}\)/g, "")
+    .trim();
+}
+
 function toolFor(route: RestRoute): McpTool {
   const schema = jsonSchema(route.inputSchema);
   return {
     name: route.action,
-    description: route.summary,
+    description: forAgents(route.summary),
     inputSchema: schema,
     scope: route.scope,
     annotations: {

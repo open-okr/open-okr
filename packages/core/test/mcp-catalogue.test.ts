@@ -165,6 +165,15 @@ describe("what a tool tells an agent", () => {
     }
   });
 
+  it("describes a tool without naming the screen it drives", () => {
+    // A model reading the catalogue has never seen screen S-28; the sentence
+    // is noise in its context (mcp-audit-2026-10-29, finding 8).
+    for (const tool of MCP_TOOLS) {
+      expect(tool.description, tool.name).not.toMatch(/\bS-\d{2}\b|\bDrives\b/);
+      expect(tool.description.trim().length, tool.name).toBeGreaterThan(10);
+    }
+  });
+
   it("carries a summary, because a name alone is not a description", () => {
     for (const tool of MCP_TOOLS) {
       expect(tool.description.length, tool.name).toBeGreaterThan(0);
