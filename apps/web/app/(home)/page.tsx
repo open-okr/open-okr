@@ -1,9 +1,11 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, callAction, resourceIdentifier } from "@openokr/core";
 import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { instanceIssuer } from "../../lib/issuer";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+import { AgentSetupPill } from "../agent-setup-pill.tsx";
 import { FirstVisitTour } from "../first-visit-tour.tsx";
 import { goalTreeNodes } from "../goal-nodes.ts";
 import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
@@ -229,6 +231,13 @@ export default async function HomePage({
         workspaceName={workspace.name}
         scopeLabel={scopeLabel}
         stats={stats}
+      />
+
+      {/* docs/design/agent-setup-prompt.md §3: a prompt a member pastes into
+          their own agent, which then connects itself through OAuth. */}
+      <AgentSetupPill
+        endpoint={resourceIdentifier(instanceIssuer())}
+        sessionId={session.session.id}
       />
 
       {/* Under the page's own heading, so the outline reads Work map and then

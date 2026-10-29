@@ -1,6 +1,8 @@
 "use client";
 
+import { CopyButton, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
+import { agentSetupPrompt } from "../../../lib/agent-setup-prompt.ts";
 import { agentConfiguration } from "./agent-config.ts";
 import { NOTHING_YET, type TokenResult } from "./token-state.ts";
 
@@ -37,6 +39,7 @@ export function TokenForm({
   readonly className?: string;
   readonly children: React.ReactNode;
 }) {
+  const { t } = useTranslations();
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
@@ -50,6 +53,18 @@ export function TokenForm({
             {state.token}
           </code>
           <span>{state.message}</span>
+          {state.audience === "mcp" && agentEndpoint ? (
+            <CopyButton
+              text={agentSetupPrompt({
+                endpoint: agentEndpoint,
+                token: state.token,
+              })}
+              variant="primary"
+              size="sm"
+            >
+              {t("account.apiTokens.copyTokenPrompt")}
+            </CopyButton>
+          ) : null}
           {state.audience === "mcp" && agentEndpoint ? (
             <pre
               data-testid="minted-agent-configuration"

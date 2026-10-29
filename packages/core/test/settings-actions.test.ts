@@ -161,7 +161,7 @@ describe("settings.readWorkspaceSettings", () => {
         "settings.readWorkspaceSettings",
         {},
       ),
-    ).rejects.toMatchObject({ code: "not_found" });
+    ).rejects.toMatchObject({ code: "forbidden" });
   });
 });
 

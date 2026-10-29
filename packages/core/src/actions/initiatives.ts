@@ -512,6 +512,7 @@ export const readInitiative = defineReadAction({
 
 export const createInitiative = defineWriteAction({
   name: "initiatives.create",
+  domain: "initiative",
   summary: "Creates an initiative in a space, owned by one member.",
   input: z.object({
     spaceId: z.uuid(),
@@ -726,6 +727,7 @@ export const updateInitiative = defineWriteAction({
 
 export const linkInitiativeKeyResult = defineWriteAction({
   name: "initiatives.linkKeyResult",
+  domain: "initiative",
   summary:
     "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
   input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
@@ -798,10 +800,12 @@ export const linkInitiativeKeyResult = defineWriteAction({
 
 export const unlinkInitiativeKeyResult = defineWriteAction({
   name: "initiatives.unlinkKeyResult",
+  domain: "initiative",
   summary: "Removes the link between an initiative and a key result.",
   input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
   output: z.object({ unlinked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
       return requireInitiative(

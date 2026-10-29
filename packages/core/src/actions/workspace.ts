@@ -273,6 +273,7 @@ export const setWorkspaceState = defineWriteAction({
  */
 export const provisionWorkspace = {
   name: "workspace.provision" as const,
+  agentSurface: false as const,
   summary:
     "Create a workspace and its first member for a newly registered person.",
   input: z.object({
@@ -285,7 +286,10 @@ export const provisionWorkspace = {
   safety: "write" as const,
   runsThroughPipeline: true,
   async handler(
-    context: { pool: import("pg").Pool },
+    context: {
+      pool: import("pg").Pool;
+      actor: { readonly kind: string };
+    },
     rawInput: unknown,
   ): Promise<{
     workspaceId: string;
@@ -293,6 +297,15 @@ export const provisionWorkspace = {
     name: string;
     slug: string;
   }> {
+    // Registration and the setup wizard call `createWorkspace` directly, so the
+    // only callers that reach this handler are the surfaces. No member of any
+    // workspace may create another one for somebody, whatever their level.
+    if (context.actor.kind !== "system" && context.actor.kind !== "operator") {
+      throw new OperationError(
+        "forbidden",
+        "A workspace is created when somebody signs up, not through this action.",
+      );
+    }
     const input = provisionWorkspace.input.parse(rawInput);
     return createWorkspace(context.pool, input);
   },

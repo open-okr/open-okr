@@ -160,6 +160,7 @@ export const removeBudget = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [existing] = await tx

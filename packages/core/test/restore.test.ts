@@ -459,13 +459,22 @@ describe("tasks.restore", () => {
     expect(await isDeleted("tasks", task.id)).toBe(false);
   });
 
+  it("tells a member who can edit the task why the delete is refused", async () => {
+    const task = await createTask();
+    await expect(call("tasks.delete", { id: task.id }, OTHER)).rejects.toThrow(
+      "tasks.delete needs a higher access level than you hold.",
+    );
+    expect(await isDeleted("tasks", task.id)).toBe(false);
+  });
+
   it("records the restore, and asks what the delete asked", async () => {
     const task = await createTask();
     await call("tasks.delete", { id: task.id });
-    // Bo is the assignee, which is edit on the task and not `full`, so the
-    // restore answers him as the delete would have: no such task.
+    // Bo is the assignee, which is edit on the task and not `full`. He can
+    // read the task, so he is told what goals.restore tells him, not that it
+    // does not exist (MCP UAT BUG-006).
     await expect(call("tasks.restore", { id: task.id }, OTHER)).rejects.toThrow(
-      /No such task/,
+      "tasks.restore needs a higher access level than you hold.",
     );
     expect(await isDeleted("tasks", task.id)).toBe(true);
 
@@ -617,6 +626,8 @@ describe("workspace.deletedItems", () => {
   });
 
   it("is refused below full, as every read on an admin screen is", async () => {
-    await expect(list(OTHER)).rejects.toThrow(/No such workspace/);
+    await expect(list(OTHER)).rejects.toThrow(
+      "workspace.deletedItems needs a higher access level than you hold.",
+    );
   });
 });

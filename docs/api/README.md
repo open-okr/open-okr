@@ -91,6 +91,23 @@ The agent sends the token as a bearer token to the agent endpoint,
 }
 ```
 
+**An agent sees the `core` tools unless the address names more.** The 57 tools
+a member uses every week: goals and key results, check-ins, the review inbox,
+notifications, comments, KPIs, tasks, initiatives, documents, `search` and
+`fetch`. Name more toolsets in the address:
+
+| Address | Tools |
+|---|---|
+| `https://okr.example.com/api/mcp` | `core` |
+| `https://okr.example.com/api/mcp?toolsets=core,work` | Everyday work, including drafts, KPI trees, checklists and the copilot |
+| `https://okr.example.com/api/mcp?toolsets=core,facilitation` | Running sessions, the planning workflow, cycles and alignment |
+| `https://okr.example.com/api/mcp?toolsets=all` | Every agent tool: `core`, `work`, `facilitation` and `admin` |
+
+A token is shown only the tools its scopes can call, and a call to a tool
+outside the chosen toolsets is refused with the toolset that holds it. The
+importer's and the scheduler's actions are not agent tools at all; they stay on
+`/api/v1`.
+
 | | An agent you approve in the browser | An agent token |
 |---|---|---|
 | Who starts it | The agent, which sends you to a consent screen | You, on the tokens screen |

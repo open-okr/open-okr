@@ -198,7 +198,10 @@ describe("the list the screen reads", () => {
         "sso.listConnections",
         {},
       ),
-    ).rejects.toMatchObject({ code: "not_found" });
+    ).rejects.toMatchObject({
+      code: "forbidden",
+      message: "sso.listConnections needs a higher access level than you hold.",
+    });
   });
 });
 

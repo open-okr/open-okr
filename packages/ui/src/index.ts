@@ -9,6 +9,7 @@ export * from "./components/bar.tsx";
 export * from "./components/button.tsx";
 export * from "./components/card.tsx";
 export * from "./components/chip.tsx";
+export * from "./components/copy-button.tsx";
 export * from "./components/kbd.tsx";
 export * from "./components/verdict-dot.tsx";
 export * from "./feedback/toast.tsx";

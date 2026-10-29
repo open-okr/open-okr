@@ -493,6 +493,7 @@ export const deleteCheckIn = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid(), rolledBack: z.boolean() }),
   access: ACCESS_LEVELS.edit,
+  safety: "destructive",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(
@@ -1119,6 +1120,7 @@ export const readConfidenceVotes = defineReadAction({
  */
 export const importCheckIn = defineWriteAction({
   name: "goals.importCheckIn",
+  agentSurface: false,
   summary:
     "Publishes a check-in an import found, keeping its own author and its own date.",
   input: z.object({

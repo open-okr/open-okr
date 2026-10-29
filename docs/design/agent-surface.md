@@ -231,6 +231,13 @@ Generated from the registry. Each tool carries:
 | required scope | The action's `access` |
 | examples | Hand-written per action, because a generated example is a lie about what people do |
 
+**The catalogue is per connection since 23 October 2026** (docs/design/mcp-toolsets.md).
+A connection is offered the toolsets its address names, `core` by default,
+intersected with what its scopes can call. Twenty actions marked
+`agentSurface: false` (the importer's, the scheduler's, the copilot's own
+bookkeeping, and the token administration every token is refused) are not
+tools at all. Every other tool is in exactly one toolset, which a test holds.
+
 **Lifecycle and destructive actions are included.** Hiding them would not make
 an agent safer; it would make the agent's user do the same thing by hand with
 less oversight. What makes them safe is that `can()` runs, the token needs
@@ -520,7 +527,8 @@ is named, and no token in the lineage works.
 ## The tool catalogue (P5-T09a)
 
 A third projection of the one action registry, beside `contract/openapi.json`
-and `contract/cli.json`. 275 tools, one per action.
+and `contract/cli.json`. 275 tools, one per action. Since mcp-toolsets.md, one per action except
+those marked `agentSurface: false`, and offered per connection by toolset.
 
 | What a tool carries | Where it comes from |
 |---|---|

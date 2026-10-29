@@ -201,8 +201,9 @@ test("a write-scoped agent token cannot mint itself a destructive one", async ()
     isError: boolean;
     content: { text: string }[];
   };
+  // Not an agent tool at all (docs/design/mcp-toolsets.md §2.2).
   expect(result.isError).toBe(true);
-  expect(result.content[0]?.text).toContain("tokens screen");
+  expect(result.content[0]?.text).toBe('There is no tool called "tokens.create".');
 
   // Nothing was minted: the list holds only what this page made.
   await goTo(page, "/account/api-tokens");

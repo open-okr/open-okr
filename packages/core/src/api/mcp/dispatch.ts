@@ -26,6 +26,8 @@ import type { KeyRing } from "../../secrets/key-ring.ts";
 import { errorFor } from "../errors.ts";
 import { toolNamed } from "./catalogue.ts";
 import { isResearchTool, runResearchTool } from "./research.ts";
+import type { ToolsetName } from "./toolset-data.ts";
+import { toolsetRefusal } from "./toolsets.ts";
 
 export interface DispatchPrincipal {
   readonly workspaceId: string;
@@ -39,6 +41,12 @@ export interface DispatchPrincipal {
    * open. Absent is correct and the address falls back to the `openokr://` form.
    */
   readonly instanceUrl?: string;
+  /**
+   * The toolsets the connection chose (docs/design/mcp-toolsets.md). Absent
+   * means every toolset, which is what a caller other than the transport,
+   * such as a test, wants.
+   */
+  readonly toolsets?: ReadonlySet<ToolsetName>;
 }
 
 export interface DispatchResult {
@@ -64,6 +72,15 @@ export async function dispatchTool(
   const tool = toolNamed(name);
   if (!tool) {
     return refusal(`There is no tool called "${name}".`);
+  }
+
+  // Before the scope gate, so a tool outside the chosen toolsets says where
+  // it lives rather than which scope it needs.
+  const outside = principal.toolsets
+    ? toolsetRefusal(name, principal.toolsets)
+    : null;
+  if (outside) {
+    return refusal(outside);
   }
 
   if (!principal.scopes.includes(tool.scope)) {
