@@ -173,9 +173,8 @@ async function signIn(options: {
   expect(start.status).toBe(200);
 
   const relayState = start.headers.get("set-cookie") ?? "";
-  const request = new URL((await start.json()).url).searchParams.get(
-    "SAMLRequest",
-  );
+  const { url } = (await start.json()) as { url: string };
+  const request = new URL(url).searchParams.get("SAMLRequest");
   const requestXml = inflateRawSync(
     Buffer.from(String(request), "base64"),
   ).toString("utf8");

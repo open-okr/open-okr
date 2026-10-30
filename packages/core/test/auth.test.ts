@@ -730,6 +730,7 @@ describe("the first account where mail is configured (UAT BUG-028)", () => {
       password: PASSWORD,
     });
     expect(response.status).toBe(403);
-    expect((await response.json()).code).toBe("EMAIL_NOT_VERIFIED");
+    const body = (await response.json()) as { code?: string };
+    expect(body.code).toBe("EMAIL_NOT_VERIFIED");
   });
 });
