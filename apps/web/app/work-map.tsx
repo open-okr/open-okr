@@ -198,6 +198,12 @@ export async function GoalTable({
   const thresholds = canonThresholds();
   const display = await confidenceDisplay();
 
+  // With the side panel open the title column was squeezed to "S..." on a
+  // laptop (OKRGoal UX review, N4). Titles wrap to two lines and keep a
+  // floor, and the next-step column gives way to the panel until the screen
+  // has room for both.
+  const nextStepShown = selected ? "2xl:table-cell" : "lg:table-cell";
+
   return (
     <Card>
       <CardBody className="p-0">
@@ -233,7 +239,7 @@ export async function GoalTable({
                 </th>
                 <th
                   scope="col"
-                  className="hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase lg:table-cell"
+                  className={`hidden px-2 py-2 text-[10px] font-bold tracking-wider text-ink-4 uppercase ${nextStepShown}`}
                 >
                   {t("workMap.nextStep")}
                 </th>
@@ -256,7 +262,7 @@ export async function GoalTable({
                       : "border-line border-b last:border-b-0 hover:bg-raised"
                   }
                 >
-                  <th scope="row" className="max-w-0 px-3 py-2 font-normal">
+                  <th scope="row" className="min-w-44 px-3 py-2 font-normal">
                     <a
                       href={rowHref(node)}
                       className="flex items-center gap-2"
@@ -269,8 +275,8 @@ export async function GoalTable({
                       <span
                         className={
                           node.kind === "goal"
-                            ? "truncate text-sm font-semibold text-ink"
-                            : "truncate text-sm text-ink-2"
+                            ? "line-clamp-2 text-sm font-semibold text-ink"
+                            : "line-clamp-2 text-sm text-ink-2"
                         }
                       >
                         {node.title}
@@ -306,7 +312,9 @@ export async function GoalTable({
                       </span>
                     </span>
                   </td>
-                  <td className="hidden max-w-[16rem] px-2 py-2 lg:table-cell">
+                  <td
+                    className={`hidden max-w-[16rem] px-2 py-2 ${nextStepShown}`}
+                  >
                     <span className="block truncate text-xs text-ink-3">
                       {node.nextStep}
                     </span>
