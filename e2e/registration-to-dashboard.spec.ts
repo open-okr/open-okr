@@ -572,7 +572,8 @@ test("drafting a goal with key results persists at zero percent and pending", as
   // undefined, and health is pending because no check-in has been published.
   // The progress bar carries the number as an accessible value, which is a
   // single element where the rendered "0%" is not.
-  await expect(page.getByText("pending")).toBeVisible();
+  // "No check-in yet" since the OKRGoal UX review (METHOD.md §3.5).
+  await expect(page.getByText("No check-in yet").first()).toBeVisible();
   // By name, because the phase rail draws its own bars and phases 1 to 3 are
   // complete by now.
   await expect(

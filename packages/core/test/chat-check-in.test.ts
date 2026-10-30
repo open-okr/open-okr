@@ -343,6 +343,13 @@ describe("the whole thing", () => {
    */
   it("publishes the record the browser produces, and moves the cadence (acceptance)", async () => {
     const wb = await workerDb();
+    // Due now. One days ahead of its due date is an extra update that leaves
+    // the cadence where it is (METHOD.md §7.1), which made this test depend
+    // on the weekday it ran.
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() where id = $1",
+      [goalId],
+    );
     const before = await wb.admin.query(
       "select next_check_in_at from goals where id = $1",
       [goalId],

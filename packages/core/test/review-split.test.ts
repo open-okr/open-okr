@@ -116,9 +116,13 @@ describe("booking a quarter held apart (acceptance)", () => {
       facilitatorId,
     });
     // The quarter began before today, so its first week is a gap of its
-    // own; neither half of the review is.
+    // own; neither half of the review is. The quarterly review only: late in
+    // a month, that month's monthly review is a gap too, and matching any
+    // "review" made this test fail on the last days of every month.
     expect(
-      booked.missing.filter((line) => /review|retrospective/.test(line)),
+      booked.missing.filter((line) =>
+        /quarterly review|retrospective/i.test(line),
+      ),
     ).toEqual([]);
 
     const [review, retrospective, ...rest] = await reviews();
