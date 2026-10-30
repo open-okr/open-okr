@@ -97,8 +97,8 @@ catalogs:
       specifier: ^14.3.0
       version: 14.3.0
     nodemailer:
-      specifier: ^10.1.2
-      version: 10.1.2
+      specifier: ^10.1.4
+      version: 10.3.1
     openai:
       specifier: ^7.34.0
       version: 7.34.0
@@ -317,7 +317,7 @@ importers:
         version: 2.12.0(@opentelemetry/api@1.9.1)
       nodemailer:
         specifier: 'catalog:'
-        version: 10.1.2
+        version: 10.3.1
       openai:
         specifier: 'catalog:'
         version: 7.34.0(@aws-sdk/credential-provider-node@3.972.86)(@smithy/signature-v4@5.7.4)(undici@8.12.3)(ws@8.22.0)(zod@4.6.7)
@@ -3667,8 +3667,8 @@ packages:
   node-rsa@1.1.1:
     resolution: {integrity: sha512-Jd4cvbJMryN21r5HgxQOpMEqv+ooke/korixNNK3mGqfGJmy0M77WDDzo/05969+OkMy3XW1UuZsSmW9KQm7Fw==}
 
-  nodemailer@10.1.2:
-    resolution: {integrity: sha512-rnQn9Rzh8RAwcp42MVsIvxbsv6YZ2a2/av+uyJ/LPU1+2QSlrRgFsWWZTKenyRUqkIl8urOI0c4+CEcmFdsvQw==}
+  nodemailer@10.3.1:
+    resolution: {integrity: sha512-uF0AFsJC07Y1vdW7p580DKAnh7rAO+4UPSSB3mDCPNDufoiaOebV6JmrzpxB14OjEEEiBsNdYoM2Y+fN8M7BBA==}
     engines: {node: '>=20.0.0'}
 
   non-error@0.1.0:
@@ -7187,7 +7187,7 @@ snapshots:
     dependencies:
       asn1: 0.2.6
 
-  nodemailer@10.1.2: {}
+  nodemailer@10.3.1: {}
 
   non-error@0.1.0: {}
 
