@@ -26,7 +26,7 @@ import { Ellipsis, Settings } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
@@ -44,6 +44,7 @@ import { embedFor } from "./embedder";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
+import { NavLink } from "./nav-link.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
@@ -96,18 +97,6 @@ function activeItemId(
     }
   }
   return best?.id ?? null;
-}
-
-function LinkComponent({
-  href,
-  className,
-  children,
-}: ComponentProps<typeof Link>) {
-  return (
-    <Link href={href} className={className}>
-      {children}
-    </Link>
-  );
 }
 
 export async function AppShellLayout({
@@ -332,7 +321,7 @@ export async function AppShellLayout({
           sidebar={
             <Sidebar
               groups={groups}
-              linkComponent={LinkComponent}
+              linkComponent={NavLink}
               workspaceSwitcher={
                 <WorkspaceSwitcher
                   memberships={memberships}
@@ -395,7 +384,7 @@ export async function AppShellLayout({
           }
           mobileTabBar={
             <MobileTabBar
-              linkComponent={LinkComponent}
+              linkComponent={NavLink}
               items={tabItems}
               // Every other destination the sidebar holds, in its own
               // groups, because the sidebar is hidden at this width and a

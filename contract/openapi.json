@@ -8799,6 +8799,12 @@
                               "null"
                             ]
                           },
+                          "subjectTitle": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "rendered": {
                             "type": [
                               "string",
@@ -8830,6 +8836,7 @@
                           "createdAt",
                           "subjectType",
                           "subjectId",
+                          "subjectTitle",
                           "rendered",
                           "actorName",
                           "ruleKey",
@@ -44435,11 +44442,17 @@
                         },
                         "alreadyAcknowledged": {
                           "type": "boolean"
+                        },
+                        "settledEarlier": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
                         }
                       },
                       "required": [
                         "id",
-                        "alreadyAcknowledged"
+                        "alreadyAcknowledged",
+                        "settledEarlier"
                       ],
                       "additionalProperties": false
                     }

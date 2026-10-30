@@ -424,6 +424,22 @@
   animation: pop 0.35s var(--motion-ease) backwards;
 }
 
+/* The bar across the top while a navigation is pending. It slows as it goes
+ * and stops short of the edge, because the time left is unknown; reaching the
+ * edge would claim the page had arrived. Under reduced motion it simply sits
+ * at its end width. */
+@keyframes nav-progress {
+  from {
+    width: 0;
+  }
+  to {
+    width: 90%;
+  }
+}
+.nav-progress {
+  animation: nav-progress 8s cubic-bezier(0.1, 0.7, 0.2, 1) forwards;
+}
+
 .stagger > * {
   animation: rise 0.32s var(--motion-ease) backwards;
 }

@@ -535,6 +535,13 @@ longer owes an acknowledgement.
 | Idempotent | Acknowledging twice is a no-op, not an error |
 | A published check-in awaiting acknowledgement is a first-class state | Derived from `acknowledged_at is null`, per REQUIREMENTS.md §51 |
 | Acknowledgement never changes health | It closes a loop. It is not a second opinion on the status |
+| One per goal (METHOD.md §2.5) | Acknowledging a check-in also stamps every earlier published, unacknowledged check-in on the same goal, with the same member and instant. The review inbox and the acknowledgement ladder read only the latest published check-in per goal, so a backlog left behind an acknowledged one is not a debt |
+| Nothing owed after close | A closed goal, or a goal whose cycle is closed, has no acknowledgement obligation and no acknowledgement nudge |
+
+**Given** a goal with three published check-ins nobody acknowledged, **when**
+the reviewer opens Review, **then** there is one row, for the latest, saying it
+covers two earlier ones; **and when** they acknowledge it, **then** all three
+carry their acknowledgement and the row is gone.
 
 ### 6.6 Confidence votes
 

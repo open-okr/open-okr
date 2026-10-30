@@ -20,6 +20,7 @@ import {
   blockers,
   checkIns,
   commitments,
+  cycles,
   goals,
   keyResultDependencies,
   keyResults,
@@ -38,6 +39,11 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
 import { daysPastDue, dueLocalDate } from "../cadence/service.ts";
+import {
+  earlierOpenOnGoal,
+  goalStillOpen,
+  isLatestPublishedOnGoal,
+} from "../check-ins/acknowledgement-owed.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
@@ -260,6 +266,11 @@ export const reviewInbox = defineReadAction({
         // moves the open ones and leaves the closed ones with whoever closed
         // them, so reading the goal here would hand a new reviewer somebody
         // else's finished work (design §4.4).
+        //
+        // One per goal, on its latest check-in, and none once the goal or its
+        // cycle is closed (METHOD.md §2.5). Listing every week's check-in
+        // separately turned a year of a reviewer's goals into fifty rows a
+        // year overdue, and nobody could tell which one mattered.
         const owed = await tx
           .select({
             id: checkIns.id,
@@ -267,9 +278,11 @@ export const reviewInbox = defineReadAction({
             goalTitle: goals.title,
             publishedAt: checkIns.publishedAt,
             authorName: workspaceMembers.name,
+            earlier: earlierOpenOnGoal(),
           })
           .from(checkIns)
           .innerJoin(goals, eq(goals.id, checkIns.subjectId))
+          .leftJoin(cycles, eq(cycles.id, goals.cycleId))
           .innerJoin(
             workspaceMembers,
             eq(workspaceMembers.id, checkIns.authorMemberId),
@@ -284,6 +297,8 @@ export const reviewInbox = defineReadAction({
                 isNull(checkIns.acknowledgedAt),
               ),
               isNull(goals.deletedAt),
+              goalStillOpen(),
+              isLatestPublishedOnGoal(),
             ),
           )
           .orderBy(asc(checkIns.publishedAt));
@@ -300,7 +315,16 @@ export const reviewInbox = defineReadAction({
             kind: "acknowledgement",
             group: acknowledgementGroup(age, escalateAfter),
             title: `Acknowledge the check-in on "${row.goalTitle}"`,
-            meta: `Reviewer · ${row.authorName} · ${publishedAgo(age)}`,
+            meta: [
+              "Reviewer",
+              row.authorName,
+              publishedAgo(age),
+              ...(row.earlier > 0
+                ? [
+                    `covers ${row.earlier} earlier ${row.earlier === 1 ? "check-in" : "check-ins"}`,
+                  ]
+                : []),
+            ].join(" · "),
             dueLabel: acknowledgementDueLabel(age, escalateAfter),
             dueOn: dueLocalDate(row.publishedAt, timeZone),
             daysPastDue: age,

@@ -414,7 +414,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "check_in.acknowledged": (p) =>
     p.repeat
       ? "A check-in was already acknowledged"
-      : "The reviewer acknowledged a check-in",
+      : typeof p.settledEarlier === "number" && p.settledEarlier > 0
+        ? `The reviewer acknowledged a check-in and the ${p.settledEarlier === 1 ? "earlier one" : `${p.settledEarlier} earlier ones`} still open`
+        : "The reviewer acknowledged a check-in",
   "alignment.dependency_added": (p) =>
     p.note
       ? "Two goals were linked as depending on each other, with a note"
