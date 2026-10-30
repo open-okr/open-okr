@@ -149,7 +149,9 @@ export const THRESHOLDS = {
     group: "cadence",
     label: "Check-in escalation ladder",
     section: "§11",
-    why: "Champion at due, champion again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, sponsor at fourteen. Widening rather than repeating is what makes an escalation mean something.",
+    // The sponsor step is conditional, as METHOD §11 and `escalation.ts` say;
+    // this sentence named it unconditionally until the OKRGoal UX review.
+    why: "Champion at due, champion again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
     default: { championRepeat: 1, coordinator: 7, sponsor: 14 },
     schema: z.object({
       championRepeat: wholeDays,
@@ -458,7 +460,10 @@ export const THRESHOLDS = {
     group: "quality",
     label: "Objective length limit",
     section: "§4.1",
-    why: "Eighteen words, warn above: longer and the team cannot recite it. There is no lower bound since P9-T02's review: whatmatters' own \"Achieve fiscal sustainability\" is three words.",
+    // No lower bound since P9-T02's review: whatmatters' own "Achieve fiscal
+    // sustainability" is three words. The history stays here, not in the
+    // sentence Admin shows (OKRGoal UX review, N7).
+    why: "Eighteen words, warn above: longer and the team cannot recite it. There is no lower bound, because a short objective can be a good one.",
     default: 18,
     schema: z.number().int().min(1).max(100),
   }),
@@ -490,7 +495,12 @@ export const THRESHOLDS = {
     group: "quality",
     label: "Strategic issue minimum",
     section: "§2.3",
-    why: "Three, ranked by impact. Fewer than three is not a diagnosis. The floor was five until 2026-08-17: it held for a mid-sized company and blocked a team of eight on day one, which taught them to invent two issues rather than to diagnose, and inventing is the exact failure the check exists to prevent. There is no ceiling since P9-T02: the old upper bound of ten was never checked by anything, and a long ranked list is a facilitator's problem rather than a defect.",
+    // The floor was five until 2026-08-17: it held for a mid-sized company and
+    // blocked a team of eight on day one, which taught them to invent two
+    // issues rather than to diagnose. No ceiling since P9-T02: the old upper
+    // bound of ten was never checked by anything. The history stays here, not
+    // in the sentence Admin shows (OKRGoal UX review, N7).
+    why: "Three, ranked by impact. Fewer than three is not a diagnosis. There is no upper bound: a long ranked list is for the facilitator to trim, not a defect.",
     default: 3,
     schema: z.number().int().min(0).max(100),
   }),
