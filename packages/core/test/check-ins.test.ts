@@ -344,6 +344,48 @@ describe("who hears about a check-in", () => {
   });
 });
 
+describe("the champion hears the acknowledgement", () => {
+  it("tells the champion watching their goal, once, and not the reviewer", async () => {
+    // OKRGoal UX review, H9: "Acknowledging is a chore for the reviewer and
+    // silent for the owner." The acknowledgement is the reaction, so the
+    // owner hears it.
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "subscriptions.toggle",
+      { subjectType: "goal", subjectId: goalId, subscribe: true },
+    );
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.startCheckIn",
+      { goalId },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.publishCheckIn",
+      {
+        id: draft.id,
+        status: "on_track",
+        confidence: 0.7,
+        narrative: richText("Activation is moving."),
+        values: [],
+      },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "goals.acknowledgeCheckIn",
+      { id: draft.id },
+    );
+    const { rows } = await wb.admin.query<{ recipient_member_id: string }>(
+      `select n.recipient_member_id from notifications n
+         join activities a on a.id = n.activity_id
+        where n.workspace_id = $1 and a.kind = 'check_in.acknowledged'`,
+      [workspaceId],
+    );
+    expect(rows.map((row) => row.recipient_member_id)).toEqual([championId]);
+  });
+});
+
 describe("the edit window", () => {
   it("refuses an edit once the next check-in is due", async () => {
     const wb = await workerDb();

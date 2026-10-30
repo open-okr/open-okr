@@ -695,6 +695,11 @@ export const acknowledgeCheckIn = defineWriteAction({
           subjectType: "goal",
           subjectId: goalId,
           payload: { repeat: false, settledEarlier: settled.length },
+          // The goal's watchers hear it, the champion first among them: the
+          // acknowledgement is the reviewer's reaction, and it was silent for
+          // the person it reacts to (OKRGoal UX review, H9). A repeat press
+          // above changes nothing and tells nobody.
+          notify: true,
         },
         audit: {
           action: "goals.acknowledgeCheckIn",
