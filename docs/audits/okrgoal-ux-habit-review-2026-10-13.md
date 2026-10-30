@@ -263,3 +263,24 @@ Checked on 30 October 2026 against `main` at `688ec0e0`, 125 commits after the w
 | Already exists | H8 chat check-in (four providers), H12 private vote, Admin Terminology setting |
 
 The review's own blind spot holds: it was one walkthrough as an admin persona, before `2182e303` and `29ccd095`. The 241 overdue count is lower now, and several "habit" gaps (H8, H6) are smaller than estimated.
+
+## Fixes made
+
+Decisions by Agung on 30 October 2026: T1 and H1 follow the review; H1 is option A from the OKR practitioner review (an update ahead of the due date by more than the cadence tolerance is an extra update that does not advance the cadence), the blocker clock follows the due date, and METHOD.md §7.1 gains one sentence saying so; the demo is named OKRGoal.
+
+| Finding | Commit | What changed |
+|---|---|---|
+| T1 | `0bc36dc5` | A KPI-backed key result progresses from its own baseline to its own target. Decision D-4 revised in the design documents and TECHNICAL-PLAN §6.2 |
+| T2, T3 | `96aa8f54` | Value line by direction: "101 now, target 95 $", "99.95 now, hold 99.9 to 100 %" |
+| T5 | `973a296b` | The gate 3 sentence asks the gate's own question (`alignmentMapped` in `packages/method`) |
+| T9, H5 | `5ad826be` | "Not sent yet." instead of "Sent ."; the snooze note without blame |
+| H1, T7 | `3bbc2545` | Check in on any day: "Update any time" on the check-in page, "Post an update", extra updates leave the due date, the rhythm share agrees |
+| T8 | `0249ec73` | Every inbox reason has a fallback sentence |
+| N7, H3 drift | `ddbe8459` | Ticket numbers and changelog out of Admin's threshold notes; three notes without implementation detail; a visible "Confidence" label |
+| N8 | `ee55de74` | The demo defaults to the name OKRGoal. A name already saved in Admin on the live demo still wins, so it is renamed there or the demo is reset |
+| N4 | `d36f4173` | Work Map titles wrap to two lines; next step yields to the side panel below 2xl |
+| T6 | `0c9507c7` | The phase chip names the phases done and the first one open |
+
+Checked in the browser on 30 October 2026 (local instance, 1280 px): the check-in page lists the goal under "Update any time", "Post an update" publishes an extra update and the due date stays 2026-11-09; the Work Map wraps titles with the panel open and reads "9 now, target 2 days"; Review shows the new header and snooze note; the cycle chip reads "Phase 4 done, phase 1 open"; the goal page shows the "Confidence" label. T10: the copilot panel opens locally, so the demo failure was most likely an older build; recheck on demo.okrgoal.com after the next deploy.
+
+Still open: H11 (raise a blocker from the check-in page, core action exists), N6 (delete into the overflow menu, as S-14 says), N7 dates (one locale-aware formatter), T10 (copilot, a browser check), N9 (demo seed), and every row marked Decision above.
