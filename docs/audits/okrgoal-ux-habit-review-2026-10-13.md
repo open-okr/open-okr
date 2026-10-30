@@ -291,17 +291,17 @@ Decisions by Agung on 30 October 2026: T1 and H1 follow the review; H1 is option
 | N1 to N3 | `35acd7e1` | Home, Updates, Goals, Work, Teams and Cycle for those who run it; tabs inside areas; account and Admin in the avatar menu |
 | Backlog 12 | `9b5bcda8` | My week, a reviewer's digest, a cockpit with rhythm by team; the Work Map at `/map` |
 | N5, backlog 14 | `aa2b2828` | Mine by default, filters behind one button, row pickers quiet until hovered |
+| Backlog 8 | `6c5c2ccb` | Two or more goals due on the anchor day become one `checkin.week` message that opens the check-in walker |
+| Backlog 5 | `e3b31ca0` | Reviewers acknowledge imported check-ins the next day; eight tasks fill the Q4 board |
 
 Checked in the browser on 30 October 2026 (local instance, 1280 px): the check-in page lists the goal under "Update any time", "Post an update" publishes an extra update and the due date stays 2026-11-09; the Work Map wraps titles with the panel open and reads "9 now, target 2 days"; Review shows the new header and snooze note; the cycle chip reads "Phase 4 done, phase 1 open"; the goal page shows the "Confidence" label. T10: the copilot panel opens locally, so the demo failure was most likely an older build; recheck on demo.okrgoal.com after the next deploy.
 
-Further decisions on 30 October 2026: H4 auto-close follows the review as a 14-day window; the peer step is built Off by default, with the peer defined by the OKR practitioner review; Cycle and the phase strip are shown to administrators and space coordinators and managers.
+Further decisions on 30 October 2026: backlog 8 and 5 are built (Agung, "jalankan 2 keputusan yang tersisa"); H4 auto-close follows the review as a 14-day window; the peer step is built Off by default, with the peer defined by the OKR practitioner review; Cycle and the phase strip are shown to administrators and space coordinators and managers.
 
 Not built, and why:
 
 | Backlog | Reason |
 |---|---|
-| 8, Monday digest | Covered in substance: `checkin.due` fires on the anchor day (Monday by default) with a deep link to `/check-in?goal=`, and the composer arrives prefilled, KPI-linked values included. One combined message per owner would be a new proactive message kind, which CLAUDE.md leaves to a person |
-| 5, reseed the demo as a healthy workspace | The year seed reproduces the Northwind scenario on purpose (`docs/design/northwind-year-seed.md`). The 241-item backlog no longer shows since the acknowledgement window; a healthier story is a change to the scenario, and is a decision |
 | 9, team rhythm bar for owners | Rhythm by team is on the cockpit; a bar on every owner's Home is not built |
 | N2, initiatives and tasks as one object | Kept as two objects; Work shows them as two tabs |
 | T10 | Recheck the copilot on demo.okrgoal.com after the next deploy |
