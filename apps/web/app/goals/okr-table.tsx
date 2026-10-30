@@ -169,6 +169,25 @@ function Grip({ id, mover }: { readonly id: string; readonly mover: Mover }) {
   );
 }
 
+/**
+ * Read first, edit on demand (OKRGoal UX review N5: "The OKRs list renders
+ * every objective as an open edit form, which reads as work, not as a
+ * status"). On a device that can hover, the row's pickers lose their
+ * chevrons and calendar marks until the row is hovered or a field in it has
+ * focus, so the list reads as a status and every field is still one click
+ * away. A touch screen, which cannot hover, keeps them.
+ */
+const QUIET_CONTROLS = [
+  "[@media(hover:hover)]:[&_svg]:opacity-0",
+  "[@media(hover:hover)]:[&_select]:appearance-none",
+  "[@media(hover:hover)]:[&_input::-webkit-calendar-picker-indicator]:opacity-0",
+  "group-hover:[&_svg]:opacity-100",
+  "group-focus-within:[&_svg]:opacity-100",
+  "group-hover:[&_select]:appearance-auto",
+  "group-focus-within:[&_select]:appearance-auto",
+  "group-hover:[&_input::-webkit-calendar-picker-indicator]:opacity-100",
+  "group-focus-within:[&_input::-webkit-calendar-picker-indicator]:opacity-100",
+].join(" ");
 export function OkrTable({
   initialTree,
   initialAt,
@@ -701,7 +720,9 @@ function ObjectiveRow({
             onSave={cells.saveTitle}
           />
           <VerdictChips verdicts={cells.verdicts} />
-          <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
+          <span
+            className={`flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3 ${QUIET_CONTROLS}`}
+          >
             <KindControl
               kind={goal.kind}
               title={goal.title}
@@ -861,7 +882,9 @@ function KeyResultRow({
             onSave={(title) => patch({ title }, { title: keyResult.title })}
           />
           <VerdictChips verdicts={cells.verdicts} />
-          <span className="flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3">
+          <span
+            className={`flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3 ${QUIET_CONTROLS}`}
+          >
             <KeyResultKindPicker
               kind={keyResult.kind}
               title={keyResult.title}

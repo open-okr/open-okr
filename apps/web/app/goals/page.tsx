@@ -22,6 +22,7 @@ import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import { healthWord } from "../../lib/health-words.ts";
 import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -155,7 +156,22 @@ export default async function GoalsPage({
   // Validated against the band list rather than passed through, so a hand-edited
   // URL cannot ask for a band the product does not have.
   const health = GOAL_HEALTH_BANDS.find((entry) => entry === query.health);
-  const mine = query.mine === "1";
+  // "Mine" by default (OKRGoal UX review N5): a member opens on their own
+  // objectives, and All is one tab away. `scope=all` is how All is asked for.
+  // Unless the reader has none of their own in this cycle, where Mine would
+  // be an empty page and All is the useful answer.
+  const scopeAsked = query.mine !== undefined || query.scope !== undefined;
+  const ownInCycle =
+    scopeAsked || !cycleId
+      ? null
+      : (
+          await callAction(context, "goals.tree", {
+            cycleId,
+            scope: "mine",
+            includeClosed: true,
+          })
+        ).goals.length;
+  const mine = query.mine === "1" || (!scopeAsked && (ownInCycle ?? 0) > 0);
   const scopeTab: "all" | "mine" | "team" | "company" = mine
     ? "mine"
     : query.scope === "team"
@@ -345,7 +361,9 @@ export default async function GoalsPage({
       level: level ?? null,
       health: health ?? null,
       mine: mine ? "1" : null,
-      scope: scopeTab === "team" || scopeTab === "company" ? scopeTab : null,
+      // "all" is written out since Mine became the default: without it a
+      // chip clicked under All would fall back to Mine.
+      scope: scopeTab === "mine" ? null : scopeTab,
       champion: champion ?? null,
       space: space ?? null,
       kind: kind ?? null,
@@ -810,6 +828,12 @@ async function Filters({
 }) {
   const { t } = await getTranslations();
 
+  // How many of the collapsed filters narrow the set right now.
+  const filterCount =
+    [level, health, kind, champion, space].filter(
+      (value) => value !== null && value !== undefined,
+    ).length + (includeClosed ? 1 : 0);
+
   return (
     // Two columns from `2xl` (1536px), not `xl`. Measured at 1280 the split
     // left only 536px for the groups, which pushed them from two rows to four
@@ -869,67 +893,11 @@ async function Filters({
 
         <span aria-hidden="true" className="h-5 w-px flex-none bg-line" />
 
-        <Group label={t("common.level")}>
-          <Tab href={href({ level: null })} active={level === null}>
-            {t("goals.all")}
-          </Tab>
-          {ALIGNMENT_LEVEL_ORDER.filter((entry) => levels.includes(entry)).map(
-            (entry) => (
-              <Tab
-                key={entry}
-                href={href({ level: entry })}
-                active={level === entry}
-              >
-                {entry}
-              </Tab>
-            ),
-          )}
-        </Group>
-
-        <Group label={t("workMap.health")}>
-          <Tab href={href({ health: null })} active={health === null}>
-            {t("common.any")}
-          </Tab>
-          {GOAL_HEALTH_BANDS.map((band) => (
-            <Tab
-              key={band}
-              href={href({ health: band })}
-              active={health === band}
-            >
-              {band.replace("_", " ")}
-            </Tab>
-          ))}
-        </Group>
-
-        {kind !== undefined ? (
-          <Group label={t("okrKind.label")}>
-            <Tab href={href({ kind: null })} active={kind === null}>
-              {t("common.any")}
-            </Tab>
-            <Tab
-              href={href({ kind: "committed" })}
-              active={kind === "committed"}
-            >
-              {t("okrKind.committed")}
-            </Tab>
-            <Tab
-              href={href({ kind: "aspirational" })}
-              active={kind === "aspirational"}
-            >
-              {t("okrKind.aspirational")}
-            </Tab>
-          </Group>
-        ) : null}
-
-        {/* Two filters that are a yes or a no, drawn as a yes or a no. A pair
-         * of options each needed a label to say which pair it was; a single
-         * chip says it in the word on the chip. `aria-pressed` is what tells
-         * somebody who cannot see the fill which way it is set. */}
         {/* The scope tabs (design §3): whose objectives these are. Mine
          * keeps the `mine=1` the filter assist writes. */}
         <Group label={t("okrList.scope")}>
           <Tab
-            href={href({ mine: null, scope: null })}
+            href={href({ mine: null, scope: "all" })}
             active={scope === "all"}
           >
             {t("goals.all")}
@@ -953,30 +921,100 @@ async function Filters({
             {t("okrList.company")}
           </Tab>
         </Group>
-        <FilterSelect
-          label={t("okrList.champion")}
-          value={champion}
-          options={members.map((member) =>
-            memberOption(member, t("common.agent")),
-          )}
-          people
-          anyLabel={t("common.any")}
-          hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
-          anyHref={href({ champion: null })}
-        />
-        <FilterSelect
-          label={t("okrList.space")}
-          value={space}
-          options={spaces.map(namedOption)}
-          anyLabel={t("common.any")}
-          hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
-          anyHref={href({ space: null })}
-        />
-        <Toggle
-          href={href({ closed: includeClosed ? null : "1" })}
-          on={includeClosed}
-          label={t("goals.editor.filterClosed")}
-        />
+
+        {/* Collapsed behind one Filter button, the scope and the display
+         * above it (OKRGoal UX review N5): seven groups before the first goal
+         * read as work. Open while any of them narrows the set, so a filter
+         * that is on is never hidden. */}
+        <details className="group" {...(filterCount > 0 ? { open: true } : {})}>
+          <summary className="cursor-pointer list-none rounded-control border border-line px-2.5 py-1 text-xs font-semibold text-ink-2 hover:border-brand">
+            {filterCount > 0
+              ? t("goals.filter.withCount", { count: filterCount })
+              : t("goals.filter.label")}
+          </summary>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <Group label={t("common.level")}>
+              <Tab href={href({ level: null })} active={level === null}>
+                {t("goals.all")}
+              </Tab>
+              {ALIGNMENT_LEVEL_ORDER.filter((entry) =>
+                levels.includes(entry),
+              ).map((entry) => (
+                <Tab
+                  key={entry}
+                  href={href({ level: entry })}
+                  active={level === entry}
+                >
+                  {entry}
+                </Tab>
+              ))}
+            </Group>
+
+            <Group label={t("workMap.health")}>
+              <Tab href={href({ health: null })} active={health === null}>
+                {t("common.any")}
+              </Tab>
+              {GOAL_HEALTH_BANDS.map((band) => (
+                <Tab
+                  key={band}
+                  href={href({ health: band })}
+                  active={health === band}
+                >
+                  {healthWord(t, band)}
+                </Tab>
+              ))}
+            </Group>
+
+            {kind !== undefined ? (
+              <Group label={t("okrKind.label")}>
+                <Tab href={href({ kind: null })} active={kind === null}>
+                  {t("common.any")}
+                </Tab>
+                <Tab
+                  href={href({ kind: "committed" })}
+                  active={kind === "committed"}
+                >
+                  {t("okrKind.committed")}
+                </Tab>
+                <Tab
+                  href={href({ kind: "aspirational" })}
+                  active={kind === "aspirational"}
+                >
+                  {t("okrKind.aspirational")}
+                </Tab>
+              </Group>
+            ) : null}
+
+            {/* Two filters that are a yes or a no, drawn as a yes or a no. A pair
+             * of options each needed a label to say which pair it was; a single
+             * chip says it in the word on the chip. `aria-pressed` is what tells
+             * somebody who cannot see the fill which way it is set. */}
+            <FilterSelect
+              label={t("okrList.champion")}
+              value={champion}
+              options={members.map((member) =>
+                memberOption(member, t("common.agent")),
+              )}
+              people
+              anyLabel={t("common.any")}
+              hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
+              anyHref={href({ champion: null })}
+            />
+            <FilterSelect
+              label={t("okrList.space")}
+              value={space}
+              options={spaces.map(namedOption)}
+              anyLabel={t("common.any")}
+              hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
+              anyHref={href({ space: null })}
+            />
+            <Toggle
+              href={href({ closed: includeClosed ? null : "1" })}
+              on={includeClosed}
+              label={t("goals.editor.filterClosed")}
+            />
+          </div>
+        </details>
       </div>
 
       {filterAssist ? (

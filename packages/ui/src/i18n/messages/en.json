@@ -2130,6 +2130,8 @@
   "goals.editor.searchCycle": "Search cycle",
   "goals.editor.toggleKeyResults": "Show or hide the key results of {title}",
   "goals.editor.valueFor": "Current value for {title}",
+  "goals.filter.label": "Filter",
+  "goals.filter.withCount": "Filter ({count})",
   "goals.filterAssist.describeTheListYou": "Describe the list you want",
   "goals.filterAssist.filter": "Filter",
   "goals.filterAssist.myOffTrackGoals": "my off-track goals this quarter",

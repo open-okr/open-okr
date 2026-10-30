@@ -2130,6 +2130,8 @@
   "goals.editor.searchCycle": "Cari kitaran",
   "goals.editor.toggleKeyResults": "Tunjuk atau sembunyikan keputusan utama bagi {title}",
   "goals.editor.valueFor": "Nilai semasa bagi {title}",
+  "goals.filter.label": "Tapis",
+  "goals.filter.withCount": "Tapis ({count})",
   "goals.filterAssist.describeTheListYou": "Huraikan senarai yang anda mahu",
   "goals.filterAssist.filter": "Tapis",
   "goals.filterAssist.myOffTrackGoals": "matlamat saya yang tersasar suku tahun ini",
