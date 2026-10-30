@@ -134,6 +134,72 @@ afterAll(async () => {
   await wb.close();
 });
 
+describe("raising a blocker outside a session", () => {
+  // METHOD.md §3 asks for a blocker wherever a key result is actually blocked
+  // at low confidence, and §7.3 ties it to an owner, a next action and the
+  // next check-in, not to a session (mcp-audit-2026-10-29, finding 10).
+  const goalWithKeyResult = async () => {
+    const goal = (await call("goals.create", {
+      title: "Ship the partner portal",
+      cycleId,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+    const keyResult = (await call("goals.addKeyResult", {
+      goalId: goal.id,
+      title: "Ten partners live",
+      indicatorType: "lagging",
+      direction: "increase",
+      baselineValue: 0,
+      targetValue: 10,
+    })) as { id: string };
+    return { goalId: goal.id, keyResultId: keyResult.id };
+  };
+
+  it("opens one at check-in time, due by the goal's next check-in, on the space's board", async () => {
+    const { keyResultId } = await goalWithKeyResult();
+    const raised = (await call("blockers.raise", {
+      keyResultId,
+      type: "dependency",
+      ownerId: ownerMemberId,
+      nextAction: "Ask legal for the partner contract",
+    })) as { id: string; dueAt: string };
+
+    expect(new Date(raised.dueAt).getTime()).toBeGreaterThan(Date.now());
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      session_id: string | null;
+      source: string;
+      goal_id: string | null;
+    }>("select session_id, source, goal_id from blockers where id = $1", [
+      raised.id,
+    ]);
+    expect(rows[0]).toMatchObject({ session_id: null, source: "manual" });
+    expect(rows[0]?.goal_id).not.toBeNull();
+    expect((await board()).map((entry) => entry.nextAction)).toEqual([
+      "Ask legal for the partner contract",
+    ]);
+  });
+
+  it("refuses a key result that is not in this workspace, and writes nothing", async () => {
+    await expect(
+      call("blockers.raise", {
+        keyResultId: "00000000-0000-4000-8000-000000000000",
+        type: "other",
+        ownerId: ownerMemberId,
+        nextAction: "Anything",
+      }),
+    ).rejects.toThrow(/key result/i);
+    const wb = await workerDb();
+    const { rowCount } = await wb.admin.query("select 1 from blockers");
+    expect(rowCount).toBe(0);
+  });
+});
+
 describe("the board, with no provider anywhere near it", () => {
   it("is empty for a space with nothing stuck", async () => {
     expect(await board()).toEqual([]);

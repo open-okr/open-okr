@@ -102,6 +102,7 @@ const subjectWords = (subjectType: string): string =>
  */
 export const summariseThread = defineReadAction({
   name: "comments.summarise",
+  agentSurface: false,
   summary:
     "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
   input: z.object({
@@ -199,6 +200,7 @@ const draftedOutput = z.object({
  */
 export const decomposeKeyResult = defineReadAction({
   name: "goals.decomposeKeyResult",
+  agentSurface: false,
   summary:
     "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
   input: z.object({ goalId: z.uuid(), keyResultId: z.uuid() }),

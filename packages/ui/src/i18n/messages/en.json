@@ -32,7 +32,7 @@
   "account.apiTokens.agentHow": "Create a token for an AI agent above. Point the agent at {endpoint} and have it send the token as a bearer token. Most agents read a configuration like this one:",
   "account.apiTokens.agentIntro": "An agent that can open a browser connects on its own: it sends you to a consent screen, and then appears under Connected agents. An agent that cannot, such as a coding agent in a terminal or a desktop assistant set up from a file, uses an agent token instead.",
   "account.apiTokens.agentSameRules": "An agent token carries your own access, narrowed by its scopes, exactly as an agent you approve in the browser does. It works at the agent endpoint and nowhere else, and a REST token does not work there.",
-  "account.apiTokens.agentToolsets": "By default an agent sees the core tools a member uses every week. Add ?toolsets=core,work,facilitation,admin (or ?toolsets=all) to the address to offer more. A token is only shown the tools its scopes can call.",
+  "account.apiTokens.agentToolsets": "By default an agent sees the core tools a member uses every week. Add ?toolsets=core,work,facilitation,room,admin,integrations (or ?toolsets=all) to the address to offer more. A token is only shown the tools its scopes can call.",
   "account.apiTokens.apiTokens": "API tokens",
   "account.apiTokens.audienceAgent": "agent",
   "account.apiTokens.audienceRest": "REST",

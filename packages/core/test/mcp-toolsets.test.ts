@@ -16,7 +16,7 @@ import {
  * A catalogue an agent can hold (docs/design/mcp-toolsets.md, MCP UAT BUG-004).
  *
  * The agent endpoint offered all 415 tools to every connection. These hold the
- * design's acceptance criteria: the default is the 57 `core` tools, a token is
+ * design's acceptance criteria: the default is the 61 `core` tools, a token is
  * shown only what its scopes can call, the importer's and the scheduler's
  * actions are not tools, and the list and the call agree.
  */
@@ -43,6 +43,26 @@ const NOT_FOR_AGENTS = [
   "tokens.revoke",
   "tokens.approveDevice",
   "tokens.pendingDevice",
+  // AI assists. The agent path carries no drafter, because the MCP server
+  // makes no outbound AI calls (agent-surface.md §5.1), so each of these
+  // answers null to every agent (mcp-audit-2026-10-29, finding 16).
+  "goals.draftObjective",
+  "goals.rewriteKeyResult",
+  "goals.decomposeKeyResult",
+  "goals.suggestMeasure",
+  "goals.suggestParent",
+  "goals.draftRetrospective",
+  "goals.parseFilter",
+  "kpis.suggest",
+  "kpis.narrateTrend",
+  "comments.summarise",
+  "blockers.summarise",
+  "sessions.clusterRetro",
+  "sessions.draftMinutes",
+  "sessions.narrateDiagnostic",
+  "sessions.narrateDigest",
+  "imports.proposeMapping",
+  "copilot.availability",
 ];
 
 const chosen = (raw: string | null): ReadonlySet<ToolsetName> => {
@@ -64,6 +84,68 @@ describe("placement", () => {
           .length !== 1,
     );
     expect(misplaced).toEqual([]);
+  });
+
+  it("keeps every toolset under the 128 tools some clients cap at", () => {
+    // mcp-toolsets.md §0; admin alone was 137 (mcp-audit-2026-10-29, 7).
+    for (const toolset of TOOLSET_NAMES) {
+      const offered = offeredTools(MCP_TOOLS, FULL, new Set([toolset]));
+      expect(offered.length, toolset).toBeLessThanOrEqual(128);
+    }
+  });
+
+  it("puts the live room's own moves in room, apart from facilitation", () => {
+    // Votes, reveals, the mic and anonymous answers only make sense for the
+    // people in the room (METHOD.md §7.2, §8.3, §8.5).
+    for (const name of [
+      "sessions.castVote",
+      "sessions.revealVotes",
+      "sessions.passMic",
+      "sessions.giveKudos",
+      "sessions.submitProcessHealth",
+    ]) {
+      expect(TOOLSETS.room.has(name), name).toBe(true);
+    }
+    for (const name of ["sessions.scoreKeyResult", "sessions.setNextAction"]) {
+      expect(TOOLSETS.facilitation.has(name), name).toBe(true);
+    }
+  });
+
+  it("puts providers and connections in integrations, apart from admin", () => {
+    for (const name of [
+      "ai.setWorkspaceCredential",
+      "channels.connect",
+      "sso.updateConnection",
+      "imports.runTable",
+    ]) {
+      expect(TOOLSETS.integrations.has(name), name).toBe(true);
+    }
+  });
+
+  it("lets the default connection publish and approve a drafted objective", () => {
+    // METHOD.md §2.9: the owner publishes their own draft and the reviewer
+    // approves it, beside goals.create and review.inbox in core.
+    expect(TOOLSETS.core.has("goals.publishDraft")).toBe(true);
+    expect(TOOLSETS.core.has("goals.approveDraft")).toBe(true);
+  });
+
+  it("describes every input field of every core tool", () => {
+    // An agent guesses a field nobody described (mcp-audit-2026-10-29, 6).
+    const bare = offeredTools(
+      MCP_TOOLS,
+      FULL,
+      new Set(["core" as const]),
+    ).flatMap((tool) =>
+      Object.entries(
+        (tool.inputSchema.properties ?? {}) as Record<
+          string,
+          { description?: string }
+        >,
+      )
+        .filter(([, node]) => !node.description)
+        .map(([field]) => `${tool.name}.${field}`),
+    );
+    expect(bare).toEqual([]);
   });
 
   it("names no tool that does not exist", () => {
@@ -93,7 +175,7 @@ describe("what a connection is offered", () => {
     const offered = offeredTools(MCP_TOOLS, FULL, chosen(null)).map(
       (tool) => tool.name,
     );
-    expect(offered).toHaveLength(57);
+    expect(offered).toHaveLength(61);
     expect(offered).toEqual(expect.arrayContaining(["search", "fetch"]));
   });
 
@@ -120,7 +202,7 @@ describe("choosing toolsets", () => {
     const choice = parseToolsets("core,nonsense");
     expect(choice.kind).toBe("unknown");
     expect(choice.kind === "unknown" && choice.message).toBe(
-      "There is no toolset called nonsense. Choose from core, work, facilitation, admin, all.",
+      "There is no toolset called nonsense. Choose from core, work, facilitation, room, admin, integrations, all.",
     );
   });
 

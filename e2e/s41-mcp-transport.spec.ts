@@ -280,7 +280,7 @@ test("names more toolsets in the address, and refuses an unknown one", async () 
     path: "/api/mcp?toolsets=core,nonsense",
   });
   expect(unknown.status()).toBe(400);
-  expect(await unknown.text()).toContain("core, work, facilitation, admin, all");
+  expect(await unknown.text()).toContain("core, work, facilitation, room, admin, integrations, all");
 });
 
 test("offers the two research tools, both marked as reads", async () => {

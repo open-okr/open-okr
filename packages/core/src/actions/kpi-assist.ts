@@ -79,6 +79,7 @@ const suggestionOutput = z.object({
  */
 export const suggestKpi = defineReadAction({
   name: "kpis.suggest",
+  agentSurface: false,
   summary:
     "Suggests a metric, its corridor and its formula from a sentence, with §6's parser checking the formula first.",
   input: z.object({

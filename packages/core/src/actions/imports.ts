@@ -282,6 +282,7 @@ export const listImportRuns = defineReadAction({
  */
 export const proposeImportMapping = defineReadAction({
   name: "imports.proposeMapping",
+  agentSurface: false,
   summary:
     "Proposes which column carries which field, for a human to confirm. Null with the provider off.",
   input: z.object({

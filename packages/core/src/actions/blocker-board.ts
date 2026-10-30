@@ -16,6 +16,7 @@
  */
 import {
   activeOnly,
+  BLOCKER_TYPES,
   blockers,
   goals,
   keyResults,
@@ -28,15 +29,24 @@ import { eq, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
 import { RHYTHM_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
-import { blockerClockOf, frequencyOf } from "../cadence/blockers.ts";
+import {
+  blockerClockOf,
+  frequencyOf,
+  nextCheckInDueAt,
+} from "../cadence/blockers.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
-import { type ActionCallContext, defineReadAction } from "./define.ts";
+import {
+  type ActionCallContext,
+  defineReadAction,
+  defineWriteAction,
+} from "./define.ts";
 
 /** How many blockers a board returns, and a summary is shown. */
 const BOARD_LIMIT = 30;
@@ -206,6 +216,7 @@ export const readBlockerBoard = defineReadAction({
  */
 export const summariseBlockers = defineReadAction({
   name: "blockers.summarise",
+  agentSurface: false,
   summary:
     "Summarises a space's open blockers, over the product's own ranking, refusing a summary that names one not on the board.",
   input: z.object({ spaceId: z.uuid() }),
@@ -290,3 +301,123 @@ export function mentionedButUnknown(
     );
   });
 }
+
+/**
+ * A blocker raised by the key result's owner, outside any session.
+ *
+ * METHOD.md §3 asks for a blocker wherever a key result is actually blocked at
+ * low confidence, and §7.3 ties it to an owner, a type, a next action and the
+ * next check-in, never to a session. Only `sessions.createBlocker` could open
+ * one, so an owner checking in on a Tuesday, or their agent, waited for the
+ * team to meet (mcp-audit-2026-10-29, finding 10). The weekly session still
+ * discusses it: the board finds a blocker through its goal's space.
+ */
+export const raiseBlocker = defineWriteAction({
+  name: "blockers.raise",
+  summary:
+    "Raises a blocker on a key result outside a session, with an owner and a next action due by the goal's next check-in.",
+  input: z.object({
+    keyResultId: z.uuid(),
+    type: z.enum(BLOCKER_TYPES),
+    description: z.string().max(500).optional(),
+    ownerId: z.uuid(),
+    nextAction: z.string().trim().min(1).max(500),
+  }),
+  output: z.object({ id: z.uuid(), dueAt: z.string() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+
+      const [keyResult] = await tx
+        .select({ goalId: keyResults.goalId })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.keyResultId),
+          ),
+        )
+        .limit(1);
+      if (!keyResult) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      // Edit on the goal, as recording its value takes: whoever may move the
+      // number may say what is stopping it.
+      await getAccessScoped(tx, {
+        workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: keyResult.goalId,
+        requires: ACCESS_LEVELS.edit as never,
+      });
+
+      const [owner] = await tx
+        .select({ id: workspaceMembers.id })
+        .from(workspaceMembers)
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.id, input.ownerId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such member to own it.");
+      }
+
+      const now = new Date();
+      const dueAt = await nextCheckInDueAt(tx, {
+        workspaceId,
+        goalId: keyResult.goalId,
+        now,
+        thresholds: resolveRhythm(await readRhythmRow(tx, workspaceId))
+          .thresholds,
+        timeZone: await workspaceTimeZone(tx, workspaceId),
+      });
+
+      const id = crypto.randomUUID();
+      await tx.insert(blockers).values({
+        id,
+        workspaceId,
+        keyResultId: input.keyResultId,
+        goalId: keyResult.goalId,
+        sessionId: null,
+        type: input.type,
+        description: input.description ?? null,
+        ownerId: input.ownerId,
+        nextAction: input.nextAction,
+        openedAt: now,
+        dueAt,
+        source: "manual",
+      });
+
+      return {
+        result: { id, dueAt: dueAt.toISOString() },
+        activity: {
+          kind: "goal.blocker_raised",
+          subjectType: "goal",
+          subjectId: keyResult.goalId,
+          payload: { keyResultId: input.keyResultId, type: input.type },
+        },
+        audit: {
+          action: "blockers.raise",
+          targetType: "blocker",
+          targetId: id,
+          payload: {
+            keyResultId: input.keyResultId,
+            type: input.type,
+            ownerId: input.ownerId,
+          },
+        },
+      };
+    },
+  }),
+});

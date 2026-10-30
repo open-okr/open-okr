@@ -165,6 +165,15 @@ describe("what a tool tells an agent", () => {
     }
   });
 
+  it("describes a tool without naming the screen it drives", () => {
+    // A model reading the catalogue has never seen screen S-28; the sentence
+    // is noise in its context (mcp-audit-2026-10-29, finding 8).
+    for (const tool of MCP_TOOLS) {
+      expect(tool.description, tool.name).not.toMatch(/\bS-\d{2}\b|\bDrives\b/);
+      expect(tool.description.trim().length, tool.name).toBeGreaterThan(10);
+    }
+  });
+
   it("carries a summary, because a name alone is not a description", () => {
     for (const tool of MCP_TOOLS) {
       expect(tool.description.length, tool.name).toBeGreaterThan(0);
@@ -189,6 +198,24 @@ describe("what a tool tells an agent", () => {
         "[0-9a-fA-F]{8}-",
       );
     }
+  });
+
+  it("never offers an agent a field only the server sets", () => {
+    for (const tool of MCP_TOOLS) {
+      const properties = (tool.inputSchema.properties ?? {}) as object;
+      expect(Object.keys(properties), tool.name).not.toContain("legacy");
+      expect(Object.keys(properties), tool.name).not.toContain("aiGenerated");
+    }
+  });
+
+  it("tells an agent a rich text field takes plain text", () => {
+    const body = (
+      toolNamed("comments.create")?.inputSchema.properties as
+        | Record<string, { description?: string }>
+        | undefined
+    )?.body;
+    expect(body?.description).toMatch(/plain text/i);
+    expect(body?.description).toMatch(/editor JSON/i);
   });
 
   it("builds an example holding exactly the required fields", () => {
@@ -350,6 +377,48 @@ describe("the prompts an agent can ask for", () => {
         expect(names.has(tool), `${prompt.name} names ${tool}`).toBe(true);
       }
     }
+  });
+
+  it("names every required input of every tool it tells the agent to call", () => {
+    // A prompt that calls a tool without saying where its required input comes
+    // from sends the agent into a refusal (mcp-audit-2026-10-29, finding 4).
+    for (const prompt of MCP_PROMPTS) {
+      const text = prompt.render({});
+      const mentioned = [...text.matchAll(/\b([a-z]+\.[a-zA-Z]+)\b/g)].map(
+        (match) => match[1] as string,
+      );
+      for (const name of mentioned) {
+        const required = (toolNamed(name)?.inputSchema.required ??
+          []) as string[];
+        for (const field of required) {
+          expect(text, `${prompt.name}: ${name} needs ${field}`).toContain(
+            field,
+          );
+        }
+      }
+    }
+  });
+
+  it("asks for check-in values on the scale and with the labels the tool takes", () => {
+    const text =
+      MCP_PROMPTS.find((prompt) => prompt.name === "weekly-check-in")?.render(
+        {},
+      ) ?? "";
+    const properties = toolNamed("goals.publishCheckIn")?.inputSchema
+      .properties as Record<string, { enum?: string[] }> | undefined;
+    const status = properties?.status;
+    for (const value of status?.enum ?? []) {
+      expect(text).toContain(value);
+    }
+    expect(text).toContain("0 to 1");
+    expect(text).not.toContain("0 to 10");
+    // Due check-ins come from the one read built for it, not a scan of goals.
+    expect(text).toContain("goals.due");
+    expect(text).toContain("goals.startCheckIn");
+    // METHOD.md §3: a low confidence gets a next action, and a blocker where
+    // something is actually blocked.
+    expect(text).toContain("next action");
+    expect(text).toContain("blocked");
   });
 
   it("uses the argument it was given", () => {

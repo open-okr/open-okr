@@ -56,8 +56,8 @@ them. It is not listing what the server would refuse anyway.
 
 ### 2.2 Tools that are not for agents leave the agent surface
 
-Twenty actions exist for the importer, the scheduler, the copilot's own
-bookkeeping, or the token screen, and an agent can only misuse or be refused
+Thirty-seven actions exist for the importer, the scheduler, the copilot's own
+bookkeeping, the token screen, or an AI provider the agent path never has, and an agent can only misuse or be refused
 by them.
 
 | Kind | Actions |
@@ -67,6 +67,7 @@ by them.
 | The copilot's own bookkeeping | `copilot.recordAnswer`, `copilot.completeRun`, `copilot.recordProposal` |
 | Registration and the key check | `workspace.provision`, `ai.recordCredentialCheck` |
 | Refused to every token by design (§8.2 "a token cannot administer tokens") | `tokens.create`, `tokens.revoke`, `tokens.approveDevice`, `tokens.pendingDevice` |
+| AI assists, which answer null to every agent because the agent path carries no drafter (agent-surface.md §5.1). Added 30 October 2026, MCP audit finding 16 | `goals.draftObjective`, `goals.rewriteKeyResult`, `goals.decomposeKeyResult`, `goals.suggestMeasure`, `goals.suggestParent`, `goals.draftRetrospective`, `goals.parseFilter`, `kpis.suggest`, `kpis.narrateTrend`, `comments.summarise`, `blockers.summarise`, `sessions.clusterRetro`, `sessions.draftMinutes`, `sessions.narrateDiagnostic`, `sessions.narrateDigest`, `imports.proposeMapping`, `copilot.availability` |
 
 The action gains `agentSurface: false`. The catalogue generator skips it and
 the dispatcher refuses it by name. It stays on REST and the command line for
@@ -78,11 +79,13 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 
 | Toolset | Holds | Tools |
 |---|---|---|
-| `core` | What a member does every week: search and fetch, goals and key results, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites | 57 (36 read-only) |
-| `work` | The rest of everyday work: drafts and approvals, targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 89 |
-| `facilitation` | Running the rhythm: sessions, the planning workflow, cycles, alignment, votes, dependencies, decisions, closing | 113 |
-| `admin` | Workspace, people, spaces, roles, invitations, settings, single sign-on, audit, channels, AI, agents, practice, nudges, exports | 135 |
-| `all` | Every agent-surface tool | 395 |
+| `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites, and checking an unsaved draft | 61 |
+| `work` | The rest of everyday work: targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 77 |
+| `facilitation` | Running the rhythm: preparing, running remotely and following up sessions, the planning workflow, cycles, alignment, dependencies, decisions, closing | 91 |
+| `room` | The live room's own moves: private votes and their reveal, the mic, pulse, kudos, retro notes, anonymous process-health answers | 16 |
+| `admin` | Workspace, people, spaces, roles, invitations, settings, audit, agents, practice, nudges, exports | 84 |
+| `integrations` | AI providers, chat channels, single sign-on, spreadsheet imports | 50 |
+| `all` | Every agent-surface tool | 377 |
 
 Chosen in the address the client is configured with, so it works with every
 client and needs no new column:
@@ -100,10 +103,24 @@ https://okr.example/api/mcp?toolsets=all
 | Toolsets compose with scopes: the list is the intersection | A read-only token on `admin` sees the admin reads only |
 | `search` and `fetch` are in every toolset | Research connectors need them, and they are permission-filtered already |
 | Every tool a prompt cites is in `core` | A prompt that tells the agent to call a tool it cannot see is broken |
-| Every agent-surface tool is in exactly one of `core`, `work`, `facilitation`, `admin` | A new action fails the build until somebody places it |
+| Every agent-surface tool is in exactly one of `core`, `work`, `facilitation`, `room`, `admin`, `integrations` | A new action fails the build until somebody places it |
+| No toolset holds more than 128 tools | Several clients cap there and drop the rest silently |
 
 The token screen's configuration snippet gains one line explaining
 `?toolsets=` and showing the `all` form.
+
+### 2.4 Revision of 30 October 2026
+
+From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 16) and the OKR practitioner's recommendations in its §10:
+
+| Change | Why |
+|---|---|
+| `room` split from `facilitation` | Sixteen session tools are moves only the people in the room make. A facilitator's agent prepares and follows up; it does not cast someone's vote |
+| `integrations` split from `admin` | `admin` held 137 tools, over the 128 cap |
+| `goals.publishDraft` and `goals.approveDraft` move to `core` | Publishing your own draft and approving it as reviewer are weekly acts beside `goals.create` and `review.inbox` (METHOD.md §2.9) |
+| Seventeen AI assists leave the agent surface (§2.2) | They answer null on the agent path, which has no provider |
+| `goals.checkDraft` joins `core` | The §4 verdicts on an unsaved draft, with each check's prompt, so an agent drafting with its own model can check before `goals.create` publishes |
+| `blockers.raise` joins `core` | An owner raises a blocker at check-in time, outside any session (METHOD.md §3, §7.3) |
 
 ## 3. What it measures after
 

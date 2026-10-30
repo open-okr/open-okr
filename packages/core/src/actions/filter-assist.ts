@@ -62,6 +62,7 @@ const filterOutput = z.object({
  */
 export const parseListFilter = defineReadAction({
   name: "goals.parseFilter",
+  agentSurface: false,
   summary:
     "Turns a sentence into a validated goals filter, or refuses it with the reason.",
   input: z.object({

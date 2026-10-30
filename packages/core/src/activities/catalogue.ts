@@ -347,6 +347,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     draft: z.boolean().optional(),
   }),
   "goal.updated": z.object({ title: z.string() }),
+  // A blocker an owner raises outside a session (mcp-audit-2026-10-29, 10)
+  "goal.blocker_raised": z.object({
+    keyResultId: z.string(),
+    type: z.string(),
+  }),
   // A draft published by its owner, live or now with its reviewer, and a
   // draft approved by its reviewer (METHOD.md §2.9, P9-T13-b-b).
   "goal.draft_published": z.object({

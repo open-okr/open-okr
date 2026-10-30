@@ -22,8 +22,10 @@
  * the scope is separate, the grant has to carry it, and the client is told.
  */
 import { type ZodType, z } from "zod";
+import { RICH_TEXT_MARKER } from "../../rich-text/field-schema.ts";
 import type { JsonObject } from "../openapi.ts";
 import { REST_ROUTES, type RestRoute } from "../surface.ts";
+import { fieldDescription } from "./field-descriptions.ts";
 import { RESEARCH_TOOL_SPECS, type ResearchToolSpec } from "./research.ts";
 
 /** The catalogue's own version, bumped when its shape changes. */
@@ -113,7 +115,86 @@ function jsonSchema(schema: ZodType): JsonObject {
   // one such tool made the whole list unreadable to those clients (found by
   // the MCP test against the UAT instance, 9 October 2026). The union stays
   // as it is, under an object type it already satisfies.
-  return rest.type === "object" ? rest : { type: "object", ...rest };
+  const object = rest.type === "object" ? rest : { type: "object", ...rest };
+  return withoutServerSetFields(describingPlainText(object) as JsonObject);
+}
+
+/** What an agent is told about a rich text field it may fill. */
+const AGENT_RICH_TEXT_DESCRIPTION =
+  'Plain text, or editor JSON: {"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"..."}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.';
+
+/**
+ * Tells an agent a rich text field takes plain text, because on this path it
+ * does: the dispatcher turns the string into a document before the action
+ * runs (mcp-audit-2026-10-29, finding 1). REST and the command line still
+ * refuse it (guided-inputs.md change 13b), so only this projection says so.
+ */
+function describingPlainText(node: unknown): unknown {
+  if (Array.isArray(node)) {
+    return node.map(describingPlainText);
+  }
+  if (node === null || typeof node !== "object") {
+    return node;
+  }
+  const record = node as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(record)) {
+    out[key] = describingPlainText(value);
+  }
+  if (record[RICH_TEXT_MARKER] === true) {
+    out.description = AGENT_RICH_TEXT_DESCRIPTION;
+  }
+  return out;
+}
+
+/** True when a property of a tool's schema is a rich text field. */
+export function isRichTextField(schema: JsonObject, field: string): boolean {
+  const properties = (schema.properties ?? {}) as Record<string, JsonObject>;
+  const node = properties[field];
+  if (!node) {
+    return false;
+  }
+  const alternatives = (node.anyOf ?? []) as JsonObject[];
+  return [node, ...alternatives].some(
+    (candidate) => candidate[RICH_TEXT_MARKER] === true,
+  );
+}
+
+/**
+ * Input fields an action accepts from the importer or the copilot, never from
+ * an external agent.
+ *
+ * `legacy` is the import identity, unique on the workspace, the source and the
+ * source id; an agent that set one could take an imported row's place in the
+ * next run. `aiGenerated` is the copilot's provenance label on a goal. Both
+ * stay in the action's own schema for the callers that own them. The
+ * dispatcher refuses either when an agent sends it (mcp-audit-2026-10-29,
+ * finding 17).
+ */
+export const SERVER_SET_FIELDS: readonly string[] = ["legacy", "aiGenerated"];
+
+function withoutServerSetFields(schema: JsonObject): JsonObject {
+  const properties = schema.properties as Record<string, unknown> | undefined;
+  if (!properties) {
+    return schema;
+  }
+  const kept = Object.fromEntries(
+    Object.entries(properties).filter(
+      ([field]) => !SERVER_SET_FIELDS.includes(field),
+    ),
+  );
+  const required = schema.required as string[] | undefined;
+  return {
+    ...schema,
+    properties: kept,
+    ...(required
+      ? {
+          required: required.filter(
+            (field) => !SERVER_SET_FIELDS.includes(field),
+          ),
+        }
+      : {}),
+  };
 }
 
 /**
@@ -196,11 +277,45 @@ function placeholderFor(field: JsonObject): unknown {
  */
 const idempotent = (route: RestRoute) => route.safety === "read";
 
+/**
+ * The summary as an agent should read it: without the screen it drives.
+ *
+ * The registry's summaries serve REST and the command line too, where "Drives
+ * screen S-28" tells a developer where to look. A model has never seen S-28,
+ * and the sentence only costs context (mcp-audit-2026-10-29, finding 8).
+ */
+function forAgents(summary: string): string {
+  return summary
+    .replace(/\s*Drives [^.]*\./g, "")
+    .replace(/\s*\((?:screen )?S-\d{2}\)/g, "")
+    .trim();
+}
+
+/** Fills in a description for each top-level field the schema leaves bare. */
+function withFieldDescriptions(tool: string, schema: JsonObject): JsonObject {
+  const properties = schema.properties as
+    | Record<string, JsonObject>
+    | undefined;
+  if (!properties) {
+    return schema;
+  }
+  const described = Object.fromEntries(
+    Object.entries(properties).map(([field, node]) => {
+      const description = node.description ?? fieldDescription(tool, field);
+      return [field, description ? { ...node, description } : node];
+    }),
+  );
+  return { ...schema, properties: described };
+}
+
 function toolFor(route: RestRoute): McpTool {
-  const schema = jsonSchema(route.inputSchema);
+  const schema = withFieldDescriptions(
+    route.action,
+    jsonSchema(route.inputSchema),
+  );
   return {
     name: route.action,
-    description: route.summary,
+    description: forAgents(route.summary),
     inputSchema: schema,
     scope: route.scope,
     annotations: {
@@ -282,12 +397,14 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
       [
         "Walk me through my check-ins that are due this week, one goal at a time.",
         "",
-        "1. Call goals.list with mine set to true to find the goals I champion.",
-        "2. For each one, call goals.read for its key results, their current values and the next check-in date. Skip a goal that is not due in the next seven days.",
-        "3. For each goal that is due, ask me for every key result's new value, my confidence from 0 to 10, a status (on track, at risk or off track) and one sentence on what changed.",
-        "4. Show me the check-in before you publish it with goals.publishCheckIn, and wait for my yes.",
+        "1. Call goals.due with withinDays set to 7 to find the goals I champion that are due.",
+        "2. For each one, call goals.read with the goal's id as id, for its key results and their current values.",
+        "3. Ask me for every key result's new value, my confidence that it will land, a status and one or two sentences on what changed. Confidence is a number from 0 to 1: 7 in 10 is 0.7. The status is on_track, caution (shown to people as at risk) or off_track.",
+        "4. When my confidence is low, ask me for a next action with an owner, due by my next check-in, and whether something is actually blocked. Put the next action in the narrative. For a blocked key result, call blockers.raise with its keyResultId, a type, the ownerId and the nextAction.",
+        "5. Call goals.startCheckIn with the goal's id as goalId. It answers with the draft's id.",
+        "6. Show me the check-in, and wait for my yes. Then call goals.publishCheckIn with that draft id as id, the status, the confidence, the narrative and one entry in values per key result (keyResultId and value).",
         "",
-        "Never invent a number. If I do not know a value, leave it as it is.",
+        "Never invent a number. If I do not know a value, leave that key result out of values.",
       ].join("\n"),
   },
   {
@@ -306,10 +423,11 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
         "Review this cycle's objectives against the product's quality checks, and tell me what fails.",
         "",
         args.cycleId
-          ? `1. Call workflow.read for the cycle ${args.cycleId}.`
-          : "1. Call cycles.current, then workflow.read for that cycle.",
-        "2. Publish gate 2 names every objective and key result that fails a check. For each, call goals.read and quote the check exactly as the product words it.",
-        "3. Suggest one rewrite per failure, and list the failures by objective, the ones that block publishing first.",
+          ? `1. Call workflow.read with ${args.cycleId} as cycleId.`
+          : "1. Call cycles.current, then workflow.read with that cycle's id as cycleId.",
+        "2. Publish gate 2 names every objective and key result that fails a check. For each, call goals.read with the goal's id as id and quote the failing checks as the product names them.",
+        "3. Suggest one rewrite per failure. Before you show a rewrite, call goals.checkDraft with it as title, the goal's level and its key results, and keep only a rewrite that passes the check it failed.",
+        "4. List the failures by objective, the ones that block publishing first.",
         "",
         "Change nothing. This is a review.",
       ].join("\n"),
@@ -323,8 +441,8 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
         "Gather what I need for my quarterly review conversation.",
         "",
         "1. Call sessions.mine to find my next quarterly review.",
-        "2. Call goals.list with mine set to true, then goals.read for each, for every key result's latest value, confidence and check-ins.",
-        "3. Call blockers.board for the blockers on those key results.",
+        "2. Call goals.list with mine set to true, then goals.read with each goal's id as id, for every key result's latest value, confidence and check-ins.",
+        "3. A goal names its space as spaceId when it has one. For each of those spaces, call blockers.board with the space's id as spaceId, and keep the blockers on my key results.",
         "4. For each objective, tell me where it ended, the score I could propose with one line of evidence, what got in the way, and one thing to carry into the next cycle.",
         "",
         "Record no score. The review records scores together, in the room.",
@@ -339,8 +457,8 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
         "List what is waiting on me, the latest first.",
         "",
         "1. Call review.inbox for the check-ins waiting on my review and my other obligations.",
-        "2. Call goals.list with mine set to true. A goal whose next check-in is today or past is a check-in I owe.",
-        "3. Call blockers.board for the blockers I own.",
+        "2. Call goals.due with withinDays set to 0 for the check-ins I owe today or earlier.",
+        "3. Call spaces.list, then blockers.board with each space's id as spaceId, and keep the blockers I own.",
         "4. Call notifications.list for what I have not read.",
         "",
         "Give me one list. Each line says what it is, how late it is and where to open it. Change nothing.",
@@ -357,7 +475,7 @@ export const MCP_PROMPTS: readonly McpPrompt[] = [
  * from a route, because neither has a route: both are reads and both say so.
  */
 function researchToolFor(spec: ResearchToolSpec): McpTool {
-  const schema = jsonSchema(spec.input);
+  const schema = withFieldDescriptions(spec.name, jsonSchema(spec.input));
   return {
     name: spec.name,
     description: spec.description,

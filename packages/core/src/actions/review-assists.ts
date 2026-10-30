@@ -108,6 +108,7 @@ async function inSession<T>(
  */
 export const clusterRetroNotes = defineReadAction({
   name: "sessions.clusterRetro",
+  agentSurface: false,
   summary:
     "Groups one review's retro notes into themes, before the dot vote, without writing anything.",
   input: z.object({ sessionId: z.uuid() }),
@@ -229,6 +230,7 @@ export const clusterRetroNotes = defineReadAction({
  */
 export const narrateDiagnostic = defineReadAction({
   name: "sessions.narrateDiagnostic",
+  agentSurface: false,
   summary:
     "Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
   input: z.object({ sessionId: z.uuid() }),
@@ -289,6 +291,7 @@ export const narrateDiagnostic = defineReadAction({
 /** Drafts the review minutes from the record the session already holds. */
 export const draftMinutes = defineReadAction({
   name: "sessions.draftMinutes",
+  agentSurface: false,
   summary:
     "Drafts the review minutes as prose over the record the session already holds.",
   input: z.object({ sessionId: z.uuid() }),
@@ -367,6 +370,7 @@ function minutesSections(
 /** Drafts a goal's retrospective from its own check-in history. */
 export const draftRetrospective = defineReadAction({
   name: "goals.draftRetrospective",
+  agentSurface: false,
   summary:
     "Drafts a goal's closing retrospective from its published check-ins, as plain text a person edits.",
   input: z.object({ goalId: z.uuid() }),
