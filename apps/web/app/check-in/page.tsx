@@ -8,6 +8,7 @@ import { healthWord } from "../../lib/health-words.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
+import { RaiseBlocker } from "./raise-blocker.tsx";
 import { Timeline } from "./timeline.tsx";
 import type { VoteState } from "./vote-panel.tsx";
 
@@ -309,6 +310,17 @@ async function CheckInForGoal({
     "confidence.display"
   ];
 
+  // The people a blocker can be given to (H11): members only, because an
+  // agent or an unclaimed placeholder cannot clear one (H-09).
+  const owners =
+    canEdit && (draft || updatable)
+      ? (await callAction(context, "people.directory", {}))
+          .filter(
+            (member) => member.kind === "human" || member.kind === "guest",
+          )
+          .map((member) => ({ id: member.id, label: member.name }))
+      : [];
+
   const votes: VoteState[] = [];
   for (const keyResult of goal.keyResults) {
     const state = await callAction(context, "goals.readVotes", {
@@ -369,6 +381,16 @@ async function CheckInForGoal({
           </CardBody>
         </Card>
       )}
+
+      {owners.length > 0 ? (
+        <RaiseBlocker
+          keyResults={goal.keyResults.map((keyResult) => ({
+            id: keyResult.id,
+            label: keyResult.title,
+          }))}
+          owners={owners}
+        />
+      ) : null}
 
       <Votes votes={votes} canReveal={canEdit} display={display} />
 
