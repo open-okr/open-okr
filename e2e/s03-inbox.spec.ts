@@ -154,11 +154,13 @@ test("a notification is listed, links to its goal, and clears the badge", async 
   const nav = page.getByRole("navigation", { name: "Primary" });
   const updates = nav.getByRole("link", { name: /Updates/ });
   await expect(updates).toContainText(/\d/);
-  const badge = async () =>
-    Number(
-      (await updates.locator("[data-sidebar-badge]").textContent())?.trim() ??
-        "0",
-    );
+  // No badge at all is zero: the row draws none once nothing is waiting.
+  const badge = async () => {
+    const shown = updates.locator("[data-sidebar-badge]");
+    return (await shown.count()) === 0
+      ? 0
+      : Number((await shown.textContent())?.trim() ?? "0");
+  };
   const before = await badge();
   await expect(
     page

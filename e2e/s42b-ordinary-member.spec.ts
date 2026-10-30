@@ -175,9 +175,11 @@ test("the front door renders for them, and does not bounce to the setup screen",
   );
 
   await memberPage.goto("/");
-  await expect(memberPage.getByRole("heading", { name: "Work map" })).toBeVisible(
-    { timeout: 20_000 },
-  );
+  // An ordinary member's front door is their week since the role homes
+  // (OKRGoal UX review, backlog 12); the Work Map is the cockpit's.
+  await expect(
+    memberPage.getByRole("heading", { level: 1, name: "My week" }),
+  ).toBeVisible({ timeout: 20_000 });
   // Still on the front door a moment later. A client-side redirect loop leaves
   // 200s and no `Location` header, so the URL after it settles is the evidence.
   await memberPage.waitForTimeout(1_500);

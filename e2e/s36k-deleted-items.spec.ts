@@ -101,6 +101,8 @@ test("sign in and draft a goal of this spec's own", async () => {
 
 test("one press deletes it, and the page it lands on offers an undo", async () => {
   await goTo(page, `/goals/${goalId}`);
+  // Behind "Manage this goal" since the OKRGoal UX review (N6).
+  await page.getByText("Manage this goal", { exact: true }).click();
   await page.getByRole("button", { name: "Delete this goal" }).click();
 
   await page.waitForURL(/\/goals$/, { timeout: 15_000 });
@@ -133,6 +135,7 @@ test("the Deleted items screen is in the admin navigation", async () => {
 
 test("a goal left deleted is listed with who deleted it, and Restore brings it back", async () => {
   await goTo(page, `/goals/${goalId}`);
+  await page.getByText("Manage this goal", { exact: true }).click();
   await page.getByRole("button", { name: "Delete this goal" }).click();
   await page.waitForURL(/\/goals$/, { timeout: 15_000 });
   await expect.poll(deleted).toBe(true);
@@ -161,6 +164,7 @@ test("a goal left deleted is listed with who deleted it, and Restore brings it b
 });
 
 test("and it is left deleted, so no later spec meets it", async () => {
+  await page.getByText("Manage this goal", { exact: true }).click();
   await page.getByRole("button", { name: "Delete this goal" }).click();
   await page.waitForURL(/\/goals$/, { timeout: 15_000 });
   await expect.poll(deleted).toBe(true);
