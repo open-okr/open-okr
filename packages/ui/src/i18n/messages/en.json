@@ -1618,7 +1618,7 @@
   "cycle.drafting.noKeyResultsYet": "No key results yet. Without one, nothing here is measurable.",
   "cycle.drafting.noKpisYet": "No KPIs to read from yet, so this key result is measured by hand.",
   "cycle.drafting.noOwner": "No owner",
-  "cycle.drafting.noParentAndNo": "No parent and no contribution statement, so publish gate 3 is\n                red.",
+  "cycle.drafting.noParentAndNo": "No parent and no contribution statement, so publish gate 3 is red.",
   "cycle.drafting.noReviewer": "No reviewer",
   "cycle.drafting.noSpace": "No {termSpaceLower}",
   "cycle.drafting.nothingDraftedYetAn": "Nothing drafted yet. An objective states the change; its key\n              results are the proof it happened.",

@@ -438,6 +438,7 @@ export {
   trigger,
 } from "./triggers.ts";
 export {
+  alignmentMapped,
   type CycleWorkflowInput,
   canPublish,
   type FrameSnapshot,

@@ -7,6 +7,7 @@ import {
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
 import {
+  alignmentMapped,
   type ResolvedPractice,
   type ResolvedThresholds,
   WEIGHT_MAX,
@@ -374,10 +375,17 @@ export default async function GoalPage({
                 {t("goals.detail.noCheckInIs")}
               </p>
             )}
-            <p className="text-xs text-ink-3">
-              {goal.contributionStatement ??
-                t("goals.detail.noParentNoContribution")}
-            </p>
+            {goal.contributionStatement ? (
+              <p className="text-xs text-ink-3">{goal.contributionStatement}</p>
+            ) : alignmentMapped({
+                hasParent: goal.parentGoalId !== null,
+                contributionStatement: goal.contributionStatement,
+                standaloneReason: goal.standaloneReason,
+              }) ? null : (
+              <p className="text-xs text-ink-3">
+                {t("goals.detail.noParentNoContribution")}
+              </p>
+            )}
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
                 {t("goals.detail.nothingHasMovedYet")}

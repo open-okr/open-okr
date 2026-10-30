@@ -306,6 +306,24 @@ export const GATE_TITLES = [
 const isBlank = (value: string | null | undefined): boolean =>
   value === null || value === undefined || value.trim() === "";
 
+/**
+ * Gate 3 for one goal (§4.5): it has a parent, states what it contributes to,
+ * or says why it stands alone. Exported so a screen that explains gate 3 asks
+ * the same question the gate does.
+ */
+export function alignmentMapped(
+  goal: Pick<
+    GoalSnapshot,
+    "hasParent" | "contributionStatement" | "standaloneReason"
+  >,
+): boolean {
+  return (
+    goal.hasParent ||
+    !isBlank(goal.contributionStatement) ||
+    !isBlank(goal.standaloneReason)
+  );
+}
+
 const asDate = (value: Date | string | null): Date | null => {
   if (value === null) {
     return null;
@@ -1029,12 +1047,7 @@ export function publishGates(
     results.push(unevaluable(3, goalsBlocked));
   } else {
     const missing = goals
-      .filter(
-        (goal) =>
-          !goal.hasParent &&
-          isBlank(goal.contributionStatement) &&
-          isBlank(goal.standaloneReason),
-      )
+      .filter((goal) => !alignmentMapped(goal))
       .map(
         (goal) =>
           `"${goal.title}" has no parent, states no contribution and gives no reason to stand alone`,
