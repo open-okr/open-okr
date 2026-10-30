@@ -2,39 +2,27 @@ import { ACCESS_LEVELS, callAction, resourceIdentifier } from "@openokr/core";
 import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { seesCycle } from "../../lib/cycle-visibility.ts";
 import { instanceIssuer } from "../../lib/issuer";
+import { myWeek, rhythmByTeam } from "../../lib/my-week.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { AgentSetupPill } from "../agent-setup-pill.tsx";
-import { FirstVisitTour } from "../first-visit-tour.tsx";
-import { goalTreeNodes } from "../goal-nodes.ts";
 import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
-import { WorkMap } from "../work-map.tsx";
-import {
-  type ScopeTab,
-  type WorkMapContext,
-  WorkMapContextStrip,
-  WorkMapHeader,
-  WorkMapScopeTabs,
-  type WorkMapStats,
-} from "../work-map-header.tsx";
+import { WorkMapScreen } from "../work-map-screen.tsx";
+import { MyWeek, RhythmByTeam, TeamDigest } from "./role-home.tsx";
 
 /**
- * The Work Map, the front door (UIUX-PLAN.md §4 S-01, P3-T11).
+ * Home, by role (OKRGoal UX review, backlog 12; UIUX-PLAN.md §4 S-01).
  *
- * Replaces the proving dashboard P1-T08 put here, which was scaffolding and said
- * so. One tree over goals, sub-goals and key results, with the uniform node
- * contract S-01 describes. Initiatives, tasks and KPI tiles join the same tree in
- * Phase 5 and P3-T12 without the row component changing.
- *
- * **The tree is flattened on the server, parents before children.** A nested
- * render would put the DOM depth at the mercy of how deep somebody aligned their
- * goals, and would make virtualisation impossible later: a virtual list needs
- * siblings. Depth is a number on each row, not a shape in the markup.
- *
- * **Every node is a deep link.** Selecting one is `?node=<id>`, so a row is a URL
- * somebody can send, and the panel opens without the list losing its place
- * because the list never re-orders.
+ * The review: "Give each role its own home ('My week') instead of showing
+ * everyone the company Work Map." Every member opens on their week, the goals
+ * they champion as check-in cards. A reviewer with check-ins waiting sees them
+ * here to read and acknowledge. The people who run the cycle (administrators,
+ * space coordinators and managers) also get the cockpit: each team's rhythm,
+ * then the phase, the gates, the numbers and the company tree that used to be
+ * everybody's front door. Everybody else reaches the tree at `/map`, the Map
+ * tab of Goals.
  */
 export default async function HomePage({
   searchParams,
@@ -50,21 +38,10 @@ export default async function HomePage({
     actor: { kind: "human" as const, userId: session.user.id },
   };
 
-  /**
-   * A workspace that has never been set up goes to S-34 first (P6-G26).
-   *
-   * **Here rather than in the shell**, because this is the screen a first
-   * sign-in lands on and the only one worth interrupting. Redirecting from the
-   * layout would catch every navigation, including the wizard's own way back.
-   *
-   * The default is `true`, so a workspace nobody marked never comes here: only
-   * one provisioning wrote `false` for is pending.
-   */
   const level = await workspaceReaderLevel(
     workspace.workspaceId,
     workspace.memberId,
   );
-  const canEdit = level >= ACCESS_LEVELS.edit;
 
   // **Somebody who holds nothing on the workspace itself is a guest**
   // (completeness review M-22), and `workspaceReaderLevel` has already sent
@@ -86,132 +63,38 @@ export default async function HomePage({
   ) {
     redirect("/welcome");
   }
-  // The first-visit tour (UIUX-PLAN S-34, L-08). Here, because this is the
-  // screen every first visit lands on, and after the redirect above, so an
-  // owner meets the setup first and the tour when they arrive.
-  const tour = await callAction(context, "people.readOwnTour", {});
   const query = await searchParams;
 
-  const cycles = await callAction(context, "cycles.list", {});
-  const current = await callAction(context, "cycles.current", {
-    mode: "quarterly",
-  });
-  const cycleId = query.cycle ?? current?.id ?? cycles[0]?.id ?? null;
-
-  // The scope tab. "company" is every goal the reader may see; a space id
-  // narrows to that space. S-01 names a "my spaces" tab too, and it is left out
-  // rather than faked: `goals.list` filters by one space, and answering "mine"
-  // properly means the reader's space membership, which is a read this screen
-  // does not have yet.
   const spaces = await callAction(context, "spaces.list", {});
-  const scope =
-    query.scope && spaces.some((space) => space.id === query.scope)
-      ? query.scope
-      : "company";
+  const runsCycle = seesCycle({
+    administers: level >= ACCESS_LEVELS.full,
+    spaceRoles: spaces.map((space) => space.ownRole),
+  });
 
-  const { goals } = cycleId
-    ? await callAction(context, "goals.list", {
-        cycleId,
-        includeClosed: false,
-        ...(scope === "company" ? {} : { spaceId: scope }),
-      })
-    : { goals: [] };
+  const mine = await callAction(context, "goals.list", {
+    mine: true,
+    includeClosed: false,
+  });
+  const cards = myWeek(mine.goals, workspace.memberId);
+  const streak = await callAction(context, "goals.myStreak", {});
+  const owed = (
+    await callAction(context, "review.inbox", {})
+  ).obligations.filter((item) => item.kind === "acknowledgement");
 
-  // The cycle's phase, its gates and its deadline (P3-T03, P4-T03). The front
-  // door is where somebody asks "where are we", and a tree of goals alone does
-  // not answer it.
-  const workflow = cycleId
-    ? await callAction(context, "workflow.read", { cycleId })
+  const current = runsCycle
+    ? await callAction(context, "cycles.current", { mode: "quarterly" })
     : null;
-
-  const alignment = cycleId
-    ? await callAction(context, "alignment.read", {
-        cycleId,
-        includeDismissed: false,
-        ...(scope === "company" ? {} : { spaceId: scope }),
-      })
-    : null;
-
-  const nodes = goalTreeNodes(t, goals, locale);
-  const selected = nodes.find((node) => node.id === query.node) ?? null;
-
-  // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on
-  // track" is counted over goals and reported against the measures they carry:
-  // a set of four objectives is a smaller number than the fourteen key results
-  // somebody is actually reading about.
-  const keyResultCount = goals.reduce(
-    (sum, goal) => sum + goal.keyResults.length,
-    0,
-  );
-  const measured = goals.filter((goal) => goal.keyResults.length > 0);
-  const onTrackKeyResults = measured
-    .filter((goal) => goal.health === "on_track" || goal.health === "achieved")
-    .reduce((sum, goal) => sum + goal.keyResults.length, 0);
-  const stats: WorkMapStats = {
-    objectiveCount: goals.length,
-    keyResultCount,
-    onTrackPct:
-      keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
-    outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
-    alignmentScore: alignment?.score ?? null,
-    alignmentBand: alignment?.band ?? null,
-  };
-
-  const workMapContext: WorkMapContext | null = workflow
-    ? {
-        phase: workflow.phase,
-        phaseTitle:
-          workflow.phases.find((phase) => phase.phase === workflow.phase)
-            ?.title ?? "",
-        unmetGates: workflow.gates
-          .filter((gate) => !gate.passed)
-          .map((gate) => gate.title),
-        daysToDeadline: workflow.daysToDeadline,
-        published: workflow.publishedAt !== null,
-      }
-    : null;
-
-  const linkTo = (next: {
-    cycle?: string | null;
-    node?: string | null;
-    scope?: string | null;
-  }): string => {
-    const params = new URLSearchParams();
-    const cycle = next.cycle === undefined ? cycleId : next.cycle;
-    const node = next.node === undefined ? (query.node ?? null) : next.node;
-    const nextScope = next.scope === undefined ? scope : next.scope;
-    if (cycle) {
-      params.set("cycle", cycle);
-    }
-    if (nextScope && nextScope !== "company") {
-      params.set("scope", nextScope);
-    }
-    if (node) {
-      params.set("node", node);
-    }
-    const search = params.toString();
-    return search ? `/?${search}` : "/";
-  };
-
-  const hrefFor = (nodeId: string | null): string => linkTo({ node: nodeId });
-
-  const scopeTabs: ScopeTab[] = [
-    {
-      key: "company",
-      label: "Company",
-      href: linkTo({ scope: "company", node: null }),
-    },
-    ...spaces.map((space) => ({
-      key: space.id,
-      label: space.name,
-      href: linkTo({ scope: space.id, node: null }),
-    })),
-  ];
-
-  const scopeLabel =
-    scope === "company"
-      ? "Company-wide tree"
-      : (spaces.find((space) => space.id === scope)?.name ?? "One space");
+  const rhythm = current
+    ? rhythmByTeam(
+        (
+          await callAction(context, "goals.list", {
+            cycleId: current.id,
+            includeClosed: false,
+          })
+        ).goals,
+        spaces.map((space) => ({ id: space.id, name: space.name })),
+      )
+    : [];
 
   return (
     <div className="flex w-full flex-col gap-3.5">
@@ -222,17 +105,6 @@ export default async function HomePage({
         email={session.user.email}
       />
 
-      <WorkMapContextStrip
-        context={workMapContext}
-        cycleHref={cycleId ? `/cycle?cycle=${cycleId}` : "/cycle"}
-      />
-
-      <WorkMapHeader
-        workspaceName={workspace.name}
-        scopeLabel={scopeLabel}
-        stats={stats}
-      />
-
       {/* docs/design/agent-setup-prompt.md §3: a prompt a member pastes into
           their own agent, which then connects itself through OAuth. */}
       <AgentSetupPill
@@ -240,56 +112,30 @@ export default async function HomePage({
         sessionId={session.session.id}
       />
 
-      {/* Under the page's own heading, so the outline reads Work map and then
-          the tour, and above the tree its first stop outlines, so a keyboard
-          meets the card before the rows it introduces. Gone for good once
-          finished or ended. */}
-      {tour.finished ? null : <FirstVisitTour />}
-
-      <WorkMapScopeTabs
-        tabs={scopeTabs}
-        active={scope}
-        cycles={cycles}
-        activeCycleId={cycleId}
-        cycleHrefFor={(id) => linkTo({ cycle: id, node: null })}
+      <MyWeek
+        cards={cards}
+        streak={streak}
+        // The cockpit's tree carries the page's own heading; without it,
+        // the week is the page.
+        heading={runsCycle ? "h2" : "h1"}
+        t={t}
+        locale={locale}
       />
 
-      <WorkMap
-        nodes={nodes}
-        selected={selected}
-        canEdit={canEdit}
-        hrefFor={hrefFor}
-      />
+      {owed.length > 0 ? <TeamDigest owed={owed} t={t} /> : null}
 
-      <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
-        <a className="text-brand-text underline" href="/goals">
-          {t("home.filterAndSearchIn")}
-        </a>
-        <a className="text-brand-text underline" href="/goals?display=diagram">
-          {t("home.seeTheCascade")}
-        </a>
-        <a className="text-brand-text underline" href="/review">
-          {t("common.whatYouOwe")}
-        </a>
-        {/* P5-T01c. The task asks for a door from the front door itself,
-            two clicks from the session, and since P9-T07a-b this is the
-            only one outside the Cycle module's own tabs: Sessions left the
-            sidebar for a tab inside Cycle (okr-entry-points.md §3.1). */}
-        <a className="text-brand-text underline" href="/sessions">
-          {t("common.sessions")}
-        </a>
-        {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
-            this is how it is reached. The engine has written a row on every
-            operation since P2-T07 and nothing has ever shown one. */}
-        <a className="text-brand-text underline" href="/activity">
-          {t("home.whatHasHappenedHere")}
-        </a>
-        {/* P6-G09. S-33 has a screen in §6 and no slot in §3's sidebar,
-            same pattern as Activity above. */}
-        <a className="text-brand-text underline" href="/people">
-          {t("home.whoIsHere")}
-        </a>
-      </p>
+      {runsCycle ? (
+        <>
+          <RhythmByTeam rows={rhythm} t={t} />
+          <WorkMapScreen query={query} basePath="/" />
+        </>
+      ) : (
+        <p className="text-xs">
+          <a className="text-brand-text underline" href="/map">
+            {t("home.map.link")}
+          </a>
+        </p>
+      )}
     </div>
   );
 }

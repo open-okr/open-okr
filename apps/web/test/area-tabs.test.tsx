@@ -28,7 +28,11 @@ describe("an area's tabs", () => {
 
   it("covers the three areas that hold more than one screen", () => {
     expect(Object.keys(AREAS).sort()).toEqual(["goals", "updates", "work"]);
-    expect(AREAS.goals.map((tab) => tab.href)).toEqual(["/goals", "/kpis"]);
+    expect(AREAS.goals.map((tab) => tab.href)).toEqual([
+      "/goals",
+      "/kpis",
+      "/map",
+    ]);
     expect(AREAS.work.map((tab) => tab.href)).toEqual([
       "/initiatives",
       "/board",

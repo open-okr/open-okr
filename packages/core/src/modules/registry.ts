@@ -177,6 +177,22 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
+    name: "map",
+    navigation: [
+      {
+        id: "map",
+        label: "Map",
+        href: "/map",
+        // The company tree, the Map tab of Goals since the role homes
+        // (OKRGoal UX review, backlog 12): Home is each reader's own week,
+        // and the tree that was everybody's front door lives here.
+        section: "inside",
+        parent: "goals",
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
     name: "initiatives",
     navigation: [
       {

@@ -17,6 +17,8 @@ export const AREAS = {
   goals: [
     { href: "/goals", key: "areaTabs.goals.okrs" },
     { href: "/kpis", key: "areaTabs.goals.kpis" },
+    // The company tree, which was everybody's Home until the role homes.
+    { href: "/map", key: "areaTabs.goals.map" },
   ],
   work: [
     { href: "/initiatives", key: "areaTabs.work.initiatives" },

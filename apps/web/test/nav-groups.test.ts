@@ -44,6 +44,7 @@ describe("navBlocks", () => {
         ["check-in", "goals"],
         ["inbox", "review"],
         ["kpis", "goals"],
+        ["map", "goals"],
         ["scorecard", "cycle"],
         ["search", null],
         ["sessions", "cycle"],

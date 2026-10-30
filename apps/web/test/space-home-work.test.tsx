@@ -32,7 +32,8 @@ const workText = withMessages(
   readScreen(at("../app/spaces/[id]/space-work.tsx")),
 );
 const treeScreen = source("../app/kpis/trees/page.tsx");
-const home = source("../app/(home)/page.tsx");
+// The Work Map's own screen since the role homes moved it off Home.
+const home = source("../app/work-map-screen.tsx");
 
 const render = (node: React.ReactNode) =>
   renderToStaticMarkup(

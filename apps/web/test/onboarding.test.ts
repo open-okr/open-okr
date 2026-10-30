@@ -24,6 +24,9 @@ const page = at("../app/welcome/page.tsx");
 const wizard = at("../app/welcome/wizard.tsx");
 const actions = at("../app/welcome/actions.ts");
 const home = at("../app/(home)/page.tsx");
+// The tour's first stop outlines the tree, so it is drawn wherever the tree
+// is: Home's cockpit and the Map tab since the role homes.
+const workMapScreen = at("../app/work-map-screen.tsx");
 
 describe("the setting", () => {
   test("defaults to finished, so no existing workspace is dragged into it", () => {
@@ -177,10 +180,14 @@ describe("the first-visit tour (L-08)", () => {
   const css = at("../app/globals.css");
 
   test("is drawn on the Work Map, only for a member who has not finished it", () => {
-    expect(home).toContain('callAction(context, "people.readOwnTour", {})');
-    expect(home).toContain("{tour.finished ? null : <FirstVisitTour />}");
+    expect(workMapScreen).toContain(
+      'callAction(context, "people.readOwnTour", {})',
+    );
+    expect(workMapScreen).toContain(
+      "{tour.finished ? null : <FirstVisitTour />}",
+    );
     // After the setup redirect, so an owner meets the setup first.
-    expect(home.indexOf('"people.readOwnTour"')).toBeGreaterThan(
+    expect(home.indexOf("<WorkMapScreen")).toBeGreaterThan(
       home.indexOf('redirect("/welcome")'),
     );
   });
