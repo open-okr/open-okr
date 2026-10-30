@@ -136,16 +136,16 @@ describe("useSubmitShortcut", () => {
   });
 });
 
-describe("UnsavedChangesProvider", () => {
-  function Page({ guard }: { readonly guard: boolean }) {
-    return (
-      <UnsavedChangesProvider message="Leave and lose them?">
-        <Harness guard={guard} />
-        <a href="/elsewhere">Elsewhere</a>
-      </UnsavedChangesProvider>
-    );
-  }
+function Page({ guard }: { readonly guard: boolean }) {
+  return (
+    <UnsavedChangesProvider message="Leave and lose them?">
+      <Harness guard={guard} />
+      <a href="/elsewhere">Elsewhere</a>
+    </UnsavedChangesProvider>
+  );
+}
 
+describe("UnsavedChangesProvider", () => {
   test("a link click is asked about while the form holds unsaved work", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     render(<Page guard />);

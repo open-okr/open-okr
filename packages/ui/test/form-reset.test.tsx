@@ -95,6 +95,30 @@ describe("after a form resets", () => {
   });
 });
 
+function Profile() {
+  const [saved, setSaved] = useState({ start: "22:00", end: "07:00" });
+  return (
+    <form
+      action={async (form: FormData) => {
+        setSaved({
+          start: String(form.get("quietStart")),
+          end: String(form.get("quietEnd")),
+        });
+      }}
+    >
+      <TimeRangeInput
+        label="Quiet hours"
+        startLabel="Quiet hours start"
+        endLabel="Quiet hours end"
+        startName="quietStart"
+        endName="quietEnd"
+        defaultValue={saved}
+      />
+      <button type="submit">Save</button>
+    </form>
+  );
+}
+
 /**
  * A save that succeeds hands the form its new saved value in the same commit
  * that resets it, so the reset has to read the value of that render, not of
@@ -103,29 +127,6 @@ describe("after a form resets", () => {
  */
 test("a reset after a save goes back to the value just saved", async () => {
   const user = userEvent.setup();
-  function Profile() {
-    const [saved, setSaved] = useState({ start: "22:00", end: "07:00" });
-    return (
-      <form
-        action={async (form: FormData) => {
-          setSaved({
-            start: String(form.get("quietStart")),
-            end: String(form.get("quietEnd")),
-          });
-        }}
-      >
-        <TimeRangeInput
-          label="Quiet hours"
-          startLabel="Quiet hours start"
-          endLabel="Quiet hours end"
-          startName="quietStart"
-          endName="quietEnd"
-          defaultValue={saved}
-        />
-        <button type="submit">Save</button>
-      </form>
-    );
-  }
   const { container } = render(
     <TranslationsProvider locale="en">
       <Profile />

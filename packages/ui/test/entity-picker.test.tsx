@@ -39,6 +39,21 @@ const MANY: readonly EntityOption[] = Array.from({ length: 500 }, (_, i) => ({
   avatar: true,
 }));
 
+function Card() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((one) => one + 1), 20);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <EntityPicker
+      label={`Move ${tick % 1}`}
+      options={PEOPLE.map((one) => ({ ...one }))}
+      defaultValue="m-2"
+    />
+  );
+}
+
 describe("an entity picker", () => {
   test("is labelled, shows the stored choice by name, and posts its id", () => {
     const { container } = inEnglish(
@@ -176,20 +191,6 @@ describe("an entity picker", () => {
     // time with a new list of the same targets, and the box went back to
     // the stored choice's name under the person typing.
     const user = userEvent.setup();
-    function Card() {
-      const [tick, setTick] = useState(0);
-      useEffect(() => {
-        const timer = setInterval(() => setTick((one) => one + 1), 20);
-        return () => clearInterval(timer);
-      }, []);
-      return (
-        <EntityPicker
-          label={`Move ${tick % 1}`}
-          options={PEOPLE.map((one) => ({ ...one }))}
-          defaultValue="m-2"
-        />
-      );
-    }
     inEnglish(<Card />);
     const box = screen.getByLabelText("Move 0") as HTMLInputElement;
     await user.click(box);

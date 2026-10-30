@@ -362,6 +362,15 @@ describe("a message that carries a value", () => {
   });
 });
 
+function Localized() {
+  const { t } = useTranslations();
+  return <span>{t("shell.shortcuts.close")}</span>;
+}
+
+function Unlocalized() {
+  return <span>Close</span>;
+}
+
 describe("the pseudo-locale build check (UIUX-PLAN.md §8)", () => {
   test("every pseudo value is wrapped and longer than its source", () => {
     for (const value of Object.values(CATALOGUES.en)) {
@@ -379,15 +388,6 @@ describe("the pseudo-locale build check (UIUX-PLAN.md §8)", () => {
   test("findUnwrappedText catches a hardcoded string sitting outside the wrapping", () => {
     expect(findUnwrappedText("[Ŝëäŕçh~~~] Hardcoded")).toEqual(["Hardcoded"]);
   });
-
-  function Localized() {
-    const { t } = useTranslations();
-    return <span>{t("shell.shortcuts.close")}</span>;
-  }
-
-  function Unlocalized() {
-    return <span>Close</span>;
-  }
 
   test("a component that sources its text from the catalogue passes under the pseudo locale", () => {
     const pseudoCatalogue = buildPseudoCatalogue();

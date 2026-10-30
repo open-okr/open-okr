@@ -2,14 +2,14 @@
 
 Geist Sans, vendored. UIUX-PLAN.md §2: "Geist, self-hosted."
 
-| | |
-|---|---|
-| File | `Geist-Variable.woff2`, 68 KB |
-| Weights | 100 to 900, one variable file |
-| Version | Geist 1.7.2, the `geist` npm package's `dist/fonts/geist-sans/Geist-Variable.woff2` |
-| Source | <https://vercel.com/font>, published by Vercel in collaboration with basement.studio |
-| SHA-256 | `a369fcf5628ea2aa4e1b9e2ec6a5b3624e365bda588e1f0f2f12b564f728fbb8` |
-| Licence | SIL Open Font License 1.1, `LICENSE.txt` in this directory |
+|         |                                                                                      |
+| ------- | ------------------------------------------------------------------------------------ |
+| File    | `Geist-Variable.woff2`, 68 KB                                                        |
+| Weights | 100 to 900, one variable file                                                        |
+| Version | Geist 1.7.2, the `geist` npm package's `dist/fonts/geist-sans/Geist-Variable.woff2`  |
+| Source  | <https://vercel.com/font>, published by Vercel in collaboration with basement.studio |
+| SHA-256 | `a369fcf5628ea2aa4e1b9e2ec6a5b3624e365bda588e1f0f2f12b564f728fbb8`                   |
+| Licence | SIL Open Font License 1.1, `LICENSE.txt` in this directory                           |
 
 ## Why the file is committed rather than fetched
 
