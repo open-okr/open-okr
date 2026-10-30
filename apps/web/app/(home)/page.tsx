@@ -41,7 +41,7 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ node?: string; cycle?: string; scope?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -132,7 +132,7 @@ export default async function HomePage({
       })
     : null;
 
-  const nodes = goalTreeNodes(t, goals);
+  const nodes = goalTreeNodes(t, goals, locale);
   const selected = nodes.find((node) => node.id === query.node) ?? null;
 
   // Health lives on the goal, never on a key result (METHOD.md §3.5), so "on

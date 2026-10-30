@@ -104,7 +104,7 @@ export default async function GoalsPage({
     display?: string;
   }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   // A guest holds nothing here, and is moved to their spaces (L-23). The level
@@ -585,6 +585,7 @@ export default async function GoalsPage({
               goal,
               depth,
               detached ? t("goals.parentIsOutsideThisFilter") : undefined,
+              locale,
             ),
           )}
           selected={null}

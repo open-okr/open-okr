@@ -1,4 +1,5 @@
 import type { callAction } from "@openokr/core";
+import { dueDayLabel } from "@openokr/ui";
 import type { MapNode } from "./work-map.tsx";
 
 /**
@@ -29,7 +30,7 @@ type Goal = Awaited<
 >["goals"][number];
 
 /** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(t: Translate, goal: Goal): string {
+function nextStepFor(t: Translate, goal: Goal, locale: string): string {
   if (goal.closedAt) {
     return goal.successStatus
       ? t("goalNodes.closed", { outcome: goal.successStatus })
@@ -41,7 +42,13 @@ function nextStepFor(t: Translate, goal: Goal): string {
       : t("goalNodes.checkInOverdueOther", { count: goal.daysPastDue });
   }
   if (goal.nextCheckInOn) {
-    return t("goalNodes.checkInBy", { date: goal.nextCheckInOn });
+    // "check in by Mon" rather than an ISO date (OKRGoal UX review, N7).
+    return t("goalNodes.checkInBy", {
+      date:
+        goal.daysPastDue === null
+          ? goal.nextCheckInOn
+          : dueDayLabel(goal.nextCheckInOn, -goal.daysPastDue, locale),
+    });
   }
   return t("goalNodes.noCadence");
 }
@@ -106,6 +113,7 @@ export function mapNodesFor(
   goal: Goal,
   depth: number,
   note?: string,
+  locale = "en",
 ): MapNode[] {
   const confidences = goal.keyResults
     .map((keyResult) => keyResult.confidence)
@@ -134,7 +142,7 @@ export function mapNodesFor(
             endsOn: goal.timeframe.endsOn,
           })
         : null,
-      nextStep: nextStepFor(t, goal),
+      nextStep: nextStepFor(t, goal, locale),
       goalId: goal.id,
       keyResultId: null,
       currentValue: null,
@@ -177,7 +185,11 @@ export function mapNodesFor(
  * in the Work Map's page since completeness review M-22, because the space
  * home draws a space's goals as the same tree and a second copy would drift.
  */
-export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
+export function goalTreeNodes(
+  t: Translate,
+  goals: readonly Goal[],
+  locale = "en",
+): MapNode[] {
   const present = new Set(goals.map((goal) => goal.id));
   const childrenOf = new Map<string, Goal[]>();
   const roots: Goal[] = [];
@@ -203,7 +215,7 @@ export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
       return;
     }
     seen.add(goal.id);
-    out.push(...mapNodesFor(t, goal, depth));
+    out.push(...mapNodesFor(t, goal, depth, undefined, locale));
     for (const child of childrenOf.get(goal.id) ?? []) {
       walk(child, depth + 1);
     }

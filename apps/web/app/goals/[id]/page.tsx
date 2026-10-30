@@ -21,6 +21,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  dueDayLabel,
   EntityPicker,
   formatMeasure,
   NumberInput,
@@ -85,7 +86,7 @@ export default async function GoalPage({
   /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
   searchParams: Promise<{ at?: string; id?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -367,7 +368,14 @@ export default async function GoalPage({
                             }),
                     })
                   : t("goals.detail.nextCheckInDueOn", {
-                      date: goal.nextCheckInOn,
+                      date:
+                        goal.daysPastDue === null
+                          ? goal.nextCheckInOn
+                          : dueDayLabel(
+                              goal.nextCheckInOn,
+                              -goal.daysPastDue,
+                              locale,
+                            ),
                     })}
               </p>
             ) : (

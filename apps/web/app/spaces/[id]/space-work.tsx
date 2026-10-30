@@ -31,7 +31,7 @@ export async function SpaceGoals({
   readonly context: ActionCallContext;
   readonly spaceId: string;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
   const { goals } = await callAction(context, "goals.list", {
     spaceId,
     includeClosed: false,
@@ -53,7 +53,7 @@ export async function SpaceGoals({
         </Link>
       </div>
       <GoalTable
-        nodes={goalTreeNodes(t, goals)}
+        nodes={goalTreeNodes(t, goals, locale)}
         selected={null}
         rowHref={(node) => `/goals/${node.goalId}`}
         empty={

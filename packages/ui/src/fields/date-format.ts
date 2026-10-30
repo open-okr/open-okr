@@ -43,3 +43,46 @@ export function browserToday(): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
+
+/**
+ * A due date as a person reads it (OKRGoal UX review, N7): "today",
+ * "tomorrow", the weekday within the coming week ("Mon"), and the day and
+ * month beyond that ("9 Nov"), with the year only when it is not this one.
+ *
+ * Takes how many days away the date is rather than reading a clock: the
+ * server already decided that in the workspace's timezone (`daysPastDue`
+ * negated), and a second clock here could disagree with it at midnight.
+ * Anything that is not a local date comes back as it was.
+ */
+export function dueDayLabel(
+  date: string,
+  daysAway: number,
+  locale: string,
+): string {
+  if (!isLocalDate(date)) {
+    return date;
+  }
+  const [year, month, day] = date.split("-").map(Number);
+  const at = new Date(Date.UTC(year ?? 0, (month ?? 1) - 1, day ?? 1));
+  if (Math.abs(daysAway) <= 1) {
+    return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(
+      daysAway,
+      "day",
+    );
+  }
+  if (daysAway > 1 && daysAway < 7) {
+    return new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      timeZone: "UTC",
+    }).format(at);
+  }
+  const today = new Date(at.getTime() - daysAway * 86_400_000);
+  return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : locale, {
+    day: "numeric",
+    month: "short",
+    ...(today.getUTCFullYear() === at.getUTCFullYear()
+      ? {}
+      : { year: "numeric" }),
+    timeZone: "UTC",
+  }).format(at);
+}

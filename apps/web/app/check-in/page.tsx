@@ -1,6 +1,13 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  dueDayLabel,
+} from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
@@ -34,6 +41,25 @@ import type { VoteState } from "./vote-panel.tsx";
  * duplicated. That is what makes the walker resumable: leaving halfway through and
  * coming back finds the same draft.
  */
+/**
+ * A goal's next due date as a person reads it, "Mon" or "9 Nov", from the
+ * days the server counted in the workspace's timezone (OKRGoal UX review, N7).
+ */
+function dueOn(
+  goal: {
+    readonly nextCheckInOn: string | null;
+    readonly daysPastDue: number | null;
+  },
+  locale: string,
+): string {
+  if (goal.nextCheckInOn === null) {
+    return "";
+  }
+  return goal.daysPastDue === null
+    ? goal.nextCheckInOn
+    : dueDayLabel(goal.nextCheckInOn, -goal.daysPastDue, locale);
+}
+
 /** How far ahead a goal counts as due now, the walker's two-day lead. */
 const DUE_LEAD_DAYS = 2;
 
@@ -42,7 +68,7 @@ export default async function CheckInPage({
 }: {
   searchParams: Promise<{ goal?: string; update?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -161,7 +187,7 @@ export default async function CheckInPage({
                                         }),
                                 })
                               : t("checkIn.dueOn", {
-                                  date: String(goal.nextCheckInOn),
+                                  date: dueOn(goal, locale),
                                 }),
                           health: healthWord(t, goal.health),
                         },
@@ -211,7 +237,7 @@ export default async function CheckInPage({
                 >
                   <span className="text-sm text-ink">{goal.title}</span>
                   <span className="text-xs text-ink-3">
-                    {t("checkIn.dueOn", { date: String(goal.nextCheckInOn) })}
+                    {t("checkIn.dueOn", { date: dueOn(goal, locale) })}
                   </span>
                 </a>
               ))}
@@ -277,7 +303,7 @@ async function CheckInForGoal({
   /** The reader's own goal, not due yet, so an update can be offered. */
   readonly updatable: boolean;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const goal = await callAction(context, "goals.read", { id: goalId });
   const timeline = await callAction(context, "goals.checkIns", {
@@ -356,9 +382,9 @@ async function CheckInForGoal({
               {dueHere
                 ? t("checkIn.youCanReadNotPost")
                 : updatable && goal.nextCheckInOn
-                  ? t("checkIn.notDueYetUpdate", { date: goal.nextCheckInOn })
+                  ? t("checkIn.notDueYetUpdate", { date: dueOn(goal, locale) })
                   : goal.nextCheckInOn
-                    ? t("checkIn.notDueNextOn", { date: goal.nextCheckInOn })
+                    ? t("checkIn.notDueNextOn", { date: dueOn(goal, locale) })
                     : t("checkIn.notDueNotScheduled")}
             </p>
             {updatable && canEdit && !dueHere ? (

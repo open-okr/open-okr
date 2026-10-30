@@ -26,6 +26,8 @@ import { workspaceTerms } from "./workspace-presentation";
  */
 export async function getTranslations(): Promise<{
   readonly t: (key: string, values?: MessageValues) => string;
+  /** The locale `t` speaks, for a date or a number the page formats itself. */
+  readonly locale: string;
 }> {
   const locale = await resolveLocale();
   const catalogue = CATALOGUES[locale];
@@ -39,5 +41,6 @@ export async function getTranslations(): Promise<{
   return {
     t: (key: string, values?: MessageValues) =>
       translate(catalogue, key, values, renamed),
+    locale,
   };
 }

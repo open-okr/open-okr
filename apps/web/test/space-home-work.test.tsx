@@ -48,11 +48,11 @@ describe("the space home's own work", () => {
 
   test("draws them with the Work Map's table and S-18's rows, not new ones", () => {
     expect(work).toContain("<GoalTable");
-    expect(work).toContain("goalTreeNodes(t, goals)");
+    expect(work).toContain("goalTreeNodes(t, goals, locale)");
     expect(work).toContain("<KpiTreeRows");
     // One tree order and one row drawing, shared with the screens they came
     // from rather than copied beside them.
-    expect(home).toContain("goalTreeNodes(t, goals)");
+    expect(home).toContain("goalTreeNodes(t, goals, locale)");
     expect(home).not.toContain("function flatten(");
     expect(treeScreen).toContain("<KpiTreeRows");
     expect(treeScreen).not.toContain("function flatten(");
