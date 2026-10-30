@@ -550,7 +550,52 @@ export async function dueCheckInNudges(
       });
     }
   }
-  return due;
+  return weekOf(due);
+}
+
+/**
+ * The week's check-ins as one message (OKRGoal UX review, backlog 8).
+ *
+ * A champion with two or more goals reaching their due date today hears once,
+ * under `checkin.week`, about themselves, and the message opens the check-in
+ * walker that holds them all. Their `checkin.due` rows for today are what it
+ * replaces, so nobody is told the same thing twice. One goal due keeps its own
+ * reminder, which already is that message. A drafted check-in that rode on a
+ * replaced reminder is dropped with it: the walker composes each one.
+ */
+function weekOf(due: readonly DueNudge[]): DueNudge[] {
+  const dueToday = new Map<string, number>();
+  for (const nudge of due) {
+    if (nudge.ruleKey === "checkin.due") {
+      dueToday.set(
+        nudge.recipientMemberId,
+        (dueToday.get(nudge.recipientMemberId) ?? 0) + 1,
+      );
+    }
+  }
+  const out: DueNudge[] = [];
+  const told = new Set<string>();
+  for (const nudge of due) {
+    if (
+      nudge.ruleKey !== "checkin.due" ||
+      (dueToday.get(nudge.recipientMemberId) ?? 0) < 2
+    ) {
+      out.push(nudge);
+      continue;
+    }
+    if (told.has(nudge.recipientMemberId)) {
+      continue;
+    }
+    told.add(nudge.recipientMemberId);
+    const { proposal: _dropped, ...rest } = nudge;
+    out.push({
+      ...rest,
+      ruleKey: "checkin.week",
+      subjectType: "member",
+      subjectId: nudge.recipientMemberId,
+    });
+  }
+  return out;
 }
 
 /**

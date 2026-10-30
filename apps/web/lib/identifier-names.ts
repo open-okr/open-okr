@@ -35,6 +35,7 @@
 export const TRIGGER_NAME_KEYS: Readonly<Record<string, string>> = {
   "checkin.due_soon": "triggers.checkinDueSoon",
   "checkin.due": "triggers.checkinDue",
+  "checkin.week": "triggers.checkinWeek",
   "checkin.overdue": "triggers.checkinOverdue",
   "checkin.stale": "triggers.checkinStale",
   "checkin.peer": "triggers.checkinPeer",

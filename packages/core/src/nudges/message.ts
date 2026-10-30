@@ -39,6 +39,7 @@ import { withoutTrailingSlashes } from "../urls.ts";
 const CHECK_IN_RULES = new Set([
   "checkin.due_soon",
   "checkin.due",
+  "checkin.week",
   "checkin.overdue",
   "checkin.stale",
 ]);
@@ -123,8 +124,13 @@ async function subjectOf(
     }
     default:
       // A member: the message is about their own day, and the inbox is where
-      // that lives.
-      return { name: null, path: "/inbox", goalId: null };
+      // that lives. The week's check-ins open the walker, which holds every
+      // goal due and opens the first one prefilled (backlog 8).
+      return {
+        name: null,
+        path: input.ruleKey === "checkin.week" ? "/check-in" : "/inbox",
+        goalId: null,
+      };
   }
 }
 
@@ -156,15 +162,19 @@ export async function nudgeDraft(
     : null;
 
   const buttons: MessageButton[] = [];
-  if (CHECK_IN_RULES.has(input.ruleKey) && subject.goalId) {
+  if (
+    CHECK_IN_RULES.has(input.ruleKey) &&
+    (subject.goalId || input.ruleKey === "checkin.week")
+  ) {
     if (input.provider === "email") {
       if (link) {
         buttons.push({ label: "Check in", url: link });
       }
     } else {
+      // No goal named: the chat check-in offers the goals that are due.
       buttons.push({
         label: "Check in",
-        url: `okr:checkin ${subject.goalId}`,
+        url: subject.goalId ? `okr:checkin ${subject.goalId}` : "okr:checkin",
       });
     }
   }

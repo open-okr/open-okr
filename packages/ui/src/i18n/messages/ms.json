@@ -3651,6 +3651,7 @@
   "triggers.checkinOverdue": "Kemas kini lewat",
   "triggers.checkinPeer": "Daftar masuk rakan sepasukan lewat",
   "triggers.checkinStale": "Kemas kini melepasi tempoh ihsan",
+  "triggers.checkinWeek": "Daftar masuk anda minggu ini",
   "triggers.commitmentDue": "Komitmen perlu dipenuhi",
   "triggers.confidenceCritical": "Keyakinan jatuh ke jalur rendah",
   "triggers.cycleClosing": "Kitaran ditutup tanpa skor",

@@ -166,6 +166,7 @@ the build.
 |---|---|---|---|---|
 | `checkin.due_soon` | 1 day before anchor | Champion | No | Yes |
 | `checkin.due` | On anchor day | Champion | No | Yes |
+| `checkin.week` | On anchor day, two or more goals due, in place of their `checkin.due` | Champion | No | Yes |
 | `checkin.overdue` | Daily past due, escalating | Champion, then ladder | Yes | Yes |
 | `checkin.stale` | Grace exceeded | Champion + reviewer | No | Yes |
 | `checkin.peer` | Grace exceeded, where the peer step is on | One peer from the goal's space | No | Yes |

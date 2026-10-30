@@ -70,6 +70,13 @@ const RHYTHM_ROWS = [
     escalates: false,
   },
   {
+    key: "checkin.week",
+    title: "Your check-ins this week",
+    fires: "On anchor day, two or more goals due",
+    recipient: "Champion",
+    escalates: false,
+  },
+  {
     key: "checkin.peer",
     title: "A teammate's check-in is late",
     fires: "Grace exceeded, where the peer step is on",

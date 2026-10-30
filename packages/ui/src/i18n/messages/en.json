@@ -3651,6 +3651,7 @@
   "triggers.checkinOverdue": "Check-in overdue",
   "triggers.checkinPeer": "A teammate's check-in is late",
   "triggers.checkinStale": "Check-in past its grace",
+  "triggers.checkinWeek": "Your check-ins this week",
   "triggers.commitmentDue": "Commitment due",
   "triggers.confidenceCritical": "Confidence fell into the low band",
   "triggers.cycleClosing": "Cycle closing unscored",
