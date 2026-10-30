@@ -430,6 +430,17 @@ export const PRACTICE = {
     optionLabels: ON_OFF_LABELS,
     default: "off",
   }),
+  // The OKRGoal UX review's backlog 15: peers before the hierarchy, as an
+  // option, with the default unchanged until buyers have seen it.
+  "escalation.peerStep": setting({
+    label: "Peer step in the check-in ladder",
+    group: "rhythm",
+    section: "§11",
+    source: "OpenOKR default",
+    options: OFF_ON,
+    optionLabels: ON_OFF_LABELS,
+    default: "off",
+  }),
 
   // --- The review and the close ------------------------------------------
   "review.format": setting({

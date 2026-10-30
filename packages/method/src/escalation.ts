@@ -20,6 +20,12 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 /** The roles §11 names, in the order the ladder reaches them. */
 export type EscalationRole =
   | "champion"
+  /**
+   * One member of the goal's space, asked to offer a hand, where the workspace
+   * turns on §12's peer step (OKRGoal UX review, backlog 15). §2.5 says who
+   * qualifies; the caller picks the one.
+   */
+  | "peer"
   | "reviewer"
   | "coordinator"
   | "sponsor";
@@ -53,6 +59,12 @@ export function escalation(
    * digest, and is a ladder step only where the workspace adds it.
    */
   sponsorInLadders = false,
+  /**
+   * §12's "Peer step in the check-in ladder". On, grace exceeded asks one
+   * peer instead of the reviewer, and the reviewer joins at the coordinator's
+   * day: the ladder goes sideways before it goes up.
+   */
+  peerStep = false,
 ): Escalation {
   const ladder = thresholds["cadence.checkInLadderDays"];
   const lead = thresholds["cadence.dueSoonLeadDays"];
@@ -72,7 +84,10 @@ export function escalation(
     return { step: 4, targets: ["champion", "reviewer", "coordinator"] };
   }
   if (daysPastDue > graceDays) {
-    return { step: 3, targets: ["champion", "reviewer"] };
+    return {
+      step: 3,
+      targets: peerStep ? ["champion", "peer"] : ["champion", "reviewer"],
+    };
   }
   if (daysPastDue >= ladder.championRepeat) {
     return { step: 2, targets: ["champion"] };

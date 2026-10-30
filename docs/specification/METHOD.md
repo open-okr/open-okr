@@ -159,6 +159,8 @@ Guidance for people, not machine thresholds (§11).
 | Contributor | Work that moves a key result | Any number |
 | Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers. *Source:* OpenOKR default |
 
+A **peer** of a goal's champion, for the ladder's optional peer step (§11, §12.1), is a member of the goal's space who champions another goal in the same cycle, is up to date on their own check-ins, can read the goal, and is not its reviewer or its space's coordinator. One is asked at a time, the one asked least recently, and only to offer a hand: the message names the goal and how late it is, and nothing else. Where nobody qualifies, the step is skipped. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
+
 ### 2.6 The input pack
 
 A checklist for Phase 1, shown in Phase 1 and beside the drafting form. It never blocks unless phases are binding.
@@ -1006,7 +1008,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
-| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it |
+| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it. Where the workspace turns on the peer step, one peer from the goal's space is offered the goal once grace is exceeded, in place of the reviewer, and the reviewer joins at the coordinator's day |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days. Only where the goal has a reviewer |
 | Acknowledgement window | 14 days after publication, after which an unacknowledged check-in lapses from the review inbox and the ladder |
 | Blocker clock | The next action is due by the next check-in |
@@ -1131,6 +1133,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Progress signal | Pace-aware · Absolute | Pace-aware | Microsoft Viva Goals (vendor) |
 | Critical confidence escalation | Off · On | Off | OpenOKR default |
 | Sponsor in escalation ladders | Off · On | Off | OpenOKR default |
+| Peer step in the check-in ladder | Off · On | Off | OpenOKR default, from the OKRGoal UX review of October 2026 |
 | Quarterly review format | One session · Review and retrospective separately | One session | Workpath (vendor) |
 | Root causes at the review | As §8.4 · Optional | As §8.4 | OpenOKR default |
 | Carry forward unfinished aspirational objectives | Proposed as Keep · Not proposed | Proposed | Google's OKR playbook |

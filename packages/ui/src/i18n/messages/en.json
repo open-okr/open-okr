@@ -3627,6 +3627,7 @@
   "triggers.checkinDue": "Check-in due today",
   "triggers.checkinDueSoon": "Check-in due tomorrow",
   "triggers.checkinOverdue": "Check-in overdue",
+  "triggers.checkinPeer": "A teammate's check-in is late",
   "triggers.checkinStale": "Check-in past its grace",
   "triggers.commitmentDue": "Commitment due",
   "triggers.confidenceCritical": "Confidence fell into the low band",

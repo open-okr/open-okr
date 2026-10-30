@@ -3627,6 +3627,7 @@
   "triggers.checkinDue": "Kemas kini perlu dibuat hari ini",
   "triggers.checkinDueSoon": "Kemas kini perlu dibuat esok",
   "triggers.checkinOverdue": "Kemas kini lewat",
+  "triggers.checkinPeer": "Daftar masuk rakan sepasukan lewat",
   "triggers.checkinStale": "Kemas kini melepasi tempoh ihsan",
   "triggers.commitmentDue": "Komitmen perlu dipenuhi",
   "triggers.confidenceCritical": "Keyakinan jatuh ke jalur rendah",

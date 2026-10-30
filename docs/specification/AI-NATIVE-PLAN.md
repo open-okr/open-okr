@@ -272,6 +272,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `checkin.due` | On the anchor day | Champion |
 | `checkin.overdue` | Daily past the due date, escalating | Champion, then the ladder |
 | `checkin.stale` | Grace exceeded | Champion and reviewer. The goal renders outdated |
+| `checkin.peer` | Grace exceeded, where the workspace turns on the peer step (METHOD.md §12.1) | One peer from the goal's space, in place of the reviewer, asked to offer a hand (METHOD.md §2.5) |
 | `ack.owed` | 1 day after publication | Reviewer |
 | `ack.overdue` | 3 days after publication | Reviewer, then the ladder |
 | `blocker.warning` | 1 day before the check-in the next action is due by | Blocker owner |

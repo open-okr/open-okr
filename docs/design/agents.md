@@ -168,6 +168,7 @@ the build.
 | `checkin.due` | On anchor day | Champion | No | Yes |
 | `checkin.overdue` | Daily past due, escalating | Champion, then ladder | Yes | Yes |
 | `checkin.stale` | Grace exceeded | Champion + reviewer | No | Yes |
+| `checkin.peer` | Grace exceeded, where the peer step is on | One peer from the goal's space | No | Yes |
 | `ack.owed` | 1 day after publication | Reviewer | No | Yes |
 | `ack.overdue` | 3 days after publication | Reviewer, then ladder | Yes | Yes |
 | `blocker.warning` | 20h after opening | Blocker owner | No | Yes |

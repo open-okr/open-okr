@@ -212,6 +212,18 @@ only where the workspace turns on "Sponsor in escalation ladders" (§12), at
 §11's fourteen days; without it a goal fourteen days late stays at step 4. The
 reviewer is reached only where the goal has one, which the caller resolves.
 
+**The peer step** (§12.1 "Peer step in the check-in ladder", default Off;
+OKRGoal UX review backlog 15). On, step 3 asks one peer instead of the
+reviewer, under its own rule key `checkin.peer`, and the reviewer joins at
+step 4 with the coordinator. The caller picks the peer (`peerFor` in
+`packages/core/src/nudges/service.ts`): a member of the goal's space who
+champions another open goal in the same cycle, has none overdue, can read the
+goal, and is not its champion, reviewer or coordinator; the one asked least
+recently, then by member id. Nobody qualifying skips the step. A peer's
+message is not urgent, so their quiet hours and weekly ceiling hold. The
+golden table below is the ladder with the step off; `escalation-peer.test.ts`
+in `packages/method` covers it on.
+
 <!-- golden: cadence.escalation -->
 
 | case | days_past_due | grace_days | sponsor_in_ladders | expected_step | expected_targets |
