@@ -10,8 +10,9 @@ import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
  * Key results that read a KPI (TECHNICAL-PLAN §6.2, design
  * `kpi-engine.md` §10, completeness review M-07).
  *
- * "A KPI-backed key result reads the KPI's latest achievement." The scoring
- * cascade already read it, but only when something else asked it to run: a
+ * A KPI-backed key result takes the KPI's latest reading as its value and
+ * progresses from its own baseline to its own target (decision D-4, revised
+ * after the October 2026 UX review). The scoring cascade already read the KPI, but only when something else asked it to run: a
  * value typed into the KPI grid moved the KPI and left every key result that
  * reads it, and every goal above those, where they were until somebody
  * checked in on the goal for an unrelated reason.
@@ -148,13 +149,13 @@ describe("recording a KPI moves the key results that read it", () => {
 
     await record(kpi.id, "2026-08-11", 50);
 
-    // 50 of a 200 target. The key result reads the KPI's achievement, not a
-    // second formula over its own baseline and target.
+    // 50 on the key result's own span from 40 to 200 is 10 of 160. The KPI's
+    // achievement against its own target, 25%, is not what the key result reads.
     const childAfter = await readGoal(child.id);
-    expect(childAfter.keyResults[0]?.progressPct).toBe(25);
-    expect(childAfter.progressPct).toBe(25);
+    expect(childAfter.keyResults[0]?.progressPct).toBe(6.25);
+    expect(childAfter.progressPct).toBe(6.25);
     // The parent has no key results of its own, so it is its child.
-    expect((await readGoal(parent.id)).progressPct).toBe(25);
+    expect((await readGoal(parent.id)).progressPct).toBe(6.25);
 
     // The value follows the KPI, and the movement is history like any other.
     expect(childAfter.keyResults[0]?.currentValue).toBe(50);
@@ -163,8 +164,8 @@ describe("recording a KPI moves the key results that read it", () => {
 
     // A second reading moves it again, in the same call.
     await record(kpi.id, "2026-08-20", 150);
-    expect((await readGoal(child.id)).progressPct).toBe(75);
-    expect((await readGoal(parent.id)).progressPct).toBe(75);
+    expect((await readGoal(child.id)).progressPct).toBe(68.75);
+    expect((await readGoal(parent.id)).progressPct).toBe(68.75);
   });
 
   it("moves a key result reading a calculated KPI the cascade recomputes", async () => {
@@ -224,7 +225,7 @@ describe("recording a KPI moves the key results that read it", () => {
 
     await record(read.id, "2026-08-11", 100);
 
-    expect((await readGoal(linked.id)).progressPct).toBe(50);
+    expect((await readGoal(linked.id)).progressPct).toBe(37.5);
     const manualAfter = await readGoal(manual.id);
     expect(manualAfter.progressPct).toBe(manualBefore.progressPct);
     expect(manualAfter.keyResults[0]?.currentValue).toBe(6);
@@ -310,7 +311,7 @@ describe("recording a KPI moves the key results that read it", () => {
 
     // The goal follows the KPI whoever recorded it. A goal that moved only
     // for readers who could see it would be two numbers for one measure.
-    expect((await readGoal(goal.id)).progressPct).toBe(25);
+    expect((await readGoal(goal.id)).progressPct).toBe(6.25);
 
     // And the recorder learns nothing: not from the answer, not from the
     // goal, and not from their own feed.
@@ -325,21 +326,23 @@ describe("recording a KPI moves the key results that read it", () => {
     expect(feed).not.toContain(title);
   });
 
-  it("moves the key result when the KPI's own target changes", async () => {
+  it("leaves the key result where it is when only the KPI's own target changes", async () => {
+    // The key result measures its own span. The KPI's target moves the KPI's
+    // achievement and health, not how far the key result has travelled.
     const kpi = await makeKpi("Weekly active teams");
     const goal = await makeGoal("Teams make the product a weekly habit");
     await addKeyResult(goal.id, { kpiId: kpi.id });
     await record(kpi.id, "2026-08-11", 50);
-    expect((await readGoal(goal.id)).progressPct).toBe(25);
+    expect((await readGoal(goal.id)).progressPct).toBe(6.25);
 
     await call("kpis.update", { kpiId: kpi.id, targetDefault: 100 });
 
-    expect((await readGoal(goal.id)).progressPct).toBe(50);
+    expect((await readGoal(goal.id)).progressPct).toBe(6.25);
   });
 });
 
 describe("drafting a key result on a KPI", () => {
-  it("starts from the KPI's latest reading and its achievement", async () => {
+  it("starts from the KPI's latest reading, measured on its own span", async () => {
     const kpi = await makeKpi("Weekly active teams");
     await record(kpi.id, "2026-07-11", 30);
     await record(kpi.id, "2026-08-11", 80);
@@ -351,8 +354,8 @@ describe("drafting a key result on a KPI", () => {
     expect(read.keyResults[0]?.kpiId).toBe(kpi.id);
     // The newest period with a value, which is what the KPI itself reads.
     expect(read.keyResults[0]?.currentValue).toBe(80);
-    expect(read.keyResults[0]?.progressPct).toBe(40);
-    expect(read.progressPct).toBe(40);
+    expect(read.keyResults[0]?.progressPct).toBe(25);
+    expect(read.progressPct).toBe(25);
     // One row, as for any key result: where the measure stood when it began.
     expect(await history(keyResult.id)).toHaveLength(1);
   });
@@ -400,7 +403,7 @@ describe("drafting a key result on a KPI", () => {
 });
 
 describe("linking an existing key result to a KPI", () => {
-  it("takes the KPI's reading and progress, and then refuses a typed value", async () => {
+  it("takes the KPI's reading, and then refuses a typed value", async () => {
     const kpi = await makeKpi("Weekly active teams");
     await record(kpi.id, "2026-08-11", 100);
     const goal = await makeGoal("Teams make the product a weekly habit");
@@ -412,7 +415,7 @@ describe("linking an existing key result to a KPI", () => {
     const read = await readGoal(goal.id);
     expect(read.keyResults[0]?.kpiId).toBe(kpi.id);
     expect(read.keyResults[0]?.currentValue).toBe(100);
-    expect(read.progressPct).toBe(50);
+    expect(read.progressPct).toBe(37.5);
     const values = await history(keyResult.id);
     expect(values).toHaveLength(2);
     expect(values[0]).toMatchObject({ value: 100, source: "kpi" });
@@ -423,7 +426,7 @@ describe("linking an existing key result to a KPI", () => {
 
     // And the next reading reaches it like any other linked key result.
     await record(kpi.id, "2026-08-20", 160);
-    expect((await readGoal(goal.id)).progressPct).toBe(80);
+    expect((await readGoal(goal.id)).progressPct).toBe(75);
   });
 
   it("refuses a key result that already reads a KPI", async () => {

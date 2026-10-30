@@ -235,55 +235,6 @@ async function recomputeScoring<
     { projected: number; trendingOffTrack: boolean } | null
   >();
 
-  // Decision D-4 and design §10: a linked key result reads the KPI's **real**
-  // achievement, clamped to 0 to 100, and never the effective figure. A
-  // recovery key result reading its own KPI's effective health would feed its
-  // own progress back into itself.
-  const linkedKpiIds = [
-    ...new Set(
-      keyResultRows
-        .map((row) => row.kpiId)
-        .filter((id): id is string => id !== null),
-    ),
-  ];
-  const kpiAchievementById = new Map<string, number>();
-  // Each linked KPI's recovery objective, where it has one (§6.5).
-  const recoveryGoalByKpi = new Map<string, string>();
-  if (linkedKpiIds.length > 0) {
-    const linked = await tx
-      .select({
-        id: kpis.id,
-        achievementPct: kpis.achievementPct,
-        recoveryGoalId: kpis.recoveryGoalId,
-      })
-      .from(kpis)
-      .where(
-        activeOnly(
-          kpis,
-          eq(kpis.workspaceId, workspaceId),
-          inArray(kpis.id, linkedKpiIds),
-        ),
-      );
-    for (const row of linked) {
-      if (row.recoveryGoalId !== null) {
-        recoveryGoalByKpi.set(row.id, row.recoveryGoalId);
-      }
-      if (row.achievementPct !== null) {
-        // The ceiling is §11's `scoring.progressCeilingPct`, not a constant.
-        // This line read `Math.min(100, ...)` until P8-G03, which threw away
-        // everything §6.4 measured above 100 and made a KPI at 180 and one at
-        // exactly 100 indistinguishable on the key result that linked to it.
-        kpiAchievementById.set(
-          row.id,
-          Math.min(
-            thresholds["scoring.progressCeilingPct"],
-            Math.max(0, Number(row.achievementPct)),
-          ),
-        );
-      }
-    }
-  }
-
   for (const row of keyResultRows) {
     const baseline = asNumber(row.baselineValue);
     // No target yet (P9-T13-b-a) is nothing to move toward, so the key
@@ -297,33 +248,25 @@ async function recomputeScoring<
     const current = asNumber(row.currentValue);
     const direction = row.direction;
 
-    // A recovery's own key result runs from the reading the KPI had to its
-    // healthy boundary (§6.5), so it reads that span, which the KPI's readings
-    // move, rather than the KPI's achievement against its whole target: a KPI
-    // at 9 of 15 with a boundary of 13.5 is not 60% recovered on day one, and
-    // a range KPI has no achievement at all.
-    const recovering =
-      row.kpiId !== null && recoveryGoalByKpi.get(row.kpiId) === row.goalId;
-    // A KPI with no achievement at all has measured nothing, so the key result
-    // keeps the progress it had rather than dropping to zero: a KPI nobody has
-    // recorded is unmeasured, not failing.
-    const progress =
-      row.kpiId && !recovering
-        ? (kpiAchievementById.get(row.kpiId) ?? asNumber(row.progressPct))
-        : untargeted
-          ? 0
-          : keyResultProgress(
-              {
-                // §2.10 (P9-T12b): a milestone or a baseline reads its done.
-                kind: row.kind,
-                done: row.doneAt !== null,
-                direction,
-                baseline,
-                target,
-                current,
-              },
-              thresholds,
-            );
+    // A key result that reads a KPI takes the KPI's reading as its current
+    // value (`kpis/linked.ts`) and progresses from its own baseline to its own
+    // target like any other (METHOD §3.1, decision D-4 as revised after the
+    // October 2026 UX review). It used to read the KPI's achievement against
+    // the KPI's target, so "from 31% to 35%" at 31 read 89%.
+    const progress = untargeted
+      ? 0
+      : keyResultProgress(
+          {
+            // §2.10 (P9-T12b): a milestone or a baseline reads its done.
+            kind: row.kind,
+            done: row.doneAt !== null,
+            direction,
+            baseline,
+            target,
+            current,
+          },
+          thresholds,
+        );
     keyResultProgressById.set(row.id, progress);
 
     const points = pointsByKeyResult.get(row.id) ?? [];

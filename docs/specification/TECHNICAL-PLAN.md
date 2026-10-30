@@ -372,7 +372,7 @@ The METHOD.md §4 catalogue as data plus a pure evaluator. Input: an objective, 
 
 ### 6.2 The scoring and health engine (`packages/core`)
 
-1. **Key result progress.** Direction-aware, clamped 0 to 100, per METHOD.md §3.1. A KPI-backed key result reads the KPI's latest achievement.
+1. **Key result progress.** Direction-aware, clamped 0 to 100, per METHOD.md §3.1. A KPI-backed key result takes the KPI's latest reading as its current value and progresses from its own baseline to its own target.
 2. **Goal progress.** Weighted average of its key results, including the weighted contribution of aligned child goals. The cascade walks upward through key result, goal, parent key result, parent goal, with cycle detection.
 3. **Health.** The precedence cascade in METHOD.md §3.5: closed outcome, then outdated, then the latest published check-in status, then pending. Never a bare formula.
 4. **RAG colour.** The METHOD.md §3.7 progress signal, from the workspace pass and fail thresholds over progress. Shown beside health, never instead of it.

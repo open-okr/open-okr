@@ -2,7 +2,9 @@
  * KPI-backed key results, end to end (completeness review M-07, TECHNICAL-PLAN
  * §6.2, screens S-09, S-14 and S-20).
  *
- * "A KPI-backed key result reads the KPI's latest achievement." Two things
+ * A KPI-backed key result reads the KPI's latest reading, and progresses over
+ * its own baseline and target (decision D-4, revised after the OKRGoal UX
+ * review). Two things
  * stopped that being true in a browser: no screen could name a KPI for a key
  * result, and a value typed into the KPI grid moved the KPI and nothing that
  * read it. The rows are proved in
@@ -101,9 +103,10 @@ test("drafting names the KPI, and the key result starts where it stands", async 
   await expect(page.getByText(READ_FROM_KPI, { exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  // Progress is the KPI's achievement, not a second formula over the key
-  // result's own baseline and target, which would read 6%.
-  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "25");
+  // Progress runs over the key result's own span, 40 to 200, with the KPI's
+  // reading of 50 as its value: 10 of 160 is 6%. It read the KPI's
+  // achievement, 25%, until the OKRGoal UX review (T1).
+  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "6");
 });
 
 test("a second key result, measured by hand", async () => {
@@ -126,8 +129,8 @@ test("a new reading on the grid moves the objective without touching it", async 
   await recordOnTheGrid("100", "50%");
 
   await goTo(page, "/cycle?phase=4");
-  // One key result at 50, one measured by hand still at 0.
-  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "25", {
+  // One key result at 60 of 160, 37.5%, and one measured by hand still at 0.
+  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "19", {
     timeout: 15_000,
   });
 });
@@ -151,9 +154,10 @@ test("the goal page links the key result drafted by hand", async () => {
   // Nothing measured by hand is left, so there is nothing left to offer.
   await expect(page.getByLabel("Key result to link")).toHaveCount(0);
 
-  // Both key results now read 50, so the objective does.
+  // The second now reads the KPI's 100 on its own span, 9 down to 3, which is
+  // past its baseline the wrong way and reads 0, so the objective stays at 19.
   await goTo(page, "/cycle?phase=4");
-  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "50", {
+  await expect(progressOfTheObjective()).toHaveAttribute("aria-valuenow", "19", {
     timeout: 15_000,
   });
 });

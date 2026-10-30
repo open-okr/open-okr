@@ -337,14 +337,12 @@ KPI itself, then up to three drivers.
 | Driver key result | `Improve <driver title> from <current> to <target>`, `increase` or `reduce` by the driver's direction, owned by the driver's named owner or the member whose list it is on, indicator type `leading` |
 | At launch | `recovery_started_pct` stores the KPI's achievement and `recovery_goal_id` links back. The state stays the band (P9-T17b-a). One Operation, one transaction |
 
-**A question this leaves for a human.** A KPI-backed key result's progress is
-the KPI's achievement against the KPI's own target (decision D-4), so the
-first key result, written "from its reading to its healthy boundary", reads
-about 90% when the KPI reaches its boundary on the ratio fallback, rather than
-100%. Whether a KPI-backed key result should instead progress from its own
-baseline to its own target is a change to D-4 for every such key result, and is
-recorded in adaptable-practice.md's open questions rather than made
-here.
+**Answered on 30 October 2026.** A KPI-backed key result progresses from its
+own baseline to its own target, with the KPI's reading as its current value
+(decision D-4, revised after the OKRGoal UX review in
+`docs/audits/okrgoal-ux-habit-review-2026-10-13.md`, finding T1). The first key
+result, written "from its reading to its healthy boundary", reads 0% at launch
+and 100% when the KPI reaches its boundary.
 
 <!-- golden: kpi.recovery-draft -->
 
@@ -417,8 +415,8 @@ METHOD.md §6.1's first connection: a key result measured by a live KPI.
 
 | Rule | Detail |
 |---|---|
-| Progress source | The KPI's **real** `achievement_pct`, clamped to 0 to 100 (decision D-4) |
-| Never the effective value | A recovery key result reading its own KPI's effective health would feed its own progress back into itself |
+| Progress source | The key result's own baseline and target, with the KPI's latest reading as the current value (decision D-4, revised 30 October 2026). The KPI's achievement against the KPI's own target is not read |
+| Never the effective value | A recovery key result reading its own KPI's effective health would feed its own progress back into itself, so the reading is the real actual value |
 | Manual entry | Refused while linked |
 | Current value | The KPI's latest reading, the newest period with an actual value. Written as a `kpi` history row when it moves, so the sparkline records it |
 | Cascade | A KPI record write recomputes the KPI and every calculated KPI downstream, then every linked key result, then their goals upward |

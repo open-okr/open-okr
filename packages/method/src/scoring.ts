@@ -61,12 +61,6 @@ export interface KeyResultProgressInput {
   readonly baseline: number;
   readonly target: number;
   readonly current: number;
-  /**
-   * A linked KPI's real achievement, 0 to 200 (decision D-4). When present the
-   * four direction formulas are ignored: the value has one source of truth, and
-   * the recovery projection is deliberately not it.
-   */
-  readonly kpiAchievementPct?: number | null;
 }
 
 /**
@@ -88,13 +82,6 @@ export function keyResultProgress(
 ): number {
   const { direction, baseline, target, current } = input;
   const ceiling = thresholds["scoring.progressCeilingPct"];
-
-  if (
-    input.kpiAchievementPct !== undefined &&
-    input.kpiAchievementPct !== null
-  ) {
-    return round2(clampPercent(input.kpiAchievementPct, ceiling));
-  }
 
   if (input.kind === "milestone" || input.kind === "baseline") {
     return input.done ? 100 : 0;

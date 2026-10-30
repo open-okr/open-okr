@@ -11,8 +11,9 @@ import { latestKpiReading } from "./service.ts";
  * The key results that read a KPI, kept in step with it (TECHNICAL-PLAN §6.2,
  * design `kpi-engine.md` §10, completeness review M-07).
  *
- * "A KPI-backed key result reads the KPI's latest achievement." The scoring
- * cascade has always read it, but only when something else made it run, so a
+ * A KPI-backed key result takes the KPI's latest reading as its current value
+ * and progresses from its own baseline to its own target (decision D-4). The
+ * scoring cascade has always read the KPI, but only when something else made it run, so a
  * value typed into the KPI grid moved the KPI and left every key result that
  * reads it, and every goal above those, where they were.
  *
@@ -29,10 +30,9 @@ import { latestKpiReading } from "./service.ts";
  * nothing about a goal, and the only activity row is the KPI's own.
  *
  * **No second formula.** The progress comes from `recomputeForGoal`, which
- * reads the KPI's real achievement (decision D-4). What this adds is the
- * current value, which the design says a linked key result also reads from the
- * KPI, written through `recordValueInTx` so it is history like any other
- * movement.
+ * measures the key result's own span like any other. What this adds is the
+ * current value, read from the KPI and written through `recordValueInTx` so it
+ * is history like any other movement.
  */
 
 /**
