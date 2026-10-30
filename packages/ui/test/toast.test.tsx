@@ -55,6 +55,48 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+function Sourced() {
+  const { show } = useToast();
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() =>
+          show({ tone: "bad", message: "Too big.", source: "cadence" })
+        }
+      >
+        Refuse
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          show({ tone: "ok", message: "Saved.", source: "cadence" })
+        }
+      >
+        Confirm
+      </button>
+    </div>
+  );
+}
+
+function Deleter({ run }: { readonly run: () => void }) {
+  const { show } = useToast();
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        show({
+          tone: "ok",
+          message: "Goal deleted.",
+          action: { label: "Undo", run },
+        })
+      }
+    >
+      Delete
+    </button>
+  );
+}
+
 describe("ToastProvider", () => {
   test("a confirmation appears", async () => {
     renderToasts();
@@ -158,29 +200,6 @@ describe("ToastProvider", () => {
     // Without this a refusal outlives what it was about: it stays until
     // dismissed, so somebody who reads it, fixes the value and saves again is
     // left looking at the old refusal beside the new confirmation.
-    function Sourced() {
-      const { show } = useToast();
-      return (
-        <div>
-          <button
-            type="button"
-            onClick={() =>
-              show({ tone: "bad", message: "Too big.", source: "cadence" })
-            }
-          >
-            Refuse
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              show({ tone: "ok", message: "Saved.", source: "cadence" })
-            }
-          >
-            Confirm
-          </button>
-        </div>
-      );
-    }
     render(
       <ToastProvider dismissLabel="Dismiss">
         <Sourced />
@@ -203,26 +222,9 @@ describe("ToastProvider", () => {
     // toast rather than a confirmation (M-13). Pressing it closes the toast
     // first, so a second press has nothing left to press.
     const run = vi.fn();
-    function Deleter() {
-      const { show } = useToast();
-      return (
-        <button
-          type="button"
-          onClick={() =>
-            show({
-              tone: "ok",
-              message: "Goal deleted.",
-              action: { label: "Undo", run },
-            })
-          }
-        >
-          Delete
-        </button>
-      );
-    }
     render(
       <ToastProvider dismissLabel="Dismiss">
-        <Deleter />
+        <Deleter run={run} />
       </ToastProvider>,
     );
 
