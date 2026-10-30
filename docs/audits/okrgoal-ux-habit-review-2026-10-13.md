@@ -274,16 +274,34 @@ Decisions by Agung on 30 October 2026: T1 and H1 follow the review; H1 is option
 | T2, T3 | `4015e323` | Value line by direction: "101 now, target 95 $", "99.95 now, hold 99.9 to 100 %" |
 | T5 | `8625cc17` | The gate 3 sentence asks the gate's own question (`alignmentMapped` in `packages/method`) |
 | T9, H5 | `b6455d46` | "Not sent yet." instead of "Sent ."; the snooze note without blame |
-| H1, T7 | `76abcf55` | Check in on any day: "Update any time" on the check-in page, "Post an update", extra updates leave the due date, the rhythm share agrees |
+| H1, T7 | `76abcf55` | Check in on any day: "Update any time", "Post an update", extra updates leave the due date (METHOD §7.1) |
 | T8 | `47e6785a` | Every inbox reason has a fallback sentence |
-| N7, H3 drift | `61112078` | Ticket numbers and changelog out of Admin's threshold notes; three notes without implementation detail; a visible "Confidence" label |
-| N8 | `f458b536` | The demo defaults to the name OKRGoal. A name already saved in Admin on the live demo still wins, so it is renamed there or the demo is reset |
+| N7, H3 drift | `61112078` | Ticket numbers and changelog out of Admin's threshold notes; plain notes; a visible "Confidence" label |
+| N8 | `f458b536` | The demo defaults to the name OKRGoal; a name saved in Admin still wins |
 | N4 | `704431ea` | Work Map titles wrap to two lines; next step yields to the side panel below 2xl |
 | T6 | `98acea88` | The phase chip names the phases done and the first one open |
-| H11 | `c8ef4b8f` | "Something in the way?" on the check-in page raises a blocker through `blockers.raise` |
-| N6 | `0321d33e` | Move, link and delete sit in "Manage this goal", closed until opened |
-| N7 dates | `5491506a` | One `dueDayLabel`: "today", "Mon", "9 Nov" on the Work Map, OKRs list, space page, check-in page and goal page |
+| H11 | `fd00fd30` | "Something in the way?" raises a blocker through `blockers.raise` |
+| N6 | `679adaa8` | Move, link and delete sit in "Manage this goal" |
+| N7 dates | `d9830b2f` | One `dueDayLabel`: "today", "Mon", "9 Nov" |
+| H4 | `af6432b6` | Preview on each acknowledgement, Acknowledge all, and a 14-day acknowledgement window (METHOD §2.5, §11) |
+| H9 | `44060713` | The acknowledgement notifies the goal's watchers |
+| N7 Pending | `d518228c` | "No check-in yet" instead of "Pending" (METHOD §3.5) |
+| H7 | `73845ccf` | A personal streak on the check-in page and Home, paused by the divergence check (METHOD §7.4, `goals.myStreak`) |
+| Backlog 15 | `37ba2a56` | Peer step in the check-in ladder, Off by default, rule `checkin.peer` (METHOD §2.5, §11, §12.1) |
+| N1 to N3 | `35acd7e1` | Home, Updates, Goals, Work, Teams and Cycle for those who run it; tabs inside areas; account and Admin in the avatar menu |
+| Backlog 12 | `9b5bcda8` | My week, a reviewer's digest, a cockpit with rhythm by team; the Work Map at `/map` |
+| N5, backlog 14 | `aa2b2828` | Mine by default, filters behind one button, row pickers quiet until hovered |
 
 Checked in the browser on 30 October 2026 (local instance, 1280 px): the check-in page lists the goal under "Update any time", "Post an update" publishes an extra update and the due date stays 2026-11-09; the Work Map wraps titles with the panel open and reads "9 now, target 2 days"; Review shows the new header and snooze note; the cycle chip reads "Phase 4 done, phase 1 open"; the goal page shows the "Confidence" label. T10: the copilot panel opens locally, so the demo failure was most likely an older build; recheck on demo.okrgoal.com after the next deploy.
 
-Still open: T10 (recheck the copilot on the live demo), N9 (demo seed), and the rows marked Decision above. Agung decided on 30 October 2026 that Dirk's review is priority one and the specification follows it, so those rows are next, each with its design document.
+Further decisions on 30 October 2026: H4 auto-close follows the review as a 14-day window; the peer step is built Off by default, with the peer defined by the OKR practitioner review; Cycle and the phase strip are shown to administrators and space coordinators and managers.
+
+Not built, and why:
+
+| Backlog | Reason |
+|---|---|
+| 8, Monday digest | Covered in substance: `checkin.due` fires on the anchor day (Monday by default) with a deep link to `/check-in?goal=`, and the composer arrives prefilled, KPI-linked values included. One combined message per owner would be a new proactive message kind, which CLAUDE.md leaves to a person |
+| 5, reseed the demo as a healthy workspace | The year seed reproduces the Northwind scenario on purpose (`docs/design/northwind-year-seed.md`). The 241-item backlog no longer shows since the acknowledgement window; a healthier story is a change to the scenario, and is a decision |
+| 9, team rhythm bar for owners | Rhythm by team is on the cockpit; a bar on every owner's Home is not built |
+| N2, initiatives and tasks as one object | Kept as two objects; Work shows them as two tabs |
+| T10 | Recheck the copilot on demo.okrgoal.com after the next deploy |
