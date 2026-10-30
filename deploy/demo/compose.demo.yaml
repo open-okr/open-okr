@@ -26,7 +26,10 @@ services:
   app:
     environment:
       OPENOKR_DEMO: "on"
-      OPENOKR_INSTANCE_NAME: ${OPENOKR_INSTANCE_NAME:-OpenOKR demo}
+      # The name prospects see on demo.okrgoal.com, in the tab and on sign-in
+      # (OKRGoal UX review: the tab read "OpenOKR demo"). Override it for a
+      # demo of your own.
+      OPENOKR_INSTANCE_NAME: ${OPENOKR_INSTANCE_NAME:-OKRGoal}
 
   db:
     # Loopback only, and deliberately not 5432: a host running the demo is
