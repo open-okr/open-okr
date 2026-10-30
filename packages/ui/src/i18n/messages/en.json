@@ -2156,6 +2156,8 @@
   "home.whatHasHappenedHere": "What has happened here",
   "home.whoIsHere": "Who is here",
   "inbox.aRowAppearsWhen": "A row appears when somebody mentions you, when a check-in you\n              review arrives, or when the Champion has a reminder for you. Watch\n              a goal from its own page to hear about its check-ins.",
+  "inbox.fallback.checkIn": "A reminder about this check-in.",
+  "inbox.fallback.invited": "You were invited here.",
   "inbox.fallback.joined": "Something new here, which you follow.",
   "inbox.fallback.mentioned": "Somebody mentioned you here.",
   "inbox.fallback.review": "A check-in is waiting for you to acknowledge it.",

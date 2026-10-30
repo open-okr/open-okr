@@ -1,3 +1,4 @@
+import { NOTIFICATION_REASONS } from "@openokr/db";
 import { CATALOGUES } from "@openokr/ui";
 import { describe, expect, it } from "vitest";
 import {
@@ -10,8 +11,10 @@ import {
  * BUG-013): a check-in waiting for review read "Something happened here."
  */
 describe("the inbox's sentence for a row with no activity", () => {
-  it("covers review, mention and following, in every catalogue", () => {
-    for (const reason of ["review", "mentioned", "joined", "role"]) {
+  it("covers every reason a row can carry, in every catalogue", () => {
+    // OKRGoal UX review, T8: a reminder or an invitation with no activity
+    // still read "Something happened here." with nothing else on the row.
+    for (const reason of NOTIFICATION_REASONS) {
       const key = REASON_FALLBACK_KEYS[reason];
       expect(key, reason).toBeDefined();
       for (const [locale, catalogue] of Object.entries(CATALOGUES)) {

@@ -53,6 +53,10 @@ export function subjectNameKey(subjectType: string | null): string | null {
  * what it is, and the row links to the subject for the rest.
  */
 export const REASON_FALLBACK_KEYS: Readonly<Record<string, string>> = {
+  // A reminder whose rule no longer resolves, and an invitation, had no
+  // sentence and read "Something happened here." (OKRGoal UX review, T8).
+  check_in: "inbox.fallback.checkIn",
+  invited: "inbox.fallback.invited",
   review: "inbox.fallback.review",
   mentioned: "inbox.fallback.mentioned",
   joined: "inbox.fallback.joined",

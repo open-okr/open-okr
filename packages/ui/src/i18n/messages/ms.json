@@ -2156,6 +2156,8 @@
   "home.whatHasHappenedHere": "Apa yang telah berlaku di sini",
   "home.whoIsHere": "Siapa yang ada di sini",
   "inbox.aRowAppearsWhen": "Satu baris muncul apabila seseorang menyebut anda, apabila kemas kini yang anda semak tiba, atau apabila Champion mempunyai peringatan untuk anda. Pantau matlamat dari halamannya sendiri untuk mendapat tahu tentang kemas kininya.",
+  "inbox.fallback.checkIn": "Peringatan tentang daftar masuk ini.",
+  "inbox.fallback.invited": "Anda telah dijemput ke sini.",
   "inbox.fallback.joined": "Ada sesuatu yang baharu di sini, yang anda ikuti.",
   "inbox.fallback.mentioned": "Seseorang menyebut anda di sini.",
   "inbox.fallback.review": "Satu daftar masuk menunggu anda mengakuinya.",
