@@ -43,6 +43,7 @@ export interface SidebarProps {
   readonly linkComponent?: (props: {
     href: string;
     className: string;
+    title?: string;
     children: ReactNode;
   }) => ReactNode;
 }
@@ -50,17 +51,19 @@ export interface SidebarProps {
 function DefaultLink({
   href,
   className,
+  title,
   children,
 }: {
   href: string;
   className: string;
+  title?: string;
   children: ReactNode;
 }) {
   // A caller wiring this into a router (Next's <Link>, via linkComponent)
   // is the normal path; this plain <a> only serves the preview page and
   // non-router consumers.
   return (
-    <a href={href} className={className}>
+    <a href={href} className={className} title={title}>
       {children}
     </a>
   );
@@ -98,6 +101,9 @@ export function Sidebar({
             <Link
               key={item.id}
               href={item.href}
+              // The label on hover where the rail is icons only, 768 to 1279
+              // px (navigation-five-areas.md, OKRGoal UX review N1).
+              title={item.label}
               className={cn(
                 // `rounded-control`, not `rounded-lg`: the latter resolves to
                 // the card radius (14px), which on a 29px row is a pill. The

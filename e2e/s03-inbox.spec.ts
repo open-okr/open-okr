@@ -148,11 +148,23 @@ test("a notification is listed, links to its goal, and clears the badge", async 
     timeout: 15_000,
   });
 
-  // The badge beside Inbox in the primary block. It is the unread count and
-  // the page's own count is the same number, which is the whole reason the
-  // badge reads `notifications.unreadCount` rather than a second query.
+  // Inbox is the Activity tab of Updates since the five areas
+  // (navigation-five-areas.md): the Updates row carries one badge, what is
+  // owed plus what is unread, and the tab says where the reader is.
   const nav = page.getByRole("navigation", { name: "Primary" });
-  await expect(nav.getByRole("link", { name: /Inbox/ })).toContainText("1");
+  const updates = nav.getByRole("link", { name: /Updates/ });
+  await expect(updates).toContainText(/\d/);
+  const badge = async () =>
+    Number(
+      (await updates.locator("[data-sidebar-badge]").textContent())?.trim() ??
+        "0",
+    );
+  const before = await badge();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Updates" })
+      .getByRole("link", { name: "Activity" }),
+  ).toHaveAttribute("aria-current", "page");
 
   // The group heading names the goal, not only that it is a goal: a heading
   // reading "Goal" over every group left the reader unable to tell them apart.
@@ -167,10 +179,9 @@ test("a notification is listed, links to its goal, and clears the badge", async 
 
   // Mark read, and both the row's dot and the badge go with it.
   await page.getByRole("button", { name: "Mark read" }).first().click();
-  await expect(nav.getByRole("link", { name: /Inbox/ })).not.toContainText(
-    "1",
-    { timeout: 15_000 },
-  );
+  await expect
+    .poll(badge, { timeout: 15_000 })
+    .toBe(before - 1);
 });
 
 test("snoozing a row takes it off the list without deleting it", async () => {

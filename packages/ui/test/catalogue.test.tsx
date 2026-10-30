@@ -130,6 +130,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.champion",
   "common.confidence",
   "common.count",
+  "areaTabs.goals.kpis",
   "common.count.keyResultOne",
   "common.count.keyResultOther",
   "common.count.objectiveOne",

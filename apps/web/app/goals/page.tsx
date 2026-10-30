@@ -18,6 +18,7 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
+import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
@@ -363,250 +364,256 @@ export default async function GoalsPage({
   };
 
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
-        {/* **Two rows of two, not four things on one line.** Four groups on
-         * one line put the title, the set it belongs to, a score and an export
-         * at the same rank, and each pushed the next towards the middle. The
-         * split is by what each row answers: the first says what you are
-         * looking at and how it is doing, the second is what you can do to it.
-         * Agung asked for this shape after the filter bar was fixed. */}
-        <CardHeader className="flex-col items-stretch gap-2.5">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            {/* Identity and state as one unit on the left, rather than a title
-             * with a sentence under it that repeated what the table below
-             * already says. The chip reports what is on screen; the table owns
-             * the empty state and its suggestion. */}
-            <div className="flex min-w-0 items-center gap-2.5">
-              <h1 className="flex-none text-lg font-bold text-ink">
-                {t("okrList.title")}
-              </h1>
-              <Chip tone={filtered ? "brand" : "neutral"}>
-                {/* Never "nothing in this cycle" from a filtered count. The
-                 * cycle had two goals and the filters excluded both, and this
-                 * line claimed the cycle was empty while the table forty
-                 * pixels below correctly said no goals matched. One screen,
-                 * two answers, and the wrong one was the louder. */}
-                {shownCount === 0
-                  ? filtered
-                    ? t("goals.noMatchForTheseFilters")
-                    : t("goals.noGoalsInThisCycleYet")
-                  : countChip(
-                      t,
-                      shownCount,
-                      filtered,
-                      tree && display === "tree",
-                    )}
-              </Chip>
-            </div>
-            {alignment?.score !== null && alignment !== null ? (
-              <AlignmentScore
-                score={alignment.score}
-                band={alignment.band}
-                label={t("goals.alignment")}
-              />
-            ) : null}
-          </div>
-          {summary.objectives > 0 ? (
-            <p data-testid="okr-summary" className="text-xs text-ink-3">
-              {t("okrList.summary", {
-                objectives: summary.objectives,
-                keyResults: summary.keyResults,
-                average: summary.average,
-                atRisk: summary.atRisk,
-                outdated: summary.outdated,
-              })}
-            </p>
-          ) : null}
-
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-            {/* Which cycle is on screen, and the way another one is made.
-             * Beside the title rather than in the filter bar below: it is the
-             * first question this screen answers and it is not a filter, it is
-             * the set. */}
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <CyclePicker
-                cycles={cycles}
-                cycleId={cycleId}
-                hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
-                canCreate={canAdminister}
-              />
-              {/* Beside the cycle, because the two answer one after the other:
-               * which set am I looking at, and what do I want to put in it.
-               * The set also carries an add row under it, for the moment
-               * somebody is already reading. */}
-              {canEdit && cycleId ? (
-                <NewObjectiveButton
-                  cycleId={cycleId}
-                  level={levelForNew}
-                  refusal={refusal}
-                  // The topbar's `+ New` lands here (P9-T07b-a).
-                  initiallyOpen={query.new === "objective"}
-                  kinds={kindsInUse}
-                  defaultKind={defaultOkrKind(
-                    practiceRead.practice as ResolvedPractice,
-                  )}
-                  askReason={
-                    okrTree?.cycle.midCycle &&
-                    practiceRead.practice["reasons.midCycleAddition"] !== "off"
-                      ? (practiceRead.practice["reasons.midCycleAddition"] as
-                          | "optional"
-                          | "required")
-                      : null
-                  }
+    <>
+      <AreaTabs area="goals" current="/goals" t={t} />
+      <div className="flex flex-col gap-4.5">
+        <Card>
+          {/* **Two rows of two, not four things on one line.** Four groups on
+           * one line put the title, the set it belongs to, a score and an export
+           * at the same rank, and each pushed the next towards the middle. The
+           * split is by what each row answers: the first says what you are
+           * looking at and how it is doing, the second is what you can do to it.
+           * Agung asked for this shape after the filter bar was fixed. */}
+          <CardHeader className="flex-col items-stretch gap-2.5">
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              {/* Identity and state as one unit on the left, rather than a title
+               * with a sentence under it that repeated what the table below
+               * already says. The chip reports what is on screen; the table owns
+               * the empty state and its suggestion. */}
+              <div className="flex min-w-0 items-center gap-2.5">
+                <h1 className="flex-none text-lg font-bold text-ink">
+                  {t("okrList.title")}
+                </h1>
+                <Chip tone={filtered ? "brand" : "neutral"}>
+                  {/* Never "nothing in this cycle" from a filtered count. The
+                   * cycle had two goals and the filters excluded both, and this
+                   * line claimed the cycle was empty while the table forty
+                   * pixels below correctly said no goals matched. One screen,
+                   * two answers, and the wrong one was the louder. */}
+                  {shownCount === 0
+                    ? filtered
+                      ? t("goals.noMatchForTheseFilters")
+                      : t("goals.noGoalsInThisCycleYet")
+                    : countChip(
+                        t,
+                        shownCount,
+                        filtered,
+                        tree && display === "tree",
+                      )}
+                </Chip>
+              </div>
+              {alignment?.score !== null && alignment !== null ? (
+                <AlignmentScore
+                  score={alignment.score}
+                  band={alignment.band}
+                  label={t("goals.alignment")}
                 />
               ) : null}
-              {/* Check in's door now that it has left the sidebar
-               * (P9-T07a-b, okr-entry-points.md §3.1). */}
-              {canEdit ? (
-                <Link
-                  href="/check-in"
-                  className={buttonVariants({ size: "sm" })}
-                >
-                  {t("okrList.checkInAll")}
-                </Link>
-              ) : null}
             </div>
-            {/*
-             * Taking the list away, beside the thing it is a list of (P5-T13).
-             * The file matches the rows and columns on screen, and every export
-             * writes an audit row: it is the one action that takes data out of
-             * the product.
-             */}
-            <ExportButton onExport={exportListAction.bind(null, "goals")} />
-          </div>
-        </CardHeader>
-        {/*
-         * Where a queued export is collected (P5-T15). Renders nothing until
-         * somebody has one, so a person who only ever exports small lists
-         * never sees an empty heading.
-         */}
-        <MyExports />
-        <CardBody className="flex flex-col gap-2.5">
-          <Filters
-            level={level ?? null}
-            levels={cycleLevels}
-            health={health ?? null}
-            scope={scopeTab}
+            {summary.objectives > 0 ? (
+              <p data-testid="okr-summary" className="text-xs text-ink-3">
+                {t("okrList.summary", {
+                  objectives: summary.objectives,
+                  keyResults: summary.keyResults,
+                  average: summary.average,
+                  atRisk: summary.atRisk,
+                  outdated: summary.outdated,
+                })}
+              </p>
+            ) : null}
+
+            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
+              {/* Which cycle is on screen, and the way another one is made.
+               * Beside the title rather than in the filter bar below: it is the
+               * first question this screen answers and it is not a filter, it is
+               * the set. */}
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <CyclePicker
+                  cycles={cycles}
+                  cycleId={cycleId}
+                  hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
+                  canCreate={canAdminister}
+                />
+                {/* Beside the cycle, because the two answer one after the other:
+                 * which set am I looking at, and what do I want to put in it.
+                 * The set also carries an add row under it, for the moment
+                 * somebody is already reading. */}
+                {canEdit && cycleId ? (
+                  <NewObjectiveButton
+                    cycleId={cycleId}
+                    level={levelForNew}
+                    refusal={refusal}
+                    // The topbar's `+ New` lands here (P9-T07b-a).
+                    initiallyOpen={query.new === "objective"}
+                    kinds={kindsInUse}
+                    defaultKind={defaultOkrKind(
+                      practiceRead.practice as ResolvedPractice,
+                    )}
+                    askReason={
+                      okrTree?.cycle.midCycle &&
+                      practiceRead.practice["reasons.midCycleAddition"] !==
+                        "off"
+                        ? (practiceRead.practice["reasons.midCycleAddition"] as
+                            | "optional"
+                            | "required")
+                        : null
+                    }
+                  />
+                ) : null}
+                {/* Check in's door now that it has left the sidebar
+                 * (P9-T07a-b, okr-entry-points.md §3.1). */}
+                {canEdit ? (
+                  <Link
+                    href="/check-in"
+                    className={buttonVariants({ size: "sm" })}
+                  >
+                    {t("okrList.checkInAll")}
+                  </Link>
+                ) : null}
+              </div>
+              {/*
+               * Taking the list away, beside the thing it is a list of (P5-T13).
+               * The file matches the rows and columns on screen, and every export
+               * writes an audit row: it is the one action that takes data out of
+               * the product.
+               */}
+              <ExportButton onExport={exportListAction.bind(null, "goals")} />
+            </div>
+          </CardHeader>
+          {/*
+           * Where a queued export is collected (P5-T15). Renders nothing until
+           * somebody has one, so a person who only ever exports small lists
+           * never sees an empty heading.
+           */}
+          <MyExports />
+          <CardBody className="flex flex-col gap-2.5">
+            <Filters
+              level={level ?? null}
+              levels={cycleLevels}
+              health={health ?? null}
+              scope={scopeTab}
+              members={members}
+              spaces={spaces}
+              champion={champion ?? null}
+              space={space ?? null}
+              kind={kindsInUse.length > 1 ? (kind ?? null) : undefined}
+              filterAssist={
+                filterAssistAvailable ? <FilterAssist /> : undefined
+              }
+              tree={tree}
+              display={display}
+              includeClosed={includeClosed}
+              href={href}
+            />
+          </CardBody>
+        </Card>
+
+        {display === "editor" ? (
+          <OkrTable
+            initialTree={okrTree}
+            initialAt={treeReadAt}
             members={members}
             spaces={spaces}
-            champion={champion ?? null}
-            space={space ?? null}
-            kind={kindsInUse.length > 1 ? (kind ?? null) : undefined}
-            filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
-            tree={tree}
-            display={display}
-            includeClosed={includeClosed}
-            href={href}
+            refusal={refusal}
+            coach={{
+              thresholds: (rhythmRead?.thresholds ??
+                defaultThresholds()) as ResolvedThresholds,
+              practice: practiceRead.practice as ResolvedPractice,
+            }}
+            scope={scope}
+            filters={filters}
+            cycleId={cycleId}
+            // The level a row added here is written at. The filter when one is
+            // chosen, so a filtered set adds to itself rather than adding a row
+            // the filter immediately hides; team otherwise, which is the level
+            // §4.3 puts most objectives at.
+            level={levelForNew}
+            canEdit={canEdit}
+            canAdminister={canAdminister}
+            progressMax={progressMax}
+            empty={
+              <div className="flex flex-col gap-1.5 p-3">
+                <p className="text-sm text-ink-2">
+                  {t("goals.noGoalsMatchThis")}
+                </p>
+              </div>
+            }
           />
-        </CardBody>
-      </Card>
+        ) : null}
 
-      {display === "editor" ? (
-        <OkrTable
-          initialTree={okrTree}
-          initialAt={treeReadAt}
-          members={members}
-          spaces={spaces}
-          refusal={refusal}
-          coach={{
-            thresholds: (rhythmRead?.thresholds ??
-              defaultThresholds()) as ResolvedThresholds,
-            practice: practiceRead.practice as ResolvedPractice,
-          }}
-          scope={scope}
-          filters={filters}
-          cycleId={cycleId}
-          // The level a row added here is written at. The filter when one is
-          // chosen, so a filtered set adds to itself rather than adding a row
-          // the filter immediately hides; team otherwise, which is the level
-          // §4.3 puts most objectives at.
-          level={levelForNew}
-          canEdit={canEdit}
-          canAdminister={canAdminister}
-          progressMax={progressMax}
-          empty={
-            <div className="flex flex-col gap-1.5 p-3">
-              <p className="text-sm text-ink-2">
-                {t("goals.noGoalsMatchThis")}
-              </p>
-            </div>
-          }
-        />
-      ) : null}
+        {display === "diagram" ? (
+          <OkrDiagram
+            initialTree={okrTree}
+            initialAt={treeReadAt}
+            alignment={alignment}
+            levels={cycleLevels}
+            scope={scope}
+            filters={filters}
+            cycleId={cycleId}
+            canEdit={canEdit}
+            canAdminister={canAdminister}
+            progressMax={progressMax}
+            members={members}
+            spaces={spaces}
+            coach={{
+              thresholds: (rhythmRead?.thresholds ??
+                defaultThresholds()) as ResolvedThresholds,
+              practice: practiceRead.practice as ResolvedPractice,
+            }}
+            empty={
+              <div className="flex flex-col gap-1.5 p-3">
+                <p className="text-sm text-ink-2">
+                  {t("goals.noGoalsMatchThis")}
+                </p>
+              </div>
+            }
+          />
+        ) : null}
 
-      {display === "diagram" ? (
-        <OkrDiagram
-          initialTree={okrTree}
-          initialAt={treeReadAt}
-          alignment={alignment}
-          levels={cycleLevels}
-          scope={scope}
-          filters={filters}
-          cycleId={cycleId}
-          canEdit={canEdit}
-          canAdminister={canAdminister}
-          progressMax={progressMax}
-          members={members}
-          spaces={spaces}
-          coach={{
-            thresholds: (rhythmRead?.thresholds ??
-              defaultThresholds()) as ResolvedThresholds,
-            practice: practiceRead.practice as ResolvedPractice,
-          }}
-          empty={
-            <div className="flex flex-col gap-1.5 p-3">
-              <p className="text-sm text-ink-2">
-                {t("goals.noGoalsMatchThis")}
-              </p>
-            </div>
-          }
-        />
-      ) : null}
-
-      {/* The same table the Work Map draws (`01-work-map`), not a card per
-       * goal. S-13 has no mockup, and §10 treats a detail only the mockups
-       * show as the proposed default, so the one drawing of a goal row this
-       * repository has is the one both screens use. The explorer's own tree
-       * ordering stays here: it walks what survived the filters and has to
-       * mark a goal whose parent did not. */}
-      {display === "tree" ? (
-        <GoalTable
-          nodes={(tree
-            ? inTreeOrder(goals)
-            : goals.map((goal) => ({
+        {/* The same table the Work Map draws (`01-work-map`), not a card per
+         * goal. S-13 has no mockup, and §10 treats a detail only the mockups
+         * show as the proposed default, so the one drawing of a goal row this
+         * repository has is the one both screens use. The explorer's own tree
+         * ordering stays here: it walks what survived the filters and has to
+         * mark a goal whose parent did not. */}
+        {display === "tree" ? (
+          <GoalTable
+            nodes={(tree
+              ? inTreeOrder(goals)
+              : goals.map((goal) => ({
+                  goal,
+                  depth: 0,
+                  detached: false,
+                }))
+            ).flatMap(({ goal, depth, detached }) =>
+              mapNodesFor(
+                t,
                 goal,
-                depth: 0,
-                detached: false,
-              }))
-          ).flatMap(({ goal, depth, detached }) =>
-            mapNodesFor(
-              t,
-              goal,
-              depth,
-              detached ? t("goals.parentIsOutsideThisFilter") : undefined,
-              locale,
-            ),
-          )}
-          selected={null}
-          rowHref={(node) => `/goals/${node.goalId}`}
-          empty={
-            <div className="flex flex-col gap-1.5 p-3">
-              <p className="text-sm text-ink-2">
-                {t("goals.noGoalsMatchThis")}
-              </p>
-              <p className="text-xs text-ink-3">
-                {t("goals.objectivesAreDraftedIn")}{" "}
-                <a className="underline" href="/cycle?phase=4">
-                  {t("goals.openDrafting")}
-                </a>
-                .
-              </p>
-            </div>
-          }
-        />
-      ) : null}
-    </div>
+                depth,
+                detached ? t("goals.parentIsOutsideThisFilter") : undefined,
+                locale,
+              ),
+            )}
+            selected={null}
+            rowHref={(node) => `/goals/${node.goalId}`}
+            empty={
+              <div className="flex flex-col gap-1.5 p-3">
+                <p className="text-sm text-ink-2">
+                  {t("goals.noGoalsMatchThis")}
+                </p>
+                <p className="text-xs text-ink-3">
+                  {t("goals.objectivesAreDraftedIn")}{" "}
+                  <a className="underline" href="/cycle?phase=4">
+                    {t("goals.openDrafting")}
+                  </a>
+                  .
+                </p>
+              </div>
+            }
+          />
+        ) : null}
+      </div>
+    </>
   );
 }
 

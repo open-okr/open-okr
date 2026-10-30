@@ -26,18 +26,11 @@ test("the More tab reaches every screen the hidden sidebar would", async ({
 
   await more.click();
   await expect(more).toHaveAttribute("aria-expanded", "true");
-  // Sessions and Scorecard are tabs inside Cycle since P9-T07a-b, and Check
-  // in a button on the screens that owe one, so the sheet carries the module
-  // rows rather than them (okr-entry-points.md §3.1).
-  for (const name of [
-    "Cycle",
-    "OKRs",
-    "KPIs",
-    "Spaces",
-    "Board",
-    "Initiatives",
-    "Admin",
-  ]) {
+  // Five areas since the OKRGoal UX review (navigation-five-areas.md): Home,
+  // Updates, Goals and Work are the tabs, and the sheet holds the rest. KPIs,
+  // the Board and the Inbox are tabs inside their areas, and Admin is in the
+  // avatar menu. The claimer administers, so Cycle is theirs to see.
+  for (const name of ["Spaces", "Cycle"]) {
     await expect(bar.getByRole("link", { name, exact: true })).toBeVisible();
   }
 
@@ -47,8 +40,8 @@ test("the More tab reaches every screen the hidden sidebar would", async ({
 
   // A choice navigates and closes the sheet behind it.
   await more.click();
-  await bar.getByRole("link", { name: "KPIs", exact: true }).click();
-  await page.waitForURL(/\/kpis$/);
+  await bar.getByRole("link", { name: "Spaces", exact: true }).click();
+  await page.waitForURL(/\/spaces$/);
   await expect(more).toHaveAttribute("aria-expanded", "false");
   // On the screen it opened, More is where the reader is.
   await expect(more).toHaveClass(/text-brand-text/);

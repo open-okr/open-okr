@@ -12,6 +12,7 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { namedOption } from "../../lib/entity-options.ts";
 import { getTranslations } from "../../lib/translations";
@@ -77,11 +78,14 @@ export default async function BoardPage({
 
   if (!narrowed && !space) {
     return (
-      <Card className="w-full">
-        <CardBody>
-          <p className="text-sm text-ink-3">{t("board.aBoardIsA")}</p>
-        </CardBody>
-      </Card>
+      <>
+        <AreaTabs area="work" current="/board" t={t} />
+        <Card className="w-full">
+          <CardBody>
+            <p className="text-sm text-ink-3">{t("board.aBoardIsA")}</p>
+          </CardBody>
+        </Card>
+      </>
     );
   }
 
@@ -113,226 +117,231 @@ export default async function BoardPage({
       : t("common.count.taskOther", { count: cards.length });
 
   return (
-    <div className="flex w-full flex-col gap-4.5 xl:flex-row">
-      <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-        <Card>
-          <CardHeader className="justify-between">
-            {scope.kind === "space" ? (
-              <div className="flex min-w-0 flex-col">
-                <h1 className="text-lg font-bold text-ink">
-                  {t("board.board")}
-                </h1>
-                <p className="text-xs text-ink-3" data-testid="board-count">
-                  {cards.length === 0
-                    ? t("board.noWorkYet")
-                    : t("board.tasksInSpace", { tasks, name: scope.title })}
-                </p>
-              </div>
-            ) : (
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <Link
-                  href={
-                    scope.kind === "initiative"
-                      ? `/initiatives/${scope.id}`
-                      : `/goals/${scope.goalId}#kr-${scope.id}`
-                  }
-                  className="text-xs text-ink-3 hover:text-brand-text"
-                >
-                  {scope.kind === "initiative"
-                    ? t("board.scope.initiativeBoard")
-                    : t("board.scope.keyResultBoard")}
-                </Link>
-                <h1 className="text-lg font-bold text-ink">{scope.title}</h1>
-                {scope.parentTitle ? (
-                  <p className="text-xs text-ink-3">
-                    {scope.kind === "initiative"
-                      ? t("board.scope.inSpace", { name: scope.parentTitle })
-                      : t("board.scope.ofObjective", {
-                          title: scope.parentTitle,
-                        })}
+    <>
+      <AreaTabs area="work" current="/board" t={t} />
+      <div className="flex w-full flex-col gap-4.5 xl:flex-row">
+        <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+          <Card>
+            <CardHeader className="justify-between">
+              {scope.kind === "space" ? (
+                <div className="flex min-w-0 flex-col">
+                  <h1 className="text-lg font-bold text-ink">
+                    {t("board.board")}
+                  </h1>
+                  <p className="text-xs text-ink-3" data-testid="board-count">
+                    {cards.length === 0
+                      ? t("board.noWorkYet")
+                      : t("board.tasksInSpace", { tasks, name: scope.title })}
                   </p>
-                ) : null}
-                <p className="text-xs text-ink-3" data-testid="board-count">
-                  {cards.length === 0
-                    ? t("board.noWorkYet")
-                    : t("board.tasksOnBoard", { tasks })}
-                </p>
-              </div>
-            )}
-            {scope.kind === "space" ? (
-              <div className="flex flex-wrap gap-1.5">
-                {spaces.map((one) => (
+                </div>
+              ) : (
+                <div className="flex min-w-0 flex-col gap-0.5">
                   <Link
-                    key={one.id}
-                    href={`/board?space=${one.id}`}
-                    aria-current={one.id === scope.id ? "true" : undefined}
-                    className={
-                      one.id === scope.id
-                        ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                        : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
+                    href={
+                      scope.kind === "initiative"
+                        ? `/initiatives/${scope.id}`
+                        : `/goals/${scope.goalId}#kr-${scope.id}`
                     }
+                    className="text-xs text-ink-3 hover:text-brand-text"
                   >
-                    {one.name}
+                    {scope.kind === "initiative"
+                      ? t("board.scope.initiativeBoard")
+                      : t("board.scope.keyResultBoard")}
                   </Link>
-                ))}
-              </div>
-            ) : scope.spaceId ? (
-              <Link
-                href={`/board?space=${scope.spaceId}`}
-                className="rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-              >
-                {t("board.scope.openSpaceBoard")}
-              </Link>
-            ) : null}
-          </CardHeader>
-          <CardBody>
-            <Board
-              scope={{ kind: scope.kind, id: scope.id }}
-              columns={board.columns}
-              canEdit={canEdit}
-              onMove={moveTaskAction}
-            />
-          </CardBody>
-        </Card>
+                  <h1 className="text-lg font-bold text-ink">{scope.title}</h1>
+                  {scope.parentTitle ? (
+                    <p className="text-xs text-ink-3">
+                      {scope.kind === "initiative"
+                        ? t("board.scope.inSpace", { name: scope.parentTitle })
+                        : t("board.scope.ofObjective", {
+                            title: scope.parentTitle,
+                          })}
+                    </p>
+                  ) : null}
+                  <p className="text-xs text-ink-3" data-testid="board-count">
+                    {cards.length === 0
+                      ? t("board.noWorkYet")
+                      : t("board.tasksOnBoard", { tasks })}
+                  </p>
+                </div>
+              )}
+              {scope.kind === "space" ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {spaces.map((one) => (
+                    <Link
+                      key={one.id}
+                      href={`/board?space=${one.id}`}
+                      aria-current={one.id === scope.id ? "true" : undefined}
+                      className={
+                        one.id === scope.id
+                          ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                          : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
+                      }
+                    >
+                      {one.name}
+                    </Link>
+                  ))}
+                </div>
+              ) : scope.spaceId ? (
+                <Link
+                  href={`/board?space=${scope.spaceId}`}
+                  className="rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
+                >
+                  {t("board.scope.openSpaceBoard")}
+                </Link>
+              ) : null}
+            </CardHeader>
+            <CardBody>
+              <Board
+                scope={{ kind: scope.kind, id: scope.id }}
+                columns={board.columns}
+                canEdit={canEdit}
+                onMove={moveTaskAction}
+              />
+            </CardBody>
+          </Card>
 
-        {canEdit ? (
+          {canEdit ? (
+            <Card>
+              <CardHeader>
+                <h2 className="text-sm font-bold text-ink">
+                  {t("board.addATask")}
+                </h2>
+              </CardHeader>
+              <CardBody>
+                <ActionForm
+                  action={createTaskAction}
+                  className="flex flex-col gap-2"
+                >
+                  {/* Work added on a scoped board belongs to what the board is
+                    of, and lands in that thing's own space. */}
+                  {scope.spaceId ? (
+                    <input type="hidden" name="spaceId" value={scope.spaceId} />
+                  ) : null}
+                  {scope.kind === "initiative" ? (
+                    <input type="hidden" name="initiativeId" value={scope.id} />
+                  ) : null}
+                  {scope.kind === "key_result" ? (
+                    <input type="hidden" name="keyResultId" value={scope.id} />
+                  ) : null}
+                  <TextInput
+                    label={t("board.whatHasToHappen")}
+                    id="title"
+                    name="title"
+                    required
+                    maxLength={500}
+                    placeholder={t("board.rewriteTheFirstRun")}
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <SelectInput label={t("board.column")} name="status">
+                      <option value="backlog">{t("board.backlog")}</option>
+                      <option value="todo">{t("board.toDo")}</option>
+                      <option value="in_progress">
+                        {t("common.inProgress")}
+                      </option>
+                      <option value="done">{t("board.done")}</option>
+                    </SelectInput>
+                    {scope.spaceId ? null : (
+                      // A key result whose goal belongs to no space: the person
+                      // adding the work says where it lives.
+                      // It opens on the first space, as the select it replaced
+                      // did, and a space is required.
+                      <EntityPicker
+                        label={t("board.scope.spaceItLivesIn")}
+                        name="spaceId"
+                        required
+                        defaultValue={spaces[0]?.id ?? null}
+                        options={spaces.map(namedOption)}
+                        className="w-56"
+                      />
+                    )}
+                    {scope.kind === "key_result" ? null : (
+                      <EntityPicker
+                        label={t("board.keyResultItMoves")}
+                        name="keyResultId"
+                        defaultValue={null}
+                        options={keyResults.map((one) => ({
+                          id: one.id,
+                          label: one.title,
+                        }))}
+                        noneLabel={t("board.noneYet")}
+                        className="w-64"
+                      />
+                    )}
+                    <DateInput label={t("board.due")} name="dueOn" />
+                  </div>
+                  <button
+                    type="submit"
+                    className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+                  >
+                    {t("common.add")}
+                  </button>
+                </ActionForm>
+              </CardBody>
+            </Card>
+          ) : null}
+        </div>
+
+        <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
           <Card>
             <CardHeader>
               <h2 className="text-sm font-bold text-ink">
-                {t("board.addATask")}
+                {t("board.whatThisWorkIs")}
               </h2>
             </CardHeader>
-            <CardBody>
-              <ActionForm
-                action={createTaskAction}
-                className="flex flex-col gap-2"
-              >
-                {/* Work added on a scoped board belongs to what the board is
-                    of, and lands in that thing's own space. */}
-                {scope.spaceId ? (
-                  <input type="hidden" name="spaceId" value={scope.spaceId} />
-                ) : null}
-                {scope.kind === "initiative" ? (
-                  <input type="hidden" name="initiativeId" value={scope.id} />
-                ) : null}
-                {scope.kind === "key_result" ? (
-                  <input type="hidden" name="keyResultId" value={scope.id} />
-                ) : null}
-                <TextInput
-                  label={t("board.whatHasToHappen")}
-                  id="title"
-                  name="title"
-                  required
-                  maxLength={500}
-                  placeholder={t("board.rewriteTheFirstRun")}
-                />
-                <div className="flex flex-wrap gap-2">
-                  <SelectInput label={t("board.column")} name="status">
-                    <option value="backlog">{t("board.backlog")}</option>
-                    <option value="todo">{t("board.toDo")}</option>
-                    <option value="in_progress">
-                      {t("common.inProgress")}
-                    </option>
-                    <option value="done">{t("board.done")}</option>
-                  </SelectInput>
-                  {scope.spaceId ? null : (
-                    // A key result whose goal belongs to no space: the person
-                    // adding the work says where it lives.
-                    // It opens on the first space, as the select it replaced
-                    // did, and a space is required.
-                    <EntityPicker
-                      label={t("board.scope.spaceItLivesIn")}
-                      name="spaceId"
-                      required
-                      defaultValue={spaces[0]?.id ?? null}
-                      options={spaces.map(namedOption)}
-                      className="w-56"
-                    />
-                  )}
-                  {scope.kind === "key_result" ? null : (
-                    <EntityPicker
-                      label={t("board.keyResultItMoves")}
-                      name="keyResultId"
-                      defaultValue={null}
-                      options={keyResults.map((one) => ({
-                        id: one.id,
-                        label: one.title,
-                      }))}
-                      noneLabel={t("board.noneYet")}
-                      className="w-64"
-                    />
-                  )}
-                  <DateInput label={t("board.due")} name="dueOn" />
-                </div>
-                <button
-                  type="submit"
-                  className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
-                >
-                  {t("common.add")}
-                </button>
-              </ActionForm>
+            <CardBody className="flex flex-col gap-3">
+              {board.rail.length === 0 ? (
+                <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
+                  {t("board.noCardOnThis")}
+                </p>
+              ) : (
+                board.rail.map((entry) => (
+                  <div
+                    key={entry.keyResultId}
+                    data-testid="rail-entry"
+                    className="flex flex-col gap-1 border-line border-b pb-3 last:border-b-0 last:pb-0"
+                  >
+                    <span className="text-sm text-ink">
+                      {entry.keyResultTitle}
+                    </span>
+                    <span className="text-xs text-ink-3">
+                      {entry.goalTitle}
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/*
+                       * Two chips, labelled differently, never added together.
+                       * Progress is the measured value; linked work is a count
+                       * of tasks. §4.9 is explicit that the second never
+                       * replaces the first.
+                       */}
+                      <Chip tone="neutral">
+                        {t("common.progress2", {
+                          progressPct: Math.round(entry.progressPct),
+                        })}
+                      </Chip>
+                      <Chip tone="neutral">
+                        {t("board.linkedWork", {
+                          done: entry.linkedWork.done,
+                          total: entry.linkedWork.total,
+                        })}
+                      </Chip>
+                    </div>
+                    {entry.divergence ? (
+                      <p
+                        data-testid="rail-divergence"
+                        className="rounded-md bg-warn-bg px-2 py-1.5 text-xs text-warn"
+                      >
+                        {entry.divergence}
+                      </p>
+                    ) : null}
+                  </div>
+                ))
+              )}
             </CardBody>
           </Card>
-        ) : null}
+        </div>
       </div>
-
-      <div className="flex w-full flex-none flex-col gap-3.5 xl:w-80">
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("board.whatThisWorkIs")}
-            </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {board.rail.length === 0 ? (
-              <p className="rounded-md border border-line border-dashed px-2.5 py-4 text-center text-xs text-ink-3">
-                {t("board.noCardOnThis")}
-              </p>
-            ) : (
-              board.rail.map((entry) => (
-                <div
-                  key={entry.keyResultId}
-                  data-testid="rail-entry"
-                  className="flex flex-col gap-1 border-line border-b pb-3 last:border-b-0 last:pb-0"
-                >
-                  <span className="text-sm text-ink">
-                    {entry.keyResultTitle}
-                  </span>
-                  <span className="text-xs text-ink-3">{entry.goalTitle}</span>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {/*
-                     * Two chips, labelled differently, never added together.
-                     * Progress is the measured value; linked work is a count
-                     * of tasks. §4.9 is explicit that the second never
-                     * replaces the first.
-                     */}
-                    <Chip tone="neutral">
-                      {t("common.progress2", {
-                        progressPct: Math.round(entry.progressPct),
-                      })}
-                    </Chip>
-                    <Chip tone="neutral">
-                      {t("board.linkedWork", {
-                        done: entry.linkedWork.done,
-                        total: entry.linkedWork.total,
-                      })}
-                    </Chip>
-                  </div>
-                  {entry.divergence ? (
-                    <p
-                      data-testid="rail-divergence"
-                      className="rounded-md bg-warn-bg px-2 py-1.5 text-xs text-warn"
-                    >
-                      {entry.divergence}
-                    </p>
-                  ) : null}
-                </div>
-              ))
-            )}
-          </CardBody>
-        </Card>
-      </div>
-    </div>
+    </>
   );
 }
 

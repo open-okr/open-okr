@@ -8,6 +8,7 @@ import {
   Chip,
 } from "@openokr/ui";
 import Link from "next/link";
+import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -91,126 +92,131 @@ export default async function ReviewPage() {
   );
 
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("common.whatYouOwe")}
-            </h1>
-            <p className="text-xs text-ink-3">
-              {t("review.computedOnTheServer")}
-            </p>
-          </div>
-          <div className="flex flex-none items-center gap-3.5">
-            <Count label="Overdue" value={inbox.counts.overdue} urgent />
-            <Count label="Today" value={inbox.counts.today} />
-            <Count label="This week" value={inbox.counts.thisWeek} />
-            {/* The walker through every check-in owed, which this screen
-             * already lists one by one (P9-T07a-b). Named apart from each
-             * row's own "Check in", which opens that one goal. */}
-            <Link href="/check-in" className={buttonVariants({ size: "sm" })}>
-              {t("okrList.checkInAll")}
-            </Link>
-            {acknowledgements.length > 1 ? (
-              <ActionForm action={acknowledgeAll}>
-                {acknowledgements.map((id) => (
-                  <input key={id} type="hidden" name="checkInId" value={id} />
-                ))}
-                <Button type="submit" size="sm">
-                  {t("review.acknowledgeAll", {
-                    count: acknowledgements.length,
-                  })}
-                </Button>
-              </ActionForm>
-            ) : null}
-          </div>
-        </CardHeader>
-      </Card>
-
-      {inbox.obligations.length === 0 ? (
+    <>
+      <AreaTabs area="updates" current="/review" t={t} />
+      <div className="flex flex-col gap-4.5">
         <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">{t("review.youAreAllCaught")}</p>
-            <p className="mt-1 text-xs text-ink-3">
-              {t("review.aRowAppearsHere")}
-            </p>
-          </CardBody>
+          <CardHeader className="justify-between">
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-lg font-bold text-ink">
+                {t("common.whatYouOwe")}
+              </h1>
+              <p className="text-xs text-ink-3">
+                {t("review.computedOnTheServer")}
+              </p>
+            </div>
+            <div className="flex flex-none items-center gap-3.5">
+              <Count label="Overdue" value={inbox.counts.overdue} urgent />
+              <Count label="Today" value={inbox.counts.today} />
+              <Count label="This week" value={inbox.counts.thisWeek} />
+              {/* The walker through every check-in owed, which this screen
+               * already lists one by one (P9-T07a-b). Named apart from each
+               * row's own "Check in", which opens that one goal. */}
+              <Link href="/check-in" className={buttonVariants({ size: "sm" })}>
+                {t("okrList.checkInAll")}
+              </Link>
+              {acknowledgements.length > 1 ? (
+                <ActionForm action={acknowledgeAll}>
+                  {acknowledgements.map((id) => (
+                    <input key={id} type="hidden" name="checkInId" value={id} />
+                  ))}
+                  <Button type="submit" size="sm">
+                    {t("review.acknowledgeAll", {
+                      count: acknowledgements.length,
+                    })}
+                  </Button>
+                </ActionForm>
+              ) : null}
+            </div>
+          </CardHeader>
         </Card>
-      ) : (
-        GROUPS.map((group) => {
-          const rows = inbox.obligations.filter(
-            (item) => item.group === group.id,
-          );
-          if (rows.length === 0) {
-            return null;
-          }
-          return (
-            <section key={group.id} className="flex flex-col gap-1.5">
-              <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-                {group.label}
-                <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
-                  {rows.length}
-                </span>
-              </h2>
-              <div className="flex flex-col gap-1.5">
-                {rows.map((row) => (
-                  <Row key={row.id} obligation={row} t={t} />
-                ))}
-              </div>
-            </section>
-          );
-        })
-      )}
 
-      {/* Empty since P6-G02, and the card is kept rather than deleted. It
+        {inbox.obligations.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-sm text-ink-2">
+                {t("review.youAreAllCaught")}
+              </p>
+              <p className="mt-1 text-xs text-ink-3">
+                {t("review.aRowAppearsHere")}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          GROUPS.map((group) => {
+            const rows = inbox.obligations.filter(
+              (item) => item.group === group.id,
+            );
+            if (rows.length === 0) {
+              return null;
+            }
+            return (
+              <section key={group.id} className="flex flex-col gap-1.5">
+                <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
+                  {group.label}
+                  <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
+                    {rows.length}
+                  </span>
+                </h2>
+                <div className="flex flex-col gap-1.5">
+                  {rows.map((row) => (
+                    <Row key={row.id} obligation={row} t={t} />
+                  ))}
+                </div>
+              </section>
+            );
+          })
+        )}
+
+        {/* Empty since P6-G02, and the card is kept rather than deleted. It
           listed four sources naming P3-T09, P4-T07, P4-T04 and P4-T05, and
           all four of those tasks had been done for weeks by the time the gap
           audit read it. The mechanism is what makes the next source that
           arrives ahead of its reader legible; the card renders nothing when
           there is nothing to say. */}
-      {inbox.pending.length > 0 ? (
+        {inbox.pending.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("common.notHereYet")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1.5">
+              <p className="text-xs text-ink-3">
+                {t("review.theseSourcesOfObligation")}
+              </p>
+              <ul className="flex flex-col gap-1">
+                {inbox.pending.map((source) => (
+                  <li
+                    key={source.kind}
+                    className="flex items-center justify-between gap-2.5 text-xs"
+                  >
+                    <span className="text-ink-2">{source.label}</span>
+                    <Chip tone="neutral">{source.task}</Chip>
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("common.notHereYet")}
-            </h2>
+            <div className="flex min-w-0 flex-col">
+              <h2 className="text-sm font-bold text-ink">
+                {t("review.whyYouGotNudged")}
+              </h2>
+              <p className="text-xs text-ink-3">
+                {t("review.everyMessageTheProduct")}
+              </p>
+            </div>
           </CardHeader>
-          <CardBody className="flex flex-col gap-1.5">
-            <p className="text-xs text-ink-3">
-              {t("review.theseSourcesOfObligation")}
-            </p>
-            <ul className="flex flex-col gap-1">
-              {inbox.pending.map((source) => (
-                <li
-                  key={source.kind}
-                  className="flex items-center justify-between gap-2.5 text-xs"
-                >
-                  <span className="text-ink-2">{source.label}</span>
-                  <Chip tone="neutral">{source.task}</Chip>
-                </li>
-              ))}
-            </ul>
+          <CardBody>
+            <NudgeProvenance nudges={nudges} />
           </CardBody>
         </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("review.whyYouGotNudged")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("review.everyMessageTheProduct")}
-            </p>
-          </div>
-        </CardHeader>
-        <CardBody>
-          <NudgeProvenance nudges={nudges} />
-        </CardBody>
-      </Card>
-    </div>
+      </div>
+    </>
   );
 }
 

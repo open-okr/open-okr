@@ -23,10 +23,11 @@ export const NAVIGATION_STALL_MS = 10_000;
 export function NavLink({
   href,
   className,
+  title,
   children,
 }: ComponentProps<typeof Link>) {
   return (
-    <Link href={href} className={className}>
+    <Link href={href} className={className} title={title}>
       {children}
       <NavigationPending href={typeof href === "string" ? href : null} />
     </Link>
