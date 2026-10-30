@@ -71,6 +71,7 @@ import { daysPastDue } from "../cadence/service.ts";
 import {
   goalStillOpen,
   isLatestPublishedOnGoal,
+  withinAcknowledgementWindow,
 } from "../check-ins/acknowledgement-owed.ts";
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -1004,6 +1005,12 @@ export async function dueAcknowledgementNudges(
         isNull(goals.deletedAt),
         goalStillOpen(),
         isLatestPublishedOnGoal(),
+        // Lapsed past the window (§11, OKRGoal UX review H4): Review no
+        // longer lists it, so the ladder no longer asks.
+        withinAcknowledgementWindow(
+          input.now,
+          input.thresholds["cadence.acknowledgementWindowDays"],
+        ),
         input.scope ? agentSeesCheckIn(input.scope) : undefined,
       ),
     );

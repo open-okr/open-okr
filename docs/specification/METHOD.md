@@ -155,7 +155,7 @@ Guidance for people, not machine thresholds (§11).
 | Facilitator | The sessions and the quality bar | One per cycle. May decline to run a drafting session without its inputs. That is their judgement; the product never refuses on their behalf unless phases are binding |
 | Champion | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee. Block. *Source:* whatmatters: "only one owner per OKR, even if Key Results are distributed across a team" |
 | Key result owner | One key result | Exactly one per key result, defaulting to the champion |
-| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer |
+| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. One left unacknowledged past the acknowledgement window (§11) lapses: it leaves the review inbox and the ladder, and is not recorded as acknowledged. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer. The window follows the OKRGoal UX review of October 2026 |
 | Contributor | Work that moves a key result | Any number |
 | Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers. *Source:* OpenOKR default |
 
@@ -1006,6 +1006,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
 | Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days. Only where the goal has a reviewer |
+| Acknowledgement window | 14 days after publication, after which an unacknowledged check-in lapses from the review inbox and the ladder |
 | Blocker clock | The next action is due by the next check-in |
 | Blocker ladder | Owner reminded 1 day before the next check-in, coordinator when the check-in passes with the action open |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |

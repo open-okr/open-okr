@@ -49773,6 +49773,25 @@
                                     "type": "null"
                                   }
                                 ]
+                              },
+                              "preview": {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "excerpt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "status",
+                                  "excerpt"
+                                ],
+                                "additionalProperties": false
                               }
                             },
                             "required": [

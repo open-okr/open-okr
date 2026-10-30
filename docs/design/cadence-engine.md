@@ -253,6 +253,13 @@ its messages are not about them.
 | three days, the coordinator is brought in | 3 | 2 | reviewer,coordinator |
 | a week later, no further | 7 | 2 | reviewer,coordinator |
 
+**The window** (§11, OKRGoal UX review H4). Fourteen days after publication an
+unacknowledged check-in lapses: the review inbox stops listing it and this
+ladder stops asking. Nothing records it as acknowledged, because nobody did.
+The predicate is `withinAcknowledgementWindow` in
+`packages/core/src/check-ins/acknowledgement-owed.ts`, which Review and the
+ladder share, so the two cannot disagree about what is still owed.
+
 **Blocker.** §11, as METHOD v2 has it since P9-T19a-a: "owner reminded 1 day
 before the next check-in, coordinator when the check-in passes with the action
 open". The clock is the check-in the next action is due by, stored on the

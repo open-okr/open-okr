@@ -12,7 +12,7 @@ import { getPool } from "../../lib/auth";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
-import { acknowledge } from "./actions.ts";
+import { acknowledge, acknowledgeAll } from "./actions.ts";
 import { NudgeProvenance } from "./nudge-provenance.tsx";
 import { ProposalDecision } from "./proposal-decision.tsx";
 
@@ -84,6 +84,12 @@ export default async function ReviewPage() {
     { limit: 20 },
   );
 
+  // Every acknowledgement listed, for "Acknowledge all" (OKRGoal UX review,
+  // H4). Offered from two up: one row already has its own button.
+  const acknowledgements = inbox.obligations.flatMap((item) =>
+    item.kind === "acknowledgement" && item.checkInId ? [item.checkInId] : [],
+  );
+
   return (
     <div className="flex flex-col gap-4.5">
       <Card>
@@ -106,6 +112,18 @@ export default async function ReviewPage() {
             <Link href="/check-in" className={buttonVariants({ size: "sm" })}>
               {t("okrList.checkInAll")}
             </Link>
+            {acknowledgements.length > 1 ? (
+              <ActionForm action={acknowledgeAll}>
+                {acknowledgements.map((id) => (
+                  <input key={id} type="hidden" name="checkInId" value={id} />
+                ))}
+                <Button type="submit" size="sm">
+                  {t("review.acknowledgeAll", {
+                    count: acknowledgements.length,
+                  })}
+                </Button>
+              </ActionForm>
+            ) : null}
           </div>
         </CardHeader>
       </Card>
@@ -137,7 +155,7 @@ export default async function ReviewPage() {
               </h2>
               <div className="flex flex-col gap-1.5">
                 {rows.map((row) => (
-                  <Row key={row.id} obligation={row} />
+                  <Row key={row.id} obligation={row} t={t} />
                 ))}
               </div>
             </section>
@@ -196,6 +214,15 @@ export default async function ReviewPage() {
   );
 }
 
+/** A check-in's status in the reader's words. */
+function statusWord(status: string | null, t: (key: string) => string): string {
+  return status === "off_track"
+    ? t("common.offTrack")
+    : status === "caution"
+      ? t("common.caution")
+      : t("common.onTrack");
+}
+
 function Count({
   label,
   value,
@@ -237,7 +264,13 @@ function Count({
  * answers sit under the title, and the card carries the anchor the inbox's own
  * `href` points at, so a link to the proposal from anywhere lands on it.
  */
-function Row({ obligation }: { readonly obligation: Obligation }) {
+function Row({
+  obligation,
+  t,
+}: {
+  readonly obligation: Obligation;
+  readonly t: (key: string, values?: Record<string, string | number>) => string;
+}) {
   const overdue = obligation.group === "overdue";
   return (
     <Card
@@ -259,6 +292,16 @@ function Row({ obligation }: { readonly obligation: Obligation }) {
             {obligation.title}
           </span>
           <span className="text-xs text-ink-3">{obligation.meta}</span>
+          {/* What the check-in says, so it can be read before it is
+              acknowledged (OKRGoal UX review, H4). */}
+          {obligation.preview?.excerpt ? (
+            <span className="line-clamp-2 text-xs text-ink-2">
+              {t("review.checkInSays", {
+                status: statusWord(obligation.preview.status, t),
+                excerpt: obligation.preview.excerpt,
+              })}
+            </span>
+          ) : null}
           {obligation.proposal ? (
             <ProposalDecision
               proposal={obligation.proposal}

@@ -43,6 +43,7 @@ import {
   earlierOpenOnGoal,
   goalStillOpen,
   isLatestPublishedOnGoal,
+  withinAcknowledgementWindow,
 } from "../check-ins/acknowledgement-owed.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
@@ -66,6 +67,7 @@ import {
   proposalPreview,
   proposalRecipients,
 } from "../review/proposals.ts";
+import { excerptRichText } from "../rich-text/excerpt.ts";
 import { defineReadAction } from "./define.ts";
 
 const obligationSchema = z.object({
@@ -99,6 +101,13 @@ const obligationSchema = z.object({
       preview: z.array(z.object({ label: z.string(), value: z.string() })),
     })
     .nullable(),
+  /**
+   * What an acknowledgement's check-in says, so the row can be read before it
+   * is acknowledged, one at a time or all at once (OKRGoal UX review, H4).
+   */
+  preview: z
+    .object({ status: z.string().nullable(), excerpt: z.string() })
+    .optional(),
 });
 
 async function actingMember(
@@ -279,6 +288,8 @@ export const reviewInbox = defineReadAction({
             publishedAt: checkIns.publishedAt,
             authorName: workspaceMembers.name,
             earlier: earlierOpenOnGoal(),
+            status: checkIns.status,
+            narrative: checkIns.narrative,
           })
           .from(checkIns)
           .innerJoin(goals, eq(goals.id, checkIns.subjectId))
@@ -299,6 +310,10 @@ export const reviewInbox = defineReadAction({
               isNull(goals.deletedAt),
               goalStillOpen(),
               isLatestPublishedOnGoal(),
+              withinAcknowledgementWindow(
+                now,
+                thresholds["cadence.acknowledgementWindowDays"],
+              ),
             ),
           )
           .orderBy(asc(checkIns.publishedAt));
@@ -333,6 +348,13 @@ export const reviewInbox = defineReadAction({
             subjectId: row.goalId,
             checkInId: row.id,
             proposal: null,
+            preview: {
+              status: row.status,
+              excerpt:
+                row.narrative === null
+                  ? ""
+                  : excerptRichText(row.narrative as never, 200),
+            },
           });
         }
 

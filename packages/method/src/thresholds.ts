@@ -167,6 +167,14 @@ export const THRESHOLDS = {
     default: { nudge: 1, escalate: 3 },
     schema: z.object({ nudge: wholeDays, escalate: wholeDays }),
   }),
+  "cadence.acknowledgementWindowDays": param({
+    group: "cadence",
+    label: "Acknowledgement window",
+    section: "§11",
+    why: "A check-in nobody acknowledged within this many days lapses: it leaves Review and the ladder stops asking. It is history by then, and a backlog nobody can clear teaches people to ignore the list.",
+    default: 14,
+    schema: wholeDays,
+  }),
   "cadence.blockerLadderDays": param({
     group: "cadence",
     label: "Blocker ladder",
