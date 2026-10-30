@@ -358,9 +358,9 @@ Health is derived, never typed in. Precedence, first match wins:
 1. **Closed outcome.** The goal is closed as achieved, missed or abandoned.
 2. **Outdated.** The check-in is overdue past the grace window. This overrides whatever the last check-in said, and the last reported status is still shown beside it.
 3. **Latest published check-in status.** On track, at risk, or off track. "At risk" is the default label for the stored status `caution`, set in terminology.
-4. **Pending.** No check-in yet.
+4. **No check-in yet.** Stored as `pending`.
 
-A goal that has never been checked in is `pending`, not `on track`. Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
+A goal that has never been checked in is `pending`, not `on track`, and reads "No check-in yet": "Pending" read as waiting for somebody's approval (OKRGoal UX review, October 2026). Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
 **Reported health against the data.** When a goal reports on track and one of its metric key results has not moved within the divergence window (§11), the coach says so (§10).
 

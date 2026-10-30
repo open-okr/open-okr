@@ -229,7 +229,7 @@ test("acceptance: checking in from the row moves its health, and the history sho
   await expect(title).toBeVisible({ timeout: 15_000 });
   const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   // Never checked in, so pending: silence is never green (METHOD.md §3.5).
-  await expect(row).toContainText("Pending");
+  await expect(row).toContainText("No check-in yet");
   await row.hover();
   await row.getByRole("button", { name: "Check in on this objective" }).click();
 

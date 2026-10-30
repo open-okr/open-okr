@@ -2152,7 +2152,7 @@
   "health.outdatedLastAtRisk": "Outdated, last {termAtRiskLower}",
   "health.outdatedLastOffTrack": "Outdated, last off track",
   "health.outdatedLastOnTrack": "Outdated, last on track",
-  "health.pending": "Pending",
+  "health.pending": "No check-in yet",
   "home.agentPrompt.close": "Hide for this session",
   "home.agentPrompt.label": "Connect your AI agent to {instanceName}",
   "home.agentPrompt.tooltip": "Copies a setup prompt for your AI agent",
