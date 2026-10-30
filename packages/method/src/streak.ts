@@ -239,3 +239,25 @@ export function currentStreakOn(
     ? state.currentWeeks
     : 0;
 }
+
+/**
+ * A member's own streak (§7.4, OKRGoal UX review H7): the periods in a row in
+ * which they posted a check-in on a goal they champion, as it stands on
+ * `today`.
+ *
+ * The space's rule applied to one person's publication dates, so a member's
+ * run and their space's run cannot disagree about what a period is. Dates may
+ * arrive in any order; a second post in one period counts once.
+ */
+export function memberStreak(
+  publishedOn: readonly string[],
+  today: string,
+  frequency: CheckInFrequency = "weekly",
+  holidays: readonly Holiday[] = [],
+): number {
+  let state: StreakState | null = null;
+  for (const on of [...publishedOn].sort()) {
+    state = afterCheckIn(state, on, frequency, holidays);
+  }
+  return currentStreakOn(state, today, frequency, holidays);
+}

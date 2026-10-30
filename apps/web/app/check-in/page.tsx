@@ -94,6 +94,9 @@ export default async function CheckInPage({
   const { goals: mine } = await callAction(context, "goals.due", {
     withinDays: 366,
   });
+  // The reader's own run (OKRGoal UX review, H7): the reward a check-in earns,
+  // paused while a goal reads on track with a key result that has not moved.
+  const streak = await callAction(context, "goals.myStreak", {});
   const due = mine.filter(
     (goal) => goal.daysPastDue !== null && goal.daysPastDue >= -DUE_LEAD_DAYS,
   );
@@ -128,6 +131,15 @@ export default async function CheckInPage({
                 : due.length === 1
                   ? t("checkIn.goalsDueOne", { count: due.length })
                   : t("checkIn.goalsDueOther", { count: due.length })}
+            </p>
+            <p className="text-xs font-semibold text-ink-2">
+              {streak.pausedBy
+                ? t("checkIn.streak.paused", { title: streak.pausedBy.title })
+                : streak.periods === 0
+                  ? t("checkIn.streak.none")
+                  : streak.periods === 1
+                    ? t("checkIn.streak.one")
+                    : t("checkIn.streak.other", { count: streak.periods })}
             </p>
           </div>
           <Chip tone={due.length === 0 ? "ok" : "brand"}>

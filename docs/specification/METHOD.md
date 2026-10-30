@@ -755,6 +755,8 @@ Consecutive check-in periods in which a space held its check-in, at whatever fre
 
 A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
 
+Each member also has their own streak: the periods in a row in which they posted a check-in on a goal they champion, by the same rule, shown on their check-in page. It is paused, not counted, while one of their goals reads on track with a key result flat past the divergence window (§3.5, §11), so a streak cannot be kept by re-entering the same number. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
+
 A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they champion is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
 
 ### 7.5 Monthly review

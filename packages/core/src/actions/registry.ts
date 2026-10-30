@@ -148,6 +148,7 @@ import {
   publishCheckIn,
   publishDraftedCheckIn,
   readConfidenceVotes,
+  readMyStreak,
   revealConfidenceVotes,
   startCheckIn,
 } from "./check-ins.ts";
@@ -797,6 +798,7 @@ export const ACTION_MAP = {
   "goals.unlinkKpi": unlinkKeyResultKpi,
   "goals.keyResultHistory": readKeyResultHistory,
   "goals.due": listDueGoals,
+  "goals.myStreak": readMyStreak,
   "goals.checkIns": listCheckIns,
   "goals.rewriteKeyResult": rewriteKeyResult,
   "goals.draftObjective": draftObjective,

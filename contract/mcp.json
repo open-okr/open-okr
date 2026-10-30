@@ -9475,6 +9475,21 @@
       "example": {}
     },
     {
+      "name": "goals.myStreak",
+      "description": "The reader's own check-in streak, and the goal pausing it where one reads on track while a key result has not moved.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "goals.checkIns",
       "description": "One goal's check-in timeline, newest first, with each one's snapshot differences.",
       "inputSchema": {

@@ -386,6 +386,62 @@ describe("the champion hears the acknowledgement", () => {
   });
 });
 
+describe("the champion's own streak (OKRGoal UX review, H7)", () => {
+  it("counts this period's check-in, and is paused while a key result sits flat on track", async () => {
+    const wb = await workerDb();
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.startCheckIn",
+      { goalId },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.publishCheckIn",
+      {
+        id: draft.id,
+        status: "on_track",
+        confidence: 0.7,
+        narrative: richText("Activation is moving."),
+        values: [],
+      },
+    );
+    const mine = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.myStreak",
+      {},
+    );
+    expect(mine.periods).toBe(1);
+    expect(mine.pausedBy).toBeNull();
+
+    // The divergence check found a measure flat for four weeks while the goal
+    // said on track: a streak kept by re-entering the same number is not a
+    // rhythm, so it is paused and says why.
+    await wb.admin.query(
+      `insert into alignment_findings
+         (id, workspace_id, scope, cycle_id, kind, severity, subject_goal_id,
+          subject_key_result_id, reason, rule_key, state)
+       select gen_random_uuid(), workspace_id, 'workspace', cycle_id, 'divergence', 'medium', id,
+              $2, 'Flat for four weeks', 'quality.divergence', 'open'
+         from goals where id = $1`,
+      [goalId, keyResultId],
+    );
+    const paused = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.myStreak",
+      {},
+    );
+    expect(paused.pausedBy?.goalId).toBe(goalId);
+
+    // Nobody else's run: the reviewer posted nothing.
+    const theirs = await callAction(
+      { pool: wb.appPool, ...context(REVIEWER) },
+      "goals.myStreak",
+      {},
+    );
+    expect(theirs.periods).toBe(0);
+  });
+});
+
 describe("the edit window", () => {
   it("refuses an edit once the next check-in is due", async () => {
     const wb = await workerDb();

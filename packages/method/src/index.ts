@@ -364,6 +364,7 @@ export {
   isHoliday,
   isHolidayPeriod,
   lastWorkingDayOfPeriod,
+  memberStreak,
   nextPeriodStart,
   periodEndOf,
   periodStartOf,
