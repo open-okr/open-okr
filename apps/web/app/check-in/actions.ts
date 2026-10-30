@@ -10,6 +10,7 @@
  */
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getPool } from "../../lib/auth";
 import { formNumber } from "../../lib/form-number";
 import { readRichTextField } from "../../lib/rich-text-form";
@@ -122,7 +123,7 @@ export async function publishCheckIn(
     return { error: t("checkIn.actions.confidenceNeeded") };
   }
 
-  return run((context) =>
+  const published = await run((context) =>
     callAction(context, "goals.publishCheckIn", {
       id,
       status: String(formData.get("status") ?? "on_track") as
@@ -134,6 +135,17 @@ export async function publishCheckIn(
       values: composerValues(formData),
     }),
   );
+  // An extra update returns to the goal without `update=1`, so the page does
+  // not open a fresh empty draft the moment this one is published. Only a
+  // check-in page for one goal, so the field cannot send anybody elsewhere.
+  const then = String(formData.get("then") ?? "");
+  if (
+    published.error === null &&
+    /^\/check-in\?goal=[0-9a-f-]{36}$/.test(then)
+  ) {
+    redirect(then);
+  }
+  return published;
 }
 
 export async function editCheckIn(

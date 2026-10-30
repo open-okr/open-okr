@@ -825,7 +825,11 @@ test("the check-in walker lists only what is actually due", async () => {
   await expect(chip).toBeVisible();
   const claimed = Number(((await chip.textContent()) ?? "0").split(" ")[0]);
 
-  const offered = page.locator('a[href^="/check-in?goal="]');
+  // The goals that are not due yet sit under "Update any time" (OKRGoal UX
+  // review, H1) and are not part of the claim.
+  const offered = page.locator(
+    'a[href^="/check-in?goal="]:not(section[aria-labelledby="check-in-update-any-time"] a)',
+  );
   await expect(offered).toHaveCount(claimed);
 
   if (claimed === 0) {
@@ -860,9 +864,19 @@ test("a goal reached directly shows its history and refuses a draft", async () =
     page.getByRole("heading", { name: "Check-in history" }),
   ).toBeVisible();
 
-  const notDue = page.getByText("This goal is not due");
+  // Not due yet, the goal offers an update instead of opening a draft on
+  // sight, and the update opens the composer (OKRGoal UX review, H1).
+  const notDue = page.getByText(/^Next due /);
   if (await notDue.isVisible().catch(() => false)) {
     await expect(page.getByRole("button", { name: "Publish" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Post an update" }).click();
+    await expect(page).toHaveURL(/update=1/);
+    await expect(
+      page.getByRole("button", { name: "Publish" }),
+    ).not.toHaveCount(0);
+    await expect(
+      page.getByText(/An extra update\. The next due date stays/),
+    ).toBeVisible();
   } else {
     await expect(
       page.getByRole("button", { name: "Publish" }),

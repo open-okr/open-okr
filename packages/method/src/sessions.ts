@@ -598,8 +598,10 @@ export interface CheckInRecord {
  * check-in answers the period it falls in: the latest due date on or before
  * it, when that one is still open. Periods before it that nothing answered stay
  * missed, so a team that starts in week three is on time for week three. When
- * its own period is already answered it is early for the next one, which is
- * never late, however early. It is on time when it is published no later than
+ * its own period is already answered it is early for the next one, and answers
+ * it only inside the tolerance before that date; earlier than that it is an
+ * extra update that answers nothing, as the cadence engine reads it. It is on
+ * time when it is published no later than
  * the tolerance after the date it answers, so one three days late for its own
  * Monday is late, and is not counted again as early for the Monday after. Null
  * when nothing fell due, because a share of nothing is not a rhythm.
@@ -637,6 +639,12 @@ export function onTimeShare(
       const answered = dues[answers];
       if (answered === undefined) {
         break;
+      }
+      // An extra update: ahead of the next open due date by more than the
+      // tolerance, so the engine leaves that period owed (OKRGoal UX review,
+      // H1). It answers nothing here either.
+      if (when < shift(answered, -toleranceDays)) {
+        continue;
       }
       if (when <= shift(answered, toleranceDays)) {
         onTime += 1;

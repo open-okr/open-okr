@@ -100,11 +100,16 @@ Rule 1 is why an early or a late check-in does not shift the rhythm: a goal due
 Mondays stays due Mondays after a Tuesday check-in. Rule 2 is why a champion
 who vanishes for a month does not return to a backlog of four overdue periods.
 
-The tolerance (§11, one day by default) does not change the next due date. It
-decides whether the period that just ended was **met** or **missed**, which is
-what the streak and the escalation ladder read. A publication after
-`due + tolerance` is a missed period. A publication before the due date is
-never missed, however early it is.
+The tolerance (§11, one day by default) decides two things. A publication
+after `due + tolerance` is a **missed** period, which is what the streak and
+the escalation ladder read. A publication before `due - tolerance` is an
+**extra update**: it is published like any check-in, moves health and progress,
+and leaves the due date where it is, so the period it falls in is still owed
+and the anchor-day nudge still goes out (decided on 30 October 2026 after the
+OKRGoal UX review, findings H1 and T7: "a user who has news on Wednesday has
+nowhere to put it"). Before that, an early check-in used up the next period.
+A publication before the due date is never missed. The blocker clock is stored
+as the goal's next due date, so an extra update does not shorten it.
 
 <!-- golden: cadence.after-publication -->
 
@@ -113,7 +118,9 @@ never missed, however early it is.
 | exactly on time | weekly | 1 | 2026-08-10 | 2026-08-10 | 1 | 2026-08-17 | no |
 | one day early | weekly | 1 | 2026-08-10 | 2026-08-09 | 1 | 2026-08-17 | no |
 | one day late, inside tolerance | weekly | 1 | 2026-08-10 | 2026-08-11 | 1 | 2026-08-17 | no |
-| three days early, outside tolerance | weekly | 1 | 2026-08-10 | 2026-08-07 | 1 | 2026-08-17 | no |
+| three days early, outside tolerance, is an extra update | weekly | 1 | 2026-08-10 | 2026-08-07 | 1 | 2026-08-10 | no |
+| a Wednesday update after Monday's check-in | weekly | 1 | 2026-08-17 | 2026-08-12 | 1 | 2026-08-17 | no |
+| two days early with a two-day tolerance advances | weekly | 1 | 2026-08-10 | 2026-08-08 | 2 | 2026-08-17 | no |
 | four days late | weekly | 1 | 2026-08-10 | 2026-08-14 | 1 | 2026-08-17 | yes |
 | published on the following anchor day | weekly | 1 | 2026-08-10 | 2026-08-17 | 1 | 2026-08-24 | yes |
 | four weeks late skips the backlog | weekly | 1 | 2026-08-10 | 2026-09-07 | 1 | 2026-09-14 | yes |

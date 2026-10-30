@@ -708,6 +708,8 @@ Book all of them for the whole cycle before the cycle starts. Calendars fill fas
 
 Every two weeks and monthly are valid check-in frequencies (§11). The streak and the escalation ladders follow whichever is chosen. *Source:* Lamorte: "The sweet spot is bi-weekly check-ins"; Doerr and Wodtke: weekly.
 
+A check-in may be posted on any day. One posted earlier than the cadence tolerance (§11) before its due date is an extra update: it moves health and progress, and the due date, its nudge and the blocker clock stay where they were, so the period is still owed. *Source:* OpenOKR default, decided after the OKRGoal UX review of October 2026.
+
 Keep check-ins forward-looking. Status lives in the product. The meeting is for decisions. *Source:* Wodtke: if only a third of the time is presentations "you are doing it right".
 
 ### 7.2 The weekly check-in, in four steps

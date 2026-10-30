@@ -193,6 +193,13 @@ describe("publication", () => {
   it("snapshots the movement, moves health and creates the obligation", async () => {
     // The task's acceptance criterion: 40 to 55 with a caution status.
     const wb = await workerDb();
+    // Due now, so this publication answers the period. One days ahead of its
+    // due date is an extra update and leaves the cadence where it is, which
+    // made this test depend on the weekday it ran.
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() where id = $1",
+      [goalId],
+    );
     const before = await wb.admin.query<{ next_check_in_at: Date }>(
       "select next_check_in_at from goals where id = $1",
       [goalId],
@@ -643,6 +650,57 @@ describe("confidence votes", () => {
   });
 });
 
+describe("an update days ahead of the due date", () => {
+  it("moves the goal and leaves the due date where it was", async () => {
+    // OKRGoal UX review, H1: a member with news on Wednesday posts it, and next
+    // Monday is still owed, still nudged, and still the blocker clock.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() + interval '5 days' where id = $1",
+      [goalId],
+    );
+    const before = await wb.admin.query<{ next_check_in_at: Date }>(
+      "select next_check_in_at from goals where id = $1",
+      [goalId],
+    );
+
+    const draft = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.startCheckIn",
+      { goalId },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.publishCheckIn",
+      {
+        id: draft.id,
+        status: "on_track",
+        confidence: 0.7,
+        narrative: richText("A pilot customer signed early."),
+        values: [{ keyResultId, value: 70 }],
+      },
+    );
+
+    const goal = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.read",
+      { id: goalId },
+    );
+    expect(goal.health).toBe("on_track");
+    expect(goal.keyResults[0]?.currentValue).toBe(70);
+
+    const after = await wb.admin.query<{ next_check_in_at: Date }>(
+      "select next_check_in_at from goals where id = $1",
+      [goalId],
+    );
+    // The same due date. The engine stores it as the end of that local day,
+    // so the date is compared rather than the instant the test wrote.
+    const day = (row: { next_check_in_at: Date } | undefined) =>
+      new Date(row?.next_check_in_at as Date).toISOString().slice(0, 10);
+    expect(day(after.rows[0])).toBe(day(before.rows[0]));
+  });
+});
+
 describe("the due list the walker reads", () => {
   it("offers a goal only to the member who champions it", async () => {
     const wb = await workerDb();
@@ -687,6 +745,23 @@ describe("the due list the walker reads", () => {
       { withinDays: 2 },
     );
     expect(due.goals[0]?.hasOpenDraft).toBe(true);
+  });
+
+  it("offers a monthly goal weeks ahead when asked for the whole year", async () => {
+    // The check-in page lists every goal the member champions, due or not, so
+    // a member with news mid-week has somewhere to put it (OKRGoal UX review,
+    // H1 and T7). A monthly cadence can be a month out.
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update goals set next_check_in_at = now() + interval '40 days' where id = $1",
+      [goalId],
+    );
+    const ahead = await callAction(
+      { pool: wb.appPool, ...context() },
+      "goals.due",
+      { withinDays: 366 },
+    );
+    expect(ahead.goals.map((goal) => goal.id)).toEqual([goalId]);
   });
 
   it("leaves out a goal that is not due yet, and a closed one", async () => {

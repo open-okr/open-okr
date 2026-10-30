@@ -193,9 +193,12 @@ interface AfterPublication {
  * date, so a champion who vanishes for a month does not return to a backlog of
  * four overdue periods.
  *
- * The tolerance does not change the next due date. It decides whether the period
- * that just ended was met or missed. A publication before the due date is never
- * missed, however early it is.
+ * The tolerance decides whether the period that just ended was met or missed,
+ * and whether a publication answers it at all. One before `due - tolerance` is
+ * an extra update (design §3, OKRGoal UX review H1): the due date stays, so a
+ * Wednesday post after Monday's check-in leaves next Monday owed and nudged
+ * rather than silently spent. A publication before the due date is never
+ * missed.
  */
 function nextAfterPublication(
   due: LocalDate,
@@ -204,6 +207,9 @@ function nextAfterPublication(
   anchor: CadenceAnchor,
   toleranceDays: number,
 ): AfterPublication {
+  if (daysBetween(publishedOn, due) > toleranceDays) {
+    return { next: due, missedPeriod: false };
+  }
   let next = advance(due, frequency, anchor);
   // Bounded so a pathological input cannot spin: a daily goal published ten
   // years late is 3,650 steps, and beyond that the rhythm is not the problem.

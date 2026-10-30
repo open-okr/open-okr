@@ -832,8 +832,12 @@ export const listDueGoals = defineReadAction({
   summary:
     "The goals this member champions that are due a check-in, soonest first. Drives the session walker.",
   input: z.object({
-    /** Days ahead to count as due soon. 0 is "due or overdue only". */
-    withinDays: z.number().int().min(0).max(30).default(2),
+    /**
+     * Days ahead to count as due soon. 0 is "due or overdue only". Up to a
+     * year, which is how the check-in page asks for every goal the member
+     * champions, due or not (OKRGoal UX review, H1).
+     */
+    withinDays: z.number().int().min(0).max(366).default(2),
   }),
   output: z.object({
     goals: z.array(

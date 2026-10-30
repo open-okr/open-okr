@@ -42599,7 +42599,7 @@
               "default": 2,
               "type": "integer",
               "minimum": 0,
-              "maximum": 30
+              "maximum": 366
             }
           }
         ]

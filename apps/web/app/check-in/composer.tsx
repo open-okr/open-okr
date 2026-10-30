@@ -58,6 +58,8 @@ export async function Composer({
   display,
   keyResults,
   nextGoalId,
+  update = false,
+  goalId,
 }: {
   readonly checkInId: string;
   readonly goalTitle: string;
@@ -69,6 +71,14 @@ export async function Composer({
   readonly keyResults: readonly ComposerKeyResult[];
   /** The goal the walker moves to after this one, when there is one. */
   readonly nextGoalId: string | null;
+  /**
+   * An extra update on a goal that is not due yet (OKRGoal UX review, H1):
+   * it leaves the due date where it is, so the note under Publish says that
+   * rather than that the cadence advances.
+   */
+  readonly update?: boolean;
+  /** Where an extra update returns to once it is published. */
+  readonly goalId?: string;
 }) {
   const { t } = await getTranslations();
 
@@ -84,6 +94,13 @@ export async function Composer({
       <CardBody>
         <ActionForm action={publishCheckIn} className="flex flex-col gap-3.5">
           <input type="hidden" name="checkInId" value={checkInId} />
+          {update && goalId ? (
+            <input
+              type="hidden"
+              name="then"
+              value={`/check-in?goal=${goalId}`}
+            />
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-2.5">
             <SelectInput
@@ -241,11 +258,13 @@ export async function Composer({
               {t("checkIn.composer.publish")}
             </Button>
             <span className="text-xs text-ink-4">
-              {t("checkIn.composer.publishingAdvancesTheCadenceAnd", {
-                goal: nextGoalId
-                  ? " The walker moves to your next due goal."
-                  : "",
-              })}
+              {update
+                ? t("checkIn.composer.publishingAnUpdate")
+                : t("checkIn.composer.publishingAdvancesTheCadenceAnd", {
+                    goal: nextGoalId
+                      ? " The walker moves to your next due goal."
+                      : "",
+                  })}
             </span>
           </div>
         </ActionForm>

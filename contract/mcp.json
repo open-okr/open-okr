@@ -9461,7 +9461,7 @@
             "default": 2,
             "type": "integer",
             "minimum": 0,
-            "maximum": 30,
+            "maximum": 366,
             "description": "Days ahead to count as due. 0 is due today or overdue only."
           }
         }
