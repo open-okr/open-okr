@@ -644,6 +644,10 @@ test("a goal carries the writes that had no browser path", async () => {
 
   // The cycle picker, offering the cycle the goal is already in. Disabled,
   // because moving a goal to the cycle it is in is not a move.
+  // The one-time writes sit behind "Manage this goal" (OKRGoal UX review, N6).
+  await page
+    .getByText("Manage this goal", { exact: true })
+    .click({ timeout: 15_000 });
   const target = page.getByLabel("Cycle to move this goal to");
   await expect(target).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("move-to-cycle")).toBeDisabled();

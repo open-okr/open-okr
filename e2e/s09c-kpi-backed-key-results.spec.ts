@@ -143,6 +143,8 @@ test("the goal page links the key result drafted by hand", async () => {
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText("from a KPI", { exact: true })).toHaveCount(1);
 
+  // The one-time writes sit behind "Manage this goal" (OKRGoal UX review, N6).
+  await page.getByText("Manage this goal", { exact: true }).click();
   // The only key result left to link is the one measured by hand.
   await expect(page.getByLabel("Key result to link")).toHaveValue(/.+/);
   await choose(page.getByRole("combobox", { name: "KPI it reads from" }), KPI);
