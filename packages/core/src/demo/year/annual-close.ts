@@ -16,7 +16,7 @@ import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import { YEAR_FRAME } from "./annual.ts";
 import { narrative, writeYearObjective, type YearObjective } from "./okr.ts";
 import { type Carry, nameCarried, type Redraft, redraft } from "./redraft.ts";
-import { milestoneDone } from "./rhythm.ts";
+import { milestoneDone, reviewedNextDay } from "./rhythm.ts";
 import { cycleHolding, need, type YearEvent } from "./timeline.ts";
 
 /** 2027's annual close carried into 2028's annual cycle. */
@@ -332,25 +332,33 @@ export const ANNUAL_CLOSE_EVENTS: readonly YearEvent[] = [
     order: 10,
     async run(context) {
       for (const [goalKey, values] of Object.entries(ANNUAL_VALUES)) {
-        await callAction(context.action, "goals.importCheckIn", {
-          goalId: need(context.ids.goals, goalKey, "Objective"),
-          authorMemberId: need(
-            context.ids.people,
-            ANNUAL_AUTHORS[goalKey as keyof typeof ANNUAL_AUTHORS],
-            "Author",
-          ),
-          status: "on_track",
-          confidence: 0.6,
-          narrative: narrative(
-            "The year's latest values, for the annual review.",
-          ),
-          values: values.map(([keyResult, value]) => ({
-            keyResultId: need(context.ids.keyResults, keyResult, "Key result"),
-            value,
-          })),
-          publishedAt: `${context.real("2027-12-06")}T16:00:00.000Z`,
-          legacy: { type: "csv", id: `northwind-year:${goalKey}:2027-12-06` },
-        });
+        await callAction(
+          context.action,
+          "goals.importCheckIn",
+          await reviewedNextDay(context, {
+            goalId: need(context.ids.goals, goalKey, "Objective"),
+            authorMemberId: need(
+              context.ids.people,
+              ANNUAL_AUTHORS[goalKey as keyof typeof ANNUAL_AUTHORS],
+              "Author",
+            ),
+            status: "on_track",
+            confidence: 0.6,
+            narrative: narrative(
+              "The year's latest values, for the annual review.",
+            ),
+            values: values.map(([keyResult, value]) => ({
+              keyResultId: need(
+                context.ids.keyResults,
+                keyResult,
+                "Key result",
+              ),
+              value,
+            })),
+            publishedAt: `${context.real("2027-12-06")}T16:00:00.000Z`,
+            legacy: { type: "csv", id: `northwind-year:${goalKey}:2027-12-06` },
+          }),
+        );
       }
     },
   },

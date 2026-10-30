@@ -167,6 +167,30 @@ describe("Q4's weeks (NW-Q4-02 to NW-Q4-05)", () => {
     expect(e2).toEqual({ confidence: "0.30", on: on("2027-12-06") });
   });
 
+  it("fills the board and leaves no stale acknowledgement (OKRGoal UX review, backlog 5)", async () => {
+    // Eight tasks on 15 October, beside the failover task of 3 December.
+    const [board] = await rows<{ tasks: number; moving: number }>(
+      `select count(*)::int as tasks,
+              count(*) filter (where status = 'in_progress')::int as moving
+         from tasks where workspace_id = $1 and deleted_at is null`,
+    );
+    expect(board?.tasks).toBeGreaterThanOrEqual(9);
+    expect(board?.moving).toBeGreaterThanOrEqual(3);
+    // Every check-in a reviewer other than its author owes was read the day
+    // after it was published. The ones from the build's last day, the annual
+    // values of 6 December, are still waiting, as yesterday's would be.
+    const [owed] = await rows<{ open: number }>(
+      `select count(*)::int as open
+         from check_ins c join goals g on g.id = c.subject_id
+        where c.workspace_id = $1 and c.state = 'published' and c.deleted_at is null
+          and c.acknowledged_at is null and g.reviewer_id is not null
+          and g.reviewer_id <> c.author_member_id
+          and c.published_at < $2::date`,
+      [on("2027-12-05")],
+    );
+    expect(owed?.open).toBe(0);
+  });
+
   it("reads November's margin healthy, with C6 still open", async () => {
     const [margin] = await rows<{ state: string; open: boolean }>(
       `select i.state, g.closed_at is null as open from kpis i join goals g on g.id = i.recovery_goal_id

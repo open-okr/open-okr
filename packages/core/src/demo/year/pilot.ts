@@ -15,6 +15,7 @@
 import { callAction } from "../../actions/registry.ts";
 import { addDays } from "./calendar.ts";
 import { narrative, writeYearObjective, type YearObjective } from "./okr.ts";
+import { reviewedNextDay } from "./rhythm.ts";
 import { cycleHolding, need, type YearEvent } from "./timeline.ts";
 
 const PILOT_OBJECTIVES: readonly YearObjective[] = [
@@ -161,41 +162,45 @@ const PILOT_CHECK_INS: readonly YearEvent[] = PILOT_WEEKS.map(
       for (const objective of PILOT_OBJECTIVES) {
         const renewals = objective.key === "PL2";
         const confidence = renewals ? renewalsConfidence(week) : 0.6;
-        await callAction(context.action, "goals.importCheckIn", {
-          goalId: need(context.ids.goals, objective.key, "Objective"),
-          authorMemberId: need(
-            context.ids.people,
-            objective.championKey,
-            "Champion",
-          ),
-          status: confidence < 0.4 ? "caution" : "on_track",
-          confidence,
-          narrative: narrative(
-            renewals && week === 4
-              ? "Renewals flagged 90 days out stalled at 48%: the health readings for three of our largest accounts are two months old. Confidence 3 in 10 until we fix the readings."
-              : `Week ${week + 1}. Moving, more slowly than we hoped.`,
-          ),
-          values: objective.keyResults.map((keyResult) => {
-            const finish = PILOT_FINISH[keyResult.key];
-            const from = keyResult.baselineValue ?? 0;
-            const to = finish?.value ?? from;
-            return {
-              keyResultId: need(
-                context.ids.keyResults,
-                keyResult.key,
-                "Key result",
-              ),
-              value: Math.round((from + (to - from) * share) * 10) / 10,
-              confidence:
-                keyResult.key === "PL2.1" ? renewalsConfidence(week) : 0.6,
-            };
+        await callAction(
+          context.action,
+          "goals.importCheckIn",
+          await reviewedNextDay(context, {
+            goalId: need(context.ids.goals, objective.key, "Objective"),
+            authorMemberId: need(
+              context.ids.people,
+              objective.championKey,
+              "Champion",
+            ),
+            status: confidence < 0.4 ? "caution" : "on_track",
+            confidence,
+            narrative: narrative(
+              renewals && week === 4
+                ? "Renewals flagged 90 days out stalled at 48%: the health readings for three of our largest accounts are two months old. Confidence 3 in 10 until we fix the readings."
+                : `Week ${week + 1}. Moving, more slowly than we hoped.`,
+            ),
+            values: objective.keyResults.map((keyResult) => {
+              const finish = PILOT_FINISH[keyResult.key];
+              const from = keyResult.baselineValue ?? 0;
+              const to = finish?.value ?? from;
+              return {
+                keyResultId: need(
+                  context.ids.keyResults,
+                  keyResult.key,
+                  "Key result",
+                ),
+                value: Math.round((from + (to - from) * share) * 10) / 10,
+                confidence:
+                  keyResult.key === "PL2.1" ? renewalsConfidence(week) : 0.6,
+              };
+            }),
+            publishedAt: `${context.real(monday)}T10:00:00.000Z`,
+            legacy: {
+              type: "csv",
+              id: `northwind-year:${objective.key}:${monday}`,
+            },
           }),
-          publishedAt: `${context.real(monday)}T10:00:00.000Z`,
-          legacy: {
-            type: "csv",
-            id: `northwind-year:${objective.key}:${monday}`,
-          },
-        });
+        );
       }
     },
   }),
