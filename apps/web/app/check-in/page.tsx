@@ -1,6 +1,13 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import type { ResolvedPractice, ResolvedThresholds } from "@openokr/method";
-import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  Bar,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  dueDayLabel,
+} from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
@@ -8,6 +15,7 @@ import { healthWord } from "../../lib/health-words.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
+import { RaiseBlocker } from "./raise-blocker.tsx";
 import { Timeline } from "./timeline.tsx";
 import type { VoteState } from "./vote-panel.tsx";
 
@@ -15,8 +23,15 @@ import type { VoteState } from "./vote-panel.tsx";
  * The check-in composer and the session walker (UIUX-PLAN.md §4 S-15, P3-T07).
  *
  * Without `?goal=`, this is the walker: every goal the reader champions that is
- * due, soonest first, with what each one still needs. With one, it is the composer
- * for that goal plus its timeline.
+ * due, soonest first, with what each one still needs, and below it the rest of
+ * their goals under "Update any time". With one, it is the composer for that
+ * goal plus its timeline.
+ *
+ * **Any day, not only when due** (OKRGoal UX review, H1 and T7). A member with
+ * news on Wednesday posts it as an extra update: the cadence engine leaves the
+ * due date where it is (METHOD.md §7.1), so next Monday is still owed and
+ * nudged. The Review inbox lists every goal the member champions, and this page
+ * now lists the same ones, so the two cannot disagree about what is owed.
  *
  * The walker lists only the reader's own goals, because METHOD.md §2.5 puts the
  * check-in on the champion. Asking anybody else to post one is asking the wrong
@@ -26,12 +41,34 @@ import type { VoteState } from "./vote-panel.tsx";
  * duplicated. That is what makes the walker resumable: leaving halfway through and
  * coming back finds the same draft.
  */
+/**
+ * A goal's next due date as a person reads it, "Mon" or "9 Nov", from the
+ * days the server counted in the workspace's timezone (OKRGoal UX review, N7).
+ */
+function dueOn(
+  goal: {
+    readonly nextCheckInOn: string | null;
+    readonly daysPastDue: number | null;
+  },
+  locale: string,
+): string {
+  if (goal.nextCheckInOn === null) {
+    return "";
+  }
+  return goal.daysPastDue === null
+    ? goal.nextCheckInOn
+    : dueDayLabel(goal.nextCheckInOn, -goal.daysPastDue, locale);
+}
+
+/** How far ahead a goal counts as due now, the walker's two-day lead. */
+const DUE_LEAD_DAYS = 2;
+
 export default async function CheckInPage({
   searchParams,
 }: {
-  searchParams: Promise<{ goal?: string }>;
+  searchParams: Promise<{ goal?: string; update?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -51,10 +88,21 @@ export default async function CheckInPage({
   // level, because it reads a workspace setting a guest cannot (L-23).
   const ceiling = await progressCeiling();
 
-  const { goals: due } = await callAction(context, "goals.due", {
-    withinDays: 2,
+  // Every goal the reader champions with a next check-in, due or not: a year
+  // ahead covers a monthly cadence. The walker is the ones inside the
+  // two-day lead; the rest can take an update any day.
+  const { goals: mine } = await callAction(context, "goals.due", {
+    withinDays: 366,
   });
-  const requested = (await searchParams).goal ?? null;
+  // The reader's own run (OKRGoal UX review, H7): the reward a check-in earns,
+  // paused while a goal reads on track with a key result that has not moved.
+  const streak = await callAction(context, "goals.myStreak", {});
+  const due = mine.filter(
+    (goal) => goal.daysPastDue !== null && goal.daysPastDue >= -DUE_LEAD_DAYS,
+  );
+  const later = mine.filter((goal) => !due.includes(goal));
+  const params = await searchParams;
+  const requested = params.goal ?? null;
 
   // The goal after this one in the walker, so publishing can offer to continue.
   const index = requested ? due.findIndex((goal) => goal.id === requested) : -1;
@@ -64,6 +112,10 @@ export default async function CheckInPage({
   // due list, because publishing advanced its cadence. Dropping the reader back to
   // an empty walker the moment they finish would hide the very card they wrote.
   const stillDue = index >= 0;
+  // Not due yet and the reader's own: offered as an update, and opened as one
+  // only on asking, so reading the page never leaves an empty draft behind.
+  const updatable = !stillDue && later.some((goal) => goal.id === requested);
+  const updating = updatable && params.update === "1";
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -79,6 +131,15 @@ export default async function CheckInPage({
                 : due.length === 1
                   ? t("checkIn.goalsDueOne", { count: due.length })
                   : t("checkIn.goalsDueOther", { count: due.length })}
+            </p>
+            <p className="text-xs font-semibold text-ink-2">
+              {streak.pausedBy
+                ? t("checkIn.streak.paused", { title: streak.pausedBy.title })
+                : streak.periods === 0
+                  ? t("checkIn.streak.none")
+                  : streak.periods === 1
+                    ? t("checkIn.streak.one")
+                    : t("checkIn.streak.other", { count: streak.periods })}
             </p>
           </div>
           <Chip tone={due.length === 0 ? "ok" : "brand"}>
@@ -138,7 +199,7 @@ export default async function CheckInPage({
                                         }),
                                 })
                               : t("checkIn.dueOn", {
-                                  date: String(goal.nextCheckInOn),
+                                  date: dueOn(goal, locale),
                                 }),
                           health: healthWord(t, goal.health),
                         },
@@ -163,6 +224,38 @@ export default async function CheckInPage({
             })}
           </CardBody>
         ) : null}
+        {later.length > 0 ? (
+          <CardBody className="border-t border-line p-2">
+            <section
+              aria-labelledby="check-in-update-any-time"
+              className="flex flex-col gap-1"
+            >
+              <h2
+                id="check-in-update-any-time"
+                className="px-2.5 pt-1 text-xs font-semibold text-ink-2"
+              >
+                {t("checkIn.updateAnyTime")}
+              </h2>
+              {later.map((goal) => (
+                <a
+                  key={goal.id}
+                  href={`/check-in?goal=${goal.id}`}
+                  aria-current={goal.id === requested ? "step" : undefined}
+                  className={
+                    goal.id === requested
+                      ? "flex flex-col gap-0.5 rounded-md border border-brand-line bg-brand-weak p-2.5"
+                      : "flex flex-col gap-0.5 rounded-md border border-transparent p-2.5 hover:bg-raised"
+                  }
+                >
+                  <span className="text-sm text-ink">{goal.title}</span>
+                  <span className="text-xs text-ink-3">
+                    {t("checkIn.dueOn", { date: dueOn(goal, locale) })}
+                  </span>
+                </a>
+              ))}
+            </section>
+          </CardBody>
+        ) : null}
       </Card>
 
       {requested ? (
@@ -171,7 +264,9 @@ export default async function CheckInPage({
           goalId={requested}
           canEdit={canEdit}
           nextGoalId={nextGoalId}
-          stillDue={stillDue}
+          stillDue={stillDue || updating}
+          updating={updating}
+          updatable={updatable && !updating}
         />
       ) : due.length > 0 ? (
         <Card>
@@ -202,6 +297,8 @@ async function CheckInForGoal({
   canEdit,
   nextGoalId,
   stillDue,
+  updating,
+  updatable,
 }: {
   readonly context: {
     pool: ReturnType<typeof getPool>;
@@ -213,8 +310,12 @@ async function CheckInForGoal({
   readonly nextGoalId: string | null;
   /** False once this goal's cadence has moved past today, which publishing does. */
   readonly stillDue: boolean;
+  /** An extra update the reader asked to post on a goal not due yet. */
+  readonly updating: boolean;
+  /** The reader's own goal, not due yet, so an update can be offered. */
+  readonly updatable: boolean;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const goal = await callAction(context, "goals.read", { id: goalId });
   const timeline = await callAction(context, "goals.checkIns", {
@@ -247,6 +348,17 @@ async function CheckInForGoal({
     "confidence.display"
   ];
 
+  // The people a blocker can be given to (H11): members only, because an
+  // agent or an unclaimed placeholder cannot clear one (H-09).
+  const owners =
+    canEdit && (draft || updatable)
+      ? (await callAction(context, "people.directory", {}))
+          .filter(
+            (member) => member.kind === "human" || member.kind === "guest",
+          )
+          .map((member) => ({ id: member.id, label: member.name }))
+      : [];
+
   const votes: VoteState[] = [];
   for (const keyResult of goal.keyResults) {
     const state = await callAction(context, "goals.readVotes", {
@@ -265,7 +377,9 @@ async function CheckInForGoal({
           thresholds={thresholds}
           display={display}
           keyResults={goal.keyResults}
-          nextGoalId={nextGoalId}
+          nextGoalId={updating ? null : nextGoalId}
+          update={updating}
+          goalId={goal.id}
         />
       ) : (
         <Card>
@@ -279,10 +393,22 @@ async function CheckInForGoal({
             <p className="text-sm text-ink-3">
               {dueHere
                 ? t("checkIn.youCanReadNotPost")
-                : goal.nextCheckInOn
-                  ? t("checkIn.notDueNextOn", { date: goal.nextCheckInOn })
-                  : t("checkIn.notDueNotScheduled")}
+                : updatable && goal.nextCheckInOn
+                  ? t("checkIn.notDueYetUpdate", { date: dueOn(goal, locale) })
+                  : goal.nextCheckInOn
+                    ? t("checkIn.notDueNextOn", { date: dueOn(goal, locale) })
+                    : t("checkIn.notDueNotScheduled")}
             </p>
+            {updatable && canEdit && !dueHere ? (
+              <p>
+                <a
+                  className="inline-flex rounded-md border border-brand-line px-2.5 py-1 text-xs font-semibold text-brand-text hover:bg-brand-weak"
+                  href={`/check-in?goal=${goal.id}&update=1`}
+                >
+                  {t("checkIn.postAnUpdate")}
+                </a>
+              </p>
+            ) : null}
             {nextGoalId ? (
               <p className="text-xs text-ink-3">
                 <a className="underline" href={`/check-in?goal=${nextGoalId}`}>
@@ -293,6 +419,16 @@ async function CheckInForGoal({
           </CardBody>
         </Card>
       )}
+
+      {owners.length > 0 ? (
+        <RaiseBlocker
+          keyResults={goal.keyResults.map((keyResult) => ({
+            id: keyResult.id,
+            label: keyResult.title,
+          }))}
+          owners={owners}
+        />
+      ) : null}
 
       <Votes votes={votes} canReveal={canEdit} display={display} />
 

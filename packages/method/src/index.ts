@@ -364,6 +364,7 @@ export {
   isHoliday,
   isHolidayPeriod,
   lastWorkingDayOfPeriod,
+  memberStreak,
   nextPeriodStart,
   periodEndOf,
   periodStartOf,
@@ -438,6 +439,7 @@ export {
   trigger,
 } from "./triggers.ts";
 export {
+  alignmentMapped,
   type CycleWorkflowInput,
   canPublish,
   type FrameSnapshot,

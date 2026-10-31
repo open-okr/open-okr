@@ -76,6 +76,11 @@ export interface Obligation {
     // is a plain array, and the handler hands this straight to it.
     readonly preview: ProposalPreviewLine[];
   } | null;
+  /** An acknowledgement's check-in, as status and a line of its narrative. */
+  readonly preview?: {
+    readonly status: string | null;
+    readonly excerpt: string;
+  };
 }
 
 /**

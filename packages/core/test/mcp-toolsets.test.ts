@@ -175,7 +175,7 @@ describe("what a connection is offered", () => {
     const offered = offeredTools(MCP_TOOLS, FULL, chosen(null)).map(
       (tool) => tool.name,
     );
-    expect(offered).toHaveLength(61);
+    expect(offered).toHaveLength(62);
     expect(offered).toEqual(expect.arrayContaining(["search", "fetch"]));
   });
 

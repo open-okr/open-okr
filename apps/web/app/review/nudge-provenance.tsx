@@ -125,11 +125,13 @@ export function NudgeProvenance({
             </p>
           ) : (
             <p className="text-xs text-ink-3">
-              {t("common.sent3", {
-                sentAt: nudge.sentAt
-                  ? new Date(nudge.sentAt).toLocaleString()
-                  : "",
-              })}
+              {/* Recorded and not yet delivered has no sent time, and "Sent ."
+                  read as a broken page (OKRGoal UX review, T9). */}
+              {nudge.sentAt
+                ? t("common.sent3", {
+                    sentAt: new Date(nudge.sentAt).toLocaleString(),
+                  })
+                : t("review.nudgeProvenance.notSentYet")}
             </p>
           )}
 

@@ -9461,10 +9461,25 @@
             "default": 2,
             "type": "integer",
             "minimum": 0,
-            "maximum": 30,
+            "maximum": 366,
             "description": "Days ahead to count as due. 0 is due today or overdue only."
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "goals.myStreak",
+      "description": "The reader's own check-in streak, and the goal pausing it where one reads on track while a key result has not moved.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {

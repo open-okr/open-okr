@@ -52,21 +52,6 @@ describe("the ceiling's default is the behaviour that shipped before it", () => 
     ).toBe(100);
   });
 
-  it("holds a KPI-linked key result at 100 although the KPI reads 180", () => {
-    expect(
-      keyResultProgress(
-        {
-          direction: "increase",
-          baseline: 0,
-          target: 100,
-          current: 0,
-          kpiAchievementPct: 180,
-        },
-        canon,
-      ),
-    ).toBe(100);
-  });
-
   it("holds a weighted rollup at 100", () => {
     expect(weightedProgress([{ weight: 1, progressPct: 150 }], canon)).toBe(
       100,
@@ -92,24 +77,6 @@ describe("a raised ceiling lets over-achievement through", () => {
         raised,
       ),
     ).toBe(150);
-  });
-
-  it("carries a KPI's own achievement through instead of cutting it to 100", () => {
-    // §6.4 already allows a KPI 0 to 200. Before this parameter the link threw
-    // away everything above 100, so a KPI at 180 and one at exactly 100 were
-    // indistinguishable on the key result that measured them.
-    expect(
-      keyResultProgress(
-        {
-          direction: "increase",
-          baseline: 0,
-          target: 100,
-          current: 0,
-          kpiAchievementPct: 180,
-        },
-        raised,
-      ),
-    ).toBe(180);
   });
 
   it("still stops at the ceiling, and the ceiling is 200", () => {

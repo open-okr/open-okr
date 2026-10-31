@@ -202,13 +202,22 @@ export const weeklyCheckIns = (
       }
       values.push(...(run.extraValues?.(context, objective, week) ?? []));
       const on = run.publishedOn?.(objective, monday) ?? monday;
+      const goalId = need(context.ids.goals, objective.key, "Objective");
+      const authorMemberId = need(
+        context.ids.people,
+        run.authorOf?.(objective, week) ?? objective.authorKey,
+        "Author",
+      );
+      const acknowledged = await acknowledgedNextDay(
+        context,
+        goalId,
+        authorMemberId,
+        context.real(on),
+      );
       await callAction(context.action, "goals.importCheckIn", {
-        goalId: need(context.ids.goals, objective.key, "Objective"),
-        authorMemberId: need(
-          context.ids.people,
-          run.authorOf?.(objective, week) ?? objective.authorKey,
-          "Author",
-        ),
+        goalId,
+        authorMemberId,
+        ...acknowledged,
         status: reported.status,
         confidence: reported.confidence,
         narrative: narrative(run.said(objective, monday)),
@@ -223,6 +232,69 @@ export const weeklyCheckIns = (
   },
 });
 
+/** Each goal's reviewer, read once per goal for the whole year. */
+const reviewerOfGoal = new Map<string, string | null>();
+
+/**
+ * The reviewer's acknowledgement, the day after publication (OKRGoal UX
+ * review, backlog 5: "Seed the demo with a healthy team").
+ *
+ * The demo greeted a visitor with 241 acknowledgements, some 267 days old,
+ * because the year imported every check-in and nobody ever read one. A
+ * healthy team's reviewer reads them the next day, so every check-in is
+ * acknowledged a day after it was published, except one published yesterday
+ * or today, which is still waiting, as it would be. A goal with no reviewer,
+ * or one its own author reviews, owes nobody.
+ */
+async function acknowledgedNextDay(
+  context: YearContext,
+  goalId: string,
+  authorMemberId: string,
+  publishedOn: string,
+): Promise<{ acknowledgedById?: string; acknowledgedAt?: string }> {
+  if (!reviewerOfGoal.has(goalId)) {
+    const goal = await callAction(context.action, "goals.read", { id: goalId });
+    reviewerOfGoal.set(goalId, goal.reviewer?.id ?? null);
+  }
+  const reviewerId = reviewerOfGoal.get(goalId) ?? null;
+  const next = new Date(`${publishedOn}T00:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  const nextDay = next.toISOString().slice(0, 10);
+  if (
+    !reviewerId ||
+    reviewerId === authorMemberId ||
+    nextDay >= context.today
+  ) {
+    return {};
+  }
+  return {
+    acknowledgedById: reviewerId,
+    acknowledgedAt: `${nextDay}T09:00:00.000Z`,
+  };
+}
+
+/**
+ * An imported check-in with its next-day acknowledgement added, for the
+ * year's other imports: the pilot, the milestones and the annual values.
+ */
+export async function reviewedNextDay<
+  T extends {
+    readonly goalId: string;
+    readonly authorMemberId: string;
+    readonly publishedAt: string;
+  },
+>(context: YearContext, input: T): Promise<T> {
+  return {
+    ...input,
+    ...(await acknowledgedNextDay(
+      context,
+      input.goalId,
+      input.authorMemberId,
+      input.publishedAt.slice(0, 10),
+    )),
+  };
+}
+
 /** A milestone ticked done on its own day, in a check-in of its own. */
 export const milestoneDone = (
   step: string,
@@ -236,21 +308,29 @@ export const milestoneDone = (
   step,
   label: `${keyResultKey} done`,
   async run(context) {
-    await callAction(context.action, "goals.importCheckIn", {
-      goalId: need(context.ids.goals, objectiveKey, "Objective"),
-      authorMemberId: need(context.ids.people, authorKey, "Author"),
-      status: "on_track",
-      confidence: 0.9,
-      narrative: narrative(text),
-      values: [
-        {
-          keyResultId: need(context.ids.keyResults, keyResultKey, "Key result"),
-          done: true,
-        },
-      ],
-      publishedAt: `${context.real(doneOn)}T15:00:00.000Z`,
-      legacy: { type: "csv", id: `northwind-year:${keyResultKey}:done` },
-    });
+    await callAction(
+      context.action,
+      "goals.importCheckIn",
+      await reviewedNextDay(context, {
+        goalId: need(context.ids.goals, objectiveKey, "Objective"),
+        authorMemberId: need(context.ids.people, authorKey, "Author"),
+        status: "on_track",
+        confidence: 0.9,
+        narrative: narrative(text),
+        values: [
+          {
+            keyResultId: need(
+              context.ids.keyResults,
+              keyResultKey,
+              "Key result",
+            ),
+            done: true,
+          },
+        ],
+        publishedAt: `${context.real(doneOn)}T15:00:00.000Z`,
+        legacy: { type: "csv", id: `northwind-year:${keyResultKey}:done` },
+      }),
+    );
   },
 });
 

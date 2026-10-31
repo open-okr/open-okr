@@ -70,10 +70,12 @@ otherwise, because there is no width to scale by.
 Equal baseline and target score 0 for every direction except `maintain`, where
 they describe a band of one point.
 
-A key result with `kpi_id` set ignores all four formulas and takes the KPI's
-real `achievement_pct`, clamped to 0 and to the progress ceiling (decision D-4).
-At the default ceiling a KPI at 130% of target gives the key result 100%. With
-the ceiling raised to 200 it gives 130, and the second clamp stops discarding
+A key result with `kpi_id` set uses the same formulas. Its current value is the
+KPI's latest reading, and it progresses from its own baseline to its own target
+(decision D-4, revised on 30 October 2026). Until then it took the KPI's real
+`achievement_pct`, which ignored the key result's baseline and target. That
+earlier rule read, at the default ceiling, a KPI at 130% of target as 100%; with
+the ceiling raised to 200 it read 130, and the second clamp stopped discarding
 what §6.4 measured: before P8-G03 a KPI at 180 and one at exactly 100 were
 indistinguishable on the key result that linked to them.
 
@@ -112,15 +114,22 @@ indistinguishable on the key result that linked to them.
 | move downward at target | move | 9 | 5 | 5 | 100 |
 | move downward past baseline clamps | move | 9 | 5 | 10 | 0 |
 
+A key result that reads a KPI takes the KPI's latest reading as its current
+value and progresses from its own baseline to its own target (decision D-4,
+revised on 30 October 2026 after the OKRGoal UX review). The KPI's achievement
+against the KPI's own target is not read: "from 31% to 35%" at a reading of 31
+is 0%, not 89%.
+
 <!-- golden: scoring.kr-progress-kpi -->
 
-| case | achievement_pct | expected_pct |
-|---|---|---|
-| kpi-backed below target | 82 | 82 |
-| kpi-backed at target | 100 | 100 |
-| kpi-backed over target clamps | 130 | 100 |
-| kpi-backed at zero | 0 | 0 |
-| kpi-backed with no achievement yet | | 0 |
+| case | direction | baseline | target | kpi_reading | expected_pct |
+|---|---|---|---|---|---|
+| kpi-backed at its baseline | increase | 31 | 35 | 31 | 0 |
+| kpi-backed halfway | increase | 31 | 35 | 33 | 50 |
+| kpi-backed at target | increase | 158 | 200 | 200 | 100 |
+| kpi-backed over target clamps | increase | 158 | 200 | 230 | 100 |
+| kpi-backed reduce, halfway | reduce | 110 | 95 | 102.5 | 50 |
+| kpi-backed below its baseline | increase | 101 | 104 | 99 | 0 |
 
 ## 3. Goal progress and the upward cascade
 

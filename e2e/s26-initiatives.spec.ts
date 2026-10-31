@@ -75,7 +75,13 @@ test("sign in", async () => {
 
 test("the sidebar reaches it, and it says what it is for when empty", async () => {
   await goTo(page, "/");
-  await page.getByRole("link", { name: "Initiatives" }).first().click();
+  // "Work" since the five areas (navigation-five-areas.md), which opens
+  // Initiatives with the Board as its second tab.
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Work", exact: true })
+    .first()
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Initiatives" }),

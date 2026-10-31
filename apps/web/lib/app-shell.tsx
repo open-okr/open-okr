@@ -22,7 +22,7 @@ import {
   TopbarSearch,
   UnsavedChangesProvider,
 } from "@openokr/ui";
-import { Ellipsis, Settings } from "lucide-react";
+import { Ellipsis } from "lucide-react";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -40,6 +40,7 @@ import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
+import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks, navLabel } from "./nav-groups.ts";
@@ -177,13 +178,39 @@ export async function AppShellLayout({
   const insideItems = navigationFor("inside", level);
   const accountItems = sidebarItems.filter((item) => item.group === "account");
 
-  const { t } = await getTranslations();
-  const strip = await loadCycleStrip(
-    workspace.workspaceId,
-    session.user.id,
-    level,
-    t,
+  // Cycle and the phase strip are for the people who run the cycle
+  // (navigation-five-areas.md, OKRGoal UX review N3). Read from the spaces
+  // list the reader already gets, so nothing new is asked of the database.
+  const spaceRoles = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "spaces.list",
+    {},
+  )
+    .then((spaces) => spaces.map((space) => space.ownRole))
+    .catch((error: unknown) => {
+      if (error instanceof OperationError) {
+        return [];
+      }
+      throw error;
+    });
+  const runsCycle = seesCycle({
+    administers: adminItems.length > 0,
+    spaceRoles,
+  });
+  // The rows the sidebar draws: the five areas, and Cycle for those who run
+  // it. The account rows live in the avatar menu, as the review asked.
+  const drawnItems = sidebarItems.filter(
+    (item) => item.group !== "account" && (item.id !== "cycle" || runsCycle),
   );
+
+  const { t } = await getTranslations();
+  const strip = runsCycle
+    ? await loadCycleStrip(workspace.workspaceId, session.user.id, level, t)
+    : null;
   const reviewBadge = await loadReviewBadge(
     workspace.workspaceId,
     session.user.id,
@@ -222,7 +249,13 @@ export async function AppShellLayout({
   // §3's separated blocks rather than one flat column. The split is the
   // registry's `group` field, read through `navBlocks` so the ordering and the
   // headings are testable without rendering a server component.
-  const groups: SidebarGroup[] = navBlocks(sidebarItems, renamed).map(
+  // Updates carries one badge: what is owed plus what is unread
+  // (navigation-five-areas.md).
+  const updatesBadge =
+    reviewBadge === null && inboxBadge === null
+      ? null
+      : (reviewBadge ?? 0) + (inboxBadge ?? 0);
+  const groups: SidebarGroup[] = navBlocks(drawnItems, renamed).map(
     (block) => ({
       id: block.id,
       ...(block.label === undefined ? {} : { label: block.label }),
@@ -235,11 +268,8 @@ export async function AppShellLayout({
         // Two badges in the primary block since P6-G07a. Named per item rather
         // than looked up in a map, because each one comes from a different read
         // and a map would hide which.
-        ...(item.id === "review" && reviewBadge !== null
-          ? { badge: reviewBadge }
-          : {}),
-        ...(item.id === "inbox" && inboxBadge !== null
-          ? { badge: inboxBadge }
+        ...(item.id === "review" && updatesBadge !== null
+          ? { badge: updatesBadge }
           : {}),
       })),
     }),
@@ -275,7 +305,7 @@ export async function AppShellLayout({
       })),
   ];
 
-  const tabItems = sidebarItems.slice(0, 4).map((item) => ({
+  const tabItems = drawnItems.slice(0, 4).map((item) => ({
     id: item.id,
     label: navLabel(item, renamed),
     href: item.href,
@@ -283,20 +313,14 @@ export async function AppShellLayout({
     active: item.id === active,
   }));
   const tabIds = new Set(tabItems.map((item) => item.id));
-  if (adminItems.length > 0) {
-    groups.push({
-      id: "admin",
-      items: [
-        {
-          id: "admin",
-          label: "Admin",
-          href: "/admin",
-          icon: <Settings className="size-full" />,
-          active: active === "admin",
-        },
-      ],
-    });
-  }
+  // Admin is in the avatar menu since the five areas, beside the account
+  // rows, for those who reach it.
+  const avatarItems = [
+    ...accountItems.map((item) => ({ href: item.href, label: item.label })),
+    ...(adminItems.length > 0
+      ? [{ href: "/admin", label: t("shell.avatar.workspaceAdmin") }]
+      : []),
+  ];
 
   return (
     <KeyboardRegistryProvider>
@@ -363,10 +387,7 @@ export async function AppShellLayout({
                   // the page and the menu were two places to remember, and only
                   // one of them ever got opened. reachability.test.ts asserts
                   // the two agree.
-                  items={accountItems.map((item) => ({
-                    href: item.href,
-                    label: item.label,
-                  }))}
+                  items={avatarItems}
                   appearance={<AppearanceControl compact />}
                   signOut={<SignOut />}
                 />

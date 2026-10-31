@@ -406,18 +406,34 @@ describe("§8.6's rhythm, measured (P9-T20d)", () => {
     ).toEqual({ due: 12, onTime: 0, share: 0 });
   });
 
-  it("counts a check-in early for its own due date, as the engine does", () => {
+  it("counts a check-in early for its own due date within tolerance, as the engine does", () => {
     expect(
       onTimeShare(
         [
           {
             dueOn: ["2026-10-05", "2026-10-12"],
-            publishedOn: ["2026-10-01", "2026-10-09"],
+            publishedOn: ["2026-10-04", "2026-10-11"],
           },
         ],
         1,
       ).onTime,
     ).toBe(2);
+  });
+
+  it("does not let an update days ahead of the due date answer it, as the engine does", () => {
+    // A Wednesday post after Monday's check-in is an extra update (OKRGoal UX
+    // review, H1): the engine keeps the next Monday owed, so the share does too.
+    expect(
+      onTimeShare(
+        [
+          {
+            dueOn: ["2026-10-05", "2026-10-12"],
+            publishedOn: ["2026-10-05", "2026-10-07"],
+          },
+        ],
+        1,
+      ),
+    ).toEqual({ due: 2, onTime: 1, share: 0.5 });
   });
 
   it("leaves the periods nothing answered as missed, and answers the check-in's own", () => {

@@ -1,6 +1,7 @@
 import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { phaseProgress } from "../../lib/phase-progress.ts";
 import { getTranslations } from "../../lib/translations";
 import { phaseHref } from "./cycle-href.ts";
 
@@ -83,8 +84,7 @@ export async function PhaseRail({
 }) {
   const { t } = await getTranslations();
 
-  const applicable = phases.filter((entry) => entry.state !== "not_applicable");
-  const done = applicable.filter((entry) => entry.state === "pass").length;
+  const progress = phaseProgress(t, phases);
 
   return (
     <Card>
@@ -92,9 +92,7 @@ export async function PhaseRail({
         <h2 className="text-sm font-bold text-ink">
           {t("cycle.phaseRail.theCycle")}
         </h2>
-        <Chip tone={done === applicable.length ? "ok" : "brand"}>
-          {t("common.ofDone", { done, length: applicable.length })}
-        </Chip>
+        <Chip tone={progress.complete ? "ok" : "brand"}>{progress.text}</Chip>
       </CardHeader>
       <CardBody className="flex flex-col gap-1 p-2">
         {phases.map((entry) => {

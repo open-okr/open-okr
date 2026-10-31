@@ -85,7 +85,17 @@ test("the sidebar reaches the board, and it says so when empty", async () => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible({ timeout: 15_000 });
-  await page.getByRole("link", { name: "Board" }).first().click();
+  // The Board is a tab of Work since the five areas
+  // (navigation-five-areas.md): the sidebar's Work row, then the tab.
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Work", exact: true })
+    .first()
+    .click();
+  await page
+    .getByRole("navigation", { name: "Work" })
+    .getByRole("link", { name: "Board" })
+    .click();
 
   await expect(
     page.getByRole("heading", { level: 1, name: "Board" }),

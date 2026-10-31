@@ -114,17 +114,26 @@ export function KeyResultUpdate({
           target={keyResult.targetValue}
           inputClassName="h-auto w-32 px-1.5 py-0.5 text-xs"
         />
-        <ConfidenceInput
-          label={t("goals.detail.confidenceFor", {
-            title: keyResult.title,
-          })}
-          hideLabel
-          value={confidence}
-          onValueChange={setConfidence}
-          display={display}
-          thresholds={thresholds}
-          inputClassName="h-auto px-1.5 py-0.5 text-xs"
-        />
+        {/* Named on screen, apart from the value: "101 $ ... in 10" beside
+            each other read as one number (OKRGoal UX review, N7). The input
+            keeps its own label for a screen reader, so this word is hidden
+            from one. */}
+        <span className="flex items-center gap-1 border-l border-line pl-1.5">
+          <span aria-hidden className="text-xs text-ink-3">
+            {t("common.confidence")}
+          </span>
+          <ConfidenceInput
+            label={t("goals.detail.confidenceFor", {
+              title: keyResult.title,
+            })}
+            hideLabel
+            value={confidence}
+            onValueChange={setConfidence}
+            display={display}
+            thresholds={thresholds}
+            inputClassName="h-auto px-1.5 py-0.5 text-xs"
+          />
+        </span>
         <Button type="submit" size="sm" disabled={saving}>
           {t("common.save")}
         </Button>

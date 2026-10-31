@@ -14,15 +14,17 @@
  */
 import {
   activeOnly,
+  alignmentFindings,
   CHECK_IN_STATUSES,
   checkInSnapshots,
   checkIns,
   checkInVotes,
+  goals,
   keyResults,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { standInFor } from "@openokr/method";
+import { memberStreak, standInFor } from "@openokr/method";
 import { and, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -695,6 +697,11 @@ export const acknowledgeCheckIn = defineWriteAction({
           subjectType: "goal",
           subjectId: goalId,
           payload: { repeat: false, settledEarlier: settled.length },
+          // The goal's watchers hear it, the champion first among them: the
+          // acknowledgement is the reviewer's reaction, and it was silent for
+          // the person it reacts to (OKRGoal UX review, H9). A repeat press
+          // above changes nothing and tells nobody.
+          notify: true,
         },
         audit: {
           action: "goals.acknowledgeCheckIn",
@@ -1280,4 +1287,106 @@ export const importCheckIn = defineWriteAction({
       };
     },
   }),
+});
+
+/**
+ * The reader's own check-in streak (METHOD.md §7.4, OKRGoal UX review H7).
+ *
+ * The periods in a row in which they posted a check-in on a goal they
+ * champion, at the workspace's frequency, read from the check-ins themselves
+ * rather than stored, so it needs no table and cannot drift from them.
+ *
+ * **Paused, not counted, while one of their goals reads on track with a key
+ * result flat past the divergence window.** A streak kept by re-entering the
+ * same number is the fake update the review warned about, and the open
+ * divergence finding is the deterministic check that already says so. The
+ * goal is named so the reader knows what would restart it.
+ */
+export const readMyStreak = defineReadAction({
+  name: "goals.myStreak",
+  summary:
+    "The reader's own check-in streak, and the goal pausing it where one reads on track while a key result has not moved.",
+  input: z.object({}),
+  output: z.object({
+    periods: z.number().int(),
+    frequency: z.string(),
+    pausedBy: z.object({ goalId: z.uuid(), title: z.string() }).nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const timeZone = await workspaceTimeZone(tx, context.workspaceId);
+        const frequency = resolveRhythm(
+          await readRhythmRow(tx, context.workspaceId),
+        ).thresholds["cadence.checkInFrequency"];
+
+        const posted = await tx
+          .select({ publishedAt: checkIns.publishedAt })
+          .from(checkIns)
+          .innerJoin(goals, eq(goals.id, checkIns.subjectId))
+          .where(
+            and(
+              activeOnly(
+                checkIns,
+                eq(checkIns.workspaceId, context.workspaceId),
+                eq(checkIns.authorMemberId, memberId),
+                eq(checkIns.state, "published"),
+              ),
+              eq(goals.championId, memberId),
+              isNull(goals.deletedAt),
+            ),
+          );
+        const days = posted.flatMap((row) =>
+          row.publishedAt
+            ? [
+                formatLocalDate(
+                  localDateIn(new Date(row.publishedAt), timeZone),
+                ),
+              ]
+            : [],
+        );
+        const periods = memberStreak(
+          days,
+          formatLocalDate(localDateIn(new Date(), timeZone)),
+          frequency,
+        );
+
+        const [stalled] = await tx
+          .select({ goalId: goals.id, title: goals.title })
+          .from(alignmentFindings)
+          .innerJoin(goals, eq(goals.id, alignmentFindings.subjectGoalId))
+          .where(
+            and(
+              activeOnly(
+                alignmentFindings,
+                eq(alignmentFindings.workspaceId, context.workspaceId),
+                eq(alignmentFindings.ruleKey, "quality.divergence"),
+                eq(alignmentFindings.state, "open"),
+              ),
+              sql`${alignmentFindings.subjectKeyResultId} is not null`,
+              eq(goals.championId, memberId),
+              isNull(goals.deletedAt),
+              isNull(goals.closedAt),
+            ),
+          )
+          .limit(1);
+
+        return {
+          periods,
+          frequency,
+          pausedBy: stalled ?? null,
+        };
+      },
+    );
+  },
 });

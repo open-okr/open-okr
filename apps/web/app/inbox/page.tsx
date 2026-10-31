@@ -3,6 +3,7 @@ import { trigger } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access.ts";
+import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
 import { getTranslations } from "../../lib/translations";
@@ -147,126 +148,129 @@ export default async function InboxPage({
   const unread = rows.filter((row) => row.readAt === null).length;
 
   return (
-    <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("inbox.whatHappened")}
-            </h1>
-            <p className="text-xs text-ink-3">{t("inbox.groupedByWhatIt")}</p>
-            <InboxLive />
-          </div>
-          <div className="flex flex-none items-center gap-3.5">
-            <div className="flex flex-col items-end">
-              <span className="text-lg font-bold tabular-nums text-ink">
-                {unread}
-              </span>
-              <span className="text-xs text-ink-3">{t("inbox.unread")}</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardBody className="flex flex-wrap gap-1.5">
-          {FILTERS.map((one) => (
-            <Link
-              key={one.id || "all"}
-              href={one.id === "" ? "/inbox" : `/inbox?filter=${one.id}`}
-              className={
-                one.id === active
-                  ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                  : "rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-ink-3 hover:text-ink"
-              }
-            >
-              {one.labelKey ? t(one.labelKey) : one.id}
-            </Link>
-          ))}
-        </CardBody>
-      </Card>
-
-      {rows.length === 0 ? (
+    <>
+      <AreaTabs area="updates" current="/inbox" t={t} />
+      <div className="flex flex-col gap-4.5">
         <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">
-              {active === ""
-                ? t("inbox.nothingNew")
-                : t("inbox.nothingHereUnderThat")}
-            </p>
-            <p className="mt-1 text-xs text-ink-3">
-              {t("inbox.aRowAppearsWhen")}
-            </p>
+          <CardHeader className="justify-between">
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-lg font-bold text-ink">
+                {t("inbox.whatHappened")}
+              </h1>
+              <p className="text-xs text-ink-3">{t("inbox.groupedByWhatIt")}</p>
+              <InboxLive />
+            </div>
+            <div className="flex flex-none items-center gap-3.5">
+              <div className="flex flex-col items-end">
+                <span className="text-lg font-bold tabular-nums text-ink">
+                  {unread}
+                </span>
+                <span className="text-xs text-ink-3">{t("inbox.unread")}</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardBody className="flex flex-wrap gap-1.5">
+            {FILTERS.map((one) => (
+              <Link
+                key={one.id || "all"}
+                href={one.id === "" ? "/inbox" : `/inbox?filter=${one.id}`}
+                className={
+                  one.id === active
+                    ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
+                    : "rounded-full bg-raised px-2.5 py-1 text-xs font-semibold text-ink-3 hover:text-ink"
+                }
+              >
+                {one.labelKey ? t(one.labelKey) : one.id}
+              </Link>
+            ))}
           </CardBody>
         </Card>
-      ) : (
-        /* A named region around the groups, so the list is addressable
+
+        {rows.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-sm text-ink-2">
+                {active === ""
+                  ? t("inbox.nothingNew")
+                  : t("inbox.nothingHereUnderThat")}
+              </p>
+              <p className="mt-1 text-xs text-ink-3">
+                {t("inbox.aRowAppearsWhen")}
+              </p>
+            </CardBody>
+          </Card>
+        ) : (
+          /* A named region around the groups, so the list is addressable
            separately from the filter row above it. The filter chips carry
            the same words as the reason chips by design, which makes "is
            there a Joined row" unanswerable without this: the end-to-end
            spec asked exactly that and matched the filter link instead. A
            labelled region is the right answer for a screen reader too,
            which otherwise meets an unnamed run of sections. */
-        <section
-          aria-label={t("inbox.notifications")}
-          className="flex flex-col gap-4.5"
-        >
-          {[...groups.entries()].map(([key, held]) => {
-            const first = held[0];
-            if (!first) {
-              return null;
-            }
-            const href = subjectLink(first.subjectType, first.subjectId);
-            return (
-              <section key={key} className="flex flex-col gap-1.5">
-                <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-                  {href ? (
-                    <Link
-                      href={href}
-                      className="flex min-w-0 items-center gap-2 hover:text-ink hover:underline"
-                    >
-                      {heading(first.subjectType, first.subjectTitle)}
-                    </Link>
-                  ) : (
-                    <span className="flex min-w-0 items-center gap-2">
-                      {heading(first.subjectType, first.subjectTitle)}
-                    </span>
-                  )}
-                  <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
-                    {held.length}
-                  </span>
-                  {first.watching ? (
-                    <ActionForm action={mute}>
-                      <input
-                        type="hidden"
-                        name="subjectType"
-                        value={first.subjectType ?? ""}
-                      />
-                      <input
-                        type="hidden"
-                        name="subjectId"
-                        value={first.subjectId ?? ""}
-                      />
-                      <input type="hidden" name="subscribe" value="false" />
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 px-1.5 text-xs font-semibold normal-case"
+          <section
+            aria-label={t("inbox.notifications")}
+            className="flex flex-col gap-4.5"
+          >
+            {[...groups.entries()].map(([key, held]) => {
+              const first = held[0];
+              if (!first) {
+                return null;
+              }
+              const href = subjectLink(first.subjectType, first.subjectId);
+              return (
+                <section key={key} className="flex flex-col gap-1.5">
+                  <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
+                    {href ? (
+                      <Link
+                        href={href}
+                        className="flex min-w-0 items-center gap-2 hover:text-ink hover:underline"
                       >
-                        {t("inbox.mute")}
-                      </Button>
-                    </ActionForm>
-                  ) : null}
-                </h2>
-                <div className="flex flex-col gap-1.5">
-                  {held.map((row) => (
-                    <NotificationRow key={row.id} row={row} href={href} />
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </section>
-      )}
-    </div>
+                        {heading(first.subjectType, first.subjectTitle)}
+                      </Link>
+                    ) : (
+                      <span className="flex min-w-0 items-center gap-2">
+                        {heading(first.subjectType, first.subjectTitle)}
+                      </span>
+                    )}
+                    <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
+                      {held.length}
+                    </span>
+                    {first.watching ? (
+                      <ActionForm action={mute}>
+                        <input
+                          type="hidden"
+                          name="subjectType"
+                          value={first.subjectType ?? ""}
+                        />
+                        <input
+                          type="hidden"
+                          name="subjectId"
+                          value={first.subjectId ?? ""}
+                        />
+                        <input type="hidden" name="subscribe" value="false" />
+                        <Button
+                          type="submit"
+                          variant="ghost"
+                          size="sm"
+                          className="h-5 px-1.5 text-xs font-semibold normal-case"
+                        >
+                          {t("inbox.mute")}
+                        </Button>
+                      </ActionForm>
+                    ) : null}
+                  </h2>
+                  <div className="flex flex-col gap-1.5">
+                    {held.map((row) => (
+                      <NotificationRow key={row.id} row={row} href={href} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 

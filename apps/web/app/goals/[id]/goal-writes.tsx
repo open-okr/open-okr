@@ -4,7 +4,6 @@ import {
   Button,
   Card,
   CardBody,
-  CardHeader,
   EntityPicker,
   useTranslations,
 } from "@openokr/ui";
@@ -97,151 +96,162 @@ export function GoalWrites({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex min-w-0 flex-col">
-          <h2 className="text-sm font-bold text-ink">
-            {t("goal.writes.title")}
-          </h2>
-          <p className="text-xs text-ink-3">{t("goal.writes.explains")}</p>
-        </div>
-      </CardHeader>
-      <CardBody className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1 text-xs text-ink-3">
-          {t("goal.writes.moveLabel")}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <EntityPicker
-              label={t("goal.writes.moveTarget")}
-              hideLabel
-              value={target === "" ? null : target}
-              options={cycles.map(namedOption)}
-              disabled={pending}
-              onValueChange={(next) => setTarget(next ?? "")}
-              className="w-56"
-              inputClassName="text-xs"
-            />
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending || target === "" || target === currentCycleId}
-              data-testid="move-to-cycle"
-              onClick={() =>
-                run(() => moveGoalToCycle({ id: goalId, cycleId: target }))
-              }
-            >
-              {t("goal.writes.move")}
-            </Button>
-          </div>
-          <span className="text-ink-4">{t("goal.writes.moveHelp")}</span>
-        </div>
-
-        {unlinkedKeyResults.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-ink-3">
-              {t("goal.writes.linkLabel")}
+      {/* Closed until asked for: the goal page is read every week, and moving,
+          linking or deleting a goal happens once (OKRGoal UX review, N6). */}
+      <details className="group">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-3.5 py-3 group-open:border-b group-open:border-line">
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="text-sm font-bold text-ink">
+              {t("goal.writes.title")}
             </span>
-            {kpis === null ? (
-              <span role="status" className="text-xs text-warn">
-                {t("goal.writes.kpisUnavailable")}
+            <span className="text-xs text-ink-3">
+              {t("goal.writes.explains")}
+            </span>
+          </span>
+          <span aria-hidden className="text-xs text-ink-3 group-open:rotate-90">
+            ›
+          </span>
+        </summary>
+        <CardBody className="flex flex-col gap-3.5">
+          <div className="flex flex-col gap-1 text-xs text-ink-3">
+            {t("goal.writes.moveLabel")}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <EntityPicker
+                label={t("goal.writes.moveTarget")}
+                hideLabel
+                value={target === "" ? null : target}
+                options={cycles.map(namedOption)}
+                disabled={pending}
+                onValueChange={(next) => setTarget(next ?? "")}
+                className="w-56"
+                inputClassName="text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending || target === "" || target === currentCycleId}
+                data-testid="move-to-cycle"
+                onClick={() =>
+                  run(() => moveGoalToCycle({ id: goalId, cycleId: target }))
+                }
+              >
+                {t("goal.writes.move")}
+              </Button>
+            </div>
+            <span className="text-ink-4">{t("goal.writes.moveHelp")}</span>
+          </div>
+
+          {unlinkedKeyResults.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-ink-3">
+                {t("goal.writes.linkLabel")}
               </span>
-            ) : kpis.length === 0 ? (
-              <span className="text-xs text-ink-4">
-                {t("goal.writes.noKpisYet")}{" "}
-                <a className="underline" href="/kpis">
-                  {t("goal.writes.addAKpi")}
-                </a>
+              {kpis === null ? (
+                <span role="status" className="text-xs text-warn">
+                  {t("goal.writes.kpisUnavailable")}
+                </span>
+              ) : kpis.length === 0 ? (
+                <span className="text-xs text-ink-4">
+                  {t("goal.writes.noKpisYet")}{" "}
+                  <a className="underline" href="/kpis">
+                    {t("goal.writes.addAKpi")}
+                  </a>
+                </span>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <EntityPicker
+                      label={t("goal.writes.linkKeyResult")}
+                      hideLabel
+                      value={linking === "" ? null : linking}
+                      options={unlinkedKeyResults.map((keyResult) => ({
+                        id: keyResult.id,
+                        label: keyResult.title,
+                      }))}
+                      disabled={pending}
+                      onValueChange={(next) => setPickedKeyResult(next ?? "")}
+                      className="w-64"
+                      inputClassName="text-xs"
+                    />
+                    <EntityPicker
+                      label={t("goal.writes.linkKpi")}
+                      hideLabel
+                      value={kpiId === "" ? null : kpiId}
+                      options={kpis.map((kpi) => ({
+                        id: kpi.id,
+                        label: kpi.title,
+                        detail: kpi.unit
+                          ? `${kpi.shortId} · ${kpi.unit}`
+                          : kpi.shortId,
+                      }))}
+                      disabled={pending}
+                      onValueChange={(next) => setPickedKpi(next ?? "")}
+                      className="w-64"
+                      inputClassName="text-xs"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={pending || linking === "" || kpiId === ""}
+                      data-testid="link-kpi"
+                      onClick={() =>
+                        run(() => linkKeyResultKpi({ id: linking, kpiId }))
+                      }
+                    >
+                      {t("goal.writes.link")}
+                    </Button>
+                  </div>
+                  <span className="text-xs text-ink-4">
+                    {t("goal.writes.linkHelp")}
+                  </span>
+                </>
+              )}
+            </div>
+          ) : null}
+
+          {linkedKeyResults.length > 0 ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-ink-3">
+                {t("goal.writes.unlinkLabel")}
               </span>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <EntityPicker
-                    label={t("goal.writes.linkKeyResult")}
-                    hideLabel
-                    value={linking === "" ? null : linking}
-                    options={unlinkedKeyResults.map((keyResult) => ({
-                      id: keyResult.id,
-                      label: keyResult.title,
-                    }))}
-                    disabled={pending}
-                    onValueChange={(next) => setPickedKeyResult(next ?? "")}
-                    className="w-64"
-                    inputClassName="text-xs"
-                  />
-                  <EntityPicker
-                    label={t("goal.writes.linkKpi")}
-                    hideLabel
-                    value={kpiId === "" ? null : kpiId}
-                    options={kpis.map((kpi) => ({
-                      id: kpi.id,
-                      label: kpi.title,
-                      detail: kpi.unit
-                        ? `${kpi.shortId} · ${kpi.unit}`
-                        : kpi.shortId,
-                    }))}
-                    disabled={pending}
-                    onValueChange={(next) => setPickedKpi(next ?? "")}
-                    className="w-64"
-                    inputClassName="text-xs"
-                  />
+              {linkedKeyResults.map((keyResult) => (
+                <div
+                  key={keyResult.id}
+                  className="flex flex-wrap items-center justify-between gap-2.5"
+                >
+                  <span className="min-w-0 text-xs text-ink-2">
+                    {keyResult.title}
+                  </span>
                   <Button
                     type="button"
                     size="sm"
-                    disabled={pending || linking === "" || kpiId === ""}
-                    data-testid="link-kpi"
+                    disabled={pending}
+                    data-testid={`unlink-kpi-${keyResult.id}`}
                     onClick={() =>
-                      run(() => linkKeyResultKpi({ id: linking, kpiId }))
+                      run(() => unlinkKeyResultKpi({ id: keyResult.id }))
                     }
                   >
-                    {t("goal.writes.link")}
+                    {t("common.unlink")}
                   </Button>
                 </div>
-                <span className="text-xs text-ink-4">
-                  {t("goal.writes.linkHelp")}
-                </span>
-              </>
-            )}
-          </div>
-        ) : null}
+              ))}
+              <span className="text-xs text-ink-4">
+                {t("common.unlinkHelp")}
+              </span>
+            </div>
+          ) : null}
 
-        {linkedKeyResults.length > 0 ? (
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs text-ink-3">
-              {t("goal.writes.unlinkLabel")}
+          {canAdminister ? (
+            <DeleteControl subject="goal" id={goalId} returnTo="/goals" />
+          ) : null}
+
+          {problem ? (
+            <span role="alert" className="text-xs text-bad">
+              {problem}
             </span>
-            {linkedKeyResults.map((keyResult) => (
-              <div
-                key={keyResult.id}
-                className="flex flex-wrap items-center justify-between gap-2.5"
-              >
-                <span className="min-w-0 text-xs text-ink-2">
-                  {keyResult.title}
-                </span>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={pending}
-                  data-testid={`unlink-kpi-${keyResult.id}`}
-                  onClick={() =>
-                    run(() => unlinkKeyResultKpi({ id: keyResult.id }))
-                  }
-                >
-                  {t("common.unlink")}
-                </Button>
-              </div>
-            ))}
-            <span className="text-xs text-ink-4">{t("common.unlinkHelp")}</span>
-          </div>
-        ) : null}
-
-        {canAdminister ? (
-          <DeleteControl subject="goal" id={goalId} returnTo="/goals" />
-        ) : null}
-
-        {problem ? (
-          <span role="alert" className="text-xs text-bad">
-            {problem}
-          </span>
-        ) : null}
-      </CardBody>
+          ) : null}
+        </CardBody>
+      </details>
     </Card>
   );
 }

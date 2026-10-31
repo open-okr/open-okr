@@ -599,3 +599,46 @@ describe("the whole inbox", () => {
     expect(owed.counts.total).toBe(owed.obligations.length);
   });
 });
+
+describe("an acknowledgement nobody gave in time (OKRGoal UX review, H4)", () => {
+  it("lapses from the inbox and the ladder once the window has passed", async () => {
+    // The demo greeted a reviewer with 241 overdue items, some 267 days old.
+    // Fourteen days on, a check-in nobody acknowledged is history, not a debt:
+    // it leaves Review and the ladder stops asking, and it is not recorded as
+    // acknowledged, because nobody did.
+    const wb = await workerDb();
+    const goalId = await makeGoal("Support answers within the hour");
+    const checkInId = await publish(goalId);
+    const window = canonThresholds()["cadence.acknowledgementWindowDays"];
+    expect(window).toBe(14);
+
+    await publishedDaysAgo(checkInId, window - 1);
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(1);
+
+    await publishedDaysAgo(checkInId, window + 1);
+    expect(await acknowledgementsOf(REVIEWER)).toHaveLength(0);
+    const ladder = await withWorkspace(drizzle(wb.appPool), workspaceId, (tx) =>
+      dueAcknowledgementNudges(tx, {
+        workspaceId,
+        now: new Date(),
+        thresholds: canonThresholds(),
+      }),
+    );
+    expect(ladder.filter((nudge) => nudge.subjectId === checkInId)).toEqual([]);
+    const row = await wb.admin.query<{ acknowledged_at: Date | null }>(
+      "select acknowledged_at from check_ins where id = $1",
+      [checkInId],
+    );
+    expect(row.rows[0]?.acknowledged_at).toBeNull();
+  });
+
+  it("previews what the check-in says on the row", async () => {
+    const goalId = await makeGoal("Support answers within the hour");
+    await publish(goalId);
+    const [row] = await acknowledgementsOf(REVIEWER);
+    // "Acknowledge all" is only honest if the reviewer can see what each one
+    // says before pressing it.
+    expect(row?.preview?.status).toBe("on_track");
+    expect(row?.preview?.excerpt).toContain("the lever is onboarding");
+  });
+});

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolvePractice } from "../src/practice.ts";
 import { canonThresholds } from "../src/thresholds.ts";
 import {
+  alignmentMapped,
   type CycleWorkflowInput,
   canPublish,
   type GoalSnapshot,
@@ -504,6 +505,32 @@ describe("the six publish gates", () => {
       }),
     );
     expect(gates.find((entry) => entry.gateKey === 3)?.passed).toBe(true);
+  });
+
+  it("names one goal's gate 3 answer the way the gate reads it", () => {
+    // A goal page said "no parent, gate 3 is red" beside "Supports: X"
+    // whenever the contribution statement was empty (OKRGoal UX review, T5).
+    expect(
+      alignmentMapped({
+        hasParent: true,
+        contributionStatement: null,
+        standaloneReason: null,
+      }),
+    ).toBe(true);
+    expect(
+      alignmentMapped({
+        hasParent: false,
+        contributionStatement: "  ",
+        standaloneReason: null,
+      }),
+    ).toBe(false);
+    expect(
+      alignmentMapped({
+        hasParent: false,
+        contributionStatement: null,
+        standaloneReason: "Month-end close",
+      }),
+    ).toBe(true);
   });
 
   it("gate 4 accepts a risk owner where confirmation is missing", () => {

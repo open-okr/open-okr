@@ -1,4 +1,5 @@
 import type { callAction } from "@openokr/core";
+import { dueDayLabel } from "@openokr/ui";
 import type { MapNode } from "./work-map.tsx";
 
 /**
@@ -29,7 +30,7 @@ type Goal = Awaited<
 >["goals"][number];
 
 /** What happens next on this goal, in the words the cadence already uses. */
-function nextStepFor(t: Translate, goal: Goal): string {
+function nextStepFor(t: Translate, goal: Goal, locale: string): string {
   if (goal.closedAt) {
     return goal.successStatus
       ? t("goalNodes.closed", { outcome: goal.successStatus })
@@ -41,9 +42,63 @@ function nextStepFor(t: Translate, goal: Goal): string {
       : t("goalNodes.checkInOverdueOther", { count: goal.daysPastDue });
   }
   if (goal.nextCheckInOn) {
-    return t("goalNodes.checkInBy", { date: goal.nextCheckInOn });
+    // "check in by Mon" rather than an ISO date (OKRGoal UX review, N7).
+    return t("goalNodes.checkInBy", {
+      date:
+        goal.daysPastDue === null
+          ? goal.nextCheckInOn
+          : dueDayLabel(goal.nextCheckInOn, -goal.daysPastDue, locale),
+    });
   }
   return t("goalNodes.noCadence");
+}
+
+/** The fields of a key result its value line reads. */
+type KeyResultValues = Pick<
+  Goal["keyResults"][number],
+  | "kind"
+  | "direction"
+  | "baselineValue"
+  | "targetValue"
+  | "currentValue"
+  | "unit"
+>;
+
+/**
+ * Where a key result stands, worded by its direction (OKRGoal UX review, T2
+ * and T3).
+ *
+ * "{current} of {target}" only reads right for one that rises: a reduce read
+ * "101 of 95", and a maintain band printed its upper end as the target. A
+ * maintain key result keeps its band as baseline and target, either way round
+ * (METHOD §3.1), so the line names both ends, lower first.
+ */
+export function keyResultValueText(
+  t: Translate,
+  keyResult: KeyResultValues,
+): string {
+  const { currentValue: current, targetValue: target, unit } = keyResult;
+  if (target === null) {
+    return t("goalNodes.progressNoTarget", { current });
+  }
+  if (keyResult.kind === "maintain" || keyResult.direction === "maintain") {
+    const values = {
+      current,
+      low: Math.min(keyResult.baselineValue, target),
+      high: Math.max(keyResult.baselineValue, target),
+    };
+    return unit
+      ? t("goalNodes.progressBandWithUnit", { ...values, unit })
+      : t("goalNodes.progressBand", values);
+  }
+  if (keyResult.direction === "reduce") {
+    return unit
+      ? t("goalNodes.progressReduceWithUnit", { current, target, unit })
+      : t("goalNodes.progressReduce", { current, target });
+  }
+  return unit
+    ? t("goalNodes.progressWithUnit", { current, target, unit })
+    : t("goalNodes.progress", { current, target });
 }
 
 /**
@@ -58,6 +113,7 @@ export function mapNodesFor(
   goal: Goal,
   depth: number,
   note?: string,
+  locale = "en",
 ): MapNode[] {
   const confidences = goal.keyResults
     .map((keyResult) => keyResult.confidence)
@@ -86,7 +142,7 @@ export function mapNodesFor(
             endsOn: goal.timeframe.endsOn,
           })
         : null,
-      nextStep: nextStepFor(t, goal),
+      nextStep: nextStepFor(t, goal, locale),
       goalId: goal.id,
       keyResultId: null,
       currentValue: null,
@@ -108,21 +164,7 @@ export function mapNodesFor(
       progressPct: keyResult.progressPct,
       confidence: keyResult.confidence,
       timeframe: keyResult.dueOn,
-      nextStep:
-        keyResult.targetValue === null
-          ? t("goalNodes.progressNoTarget", {
-              current: keyResult.currentValue,
-            })
-          : keyResult.unit
-            ? t("goalNodes.progressWithUnit", {
-                current: keyResult.currentValue,
-                target: keyResult.targetValue,
-                unit: keyResult.unit,
-              })
-            : t("goalNodes.progress", {
-                current: keyResult.currentValue,
-                target: keyResult.targetValue,
-              }),
+      nextStep: keyResultValueText(t, keyResult),
       goalId: goal.id,
       keyResultId: keyResult.id,
       currentValue: keyResult.currentValue,
@@ -143,7 +185,11 @@ export function mapNodesFor(
  * in the Work Map's page since completeness review M-22, because the space
  * home draws a space's goals as the same tree and a second copy would drift.
  */
-export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
+export function goalTreeNodes(
+  t: Translate,
+  goals: readonly Goal[],
+  locale = "en",
+): MapNode[] {
   const present = new Set(goals.map((goal) => goal.id));
   const childrenOf = new Map<string, Goal[]>();
   const roots: Goal[] = [];
@@ -169,7 +215,7 @@ export function goalTreeNodes(t: Translate, goals: readonly Goal[]): MapNode[] {
       return;
     }
     seen.add(goal.id);
-    out.push(...mapNodesFor(t, goal, depth));
+    out.push(...mapNodesFor(t, goal, depth, undefined, locale));
     for (const child of childrenOf.get(goal.id) ?? []) {
       walk(child, depth + 1);
     }

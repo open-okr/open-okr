@@ -95,21 +95,15 @@ describe("key result progress", () => {
 
   for (const row of table("scoring.kr-progress-kpi").rows) {
     it(`${row.case}`, () => {
-      const achievement = row.achievement_pct?.trim();
+      // The reading is the key result's current value, measured over the key
+      // result's own span. There is no KPI input left to bypass the formula.
       expect(
         keyResultProgress(
           {
-            direction: "increase",
-            baseline: 0,
-            target: 100,
-            current: 0,
-            // An empty cell is "no achievement yet", which is a different fact from
-            // an achievement of zero. Both answer 0 here, and only one of them is
-            // allowed to bypass the direction formula.
-            kpiAchievementPct:
-              achievement === undefined || achievement === ""
-                ? null
-                : Number(achievement),
+            direction: row.direction as KeyResultDirection,
+            baseline: num(row, "baseline"),
+            target: num(row, "target"),
+            current: num(row, "kpi_reading"),
           },
           thresholds,
         ),

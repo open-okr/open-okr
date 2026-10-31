@@ -92,7 +92,9 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     navigation: [
       {
         id: "overview",
-        label: "Overview",
+        // "Home" since the five areas (navigation-five-areas.md), and "My
+        // week" once the role homes land.
+        label: "Home",
         href: "/",
         section: "sidebar",
         group: "primary",
@@ -107,8 +109,11 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "inbox",
         label: "Inbox",
         href: "/inbox",
-        section: "sidebar",
-        group: "primary",
+        // The Activity tab of Updates since the five areas
+        // (navigation-five-areas.md, OKRGoal UX review N2): Inbox and Review
+        // both listed what needs attention, under two rows and two counters.
+        section: "inside",
+        parent: "review",
         // UIUX-PLAN §3 puts it in the primary block beside Home and Review,
         // and it belongs at view for the same reason Review does: the list
         // only ever holds rows addressed to the reader, so there is nothing
@@ -122,7 +127,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     navigation: [
       {
         id: "review",
-        label: "Review",
+        // "Updates", holding To do (this screen) and Activity (the inbox).
+        label: "Updates",
         href: "/review",
         section: "sidebar",
         group: "primary",
@@ -134,32 +140,18 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     ],
   },
   {
-    name: "cycle",
-    navigation: [
-      {
-        id: "cycle",
-        label: "Cycle",
-        href: "/cycle",
-        section: "sidebar",
-        group: "okr",
-        // Every member can watch the cycle being planned. The writes on the
-        // screen each ask for edit access of their own, so a reader sees the
-        // workflow without being handed a control they cannot use (P3-T03).
-        minLevel: ACCESS_LEVELS.view,
-      },
-    ],
-  },
-  {
     name: "goals",
     navigation: [
       {
         id: "goals",
         // "OKRs" since P9-T07a-b, decision D5: the screen holds objectives and
         // their key results together, and that is what the practice calls them.
-        label: "OKRs",
+        label: "Goals",
         href: "/goals",
         section: "sidebar",
-        group: "okr",
+        // One area for the measures since the five areas: OKRs and KPIs are
+        // its two tabs (navigation-five-areas.md).
+        group: "primary",
         // Every member can read the set. An OKR set nobody can read is not one,
         // which is the same reason a goal's context binds `workspace_standard`
         // at view (P3-T04). The writes on each row ask for their own access.
@@ -174,11 +166,28 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "kpis",
         label: "KPIs",
         href: "/kpis",
-        section: "sidebar",
-        group: "okr",
+        // The KPIs tab of Goals since the five areas.
+        section: "inside",
+        parent: "goals",
         // Every member reads the grid. A measure nobody can see is not a
         // shared measure, which is the same reason a company objective binds
         // workspace_standard at view (P3-T12).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "map",
+    navigation: [
+      {
+        id: "map",
+        label: "Map",
+        href: "/map",
+        // The company tree, the Map tab of Goals since the role homes
+        // (OKRGoal UX review, backlog 12): Home is each reader's own week,
+        // and the tree that was everybody's front door lives here.
+        section: "inside",
+        parent: "goals",
         minLevel: ACCESS_LEVELS.view,
       },
     ],
@@ -188,10 +197,12 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     navigation: [
       {
         id: "initiatives",
-        label: "Initiatives",
+        // "Work", holding Initiatives (this screen) and the Board, since the
+        // five areas. The two stay separate objects.
+        label: "Work",
         href: "/initiatives",
         section: "sidebar",
-        group: "work",
+        group: "primary",
         // Every member reads the work behind the measures. An initiative binds
         // `workspace_standard` at view for the same reason a goal does:
         // alignment reads across spaces, and a key result whose work is
@@ -207,8 +218,9 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "board",
         label: "Board",
         href: "/board",
-        section: "sidebar",
-        group: "work",
+        // The Board tab of Work since the five areas.
+        section: "inside",
+        parent: "initiatives",
         // Every member reads the board. A shared record of what a team is
         // doing is the same kind of thing as its goals, and each card asks for
         // its own access before it can be changed (P5-T11).
@@ -223,8 +235,9 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         id: "search",
         label: "Search",
         href: "/search",
-        section: "sidebar",
-        group: "primary",
+        // The top bar's search and ⌘K reach it; the sidebar row was a second
+        // copy of both (navigation-five-areas.md, OKRGoal UX review N1).
+        section: "inside",
         // Every member searches, and every member gets a different answer: the
         // index filters in SQL by the access context on each row, so there is
         // nothing here to withhold from anybody (P5-T13).
@@ -290,9 +303,28 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Spaces",
         href: "/spaces",
         section: "sidebar",
-        group: "spaces",
+        group: "primary",
         // Every human member can see that spaces exist and join one, which is
         // what makes a team home a home rather than a locked room (P3-T01).
+        minLevel: ACCESS_LEVELS.view,
+      },
+    ],
+  },
+  {
+    name: "cycle",
+    navigation: [
+      {
+        id: "cycle",
+        label: "Cycle",
+        href: "/cycle",
+        section: "sidebar",
+        // Last, and drawn only for the people who run the cycle: workspace
+        // administrators and space coordinators and managers
+        // (navigation-five-areas.md). The route stays open at view.
+        group: "primary",
+        // Every member can watch the cycle being planned. The writes on the
+        // screen each ask for edit access of their own, so a reader sees the
+        // workflow without being handed a control they cannot use (P3-T03).
         minLevel: ACCESS_LEVELS.view,
       },
     ],

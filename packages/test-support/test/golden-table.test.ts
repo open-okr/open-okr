@@ -36,7 +36,16 @@ const MANIFEST: Record<
       minRows: 30,
     },
     "scoring.kr-progress-kpi": {
-      columns: ["case", "achievement_pct", "expected_pct"],
+      // Over the key result's own span since decision D-4 was revised
+      // (OKRGoal UX review, T1).
+      columns: [
+        "case",
+        "direction",
+        "baseline",
+        "target",
+        "kpi_reading",
+        "expected_pct",
+      ],
       minRows: 5,
     },
     "scoring.goal-progress": {

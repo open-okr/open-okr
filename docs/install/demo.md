@@ -71,6 +71,7 @@ environment, so it cannot be pointed at another stack by setting a variable.
 | Setting | Value | What it does |
 |---|---|---|
 | `OPENOKR_DEMO` | `on` | The sign-in page names the personas and publishes their password. Nothing else in the product reads it |
+| `OPENOKR_INSTANCE_NAME` | `OKRGoal` | The name in the browser tab and on the sign-in page. A name an administrator saves in Admin wins over it |
 | `OPENOKR_DEMO_HTTP_PORT` | `80` | The port Caddy publishes |
 | `OPENOKR_DEMO_DB_PORT` | `55433` | Postgres on the loopback address, so the seed can reach it from the host. Not reachable from anywhere else |
 | `OPENOKR_DEMO_OWNER_EMAIL` | `demo-owner@northwind.example` | The account that claims the instance |

@@ -9,7 +9,9 @@
  * cannot replace is the refusal, which stays on the server.
  */
 import { callAction, OperationError } from "@openokr/core";
+import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getPool } from "../../lib/auth";
 import { formNumber } from "../../lib/form-number";
 import { readRichTextField } from "../../lib/rich-text-form";
@@ -122,7 +124,7 @@ export async function publishCheckIn(
     return { error: t("checkIn.actions.confidenceNeeded") };
   }
 
-  return run((context) =>
+  const published = await run((context) =>
     callAction(context, "goals.publishCheckIn", {
       id,
       status: String(formData.get("status") ?? "on_track") as
@@ -134,6 +136,17 @@ export async function publishCheckIn(
       values: composerValues(formData),
     }),
   );
+  // An extra update returns to the goal without `update=1`, so the page does
+  // not open a fresh empty draft the moment this one is published. Only a
+  // check-in page for one goal, so the field cannot send anybody elsewhere.
+  const then = String(formData.get("then") ?? "");
+  if (
+    published.error === null &&
+    /^\/check-in\?goal=[0-9a-f-]{36}$/.test(then)
+  ) {
+    redirect(then);
+  }
+  return published;
 }
 
 export async function editCheckIn(
@@ -211,4 +224,51 @@ export async function revealVotes(
   return run((context) =>
     callAction(context, "goals.revealVotes", { keyResultId }),
   );
+}
+
+/**
+ * Raises a blocker from the check-in page, outside a session (OKRGoal UX
+ * review, H11).
+ *
+ * The same four fields and the same refusals as the session room's form,
+ * through `blockers.raise`, which is due by the goal's next due date and
+ * shows on the space's blocker board for the weekly session to pick up.
+ */
+export async function raiseBlockerFromCheckIn(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const keyResultId = String(formData.get("keyResultId") ?? "");
+  const type = String(formData.get("type") ?? "");
+  const ownerId = String(formData.get("ownerId") ?? "");
+  const nextAction = String(formData.get("nextAction") ?? "").trim();
+  const { t } = await getTranslations();
+
+  if (keyResultId === "") {
+    return { error: t("session.detail.actions.nameTheKeyResultBlocked") };
+  }
+  // Checked against §7.3's taxonomy rather than cast: a select's value
+  // arrives as a string like any other.
+  const known = BLOCKER_TYPE_DEFINITIONS.find((one) => one.type === type);
+  if (!known) {
+    return { error: t("session.detail.actions.chooseTheBlockerKind") };
+  }
+  if (ownerId === "") {
+    return { error: t("session.detail.actions.somebodyOwnsClearingIt") };
+  }
+  if (nextAction === "") {
+    return { error: t("session.detail.actions.writeTheNextAction") };
+  }
+
+  const raised = await run((context) =>
+    callAction(context, "blockers.raise", {
+      keyResultId,
+      type: known.type,
+      ownerId,
+      nextAction,
+    }),
+  );
+  return raised.error === null
+    ? { error: null, notice: t("checkIn.blocker.raised") }
+    : raised;
 }

@@ -16,6 +16,7 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -45,6 +46,55 @@ export async function acknowledge(
   revalidatePath("/check-in");
   revalidatePath("/");
   return NO_ERROR;
+}
+
+/**
+ * Acknowledges every check-in the inbox listed, in one press (OKRGoal UX
+ * review, H4).
+ *
+ * One Operation per check-in through the reviewer's own action, so each is
+ * authorised, audited and refused on its own terms, and a refusal on one does
+ * not stop the rest. The rows already show what each check-in says, which is
+ * what makes one press an informed one.
+ */
+export async function acknowledgeAll(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const ids = formData.getAll("checkInId").map(String);
+  const { session, workspace } = await requireWorkspace();
+  const { t } = await getTranslations();
+  const context = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  let done = 0;
+  const refusals: string[] = [];
+  for (const id of ids) {
+    try {
+      await callAction(context, "goals.acknowledgeCheckIn", { id });
+      done += 1;
+    } catch (error) {
+      if (!(error instanceof OperationError)) {
+        throw error;
+      }
+      refusals.push(error.message);
+    }
+  }
+  revalidatePath("/review");
+  revalidatePath("/check-in");
+  revalidatePath("/");
+  const acknowledged = t("review.acknowledgedCount", { count: done });
+  return refusals.length === 0
+    ? { error: null, notice: acknowledged }
+    : {
+        error: t("review.acknowledgedWithRefusals", {
+          acknowledged,
+          count: refusals.length,
+          reason: refusals[0] ?? "",
+        }),
+      };
 }
 
 /**

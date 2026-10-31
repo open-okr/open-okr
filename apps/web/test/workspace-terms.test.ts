@@ -122,7 +122,12 @@ describe("the Spaces screen", () => {
 });
 
 describe("the sidebar", () => {
-  const items = navigationFor("sidebar", ACCESS_LEVELS.full);
+  // Inside items too: KPIs is a tab of Goals since the five areas
+  // (navigation-five-areas.md), and the palette still names it.
+  const items = [
+    ...navigationFor("sidebar", ACCESS_LEVELS.full),
+    ...navigationFor("inside", ACCESS_LEVELS.full),
+  ];
   const renamed = {
     space: { singular: "team", plural: "teams" },
     kpi: { singular: "Metric", plural: "Metrics" },
@@ -137,26 +142,17 @@ describe("the sidebar", () => {
     expect(labels.kpis).toBe("Metrics");
     expect(labels.cycle).toBe("Quarter");
     // An entry named after no term keeps its registry label.
-    expect(labels.goals).toBe("OKRs");
-  });
-
-  it("heads the Spaces block with the same word", () => {
-    const block = navBlocks(items, renamed).find(
-      (candidate) => candidate.id === "spaces",
-    );
-    expect(block?.label).toBe("Teams");
+    expect(labels.goals).toBe("Goals");
   });
 
   it("keeps the registry's labels when nothing was renamed", () => {
     for (const item of items) {
       expect(navLabel(item)).toBe(item.label);
     }
-    expect(navBlocks(items).map((block) => block.label)).toEqual([
-      undefined,
-      "OKR",
-      "Work",
-      "Spaces",
-      "Account",
-    ]);
+    expect(
+      navBlocks(navigationFor("sidebar", ACCESS_LEVELS.full)).map(
+        (block) => block.label,
+      ),
+    ).toEqual([undefined, "Account"]);
   });
 });

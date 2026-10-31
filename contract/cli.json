@@ -7473,6 +7473,16 @@
       "pages": false
     },
     {
+      "name": "goals myStreak",
+      "action": "goals.myStreak",
+      "method": "GET",
+      "path": "/goals/myStreak",
+      "scope": "read",
+      "summary": "The reader's own check-in streak, and the goal pausing it where one reads on track while a key result has not moved.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "goals checkIns",
       "action": "goals.checkIns",
       "method": "GET",

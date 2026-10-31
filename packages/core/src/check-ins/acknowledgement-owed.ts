@@ -50,3 +50,12 @@ export function earlierOpenOnGoal(): SQL<number> {
        and earlier.published_at < ${checkIns.publishedAt}
   )`;
 }
+
+/**
+ * Published within the acknowledgement window (§11, OKRGoal UX review H4).
+ * Older than that, an unacknowledged check-in has lapsed: the inbox stops
+ * listing it and the ladder stops asking, and nothing records it as given.
+ */
+export function withinAcknowledgementWindow(now: Date, days: number): SQL {
+  return sql`${checkIns.publishedAt} > ${new Date(now.getTime() - days * 86_400_000)}`;
+}

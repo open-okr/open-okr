@@ -172,7 +172,11 @@ describe("route reachability", () => {
   test("every page is in the registry, named in source, or reached from outside", async () => {
     const found = await pages();
     const files = await sourceFiles();
+    // `inside` items count too: the palette offers every one of them, and
+    // since the five areas (navigation-five-areas.md) Search is reached from
+    // the top bar and the palette rather than a sidebar row.
     const registry = navigationFor("sidebar", ACCESS_LEVELS.full)
+      .concat(navigationFor("inside", ACCESS_LEVELS.full))
       .concat(navigationFor("admin", ACCESS_LEVELS.full))
       .map((item) => item.href);
 

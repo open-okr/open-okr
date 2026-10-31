@@ -354,6 +354,8 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   const scope = page.getByRole("group", { name: "Scope" });
   // The level chips offer only the levels this cycle uses (P9-T07a-c), and
   // individual OKRs are off by default.
+  // Behind the Filter button since the OKRGoal UX review (N5).
+  await page.locator("#main-content summary", { hasText: "Filter" }).click();
   const levels = page.locator("#main-content").getByRole("group", {
     name: "Level",
   });
@@ -376,6 +378,8 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // A champion is found by typing, and choosing one is a navigation like a
   // tab (guided-inputs §4.10).
   await scope.getByRole("link", { name: "All" }).click();
+  await expect(page).toHaveURL(/scope=all/);
+  await page.locator("#main-content summary", { hasText: "Filter" }).click();
   // Scoped to the page's own content: the screen just left can still be in
   // the document, hidden, while the next one renders.
   const champion = page

@@ -155,9 +155,11 @@ Guidance for people, not machine thresholds (§11).
 | Facilitator | The sessions and the quality bar | One per cycle. May decline to run a drafting session without its inputs. That is their judgement; the product never refuses on their behalf unless phases are binding |
 | Champion | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee. Block. *Source:* whatmatters: "only one owner per OKR, even if Key Results are distributed across a team" |
 | Key result owner | One key result | Exactly one per key result, defaulting to the champion |
-| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer |
+| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. One left unacknowledged past the acknowledgement window (§11) lapses: it leaves the review inbox and the ladder, and is not recorded as acknowledged. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer. The window follows the OKRGoal UX review of October 2026 |
 | Contributor | Work that moves a key result | Any number |
 | Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers. *Source:* OpenOKR default |
+
+A **peer** of a goal's champion, for the ladder's optional peer step (§11, §12.1), is a member of the goal's space who champions another goal in the same cycle, is up to date on their own check-ins, can read the goal, and is not its reviewer or its space's coordinator. One is asked at a time, the one asked least recently, and only to offer a hand: the message names the goal and how late it is, and nothing else. Where nobody qualifies, the step is skipped. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
 
 ### 2.6 The input pack
 
@@ -358,9 +360,9 @@ Health is derived, never typed in. Precedence, first match wins:
 1. **Closed outcome.** The goal is closed as achieved, missed or abandoned.
 2. **Outdated.** The check-in is overdue past the grace window. This overrides whatever the last check-in said, and the last reported status is still shown beside it.
 3. **Latest published check-in status.** On track, at risk, or off track. "At risk" is the default label for the stored status `caution`, set in terminology.
-4. **Pending.** No check-in yet.
+4. **No check-in yet.** Stored as `pending`.
 
-A goal that has never been checked in is `pending`, not `on track`. Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
+A goal that has never been checked in is `pending`, not `on track`, and reads "No check-in yet": "Pending" read as waiting for somebody's approval (OKRGoal UX review, October 2026). Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
 **Reported health against the data.** When a goal reports on track and one of its metric key results has not moved within the divergence window (§11), the coach says so (§10).
 
@@ -708,6 +710,8 @@ Book all of them for the whole cycle before the cycle starts. Calendars fill fas
 
 Every two weeks and monthly are valid check-in frequencies (§11). The streak and the escalation ladders follow whichever is chosen. *Source:* Lamorte: "The sweet spot is bi-weekly check-ins"; Doerr and Wodtke: weekly.
 
+A check-in may be posted on any day. One posted earlier than the cadence tolerance (§11) before its due date is an extra update: it moves health and progress, and the due date, its nudge and the blocker clock stay where they were, so the period is still owed. *Source:* OpenOKR default, decided after the OKRGoal UX review of October 2026.
+
 Keep check-ins forward-looking. Status lives in the product. The meeting is for decisions. *Source:* Wodtke: if only a third of the time is presentations "you are doing it right".
 
 ### 7.2 The weekly check-in, in four steps
@@ -752,6 +756,8 @@ Every blocker carries an opened time, an owner and a next action. The next actio
 Consecutive check-in periods in which a space held its check-in, at whatever frequency the space runs. A skipped period breaks it; a period marked as a holiday does not.
 
 A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
+
+Each member also has their own streak: the periods in a row in which they posted a check-in on a goal they champion, by the same rule, shown on their check-in page. It is paused, not counted, while one of their goals reads on track with a key result flat past the divergence window (§3.5, §11), so a streak cannot be kept by re-entering the same number. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
 
 A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they champion is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
 
@@ -1002,8 +1008,9 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
-| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it |
+| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it. Where the workspace turns on the peer step, one peer from the goal's space is offered the goal once grace is exceeded, in place of the reviewer, and the reviewer joins at the coordinator's day |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days. Only where the goal has a reviewer |
+| Acknowledgement window | 14 days after publication, after which an unacknowledged check-in lapses from the review inbox and the ladder |
 | Blocker clock | The next action is due by the next check-in |
 | Blocker ladder | Owner reminded 1 day before the next check-in, coordinator when the check-in passes with the action open |
 | Nudge deduplication window | 1 nudge per subject per member per day unless the escalation step increases |
@@ -1126,6 +1133,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Progress signal | Pace-aware · Absolute | Pace-aware | Microsoft Viva Goals (vendor) |
 | Critical confidence escalation | Off · On | Off | OpenOKR default |
 | Sponsor in escalation ladders | Off · On | Off | OpenOKR default |
+| Peer step in the check-in ladder | Off · On | Off | OpenOKR default, from the OKRGoal UX review of October 2026 |
 | Quarterly review format | One session · Review and retrospective separately | One session | Workpath (vendor) |
 | Root causes at the review | As §8.4 · Optional | As §8.4 | OpenOKR default |
 | Carry forward unfinished aspirational objectives | Proposed as Keep · Not proposed | Proposed | Google's OKR playbook |

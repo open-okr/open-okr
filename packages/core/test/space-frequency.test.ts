@@ -136,6 +136,13 @@ describe("the in-between week", () => {
       defaultCheckInFrequency: "biweekly",
     });
     const goalId = await goalIn("Win the late-stage deals against Brightline");
+    // Due now, so the publication answers the period and advances it: one
+    // days ahead is an extra update that leaves the due date (METHOD.md §7.1).
+    const due0 = await workerDb();
+    await due0.admin.query(
+      "update goals set next_check_in_at = now() where id = $1",
+      [goalId],
+    );
     const draft = await call<{ id: string }>("goals.startCheckIn", { goalId });
     await call("goals.publishCheckIn", {
       id: draft.id,

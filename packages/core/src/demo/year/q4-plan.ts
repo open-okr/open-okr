@@ -372,6 +372,103 @@ export const Q4_PLAN_EVENTS: readonly YearEvent[] = [
     },
   },
   {
+    on: "2027-10-15",
+    label: "Q4's board fills with the work behind the key results",
+    async run(context) {
+      // OKRGoal UX review, backlog 5: the demo's Board was empty, which read
+      // as a team doing nothing. A working team's board holds the work behind
+      // its key results, some of it done, most of it moving. Written the day
+      // after the teams' step publishes, so every key result it names exists.
+      const work: readonly {
+        readonly space: "engineering" | "product" | "sales" | "growth";
+        readonly title: string;
+        readonly keyResult: string;
+        readonly status: "backlog" | "todo" | "in_progress" | "done";
+        readonly owner: "leo" | "mei" | "sara" | "priya" | "jonas" | "yuki";
+        readonly dueOn: string;
+      }[] = [
+        {
+          space: "engineering",
+          title: "Billing answers in the in-app help panel",
+          keyResult: "q4:E1.1",
+          status: "in_progress",
+          owner: "leo",
+          dueOn: "2027-10-29",
+        },
+        {
+          space: "engineering",
+          title: "Renewal date and plan shown on the account page",
+          keyResult: "q4:E1.1",
+          status: "done",
+          owner: "mei",
+          dueOn: "2027-10-20",
+        },
+        {
+          space: "engineering",
+          title: "Restore drill for the primary database",
+          keyResult: "q4:E2.2",
+          status: "todo",
+          owner: "leo",
+          dueOn: "2027-11-05",
+        },
+        {
+          space: "engineering",
+          title: "Alert on replication lag over a minute",
+          keyResult: "q4:E2.1",
+          status: "backlog",
+          owner: "mei",
+          dueOn: "2027-11-19",
+        },
+        {
+          space: "product",
+          title: "First-session checklist in the empty workspace",
+          keyResult: "q4:P4.1",
+          status: "in_progress",
+          owner: "sara",
+          dueOn: "2027-10-27",
+        },
+        {
+          space: "product",
+          title: "Five setup interviews with new admins",
+          keyResult: "q4:P4.1",
+          status: "done",
+          owner: "priya",
+          dueOn: "2027-10-22",
+        },
+        {
+          space: "sales",
+          title: "Brightline comparison sheet for late-stage deals",
+          keyResult: "q4:S3.1",
+          status: "todo",
+          owner: "jonas",
+          dueOn: "2027-11-01",
+        },
+        {
+          space: "growth",
+          title: "Trial day-3 email with the one setup step left",
+          keyResult: "q4:G1.2",
+          status: "in_progress",
+          owner: "yuki",
+          dueOn: "2027-10-30",
+        },
+      ];
+      for (const task of work) {
+        await callAction(context.action, "tasks.create", {
+          spaceId: need(context.ids.spaces, task.space, "Space"),
+          title: task.title,
+          keyResultId: need(
+            context.ids.keyResults,
+            task.keyResult,
+            "Key result",
+          ),
+          status: task.status,
+          dueOn: context.real(task.dueOn),
+          assigneeIds: [need(context.ids.people, task.owner, "Person")],
+        });
+      }
+    },
+  },
+  {
     on: "2027-10-25",
     step: "NW-Q4-02",
     label: "Mei returns, and Leo hands E1 back",

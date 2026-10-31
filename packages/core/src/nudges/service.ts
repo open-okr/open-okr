@@ -59,7 +59,10 @@ import {
   isNotNull,
   isNull,
   ne,
+  sql,
 } from "drizzle-orm";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
 import type { AgentDrafter, DraftedCheckIn } from "../agents/drafter.ts";
 import {
   type AgentScope,
@@ -71,6 +74,7 @@ import { daysPastDue } from "../cadence/service.ts";
 import {
   goalStillOpen,
   isLatestPublishedOnGoal,
+  withinAcknowledgementWindow,
 } from "../check-ins/acknowledgement-owed.ts";
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -189,6 +193,11 @@ export async function memberForRole(
   if (role === "reviewer") {
     return goal.reviewerId;
   }
+  // A peer is chosen against the clock and the nudge history, which this
+  // resolver has neither of: `peerFor` below. The blocker ladder never asks one.
+  if (role === "peer") {
+    return null;
+  }
   if (!goal.spaceId) {
     return null;
   }
@@ -219,6 +228,138 @@ export async function memberForRole(
     .where(activeOnly(cycles, eq(cycles.id, goal.cycleId)))
     .limit(1);
   return cycle?.sponsorId ?? null;
+}
+
+/**
+ * The one peer asked about a late goal (METHOD.md §2.5, OKRGoal UX review
+ * backlog 15), or nobody.
+ *
+ * A member of the goal's space who champions another open goal in the same
+ * cycle, has none of their own overdue, can read this goal, and is not its
+ * champion, its reviewer or the space's coordinator. Of those, the one asked
+ * least recently, then by member id, so the same person is not asked every
+ * week while somebody else never is. Nobody qualifying skips the step.
+ */
+async function peerFor(
+  tx: WorkspaceTx,
+  input: { readonly workspaceId: string; readonly now: Date },
+  goal: {
+    readonly id: string;
+    readonly championId: string | null;
+    readonly reviewerId: string | null;
+    readonly spaceId: string | null;
+    readonly cycleId: string | null;
+  },
+): Promise<string | null> {
+  if (!goal.spaceId || !goal.cycleId) {
+    return null;
+  }
+  const holders = await tx
+    .select({ memberId: spaceMembers.memberId, role: spaceMembers.role })
+    .from(spaceMembers)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.id, spaceMembers.memberId))
+    .where(
+      and(
+        activeOnly(spaceMembers, eq(spaceMembers.spaceId, goal.spaceId)),
+        eq(workspaceMembers.status, "active"),
+      ),
+    )
+    .orderBy(asc(spaceMembers.createdAt));
+  const coordinator = resolveCoordinator(holders) ?? null;
+  const excluded = new Set(
+    [goal.championId, goal.reviewerId, coordinator].filter(
+      (id): id is string => id !== null,
+    ),
+  );
+  const candidates = [
+    ...new Set(
+      holders
+        .map((holder) => holder.memberId)
+        .filter((id) => !excluded.has(id)),
+    ),
+  ];
+  if (candidates.length === 0) {
+    return null;
+  }
+
+  const championed = await tx
+    .select({
+      championId: goals.championId,
+      cycleId: goals.cycleId,
+      nextCheckInAt: goals.nextCheckInAt,
+    })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, input.workspaceId),
+        inArray(goals.championId, candidates),
+        isNull(goals.closedAt),
+        ne(goals.id, goal.id),
+      ),
+    );
+  const inCycle = new Set<string>();
+  const behind = new Set<string>();
+  for (const row of championed) {
+    if (!row.championId) {
+      continue;
+    }
+    if (row.cycleId === goal.cycleId) {
+      inCycle.add(row.championId);
+    }
+    if (row.nextCheckInAt && new Date(row.nextCheckInAt) < input.now) {
+      behind.add(row.championId);
+    }
+  }
+  const eligible = candidates.filter(
+    (id) => inCycle.has(id) && !behind.has(id),
+  );
+  if (eligible.length === 0) {
+    return null;
+  }
+
+  const asked = await tx
+    .select({
+      memberId: nudges.recipientMemberId,
+      last: sql<Date | null>`max(${nudges.createdAt})`,
+    })
+    .from(nudges)
+    .where(
+      activeOnly(
+        nudges,
+        eq(nudges.workspaceId, input.workspaceId),
+        eq(nudges.ruleKey, "checkin.peer"),
+        inArray(nudges.recipientMemberId, eligible),
+      ),
+    )
+    .groupBy(nudges.recipientMemberId);
+  const lastAsked = new Map(
+    asked.map((row) => [row.memberId, row.last ? new Date(row.last) : null]),
+  );
+  const ordered = [...eligible].sort((a, b) => {
+    const at = lastAsked.get(a)?.getTime() ?? 0;
+    const bt = lastAsked.get(b)?.getTime() ?? 0;
+    return at === bt ? a.localeCompare(b) : at - bt;
+  });
+
+  for (const memberId of ordered) {
+    try {
+      await getAccessScoped(tx as never, {
+        workspaceId: input.workspaceId,
+        memberId,
+        resourceType: "goal",
+        resourceId: goal.id,
+        requires: ACCESS_LEVELS.view as never,
+      });
+      return memberId;
+    } catch (error) {
+      if (error instanceof OperationError && error.code === "not_found") {
+        continue;
+      }
+      throw error;
+    }
+  }
+  return null;
 }
 
 /**
@@ -284,6 +425,9 @@ export async function dueCheckInNudges(
   // The ladder stops at the coordinator unless the workspace puts the sponsor
   // in it (§11, §12, P9-T19a-c-a).
   const sponsorInLadders = practice["escalation.sponsorInLadders"] === "on";
+  // Sideways before up, where the workspace chooses it (§12.1, OKRGoal UX
+  // review backlog 15). Off by default.
+  const peerStep = practice["escalation.peerStep"] === "on";
 
   // A space on holiday today is nudged about nothing (§7.4, P9-T19b-a). Read
   // once per space, because a sweep visits every goal in it.
@@ -315,7 +459,13 @@ export async function dueCheckInNudges(
     if (past === null) {
       continue;
     }
-    const step = escalation(past, grace, input.thresholds, sponsorInLadders);
+    const step = escalation(
+      past,
+      grace,
+      input.thresholds,
+      sponsorInLadders,
+      peerStep,
+    );
     if (step.step === null) {
       continue;
     }
@@ -342,12 +492,17 @@ export async function dueCheckInNudges(
         : null;
 
     for (const role of step.targets) {
-      const memberId = await memberForRole(tx, goal, role);
+      const memberId =
+        role === "peer"
+          ? await peerFor(tx, input, goal)
+          : await memberForRole(tx, goal, role);
       if (!memberId) {
         continue;
       }
       due.push({
-        ruleKey,
+        // The peer's message is its own rule (§11): an offer of help, not
+        // the champion's reminder repeated to somebody else.
+        ruleKey: role === "peer" ? "checkin.peer" : ruleKey,
         // Every check-in trigger is the Champion's, which is §6.4's own split
         // rather than a guess: its first table is the rhythm and its second is
         // quality, and `trigger()` carries the owner for exactly this.
@@ -372,7 +527,9 @@ export async function dueCheckInNudges(
         // Deriving it from the step instead let a month of daily reminders sail
         // past a ceiling written to stop exactly that, which is what the
         // simulated month found.
-        urgent: role !== "champion",
+        // A peer is offered a hand, not escalated to, so their quiet hours and
+        // their weekly ceiling hold.
+        urgent: role !== "champion" && role !== "peer",
         ...(holiday ? { onHoliday: true } : {}),
         ...(drafted && role === "champion"
           ? {
@@ -393,7 +550,52 @@ export async function dueCheckInNudges(
       });
     }
   }
-  return due;
+  return weekOf(due);
+}
+
+/**
+ * The week's check-ins as one message (OKRGoal UX review, backlog 8).
+ *
+ * A champion with two or more goals reaching their due date today hears once,
+ * under `checkin.week`, about themselves, and the message opens the check-in
+ * walker that holds them all. Their `checkin.due` rows for today are what it
+ * replaces, so nobody is told the same thing twice. One goal due keeps its own
+ * reminder, which already is that message. A drafted check-in that rode on a
+ * replaced reminder is dropped with it: the walker composes each one.
+ */
+function weekOf(due: readonly DueNudge[]): DueNudge[] {
+  const dueToday = new Map<string, number>();
+  for (const nudge of due) {
+    if (nudge.ruleKey === "checkin.due") {
+      dueToday.set(
+        nudge.recipientMemberId,
+        (dueToday.get(nudge.recipientMemberId) ?? 0) + 1,
+      );
+    }
+  }
+  const out: DueNudge[] = [];
+  const told = new Set<string>();
+  for (const nudge of due) {
+    if (
+      nudge.ruleKey !== "checkin.due" ||
+      (dueToday.get(nudge.recipientMemberId) ?? 0) < 2
+    ) {
+      out.push(nudge);
+      continue;
+    }
+    if (told.has(nudge.recipientMemberId)) {
+      continue;
+    }
+    told.add(nudge.recipientMemberId);
+    const { proposal: _dropped, ...rest } = nudge;
+    out.push({
+      ...rest,
+      ruleKey: "checkin.week",
+      subjectType: "member",
+      subjectId: nudge.recipientMemberId,
+    });
+  }
+  return out;
 }
 
 /**
@@ -1004,6 +1206,12 @@ export async function dueAcknowledgementNudges(
         isNull(goals.deletedAt),
         goalStillOpen(),
         isLatestPublishedOnGoal(),
+        // Lapsed past the window (§11, OKRGoal UX review H4): Review no
+        // longer lists it, so the ladder no longer asks.
+        withinAcknowledgementWindow(
+          input.now,
+          input.thresholds["cadence.acknowledgementWindowDays"],
+        ),
         input.scope ? agentSeesCheckIn(input.scope) : undefined,
       ),
     );

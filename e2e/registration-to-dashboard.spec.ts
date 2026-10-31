@@ -572,7 +572,8 @@ test("drafting a goal with key results persists at zero percent and pending", as
   // undefined, and health is pending because no check-in has been published.
   // The progress bar carries the number as an accessible value, which is a
   // single element where the rendered "0%" is not.
-  await expect(page.getByText("pending")).toBeVisible();
+  // "No check-in yet" since the OKRGoal UX review (METHOD.md §3.5).
+  await expect(page.getByText("No check-in yet").first()).toBeVisible();
   // By name, because the phase rail draws its own bars and phases 1 to 3 are
   // complete by now.
   await expect(
@@ -778,7 +779,9 @@ test("closing a goal requires a retrospective and keeps it on reopen", async () 
   await page.getByRole("button", { name: "Reopen this goal" }).click();
   // Exact: the page also explains that every goal reads pending until P3-T05.
   // In words since P9-T15b-a, where it printed the stored code.
-  await expect(page.getByText("Pending", { exact: true })).toBeVisible();
+  // "No check-in yet" since the OKRGoal UX review: "Pending" read as waiting
+  // for approval.
+  await expect(page.getByText("No check-in yet", { exact: true })).toBeVisible();
   // The account of what happened survives the reopen.
   await expect(
     page.getByText("Activation moved. Onboarding did the work"),
@@ -825,7 +828,11 @@ test("the check-in walker lists only what is actually due", async () => {
   await expect(chip).toBeVisible();
   const claimed = Number(((await chip.textContent()) ?? "0").split(" ")[0]);
 
-  const offered = page.locator('a[href^="/check-in?goal="]');
+  // The goals that are not due yet sit under "Update any time" (OKRGoal UX
+  // review, H1) and are not part of the claim.
+  const offered = page.locator(
+    'a[href^="/check-in?goal="]:not(section[aria-labelledby="check-in-update-any-time"] a)',
+  );
   await expect(offered).toHaveCount(claimed);
 
   if (claimed === 0) {
@@ -860,9 +867,19 @@ test("a goal reached directly shows its history and refuses a draft", async () =
     page.getByRole("heading", { name: "Check-in history" }),
   ).toBeVisible();
 
-  const notDue = page.getByText("This goal is not due");
+  // Not due yet, the goal offers an update instead of opening a draft on
+  // sight, and the update opens the composer (OKRGoal UX review, H1).
+  const notDue = page.getByText(/^Next due /);
   if (await notDue.isVisible().catch(() => false)) {
     await expect(page.getByRole("button", { name: "Publish" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Post an update" }).click();
+    await expect(page).toHaveURL(/update=1/);
+    await expect(
+      page.getByRole("button", { name: "Publish" }),
+    ).not.toHaveCount(0);
+    await expect(
+      page.getByText(/An extra update\. The next due date stays/),
+    ).toBeVisible();
   } else {
     await expect(
       page.getByRole("button", { name: "Publish" }),

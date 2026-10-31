@@ -34,6 +34,8 @@ test.afterAll(async () => {
 });
 
 const SCREENS: ReadonlyArray<readonly [string, string]> = [
+  // The company tree, the Map tab of Goals since the role homes.
+  ["/map", "Work map"],
   ["/scorecard", "Scorecard"],
   ["/account/security", "Security"],
   ["/admin/ai", "AI"],

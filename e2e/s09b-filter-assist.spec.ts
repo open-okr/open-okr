@@ -46,6 +46,9 @@ test("sign in and open the goals explorer", async () => {
   ).toBeVisible({ timeout: 10_000 });
 
   await goTo(page, "/goals");
+  // The filter groups sit behind one Filter button since the OKRGoal UX
+  // review (N5), and open on their own only while one of them is set.
+  await page.locator("#main-content summary", { hasText: "Filter" }).click();
   await expect(
     page.getByRole("group", { name: "Health" }),
   ).toBeVisible({ timeout: 15_000 });
@@ -97,6 +100,9 @@ test("a hand-edited band the product does not have is ignored, not obeyed", asyn
   // The page validates the query against the band list rather than passing it
   // through, so a URL somebody typed cannot ask for a band that does not exist.
   await goTo(page, "/goals?health=struggling");
+  // The filter groups sit behind one Filter button since the OKRGoal UX
+  // review (N5), and open on their own only while one of them is set.
+  await page.locator("#main-content summary", { hasText: "Filter" }).click();
   await expect(
     page.getByRole("group", { name: "Health" }),
   ).toBeVisible({ timeout: 15_000 });

@@ -7,6 +7,7 @@ import {
   THREAD_SUMMARY_MINIMUM,
 } from "@openokr/core";
 import {
+  alignmentMapped,
   type ResolvedPractice,
   type ResolvedThresholds,
   WEIGHT_MAX,
@@ -20,6 +21,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  dueDayLabel,
   EntityPicker,
   formatMeasure,
   NumberInput,
@@ -84,7 +86,7 @@ export default async function GoalPage({
   /** The feed's cursor, which is the only thing this page reads (P6-G11b). */
   searchParams: Promise<{ at?: string; id?: string }>;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { id } = await params;
   const { session, workspace } = await requireWorkspace();
@@ -366,7 +368,14 @@ export default async function GoalPage({
                             }),
                     })
                   : t("goals.detail.nextCheckInDueOn", {
-                      date: goal.nextCheckInOn,
+                      date:
+                        goal.daysPastDue === null
+                          ? goal.nextCheckInOn
+                          : dueDayLabel(
+                              goal.nextCheckInOn,
+                              -goal.daysPastDue,
+                              locale,
+                            ),
                     })}
               </p>
             ) : (
@@ -374,10 +383,17 @@ export default async function GoalPage({
                 {t("goals.detail.noCheckInIs")}
               </p>
             )}
-            <p className="text-xs text-ink-3">
-              {goal.contributionStatement ??
-                t("goals.detail.noParentNoContribution")}
-            </p>
+            {goal.contributionStatement ? (
+              <p className="text-xs text-ink-3">{goal.contributionStatement}</p>
+            ) : alignmentMapped({
+                hasParent: goal.parentGoalId !== null,
+                contributionStatement: goal.contributionStatement,
+                standaloneReason: goal.standaloneReason,
+              }) ? null : (
+              <p className="text-xs text-ink-3">
+                {t("goals.detail.noParentNoContribution")}
+              </p>
+            )}
             {goal.progressPct === 0 ? (
               <p className="text-xs text-ink-4">
                 {t("goals.detail.nothingHasMovedYet")}

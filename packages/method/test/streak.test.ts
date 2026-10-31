@@ -5,6 +5,7 @@ import {
   isHoliday,
   isHolidayPeriod,
   lastWorkingDayOfPeriod,
+  memberStreak,
   periodStartOf,
   weekStartOf,
 } from "../src/streak.ts";
@@ -172,5 +173,38 @@ describe("a holiday in the streak", () => {
     expect(currentStreakOn(heldAugust3, "2026-08-24", "weekly", AUGUST)).toBe(
       0,
     );
+  });
+});
+
+describe("a member's own streak (§7.4, OKRGoal UX review H7)", () => {
+  it("counts the periods in a row in which the member posted a check-in", () => {
+    // Mondays 5, 12 and 19 October 2026, read on Wednesday the 21st.
+    expect(
+      memberStreak(["2026-10-05", "2026-10-12", "2026-10-19"], "2026-10-21"),
+    ).toBe(3);
+  });
+
+  it("counts a second post in one period once, in any order", () => {
+    expect(
+      memberStreak(
+        ["2026-10-19", "2026-10-12", "2026-10-14", "2026-10-05"],
+        "2026-10-21",
+      ),
+    ).toBe(3);
+  });
+
+  it("keeps the run while this period's check-in may still come", () => {
+    expect(memberStreak(["2026-10-12", "2026-10-19"], "2026-10-28")).toBe(2);
+  });
+
+  it("is broken once a whole period passed with none", () => {
+    expect(memberStreak(["2026-10-05", "2026-10-12"], "2026-10-28")).toBe(0);
+    expect(memberStreak([], "2026-10-28")).toBe(0);
+  });
+
+  it("reads the member's frequency", () => {
+    expect(
+      memberStreak(["2026-09-28", "2026-10-12"], "2026-10-21", "biweekly"),
+    ).toBe(2);
   });
 });

@@ -11,6 +11,7 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { searchHumans } from "../../lib/member-search.ts";
@@ -125,124 +126,127 @@ export default async function InitiativesPage({
   const filtered = Boolean(space || status || capacity);
 
   return (
-    <div className="flex w-full flex-col gap-3.5">
-      <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("common.initiatives")}
-            </h1>
-            <p className="text-xs text-ink-3" data-testid="initiative-count">
-              {initiatives.length === 0
-                ? filtered
-                  ? t("initiatives.noInitiativeMatches")
-                  : t("initiatives.noWorkRecordedYet")
-                : t("initiatives.eachOneWorkSomebodyOwns", {
-                    initiatives:
-                      initiatives.length === 1
-                        ? t("common.count.initiativeOne", {
-                            count: initiatives.length,
-                          })
-                        : t("common.count.initiativeOther", {
-                            count: initiatives.length,
-                          }),
-                  })}
-            </p>
-          </div>
-        </CardHeader>
-
-        <CardBody className="flex flex-col gap-3">
-          <Filters
-            href={href}
-            spaces={spaces}
-            activeSpace={space?.id ?? null}
-            activeStatus={status?.value ?? null}
-            activeCapacity={capacity?.value ?? null}
-          />
-
-          {initiatives.length === 0 ? (
-            <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
-              {filtered
-                ? t("initiatives.clearAFilter")
-                : t("initiatives.aFacilitatorRecords")}
-            </p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-line">
-              {initiatives.map((initiative) => (
-                <Row
-                  key={initiative.id}
-                  initiative={initiative}
-                  canEdit={canEdit}
-                />
-              ))}
-            </ul>
-          )}
-        </CardBody>
-      </Card>
-
-      {canEdit ? (
+    <>
+      <AreaTabs area="work" current="/initiatives" t={t} />
+      <div className="flex w-full flex-col gap-3.5">
         <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("initiatives.addAnInitiative")}
-            </h2>
+          <CardHeader className="justify-between">
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-lg font-bold text-ink">
+                {t("common.initiatives")}
+              </h1>
+              <p className="text-xs text-ink-3" data-testid="initiative-count">
+                {initiatives.length === 0
+                  ? filtered
+                    ? t("initiatives.noInitiativeMatches")
+                    : t("initiatives.noWorkRecordedYet")
+                  : t("initiatives.eachOneWorkSomebodyOwns", {
+                      initiatives:
+                        initiatives.length === 1
+                          ? t("common.count.initiativeOne", {
+                              count: initiatives.length,
+                            })
+                          : t("common.count.initiativeOther", {
+                              count: initiatives.length,
+                            }),
+                    })}
+              </p>
+            </div>
           </CardHeader>
-          <CardBody>
-            <ActionForm
-              action={createInitiativeAction}
-              className="flex flex-col gap-2"
-            >
-              <TextInput
-                label={t("initiatives.whatWorkIsThis")}
-                id="title"
-                name="title"
-                required
-                maxLength={500}
-                placeholder={t("initiatives.rebuildTheActivationFlow")}
-              />
 
-              <div className="flex flex-wrap gap-2">
-                {/* Each opens where the select it replaced did: the first
-                 * space, and whoever is adding it as the owner. */}
-                <EntityPicker
-                  label={t("initiatives.space")}
-                  name="spaceId"
-                  required
-                  defaultValue={spaces[0]?.id ?? null}
-                  options={spaces.map(namedOption)}
-                  className="w-56"
-                />
-                <EntityPicker
-                  label={t("common.owner")}
-                  name="ownerId"
-                  required
-                  defaultValue={workspace.memberId}
-                  options={members.map((one) =>
-                    memberOption(one, t("common.agent")),
-                  )}
-                  search={searchHumans}
-                  className="w-56"
-                />
+          <CardBody className="flex flex-col gap-3">
+            <Filters
+              href={href}
+              spaces={spaces}
+              activeSpace={space?.id ?? null}
+              activeStatus={status?.value ?? null}
+              activeCapacity={capacity?.value ?? null}
+            />
 
-                <DateRangeInput
-                  startLabel={t("initiatives.starts")}
-                  endLabel={t("initiatives.ends")}
-                  startName="startsOn"
-                  endName="endsOn"
-                />
-              </div>
-
-              <button
-                type="submit"
-                className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
-              >
-                {t("common.add")}
-              </button>
-            </ActionForm>
+            {initiatives.length === 0 ? (
+              <p className="rounded-md border border-line border-dashed px-3 py-6 text-center text-sm text-ink-3">
+                {filtered
+                  ? t("initiatives.clearAFilter")
+                  : t("initiatives.aFacilitatorRecords")}
+              </p>
+            ) : (
+              <ul className="flex flex-col divide-y divide-line">
+                {initiatives.map((initiative) => (
+                  <Row
+                    key={initiative.id}
+                    initiative={initiative}
+                    canEdit={canEdit}
+                  />
+                ))}
+              </ul>
+            )}
           </CardBody>
         </Card>
-      ) : null}
-    </div>
+
+        {canEdit ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("initiatives.addAnInitiative")}
+              </h2>
+            </CardHeader>
+            <CardBody>
+              <ActionForm
+                action={createInitiativeAction}
+                className="flex flex-col gap-2"
+              >
+                <TextInput
+                  label={t("initiatives.whatWorkIsThis")}
+                  id="title"
+                  name="title"
+                  required
+                  maxLength={500}
+                  placeholder={t("initiatives.rebuildTheActivationFlow")}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  {/* Each opens where the select it replaced did: the first
+                   * space, and whoever is adding it as the owner. */}
+                  <EntityPicker
+                    label={t("initiatives.space")}
+                    name="spaceId"
+                    required
+                    defaultValue={spaces[0]?.id ?? null}
+                    options={spaces.map(namedOption)}
+                    className="w-56"
+                  />
+                  <EntityPicker
+                    label={t("common.owner")}
+                    name="ownerId"
+                    required
+                    defaultValue={workspace.memberId}
+                    options={members.map((one) =>
+                      memberOption(one, t("common.agent")),
+                    )}
+                    search={searchHumans}
+                    className="w-56"
+                  />
+
+                  <DateRangeInput
+                    startLabel={t("initiatives.starts")}
+                    endLabel={t("initiatives.ends")}
+                    startName="startsOn"
+                    endName="endsOn"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="self-start rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
+                >
+                  {t("common.add")}
+                </button>
+              </ActionForm>
+            </CardBody>
+          </Card>
+        ) : null}
+      </div>
+    </>
   );
 }
 

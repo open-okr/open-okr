@@ -100,11 +100,16 @@ Rule 1 is why an early or a late check-in does not shift the rhythm: a goal due
 Mondays stays due Mondays after a Tuesday check-in. Rule 2 is why a champion
 who vanishes for a month does not return to a backlog of four overdue periods.
 
-The tolerance (§11, one day by default) does not change the next due date. It
-decides whether the period that just ended was **met** or **missed**, which is
-what the streak and the escalation ladder read. A publication after
-`due + tolerance` is a missed period. A publication before the due date is
-never missed, however early it is.
+The tolerance (§11, one day by default) decides two things. A publication
+after `due + tolerance` is a **missed** period, which is what the streak and
+the escalation ladder read. A publication before `due - tolerance` is an
+**extra update**: it is published like any check-in, moves health and progress,
+and leaves the due date where it is, so the period it falls in is still owed
+and the anchor-day nudge still goes out (decided on 30 October 2026 after the
+OKRGoal UX review, findings H1 and T7: "a user who has news on Wednesday has
+nowhere to put it"). Before that, an early check-in used up the next period.
+A publication before the due date is never missed. The blocker clock is stored
+as the goal's next due date, so an extra update does not shorten it.
 
 <!-- golden: cadence.after-publication -->
 
@@ -113,7 +118,9 @@ never missed, however early it is.
 | exactly on time | weekly | 1 | 2026-08-10 | 2026-08-10 | 1 | 2026-08-17 | no |
 | one day early | weekly | 1 | 2026-08-10 | 2026-08-09 | 1 | 2026-08-17 | no |
 | one day late, inside tolerance | weekly | 1 | 2026-08-10 | 2026-08-11 | 1 | 2026-08-17 | no |
-| three days early, outside tolerance | weekly | 1 | 2026-08-10 | 2026-08-07 | 1 | 2026-08-17 | no |
+| three days early, outside tolerance, is an extra update | weekly | 1 | 2026-08-10 | 2026-08-07 | 1 | 2026-08-10 | no |
+| a Wednesday update after Monday's check-in | weekly | 1 | 2026-08-17 | 2026-08-12 | 1 | 2026-08-17 | no |
+| two days early with a two-day tolerance advances | weekly | 1 | 2026-08-10 | 2026-08-08 | 2 | 2026-08-17 | no |
 | four days late | weekly | 1 | 2026-08-10 | 2026-08-14 | 1 | 2026-08-17 | yes |
 | published on the following anchor day | weekly | 1 | 2026-08-10 | 2026-08-17 | 1 | 2026-08-24 | yes |
 | four weeks late skips the backlog | weekly | 1 | 2026-08-10 | 2026-09-07 | 1 | 2026-09-14 | yes |
@@ -205,6 +212,18 @@ only where the workspace turns on "Sponsor in escalation ladders" (§12), at
 §11's fourteen days; without it a goal fourteen days late stays at step 4. The
 reviewer is reached only where the goal has one, which the caller resolves.
 
+**The peer step** (§12.1 "Peer step in the check-in ladder", default Off;
+OKRGoal UX review backlog 15). On, step 3 asks one peer instead of the
+reviewer, under its own rule key `checkin.peer`, and the reviewer joins at
+step 4 with the coordinator. The caller picks the peer (`peerFor` in
+`packages/core/src/nudges/service.ts`): a member of the goal's space who
+champions another open goal in the same cycle, has none overdue, can read the
+goal, and is not its champion, reviewer or coordinator; the one asked least
+recently, then by member id. Nobody qualifying skips the step. A peer's
+message is not urgent, so their quiet hours and weekly ceiling hold. The
+golden table below is the ladder with the step off; `escalation-peer.test.ts`
+in `packages/method` covers it on.
+
 <!-- golden: cadence.escalation -->
 
 | case | days_past_due | grace_days | sponsor_in_ladders | expected_step | expected_targets |
@@ -245,6 +264,13 @@ its messages are not about them.
 | still only the reviewer | 2 | 1 | reviewer |
 | three days, the coordinator is brought in | 3 | 2 | reviewer,coordinator |
 | a week later, no further | 7 | 2 | reviewer,coordinator |
+
+**The window** (§11, OKRGoal UX review H4). Fourteen days after publication an
+unacknowledged check-in lapses: the review inbox stops listing it and this
+ladder stops asking. Nothing records it as acknowledged, because nobody did.
+The predicate is `withinAcknowledgementWindow` in
+`packages/core/src/check-ins/acknowledgement-owed.ts`, which Review and the
+ladder share, so the two cannot disagree about what is still owed.
 
 **Blocker.** §11, as METHOD v2 has it since P9-T19a-a: "owner reminded 1 day
 before the next check-in, coordinator when the check-in passes with the action

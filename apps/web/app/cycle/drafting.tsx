@@ -1,4 +1,5 @@
 import {
+  alignmentMapped,
   defaultOkrKind,
   okrKindsInUse,
   type ResolvedPractice,
@@ -70,6 +71,9 @@ export interface DraftGoal {
   readonly progressPct: number;
   readonly health: string;
   readonly contributionStatement: string | null;
+  /** Gate 3 reads these beside the statement (METHOD.md §4.5). */
+  readonly parentGoalId?: string | null;
+  readonly standaloneReason?: string | null;
   readonly champion: { readonly id: string; readonly name: string };
   /** Null where the goal has none, which the practice allows (P9-T04). */
   readonly reviewer: { readonly id: string; readonly name: string } | null;
@@ -337,7 +341,11 @@ export async function Drafting({
                   contributionStatement: goal.contributionStatement,
                 })}
               </p>
-            ) : (
+            ) : alignmentMapped({
+                hasParent: Boolean(goal.parentGoalId),
+                contributionStatement: goal.contributionStatement,
+                standaloneReason: goal.standaloneReason ?? null,
+              }) ? null : (
               <p className="text-xs text-warn">
                 {t("cycle.drafting.noParentAndNo")}
               </p>

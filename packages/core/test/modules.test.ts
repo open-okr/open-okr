@@ -103,18 +103,35 @@ describe("navigation blocks", () => {
     }
   });
 
-  it("the OKR block holds the cycle, and the Work block the work (P9-T07a-b)", () => {
-    const byId = new Map(
-      navigationFor("sidebar", ACCESS_LEVELS.full).map((i) => [i.id, i.group]),
+  it("draws five areas and Cycle, with the rest inside them (navigation-five-areas.md)", () => {
+    const sidebar = navigationFor("sidebar", ACCESS_LEVELS.full).filter(
+      (item) => item.group !== "account",
     );
-    expect(byId.get("cycle")).toBe("okr");
-    expect(byId.get("goals")).toBe("okr");
-    expect(byId.get("kpis")).toBe("okr");
-    expect(byId.get("initiatives")).toBe("work");
-    expect(byId.get("board")).toBe("work");
-    expect(byId.get("overview")).toBe("primary");
-    expect(byId.get("review")).toBe("primary");
-    expect(byId.get("spaces")).toBe("spaces");
-    expect(byId.get("account-security")).toBe("account");
+    expect(sidebar.map((item) => item.id)).toEqual([
+      "overview",
+      "review",
+      "goals",
+      "initiatives",
+      "spaces",
+      "cycle",
+    ]);
+    expect(sidebar.map((item) => item.label)).toEqual([
+      "Home",
+      "Updates",
+      "Goals",
+      "Work",
+      "Spaces",
+      "Cycle",
+    ]);
+    const inside = new Map(
+      navigationFor("inside", ACCESS_LEVELS.full).map((item) => [
+        item.id,
+        item.parent,
+      ]),
+    );
+    expect(inside.get("inbox")).toBe("review");
+    expect(inside.get("kpis")).toBe("goals");
+    expect(inside.get("board")).toBe("initiatives");
+    expect(inside.has("search")).toBe(true);
   });
 });
