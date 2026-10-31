@@ -82,7 +82,8 @@ dependencies or the build files, and `image-rehearsal.yml` runs it weekly on
 release candidate first: `v1.2.3-rc.1` on the same commit. It runs every job
 for real, publishes a GitHub prerelease and moves no floating tag, which is the
 only way to exercise the joining, signing and verifying steps before a version
-customers are pointed at.
+customers are pointed at. Its notes are the `## 1.2.3` changelog section,
+because the candidate is tagged on the commit that wrote it.
 
 ## If the run fails partway
 
