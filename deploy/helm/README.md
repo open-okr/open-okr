@@ -10,7 +10,7 @@ kubectl -n openokr create secret generic openokr-database \
   --from-literal=database-url='postgres://user:password@host:5432/openokr'
 
 helm install openokr oci://ghcr.io/open-okr/charts/openokr \
-  --version 0.3.1 \
+  --version 0.4.0 \
   --namespace openokr \
   --set database.existingSecret=openokr-database \
   --set ingress.enabled=true \

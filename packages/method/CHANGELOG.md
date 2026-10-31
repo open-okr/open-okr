@@ -1,5 +1,89 @@
 # @openokr/method
 
+## 0.4.0
+
+### Minor Changes
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`af6432b`](https://github.com/open-okr/open-okr/commit/af6432b60ff60d740859c9b23485d7ceb74dac0b) Thanks [@agungksidik](https://github.com/agungksidik)! - The review inbox can be cleared.
+  
+  Each acknowledgement row shows the check-in's status and the first line of what
+  it says, and "Acknowledge all" acknowledges every listed one in one press. A
+  check-in nobody acknowledged within 14 days lapses: it leaves Review and the
+  acknowledgement ladder stops asking, and it is not recorded as acknowledged.
+  The window is the new §11 threshold `cadence.acknowledgementWindowDays`, which
+  a workspace can change in Admin, Rhythm.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`76abcf5`](https://github.com/open-okr/open-okr/commit/76abcf55b67cf00df66bad50a28522c7b8f1e23b) Thanks [@agungksidik](https://github.com/agungksidik)! - A member can check in on any day, not only when the goal is due.
+  
+  The check-in page lists the member's other goals under "Update any time". A
+  goal that is not due offers "Post an update", which opens the usual composer.
+  An update posted more than the cadence tolerance before the due date is an
+  extra update: it moves health and progress, and the due date, its nudge and
+  the blocker clock stay where they were. Before this, an early check-in used up
+  the next period and that Monday's reminder never came.
+  
+  The check-in page and the Review inbox now list the same goals, so the Review
+  can no longer say a check-in is owed while the check-in page says nothing is
+  due. The rhythm share in the review diagnostic counts an extra update as
+  answering nothing, the way the cadence does. `goals.due` accepts up to 366
+  days ahead.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`6c5c2cc`](https://github.com/open-okr/open-okr/commit/6c5c2ccb9e57a82026f76b60b585a9d04c6dfc56) Thanks [@agungksidik](https://github.com/agungksidik)! - A champion with two or more goals due on the anchor day gets one message,
+  "Your check-ins this week", instead of one reminder per goal. It opens the
+  check-in walker, which holds every goal due and opens the first one with its
+  values filled in; in chat its button starts the check-in and offers the goals
+  that are due. One goal due keeps its own reminder. The new rule key is
+  `checkin.week`.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`214cbb3`](https://github.com/open-okr/open-okr/commit/214cbb381530b9d192970688b6555ba7d2a03b91) Thanks [@agungksidik](https://github.com/agungksidik)! - A key result that reads a KPI now measures progress from its own baseline to
+  its own target.
+  
+  The KPI's latest reading is still the key result's current value. What changed
+  is the percentage: it used to be the KPI's achievement against the KPI's own
+  target, so "Raise deflection from 31% to 35%" at a reading of 31 showed 89%. It
+  now shows 0%, the same as any other key result at its baseline. Changing a
+  KPI's target no longer moves the key results that read it. Goal progress
+  recomputes the next time the KPI is recorded or the goal changes.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`73845cc`](https://github.com/open-okr/open-okr/commit/73845ccf4f0d53312158d1aa30b3643205e935c2) Thanks [@agungksidik](https://github.com/agungksidik)! - A member sees their own check-in streak on the check-in page.
+  
+  It counts the periods in a row in which they posted a check-in on a goal they
+  champion, by the same rule as the space's streak. It is paused, and names the
+  goal, while one of their goals reads on track with a key result that has not
+  moved past the divergence window, so re-entering the same number does not keep
+  it alive. A new read action, `goals.myStreak`, serves it and is in the agent
+  `core` toolset.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`37ba2a5`](https://github.com/open-okr/open-okr/commit/37ba2a56fc26177edccad4e8e1aba259534b9492) Thanks [@agungksidik](https://github.com/agungksidik)! - A workspace can put a peer step in the check-in ladder.
+  
+  The new practice setting "Peer step in the check-in ladder" is Off by default,
+  so nothing changes until a workspace turns it on. On, a goal whose check-in is
+  past its grace asks one teammate from its space to offer a hand, under the new
+  rule `checkin.peer`, before the reviewer hears; the reviewer joins at the
+  coordinator's day. A peer champions another goal in the same cycle, is up to
+  date on their own check-ins, can read the goal, and is not its reviewer or the
+  space's coordinator. The one asked least recently is chosen, and where nobody
+  qualifies the step is skipped.
+
+### Patch Changes
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`8625cc1`](https://github.com/open-okr/open-okr/commit/8625cc17565e17db2efb1e57d3b1e18e16760918) Thanks [@agungksidik](https://github.com/agungksidik)! - The goal page and the drafting list no longer say "no parent, gate 3 is red"
+  for a goal that has a parent.
+  
+  Both printed the sentence whenever the contribution statement was empty, while
+  the side panel showed the parent the goal supports. They now ask the same
+  question the publish gate asks: a parent, a contribution statement or a reason
+  to stand alone.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`6111207`](https://github.com/open-okr/open-okr/commit/611120788bb00e3fa1916b61acc93e236d7eb76f) Thanks [@agungksidik](https://github.com/agungksidik)! - Copy that explained the system's internals now tells the reader what it means
+  for them.
+  
+  Admin, Rhythm no longer shows ticket numbers and a changelog in its threshold
+  notes, and the escalation note says the sponsor step applies only where the
+  workspace adds it. The vote note, the role note on a goal and the Review header
+  say what happens rather than how it is computed. A key result's confidence on
+  the goal page carries a visible "Confidence" label, apart from its value.
+
 ## 0.3.1
 
 No changes in this release.

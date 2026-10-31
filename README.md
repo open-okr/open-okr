@@ -231,7 +231,7 @@ cd open-okr/deploy/docker
 For a real domain with an automatic certificate, and a pinned release, which is the better habit on a server:
 
 ```sh
-OPENOKR_DOMAIN=okr.example.com OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.3.1 ./openokr up
+OPENOKR_DOMAIN=okr.example.com OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.4.0 ./openokr up
 ```
 
 With no domain it serves plain HTTP on `http://localhost`, which is right for a laptop and wrong for a server anybody else reaches.
@@ -276,7 +276,7 @@ kubectl -n openokr create secret generic openokr-database \
   --from-literal=database-url='postgres://user:password@host:5432/openokr'
 
 helm install openokr oci://ghcr.io/open-okr/charts/openokr \
-  --version 0.3.1 \
+  --version 0.4.0 \
   --namespace openokr \
   --set database.existingSecret=openokr-database \
   --set ingress.enabled=true \

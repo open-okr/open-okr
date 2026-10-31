@@ -41,7 +41,7 @@ This pulls the published image, `ghcr.io/open-okr/open-okr:latest`. To pin a
 release instead, which is the better habit on a server, name it:
 
 ```sh
-OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.3.1 ./openokr up
+OPENOKR_IMAGE=ghcr.io/open-okr/open-okr:0.4.0 ./openokr up
 ```
 
 Each release image is built for amd64 and arm64, signed with cosign, and ships
