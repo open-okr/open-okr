@@ -361,10 +361,18 @@ jobs:
           # apps/web's, because Changesets never versions a monorepo's root
           # package: every changeset names @openokr/web, the application, and
           # the fixed group moves every package to the same number with it.
+          #
+          # A prerelease is looked up without its suffix, as the verify job
+          # compares it. `changeset version` writes "## 1.2.3", and v1.2.3-rc.1
+          # is tagged on that same commit, so the candidate's notes are the
+          # version's. Looking for "## 1.2.3-rc.1" found nothing, and every
+          # candidate page read "No changelog section was found".
           CHANGELOG=apps/web/CHANGELOG.md
+          version="${TAG#v}"
+          version="${version%%-*}"
           if [ -f "$CHANGELOG" ]; then
-            awk -v tag="${TAG#v}" '
-              $0 ~ "^## " tag "$" { grab = 1; next }
+            awk -v version="${version}" '
+              $0 ~ "^## " version "$" { grab = 1; next }
               grab && /^## / { exit }
               grab { print }
             ' "$CHANGELOG" > notes.md
