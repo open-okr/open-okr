@@ -1,5 +1,311 @@
 # @openokr/core
 
+## 0.4.0
+
+### Minor Changes
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`af6432b`](https://github.com/open-okr/open-okr/commit/af6432b60ff60d740859c9b23485d7ceb74dac0b) Thanks [@agungksidik](https://github.com/agungksidik)! - The review inbox can be cleared.
+  
+  Each acknowledgement row shows the check-in's status and the first line of what
+  it says, and "Acknowledge all" acknowledges every listed one in one press. A
+  check-in nobody acknowledged within 14 days lapses: it leaves Review and the
+  acknowledgement ladder stops asking, and it is not recorded as acknowledged.
+  The window is the new §11 threshold `cadence.acknowledgementWindowDays`, which
+  a workspace can change in Admin, Rhythm.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`99c5680`](https://github.com/open-okr/open-okr/commit/99c5680eb374659d932622dec2ff612e89fb7252) Thanks [@agungksidik](https://github.com/agungksidik)! - A new action, `blockers.raise`, lets a key result's owner (or their agent)
+  raise a blocker at check-in time without a session. It takes the same type,
+  owner and next action as a session blocker, is due by the goal's next
+  check-in, and shows on the space's blocker board for the weekly session to
+  discuss. It is in the default `core` agent toolset, and the weekly check-in
+  prompt uses it for a key result that is actually blocked.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`4406071`](https://github.com/open-okr/open-okr/commit/4406071352efa5819efa01d993f4f337dea6d5ac) Thanks [@agungksidik](https://github.com/agungksidik)! - A champion watching their goal hears when the reviewer acknowledges its
+  check-in: the acknowledgement reaches the goal's watchers in the inbox, as a
+  published check-in already did. Pressing acknowledge again on the same
+  check-in tells nobody.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`76abcf5`](https://github.com/open-okr/open-okr/commit/76abcf55b67cf00df66bad50a28522c7b8f1e23b) Thanks [@agungksidik](https://github.com/agungksidik)! - A member can check in on any day, not only when the goal is due.
+  
+  The check-in page lists the member's other goals under "Update any time". A
+  goal that is not due offers "Post an update", which opens the usual composer.
+  An update posted more than the cadence tolerance before the due date is an
+  extra update: it moves health and progress, and the due date, its nudge and
+  the blocker clock stay where they were. Before this, an early check-in used up
+  the next period and that Monday's reminder never came.
+  
+  The check-in page and the Review inbox now list the same goals, so the Review
+  can no longer say a check-in is owed while the check-in page says nothing is
+  due. The rhythm share in the review diagnostic counts an extra update as
+  answering nothing, the way the cadence does. `goals.due` accepts up to 366
+  days ahead.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`6c5c2cc`](https://github.com/open-okr/open-okr/commit/6c5c2ccb9e57a82026f76b60b585a9d04c6dfc56) Thanks [@agungksidik](https://github.com/agungksidik)! - A champion with two or more goals due on the anchor day gets one message,
+  "Your check-ins this week", instead of one reminder per goal. It opens the
+  check-in walker, which holds every goal due and opens the first one with its
+  values filled in; in chat its button starts the check-in and offers the goals
+  that are due. One goal due keeps its own reminder. The new rule key is
+  `checkin.week`.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`91034ec`](https://github.com/open-okr/open-okr/commit/91034ec53fea813ab7e7fe30e71e1aad0a4df40b) Thanks [@agungksidik](https://github.com/agungksidik)! - A new read action, `goals.checkDraft`, runs the METHOD.md §4 quality checks
+  on an objective and its key results that have not been saved, and returns
+  each check's status, the condition it matched, its coaching prompt and the
+  strength score. It saves nothing and needs no AI provider. It is in the
+  default `core` agent toolset, so an agent drafting with its own model can
+  check a draft before `goals.create` publishes it, and the
+  review-against-the-canon prompt checks each rewrite with it.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`214cbb3`](https://github.com/open-okr/open-okr/commit/214cbb381530b9d192970688b6555ba7d2a03b91) Thanks [@agungksidik](https://github.com/agungksidik)! - A key result that reads a KPI now measures progress from its own baseline to
+  its own target.
+  
+  The KPI's latest reading is still the key result's current value. What changed
+  is the percentage: it used to be the KPI's achievement against the KPI's own
+  target, so "Raise deflection from 31% to 35%" at a reading of 31 showed 89%. It
+  now shows 0%, the same as any other key result at its baseline. Changing a
+  KPI's target no longer moves the key results that read it. Goal progress
+  recomputes the next time the KPI is recorded or the goal changes.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`2afccd5`](https://github.com/open-okr/open-okr/commit/2afccd5d008c95a5f9fda4ad25614a2d2a67484d) Thanks [@agungksidik](https://github.com/agungksidik)! - Seventeen AI-assist tools leave the agent catalogue, among them
+  `goals.draftObjective`, `kpis.suggest` and `sessions.draftMinutes`. The MCP
+  server makes no outbound AI calls, so each of them answered null to every
+  agent. They stay on REST, the command line and the browser. The full
+  catalogue is now 377 tools.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`0467a32`](https://github.com/open-okr/open-okr/commit/0467a32baf6f63ab1814cf4b48d820863d99386e) Thanks [@agungksidik](https://github.com/agungksidik)! - Two new agent toolsets. `room` holds the live session's own moves (votes and
+  their reveal, the mic, pulse, kudos, retro notes, anonymous process-health
+  answers), split from `facilitation`. `integrations` holds AI providers, chat
+  channels, single sign-on and spreadsheet imports, split from `admin`, which
+  was over the 128-tool cap some clients apply. The default `core` toolset now
+  also publishes and approves a drafted objective. An address that named
+  `facilitation` or `admin` for one of the moved tools adds `room` or
+  `integrations`.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`7db1b13`](https://github.com/open-okr/open-okr/commit/7db1b13070ad24c90b0e3aeb444af73af2933046) Thanks [@agungksidik](https://github.com/agungksidik)! - The agent endpoint offers a small catalogue by default. A connection sees the
+  57 `core` tools a member uses every week unless its address names more with
+  `?toolsets=` (`core`, `work`, `facilitation`, `admin` or `all`), and it is shown
+  only the tools its token's scopes can call. Twenty actions that exist for the
+  importer, the scheduler, the copilot's own bookkeeping or the tokens screen are
+  no longer agent tools; they stay on `/api/v1`. An agent that relied on the full
+  list should add `?toolsets=all` to the server address. A call to a tool outside
+  the chosen toolsets is refused with the toolset that holds it.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`73845cc`](https://github.com/open-okr/open-okr/commit/73845ccf4f0d53312158d1aa30b3643205e935c2) Thanks [@agungksidik](https://github.com/agungksidik)! - A member sees their own check-in streak on the check-in page.
+  
+  It counts the periods in a row in which they posted a check-in on a goal they
+  champion, by the same rule as the space's streak. It is paused, and names the
+  goal, while one of their goals reads on track with a key result that has not
+  moved past the divergence window, so re-entering the same number does not keep
+  it alive. A new read action, `goals.myStreak`, serves it and is in the agent
+  `core` toolset.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`35acd7e`](https://github.com/open-okr/open-okr/commit/35acd7e1959a9d758075c67828b42e13627cba6d) Thanks [@agungksidik](https://github.com/agungksidik)! - The sidebar is five areas instead of fifteen rows.
+  
+  Home, Updates, Goals, Work and the workspace's word for spaces, then Cycle for
+  workspace administrators and space coordinators and managers, who also see the
+  phase strip. Updates holds To do (the former Review) and Activity (the former
+  Inbox) as tabs with one badge; Goals holds OKRs and KPIs; Work holds
+  Initiatives and the Board. Search is in the topbar only, and the account pages
+  and Admin are in the avatar menu. Every address is unchanged. Where the sidebar
+  shows icons only, each row names itself on hover.
+
+- [#132](https://github.com/open-okr/open-okr/pull/132) [`b7e71aa`](https://github.com/open-okr/open-okr/commit/b7e71aa1f72beba2cc2bbdf2b376eb691c3970d3) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `sessions.draftNextCycle` and `sessions.proposeFromLearnings` are removed.
+  
+  Both were deprecated in 0.2.0, when the quarterly review stopped drafting the
+  next cycle, and announced for removal in 0.3; 0.3 kept them one release
+  longer. A kept or modified objective reaches the next cycle's Phase 4 on its
+  own, and an idea reaches its issue list as a learning marked to carry
+  forward. The drafts already written stay, read-only, so a past review's
+  minutes still show them.
+
+- [#157](https://github.com/open-okr/open-okr/pull/157) [`2182e30`](https://github.com/open-okr/open-okr/commit/2182e303e5bd2190734c43560f9c9e0c44c8c3a4) Thanks [@agungksidik](https://github.com/agungksidik)! - A reviewer owes one acknowledgement per goal, on its latest check-in.
+  
+  Review listed every unacknowledged check-in separately, so a goal with weekly
+  check-ins added a row each week and a reviewer could face fifty rows a year
+  overdue for two goals. It now lists one row per goal, for the latest check-in,
+  and says how many earlier ones it covers. Acknowledging it closes those earlier
+  ones too, because the latest says where the goal stands. A closed goal, or a
+  goal in a closed cycle, owes no acknowledgement and the reviewer is no longer
+  nudged about it.
+  
+  `goals.acknowledgeCheckIn` returns `settledEarlier`, the number of earlier
+  check-ins it closed. METHOD.md §2.5 states the rule.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`37ba2a5`](https://github.com/open-okr/open-okr/commit/37ba2a56fc26177edccad4e8e1aba259534b9492) Thanks [@agungksidik](https://github.com/agungksidik)! - A workspace can put a peer step in the check-in ladder.
+  
+  The new practice setting "Peer step in the check-in ladder" is Off by default,
+  so nothing changes until a workspace turns it on. On, a goal whose check-in is
+  past its grace asks one teammate from its space to offer a hand, under the new
+  rule `checkin.peer`, before the reviewer hears; the reviewer joins at the
+  coordinator's day. A peer champions another goal in the same cycle, is up to
+  date on their own check-ins, can read the goal, and is not its reviewer or the
+  space's coordinator. The one asked least recently is chosen, and where nobody
+  qualifies the step is skipped.
+
+- [#131](https://github.com/open-okr/open-okr/pull/131) [`81676aa`](https://github.com/open-okr/open-okr/commit/81676aaf950d5b45db102005539015c04af9ec4a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Session prose is stored as documents only.
+  
+  The monthly review's shifts and decisions, the quarterly review's management
+  answers and private stage notes, the weekly note for leadership and the
+  revalidation's two notes were written twice in 0.3, as a document and as
+  plain text. Migration 0144 drops the plain text. It first checks that every
+  piece of prose has its document, and if any does not, as on an instance that
+  came straight from 0.2, it refuses before dropping anything and names what is
+  waiting: run `pnpm db:change`, then start again. Nothing a person sees
+  changes.
+  
+  `sessions.setShifts`, `sessions.recordDecision`,
+  `sessions.setManagementAnswer`, `sessions.setStageNote`,
+  `sessions.setCoordinatorNote` and `workflow.setRevalidation` take editor JSON
+  only and refuse a string, as the 0.3 notes announced. The read actions keep
+  their plain text fields, computed from the document.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`9b5bcda`](https://github.com/open-okr/open-okr/commit/9b5bcda887c0400cc98d831c59d6fab929214ac9) Thanks [@agungksidik](https://github.com/agungksidik)! - Home is the reader's own week.
+  
+  Every member opens on "My week": the goals they champion as cards, most
+  overdue first, with their key results, the due day and one action, Check in
+  or Post an update, and their streak. A reviewer sees the check-ins waiting for
+  them with a line of each and Acknowledge all. Administrators and space
+  coordinators and managers also see each team's rhythm and the Work Map below
+  it. The Work Map is the Map tab of Goals, at `/map`, for everybody.
+
+### Patch Changes
+
+- [#130](https://github.com/open-okr/open-okr/pull/130) [`e717b8f`](https://github.com/open-okr/open-okr/commit/e717b8fb88600e9fb2930590e18be2ecb736eddc) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A workspace archive from an earlier release imports cleanly into this one.
+  
+  A column the archive carries that this release no longer has is left out of
+  each row, and the preview says which, where the row used to fail and be
+  counted as skipped. Session prose an earlier release stored as plain text
+  arrives as a document with the same paragraphs, so moving a 0.2 workspace
+  into a later release loses none of it.
+  
+  `pnpm db:change` also counts a data change as done once the migration that
+  removed the columns it read has run and found nothing left to convert.
+
+- [#144](https://github.com/open-okr/open-okr/pull/144) [`d0b5daa`](https://github.com/open-okr/open-okr/commit/d0b5daa2adf54c081c8944912b2cea5c832b6085) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A new workspace keeps the clock of the browser that made it, and a person
+  joining one keeps their own.
+  
+  Every workspace used to start on UTC whatever the browser said, so rhythm
+  dates and quiet hours ran hours off for anybody elsewhere until somebody
+  changed it, and the setup question "Which clock does it keep?" said the zone
+  had been taken from the browser when it had not. The browser's zone now
+  reaches the server in a first-party cookie, `openokr_tz`, and is used when a
+  workspace is created, by sign-up, the setup wizard or single sign-on, and when
+  a member joins by a link, a trusted domain or a provider. A zone the server
+  does not list, a missing cookie or a page with no script all fall back as
+  before: UTC for a workspace, the workspace's zone for a member. Nothing
+  already created changes.
+  
+  `invitations.acceptLink` and `invitations.joinByTrustedDomain` take an
+  optional `timezone`, refused when it is not a listed zone.
+
+- [#161](https://github.com/open-okr/open-okr/pull/161) [`e3b31ca`](https://github.com/open-okr/open-okr/commit/e3b31ca014446750771547c0d5c60353244b5a23) Thanks [@agungksidik](https://github.com/agungksidik)! - The Northwind demo reads as a healthy team. Each imported check-in is
+  acknowledged by its goal's reviewer the day after it was published, so the
+  demo no longer opens on hundreds of overdue acknowledgements, and the Q4 board
+  holds eight tasks behind its key results, some done and most moving. Reset the
+  demo (`sh deploy/demo/reset.sh`) to see it.
+
+- [#133](https://github.com/open-okr/open-okr/pull/133) [`a9d8948`](https://github.com/open-okr/open-okr/commit/a9d89484f370c2f545c5c9ff4d7ffa0e7e05e911) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Moving a workspace with its archive points every id inside stored JSON at
+  the moved rows.
+  
+  A copilot proposal waiting in the review queue named the source workspace's
+  goals and members, so applying it after a move found nothing; an activity's
+  details and a check-in's history did the same. Each such id is now rewritten,
+  and an id the archive does not carry is left alone.
+  
+  An agent's proposal was skipped without a word, because the run that made it
+  does not move. It now stays behind on purpose, and the import preview says how
+  many: the Coach and the Champion propose again on their next run.
+
+- [#157](https://github.com/open-okr/open-okr/pull/157) [`29ccd09`](https://github.com/open-okr/open-okr/commit/29ccd0956400b4068edcab0670d6f05ba6b81f79) Thanks [@agungksidik](https://github.com/agungksidik)! - Each group in the inbox names what it is about.
+  
+  A group heading read only "Goal", so every objective's notifications looked
+  the same. It now shows the goal's title, or the space, initiative, task, KPI,
+  cycle or session name, and `notifications.list` returns it as `subjectTitle`.
+  
+  The chip on a notification sent to a goal's reviewer reads "As reviewer"
+  instead of "To review", so it no longer reads as a task. What a reviewer owes
+  is listed under Review.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`fff412a`](https://github.com/open-okr/open-okr/commit/fff412a2103173b36f767e209627f479d029a320) Thanks [@agungksidik](https://github.com/agungksidik)! - Agent tool descriptions no longer name the interface screen a tool drives
+  ("Drives screen S-28"). REST and the command line keep the full summary.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`add1f84`](https://github.com/open-okr/open-okr/commit/add1f84cae390fb8732e1efc9b64da29aff9efc6) Thanks [@agungksidik](https://github.com/agungksidik)! - Agent tool fields now say what they hold and where to get them: every input
+  of the default `core` toolset is described (an id names the tool that lists
+  it, a date gives its format, confidence its 0 to 1 scale), and the same
+  descriptions reach other toolsets wherever the field name matches. About half
+  of all 886 agent tool fields are described; the rest follow family by family.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`33bcc4e`](https://github.com/open-okr/open-okr/commit/33bcc4e5c581330b801852876d2678cdc9d114b9) Thanks [@agungksidik](https://github.com/agungksidik)! - The four agent prompts now name tools and inputs the server accepts. The
+  weekly check-in finds due goals with `goals.due`, opens the draft with
+  `goals.startCheckIn` before publishing it, asks for confidence from 0 to 1
+  and the status values `on_track`, `caution` and `off_track`, and asks for a
+  next action and any blocker when confidence is low. Blockers are read per
+  space, because `blockers.board` needs a space.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`51574a1`](https://github.com/open-okr/open-okr/commit/51574a10989ad73d4d03d5bbf253675842092db3) Thanks [@agungksidik](https://github.com/agungksidik)! - An agent can no longer send `legacy` (the import identity) or `aiGenerated`
+  (the copilot's provenance label). The fields are gone from the tool schemas,
+  and a call that sends either is refused before anything runs. The importer,
+  the copilot, REST and the command line are unchanged.
+
+- [#157](https://github.com/open-okr/open-okr/pull/157) [`7360842`](https://github.com/open-okr/open-okr/commit/7360842e146885d20e5e26fa9f98f2825efecbb9) Thanks [@agungksidik](https://github.com/agungksidik)! - The agent tool catalogue is smaller: an identifier field says `format: uuid`
+  and no longer repeats the long regular expression beside it. The default
+  toolset drops from about 47 KB to 33 KB. The server validates every call as
+  before.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`de0dfb1`](https://github.com/open-okr/open-okr/commit/de0dfb1707c8e118cc94e4106731c9118819d452) Thanks [@agungksidik](https://github.com/agungksidik)! - A member who calls an administrator's read, such as the audit trail, the
+  deleted items or the AI budgets, is told "<action> needs a higher access level
+  than you hold." (403 on REST) instead of "No such workspace" (404), the same
+  answer every write gives and what docs/design/api-contract.md describes.
+  Somebody who is not an active member of the workspace is still told it does
+  not exist.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`e95244a`](https://github.com/open-okr/open-okr/commit/e95244a9dd0ec9e312513abd73067c06dbce119d) Thanks [@agungksidik](https://github.com/agungksidik)! - `workspace.provision` refuses every person. A member's API or agent token
+  could call it and create a workspace for any user, even on an instance with
+  registration closed; sign-up and the setup wizard create workspaces without
+  it. The two import table actions now check their own `full` level too, rather
+  than relying on the settings read that happened to come first.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`cffc1a1`](https://github.com/open-okr/open-okr/commit/cffc1a1275914e0ac8565ca98688aff9993911d9) Thanks [@agungksidik](https://github.com/agungksidik)! - Eighteen actions that take something away are now in the destructive class:
+  `people.erase`, `invitations.revokeLink`, `channels.disconnect`,
+  `channels.unlinkIdentity`, `channels.removeTemplateMapping`, the five
+  `ai.remove*` actions, `attachments.detach`, `tasks.removeChecklistItem`,
+  `initiatives.unlinkKeyResult`, `goals.unlinkKpi`, `goals.deleteCheckIn`,
+  `goals.removeDependency`, `goals.removeKeyResultDependency` and
+  `sessions.removeRetroNote`. An API or agent token now needs the `destructive`
+  scope to call them, and AI clients see `destructiveHint` and ask first. A
+  token with only read and write that relied on one of them must be reissued
+  with the destructive scope. The screens are unchanged.
+
+- [#160](https://github.com/open-okr/open-okr/pull/160) [`60050f8`](https://github.com/open-okr/open-okr/commit/60050f811f2fd4ecf3a1c462c6374c670fc734d0) Thanks [@agungksidik](https://github.com/agungksidik)! - An agent may send plain text to a rich text field (a comment body, a
+  check-in narrative, a goal description). The MCP dispatcher turns it into a
+  document of paragraphs before the action runs, and the tool schema says so.
+  REST and the command line still take editor JSON only, as 0.4 decided, and
+  their schema now names the shape it wants.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`05c0ff4`](https://github.com/open-okr/open-okr/commit/05c0ff4d68ca5cc2d92fad07535c8a634495e8c7) Thanks [@agungksidik](https://github.com/agungksidik)! - A member who can read and edit a task but cannot delete it is told
+  "tasks.delete needs a higher access level than you hold." rather than "No such
+  task", the same answer goals.delete gives. Restoring a task answers the same
+  way. Somebody who cannot see the task is still told it does not exist.
+
+- [#145](https://github.com/open-okr/open-okr/pull/145) [`4ca1493`](https://github.com/open-okr/open-okr/commit/4ca149365c299bed77d4357b261138d766d5fa7f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Text can be underlined in every editor: from the toolbar's Underline
+  button, with Ctrl+U (Cmd+U on a Mac), or by pasting underlined text.
+  Importing HTML keeps `<u>` as underline too.
+  
+  0.3 taught every reader the mark first, so a document written with an
+  underline here opens in an editor still running 0.3.1 during an upgrade.
+
+- [#150](https://github.com/open-okr/open-okr/pull/150) [`0c45023`](https://github.com/open-okr/open-okr/commit/0c45023e010fdeaac1564d8ffbe7418825aac5ef) Thanks [@agungksidik](https://github.com/agungksidik)! - A member holding the Viewer role can no longer post comments, react, or
+  create and change KPIs and initiatives. Those writes named no subject, so they
+  were measured on the workspace, where every member holds edit for their own
+  profile and notifications, and the role was never read. They are now measured
+  by what the member's role grants on the comment, KPI or initiative domain.
+  Members holding the Member role keep everything they had, and a Viewer still
+  manages their own profile, notifications and tokens.
+- Updated dependencies [[`af6432b`](https://github.com/open-okr/open-okr/commit/af6432b60ff60d740859c9b23485d7ceb74dac0b), [`e717b8f`](https://github.com/open-okr/open-okr/commit/e717b8fb88600e9fb2930590e18be2ecb736eddc), [`76abcf5`](https://github.com/open-okr/open-okr/commit/76abcf55b67cf00df66bad50a28522c7b8f1e23b), [`6c5c2cc`](https://github.com/open-okr/open-okr/commit/6c5c2ccb9e57a82026f76b60b585a9d04c6dfc56), [`8625cc1`](https://github.com/open-okr/open-okr/commit/8625cc17565e17db2efb1e57d3b1e18e16760918), [`214cbb3`](https://github.com/open-okr/open-okr/commit/214cbb381530b9d192970688b6555ba7d2a03b91), [`73845cc`](https://github.com/open-okr/open-okr/commit/73845ccf4f0d53312158d1aa30b3643205e935c2), [`37ba2a5`](https://github.com/open-okr/open-okr/commit/37ba2a56fc26177edccad4e8e1aba259534b9492), [`6111207`](https://github.com/open-okr/open-okr/commit/611120788bb00e3fa1916b61acc93e236d7eb76f), [`81676aa`](https://github.com/open-okr/open-okr/commit/81676aaf950d5b45db102005539015c04af9ec4a)]:
+  - @openokr/method@0.4.0
+  - @openokr/db@0.4.0
+  - @openokr/config@0.4.0
+  - @openokr/formats@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes

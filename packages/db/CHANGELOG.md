@@ -1,5 +1,41 @@
 # @openokr/db
 
+## 0.4.0
+
+### Minor Changes
+
+- [#131](https://github.com/open-okr/open-okr/pull/131) [`81676aa`](https://github.com/open-okr/open-okr/commit/81676aaf950d5b45db102005539015c04af9ec4a) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Session prose is stored as documents only.
+  
+  The monthly review's shifts and decisions, the quarterly review's management
+  answers and private stage notes, the weekly note for leadership and the
+  revalidation's two notes were written twice in 0.3, as a document and as
+  plain text. Migration 0144 drops the plain text. It first checks that every
+  piece of prose has its document, and if any does not, as on an instance that
+  came straight from 0.2, it refuses before dropping anything and names what is
+  waiting: run `pnpm db:change`, then start again. Nothing a person sees
+  changes.
+  
+  `sessions.setShifts`, `sessions.recordDecision`,
+  `sessions.setManagementAnswer`, `sessions.setStageNote`,
+  `sessions.setCoordinatorNote` and `workflow.setRevalidation` take editor JSON
+  only and refuse a string, as the 0.3 notes announced. The read actions keep
+  their plain text fields, computed from the document.
+
+### Patch Changes
+
+- [#130](https://github.com/open-okr/open-okr/pull/130) [`e717b8f`](https://github.com/open-okr/open-okr/commit/e717b8fb88600e9fb2930590e18be2ecb736eddc) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - A workspace archive from an earlier release imports cleanly into this one.
+  
+  A column the archive carries that this release no longer has is left out of
+  each row, and the preview says which, where the row used to fail and be
+  counted as skipped. Session prose an earlier release stored as plain text
+  arrives as a document with the same paragraphs, so moving a 0.2 workspace
+  into a later release loses none of it.
+  
+  `pnpm db:change` also counts a data change as done once the migration that
+  removed the columns it read has run and found nothing left to convert.
+- Updated dependencies []:
+  - @openokr/config@0.4.0
+
 ## 0.3.1
 
 ### Patch Changes
