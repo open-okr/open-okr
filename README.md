@@ -2,7 +2,7 @@
 
 # 🎯 OpenOKR
 
-### Your OKR coach, built in.
+### Stop storing OKRs. Start running them.
 
 **Open source · AI-native · Self-hosted, on one server or on Kubernetes**
 
@@ -27,6 +27,8 @@
 
 ---
 
+OpenOKR is the software an organisation runs its OKRs on: its objectives, key results and KPIs, its weekly check-ins and its quarterly reviews, with the OKR method built in and two AI teammates that keep the quality up and the rhythm going. It is not a course. Your teams use it on their real goals, and the method comes with it.
+
 Most organisations do not fail at OKRs because their software was bad. They fail because the practice never happened. Somebody wrote objectives in a spreadsheet in January, nobody checked in by March, and the quarterly review was a meeting where everyone agreed things had gone reasonably well.
 
 The practice that makes OKRs work has been understood for twenty years. It just does not live in the software.
@@ -43,7 +45,7 @@ OpenOKR fixes this in two ways at once.
 
 ### 1. The method is in the product
 
-The full OKR practice ships as executable rules, not templates or help articles: a guided eight-phase cycle, twenty-six quality checks that run as you type, publish gates, an alignment health score that names its own gaps, KPI health bands with recovery OKRs, the weekly, monthly and quarterly rituals, and a diagnostic at the close.
+The full OKR method ships as executable rules, not templates or help articles: a guided eight-phase cycle, twenty-six quality checks that run as you type, publish gates, an alignment health score that names its own gaps, KPI health bands with recovery OKRs, the weekly, monthly and quarterly rituals, and a diagnostic at the close.
 
 The whole canon lives in [one specification](docs/specification/METHOD.md) and compiles into a pure library with no database, no network and no AI dependency. The same rules run in the browser as you type, on the server before any write, inside the agents, and in the importer. A conformance suite fails the build when the specification and the code disagree.
 
@@ -365,7 +367,7 @@ deploy/             Docker Compose, the Helm chart, and the cloud overlay
 |---|---|
 | [**The documentation index**](docs/README.md) | Everything below, plus the administrator guide, the user guide, the API and the runbooks |
 | [Install on one server](docs/install/compose.md) · [on Kubernetes](docs/install/kubernetes.md) · [the first run](docs/install/first-run.md) | To put it on a machine |
-| [The OKR handbook](docs/handbook/README.md) | To run the practice, rather than to build the software |
+| [The OKR handbook](docs/handbook/README.md) | To run your organisation's OKRs, rather than to build the software |
 | [A year of OKRs at Northwind](docs/scenarios/northwind-year/README.md) | One company's full year in OpenOKR, step by step |
 | [The product overview](docs/specification/OVERVIEW.md) | The product explained for users and administrators |
 | [METHOD.md](docs/specification/METHOD.md) | The OKR practice canon: every rule, band, setting, taxonomy and ritual the product encodes |

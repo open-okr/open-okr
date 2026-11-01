@@ -1,6 +1,6 @@
 # Using OpenOKR
 
-What each screen is for. The practice behind them is in
+What each screen is for. The method behind them is in
 [the handbook](../handbook/README.md); this is the product.
 
 ## The screens you will live in

@@ -1,6 +1,6 @@
 # OpenOKR: product overview
 
-*Your OKR coach, built in. Open source, AI-native, self-hosted or in our cloud.*
+*Stop storing OKRs. Start running them. Open source, AI-native, self-hosted or in our cloud.*
 
 This document is for the people who will use OpenOKR: team members, champions and reviewers, coordinators and facilitators, executives, and the admins who run it. It explains what OpenOKR is, who it is for, and what every part of it does. For the engineering plan behind it, see the other documents in this folder.
 
@@ -8,22 +8,24 @@ This document is for the people who will use OpenOKR: team members, champions an
 
 ## 1. What OpenOKR is
 
+OpenOKR is the software an organisation runs its OKRs on. Your objectives, key results and KPIs live in it, your teams check in through it every week, and your quarterly reviews happen in it. It is not a course or a place to rehearse OKRs: your teams use it on their real goals, and the method comes with it. People learn the method along the way, because the Coach explains every rule it applies.
+
 Most organisations do not fail at OKRs because their tool was bad. They fail because the practice never happened. Somebody wrote objectives in a spreadsheet in January, nobody checked in by March, and the quarterly review was a meeting where everyone agreed things had gone reasonably well.
 
 The practice that makes OKRs work is well understood. Run a proper planning cycle. Refuse to draft without evidence. Check every objective and key result against a quality bar before you commit a quarter to it. Align by contribution, not by copying. Hold a fifteen-minute weekly check-in that produces decisions, not status. Give every blocker an owner and twenty-four hours. Close the quarter with evidence and learn from it.
 
 None of that lives in most software. It lives in a consultant's slide deck, and it stops when the consultant leaves.
 
-**OpenOKR puts the practice in the product, and makes the product active.**
+**OpenOKR puts the method in the product, and makes the product active.**
 
 - **The method is built in.** A guided eight-phase cycle. Twenty-six quality checks that judge every draft as you type. An alignment score that names its gaps. KPI health corridors that trigger recovery objectives. Two timed session formats. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
-- **The coach is active.** Two AI teammates work the practice alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI drops out of its corridor.
+- **The product is active.** Two AI teammates work on your OKRs alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI drops out of its corridor.
 - **They reach you where you work.** In the browser, in Slack, Microsoft Teams, WhatsApp or Telegram, by email, and through your own AI agent.
 - **You own it.** Open source. Self-host it on your servers in about half an hour, or run it in our cloud. Same release, same behaviour. Export your whole workspace whenever you want.
 
 ### In one paragraph
 
-OpenOKR runs the entire OKR practice, from the annual frame to the quarterly close, with an AI coach that checks your quality as you write and an AI champion that keeps your rhythm honest. Both work in the browser and in your chat app. Both cite the rule behind every message, so you can argue with them. Turn the AI off and the practice still runs, because the rules are real code, not a prompt.
+OpenOKR runs your organisation's OKRs, from the annual frame to the quarterly close, with an AI coach that checks your quality as you write and an AI champion that keeps your rhythm honest. Both work in the browser and in your chat app. Both cite the rule behind every message, so you can argue with them. Turn the AI off and every rule still runs, because the rules are real code, not a prompt.
 
 ---
 

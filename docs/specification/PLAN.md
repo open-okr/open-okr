@@ -1,6 +1,6 @@
 # PLAN.md
 
-The architecture of OpenOKR, an open source, AI-agentic-native OKR platform.
+The architecture of OpenOKR, an open source, AI-agentic-native OKR platform that an organisation runs its OKRs on.
 
 This file is the architecture authority. Product scope lives in REQUIREMENTS.md. OKR practice lives in METHOD.md. Agent working rules live in CLAUDE.md.
 

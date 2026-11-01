@@ -2,7 +2,7 @@
 
 ## What this project is
 
-**OpenOKR** is an open source, AI-agentic-native OKR platform. Not a tracker: a system that runs the OKR practice and coaches the organisation through it.
+**OpenOKR** is an open source, AI-agentic-native OKR platform that an organisation runs its real OKRs on. Not a tracker, and not a course: a system that runs the organisation's OKRs with the method built in, and coaches its people while they do the real work. "The practice" in the documents means the discipline as an organisation carries it out, never rehearsal (REQUIREMENTS.md §1).
 
 Two things make it different, and every design decision serves one of them.
 

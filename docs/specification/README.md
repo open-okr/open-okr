@@ -1,6 +1,6 @@
 # OpenOKR: the specification
 
-What OpenOKR is, how it is built, and the OKR practice it encodes. A change to the product starts here: when the code and one of these documents disagree, the document is updated in the same change, or the code is wrong.
+What OpenOKR is, how it is built, and the OKR method it encodes. OpenOKR is the software an organisation runs its OKRs on, not a course. REQUIREMENTS.md §1 says so, and says what "the practice" means in these documents. A change to the product starts here: when the code and one of these documents disagree, the document is updated in the same change, or the code is wrong.
 
 ## The documents
 

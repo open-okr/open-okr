@@ -1,6 +1,6 @@
 # OpenOKR documentation
 
-Start where you are.
+OpenOKR is the software an organisation runs its OKRs on, with the OKR method built in. Start where you are.
 
 | You are | Start here |
 |---|---|
@@ -9,7 +9,7 @@ Start where you are.
 | Using the managed cloud | [Start on the cloud](install/cloud.md) |
 | Running an instance somebody installed | [Administrator guide](admin/README.md) |
 | Using OpenOKR day to day | [User guide](use/README.md) |
-| Running the OKR practice | [The OKR handbook](handbook/README.md) |
+| Running your organisation's OKRs | [The OKR handbook](handbook/README.md) |
 | Calling the API or writing an agent | [The API](api/README.md) |
 | Building OpenOKR itself | [CONTRIBUTING.md](../CONTRIBUTING.md) and [the specification](specification/README.md) |
 
