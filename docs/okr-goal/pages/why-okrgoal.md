@@ -8,7 +8,7 @@
 | Primary CTA | Start free |
 | Secondary CTA | Try the live demo |
 | Page title | Why OKRGoal: compared with spreadsheets, OKR trackers and consultants |
-| Meta description | Spreadsheets have no rhythm. OKR trackers store objectives and wait. Consultants leave. OKRGoal puts the practice in the product, makes the product active, and lets you own it. An honest comparison. |
+| Meta description | Spreadsheets have no rhythm. OKR trackers store objectives and wait. Consultants leave. OKRGoal puts the method in the product, makes the product active, and lets you own it. An honest comparison. |
 
 ## Section structure
 
@@ -30,7 +30,7 @@
 
 **Eyebrow:** Why OKRGoal
 
-# Every OKR tool stores objectives. This one runs the practice.
+# Every OKR tool stores objectives. This one runs them.
 
 There are four common ways to run OKRs. Each one does something well. Here is what each does, what it leaves out, and where OKRGoal is different.
 
@@ -39,7 +39,7 @@ There are four common ways to run OKRs. Each one does something well. Here is wh
 | Spreadsheets | OKR trackers | Project tools with goals | Consultants |
 |---|---|---|---|
 | **Good at:** free, flexible, everyone knows how | **Good at:** a tidy place for objectives, progress bars, dashboards | **Good at:** linking goals to the work people already track | **Good at:** the method, the workshops, the facilitation |
-| **Leaves out:** any rhythm, any owner, any quality bar. Nobody is ever told anything | **Leaves out:** they wait to be visited. Quality, rhythm and the close are left to people to remember | **Leaves out:** the OKR practice itself. Goals become one more field on a task | **Leaves out:** the weeks between visits. The practice leaves with them |
+| **Leaves out:** any rhythm, any owner, any quality bar. Nobody is ever told anything | **Leaves out:** they wait to be visited. Quality, rhythm and the close are left to people to remember | **Leaves out:** the OKR method itself. Goals become one more field on a task | **Leaves out:** the weeks between visits. The method leaves with them |
 
 ## 3. Side by side
 
@@ -70,7 +70,7 @@ There are four common ways to run OKRs. Each one does something well. Here is wh
 
 1. **The method is public, and the product is held to it.** Every rule lives in one document, and a test fails the build when the code disagrees with it.
 2. **Every message cites a rule.** You can open the rule behind any nudge and argue with it.
-3. **It runs the practice with the AI switched off.** The AI drafts and words things. The rules decide.
+3. **Every rule runs with the AI switched off.** The AI drafts and words things. The rules decide.
 4. **Two AI teammates come with every workspace and are never billed as seats.** They propose by default, and a person approves.
 5. **It is yours.** Open source, every feature on every plan, self-host free, and export everything in either direction.
 6. **It is built by people who coach OKRs for a living.** OKR Institute has coached OKR rollouts since 2017, and built OKRGoal and OpenOKR on what it learned.
@@ -80,7 +80,7 @@ There are four common ways to run OKRs. Each one does something well. Here is wh
 ## Honestly, it is not for everyone.
 
 - **You want a project-management suite.** OKRGoal has initiatives, a board and documents, deliberately OKR-shaped. It has no Gantt charts, sprints or time tracking. Keep your project tool and link its work to key results.
-- **You want goals with no practice around them.** If you want a list of objectives and nothing else, a spreadsheet is fine. The Lightweight profile is the closest we get.
+- **You want goals with no method around them.** If you want a list of objectives and nothing else, a spreadsheet is fine. The Lightweight profile is the closest we get.
 - **You need a native mobile app today.** The web app works on a phone, and so do the chat channels, but there is no app in the stores yet.
 - **You need custom fields and custom workflows.** Not in the first version. They are designed for, and come later.
 

@@ -29,7 +29,7 @@
 
 **Eyebrow:** OKRGoal
 
-# We run it. You run the practice.
+# We run it. You run your OKRs.
 
 OKRGoal is OpenOKR, run for you by OKR Institute, the people who build it. The same release as the open source edition, with every feature on every plan. Sign up, name your workspace, and the Coach is checking your first draft a few minutes later.
 

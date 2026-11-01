@@ -7,16 +7,16 @@
 | The page's one job | Say what OKRGoal is and why it is different, then get a click to the demo or to sign-up |
 | Primary CTA | Start free |
 | Secondary CTA | Try the live demo |
-| Page title | OKRGoal: the OKR platform with a coach built in. From OKR Institute, built on open source |
-| Meta description | OKRGoal runs the OKR practice with you. An AI Coach checks every objective as you write it, and an AI Champion keeps the weekly rhythm in Slack, Teams and WhatsApp. From OKR Institute, built on open source OpenOKR. Free to start. |
+| Page title | OKRGoal: run your OKRs, don't just store them. From OKR Institute, built on open source |
+| Meta description | OKRGoal runs your organisation's OKRs, from the annual plan to the quarterly close. An AI Coach checks every objective as you write it, and an AI Champion keeps the weekly rhythm in Slack, Teams and WhatsApp. From OKR Institute, built on open source OpenOKR. Free to start. |
 
 ## Section structure
 
 | # | Section | Purpose | Layout | Borrowed from |
 |---|---|---|---|---|
 | 0 | Announcement bar | The latest release, so the site looks alive | One line, linked | Langflow, Firecrawl, Mastra |
-| 1 | Hero | The promise in five words, the product in one sentence | H1, subhead, two buttons, install command, product image | Firecrawl, browser-use |
-| 2 | Proof strip | Proof without customer logos we do not have | OKR Institute's record, four product numbers, a GitHub badge, a line of sources | n8n's proof row |
+| 1 | Hero | The promise in six words, the product in one sentence | H1, subhead, two buttons, install command, product image | Firecrawl, browser-use |
+| 2 | Proof strip | Proof without customer logos we do not have | Four product numbers, a GitHub badge, then OKR Institute's record as who built it, and a line of sources | n8n's proof row |
 | 3 | The problem | Name the failure everyone recognises | Headline, short paragraph, three cards | Our README |
 | 4 | Pillar 1: the method | Show a check firing, not describe it | Split: a draft being coached on the left, the list on the right | Firecrawl's live query box, Langflow's interactive mini UIs |
 | 5 | Pillar 2: the agents | Make the two agents concrete | Two cards, each with a real message and its rule key | Mastra's tabbed primitives |
@@ -27,7 +27,7 @@
 | 10 | Run it your way | Cloud, one server, Kubernetes | Three cards | OpenHands' "Start on your laptop. Scale to the cloud." |
 | 11 | Every seat at the table | Every reader finds their row | Tabs by role | n8n's persona tabs |
 | 12 | Built in the open | Community and the method as public text | Text, GitHub card | OpenHands' "Open source at the core" |
-| 13 | FAQ | Objections, and search | Accordion, eight questions | Mastra, n8n |
+| 13 | FAQ | Objections, and search | Accordion, nine questions | Mastra, n8n |
 | 14 | Final CTA | One more chance to act | Headline, three actions | Firecrawl |
 
 ---
@@ -42,10 +42,10 @@ Links to the v0.4.0 release on GitHub. Update with every minor release.
 
 **Eyebrow:** From OKR Institute · Built on open source
 
-# Your OKR coach, built in.
+# Stop storing OKRs. Start running them.
 
 **Subhead:**
-OKRGoal is the OKR platform that runs the practice with you. The OKR Coach checks every objective as you write it. The OKR Champion keeps the weekly rhythm in Slack, Teams, WhatsApp and email. It runs on OpenOKR, which is open source, so you can also host it yourself, free.
+OKRGoal is where your organisation's OKRs live and run, with the method built in. The OKR Coach checks every objective as you write it. The OKR Champion keeps the weekly rhythm in Slack, Teams, WhatsApp and email. It runs on OpenOKR, which is open source, so you can also host it yourself, free.
 
 **Buttons:** `[ Start free ]` `[ Try the live demo ]`
 
@@ -76,10 +76,7 @@ Caption beside the chip: **Or self-host OpenOKR in about half an hour →**
 
 ## 2. Proof strip
 
-**First, one line in small caps:**
-From OKR Institute · Coaching OKRs since 2017 · 70,000+ people trained · 1,000+ organisations · 50+ countries
-
-Then four product numbers in a row, and one line under them.
+**First, four product numbers in a row:**
 
 | 26 | 8 | 7 | 0 |
 |---|---|---|---|
@@ -87,10 +84,13 @@ Then four product numbers in a row, and one line under them.
 
 **Beside the numbers:** the live GitHub star badge. `★ Star on GitHub {stars}`
 
-**Line under it, small caps, muted:**
-Built on published practice: Doerr · Grove · Wodtke · Castro · Lamorte · Cagan · Google's OKR playbook
+**Then one line in small caps:**
+Built by OKR Institute · Coaching organisations through OKRs since 2017 · 1,000+ organisations · 50+ countries
 
-> **Design note:** this is where the reference sites put a customer logo wall. OKRGoal has no customers to name yet, and inventing them is not an option. OKR Institute's record does the job honestly, the way Mastra's case-study numbers do: the people behind the product have done this before. The sources line says the method is not made up. OKR Institute's training clients are not OKRGoal customers, so their names and logos never appear here. Replace this strip with OKRGoal customer logos only with written permission.
+**Line under it, small caps, muted:**
+Built on published sources: Doerr · Grove · Wodtke · Castro · Lamorte · Cagan · Google's OKR playbook
+
+> **Design note:** this is where the reference sites put a customer logo wall. OKRGoal has no customers to name yet, and inventing them is not an option. OKR Institute's record does the job honestly, the way Mastra's case-study numbers do: the people behind the product have done this before. It comes after the product numbers and says "Built by", because it is the maker's record, not what the product does: right under the hero, "people trained" made OKRGoal read as a training product. The sources line says the method is not made up. OKR Institute's training clients are not OKRGoal customers, so their names and logos never appear here. Replace this strip with OKRGoal customer logos only with written permission.
 
 ## 3. The problem
 
@@ -98,7 +98,7 @@ Built on published practice: Doerr · Grove · Wodtke · Castro · Lamorte · Ca
 
 Somebody writes the objectives in a spreadsheet. Nobody checks in by March. The quarterly review is a meeting where everyone agrees things went reasonably well.
 
-The practice that makes OKRs work has been understood for twenty years. It just never lived in the software.
+The method that makes OKRs work has been understood for twenty years. It just never lived in the software.
 
 **Three cards:**
 
@@ -113,9 +113,9 @@ OKRGoal fixes this two ways at once. **The method is in the product. And the pro
 
 **Eyebrow:** The method
 
-## Practice, not a template.
+## Rules that run, not a template.
 
-The whole OKR practice ships as rules that run: a guided eight-phase cycle, twenty-six quality checks that judge every line as you type, six publish gates, an alignment score that names its gaps, and a diagnostic at the close. It is all written down in one public document, and a test fails our build when the code and the document disagree.
+The whole OKR method ships as rules that run on your real OKRs: a guided eight-phase cycle, twenty-six quality checks that judge every line as you type, six publish gates, an alignment score that names its gaps, and a diagnostic at the close. It is all written down in one public document, and a test fails our build when the code and the document disagree.
 
 **Left: a live coaching mock.** An objective field and two key results, with verdicts appearing beside them:
 
@@ -235,7 +235,7 @@ At most one nudge per subject per day, and five per person per week. Quiet hours
 
 ## Turn the AI off. It still coaches.
 
-Every rule, nudge, escalation, gate, score and diagnostic in OKRGoal is code, not a prompt. Switch the AI provider off and the whole practice still runs. That is why it fits regulated, air-gapped and AI-sceptical organisations that would turn away a product that depends on a model.
+Every rule, nudge, escalation, gate, score and diagnostic in OKRGoal is code, not a prompt. Switch the AI provider off and every rule still runs. That is why it fits regulated, air-gapped and AI-sceptical organisations that would turn away a product that depends on a model.
 
 **Two columns:**
 
@@ -289,7 +289,7 @@ claude mcp add --transport http openokr https://app.okrgoal.com/api/mcp
 
 | OKRGoal | OpenOKR on one server | OpenOKR on Kubernetes |
 |---|---|---|
-| **We run it.** Sign up and start. Backups, upgrades and monitoring are ours. Your practice is yours. | **Free, on your own machine.** Docker Compose and a setup wizard. About half an hour. PostgreSQL is the only thing it needs. | **For universities and large organisations.** A Helm chart with your database, your single sign-on and your backups. |
+| **We run it.** Sign up and start. Backups, upgrades and monitoring are ours. Your OKRs are yours. | **Free, on your own machine.** Docker Compose and a setup wizard. About half an hour. PostgreSQL is the only thing it needs. | **For universities and large organisations.** A Helm chart with your database, your single sign-on and your backups. |
 | `[ Start free ]` | `./openokr up` | `helm install openokr oci://ghcr.io/open-okr/charts/openokr` |
 
 **Line under the cards:**
@@ -322,7 +322,7 @@ OKRGoal runs on OpenOKR, which is open source under AGPL-3.0. The method is a pu
 
 **Three links in a row:**
 
-- **Read METHOD.md →** The whole practice in one document.
+- **Read METHOD.md →** The whole method in one document.
 - **Star on GitHub →** Follow every release.
 - **Contribute →** The interesting problems here are method, coaching and agents, not forms.
 
@@ -333,7 +333,10 @@ OKRGoal runs on OpenOKR, which is open source under AGPL-3.0. The method is a pu
 ## Questions
 
 **What is OKRGoal?**
-An OKR platform with the OKR practice built in, from OKR Institute. It guides the planning cycle, checks every objective and key result as you write it, runs the weekly check-in and the quarterly review, and comes with two AI teammates, the OKR Coach and the OKR Champion, that guard quality and keep the rhythm.
+The OKR platform your organisation runs its OKRs on, from OKR Institute. It holds your objectives, key results and KPIs, guides the planning cycle, checks every objective and key result as you write it, runs the weekly check-in and the quarterly review, and comes with two AI teammates, the OKR Coach and the OKR Champion, that guard quality and keep the rhythm.
+
+**Is it a course, or a way to learn OKRs?**
+No. OKRGoal is where your teams write, check in on and review their real OKRs. People do pick up the method along the way, because the Coach explains every rule it applies. If you want to learn OKRs before you start, OKR Institute runs courses and certification, separately from the product.
 
 **Who is behind it, and how do OKRGoal and OpenOKR relate?**
 OKR Institute, which has coached, trained and certified OKR practitioners since 2017. It built OKRGoal and OpenOKR on what it learned running its OKR platform, okri.io, and coaching organisations through OKRs. OpenOKR is the open source product, under AGPL-3.0. OKRGoal is OpenOKR in the cloud, run for you. It is the same release either way.

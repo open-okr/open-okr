@@ -8,7 +8,7 @@
 | Primary CTA | Become a partner |
 | Secondary CTA | Read METHOD.md |
 | Page title | For OKR consultants and coaches: your method keeps running after you leave · OKRGoal |
-| Meta description | OKRGoal keeps the practice running between your workshops: quality checks on every draft, a weekly rhythm with teeth, and a quarterly review you facilitate. Tune it to your method, and help shape the open method itself. |
+| Meta description | OKRGoal keeps your clients' OKRs running between your workshops: quality checks on every draft, a weekly rhythm with teeth, and a quarterly review you facilitate. Tune it to your method, and help shape the open method itself. |
 
 ## Section structure
 
@@ -31,7 +31,7 @@
 
 # Your method keeps running after you leave.
 
-You set the practice up properly. Then the engagement ends, and by week six the check-ins have stopped. OKRGoal holds the line between your visits: it checks every draft, runs the weekly rhythm, chases what is late, and brings you a clear diagnosis at the close.
+You set your client's OKRs up properly. Then the engagement ends, and by week six the check-ins have stopped. OKRGoal holds the line between your visits: it checks every draft, runs the weekly rhythm, chases what is late, and brings you a clear diagnosis at the close.
 
 **Buttons:** `[ Become a partner ]` `[ Read METHOD.md ]`
 
@@ -39,7 +39,7 @@ You set the practice up properly. Then the engagement ends, and by week six the 
 
 ## You know how this goes.
 
-The workshop was good. The objectives were good. The first two check-ins happened. Then a launch slipped, a manager went on leave, and the practice quietly stopped. When you came back for the quarterly review, half the key results had not been touched in a month.
+The workshop was good. The objectives were good. The first two check-ins happened. Then a launch slipped, a manager went on leave, and the rhythm quietly stopped. When you came back for the quarterly review, half the key results had not been touched in a month.
 
 That is not a failure of your method. It is the gap between your visits, and nothing has filled it until now.
 
@@ -89,7 +89,7 @@ We would rather be argued with by practitioners than agreed with by nobody.
 
 ## Work with OKR Institute.
 
-OKR Institute already works with certified coaches and partners around the world. OKRGoal gives that network a product that keeps the practice running between visits.
+OKR Institute already works with certified coaches and partners around the world. OKRGoal gives that network a product that keeps clients' OKRs running between visits.
 
 - **Get certified** through OKR Institute's path: Practitioner (C-OKRP®), Leader (C-OKRL®) and Professional (C-OKRPro®)
 - **Get listed** as an OKR Institute partner

@@ -66,7 +66,7 @@ Copy for 21 pages is in [pages/](pages/). The legal pages are listed here and wr
 |---|---|---|---|---|---|
 | Home | Everyone | Say what it is, why it is different, and get a click to the demo or sign-up | Start free | Try the live demo | [home.md](pages/home.md) |
 | Product tour | Evaluators who want the whole picture | Walk the product in the order a quarter runs | Start free | Try the live demo | [product.md](pages/product.md) |
-| The method | OKR leads, PMOs, practitioners | Prove the practice is real code, and adaptable | See the twenty-six checks | Read METHOD.md | [product-method.md](pages/product-method.md) |
+| The method | OKR leads, PMOs, practitioners | Prove the method is real code, and adaptable | See the twenty-six checks | Read METHOD.md | [product-method.md](pages/product-method.md) |
 | The agents | Everyone curious about "AI-native" | Show what the agents do, and why they are safe | Start free | Try the live demo | [product-agents.md](pages/product-agents.md) |
 | The rhythm | Managers, coordinators, facilitators | Show the weekly and quarterly sessions the product runs | Start free | See a weekly session in the demo | [product-rhythm.md](pages/product-rhythm.md) |
 | KPIs | Finance, operations, PMOs | Show KPIs and OKRs working as one system | Start free | Try the live demo | [product-kpis.md](pages/product-kpis.md) |
@@ -125,7 +125,7 @@ The pattern every reference site shares: four or five menus, a GitHub star count
 | Documentation | Install, administer, use, integrate |
 | OKR handbook | How to write and run OKRs, in plain English |
 | A year at Northwind | One company's year of OKRs, step by step |
-| Blog | Practice, product and releases |
+| Blog | Method, product and releases |
 | Changelog | Every release and what changed |
 | Community | GitHub, discussions and contributing |
 | OKR courses ↗ | Training and certification from OKR Institute |
@@ -139,7 +139,7 @@ One menu button. The two buttons stay visible at the bottom of the open menu: **
 
 ```
 OKRGoal logo
-Your OKR coach, built in.
+Stop storing OKRs. Start running them.
 From OKR Institute. OKRGoal is OpenOKR, run for you. OpenOKR is open source under AGPL-3.0.
 [★ Star on GitHub]
 

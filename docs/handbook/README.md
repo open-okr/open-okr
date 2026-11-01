@@ -1,6 +1,6 @@
 # The OKR handbook
 
-For the person running the practice, not for the person building the product.
+For the people running their organisation's OKRs, not for the people building the product.
 
 Everything here is what OpenOKR actually enforces, taken from
 [METHOD.md](../specification/METHOD.md), which is the specification the code

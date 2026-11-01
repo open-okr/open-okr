@@ -29,7 +29,7 @@
 
 # Built in the open. Argue with the rules.
 
-OpenOKR is open source under AGPL-3.0, and so is its method. The code, the specification, the design of every engine and the full OKR practice it enforces are public. You can read all of it, run all of it, and change any of it.
+OpenOKR is open source under AGPL-3.0, and so is its method. The code, the specification, the design of every engine and the full OKR method it enforces are public. You can read all of it, run all of it, and change any of it.
 
 **GitHub card:** `open-okr/open-okr` · ★ {stars} · latest release {version} · AGPL-3.0
 **Button:** `[ ★ Star on GitHub ]`
@@ -39,14 +39,14 @@ OpenOKR is open source under AGPL-3.0, and so is its method. The code, the speci
 | If you run OKRs for a living | If your organisation runs OKRs | If you write code |
 |---|---|---|
 | **Review the method.** Read METHOD.md and challenge any rule, threshold or agenda you think is wrong, with your reasoning and your source | **Run a real quarter on it.** Then tell us where the coaching was wrong. The whole workspace exports at any time, so trying costs you nothing | **Pick up an issue.** Start with CONTRIBUTING and the good first issues |
-| Your practice becomes enforceable software, attributable and versioned | Direct influence on the rules, and no lock-in | A codebase where the hard problems are method, coaching and agents, not forms |
+| Your method becomes enforceable software, attributable and versioned | Direct influence on the rules, and no lock-in | A codebase where the hard problems are method, coaching and agents, not forms |
 | `[ Challenge a rule ]` | `[ Start free ]` | `[ Read CONTRIBUTING ]` |
 
 ## 3. What makes it interesting to work on
 
 ## Not another CRUD app.
 
-- **A method library with no I/O.** The OKR practice as pure functions, run identically in the browser, on the server, in the agents and in the importer, with a conformance test against the document
+- **A method library with no I/O.** The OKR method as pure functions, run identically in the browser, on the server, in the agents and in the importer, with a conformance test against the document
 - **Agents with real guardrails.** Least privilege, proposals, sandbox mode, cost caps and a nudge budget
 - **One contract, many surfaces.** The API, the command line, the agent tools and the chat commands are generated from one registry
 - **Isolation in the database.** Row-level security on every table, and a test that proves a connection with no workspace reads nothing
@@ -67,7 +67,7 @@ OpenOKR is open source under AGPL-3.0, and so is its method. The code, the speci
 
 ## Who decides what.
 
-The project owner has the final say while the project is young, and it is written down in GOVERNANCE.md. Changes to the OKR practice itself are a maintainer decision, not something a pull request settles alone, because the method is the product. Contributions come under a lightweight contributor licence agreement, signed with one click.
+The project owner has the final say while the project is young, and it is written down in GOVERNANCE.md. Changes to the OKR method itself are a maintainer decision, not something a pull request settles alone, because the method is the product. Contributions come under a lightweight contributor licence agreement, signed with one click.
 
 **Links:** `GOVERNANCE.md →` `CONTRIBUTING.md →`
 

@@ -32,7 +32,7 @@
 
 # Built by people who coach OKRs for a living.
 
-OKRGoal and OpenOKR are made by OKR Institute. Since 2017 we have coached organisations through OKR rollouts, trained the people who run them, and certified OKR practitioners around the world. OKRGoal is what we built from what we learned.
+OKRGoal and OpenOKR are made by OKR Institute. Since 2017 we have coached organisations through OKR rollouts, trained the people who run them, and certified OKR practitioners around the world. OKRGoal is what we built from what we learned: the software an organisation runs its OKRs on, so the method keeps running when no coach is in the room.
 
 ## 2. OKR Institute in numbers
 
@@ -52,11 +52,11 @@ OKRGoal and OpenOKR are made by OKR Institute. Since 2017 we have coached organi
 
 > **Decision needed:** this section should be in the founders' own words. The draft below stays inside what OKR Institute already says publicly.
 
-We have watched OKRs succeed and fail in more than a thousand organisations. The ones that fail rarely fail on strategy, or on the tool. They fail because nobody holds the practice together long enough for it to become a habit. It holds while a coach is in the room, and slips in week six when the coach has gone.
+We have watched OKRs succeed and fail in more than a thousand organisations. The ones that fail rarely fail on strategy, or on the tool. They fail because nobody keeps the rhythm going long enough for it to become a habit. It holds while a coach is in the room, and slips in week six when the coach has gone.
 
 We built okri.io, our OKR platform, to support that work, and it taught us what software has to do for the habit to last. Check every objective as it is written. Run the weekly rhythm instead of reminding people about it. Chase what is late, where people already are. Close every quarter with an honest answer.
 
-OKRGoal and OpenOKR are those lessons, built in. We wrote the practice down, all of it, in one public document. We built a product that enforces it, with two AI teammates that keep it running between coaching sessions. And we made it open source, because an organisation's strategy is too important to run on a tool it does not own.
+OKRGoal and OpenOKR are those lessons, built in. We wrote the method down, all of it, in one public document. We built software for running your OKRs that enforces it, with two AI teammates that keep the rhythm going every week, whether or not a coach is involved. And we made it open source, because an organisation's strategy is too important to run on a tool it does not own.
 
 ## 4. What we believe
 
@@ -64,7 +64,7 @@ OKRGoal and OpenOKR are those lessons, built in. We wrote the practice down, all
 |---|---|
 | **The rhythm is the product** | The weekly session and the quarterly review are run by the software, not remembered by a person |
 | **Software should start the conversation** | Two agents that initiate, escalate and propose, so nothing waits to be discovered |
-| **AI should help, never decide** | Every rule is code. The AI drafts and words things. Turn it off and the practice still runs |
+| **AI should help, never decide** | Every rule is code. The AI drafts and words things. Turn it off and every rule still runs |
 | **Every rule should be arguable** | Every message cites its rule. Every rule is public. Practitioners can change it |
 | **You should own your tools** | Open source, every feature on every plan, self-host free, export everything |
 
@@ -97,7 +97,7 @@ OKRGoal and OpenOKR are those lessons, built in. We wrote the practice down, all
 
 ## Coaching and certification, from the same team.
 
-Software keeps the practice running. Sometimes a team also needs a person in the room. OKR Institute's certified coaches run OKR rollouts, and its certification path trains the people who run the practice: Foundation, Practitioner (C-OKRP®), Leader (C-OKRL®), Chief OKR Officer (C-OKRO®) and Professional (C-OKRPro®).
+OKRGoal keeps your OKRs running. Sometimes a team also needs a person in the room. OKR Institute's certified coaches run OKR rollouts, and its certification path trains the people who lead OKRs in an organisation: Foundation, Practitioner (C-OKRP®), Leader (C-OKRL®), Chief OKR Officer (C-OKRO®) and Professional (C-OKRPro®).
 
 **Buttons:** `[ See the courses ↗ ]` (to okrinstitute.org) `[ Talk to us ]`
 

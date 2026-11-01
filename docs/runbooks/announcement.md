@@ -11,10 +11,10 @@ remember when the release disappoints them.
 
 <!-- VERSION: the tag, without the v. -->
 
-OpenOKR is an open source OKR platform that runs the practice rather than
-storing it. Two things make it different from a tracker.
+OpenOKR is an open source OKR platform that runs an organisation's OKRs
+rather than storing them. Two things make it different from a tracker.
 
-**The method is in the product.** The OKR practice is written out in one
+**The method is in the product.** The OKR method is written out in one
 document: the eight-phase cycle, the scoring bands, twenty-six quality checks
 with their word lists, six publish gates, the alignment score, KPI health
 corridors, the blocker taxonomy, both session agendas and the closing

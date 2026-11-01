@@ -38,7 +38,7 @@ The company behind OKRGoal and OpenOKR. The figures are OKR Institute's claims a
 | Closing diagnostic | "Tells you whether a missed quarter was a strategy problem or a rhythm problem" | METHOD.md §8.6 |
 | KPI health | "Every KPI has a health band in its own units". **Do not quote 70/90 percent bands**: the band is per KPI, and 90% of target is only the fallback | METHOD.md §6.4, §11 |
 | Recovery OKRs | "When a KPI turns unhealthy, OpenOKR offers three responses, one of which is a drafted recovery OKR" | METHOD.md §6.5, README |
-| Published sources | "Built on published practice: Doerr, Grove, Wodtke, Castro, Lamorte, Cagan and Google's OKR playbook". Never imply endorsement | METHOD.md §13 |
+| Published sources | "Built on published sources: Doerr, Grove, Wodtke, Castro, Lamorte, Cagan and Google's OKR playbook". Never imply endorsement | METHOD.md §13 |
 | Conformance | "A test fails the build when the method document and the code disagree" | [CLAUDE.md](../../CLAUDE.md), PLAN.md §9 |
 
 ## The agents
@@ -141,6 +141,7 @@ The company behind OKRGoal and OpenOKR. The figures are OKR Institute's claims a
 | SOC 2, ISO 27001 or any certification for OKRGoal | None held. The SOC 2 report in the Northwind story belongs to the invented company |
 | A cloud region, uptime figure or response time | Not decided. See [README.md](README.md#decisions-the-copy-is-waiting-for) |
 | "AI decides", "autonomous", "set and forget" | The AI never makes the decision, and agents propose by default |
+| That OKRGoal is a course, a training tool, or a way to learn or practise OKRs | It is the software an organisation runs its real OKRs on. People learn the method while they use it, which is a side effect, not the product. Training is OKR Institute's, sold beside it. See [messaging.md §2](messaging.md) |
 | "Replaces your OKR consultant" | Untested, it insults a group we want as partners, and OKR Institute sells coaching itself |
 | Any business connection between OKR Institute, OKRGoal or OpenOKR and another OKR software company | Settled with the maintainer on 1 November 2026. An importer for another tool is a feature, and is described only as one |
 | OKR Institute's training and coaching clients as OKRGoal customers or logos | They trained with OKR Institute. They are not OKRGoal customers |

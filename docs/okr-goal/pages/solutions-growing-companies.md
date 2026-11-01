@@ -41,7 +41,7 @@ You do not need a consultant or a full-time OKR lead to run OKRs well. You need 
 
 The first time, the founders wrote objectives on an offsite. Ten of them. The key results were a to-do list. Check-ins happened for three weeks, then the quarter got busy. By the review, nobody could say what had worked.
 
-None of that was a people problem. It was a missing practice. OKRGoal brings the practice.
+None of that was a people problem. Nothing checked the drafts and nothing ran the rhythm. OKRGoal does both.
 
 ## 3. Your first quarter, week by week
 
@@ -96,13 +96,13 @@ Two profiles are built for a first rollout:
 Choose the Radical Focus or Lightweight profile and it is as small as a shared document, with a coach that does the chasing.
 
 **Do we need an OKR lead?**
-No. Somebody should own the practice, often the chief of staff or a founder, but the product runs the reminders, the agenda, the digest and the review.
+No. Somebody should own your OKRs, often the chief of staff or a founder, but the product runs the reminders, the agenda, the digest and the review.
 
 **We have OKRs in a spreadsheet. Can we keep them?**
 Upload the spreadsheet. You confirm the column mapping, see a dry run, then import.
 
 **Do we need to use AI?**
-No. It drafts and rewrites if you connect it, and the practice runs either way.
+No. It drafts and rewrites if you connect it, and every rule runs either way.
 
 ## 8. Final CTA
 

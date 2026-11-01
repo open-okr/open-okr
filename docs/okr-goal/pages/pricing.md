@@ -43,7 +43,7 @@ Pay for people, not for features. Self-host OpenOKR free with no limit on people
 
 | | **Free** | **Team** | **Enterprise** |
 |---|---|---|---|
-| Line under the name | For a team getting started | For an organisation running the practice | For large organisations, with terms to match |
+| Line under the name | For a team getting started | For an organisation running OKRs every quarter | For large organisations, with terms to match |
 | Price | **US$0** | **US$[price]** per person a month, billed yearly. US$[price] billed monthly | **Talk to us** |
 | People | Up to [N] | As many as you need | As many as you need |
 | Every feature | ✓ | ✓ | ✓ |
@@ -156,7 +156,7 @@ Because OpenOKR is open source, and we think organisations should be able to own
 If you run OpenOKR for your own staff, nothing. You owe no fee and no source code. The licence only asks something of people who change the code and offer it to others as a service: they must publish their changes.
 
 **Do the AI features cost extra?**
-Paid cloud plans include an AI allowance, with a hard cap so a bill can never surprise you. Or bring your own key and pay your provider directly. And every part of the practice works with AI switched off.
+Paid cloud plans include an AI allowance, with a hard cap so a bill can never surprise you. Or bring your own key and pay your provider directly. And every rule works with AI switched off.
 
 **Do the AI agents count as seats?**
 No, on any plan.

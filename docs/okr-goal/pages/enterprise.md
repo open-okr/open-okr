@@ -8,17 +8,17 @@
 | Primary CTA | Talk to us |
 | Secondary CTA | Read the security page |
 | Page title | OKRGoal for enterprise: governed OKRs, in our cloud or on your servers |
-| Meta description | Run OKRs across the whole organisation with a governed practice, single sign-on and directory sync, a tamper-evident audit log, AI you control, and rollout support from OKR Institute. Cloud, self-hosted or air-gapped. |
+| Meta description | Run OKRs across the whole organisation on one governed method, with single sign-on and directory sync, a tamper-evident audit log, AI you control, and rollout support from OKR Institute. Cloud, self-hosted or air-gapped. |
 
 ## Section structure
 
-Told as a story, after n8n's enterprise page: the problem, the practice, governance, deployment, scale, support.
+Told as a story, after n8n's enterprise page: the problem, the method, governance, deployment, scale, support.
 
 | # | Eyebrow | Section | Layout |
 |---|---|---|---|
 | 1 | | Hero | H1, subhead, one button |
 | 2 | The problem | Enterprise OKRs fail the same way | Three cards |
-| 3 | The practice | One practice, every department | Text and four cards |
+| 3 | The method | One method, every department | Text and four cards |
 | 4 | Governance | Control without a committee | Six cards |
 | 5 | AI under control | The AI governance console | Two columns |
 | 6 | Deployment | Run it where policy says | Four tiles |
@@ -35,7 +35,7 @@ Told as a story, after n8n's enterprise page: the problem, the practice, governa
 
 # OKRs across the whole organisation. Governed, honest, and yours.
 
-OKRGoal runs one OKR practice across every department, with the governance a large organisation needs and the audit trail a regulator asks for. Run it in our cloud, or run OpenOKR, the same open source release, on your own Kubernetes or fully offline. Every feature is in every edition, so what you are buying is OKR Institute's support, not a licence.
+OKRGoal runs every department's OKRs on one method, with the governance a large organisation needs and the audit trail a regulator asks for. Run it in our cloud, or run OpenOKR, the same open source release, on your own Kubernetes or fully offline. Every feature is in every edition, so what you are buying is OKR Institute's support, not a licence.
 
 **Button:** `[ Talk to us ]`
 
@@ -53,11 +53,11 @@ OKRGoal runs one OKR practice across every department, with the governance a lar
 |---|---|---|
 | The first quarter has a consultant, workshops and energy. By the second, check-ins are optional and the tool is a filing cabinet. | One division writes tasks as key results, another writes ten objectives, a third skips the review. Nobody can compare anything. | The quarter ends, the numbers are missed, and there is no way to tell whether the strategy was wrong or the work never happened. |
 
-## 3. The practice
+## 3. The method
 
-**Eyebrow:** The practice
+**Eyebrow:** The method
 
-## One practice. Every department. Your rules.
+## One method. Every department. Your rules.
 
 Choose a profile for the whole organisation, then tune it. The **Governed** profile makes the planning phases binding, sets a planning window for writing OKRs, routes new mid-cycle objectives through the reviewer, requires a reviewer on every goal, and blocks on five of the six publish gates. Every rule you change is audited, and a closed cycle keeps the rules it was graded under.
 
@@ -100,7 +100,7 @@ Choose a profile for the whole organisation, then tune it. The **Governed** prof
 | How much context may leave: everything, assists only, or nothing | Email addresses and phone numbers redacted before anything leaves |
 | Which hosts it may call | An allow-list, and a refused call is an audit row |
 | Whether agents may write, or only propose | Proposals wait in a review queue. Sandbox mode commits nothing |
-| A local model, or none at all | With a local model, nothing leaves your network. With none, the practice still runs |
+| A local model, or none at all | With a local model, nothing leaves your network. With none, every rule still runs |
 
 ## 6. Deployment
 
@@ -138,7 +138,7 @@ Choose a profile for the whole organisation, then tune it. The **Governed** prof
 
 ## We roll it out with you.
 
-Software does not run an OKR practice. People do. OKR Institute has coached OKR rollouts since 2017, for more than 1,000 organisations, and its coaches help yours get there.
+OKRGoal runs the rhythm. People still make the calls. OKR Institute has coached OKR rollouts since 2017, for more than 1,000 organisations, and its coaches help yours get there.
 
 **Five cards:**
 

@@ -38,7 +38,7 @@ Five tiles. Clicking one sets the form's topic and changes the form's helper tex
 | **An organisation-wide rollout** | How many people, how you run OKRs today, and whether you want the cloud or your own servers |
 | **Support for a self-hosted instance** | Where it runs, how many people use it, and what kind of help you want |
 | **Security or procurement** | Attach your questionnaire, or tell us what your reviewers need |
-| **Partnerships** | For OKR consultants and coaches. Tell us about your practice |
+| **Partnerships** | For OKR consultants and coaches. Tell us about your clients and your method |
 | **Press** | Your publication and your deadline |
 
 ## 3. The form

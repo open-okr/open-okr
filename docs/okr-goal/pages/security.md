@@ -87,7 +87,7 @@ OpenOKR is open source. Every control on this page is in the code, and most of t
 - Retrieved content is treated as data, never as instructions, and tests prove an injected instruction cannot exceed an agent's access
 - Choose what context may reach an AI provider, redact email addresses and phone numbers, and allow-list the hosts it may call
 - With a local model, nothing leaves your network
-- With AI off, the whole practice still runs
+- With AI off, every rule still runs
 
 ## 7. Chat channels
 

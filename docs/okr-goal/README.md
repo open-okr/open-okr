@@ -2,7 +2,7 @@
 
 The structure and the full copy of okrgoal.com: the home of OKRGoal, OKR Institute's cloud OKR product, and the commercial home of OpenOKR, its open source edition. Written for whoever designs and builds the site, and for the maintainers who must approve what it promises.
 
-**Status:** draft copy, 1 November 2026, written against release v0.4.0. Nothing here is published.
+**Status:** draft copy, 1 November 2026, written against release v0.4.0, and revised the same day so that no page reads as a training tool ([messaging.md §2](messaging.md)). Nothing here is published.
 
 ## What is in this folder
 
@@ -13,6 +13,7 @@ The structure and the full copy of okrgoal.com: the home of OKRGoal, OKR Institu
 | [claims.md](claims.md) | Every number and promise the site makes, with its source in the specification. And the list of things never to claim | Before publishing anything, and whenever the product changes |
 | [sitemap.md](sitemap.md) | The page tree, each page's job and CTA, the navigation, the footer, the button vocabulary, visitor paths | Before building the site |
 | [pages/](pages/) | Full copy for 21 pages, section by section, with layout and image notes | When building each page |
+| [site-changes-2026-11-01.md](site-changes-2026-11-01.md) | The brief for applying the 1 November revision to a site already built from the first draft: OKRGoal is the software an organisation runs its OKRs on, not a training tool | When the site was built before that revision |
 
 ## The pages
 

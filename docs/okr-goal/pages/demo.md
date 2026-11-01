@@ -75,7 +75,7 @@ Northwind Labs is an invented software company of 180 people, and it has been ru
 
 ## A year of OKRs, step by step.
 
-The demo is built from a written scenario: one company's full year in OKRGoal, from a pilot to the year-end. Every step names the screen and the practice rule it shows.
+The demo is built from a written scenario: one company's full year in OKRGoal, from a pilot to the year-end. Every step names the screen and the method rule it shows.
 
 | Q1: the rollout | Q2: the competitor | Q3: the long summer | Q4: the year-end |
 |---|---|---|---|

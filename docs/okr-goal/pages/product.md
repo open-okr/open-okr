@@ -7,7 +7,7 @@
 | The page's one job | Walk the product in the order a quarter runs, so a reader can picture their own |
 | Primary CTA | Start free |
 | Secondary CTA | Try the live demo |
-| Page title | Product tour: OKRGoal, the OKR platform that runs the practice |
+| Page title | Product tour: OKRGoal, the OKR platform that runs your OKRs |
 | Meta description | Plan the year, draft with a coach, commit through gates, run the weekly rhythm, and close the quarter with an honest diagnosis. A tour of OKRGoal, in the order a quarter runs. |
 
 ## Section structure
@@ -124,7 +124,7 @@ KPIs describe the health of the business. OKRs describe what you are changing ab
 
 ## Ninety minutes. Honest scores. A real diagnosis.
 
-The quarterly review runs in four acts and eleven timed stages, about two weeks before the cycle ends. Open the room before the numbers. Score every key result against evidence, with the objective score hidden until the team reveals it together. Hear the story behind each number. Then the retro, the root causes, and an anonymous check on the practice itself.
+The quarterly review runs in four acts and eleven timed stages, about two weeks before the cycle ends. Open the room before the numbers. Score every key result against evidence, with the objective score hidden until the team reveals it together. Hear the story behind each number. Then the retro, the root causes, and an anonymous check on the process itself.
 
 Then the diagnostic, which is the most useful thing the session produces:
 
@@ -134,7 +134,7 @@ Then the diagnostic, which is the most useful thing the session produces:
 | You missed, and the rhythm was strong | A strategy or quality problem. Fix the key results, not the people |
 | You missed, and the rhythm was weak | A rhythm problem. Restore the weekly check-in before you rewrite a single objective |
 
-Every objective is closed deliberately: keep, modify or abandon, with a reason. Nothing carries over by default. Scores, learnings and the weakest part of the practice feed the next cycle's planning automatically.
+Every objective is closed deliberately: keep, modify or abandon, with a reason. Nothing carries over by default. Scores, learnings and the weakest part of how you ran the quarter feed the next cycle's planning automatically.
 
 ## 3. The screens you live in
 
@@ -160,7 +160,7 @@ Six chips in two rows:
 
 ## Deliberately OKR-shaped.
 
-We would rather do one practice properly than ten things loosely. So OKRGoal does not have, and does not plan for its first version:
+We would rather do OKRs properly than ten things loosely. So OKRGoal does not have, and does not plan for its first version:
 
 - Gantt charts and dependency scheduling
 - Time and cost tracking

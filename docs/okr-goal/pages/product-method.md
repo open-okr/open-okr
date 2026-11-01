@@ -4,11 +4,11 @@
 |---|---|
 | URL | `/product/method` |
 | Audience | OKR leads, PMOs, facilitators, and OKR practitioners checking whether we know what we are talking about |
-| The page's one job | Prove the practice is real, written down and enforceable, and that it bends to how you work |
+| The page's one job | Prove the method is real, written down and enforceable, and that it bends to how you work |
 | Primary CTA | Start free |
 | Secondary CTA | Read METHOD.md |
 | Page title | The OKR method, built in: twenty-six checks, eight phases, six gates · OKRGoal |
-| Meta description | OKRGoal ships the full OKR practice as rules that run: a guided eight-phase cycle, twenty-six quality checks as you type, publish gates, an alignment score and a closing diagnostic. Every rule is public and changeable. |
+| Meta description | OKRGoal ships the full OKR method as rules that run on your OKRs: a guided eight-phase cycle, twenty-six quality checks as you type, publish gates, an alignment score and a closing diagnostic. Every rule is public and changeable. |
 
 ## Section structure
 
@@ -22,7 +22,7 @@
 | 6 | Alignment that means something | Text and a three-band scale |
 | 7 | Committed, aspirational, and four kinds of key result | Two small tables |
 | 8 | Defaults, not dogma | Profile cards and a sample of settings |
-| 9 | Built on published practice | Source list |
+| 9 | Built on published sources | Source list |
 | 10 | Argue with it | Short text and a GitHub link |
 | 11 | Final CTA | Headline and buttons |
 
@@ -32,9 +32,9 @@
 
 **Eyebrow:** The method
 
-# Practice, not a template.
+# Rules that run, not a template.
 
-Most OKR tools give you a form and a help article. OKRGoal gives you the practice itself, as rules that run while you work: a guided cycle, twenty-six quality checks as you type, six publish gates, an alignment score, and an honest diagnosis at the close.
+Most OKR tools give you a form and a help article. OKRGoal gives you the method itself, as rules that run on your real OKRs while you work: a guided cycle, twenty-six quality checks as you type, six publish gates, an alignment score, and an honest diagnosis at the close.
 
 **Buttons:** `[ Start free ]` `[ Read METHOD.md ]`
 
@@ -42,7 +42,7 @@ Most OKR tools give you a form and a help article. OKRGoal gives you the practic
 
 ## 2. One document
 
-## The whole practice, in one public document.
+## The whole method, in one public document.
 
 Every rule, threshold, band, gate, session agenda and diagnostic OKRGoal enforces lives in one document, METHOD.md, published with the open source OpenOKR code. It compiles into a small library with no database, no network and no AI. The same rules run in your browser as you type, on the server before anything is saved, inside the agents, and in the importer.
 
@@ -170,13 +170,13 @@ Every rule is a recommended default, and every one can change. Twenty-five pract
 
 **Line under the cards:** Every change is audited. A closed cycle keeps the rules it was graded under, so changing a threshold next year never rewrites last year's verdicts.
 
-> **Legal note:** "Google-style" and "Radical Focus" describe a style of practice. Neither Google nor Christina Wodtke endorses OKRGoal or OpenOKR. Keep the footnote: *Profile names describe published practice. No endorsement is implied.*
+> **Legal note:** "Google-style" and "Radical Focus" describe a published way of running OKRs. Neither Google nor Christina Wodtke endorses OKRGoal or OpenOKR. Keep the footnote: *Profile names describe published OKR methods. No endorsement is implied.*
 
-## 9. Built on published practice
+## 9. Built on published sources
 
 ## We did the reading. And the coaching.
 
-OKRGoal and OpenOKR are built by OKR Institute, on what it has learned since 2017 coaching OKR rollouts and running its OKR platform, okri.io. Every rule also names the published practice it rests on. Where the sources disagree, the document says so and picks a default you can change.
+OKRGoal and OpenOKR are built by OKR Institute, on what it has learned since 2017 coaching OKR rollouts and running its OKR platform, okri.io. Every rule also names the published source it rests on. Where the sources disagree, the document says so and picks a default you can change.
 
 **Source list, set like a bibliography:**
 

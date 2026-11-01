@@ -30,7 +30,7 @@
 
 # On your servers. In your country. Offline if you need it.
 
-OpenOKR runs the full OKR practice on infrastructure you control, with the governance and audit trail your institution requires. It is open source, it is complete, and it never needs to call home.
+OpenOKR runs your institution's OKRs on infrastructure you control, with the whole method built in and the governance and audit trail you are required to keep. It is open source, it is complete, and it never needs to call home.
 
 **Buttons:** `[ Talk to us ]` `[ Read the install guide ]`
 
@@ -68,7 +68,7 @@ The Helm chart deploys the application and nothing else. It brings no database, 
 
 ## 5. AI optional, by design
 
-## Turn it off. The practice still runs.
+## Turn it off. Every rule still runs.
 
 Every quality check, gate, score, nudge, escalation and diagnostic is deterministic code. Switch AI off and nothing that matters stops. If your policy allows AI, point it at a model you host yourself, and nothing leaves your network.
 

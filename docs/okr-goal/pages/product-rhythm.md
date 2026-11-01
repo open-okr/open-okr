@@ -147,7 +147,7 @@ About two weeks before the cycle ends. Eleven timed stages, a timer on screen, a
 |---|---|---|
 | **Open** | How is the room? | A room pulse before any numbers, because steady rooms round their numbers up |
 | **Review** | Did we achieve the results? | Score every key result against evidence. The objective score stays hidden until the team reveals it together. Then the story behind each number, owner by owner. Then recognition |
-| **Retro** | How did we work? | What worked and what did not, written silently then dot-voted. The four questions leadership owes the team. One honest cause for every key result under 0.7. An anonymous five-statement survey of the practice itself |
+| **Retro** | How did we work? | What worked and what did not, written silently then dot-voted. The four questions leadership owes the team. One honest cause for every key result under 0.7. An anonymous five-statement survey of the process itself |
 | **Reset** | What do we do next? | Every objective closed as keep, modify or abandon, with a reason. Learnings captured. Every action gets a name and a date |
 
 ### The diagnostic
@@ -162,7 +162,7 @@ That is the one question every executive asks at the end of a quarter, and the o
 | You missed, and the rhythm was strong | A strategy or quality problem | Fix the key results, not the people |
 | You missed, and the rhythm was weak | A rhythm problem | Restore the weekly check-in before you rewrite a single objective |
 
-**Then it feeds forward.** Your scores become next cycle's starting point. Unfinished work becomes ranked issues that must earn their place again. Learnings join the input pack. The lowest-scoring statement about the practice becomes next quarter's improvement action. An annual review closes the year the same way.
+**Then it feeds forward.** Your scores become next cycle's starting point. Unfinished work becomes ranked issues that must earn their place again. Learnings join the input pack. The lowest-scoring statement about your process becomes next quarter's improvement action. An annual review closes the year the same way.
 
 ## 10. Real life
 

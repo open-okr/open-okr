@@ -47,7 +47,7 @@ People do not open an OKR tool on a Thursday afternoon. So OKRGoal goes where th
 
 ## Check in from the app you already have open.
 
-**Image:** the same practice on four channels ([09-channels.png](../../mockups/png/09-channels.png)).
+**Image:** the same check-in on four channels ([09-channels.png](../../mockups/png/09-channels.png)).
 
 **Five cards:**
 
@@ -125,7 +125,7 @@ The deployment, the workspace admin or each person chooses the provider and supp
 - **Nothing leaves silently.** Choose what context may reach a provider, redact email addresses and phone numbers, and allow-list the hosts it may call.
 - **Local means local.** Point it at Ollama or your own inference server and nothing leaves your network. The admin screen says so.
 - **Cost is visible and capped.** Every call records its tokens and cost. Quotas per person, per agent and per workspace, and a hard cap that halts a run.
-- **Or none at all.** Choose "Off" and the whole practice still runs. You lose the drafting and the language, nothing else.
+- **Or none at all.** Choose "Off" and every rule still runs. You lose the drafting and the language, nothing else.
 
 ## 5. API and command line
 
