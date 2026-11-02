@@ -241,8 +241,10 @@ test("acceptance: the review shows an objective added in week five as added mid-
   await expect(page.getByText(/Stage 2 of 11/)).toBeVisible({
     timeout: 15_000,
   });
+  // The session review draws its own mark, which still writes the day as
+  // ISO; only the Goals list moved to "2 Nov 2026".
   await expect(page.getByTestId("added-mid-cycle")).toHaveText(
-    `Added mid-cycle, ${todayLabel()}`,
+    `Added mid-cycle, ${today()}`,
   );
 });
 
