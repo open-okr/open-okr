@@ -90,7 +90,7 @@ export async function Sessions({ userId }: { userId: string }) {
                 </span>
                 <form action={revoke}>
                   <input type="hidden" name="token" value={session.token} />
-                  <Button type="submit" variant="ghost" size="sm">
+                  <Button type="submit" size="sm">
                     {t("common.revoke")}
                   </Button>
                 </form>

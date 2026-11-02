@@ -2189,6 +2189,33 @@
       "pages": false
     },
     {
+      "name": "settings setWorkspaceBrandingImage",
+      "action": "settings.setWorkspaceBrandingImage",
+      "method": "POST",
+      "path": "/settings/setWorkspaceBrandingImage",
+      "scope": "write",
+      "summary": "Set or remove the workspace's logo or favicon.",
+      "flags": [
+        {
+          "name": "slot",
+          "field": "slot",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "logo",
+            "favicon"
+          ]
+        },
+        {
+          "name": "blob-id",
+          "field": "blobId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "settings resetWorkspaceSettings",
       "action": "settings.resetWorkspaceSettings",
       "method": "POST",

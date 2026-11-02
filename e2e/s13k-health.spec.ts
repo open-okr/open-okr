@@ -15,6 +15,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -117,7 +118,7 @@ test("acceptance: an outdated goal keeps its last status beside it", async () =>
 
   await goTo(page, "/goals");
   const row = main()
-    .locator(`input[aria-label="Objective title"][value="${QUIET}"]`)
+    .locator(titleField("Objective title", QUIET))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await expect(row.getByTestId("health-chip")).toHaveText(
     "Outdated, last on track",

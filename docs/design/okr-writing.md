@@ -86,6 +86,19 @@ Aligned child objectives show indented under their parent when the scope holds b
 
 **As built at P9-T07a-a**, as far as the data reaches today: the objective row has its title with the OBJ-1 and OBJ-2 chips while it is typed (the stored flags otherwise), the champion picker, the reviewer, the next check-in, progress and health; the key result row has its title with KR-2 and KR-5 chips, the owner picker and due date under it, the value cluster (current, target and unit, with the baseline under them), progress and confidence as x in 10. The kind chip and icon come with P9-T11 and P9-T12, the added-mid-cycle mark with P9-T13, the pace with P9-T15, the grip with P9-T07b.
 
+**As revised on 2 November 2026 (Goals revamp).** The owner reviewed a clickable HTML prototype and asked for the screen to match it exactly. What it changed:
+
+| Part | Rule |
+|---|---|
+| Objective | A card. Head: chevron, title (wraps, never cut), meta line with a dot between parts (kind pill, mid-cycle and draft marks, space, champion with avatar, reviewer, next check-in), health chip and actions on the right, the rule note ("OBJ-1 Outcome, not output … Read the rule"), then progress as an 8px bar across the card |
+| Key results band | "Key results n" with the column names Value, Progress, Confidence over the rows; on a phone only the count |
+| Key result row | Grip on hover, title, meta line (kind, owner with avatar, due date as "31 Dec 2026 in 59 days", "from a KPI"), the value "62 / 75 %" with "from 62" under it, a 6px progress bar, confidence with its METHOD.md §3.2 band's dot, and actions |
+| Values | Text with a dotted underline at rest; a light fill on hover; the field with the brand ring in use. Every value is still its real field (`okr-text-first` in `apps/web/app/globals.css`), except the due date, which is text that becomes the date field when pressed, because a date field cannot show "31 Dec 2026". A reader who cannot edit sees no underline |
+| Row actions | Check in and open as icons on hover; open, check in, stop and delete in a menu. On a phone only the menu |
+| Toolbar | Scope tabs with counts; Filter button with the number of filters in force; display icons; Export as a menu of CSV and Excel |
+| Filter panel | One labelled row per question; opens on its own while a filter is set; Done closes it and leaves the filters as removable chips with Clear all |
+| Phone | Health leads the meta line, the value and confidence share a line, progress runs across under them; fields are 12px at rest and 16px while edited, so iOS does not zoom |
+
 ### 4.2 Editing in place
 
 Every cell follows UIUX-PLAN §4, "Inline edit".

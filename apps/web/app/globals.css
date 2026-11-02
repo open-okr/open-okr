@@ -86,3 +86,100 @@
     --xy-node-boxshadow-selected: 0 0 0 2px var(--color-brand);
   }
 }
+
+/* The OKR list's values read as text until they are used (Goals revamp,
+ * 2 November 2026; docs/design/okr-writing.md §4.1).
+ *
+ * Every value is still the real field, so the keyboard, a screen reader and
+ * the tests meet the same control. At rest it is text with a dotted
+ * underline, which is how a reader tells a value they can change from one
+ * they cannot; hovered it takes a light fill; in use it is a field with the
+ * brand ring. A container or a title marks itself with `data-text-first`.
+ *
+ * In `utilities` with the cells' own classes, and winning over them by
+ * specificity: an attribute, an element and three `:not()`s against one
+ * class. Outside a layer it would beat every utility in the product. */
+@layer utilities {
+  [data-text-first]
+    :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+      [data-kind]
+    ) {
+    border-color: transparent;
+    border-bottom-color: color-mix(
+      in srgb,
+      var(--color-ink-4) 70%,
+      transparent
+    );
+    border-bottom-style: dotted;
+    border-radius: 5px;
+    background-color: transparent;
+    box-shadow: none;
+    field-sizing: content;
+    width: auto;
+    min-width: 1.5rem;
+    padding-left: 3px;
+    padding-right: 3px;
+    text-align: left;
+    color: var(--color-ink-2);
+    cursor: pointer;
+  }
+  [data-text-first]
+    :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+      [data-kind]
+    ):hover {
+    border-color: transparent;
+    border-bottom-color: var(--color-ink-3);
+    border-bottom-style: solid;
+    background-color: var(--color-raised);
+    color: var(--color-ink);
+  }
+  [data-text-first]
+    :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+      [data-kind]
+    ):focus {
+    padding-left: 5px;
+    border-color: var(--color-brand);
+    border-bottom-style: solid;
+    background-color: var(--color-surface);
+    box-shadow: 0 0 0 2px var(--color-brand-line);
+    color: var(--color-ink);
+    cursor: text;
+  }
+  /* A select keeps a small caret, because it is a choice and not a value.
+   * The kind is a coloured pill rather than underlined text. */
+  [data-text-first]
+    :is(select):not([type="checkbox"]):not([type="radio"]):not([data-kind]) {
+    appearance: none;
+    padding-right: 14px;
+    background-image:
+      linear-gradient(45deg, transparent 50%, currentColor 50%),
+      linear-gradient(135deg, currentColor 50%, transparent 50%);
+    background-position:
+      calc(100% - 7px) 55%,
+      calc(100% - 4px) 55%;
+    background-size:
+      3px 3px,
+      3px 3px;
+    background-repeat: no-repeat;
+  }
+  /* A picker's chevron is for the field, not for the text: hidden at rest
+   * so it never sits on the last letter of a name, back while it is used. */
+  [data-text-first] .relative > svg {
+    display: none;
+  }
+  [data-text-first] .relative:focus-within > svg {
+    display: block;
+  }
+  [data-text-first] .relative:focus-within > input {
+    padding-right: 22px;
+  }
+  /* tokens.css leaves these out of its 16px phone rule, so at rest they
+   * keep the size of the text around them; they grow to 16px when they
+   * take the focus, which is when Safari on iOS decides whether to zoom. */
+  @media (max-width: 767px) {
+    [data-text-first] :is(input, select, textarea):focus,
+    textarea[data-text-first]:focus {
+      font-size: 16px;
+    }
+  }
+}

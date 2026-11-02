@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getTranslations } from "../lib/translations";
 import { ACTIVE_WORKSPACE_COOKIE } from "../lib/workspace";
+import { initialsOf } from "../lib/workspace-initials.ts";
 import { WorkspaceSelect } from "./workspace-select.tsx";
 
 /**
@@ -52,35 +53,43 @@ async function switchWorkspace(formData: FormData): Promise<void> {
   revalidatePath("/");
 }
 
-function initialsOf(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return (
-    (parts[0]?.[0] ?? "") +
-    (parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "")
-  ).toUpperCase();
-}
-
 export async function WorkspaceSwitcher({
   memberships,
   active,
+  logoUrl,
 }: {
   memberships: readonly Membership[];
   active: Membership;
+  /**
+   * The active workspace's logo, or null for its initials
+   * (docs/design/workspace-logo-favicon.md §4).
+   */
+  logoUrl: string | null;
 }) {
   const { t } = await getTranslations();
 
   return (
     <div className="flex items-center gap-2 rounded-lg p-1.5">
-      <span
-        aria-hidden="true"
-        // `rounded-control` (8px), not `rounded-lg`. `rounded-lg` is the card
-        // radius, 14px, and 14px on a 28px square is exactly half of it, so
-        // the mockup's rounded-square brandmark rendered as a circle. The
-        // mockup's `.brandmark .logo` is 8px.
-        className="grid size-7 flex-none place-items-center rounded-control bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed] text-sm font-extrabold text-on-brand shadow-brand-hover"
-      >
-        {initialsOf(active.name)}
-      </span>
+      {logoUrl ? (
+        // biome-ignore lint/performance/noImgElement: a stored blob behind the session cookie, which next/image cannot fetch.
+        <img
+          src={logoUrl}
+          alt=""
+          data-testid="workspace-logo"
+          className="size-7 flex-none rounded-control object-contain"
+        />
+      ) : (
+        <span
+          aria-hidden="true"
+          // `rounded-control` (8px), not `rounded-lg`. `rounded-lg` is the card
+          // radius, 14px, and 14px on a 28px square is exactly half of it, so
+          // the mockup's rounded-square brandmark rendered as a circle. The
+          // mockup's `.brandmark .logo` is 8px.
+          className="grid size-7 flex-none place-items-center rounded-control bg-gradient-to-br from-[#6265f0] via-brand to-[#7c3aed] text-sm font-extrabold text-on-brand shadow-brand-hover"
+        >
+          {initialsOf(active.name)}
+        </span>
+      )}
       <div className="hidden min-w-0 flex-1 xl:block">
         <div className="truncate text-sm font-semibold tracking-tight text-ink">
           {active.name}

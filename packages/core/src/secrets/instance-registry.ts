@@ -163,6 +163,18 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "clamd's TCP port. 3310 is clamd's own default. Read only when a host is named.",
   },
+  // Not telemetry, though it is a request out: it carries no instance data,
+  // and GitHub sees only the server's address (docs/design/version-footer.md
+  // §1). On, because an administrator who never hears of a release runs an
+  // old one; an air-gapped operator sets OPENOKR_UPDATE_CHECK=off.
+  {
+    key: "instance.updateCheck",
+    kind: "boolean",
+    fallback: true,
+    environment: "OPENOKR_UPDATE_CHECK",
+    summary:
+      "Asks GitHub once a day for the newest release, so an administrator sees when this instance is behind. Sends nothing about the instance.",
+  },
   {
     key: "instance.telemetry",
     kind: "boolean",

@@ -387,10 +387,7 @@ export default async function SpacePage({
       <Card>
         <CardHeader className="justify-between">
           <span>{t("common.sessions")}</span>
-          <Link
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
-            href="/sessions"
-          >
+          <Link className={buttonVariants({ size: "sm" })} href="/sessions">
             {t("spaces.detail.allSessions")}
           </Link>
         </CardHeader>

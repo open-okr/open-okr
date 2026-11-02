@@ -126,6 +126,8 @@ export default async function SpacesPage() {
           <CardBody>
             <SpaceForm action={createSpace} className="flex flex-col gap-2">
               <TextInput
+                // The topbar's + New lands here (lib/new-menu.tsx).
+                id="space-name"
                 label={t("common.name")}
                 name="name"
                 required

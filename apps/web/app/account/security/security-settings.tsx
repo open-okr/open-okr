@@ -231,7 +231,6 @@ export function SecuritySettings({
                   <Button
                     type="button"
                     size="sm"
-                    variant="ghost"
                     onClick={() => removePasskey(passkey)}
                   >
                     {t("account.security.securitySettings.removePasskey")}

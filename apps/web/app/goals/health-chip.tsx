@@ -41,14 +41,17 @@ const OUTDATED_LAST = {
 export function HealthChip({
   health,
   reported = null,
+  testId = "health-chip",
 }: {
   readonly health: string;
   /** The last published check-in's status, shown beside "outdated". */
   readonly reported?: "on_track" | "caution" | "off_track" | null;
+  /** The phone's copy in the meta line needs a name of its own. */
+  readonly testId?: string;
 }) {
   const { t } = useTranslations();
   return (
-    <Chip tone={TONE[health] ?? "neutral"} data-testid="health-chip">
+    <Chip tone={TONE[health] ?? "neutral"} data-testid={testId}>
       {health === "outdated" && reported
         ? t(OUTDATED_LAST[reported])
         : healthWord(t, health)}

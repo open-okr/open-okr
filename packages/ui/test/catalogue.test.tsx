@@ -36,6 +36,15 @@ describe("the message catalogue", () => {
  */
 const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Product, vendor and language names.
+  // "Logo" and "Favicon" are the words Malay uses, and the file summary is
+  // two placeholders and a unit (docs/design/workspace-logo-favicon.md).
+  "admin.branding.images.faviconTitle",
+  "admin.branding.images.fileSummary",
+  "admin.branding.images.logoTitle",
+  "admin.branding.mirror.part.favicon",
+  "admin.branding.mirror.part.logo",
+  // A version number and nothing else (docs/design/version-footer.md).
+  "shell.version.running",
   "method.detail.okrChampion",
   "method.detail.okrCoach",
   "admin.ai.providerAnthropic",
@@ -161,9 +170,17 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "sessions.schedule.space",
   "spaces.spaces",
   "tour.checkIn.title",
-  // Both are a line made only of holes and a slash: the workspace's own
-  // words for the two things the column holds. Nothing to translate.
-  "goals.editor.columnName",
+  // A line made only of holes: the workspace's own word for its key
+  // results and how many there are. Nothing to translate.
+  "okrList.keyResultsBand",
+  // The workspace's own word for the thing, and nothing else.
+  "newMenu.kpi",
+  "newMenu.objective",
+  "newMenu.space",
+  // "Group: value", two holes and a colon. Nothing to translate.
+  "goals.filter.chip",
+  // A line made only of holes and a slash: the workspace's own words for
+  // the two things the column holds. Nothing to translate.
   "workMap.goalKeyResult",
   "workMap.keyResult",
   "workMap.objective",

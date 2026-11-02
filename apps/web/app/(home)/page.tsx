@@ -1,6 +1,7 @@
-import { ACCESS_LEVELS, callAction, resourceIdentifier } from "@openokr/core";
+import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
+import { agentSetupUrl } from "../../lib/agent-setup-prompt.ts";
 import { getPool } from "../../lib/auth";
 import { seesCycle } from "../../lib/cycle-visibility.ts";
 import { instanceIssuer } from "../../lib/issuer";
@@ -108,7 +109,7 @@ export default async function HomePage({
       {/* docs/design/agent-setup-prompt.md §3: a prompt a member pastes into
           their own agent, which then connects itself through OAuth. */}
       <AgentSetupPill
-        endpoint={resourceIdentifier(instanceIssuer())}
+        setupUrl={agentSetupUrl(instanceIssuer())}
         sessionId={session.session.id}
       />
 

@@ -1,11 +1,16 @@
 "use client";
 
+import { Menu } from "@base-ui-components/react/menu";
 import type { GoalLevel } from "@openokr/db";
-import { keyResultKindsInUse, okrKindsInUse } from "@openokr/method";
 import {
+  confidenceBand,
+  keyResultKindsInUse,
+  okrKindsInUse,
+} from "@openokr/method";
+import {
+  Avatar,
   Bar,
   Button,
-  Chip,
   formatConfidence,
   TextInput,
   useIsMutating,
@@ -14,6 +19,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { dayLabel } from "../../lib/day-label.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import {
   filterGoals,
@@ -88,13 +94,35 @@ import {
  * one sends is in `okr-editing.ts`, which the drawer shares (P9-T08a).
  */
 
-const GRID = "md:grid-cols-[2.75rem_minmax(0,1fr)_13rem_8rem_6.5rem_5rem]";
+/**
+ * A key result's row on a wide screen, and the band above the rows: the
+ * title and its meta line, the value, the progress, the confidence, the
+ * actions. Below `md` the row is two columns (see KeyResultRow).
+ */
+const KEY_RESULT_GRID = "md:grid-cols-[minmax(0,1fr)_140px_160px_76px_64px]";
 
 /**
- * Moving one row of a set (P9-T07b-b, design §4.4): Alt with an arrow key
- * anywhere in the row, or the grip dragged onto another row of the same set.
- * Null for a reader who cannot edit, who gets no grip at all.
+ * A meta line: the values the row carries, read as one sentence with a dot
+ * between them on a wide screen and wrapped without dots on a phone. A part
+ * that renders nothing leaves an empty wrapper, which is hidden and earns no
+ * dot; the phone-only health chip earns none either. Its fields read as text
+ * until they are used (`data-text-first` in globals.css).
  */
+const META = [
+  "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ink-3",
+  "[&>*:empty]:hidden md:gap-x-0",
+  "md:[&>*:not(:empty):not([data-phone-only])~*:not(:empty)]:before:mx-[7px]",
+  "md:[&>*:not(:empty):not([data-phone-only])~*:not(:empty)]:before:text-ink-4",
+  "md:[&>*:not(:empty):not([data-phone-only])~*:not(:empty)]:before:content-['·']",
+].join(" ");
+
+/** The dot before a confidence, in its METHOD.md §3.2 band's colour. */
+const CONFIDENCE_DOT: Record<"high" | "medium" | "low", string> = {
+  high: "bg-ok-dot",
+  medium: "bg-warn-dot",
+  low: "bg-bad-dot",
+};
+
 interface Mover {
   readonly label: string;
   readonly move: (by: -1 | 1) => void;
@@ -169,25 +197,6 @@ function Grip({ id, mover }: { readonly id: string; readonly mover: Mover }) {
   );
 }
 
-/**
- * Read first, edit on demand (OKRGoal UX review N5: "The OKRs list renders
- * every objective as an open edit form, which reads as work, not as a
- * status"). On a device that can hover, the row's pickers lose their
- * chevrons and calendar marks until the row is hovered or a field in it has
- * focus, so the list reads as a status and every field is still one click
- * away. A touch screen, which cannot hover, keeps them.
- */
-const QUIET_CONTROLS = [
-  "[@media(hover:hover)]:[&_svg]:opacity-0",
-  "[@media(hover:hover)]:[&_select]:appearance-none",
-  "[@media(hover:hover)]:[&_input::-webkit-calendar-picker-indicator]:opacity-0",
-  "group-hover:[&_svg]:opacity-100",
-  "group-focus-within:[&_svg]:opacity-100",
-  "group-hover:[&_select]:appearance-auto",
-  "group-focus-within:[&_select]:appearance-auto",
-  "group-hover:[&_input::-webkit-calendar-picker-indicator]:opacity-100",
-  "group-focus-within:[&_input::-webkit-calendar-picker-indicator]:opacity-100",
-].join(" ");
 export function OkrTable({
   initialTree,
   initialAt,
@@ -469,30 +478,34 @@ function LiveOkrTable({
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-line bg-surface">
-        <div
-          className={`hidden items-center gap-2.5 border-b border-line bg-bg px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-ink-3 md:grid ${GRID}`}
-        >
-          <span />
-          <span>{t("goals.editor.columnName")}</span>
-          <span>{t("goals.editor.columnValue")}</span>
-          <span>{t("goals.editor.columnProgress")}</span>
-          <span>{t("okrList.columnStatus")}</span>
-          <span />
-        </div>
-
+      {/* **One card per objective**, as the reference mockup (12-okr-home)
+       * draws it: the objective's head with its progress across the card,
+       * then its key results as rows. It was one table under a column
+       * header, where an objective read as one more row and its progress as
+       * a short bar in a narrow column (Goals audit, 2 November 2026). Every
+       * cell is still edited where it is read. */}
+      <div className="flex flex-col gap-3">
         {tree.goals.length === 0 ? (
-          <p className="p-3 text-sm text-ink-2" data-testid="okr-empty-cycle">
+          <p
+            className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-2"
+            data-testid="okr-empty-cycle"
+          >
             {canEdit ? t("okrList.emptyCycle") : t("okrList.emptyCycleRead")}
           </p>
         ) : goals.length === 0 ? (
-          empty
+          <div className="rounded-lg border border-line bg-surface">
+            {empty}
+          </div>
         ) : null}
 
         {goals.map((goal, goalIndex) => {
           const open = !collapsed.includes(goal.id);
           return (
-            <div key={goal.id}>
+            <section
+              key={goal.id}
+              aria-label={goal.title}
+              className="rounded-xl border border-line bg-surface"
+            >
               <ObjectiveRow
                 goal={goal}
                 open={open}
@@ -518,6 +531,23 @@ function LiveOkrTable({
               />
               {open ? (
                 <>
+                  {goal.keyResults.length > 0 ? (
+                    // The column names over the rows, so "5 in 10" reads as
+                    // a confidence. On a phone only the count stays.
+                    <div
+                      className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
+                    >
+                      <span>
+                        {t("okrList.keyResultsBand", {
+                          count: goal.keyResults.length,
+                        })}
+                      </span>
+                      <span>{t("goals.editor.columnValue")}</span>
+                      <span>{t("goals.editor.columnProgress")}</span>
+                      <span>{t("okrDrawer.confidenceLabel")}</span>
+                      <span />
+                    </div>
+                  ) : null}
                   {goal.keyResults.map((keyResult, keyResultIndex) => (
                     <KeyResultRow
                       key={keyResult.id}
@@ -566,32 +596,34 @@ function LiveOkrTable({
                   ) : null}
                 </>
               ) : null}
-            </div>
+            </section>
           );
         })}
 
         {canEdit ? (
-          <AddRow
-            label={t("goals.editor.addObjective")}
-            placeholder={t("goals.editor.objectivePlaceholder")}
-            disabled={pending}
-            refusal={refusal}
-            askReason={askReason}
-            onAdd={(title, reason) =>
-              add(async () => {
-                const created = await addObjective({
-                  cycleId,
-                  level,
-                  title,
-                  ...(reason ? { reason } : {}),
-                });
-                if (created.id) {
-                  setDraftUnder(created.id);
-                }
-                return created;
-              })
-            }
-          />
+          <div className="overflow-hidden rounded-lg border border-dashed border-line-2 bg-surface [&>*]:border-b-0">
+            <AddRow
+              label={t("goals.editor.addObjective")}
+              placeholder={t("goals.editor.objectivePlaceholder")}
+              disabled={pending}
+              refusal={refusal}
+              askReason={askReason}
+              onAdd={(title, reason) =>
+                add(async () => {
+                  const created = await addObjective({
+                    cycleId,
+                    level,
+                    title,
+                    ...(reason ? { reason } : {}),
+                  });
+                  if (created.id) {
+                    setDraftUnder(created.id);
+                  }
+                  return created;
+                })
+              }
+            />
+          </div>
         ) : null}
       </div>
 
@@ -681,48 +713,86 @@ function ObjectiveRow({
   readonly onOpen: () => void;
   readonly onCheckIn: () => void;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   const cells = useObjectiveCells(goal, okr, coach);
 
   return (
     <>
+      {/* The objective's head, as the prototype draws it: the chevron, the
+          title with its meta line, the health chip and the actions on the
+          right, the rule note, then the progress across the card. The grip
+          sits in the margin and shows on hover. */}
       <div
-        className={`group grid grid-cols-[2.75rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-2 hover:bg-bg ${GRID}`}
+        className="group relative grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-2.5"
         {...moverHandlers(mover)}
       >
-        <span className="flex items-center">
-          {mover ? (
+        {mover ? (
+          <span className="absolute top-3.5 -left-0.5 hidden md:block">
             <Grip id={goal.id} mover={mover} />
-          ) : (
-            <span className="size-5" />
-          )}
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-label={t("goals.editor.toggleKeyResults", {
-              title: goal.title,
-            })}
-            onClick={onToggle}
-            className="flex size-5 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
-          >
-            <Chevron open={open} />
-          </button>
-        </span>
+          </span>
+        ) : null}
+        <button
+          type="button"
+          aria-expanded={open}
+          aria-label={t("goals.editor.toggleKeyResults", {
+            title: goal.title,
+          })}
+          onClick={onToggle}
+          className="flex size-6 items-center justify-center rounded-md text-ink-4 hover:bg-raised hover:text-ink-2"
+        >
+          <Chevron open={open} />
+        </button>
 
-        <div className="flex min-w-0 flex-col">
-          <InlineText
-            value={goal.title}
-            label={t("goals.editor.objectiveTitle")}
-            maxLength={500}
-            readOnly={!canEdit}
-            bold
-            onDraft={cells.onDraft}
-            onSave={cells.saveTitle}
+        <InlineText
+          value={goal.title}
+          label={t("goals.editor.objectiveTitle")}
+          wrap
+          maxLength={500}
+          readOnly={!canEdit}
+          bold
+          textClass="text-[14.5px] leading-snug font-bold tracking-[-0.1px]"
+          onDraft={cells.onDraft}
+          onSave={cells.saveTitle}
+        />
+
+        <div className="col-start-3 row-start-1 flex items-center gap-1">
+          <span className="hidden md:inline-flex">
+            <HealthChip health={goal.health} reported={goal.reportedStatus} />
+          </span>
+          <RowActions
+            title={goal.title}
+            href={`/goals/${goal.id}`}
+            onOpen={onOpen}
+            // The row's check-in opens the drawer on its check-in tab (§4.4),
+            // for somebody who may change the objective, while it is open.
+            onCheckIn={canEdit && goal.closedAt === null ? onCheckIn : null}
+            openLabel={t("goals.editor.openObjective")}
+            deleteLabel={t("goals.editor.deleteObjective")}
+            canDelete={canAdminister && !busy}
+            onDelete={onDelete}
+            // §2.9's stop, for an open objective somebody may change.
+            stop={
+              canEdit && goal.closedAt === null && !busy
+                ? {
+                    label: t("okrList.stopObjective", { title: goal.title }),
+                    run: (reason) =>
+                      okr.mutate({ kind: "stopGoal", id: goal.id, reason }),
+                  }
+                : null
+            }
           />
-          <VerdictChips verdicts={cells.verdicts} />
-          <span
-            className={`flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3 ${QUIET_CONTROLS}`}
-          >
+        </div>
+
+        <div data-text-first className={`col-start-2 ${META}`}>
+          {/* On a phone the health chip leads the meta line instead. */}
+          <span className="md:hidden" data-phone-only>
+            <HealthChip
+              health={goal.health}
+              reported={goal.reportedStatus}
+              testId="health-chip-phone"
+            />
+          </span>
+          <span>
             <KindControl
               kind={goal.kind}
               title={goal.title}
@@ -731,8 +801,14 @@ function ObjectiveRow({
               readOnly={!canEdit || goal.closedAt !== null}
               onSave={cells.saveKind}
             />
+          </span>
+          <span>
             <AddedMidCycle at={goal.addedMidCycleAt} />
+          </span>
+          <span>
             <AdditionDraftMark draft={goal.draft} />
+          </span>
+          <span>
             <WaitingDraft
               state={goal.draftState}
               title={goal.title}
@@ -746,84 +822,76 @@ function ObjectiveRow({
                 okr.mutate({ kind: "approveDraft", id: goal.id })
               }
             />
-            {/* §2.9: the space it belongs to, and the move to another. */}
-            {goal.spaceId !== null ? (
-              <span className="flex items-center gap-1">
-                {t("okrDrawer.space")}
-                <SpacePicker
-                  value={goal.spaceId}
-                  spaces={spaces}
-                  label={t("okrList.spaceOf", { title: goal.title })}
-                  readOnly={!canEdit || goal.closedAt !== null || busy}
-                  onSave={(spaceId) =>
-                    okr.mutate({ kind: "moveToSpace", id: goal.id, spaceId })
-                  }
-                />
-              </span>
-            ) : null}
-            <span className="flex items-center gap-1">
-              {t("okrList.champion")}
-              <MemberPicker
-                value={goal.champion}
-                members={members}
-                label={t("okrList.championOf", { title: goal.title })}
-                // Naming the champion is administering the goal (full).
-                readOnly={!canAdminister}
-                onSave={cells.saveChampion}
+          </span>
+          {/* §2.9: the space it belongs to, and the move to another. */}
+          {goal.spaceId !== null ? (
+            <span className="inline-flex items-center gap-1">
+              {t("okrDrawer.space")}
+              <SpacePicker
+                value={goal.spaceId}
+                spaces={spaces}
+                label={t("okrList.spaceOf", { title: goal.title })}
+                readOnly={!canEdit || goal.closedAt !== null || busy}
+                onSave={(spaceId) =>
+                  okr.mutate({ kind: "moveToSpace", id: goal.id, spaceId })
+                }
               />
             </span>
-            <span>
-              {goal.reviewer
-                ? t("okrList.reviewer", { name: goal.reviewer.name })
-                : t("okrList.noReviewer")}
-            </span>
-            {goal.nextCheckInOn ? (
-              <span>
-                {t("okrList.nextCheckIn", { date: goal.nextCheckInOn })}
-              </span>
-            ) : null}
+          ) : null}
+          <span className="inline-flex items-center gap-1">
+            {t("okrList.champion")}
+            <Avatar
+              name={goal.champion.name}
+              size="sm"
+              className="ml-0.5 size-4 text-[7px]"
+            />
+            <MemberPicker
+              value={goal.champion}
+              members={members}
+              label={t("okrList.championOf", { title: goal.title })}
+              // Naming the champion is administering the goal (full).
+              readOnly={!canAdminister}
+              onSave={cells.saveChampion}
+            />
           </span>
+          <span>
+            {goal.reviewer ? (
+              <>
+                {t("okrDrawer.reviewer")}{" "}
+                <span className="text-ink-2">{goal.reviewer.name}</span>
+              </>
+            ) : (
+              t("okrList.noReviewer")
+            )}
+          </span>
+          {goal.nextCheckInOn ? (
+            <span>
+              {t("okrList.nextCheckIn", {
+                date: dayLabel(goal.nextCheckInOn, locale),
+              })}
+            </span>
+          ) : null}
         </div>
 
-        <span className="hidden text-xs text-ink-4 md:block" />
+        {cells.verdicts.length > 0 ? (
+          <div className="col-span-2 col-start-2">
+            <VerdictChips verdicts={cells.verdicts} />
+          </div>
+        ) : null}
 
-        <div className="hidden items-center gap-2 md:flex">
+        {/* The objective's progress across the card: the one number the
+            card is about. */}
+        <div className="col-span-2 col-start-2 flex items-center gap-2.5">
           <Bar
             value={goal.progressPct}
             max={progressMax}
             label={goal.title}
-            className="flex-1"
+            className="h-2 flex-1"
           />
-          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
+          <span className="w-10 text-right text-[13px] font-bold tabular-nums text-ink">
             {Math.round(goal.progressPct)}%
           </span>
         </div>
-
-        <div className="hidden md:block">
-          <HealthChip health={goal.health} reported={goal.reportedStatus} />
-        </div>
-
-        <RowActions
-          href={`/goals/${goal.id}`}
-          onOpen={onOpen}
-          // The row's check-in opens the drawer on its check-in tab (§4.4),
-          // for somebody who may change the objective, while it is open.
-          onCheckIn={canEdit && goal.closedAt === null ? onCheckIn : null}
-          openLabel={t("goals.editor.openObjective")}
-          deleteLabel={t("goals.editor.deleteObjective")}
-          canDelete={canAdminister && !busy}
-          onDelete={onDelete}
-          // §2.9's stop, for an open objective somebody may change.
-          stop={
-            canEdit && goal.closedAt === null && !busy
-              ? {
-                  label: t("okrList.stopObjective", { title: goal.title }),
-                  run: (reason) =>
-                    okr.mutate({ kind: "stopGoal", id: goal.id, reason }),
-                }
-              : null
-          }
-        />
       </div>
       <Refused okr={okr} id={goal.id} />
     </>
@@ -863,151 +931,202 @@ function KeyResultRow({
   // A value a KPI supplies is the KPI's to change, not this cell's (§4.2).
   const fromKpi = keyResult.kpiId !== null;
 
+  const band =
+    keyResult.confidence === null
+      ? null
+      : confidenceBand(keyResult.confidence, coach.thresholds).band;
+
   return (
     <>
+      {/* Wide: title and meta, value, progress, confidence, actions. On a
+          phone: the title with the menu beside it, the value and the
+          confidence under it, then the progress across. */}
       <div
-        className={`group grid grid-cols-[2.75rem_1fr] items-center gap-2.5 border-b border-line px-3.5 py-1.5 hover:bg-bg ${GRID}`}
+        className={`group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
         {...moverHandlers(mover)}
       >
-        <span className="flex justify-end">
-          {mover ? <Grip id={keyResult.id} mover={mover} /> : null}
-        </span>
-        <div className="flex min-w-0 flex-col pl-3">
-          <InlineText
-            value={keyResult.title}
-            label={t("goals.editor.keyResultTitle")}
-            maxLength={500}
-            readOnly={!canEdit}
-            onDraft={cells.onDraft}
-            onSave={(title) => patch({ title }, { title: keyResult.title })}
-          />
-          <VerdictChips verdicts={cells.verdicts} />
-          <span
-            className={`flex flex-wrap items-center gap-x-2 px-1.5 text-[11px] text-ink-3 ${QUIET_CONTROLS}`}
-          >
-            <KeyResultKindPicker
-              kind={keyResult.kind}
-              title={keyResult.title}
-              kinds={keyResultKindsInUse(coach.practice)}
-              readOnly={!canEdit || fromKpi}
-              onSave={cells.saveKind}
-            />
-            <AddedMidCycle at={keyResult.addedMidCycleAt} />
-            <AdditionDraftMark draft={keyResult.draft} />
-            <span className="flex items-center gap-1">
-              {t("okrList.owner")}
-              <MemberPicker
-                value={keyResult.owner}
-                members={members}
-                label={t("okrList.ownerOf", { title: keyResult.title })}
-                readOnly={!canEdit}
-                allowNone
-                onSave={(ownerId) =>
-                  patch({ ownerId }, { ownerId: keyResult.owner?.id ?? null })
-                }
-              />
-            </span>
-            <span className="flex items-center gap-1">
-              {t("okrList.due")}
-              <InlineDate
-                value={keyResult.dueOn}
-                label={t("okrList.dueOf", { title: keyResult.title })}
-                readOnly={!canEdit}
-                cycle={cycle}
-                onSave={(dueOn) => patch({ dueOn }, { dueOn: keyResult.dueOn })}
-              />
-            </span>
-            {fromKpi ? <Chip tone="info">{t("common.fromAKpi")}</Chip> : null}
+        {/* Flex rather than grid: the row is the nearest grid, which is how
+            a row is found from its title. */}
+        <div className="col-start-1 row-start-1 flex min-w-0 gap-x-2 md:col-start-auto md:row-start-auto">
+          <span className="hidden h-5 w-6 flex-none items-center justify-center md:flex">
+            {mover ? <Grip id={keyResult.id} mover={mover} /> : null}
           </span>
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <InlineText
+              value={keyResult.title}
+              label={t("goals.editor.keyResultTitle")}
+              wrap
+              maxLength={500}
+              readOnly={!canEdit}
+              textClass="text-[13px] leading-snug font-medium"
+              onDraft={cells.onDraft}
+              onSave={(title) => patch({ title }, { title: keyResult.title })}
+            />
+            <VerdictChips verdicts={cells.verdicts} />
+            <div data-text-first className={`text-[11.5px] ${META}`}>
+              <span>
+                <KeyResultKindPicker
+                  kind={keyResult.kind}
+                  title={keyResult.title}
+                  kinds={keyResultKindsInUse(coach.practice)}
+                  readOnly={!canEdit || fromKpi}
+                  onSave={cells.saveKind}
+                />
+              </span>
+              <span>
+                <AddedMidCycle at={keyResult.addedMidCycleAt} />
+              </span>
+              <span>
+                <AdditionDraftMark draft={keyResult.draft} />
+              </span>
+              <span className="inline-flex items-center gap-1">
+                {keyResult.owner ? (
+                  <Avatar
+                    name={keyResult.owner.name}
+                    size="sm"
+                    className="size-4 text-[7px]"
+                  />
+                ) : null}
+                <MemberPicker
+                  value={keyResult.owner}
+                  members={members}
+                  label={t("okrList.ownerOf", { title: keyResult.title })}
+                  readOnly={!canEdit}
+                  allowNone
+                  onSave={(ownerId) =>
+                    patch({ ownerId }, { ownerId: keyResult.owner?.id ?? null })
+                  }
+                />
+              </span>
+              <span className="inline-flex items-baseline gap-1">
+                {t("okrList.due")}
+                <InlineDate
+                  value={keyResult.dueOn}
+                  label={t("okrList.dueOf", { title: keyResult.title })}
+                  readOnly={!canEdit}
+                  cycle={cycle}
+                  asText
+                  onSave={(dueOn) =>
+                    patch({ dueOn }, { dueOn: keyResult.dueOn })
+                  }
+                />
+              </span>
+              {fromKpi ? (
+                <span className="text-[11px] text-info">
+                  {t("common.fromAKpi")}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </div>
 
-        {keyResult.kind === "milestone" ? (
-          // §2.10: a milestone asks one question, done or not done.
-          <DoneToggle
-            done={keyResult.doneAt !== null}
-            title={keyResult.title}
-            readOnly={!canEdit}
-            onSave={cells.saveDone}
-          />
-        ) : keyResult.kind === "baseline" ? (
-          // §2.10: a baseline is recorded by its first value, which then
-          // reads as the value it found.
-          <span className="flex flex-col gap-0.5 text-xs tabular-nums">
-            <span className="text-[11px] text-ink-4">
-              {keyResult.doneAt === null
-                ? t("keyResultKind.recordBaseline")
-                : t("keyResultKind.baseline")}
-            </span>
-            <InlineNumber
-              value={keyResult.doneAt === null ? null : keyResult.currentValue}
-              label={t("keyResultKind.baselineFor", { title: keyResult.title })}
-              readOnly={!canEdit || fromKpi}
-              onSave={cells.saveValue}
+        <div className="col-start-1 row-start-2 md:col-start-auto md:row-start-auto">
+          {keyResult.kind === "milestone" ? (
+            // §2.10: a milestone asks one question, done or not done.
+            <DoneToggle
+              done={keyResult.doneAt !== null}
+              title={keyResult.title}
+              readOnly={!canEdit}
+              onSave={cells.saveDone}
             />
-          </span>
-        ) : (
-          <div className="flex flex-col gap-0.5 text-xs tabular-nums">
-            <span className="flex items-center gap-1">
+          ) : keyResult.kind === "baseline" ? (
+            // §2.10: a baseline is recorded by its first value, which then
+            // reads as the value it found.
+            <span
+              data-text-first
+              className="flex flex-col gap-0.5 text-[13px] font-semibold tabular-nums"
+            >
+              <span className="text-[11px] font-medium text-ink-4">
+                {keyResult.doneAt === null
+                  ? t("keyResultKind.recordBaseline")
+                  : t("keyResultKind.baseline")}
+              </span>
               <InlineNumber
-                value={keyResult.currentValue}
-                label={t("goals.editor.valueFor", { title: keyResult.title })}
+                value={
+                  keyResult.doneAt === null ? null : keyResult.currentValue
+                }
+                label={t("keyResultKind.baselineFor", {
+                  title: keyResult.title,
+                })}
                 readOnly={!canEdit || fromKpi}
                 onSave={cells.saveValue}
               />
-              <span className="text-ink-4">/</span>
-              <InlineNumber
-                key={cells.targetCell}
-                value={keyResult.targetValue}
-                label={t("okrList.targetOf", { title: keyResult.title })}
-                readOnly={!canEdit}
-                onSave={cells.saveTarget}
-              />
-              <InlineUnit
-                value={keyResult.unit ?? ""}
-                label={t("okrList.unitOf", { title: keyResult.title })}
-                readOnly={!canEdit}
-                known={units}
-                placeholder={t("okrList.unit")}
-                onSave={(unit) =>
-                  patch(
-                    { unit: unit === "" ? null : unit },
-                    { unit: keyResult.unit },
-                  )
-                }
-              />
             </span>
-            <span className="flex items-center gap-1 text-[11px] text-ink-4">
-              {keyResult.kind === "maintain"
-                ? t("keyResultKind.band")
-                : t("okrList.from")}
-              <InlineNumber
-                value={keyResult.baselineValue}
-                label={t("okrList.baselineOf", { title: keyResult.title })}
-                readOnly={!canEdit}
-                onSave={(baselineValue) =>
-                  patch(
-                    { baselineValue },
-                    { baselineValue: keyResult.baselineValue },
-                  )
-                }
-              />
-            </span>
-          </div>
-        )}
+          ) : (
+            <div
+              data-text-first
+              className="flex flex-wrap items-baseline gap-x-1.5 tabular-nums md:flex-col md:gap-0.5"
+            >
+              <span className="flex items-baseline gap-1 text-[13px] font-semibold text-ink">
+                <InlineNumber
+                  value={keyResult.currentValue}
+                  label={t("goals.editor.valueFor", { title: keyResult.title })}
+                  readOnly={!canEdit || fromKpi}
+                  onSave={cells.saveValue}
+                />
+                <span className="font-medium text-ink-4">/</span>
+                <InlineNumber
+                  key={cells.targetCell}
+                  value={keyResult.targetValue}
+                  label={t("okrList.targetOf", { title: keyResult.title })}
+                  readOnly={!canEdit}
+                  onSave={cells.saveTarget}
+                />
+                <span className="font-medium text-ink-3">
+                  <InlineUnit
+                    value={keyResult.unit ?? ""}
+                    label={t("okrList.unitOf", { title: keyResult.title })}
+                    readOnly={!canEdit}
+                    known={units}
+                    placeholder={t("okrList.unit")}
+                    onSave={(unit) =>
+                      patch(
+                        { unit: unit === "" ? null : unit },
+                        { unit: keyResult.unit },
+                      )
+                    }
+                  />
+                </span>
+              </span>
+              <span className="flex items-baseline gap-1 text-[11px] text-ink-4">
+                {keyResult.kind === "maintain"
+                  ? t("keyResultKind.band")
+                  : t("okrList.from")}
+                <InlineNumber
+                  value={keyResult.baselineValue}
+                  label={t("okrList.baselineOf", { title: keyResult.title })}
+                  readOnly={!canEdit}
+                  onSave={(baselineValue) =>
+                    patch(
+                      { baselineValue },
+                      { baselineValue: keyResult.baselineValue },
+                    )
+                  }
+                />
+              </span>
+            </div>
+          )}
+        </div>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="col-span-2 row-start-3 flex items-center gap-2 md:col-span-1 md:row-start-auto">
           <Bar
             value={keyResult.progressPct}
             max={progressMax}
             label={keyResult.title}
-            className="flex-1"
+            className="h-1.5 flex-1"
           />
-          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-3">
+          <span className="w-9 text-right text-xs font-semibold tabular-nums text-ink-2">
             {Math.round(keyResult.progressPct)}%
           </span>
         </div>
 
-        <span className="hidden text-xs tabular-nums text-ink-3 md:block">
+        <span className="col-start-2 row-start-2 inline-flex items-center gap-1.5 justify-self-end text-xs whitespace-nowrap text-ink-2 tabular-nums md:col-start-auto md:row-start-auto md:justify-self-start">
+          {band ? (
+            <span
+              aria-hidden="true"
+              className={`size-1.5 rounded-full ${CONFIDENCE_DOT[band]}`}
+            />
+          ) : null}
           {keyResult.confidence === null
             ? t("okrList.noConfidence")
             : formatConfidence(
@@ -1017,16 +1136,19 @@ function KeyResultRow({
               )}
         </span>
 
-        <RowActions
-          href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
-          onOpen={onOpen}
-          openLabel={t("goals.editor.openKeyResult")}
-          deleteLabel={t("goals.editor.deleteKeyResult")}
-          canDelete={canAdminister}
-          onDelete={() =>
-            okr.mutate({ kind: "removeKeyResult", id: keyResult.id })
-          }
-        />
+        <div className="col-start-2 row-start-1 self-start md:col-start-auto md:row-start-auto md:self-center">
+          <RowActions
+            title={keyResult.title}
+            href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
+            onOpen={onOpen}
+            openLabel={t("goals.editor.openKeyResult")}
+            deleteLabel={t("goals.editor.deleteKeyResult")}
+            canDelete={canAdminister}
+            onDelete={() =>
+              okr.mutate({ kind: "removeKeyResult", id: keyResult.id })
+            }
+          />
+        </div>
       </div>
       {cells.easing !== null && keyResult.targetValue !== null ? (
         <ReasonField
@@ -1070,6 +1192,7 @@ function Chevron({ open }: { readonly open: boolean }) {
  * and only a plain click is taken over.
  */
 function RowActions({
+  title,
   href,
   onOpen,
   onCheckIn = null,
@@ -1079,6 +1202,8 @@ function RowActions({
   onDelete,
   stop = null,
 }: {
+  /** The row's title, which names its menu. */
+  readonly title: string;
   readonly href: string;
   readonly onOpen: () => void;
   /** Objectives only; null where the reader may not check in. */
@@ -1170,24 +1295,32 @@ function RowActions({
     );
   }
 
+  const icon =
+    "flex size-6.5 items-center justify-center rounded-md text-ink-3 hover:bg-raised hover:text-ink";
+  const item =
+    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text";
+
+  // Check in and open stay one press away; stopping and deleting, which
+  // change the plan, wait behind the menu (Goals revamp, 2 November 2026).
+  // The row's controls show on hover or focus, and always on a phone.
   return (
-    <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 hover:opacity-100">
+    <div className="flex items-center justify-end gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-popup-open]]:opacity-100 md:opacity-0">
       {onCheckIn ? (
         <button
           type="button"
           aria-label={t("okrList.checkInOn")}
           onClick={onCheckIn}
-          className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+          className={`hidden md:flex ${icon}`}
         >
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.2"
             aria-hidden="true"
             className="size-3.5"
           >
-            <path d="M20 6 9 17l-5-5" />
+            <path d="m5 12 5 5 9-10" />
           </svg>
         </button>
       ) : null}
@@ -1206,7 +1339,7 @@ function RowActions({
           event.preventDefault();
           onOpen();
         }}
-        className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+        className={`hidden md:flex ${icon}`}
       >
         {/* The name inside the link rather than on it: an `aria-label` on an
          * anchor whose only content is a decorative icon leaves the link
@@ -1220,48 +1353,62 @@ function RowActions({
           aria-hidden="true"
           className="size-3.5"
         >
-          <path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z" />
+          <path d="M7 17 17 7M8 7h9v9" />
         </svg>
       </a>
-      {stop ? (
-        <button
-          type="button"
-          aria-label={stop.label}
-          onClick={() => setStopping(true)}
-          className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-raised hover:text-ink-2"
+      <Menu.Root>
+        <Menu.Trigger
+          aria-label={t("okrList.moreActions", { title })}
+          className={icon}
         >
           <svg
             viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+            fill="currentColor"
             aria-hidden="true"
             className="size-3.5"
           >
-            <circle cx="12" cy="12" r="9" />
-            <rect x="9" y="9" width="6" height="6" />
+            <circle cx="5" cy="12" r="1.8" />
+            <circle cx="12" cy="12" r="1.8" />
+            <circle cx="19" cy="12" r="1.8" />
           </svg>
-        </button>
-      ) : null}
-      {canDelete ? (
-        <button
-          type="button"
-          aria-label={deleteLabel}
-          onClick={() => setConfirming(true)}
-          className="flex size-6 items-center justify-center rounded-control text-ink-4 hover:bg-bad-bg hover:text-bad"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            aria-hidden="true"
-            className="size-3.5"
-          >
-            <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" />
-          </svg>
-        </button>
-      ) : null}
+        </Menu.Trigger>
+        <Menu.Portal>
+          <Menu.Positioner sideOffset={4} align="end">
+            <Menu.Popup className="min-w-44 rounded-lg border border-line-2 bg-surface p-1 shadow-(--shadow-popover)">
+              <Menu.Item className={item} onClick={onOpen}>
+                {openLabel}
+              </Menu.Item>
+              {onCheckIn ? (
+                <Menu.Item className={item} onClick={onCheckIn}>
+                  {t("okrList.checkInOn")}
+                </Menu.Item>
+              ) : null}
+              {stop ? (
+                <Menu.Item
+                  className={item}
+                  aria-label={stop.label}
+                  // After the menu has closed, which hands the focus back to
+                  // its trigger and would take it from the reason field.
+                  onClick={() => window.setTimeout(() => setStopping(true), 50)}
+                >
+                  {t("okrList.stopThisObjective")}
+                </Menu.Item>
+              ) : null}
+              {canDelete ? (
+                <>
+                  <Menu.Separator className="my-1 h-px bg-line" />
+                  <Menu.Item
+                    className={`${item} text-bad data-[highlighted]:bg-bad-bg data-[highlighted]:text-bad`}
+                    onClick={() => setConfirming(true)}
+                  >
+                    {deleteLabel}
+                  </Menu.Item>
+                </>
+              ) : null}
+            </Menu.Popup>
+          </Menu.Positioner>
+        </Menu.Portal>
+      </Menu.Root>
     </div>
   );
 }

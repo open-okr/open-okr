@@ -155,7 +155,7 @@ function OneBlocker({
               className="w-48"
               inputClassName="text-xs"
             />
-            <Button type="submit" variant="ghost" size="sm" disabled={moving}>
+            <Button type="submit" size="sm" disabled={moving}>
               {t("common.reassign")}
             </Button>
           </form>

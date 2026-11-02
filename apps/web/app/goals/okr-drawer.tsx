@@ -464,7 +464,7 @@ function DrawerBody({
         </section>
 
         <section className="flex flex-col gap-2">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+          <h3 className="text-xs font-semibold text-ink-3">
             {t("okrDrawer.keyResults", { count: goal.keyResults.length })}
           </h3>
           {goal.keyResults.length === 0 ? (
@@ -897,10 +897,7 @@ function History({
         className="flex flex-col gap-2"
         aria-labelledby="drawer-check-ins"
       >
-        <h3
-          id="drawer-check-ins"
-          className="text-[10px] font-bold uppercase tracking-wider text-ink-3"
-        >
+        <h3 id="drawer-check-ins" className="text-xs font-semibold text-ink-3">
           {t("okrDrawer.checkIns")}
         </h3>
         {detail.checkIns.length === 0 ? (
@@ -1071,7 +1068,7 @@ function Alignment({
   return (
     <>
       <section className="flex flex-col gap-1">
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+        <h3 className="text-xs font-semibold text-ink-3">
           {t("okrDrawer.alignedTo")}
         </h3>
         {detail.relations.parent ? (
@@ -1114,7 +1111,7 @@ function Alignment({
       </section>
 
       <section className="flex flex-col gap-1">
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+        <h3 className="text-xs font-semibold text-ink-3">
           {t("okrDrawer.alignedBelow")}
         </h3>
         {detail.relations.children.length === 0 ? (
@@ -1134,7 +1131,7 @@ function Alignment({
       </section>
 
       <section className="flex flex-col gap-1">
-        <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+        <h3 className="text-xs font-semibold text-ink-3">
           {t("okrDrawer.dependencies")}
         </h3>
         {detail.relations.dependencies.length === 0 ? (

@@ -125,6 +125,10 @@ const PUBLIC_PREFIXES = [
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.
   "/.well-known",
+  // The agent setup instructions (docs/design/agent-setup-prompt.md §9.2).
+  // The agent that fetches them has no session, and they hold the endpoint
+  // and the instance's name, both public already.
+  "/agent-setup/",
 ];
 
 /**

@@ -34,7 +34,7 @@ export function AgentSwitch({
   return (
     <Button
       size="sm"
-      variant={enabled ? "ghost" : "primary"}
+      variant={enabled ? "default" : "primary"}
       disabled={pending}
       onClick={() => {
         if (
@@ -69,7 +69,6 @@ export function CancelRun({ id }: { readonly id: string }) {
   return (
     <Button
       size="sm"
-      variant="ghost"
       disabled={pending}
       onClick={() => {
         start(async () => {

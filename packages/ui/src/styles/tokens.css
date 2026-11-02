@@ -483,11 +483,18 @@
  * The three controls that carry no text are excluded, because a 16px
  * checkbox is a different thing from 16px text and the zoom rule does not
  * apply to them. Desktop is untouched: above the breakpoint every control
- * keeps the size its own class gives it. */
+ * keeps the size its own class gives it.
+ *
+ * **A value that reads as text is left out** (`data-text-first`, on a
+ * container or on the field itself): at rest it keeps the size of the text
+ * around it, and the app makes it 16px while it has the focus, which is the
+ * moment the zoom rule is read (apps/web/app/globals.css). */
 @media (max-width: 767px) {
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-  select,
-  textarea {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not(
+    [data-text-first] *
+  ),
+  select:not([data-text-first] *),
+  textarea:not([data-text-first]):not([data-text-first] *) {
     font-size: 16px;
   }
 }

@@ -23,6 +23,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -112,7 +113,7 @@ test("an objective to open, with a key result, added from the list", async () =>
   await page.keyboard.type(KEY_RESULT);
   await page.keyboard.press("Enter");
   await expect(
-    main().locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
+    main().locator(titleField("Key result title", KEY_RESULT)),
   ).toBeVisible({ timeout: 15_000 });
   await settled();
 });
@@ -120,7 +121,7 @@ test("an objective to open, with a key result, added from the list", async () =>
 test("acceptance: a value changed in the drawer moves its list row without a reload", async () => {
   await goTo(page, "/goals");
   const title = main().locator(
-    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+    titleField("Objective title", OBJECTIVE),
   );
   await expect(title).toBeVisible({ timeout: 15_000 });
   const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
@@ -217,14 +218,14 @@ test("a link to an objective in another cycle opens that cycle", async () => {
     { timeout: 15_000 },
   );
   await expect(
-    main().locator(`input[aria-label="Objective title"][value="${ELSEWHERE}"]`),
+    main().locator(titleField("Objective title", ELSEWHERE)),
   ).toBeVisible();
 });
 
 test("acceptance: checking in from the row moves its health, and the history shows the check-in", async () => {
   await goTo(page, "/goals");
   const title = main().locator(
-    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+    titleField("Objective title", OBJECTIVE),
   );
   await expect(title).toBeVisible({ timeout: 15_000 });
   const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");

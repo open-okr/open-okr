@@ -23,3 +23,12 @@ export const REFUSED_HUE = {
   amber: "admin.branding.brandingSettingsForm.refusedAmber",
   green: "admin.branding.brandingSettingsForm.refusedGreen",
 } as const;
+
+/** Which of the two branding pictures (docs/design/workspace-logo-favicon.md). */
+export type BrandingImageSlot = "logo" | "favicon";
+
+/** What an upload or a removal of a branding picture hands back. */
+export interface BrandingImageResult {
+  readonly ok: boolean;
+  readonly message: string;
+}

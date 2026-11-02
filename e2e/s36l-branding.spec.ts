@@ -70,6 +70,26 @@ test("a fresh workspace is drawn in the product's own indigo", async () => {
   ).toBeVisible();
 });
 
+test("an empty field shows the indigo in force, and a typed colour is previewed before Save", async () => {
+  // docs/design/branding-page.md §5: never black, and the mirror goes first.
+  await expect(page.locator("input[type='color']")).toHaveValue("#4f46e5");
+  await expect(page.getByText("Product default, #4f46e5.")).toBeVisible();
+
+  await field(page).fill("#0e7490");
+  await expect(page.getByTestId("branding-mirror-unsaved")).toHaveText(
+    "Not saved yet: colour",
+  );
+  const mirrorBrand = await page
+    .getByTestId("branding-mirror")
+    .locator("[style*='--brand']")
+    .first()
+    .evaluate((frame) => getComputedStyle(frame).getPropertyValue("--brand").trim());
+  expect(mirrorBrand).toBe("#0e7490");
+  // The page itself is still drawn in the colour in force.
+  expect(await token(page, "--brand")).toBe("#4f46e5");
+  await field(page).fill("");
+});
+
 test("a saved colour is what every screen is drawn in", async () => {
   await save(page, "#7c3aed");
   await expect(

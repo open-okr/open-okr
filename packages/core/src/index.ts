@@ -564,6 +564,8 @@ export {
 } from "./blobs/upload.ts";
 export {
   ALLOWED_CONTENT_TYPES,
+  BRANDING_IMAGE_MAX_BYTES,
+  BRANDING_IMAGE_TYPES,
   IMAGE_CONTENT_TYPES,
   MAX_BLOB_BYTES,
   MAX_IMAGE_PIXELS,
@@ -1115,6 +1117,7 @@ export {
   type ResolvedMailSettings,
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
+export { readUpdateCheck, setUpdateCheck } from "./secrets/update-check.ts";
 export {
   type SessionScoresRevealedEvent,
   type SessionStageChangedEvent,

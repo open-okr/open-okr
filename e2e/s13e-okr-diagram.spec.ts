@@ -19,6 +19,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 import { choose } from "./pickers.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -249,7 +250,7 @@ test("acceptance (P9-T10a): a title and a value edited on a card are the list's 
   await goTo(page, `/goals?cycle=${currentCycle}`);
   const list = page.locator("#main-content");
   await expect(
-    list.locator(`input[aria-label="Objective title"][value="${RENAMED}"]`),
+    list.locator(titleField("Objective title", RENAMED)),
   ).toBeVisible({ timeout: 15_000 });
   await expect(list.getByLabel(`Current value for ${KEY_RESULT}`)).toHaveValue(
     "150",

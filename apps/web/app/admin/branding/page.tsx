@@ -1,12 +1,17 @@
-import { callAction, deriveBrandPalette } from "@openokr/core";
+import {
+  BRANDING_IMAGE_MAX_BYTES,
+  BRANDING_IMAGE_TYPES,
+  callAction,
+  deriveBrandPalette,
+} from "@openokr/core";
 import { HEX_COLOUR_PATTERN } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
+import { brandingImageUrl } from "../../../lib/branding-image";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import {
-  BrandingSettingsForm,
-  type BrandingStatus,
-} from "./branding-settings-form";
+import { initialsOf } from "../../../lib/workspace-initials";
+import type { BrandingStatus } from "./branding-settings-form";
+import { BrandingStudio } from "./branding-studio";
 
 /**
  * Matched before a stored value is used, never after. It reaches an inline
@@ -41,12 +46,35 @@ export default async function BrandingSettingsPage() {
     adjusted: palette?.adjusted ?? false,
   };
 
+  const rules = {
+    types: [...BRANDING_IMAGE_TYPES],
+    maxBytes: BRANDING_IMAGE_MAX_BYTES,
+  };
+
+  const imageUrl = (slot: "logo" | "favicon") => {
+    const id = branding[`${slot}BlobId`];
+    return brandingImageUrl(typeof id === "string" ? id : null);
+  };
+
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.branding.branding")}
-      </h1>
-      <BrandingSettingsForm status={status} />
-    </>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.branding.branding")}
+        </h1>
+        <p className="max-w-prose text-sm text-ink-3">
+          {t("admin.branding.intro")}
+        </p>
+      </div>
+      {/* docs/design/branding-page.md: one card and its live mirror. */}
+      <BrandingStudio
+        status={status}
+        logoUrl={imageUrl("logo")}
+        faviconUrl={imageUrl("favicon")}
+        workspaceName={workspace.name}
+        initials={initialsOf(workspace.name)}
+        rules={rules}
+      />
+    </div>
   );
 }

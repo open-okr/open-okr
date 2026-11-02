@@ -9,7 +9,8 @@ import {
   NumberInput,
   TextInput,
 } from "@openokr/ui";
-import { agentSetupPrompt } from "../../../lib/agent-setup-prompt";
+import { agentSetupLine, agentSetupUrl } from "../../../lib/agent-setup-prompt";
+import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -88,6 +89,8 @@ export default async function ApiTokensPage() {
   // The address every grant and every agent token is checked against, so the
   // one an agent is told to use is the one it will be accepted at.
   const agentEndpoint = resourceIdentifier(instanceIssuer());
+  const setupUrl = agentSetupUrl(instanceIssuer());
+  const instanceName = await getInstanceName();
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -115,6 +118,7 @@ export default async function ApiTokensPage() {
           <TokenForm
             action={createToken}
             agentEndpoint={agentEndpoint}
+            setupUrl={setupUrl}
             className="flex flex-col gap-3"
           >
             <TextInput
@@ -201,7 +205,7 @@ export default async function ApiTokensPage() {
               agent that can open a browser needs no token at all. */}
           <div className="flex flex-col gap-1">
             <CopyButton
-              text={agentSetupPrompt({ endpoint: agentEndpoint })}
+              text={agentSetupLine({ instanceName, setupUrl })}
               variant="primary"
               size="sm"
             >
@@ -272,7 +276,7 @@ export default async function ApiTokensPage() {
                 {token.revokedAt ? null : (
                   <TokenForm action={revokeToken}>
                     <input type="hidden" name="id" value={token.id} />
-                    <Button type="submit" variant="ghost" size="sm">
+                    <Button type="submit" size="sm">
                       {t("common.revoke")}
                     </Button>
                   </TokenForm>

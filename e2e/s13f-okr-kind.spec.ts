@@ -16,6 +16,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -35,7 +36,7 @@ const drawer = () => page.getByTestId("okr-drawer");
 const kindOf = (title: string) =>
   main().getByRole("combobox", { name: `Kind of ${title}` });
 const titled = (title: string) =>
-  main().locator(`input[aria-label="Objective title"][value="${title}"]`);
+  main().locator(titleField("Objective title", title));
 
 async function idOf(title: string): Promise<string> {
   const listed = await api.get("/api/v1/goals/list", { headers: authed() });

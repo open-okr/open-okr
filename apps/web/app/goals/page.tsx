@@ -10,7 +10,6 @@ import {
 import {
   buttonVariants,
   Card,
-  CardBody,
   CardHeader,
   Chip,
   type MessageValues,
@@ -35,6 +34,7 @@ import { CyclePicker } from "./cycle-picker.tsx";
 import { filterAssistAvailableAction } from "./filter-actions.ts";
 import { FilterAssist } from "./filter-assist.tsx";
 import { FilterSelect } from "./filter-select.tsx";
+import { GoalsToolbar } from "./goals-toolbar.tsx";
 import { NewObjectiveButton } from "./new-objective.tsx";
 import { OkrDiagram } from "./okr-diagram.tsx";
 import { OkrTable } from "./okr-table.tsx";
@@ -259,6 +259,41 @@ export default async function GoalsPage({
   };
   const treeGoals = okrTree ? filterGoals(okrTree.goals, filters) : [];
 
+  // How many objectives each scope tab holds under the other filters, so a
+  // tab says what pressing it will show. The cycle's whole tree and the
+  // reader's own are read once each, reusing whichever the list already has.
+  const scopeCounts = cycleId
+    ? await (async () => {
+        const wholeTree =
+          okrTree && scope === "all"
+            ? okrTree
+            : await callAction(context, "goals.tree", {
+                cycleId,
+                scope: "all",
+                includeClosed: true,
+              });
+        const ownTree =
+          okrTree && scope === "mine"
+            ? okrTree
+            : await callAction(context, "goals.tree", {
+                cycleId,
+                scope: "mine",
+                includeClosed: true,
+              });
+        const others = { ...filters, level, spaceIds: undefined };
+        return {
+          all: filterGoals(wholeTree.goals, others).length,
+          mine: filterGoals(ownTree.goals, others).length,
+          team: filterGoals(wholeTree.goals, {
+            ...others,
+            spaceIds: mySpaceIds,
+          }).length,
+          company: filterGoals(wholeTree.goals, { ...others, level: "company" })
+            .length,
+        };
+      })()
+    : null;
+
   const listed =
     cycleId && display === "tree"
       ? await callAction(context, "goals.list", {
@@ -386,19 +421,16 @@ export default async function GoalsPage({
       <AreaTabs area="goals" current="/goals" t={t} />
       <div className="flex flex-col gap-4.5">
         <Card>
-          {/* **Two rows of two, not four things on one line.** Four groups on
-           * one line put the title, the set it belongs to, a score and an export
-           * at the same rank, and each pushed the next towards the middle. The
-           * split is by what each row answers: the first says what you are
-           * looking at and how it is doing, the second is what you can do to it.
-           * Agung asked for this shape after the filter bar was fixed. */}
-          <CardHeader className="flex-col items-stretch gap-2.5">
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              {/* Identity and state as one unit on the left, rather than a title
-               * with a sentence under it that repeated what the table below
-               * already says. The chip reports what is on screen; the table owns
-               * the empty state and its suggestion. */}
-              <div className="flex min-w-0 items-center gap-2.5">
+          {/* **What you are looking at on the left, what you can do on the
+           * right**, as the reference mockup (12-okr-home) draws it. This was
+           * two rows of two: the title row, then the cycle and its actions in a
+           * row of their own. One row of actions beside the title and summary
+           * frees that row for the list (Goals audit, 2 November 2026). The
+           * chip still reports what is on screen; the table owns the empty
+           * state and its suggestion. */}
+          <CardHeader className="flex-wrap items-start justify-between gap-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5">
                 <h1 className="flex-none text-lg font-bold text-ink">
                   {t("okrList.title")}
                 </h1>
@@ -419,83 +451,68 @@ export default async function GoalsPage({
                         tree && display === "tree",
                       )}
                 </Chip>
-              </div>
-              {alignment?.score !== null && alignment !== null ? (
-                <AlignmentScore
-                  score={alignment.score}
-                  band={alignment.band}
-                  label={t("goals.alignment")}
-                />
-              ) : null}
-            </div>
-            {summary.objectives > 0 ? (
-              <p data-testid="okr-summary" className="text-xs text-ink-3">
-                {t("okrList.summary", {
-                  objectives: summary.objectives,
-                  keyResults: summary.keyResults,
-                  average: summary.average,
-                  atRisk: summary.atRisk,
-                  outdated: summary.outdated,
-                })}
-              </p>
-            ) : null}
-
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-              {/* Which cycle is on screen, and the way another one is made.
-               * Beside the title rather than in the filter bar below: it is the
-               * first question this screen answers and it is not a filter, it is
-               * the set. */}
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <CyclePicker
-                  cycles={cycles}
-                  cycleId={cycleId}
-                  hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
-                  canCreate={canAdminister}
-                />
-                {/* Beside the cycle, because the two answer one after the other:
-                 * which set am I looking at, and what do I want to put in it.
-                 * The set also carries an add row under it, for the moment
-                 * somebody is already reading. */}
-                {canEdit && cycleId ? (
-                  <NewObjectiveButton
-                    cycleId={cycleId}
-                    level={levelForNew}
-                    refusal={refusal}
-                    // The topbar's `+ New` lands here (P9-T07b-a).
-                    initiallyOpen={query.new === "objective"}
-                    kinds={kindsInUse}
-                    defaultKind={defaultOkrKind(
-                      practiceRead.practice as ResolvedPractice,
-                    )}
-                    askReason={
-                      okrTree?.cycle.midCycle &&
-                      practiceRead.practice["reasons.midCycleAddition"] !==
-                        "off"
-                        ? (practiceRead.practice["reasons.midCycleAddition"] as
-                            | "optional"
-                            | "required")
-                        : null
-                    }
+                {alignment?.score !== null && alignment !== null ? (
+                  <AlignmentScore
+                    score={alignment.score}
+                    band={alignment.band}
+                    label={t("goals.alignment")}
                   />
                 ) : null}
-                {/* Check in's door now that it has left the sidebar
-                 * (P9-T07a-b, okr-entry-points.md §3.1). */}
-                {canEdit ? (
-                  <Link
-                    href="/check-in"
-                    className={buttonVariants({ size: "sm" })}
-                  >
-                    {t("okrList.checkInAll")}
-                  </Link>
-                ) : null}
               </div>
-              {/*
-               * Taking the list away, beside the thing it is a list of (P5-T13).
-               * The file matches the rows and columns on screen, and every export
-               * writes an audit row: it is the one action that takes data out of
-               * the product.
-               */}
-              <ExportButton onExport={exportListAction.bind(null, "goals")} />
+              {summary.objectives > 0 ? (
+                <p data-testid="okr-summary" className="text-xs text-ink-3">
+                  {t("okrList.summary", {
+                    objectives: summary.objectives,
+                    keyResults: summary.keyResults,
+                    average: summary.average,
+                    atRisk: summary.atRisk,
+                    outdated: summary.outdated,
+                  })}
+                </p>
+              ) : null}
+            </div>
+            <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:w-full">
+              <CyclePicker
+                cycles={cycles}
+                cycleId={cycleId}
+                hrefTemplate={href({ cycle: CYCLE_PLACEHOLDER })}
+                canCreate={canAdminister}
+              />
+              {/* Beside the cycle, because the two answer one after the other:
+               * which set am I looking at, and what do I want to put in it.
+               * The set also carries an add row under it, for the moment
+               * somebody is already reading. */}
+              {canEdit && cycleId ? (
+                <NewObjectiveButton
+                  cycleId={cycleId}
+                  level={levelForNew}
+                  refusal={refusal}
+                  // The topbar's `+ New` lands here (P9-T07b-a).
+                  initiallyOpen={query.new === "objective"}
+                  kinds={kindsInUse}
+                  defaultKind={defaultOkrKind(
+                    practiceRead.practice as ResolvedPractice,
+                  )}
+                  askReason={
+                    okrTree?.cycle.midCycle &&
+                    practiceRead.practice["reasons.midCycleAddition"] !== "off"
+                      ? (practiceRead.practice["reasons.midCycleAddition"] as
+                          | "optional"
+                          | "required")
+                      : null
+                  }
+                />
+              ) : null}
+              {/* Check in's door now that it has left the sidebar
+               * (P9-T07a-b, okr-entry-points.md §3.1). */}
+              {canEdit ? (
+                <Link
+                  href="/check-in"
+                  className={`${buttonVariants({ size: "sm" })} max-md:w-full`}
+                >
+                  {t("okrList.checkInAll")}
+                </Link>
+              ) : null}
             </div>
           </CardHeader>
           {/*
@@ -504,26 +521,32 @@ export default async function GoalsPage({
            * never sees an empty heading.
            */}
           <MyExports />
-          <CardBody className="flex flex-col gap-2.5">
-            <Filters
-              level={level ?? null}
-              levels={cycleLevels}
-              health={health ?? null}
-              scope={scopeTab}
-              members={members}
-              spaces={spaces}
-              champion={champion ?? null}
-              space={space ?? null}
-              kind={kindsInUse.length > 1 ? (kind ?? null) : undefined}
-              filterAssist={
-                filterAssistAvailable ? <FilterAssist /> : undefined
-              }
-              tree={tree}
-              display={display}
-              includeClosed={includeClosed}
-              href={href}
-            />
-          </CardBody>
+          <Filters
+            level={level ?? null}
+            levels={cycleLevels}
+            health={health ?? null}
+            scope={scopeTab}
+            counts={scopeCounts}
+            members={members}
+            spaces={spaces}
+            champion={champion ?? null}
+            space={space ?? null}
+            kind={kindsInUse.length > 1 ? (kind ?? null) : undefined}
+            filterAssist={filterAssistAvailable ? <FilterAssist /> : undefined}
+            tree={tree}
+            display={display}
+            includeClosed={includeClosed}
+            href={href}
+            // Taking the list away (P5-T13), at the end of the toolbar that
+            // shapes the list. The file matches the rows on screen, and every
+            // export writes an audit row.
+            exportControl={
+              <ExportButton
+                menu
+                onExport={exportListAction.bind(null, "goals")}
+              />
+            }
+          />
         </Card>
 
         {display === "editor" ? (
@@ -697,9 +720,7 @@ function AlignmentScore({
       href="/cycle?phase=5"
       className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
     >
-      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
-        {label}
-      </span>
+      <span className="text-xs font-medium text-ink-3">{label}</span>
       <span className="flex items-baseline gap-0.5">
         <span
           className={`text-lg font-bold tabular-nums ${
@@ -794,6 +815,7 @@ async function Filters({
   levels,
   health,
   scope,
+  counts,
   members,
   spaces,
   champion,
@@ -804,19 +826,22 @@ async function Filters({
   includeClosed,
   href,
   filterAssist,
+  exportControl,
 }: {
   readonly level: string | null;
-  /** The levels this cycle offers; the level chips show only these. */
+  /** The levels this cycle offers; the level options show only these. */
   readonly levels: readonly string[];
   readonly health: string | null;
   readonly scope: "all" | "mine" | "team" | "company";
+  /** How many objectives each scope tab holds under the other filters. */
+  readonly counts: ScopeCounts | null;
   readonly members: readonly { readonly id: string; readonly name: string }[];
   readonly spaces: readonly { readonly id: string; readonly name: string }[];
   readonly champion: string | null;
   readonly space: string | null;
   /**
    * The kind chosen, or null for either. Undefined where the workspace uses
-   * one kind, which hides the group: every objective is then that kind.
+   * one kind, which hides the row: every objective is then that kind.
    */
   readonly kind: "committed" | "aspirational" | null | undefined;
   readonly tree: boolean;
@@ -825,302 +850,417 @@ async function Filters({
   readonly href: (patch: Record<string, string | null>) => string;
   /** The sentence-to-filter box, when a provider can answer. */
   readonly filterAssist?: ReactNode;
+  readonly exportControl: ReactNode;
 }) {
   const { t } = await getTranslations();
 
-  // How many of the collapsed filters narrow the set right now.
-  const filterCount =
-    [level, health, kind, champion, space].filter(
-      (value) => value !== null && value !== undefined,
-    ).length + (includeClosed ? 1 : 0);
+  // The filters in force, each as the chip that takes it away.
+  const active: { readonly key: string; readonly label: string }[] = [];
+  const chip = (group: string, value: string) =>
+    t("goals.filter.chip", { group, value });
+  if (level !== null) {
+    active.push({
+      key: "level",
+      label: chip(t("common.level"), capital(level)),
+    });
+  }
+  if (health !== null) {
+    active.push({
+      key: "health",
+      label: chip(t("workMap.health"), healthWord(t, health)),
+    });
+  }
+  if (kind !== null && kind !== undefined) {
+    active.push({
+      key: "kind",
+      label: chip(
+        t("okrKind.label"),
+        kind === "committed"
+          ? t("okrKind.committed")
+          : t("okrKind.aspirational"),
+      ),
+    });
+  }
+  if (champion !== null) {
+    const name = members.find((member) => member.id === champion)?.name;
+    active.push({
+      key: "champion",
+      label: chip(t("okrList.champion"), name ?? champion),
+    });
+  }
+  if (space !== null) {
+    const name = spaces.find((entry) => entry.id === space)?.name;
+    active.push({
+      key: "space",
+      label: chip(t("okrList.space"), name ?? space),
+    });
+  }
+  if (includeClosed) {
+    active.push({ key: "closed", label: t("goals.filter.includeClosed") });
+  }
+  const clearAllHref = href({
+    level: null,
+    health: null,
+    kind: null,
+    champion: null,
+    space: null,
+    closed: null,
+  });
 
-  return (
-    // Two columns from `2xl` (1536px), not `xl`. Measured at 1280 the split
-    // left only 536px for the groups, which pushed them from two rows to four
-    // and made the toolbar 244px tall against 114px at 1600. Two columns are
-    // worth it only where there is genuinely room for two.
-    //
-    // The filter groups on the left, the sentence box on
-    // the right. The groups are sized by their content and stop at about 55
-    // percent of a wide card, which left the right half of the toolbar empty.
-    // Filling it with the control that was sitting in a row of its own uses the
-    // space and removes a row, where stretching the tracks would only have made
-    // long grey slabs with the chips packed at one end.
-    <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between 2xl:gap-8">
-      {/* **One row, and one control per question.**
-       *
-       * This was six labelled groups over two ragged rows, and two of them
-       * said the same two words. `Display` offered List, Diagram and Tree;
-       * `View` offered Tree and List and meant the ordering *inside* the tree
-       * table, which does nothing at all under the other two displays. Agung
-       * asked what the difference was, which is the question a reader should
-       * never have to ask of a toolbar.
-       *
-       * So the rendering is one segmented control, the ordering appears only
-       * under the rendering it belongs to, and the two yes-or-no filters are
-       * one chip each instead of a labelled pair. Six groups become four
-       * controls, and the label sits in the track rather than above it. */}
-      <div className="-mx-0.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 overflow-x-auto px-0.5">
-        <Group label={t("goals.editor.displayGroup")}>
-          <Tab href={href({ display: null })} active={display === "editor"}>
-            {t("goals.editor.displayList")}
-          </Tab>
-          <Tab
-            href={href({ display: "diagram" })}
-            active={display === "diagram"}
+  const tabs = (
+    <fieldset
+      aria-label={t("okrList.scope")}
+      className="flex gap-0.5 overflow-x-auto [scrollbar-width:none]"
+    >
+      {(
+        [
+          ["all", href({ mine: null, scope: "all" }), t("goals.all")],
+          ["mine", href({ mine: "1", scope: null }), t("goals.mine")],
+          ["team", href({ mine: null, scope: "team" }), t("okrList.myTeam")],
+          [
+            "company",
+            href({ mine: null, scope: "company" }),
+            t("okrList.company"),
+          ],
+        ] as const
+      ).map(([key, to, label]) => (
+        <a
+          key={key}
+          href={to}
+          aria-current={scope === key ? "true" : undefined}
+          className={`border-b-2 px-2.5 pt-2.5 pb-2.25 text-[13px] whitespace-nowrap ${
+            scope === key
+              ? "border-brand font-semibold text-brand-text"
+              : "border-transparent font-medium text-ink-3 hover:text-ink"
+          }`}
+        >
+          {label}
+          {counts ? (
+            <span
+              className={`ml-1 text-[11.5px] font-medium ${
+                scope === key ? "text-brand-text/70" : "text-ink-4"
+              }`}
+            >
+              {counts[key]}
+            </span>
+          ) : null}
+        </a>
+      ))}
+    </fieldset>
+  );
+
+  const displays = (
+    <fieldset
+      aria-label={t("goals.editor.displayGroup")}
+      className="inline-flex h-7.5 gap-0.5 rounded-control bg-raised p-0.75"
+    >
+      {(
+        [
+          ["editor", null, t("goals.editor.displayList"), LIST_ICON],
+          [
+            "diagram",
+            "diagram",
+            t("goals.editor.displayDiagram"),
+            DIAGRAM_ICON,
+          ],
+          ["tree", "tree", t("goals.editor.displayTree"), TREE_ICON],
+        ] as const
+      ).map(([key, value, label, icon]) => (
+        <a
+          key={key}
+          href={href({ display: value })}
+          title={label}
+          aria-current={display === key ? "true" : undefined}
+          className={`grid w-7 place-items-center rounded-md ${
+            display === key
+              ? "bg-surface text-brand-text shadow-control"
+              : "text-ink-3 hover:text-ink"
+          }`}
+        >
+          <span className="sr-only">{label}</span>
+          {icon}
+        </a>
+      ))}
+    </fieldset>
+  );
+
+  const panel = (
+    <>
+      {filterAssist ? (
+        <>
+          <span className={PANEL_LABEL}>{t("goals.filter.describeIt")}</span>
+          <div className="min-w-0">{filterAssist}</div>
+        </>
+      ) : null}
+
+      {/* Only under the tree, because the ordering is a property of that
+       * table and of nothing else. */}
+      {display === "tree" ? (
+        <PanelRow label={t("goals.editor.orderGroup")}>
+          <Pill href={href({ view: null })} on={tree}>
+            {t("goals.editor.orderNested")}
+          </Pill>
+          <Pill href={href({ view: "list" })} on={!tree}>
+            {t("goals.editor.orderFlat")}
+          </Pill>
+        </PanelRow>
+      ) : null}
+
+      <PanelRow label={t("common.level")}>
+        <Pill href={href({ level: null })} on={level === null}>
+          {t("goals.all")}
+        </Pill>
+        {ALIGNMENT_LEVEL_ORDER.filter((entry) => levels.includes(entry)).map(
+          (entry) => (
+            <Pill
+              key={entry}
+              href={href({ level: entry })}
+              on={level === entry}
+            >
+              {capital(entry)}
+            </Pill>
+          ),
+        )}
+      </PanelRow>
+
+      <PanelRow label={t("workMap.health")}>
+        <Pill href={href({ health: null })} on={health === null}>
+          {t("common.any")}
+        </Pill>
+        {GOAL_HEALTH_BANDS.map((band) => (
+          <Pill key={band} href={href({ health: band })} on={health === band}>
+            {healthWord(t, band)}
+          </Pill>
+        ))}
+      </PanelRow>
+
+      {kind !== undefined ? (
+        <PanelRow label={t("okrKind.label")}>
+          <Pill href={href({ kind: null })} on={kind === null}>
+            {t("common.any")}
+          </Pill>
+          <Pill href={href({ kind: "committed" })} on={kind === "committed"}>
+            {t("okrKind.committed")}
+          </Pill>
+          <Pill
+            href={href({ kind: "aspirational" })}
+            on={kind === "aspirational"}
           >
-            {t("goals.editor.displayDiagram")}
-          </Tab>
-          <Tab href={href({ display: "tree" })} active={display === "tree"}>
-            {t("goals.editor.displayTree")}
-          </Tab>
-        </Group>
+            {t("okrKind.aspirational")}
+          </Pill>
+        </PanelRow>
+      ) : null}
 
-        {/* Only under the tree, because the ordering is a property of that
-         * table and of nothing else. Hidden rather than disabled: a control
-         * that can never apply here is not a control a reader has to reason
-         * about. */}
-        {display === "tree" ? (
-          <Group label={t("goals.editor.orderGroup")}>
-            <Tab href={href({ view: null })} active={tree}>
-              {t("goals.editor.orderNested")}
-            </Tab>
-            <Tab href={href({ view: "list" })} active={!tree}>
-              {t("goals.editor.orderFlat")}
-            </Tab>
-          </Group>
-        ) : null}
-
-        <span aria-hidden="true" className="h-5 w-px flex-none bg-line" />
-
-        {/* The scope tabs (design §3): whose objectives these are. Mine
-         * keeps the `mine=1` the filter assist writes. */}
-        <Group label={t("okrList.scope")}>
-          <Tab
-            href={href({ mine: null, scope: "all" })}
-            active={scope === "all"}
-          >
-            {t("goals.all")}
-          </Tab>
-          <Tab
-            href={href({ mine: "1", scope: null })}
-            active={scope === "mine"}
-          >
-            {t("goals.mine")}
-          </Tab>
-          <Tab
-            href={href({ mine: null, scope: "team" })}
-            active={scope === "team"}
-          >
-            {t("okrList.myTeam")}
-          </Tab>
-          <Tab
-            href={href({ mine: null, scope: "company" })}
-            active={scope === "company"}
-          >
-            {t("okrList.company")}
-          </Tab>
-        </Group>
-
-        {/* Collapsed behind one Filter button, the scope and the display
-         * above it (OKRGoal UX review N5): seven groups before the first goal
-         * read as work. Open while any of them narrows the set, so a filter
-         * that is on is never hidden. */}
-        <details className="group" {...(filterCount > 0 ? { open: true } : {})}>
-          <summary className="cursor-pointer list-none rounded-control border border-line px-2.5 py-1 text-xs font-semibold text-ink-2 hover:border-brand">
-            {filterCount > 0
-              ? t("goals.filter.withCount", { count: filterCount })
-              : t("goals.filter.label")}
-          </summary>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Group label={t("common.level")}>
-              <Tab href={href({ level: null })} active={level === null}>
-                {t("goals.all")}
-              </Tab>
-              {ALIGNMENT_LEVEL_ORDER.filter((entry) =>
-                levels.includes(entry),
-              ).map((entry) => (
-                <Tab
-                  key={entry}
-                  href={href({ level: entry })}
-                  active={level === entry}
-                >
-                  {entry}
-                </Tab>
-              ))}
-            </Group>
-
-            <Group label={t("workMap.health")}>
-              <Tab href={href({ health: null })} active={health === null}>
-                {t("common.any")}
-              </Tab>
-              {GOAL_HEALTH_BANDS.map((band) => (
-                <Tab
-                  key={band}
-                  href={href({ health: band })}
-                  active={health === band}
-                >
-                  {healthWord(t, band)}
-                </Tab>
-              ))}
-            </Group>
-
-            {kind !== undefined ? (
-              <Group label={t("okrKind.label")}>
-                <Tab href={href({ kind: null })} active={kind === null}>
-                  {t("common.any")}
-                </Tab>
-                <Tab
-                  href={href({ kind: "committed" })}
-                  active={kind === "committed"}
-                >
-                  {t("okrKind.committed")}
-                </Tab>
-                <Tab
-                  href={href({ kind: "aspirational" })}
-                  active={kind === "aspirational"}
-                >
-                  {t("okrKind.aspirational")}
-                </Tab>
-              </Group>
-            ) : null}
-
-            {/* Two filters that are a yes or a no, drawn as a yes or a no. A pair
-             * of options each needed a label to say which pair it was; a single
-             * chip says it in the word on the chip. `aria-pressed` is what tells
-             * somebody who cannot see the fill which way it is set. */}
-            <FilterSelect
-              label={t("okrList.champion")}
-              value={champion}
-              options={members.map((member) =>
-                memberOption(member, t("common.agent")),
-              )}
-              people
-              anyLabel={t("common.any")}
-              hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
-              anyHref={href({ champion: null })}
-            />
-            <FilterSelect
-              label={t("okrList.space")}
-              value={space}
-              options={spaces.map(namedOption)}
-              anyLabel={t("common.any")}
-              hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
-              anyHref={href({ space: null })}
-            />
-            <Toggle
-              href={href({ closed: includeClosed ? null : "1" })}
-              on={includeClosed}
-              label={t("goals.editor.filterClosed")}
-            />
-          </div>
-        </details>
+      <span className={PANEL_LABEL}>{t("okrList.champion")}</span>
+      <div className="min-w-0">
+        <FilterSelect
+          bare
+          label={t("okrList.champion")}
+          value={champion}
+          options={members.map((member) =>
+            memberOption(member, t("common.agent")),
+          )}
+          people
+          anyLabel={t("common.any")}
+          hrefTemplate={href({ champion: FILTER_PLACEHOLDER })}
+          anyHref={href({ champion: null })}
+        />
       </div>
 
-      {filterAssist ? (
-        <div className="2xl:w-96 2xl:flex-none">{filterAssist}</div>
-      ) : null}
-    </div>
+      <span className={PANEL_LABEL}>{t("okrList.space")}</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <FilterSelect
+          bare
+          label={t("okrList.space")}
+          value={space}
+          options={spaces.map(namedOption)}
+          anyLabel={t("common.any")}
+          hrefTemplate={href({ space: FILTER_PLACEHOLDER })}
+          anyHref={href({ space: null })}
+        />
+        {/* A yes or a no, drawn as a box that is ticked or not. It stays a
+         * link, so the state is still an address somebody can send. */}
+        <a
+          href={href({ closed: includeClosed ? null : "1" })}
+          aria-current={includeClosed ? "true" : undefined}
+          className="inline-flex items-center gap-1.75 text-[12.5px] text-ink-2"
+        >
+          <span
+            aria-hidden="true"
+            className={`grid size-3.75 place-items-center rounded-[4px] border ${
+              includeClosed
+                ? "border-brand bg-brand text-on-brand"
+                : "border-line-2 bg-surface"
+            }`}
+          >
+            {includeClosed ? (
+              <svg viewBox="0 0 12 12" className="size-2.5" aria-hidden="true">
+                <path
+                  d="m2.5 6 2.5 2.5 4.5-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            ) : null}
+          </span>
+          {t("goals.filter.includeClosed")}
+        </a>
+      </div>
+    </>
+  );
+
+  const chips =
+    active.length === 0
+      ? null
+      : active.map((one) => (
+          <a
+            key={one.key}
+            href={href({ [one.key]: null })}
+            aria-label={t("goals.filter.removeOne", { filter: one.label })}
+            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
+          >
+            {one.label}
+            <svg viewBox="0 0 10 10" aria-hidden="true" className="size-2.5">
+              <path
+                d="m2 2 6 6M8 2 2 8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </a>
+        ));
+
+  return (
+    <GoalsToolbar
+      tabs={tabs}
+      display={displays}
+      exportControl={exportControl}
+      panel={panel}
+      chips={chips}
+      clearAll={
+        active.length === 0 ? null : (
+          <a
+            href={clearAllHref}
+            className="px-1.5 text-[12.5px] font-semibold text-brand-text hover:underline"
+          >
+            {t("goals.filter.clearAll")}
+          </a>
+        )
+      }
+      activeCount={active.length}
+    />
   );
 }
 
-function Group({
+/** How many objectives each scope tab holds, under the other filters. */
+interface ScopeCounts {
+  readonly all: number;
+  readonly mine: number;
+  readonly team: number;
+  readonly company: number;
+}
+
+const PANEL_LABEL = "text-xs font-semibold text-ink-3 max-md:mt-1.5";
+
+/** One question of the filter panel: its name, then its options. */
+function PanelRow({
   label,
   children,
 }: {
   readonly label: string;
-  readonly children: React.ReactNode;
+  readonly children: ReactNode;
 }) {
   return (
-    // A named group, because "Any" and "All" appear in more than one of these
-    // and a test that clicks the wrong one passes for the wrong reason. Naming
-    // the region is also what a screen reader wants: the chips mean nothing
-    // without knowing which filter they belong to.
-    // A `fieldset`, not a `div role="group"`: the a11y lint asks for the
-    // element that already has the role, and `getByRole("group")` finds
-    // either.
-    <fieldset
-      aria-label={label}
-      // One line, with the caption inside the track rather than above it. The
-      // stacked caption cost a whole row of height per group and made six
-      // groups read as six paragraphs; inside the track it reads as the track
-      // own name and the row halves.
-      className="flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 pl-2"
-    >
-      {/* 10px against the options 12px, and `--ink-3` rather than
-       * `--ink-4`. Rank comes from size, where it costs no contrast: at the
-       * same size the only thing separating "HEALTH" from "pending" was
-       * colour, and that colour measured 2.56:1 against §7 4.5:1 floor. */}
-      <span className="flex-none text-[10px] font-bold uppercase tracking-wider text-ink-3">
+    <>
+      <span aria-hidden="true" className={PANEL_LABEL}>
         {label}
       </span>
-      <div className="flex min-w-0 flex-wrap items-center gap-0.5">
+      {/* A named group, because "Any" and "All" appear in more than one row
+       * and a test that clicks the wrong one passes for the wrong reason;
+       * the name is also what a screen reader needs. */}
+      <fieldset
+        aria-label={label}
+        className="flex min-w-0 flex-wrap items-center gap-1.5"
+      >
         {children}
-      </div>
-    </fieldset>
+      </fieldset>
+    </>
   );
 }
 
-/**
- * A filter that is a yes or a no.
- *
- * A pair of options needs a caption to say which pair it is; one chip says it
- * in its own word. It stays a link, so the state is still a URL somebody can
- * send, and `aria-current` carries what the fill carries for anybody who
- * cannot see it. Not `aria-pressed`: that belongs to a button, and this is a
- * link to another state of the same page, which is what every other chip in
- * this toolbar is.
- */
-function Toggle({
+/** One option of the panel, a link to the list with it chosen. */
+function Pill({
   href,
   on,
-  label,
+  children,
 }: {
   readonly href: string;
   readonly on: boolean;
-  readonly label: string;
+  readonly children: ReactNode;
 }) {
   return (
     <a
       href={href}
       aria-current={on ? "true" : undefined}
-      className={
+      className={`inline-flex h-6.5 items-center rounded-full border px-2.5 text-xs whitespace-nowrap ${
         on
-          ? "inline-flex h-7 flex-none items-center whitespace-nowrap rounded-control border border-brand-line bg-brand-weak px-2.5 text-xs font-semibold text-brand-text"
-          : "inline-flex h-7 flex-none items-center whitespace-nowrap rounded-control border border-line bg-surface px-2.5 text-xs font-medium text-ink-3 hover:border-line-2 hover:text-ink-2"
-      }
-    >
-      {label}
-    </a>
-  );
-}
-
-function Tab({
-  href,
-  active,
-  children,
-}: {
-  readonly href: string;
-  readonly active: boolean;
-  readonly children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={href}
-      aria-current={active ? "true" : undefined}
-      // `h-6` is 24px, which is WCAG 2.2 SC 2.5.8's floor. These were 20px
-      // links, and the inline-in-a-sentence exemption does not cover a chip in
-      // a toolbar.
-      className={
-        active
-          ? "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-[6px] bg-surface px-2.5 text-xs font-semibold text-brand-text shadow-control"
-          : "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-[6px] px-2.5 text-xs font-medium text-ink-3 hover:bg-surface/60 hover:text-ink-2"
-      }
+          ? "border-brand bg-brand-weak font-semibold text-brand-text"
+          : "border-line-2 bg-surface font-medium text-ink-2 hover:border-ink-4"
+      }`}
     >
       {children}
     </a>
   );
 }
+
+/** A level as a reader writes it: "company" reads "Company". */
+function capital(word: string): string {
+  return word.charAt(0).toUpperCase() + word.slice(1);
+}
+
+const LIST_ICON = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+    className="size-3.5"
+  >
+    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+  </svg>
+);
+
+const DIAGRAM_ICON = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+    className="size-3.5"
+  >
+    <rect x="9" y="3" width="6" height="5" rx="1" />
+    <rect x="3" y="16" width="6" height="5" rx="1" />
+    <rect x="15" y="16" width="6" height="5" rx="1" />
+    <path d="M12 8v4M6 16v-4h12v4" />
+  </svg>
+);
+
+const TREE_ICON = (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    aria-hidden="true"
+    className="size-3.5"
+  >
+    <path d="M4 5h6M8 12h6M8 19h6M6 5v14M6 12h2M6 19h2" />
+  </svg>
+);
 
 /**
  * Parents before children, and every goal exactly once.

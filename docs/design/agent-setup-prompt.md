@@ -40,6 +40,8 @@ each supported agent, and asks the agent to do the step for its own runtime.
 | Agent | OAuth prompt step | Token prompt step |
 |---|---|---|
 | Claude Code | `claude mcp add --transport http openokr <endpoint>`, then `/mcp` to sign in | Same, with `--header "Authorization: Bearer <token>"` |
+| Codex | `codex mcp add openokr --url <endpoint>`, then `codex mcp login openokr` | Add to `~/.codex/config.toml`: `[mcp_servers.openokr]` with `url` and `http_headers = { "Authorization" = "Bearer <token>" }`, then `codex mcp list` |
+| Cursor | Add to `~/.cursor/mcp.json` under `mcpServers.openokr`: `"url": "<endpoint>"`, then sign in from Cursor Settings, MCP | `url` plus `headers.Authorization: Bearer <token>` |
 | Hermes Agent | Add to `~/.hermes/config.yaml` under `mcp_servers.openokr`: `url: <endpoint>` and `auth: oauth` | `url` plus `headers.Authorization: Bearer <token>` |
 | ChatGPT, developer mode | Settings, Apps and Connectors, Advanced, developer mode on, then create a connector with the endpoint and OAuth | Not supported: ChatGPT connectors take OAuth only. The token prompt says so |
 
@@ -53,16 +55,28 @@ token and with no `?toolsets=` parameter.
 back as instructions for the person. That is acceptable and the prompt does
 not pretend otherwise.
 
-## 3. The Work Map pill
+Sources for the Codex and Cursor steps, checked on 2 November 2026: the
+Codex MCP page (learn.chatgpt.com/docs/extend/mcp, `codex mcp add --url`,
+`codex mcp login`, `http_headers`) and the Cursor MCP page
+(cursor.com/docs/context/mcp, `~/.cursor/mcp.json`, `url`, `headers`, OAuth
+with dynamic registration and PKCE). Codex keeps `http_headers` in plain text
+in `config.toml`, so the token prompt tells the agent to keep that file out of
+any repository.
+
+## 3. The Home pill
+
+The look follows Cloudflare's "Onboard your agent to Cloudflare" pill, at the
+product owner's request on 2 November 2026.
 
 | Element | Rule |
 |---|---|
-| Place | S-01, directly below the Work Map header, above the first-visit tour and the scope tabs |
-| Content | "Connect your AI agent to {instanceName}", three generic icons (one per agent), and a close button. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
-| Icons | Generic lucide icons, no brand marks: `Terminal` Claude Code, `Bot` Hermes Agent, `MessageSquare` ChatGPT. Each has an accessible name with the agent's name |
-| Click | Copies the OAuth prompt. The label changes to "Copied" for two seconds, announced through `aria-live="polite"` |
+| Place | Home, directly below the trusted-domain offers, above My week |
+| Content | "Connect your AI agent to {instanceName}", then five agent marks. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
+| Look | One pill: `rounded-full`, a thin `border-line` border, `bg-surface`, 44 px tall, a pointer cursor, the label in `text-base text-ink`, the marks 20 px with 6 px between them, no box behind a mark |
+| Marks | The agents' own marks, in this order: Claude (Claude Code, `#D97757`), Codex, Cursor, Hermes Agent, OpenAI (ChatGPT). All but Claude are drawn in `currentColor` on `text-ink`, so they are black in light mode and white in dark mode. Inline SVG paths in `apps/web/app/agent-marks.tsx`, no network, no runtime dependency. The paths come from LobeHub icons (MIT); the notice is kept in that file. The marks are the owners' trademarks and are shown only to say the prompt works with those agents. Each is `aria-hidden`; the names are read once through the `sr-only` "Copies a setup prompt for {agents}" |
+| Click | Copies the OAuth prompt. "Copied" shows for two seconds to the right of the pill, announced through `role="status"` |
 | Tooltip | "Copies a setup prompt for your AI agent", as the button's `title` |
-| Close | Hides the pill for the rest of the login session |
+| Close | A 32 px round X beside the pill, on its right. Its slot has no width until the pointer is over the pill or the X has keyboard focus; it then opens over 200 ms, so the centred pill slides left to make room. No animation under `prefers-reduced-motion`. Always open on a device with no hover (`@media (hover: none)`), because a phone has no hover and the X would otherwise be unreachable. Hides the pill for the rest of the login session |
 | Who | Every member. The endpoint enforces each member's own access |
 | AI provider off | Still shown. The agent endpoint does not depend on the instance's AI provider |
 
@@ -142,8 +156,87 @@ each header step and naming ChatGPT as OAuth-only.
 
 ## 8. What this change does not do
 
-- No brand logos. Generic icons until the product owner decides on marks.
+- No brand marks on the token page. Only the Home pill shows them.
 - No Gemini CLI step. Left out by the product owner on 26 October 2026; it was never checked against a live client.
 - No per-agent deep links or one-click installers.
 - No server-side record of the dismissal.
 - No change to the agent endpoint, the token model or the OAuth flow.
+
+## 9. One line to paste, instructions the agent fetches
+
+Requested by the product owner on 2 November 2026, after Cloudflare's agent
+setup ("Fetch and execute the appropriate instructions to set me up for
+Cloudflare from https://developers.cloudflare.com/agent-setup/prompt.md").
+This section replaces §1 and §2 for what is copied; the per-agent steps move
+into a file the instance serves.
+
+### 9.1 What is copied
+
+| Where | Clipboard text |
+|---|---|
+| Home pill, token page "Connect an agent" card | `Fetch and execute the appropriate instructions to set me up for {instanceName} from {origin}/agent-setup/prompt.md` |
+| Token page, a freshly minted `mcp` token | The same line, then on the next line: `Use this bearer token instead of OAuth, and treat it as a password (do not repeat it back to me and do not commit it): {token}` |
+
+`{origin}` is `instanceIssuer()`, the address every grant is checked against.
+`{instanceName}` is `getInstanceName()`, already public on the sign-in page.
+Both lines are English and stay out of the catalogue, as before.
+
+### 9.2 The file
+
+`GET /agent-setup/prompt.md`, a route handler, `text/markdown; charset=utf-8`,
+built per request from the instance's own origin, endpoint and name.
+
+| Rule | Why |
+|---|---|
+| Public: `/agent-setup/` is added to `PUBLIC_PREFIXES` in `apps/web/proxy.ts` | The agent fetching it has no session. It holds the endpoint address (already public in `/.well-known/oauth-protected-resource`), the instance name (already on the sign-in page, read through `getInstanceName()`) and fixed text. No token, no workspace, no member |
+| No token in the file, ever | It is public. A token travels only in the pasted second line |
+| `cache-control: public, max-age=300` | It changes only when the instance's address or name changes |
+| Built by one pure function, `agentSetupMarkdown()` in `apps/web/lib/agent-setup-prompt.ts` | Unit-testable without a server |
+
+Structure, after Cloudflare's file:
+
+1. "These are the setup instructions from {instanceName}, an OpenOKR instance at {origin}." and "Complete the steps for your agent yourself by running the commands directly. Ask the user only for what you cannot do, such as approving the sign-in in their browser."
+2. Server facts: name `openokr`, URL, transport streamable HTTP, sign-in OAuth with dynamic registration. "If the user gave you a bearer token with this link, use the token variant of your step instead of OAuth."
+3. One section per agent, OAuth step first, token variant after it:
+
+| Agent | OAuth | Token variant | Source |
+|---|---|---|---|
+| Claude Code | `claude mcp add --transport http openokr <endpoint>`, then `/mcp` | `--header "Authorization: Bearer <token>"` | §2 |
+| Codex | `codex mcp add openokr --url <endpoint>`, `codex mcp login openokr` | `~/.codex/config.toml`, `http_headers` | §2 |
+| Cursor | `~/.cursor/mcp.json`, `mcpServers.openokr.url` | `headers.Authorization` | §2 |
+| GitHub Copilot (VS Code) | `.vscode/mcp.json`, `servers.openokr` with `"type": "http"` and `url` | `headers.Authorization` | code.visualstudio.com MCP configuration reference. Cloudflare's file says `mcpServers` there; VS Code's own reference says `servers` |
+| OpenCode | `opencode.json`, `mcp.openokr` with `"type": "remote"`, `url`, `"enabled": true`, `"oauth": {}`, then `opencode mcp auth openokr` | `headers.Authorization` and `"oauth": false` | opencode.ai/docs/mcp-servers |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json`, `mcpServers.openokr.serverUrl` | Not given: no header syntax was found in the vendor's documents, so the file says to use OAuth | Cloudflare's file |
+| Hermes Agent | `~/.hermes/config.yaml`, `auth: oauth` | `headers.Authorization` | §2 |
+| ChatGPT | Developer mode connector, OAuth; the agent tells the user what to click | Not supported, OAuth only | §2 |
+
+4. A check: "Call the `workspace.overview` tool once."
+5. A closing box, as Cloudflare's, with `{instanceName}`, the workspace name and "Restart your agent if the tools do not appear."
+6. "If you cannot fetch this file": an agent running in the cloud (ChatGPT, Claude on the web) cannot reach an instance on `localhost` or an office network. Ask the user to copy the full steps from `{origin}/account/api-tokens` instead.
+7. Resources: each agent's MCP documentation, as plain text addresses.
+8. "These instructions are served by {origin}/agent-setup/prompt.md, so you can fetch them again to check them."
+
+The token page keeps showing the full `mcpServers` JSON it shows today, so a
+cloud agent has a path that needs no fetch.
+
+### 9.3 Acceptance criteria
+
+**Given** a member on Home, **when** they click the pill, **then** the
+clipboard holds exactly the one line with this instance's name and
+`{origin}/agent-setup/prompt.md`.
+
+**Given** no session cookie, **when** `GET /agent-setup/prompt.md`, **then**
+the answer is 200 `text/markdown`, names the endpoint, and holds no workspace
+name and no token.
+
+**Given** a member mints an agent token, **when** they click "Copy setup
+prompt with this token", **then** the clipboard holds the line and a second
+line with that token, and the file itself never holds it.
+
+### 9.4 Tests
+
+| Test | Kind |
+|---|---|
+| `agentSetupLine`: the line, the token line; `agentSetupMarkdown`: every agent section, endpoint in each, no `Bearer ` followed by a real token, the cloud-agent fallback | Unit, `apps/web/test/agent-setup-prompt.test.ts` |
+| `/agent-setup/prompt.md` is public | Unit, the proxy's public-path test |
+| Pill copies the line; the file answers 200 with no cookie; minted token line | End to end, `e2e/s01c-agent-setup-prompt.spec.ts` |

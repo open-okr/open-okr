@@ -308,7 +308,7 @@ export function ArchiveImportCard() {
                     })}
               </span>
             </div>
-            <Button variant="ghost" onClick={handleReset}>
+            <Button onClick={handleReset}>
               {t("admin.imports.archiveImportCard.importAnother")}
             </Button>
           </div>

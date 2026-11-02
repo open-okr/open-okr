@@ -31,6 +31,8 @@ export function ColourInput({
   check,
   trailing,
   placeholder = "#336699",
+  fallback,
+  onValueChange,
   className,
 }: {
   readonly label: string;
@@ -45,6 +47,16 @@ export function ColourInput({
   /** Drawn after the box, such as a swatch of the colour in force. */
   readonly trailing?: ReactNode;
   readonly placeholder?: string;
+  /**
+   * The colour the picker shows while the box is empty: the colour in force,
+   * so an empty field never draws black (docs/design/branding-page.md §3).
+   */
+  readonly fallback?: string;
+  /**
+   * Each whole colour the caller's rule accepts, lower-cased, and null for
+   * anything else: half typed, empty or refused. For a live preview.
+   */
+  readonly onValueChange?: (hex: string | null) => void;
   readonly className?: string;
 }) {
   const { t } = useTranslations();
@@ -66,6 +78,11 @@ export function ColourInput({
     box.current?.setCustomValidity(ruled ?? shape ?? "");
   }, [ruled, shape]);
 
+  const accepted = whole && ruled === null ? typed.toLowerCase() : null;
+  useEffect(() => {
+    onValueChange?.(accepted);
+  }, [accepted, onValueChange]);
+
   return (
     <Field.Root
       name={name}
@@ -79,7 +96,7 @@ export function ColourInput({
         <input
           type="color"
           aria-label={t("fields.colour.pick", { label })}
-          value={whole ? typed.toLowerCase() : "#000000"}
+          value={whole ? typed.toLowerCase() : (fallback ?? "#000000")}
           onChange={(event) => {
             setValue(event.currentTarget.value);
             setLeft(true);

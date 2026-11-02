@@ -46,9 +46,11 @@ test("sign in and open the goals explorer", async () => {
   ).toBeVisible({ timeout: 10_000 });
 
   await goTo(page, "/goals");
-  // The filter groups sit behind one Filter button since the OKRGoal UX
-  // review (N5), and open on their own only while one of them is set.
-  await page.locator("#main-content summary", { hasText: "Filter" }).click();
+  // The filter rows sit behind one Filter button since the OKRGoal UX
+  // review (N5), and the panel opens on its own only while one is set.
+  await page
+    .getByRole("button", { name: "Filter", exact: true })
+    .click();
   await expect(
     page.getByRole("group", { name: "Health" }),
   ).toBeVisible({ timeout: 15_000 });
@@ -68,7 +70,8 @@ test("the two new filters are there, and they are chips", async () => {
 });
 
 test("no sentence box is offered with no provider", async () => {
-  await expect(page.getByRole("button", { name: "Filter" })).toHaveCount(0);
+  // The toolbar's own Filter button opens the panel since the Goals revamp;
+  // the assist's box is what is absent.
   await expect(
     page.getByPlaceholder("my off-track goals this quarter"),
   ).toHaveCount(0);
@@ -100,9 +103,11 @@ test("a hand-edited band the product does not have is ignored, not obeyed", asyn
   // The page validates the query against the band list rather than passing it
   // through, so a URL somebody typed cannot ask for a band that does not exist.
   await goTo(page, "/goals?health=struggling");
-  // The filter groups sit behind one Filter button since the OKRGoal UX
-  // review (N5), and open on their own only while one of them is set.
-  await page.locator("#main-content summary", { hasText: "Filter" }).click();
+  // The filter rows sit behind one Filter button since the OKRGoal UX
+  // review (N5), and the panel opens on its own only while one is set.
+  await page
+    .getByRole("button", { name: "Filter", exact: true })
+    .click();
   await expect(
     page.getByRole("group", { name: "Health" }),
   ).toBeVisible({ timeout: 15_000 });

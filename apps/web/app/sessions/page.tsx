@@ -124,7 +124,7 @@ export default async function SessionsPage({
             </p>
           </div>
           <Link
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            className={buttonVariants({ size: "sm" })}
             href={includeFinished ? "/sessions" : "/sessions?finished=1"}
           >
             {includeFinished

@@ -10,18 +10,22 @@ import {
   type QualityStatus,
 } from "@openokr/method";
 import {
+  browserToday,
   Chip,
   cn,
   DateInput,
   EntityPicker,
   formatMeasure,
   NumberInput,
+  relativeDate,
   SelectInput,
+  TextArea,
   TextInput,
   UnitInput,
   useTranslations,
 } from "@openokr/ui";
 import { useEffect, useRef, useState } from "react";
+import { dayLabel } from "../../lib/day-label.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { searchMembers } from "../../lib/member-search.ts";
@@ -53,21 +57,27 @@ function useDraft<T>(value: T): {
   readonly draft: T;
   readonly setDraft: (next: T) => void;
   readonly field: React.RefObject<HTMLInputElement | null>;
+  readonly area: React.RefObject<HTMLTextAreaElement | null>;
 } {
   const [draft, setDraft] = useState(value);
   const field = useRef<HTMLInputElement>(null);
+  const area = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
-    if (document.activeElement !== field.current) {
+    const active = document.activeElement;
+    if (active !== field.current && active !== area.current) {
       setDraft(value);
     }
   }, [value]);
-  return { draft, setDraft, field };
+  return { draft, setDraft, field, area };
 }
 
 /** Enter leaves the field, which commits it; Escape puts the stored value back. */
 const keys =
-  (revert: () => void) => (event: React.KeyboardEvent<HTMLInputElement>) => {
+  (revert: () => void) =>
+  (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     if (event.key === "Enter") {
+      // A title that wraps is a textarea, where Enter would start a new line.
+      event.preventDefault();
       event.currentTarget.blur();
     }
     if (event.key === "Escape") {
@@ -87,6 +97,8 @@ export function InlineText({
   allowEmpty,
   placeholder,
   maxLength,
+  wrap,
+  textClass,
   onDraft,
   onSave,
 }: {
@@ -99,16 +111,32 @@ export function InlineText({
   /** For a unit, where nothing is a real answer. */
   readonly allowEmpty?: boolean;
   readonly placeholder?: string;
+  /**
+   * Wraps onto as many lines as the title needs instead of cutting it with
+   * an ellipsis: a textarea one line high that grows with its text. Enter
+   * still saves. For the list's titles, which a phone cut to "Make …".
+   */
+  readonly wrap?: boolean;
+  /** The title's own type size and weight, where the default does not fit. */
+  readonly textClass?: string;
   /** Called as the reader types, for the coaching chips beside the cell. */
   readonly onDraft?: (draft: string | null) => void;
   readonly onSave: (next: string) => void;
 }) {
-  const { draft, setDraft, field } = useDraft(value);
-  const size = bold ? "text-sm font-bold" : "text-xs";
+  const { draft, setDraft, field, area } = useDraft(value);
+  const size = textClass ?? (bold ? "text-sm font-bold" : "text-xs");
 
   if (readOnly) {
     return (
-      <span className={cn("truncate px-1.5 text-ink", size)}>{value}</span>
+      <span
+        className={cn(
+          "px-1.5 text-ink",
+          wrap ? "-mx-1.5 break-words" : "truncate",
+          size,
+        )}
+      >
+        {value}
+      </span>
     );
   }
 
@@ -121,6 +149,39 @@ export function InlineText({
     }
     onSave(next);
   };
+
+  const onKeyDown = keys(() => {
+    setDraft(value);
+    onDraft?.(null);
+  });
+
+  if (wrap) {
+    return (
+      <TextArea
+        ref={area}
+        // Keeps its size at rest on a phone (globals.css, tokens.css).
+        data-text-first=""
+        value={draft}
+        label={label}
+        hideLabel
+        rows={1}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        onChange={(event) => {
+          // A pasted line break would make a title of two lines.
+          const next = event.target.value.replace(/\s*\n+\s*/g, " ");
+          setDraft(next);
+          onDraft?.(next);
+        }}
+        onBlur={commit}
+        onKeyDown={onKeyDown}
+        // Pulled out by its own padding, so the words line up with the text
+        // above and below them and only the frame sits in the margin.
+        className="-mx-1.5 w-[calc(100%+0.75rem)] min-w-0"
+        inputClassName={cn("min-h-0 w-full resize-none", FIELD, size)}
+      />
+    );
+  }
 
   return (
     <TextInput
@@ -135,10 +196,7 @@ export function InlineText({
         onDraft?.(event.target.value);
       }}
       onBlur={commit}
-      onKeyDown={keys(() => {
-        setDraft(value);
-        onDraft?.(null);
-      })}
+      onKeyDown={onKeyDown}
       className="w-full min-w-0"
       inputClassName={cn("h-auto w-full truncate", FIELD, size)}
     />
@@ -291,6 +349,7 @@ export function InlineDate({
   label,
   readOnly,
   cycle,
+  asText,
   onSave,
 }: {
   readonly value: string | null;
@@ -298,20 +357,56 @@ export function InlineDate({
   readonly readOnly: boolean;
   /** The cycle the key result sits in, for the warning. */
   readonly cycle?: { readonly startsOn: string; readonly endsOn: string };
+  /**
+   * The list's way (Goals revamp): "31 Dec 2026 in 59 days" as text with a
+   * dotted underline, which becomes the date field when it is pressed. A
+   * date field cannot show a day the way a person writes it, so this one
+   * cell swaps rather than restyles.
+   */
+  readonly asText?: boolean;
   readonly onSave: (next: string | null) => void;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   const { draft, setDraft, field } = useDraft(value ?? "");
+  const [open, setOpen] = useState(false);
+  const shown =
+    value === null ? t("okrList.noDueDate") : dayLabel(value, locale);
+  const relative =
+    value === null ? null : relativeDate(value, browserToday(), locale);
 
   if (readOnly) {
     return (
       <span className="px-1 text-xs tabular-nums text-ink-3">
-        {value ?? t("okrList.noDueDate")}
+        {asText ? shown : (value ?? t("okrList.noDueDate"))}
+        {asText && relative ? (
+          <span className="ml-1 text-ink-4">{relative}</span>
+        ) : null}
+      </span>
+    );
+  }
+
+  if (asText && !open) {
+    return (
+      <span className="inline-flex items-baseline gap-1">
+        <button
+          type="button"
+          // The visible day is part of the name, so what is read out and
+          // what is seen agree (WCAG 2.5.3).
+          aria-label={`${label}, ${shown}`}
+          onClick={() => setOpen(true)}
+          className="cursor-pointer rounded-[5px] border-b border-dotted border-ink-4/70 px-1 text-xs tabular-nums text-ink-2 hover:border-solid hover:border-ink-3 hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
+        >
+          {shown}
+        </button>
+        {relative ? (
+          <span className="text-xs text-ink-4">{relative}</span>
+        ) : null}
       </span>
     );
   }
 
   const commit = () => {
+    setOpen(false);
     const next = draft === "" ? null : draft;
     if (next === value) {
       return;
@@ -335,9 +430,18 @@ export function InlineDate({
       value={draft}
       onValueChange={(next) => setDraft(next ?? "")}
       warning={warning}
-      inputRef={field}
+      inputRef={(node: HTMLInputElement | null) => {
+        field.current = node;
+        // Pressed from its text, the field takes the focus at once.
+        if (node && open && document.activeElement !== node) {
+          node.focus();
+        }
+      }}
       onBlur={commit}
-      onKeyDown={keys(() => setDraft(value ?? ""))}
+      onKeyDown={keys(() => {
+        setDraft(value ?? "");
+        setOpen(false);
+      })}
       inputClassName={cn("h-auto w-32 text-xs", FIELD)}
     />
   );
@@ -458,8 +562,8 @@ export function SpacePicker({
 
 /** Committed reads as a promise, aspirational as the quieter default. */
 const KIND_TONE: Record<OkrKind, string> = {
-  committed: "bg-brand-weak text-brand-text",
-  aspirational: "bg-info-bg text-info",
+  committed: "bg-raised text-ink-2",
+  aspirational: "bg-brand-weak text-brand-text",
 };
 
 /**
@@ -662,7 +766,7 @@ export function KeyResultKindPicker({
  * addition from the plan. Nothing at all for the plan itself.
  */
 export function AddedMidCycle({ at }: { readonly at: string | null }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   if (at === null) {
     return null;
   }
@@ -671,7 +775,7 @@ export function AddedMidCycle({ at }: { readonly at: string | null }) {
       className="h-4.5 bg-info-bg text-[11px] text-info"
       data-testid="added-mid-cycle"
     >
-      {t("midCycle.addedOn", { date: at.slice(0, 10) })}
+      {t("midCycle.addedOn", { date: dayLabel(at, locale) })}
     </Chip>
   );
 }
@@ -906,42 +1010,50 @@ export interface ShownVerdict {
 }
 
 /**
- * The checks a cell coaches on, as the reader types (§4.2). Each chip links to
- * its rule, so the prompt is one press from the reason behind it.
+ * The checks a cell coaches on, as the reader types (§4.2): each failing or
+ * warning rule as its key and its coaching prompt, the way the reference
+ * mockup draws "KR-2 Verifiable. A target but no baseline…".
+ *
+ * **The sentence, not only the key.** These were bare chips, "OBJ-1" in red
+ * under a title, which said something was wrong and not what (Goals audit,
+ * 2 November 2026). The prompt was only a `title` tooltip, out of reach on a
+ * phone and to a keyboard. The key still links to its rule.
  */
 export function VerdictChips({
   verdicts,
 }: {
   readonly verdicts: readonly ShownVerdict[];
 }) {
+  const { t } = useTranslations();
   if (verdicts.length === 0) {
     return null;
   }
   return (
-    <span
-      className="flex flex-wrap gap-1 px-1.5 pt-0.5"
+    <ul
+      className="flex flex-col gap-1 rounded-[7px] bg-warn-bg px-2 py-1.5"
       data-testid="live-verdicts"
     >
       {verdicts.map((verdict) => (
-        <a
-          key={verdict.id}
-          href={`/method/${verdict.id}`}
-          title={verdict.prompt}
-          className="no-underline"
-        >
-          <Chip
-            tone={
+        <li key={verdict.id} className="flex items-center gap-2 text-xs">
+          <span
+            className={cn(
+              "flex-none rounded border bg-surface px-1.5 text-[10.5px] font-bold",
               verdict.status === "fail"
-                ? "bad"
-                : verdict.status === "warn"
-                  ? "warn"
-                  : "neutral"
-            }
+                ? "border-bad/30 text-bad"
+                : "border-warn/30 text-warn",
+            )}
           >
             {verdict.id}
-          </Chip>
-        </a>
+          </span>
+          <span className="min-w-0 flex-1 text-ink-2">{verdict.prompt}</span>
+          <a
+            href={`/method/${verdict.id}`}
+            className="flex-none font-semibold text-brand-text no-underline hover:underline"
+          >
+            {t("okrList.readTheRule")}
+          </a>
+        </li>
       ))}
-    </span>
+    </ul>
   );
 }

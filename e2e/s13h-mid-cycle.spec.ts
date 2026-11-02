@@ -28,6 +28,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -53,6 +54,14 @@ let saved: { starts_on: string; ends_on: string; published_at: Date | null };
 const authed = () => ({ authorization: `Bearer ${token}` });
 const main = () => page.locator("#main-content");
 const today = () => new Date().toISOString().slice(0, 10);
+/** Today as the list writes a day since the Goals revamp: "2 Nov 2026". */
+const todayLabel = () =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${today()}T00:00:00Z`));
 
 async function post<T>(action: string, data: unknown): Promise<T> {
   const response = await api.post(`/api/v1/${action.replace(".", "/")}`, {
@@ -171,11 +180,11 @@ test("NW-Q2-13: the list asks why before an addition saves, and marks it", async
   await save.click();
 
   const row = main()
-    .locator(`input[aria-label="Objective title"][value="${LISTED}"]`)
+    .locator(titleField("Objective title", LISTED))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(row.getByTestId("added-mid-cycle")).toHaveText(
-    `Added mid-cycle, ${today()}`,
+    `Added mid-cycle, ${todayLabel()}`,
   );
   const listed = (await (
     await api.get("/api/v1/goals/list", { headers: authed() })
@@ -232,6 +241,8 @@ test("acceptance: the review shows an objective added in week five as added mid-
   await expect(page.getByText(/Stage 2 of 11/)).toBeVisible({
     timeout: 15_000,
   });
+  // The session review draws its own mark, which still writes the day as
+  // ISO; only the Goals list moved to "2 Nov 2026".
   await expect(page.getByTestId("added-mid-cycle")).toHaveText(
     `Added mid-cycle, ${today()}`,
   );
@@ -307,7 +318,7 @@ test("acceptance (P9-T13-b-b): a draft its owner publishes waits for its reviewe
 
   await goTo(page, "/goals");
   const row = main()
-    .locator(`input[aria-label="Objective title"][value="${APPROVED}"]`)
+    .locator(titleField("Objective title", APPROVED))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   const waiting = row.getByTestId("waiting-draft");
   await expect(waiting).toContainText(

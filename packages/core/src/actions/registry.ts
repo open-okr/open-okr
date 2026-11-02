@@ -456,6 +456,7 @@ import {
   readSettingsForMember,
   readWorkspaceSettings,
   resetWorkspaceSettings,
+  setWorkspaceBrandingImage,
   updateWorkspaceBranding,
   updateWorkspaceGeneralSettings,
 } from "./settings.ts";
@@ -616,6 +617,7 @@ export const ACTION_MAP = {
   "settings.readForMember": readSettingsForMember,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
+  "settings.setWorkspaceBrandingImage": setWorkspaceBrandingImage,
   "settings.resetWorkspaceSettings": resetWorkspaceSettings,
   "ai.readProviderConfig": readProviderConfig,
   // P8-G05. One boolean, so a member screen never asks the admin read.

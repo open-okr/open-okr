@@ -170,7 +170,6 @@ export function CoachStrip({
                   {drafting && canEdit ? (
                     <Button
                       type="button"
-                      variant="ghost"
                       disabled={pending}
                       onClick={() => ask(kr.id, rule)}
                     >

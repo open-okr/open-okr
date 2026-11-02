@@ -19,6 +19,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -118,12 +119,12 @@ test("U1: an objective and two key results, with the keyboard alone", async () =
   await page.keyboard.type(FIRST);
   await page.keyboard.press("Enter");
   await expect(
-    main().locator(`input[aria-label="Key result title"][value="${FIRST}"]`),
+    main().locator(titleField("Key result title", FIRST)),
   ).toBeVisible({ timeout: 15_000 });
 
   // The second from the add row under it, reached by focus and Enter.
   const objectiveRow = main()
-    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .locator(titleField("Objective title", OBJECTIVE))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]/..");
   const again = objectiveRow.getByRole("button", { name: "Add key result" });
   await again.focus();
@@ -131,13 +132,13 @@ test("U1: an objective and two key results, with the keyboard alone", async () =
   await page.keyboard.type(SECOND);
   await page.keyboard.press("Enter");
   await expect(
-    main().locator(`input[aria-label="Key result title"][value="${SECOND}"]`),
+    main().locator(titleField("Key result title", SECOND)),
   ).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
   for (const title of [FIRST, SECOND]) {
     await expect(
-      main().locator(`input[aria-label="Key result title"][value="${title}"]`),
+      main().locator(titleField("Key result title", title)),
     ).toBeVisible({ timeout: 15_000 });
   }
 });
@@ -151,11 +152,11 @@ test("a key result moved to the top with Alt and the up arrow stays there", asyn
   const THIRD = "Teams finishing setup in one sitting from 30% to 60%";
   await goTo(page, "/goals");
   const objectiveRow = main()
-    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .locator(titleField("Objective title", OBJECTIVE))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]/..");
   if (
     (await main()
-      .locator(`input[aria-label="Key result title"][value="${THIRD}"]`)
+      .locator(titleField("Key result title", THIRD))
       .count()) === 0
   ) {
     await objectiveRow.getByRole("button", { name: "Add key result" }).click();
@@ -165,7 +166,9 @@ test("a key result moved to the top with Alt and the up arrow stays there", asyn
   const order = async () =>
     (
       await objectiveRow
-        .locator('input[aria-label="Key result title"]')
+        .locator(
+      'input[aria-label="Key result title"], textarea[aria-label="Key result title"]',
+    )
         .evaluateAll((fields) =>
           fields.map((field) => (field as HTMLInputElement).value),
         )
@@ -190,12 +193,16 @@ test("a key result moved to the top with Alt and the up arrow stays there", asyn
 test("an objective deleted from the list comes back with Undo", async () => {
   await goTo(page, "/goals");
   const title = main().locator(
-    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+    titleField("Objective title", OBJECTIVE),
   );
   await expect(title).toBeVisible({ timeout: 15_000 });
   const row = title.locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await row.hover();
-  await row.getByRole("button", { name: "Delete this objective" }).click();
+  // Deleting waits behind the row's menu since the Goals revamp.
+  await row
+    .getByRole("button", { name: `More actions for ${OBJECTIVE}` })
+    .click();
+  await page.getByRole("menuitem", { name: "Delete this objective" }).click();
   await row.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(title).toHaveCount(0);
 
@@ -259,7 +266,9 @@ test("the topbar's + New opens the new objective where the reader can write", as
     data: { overrides: { "writing.when": null } },
   });
   await goTo(page, "/");
-  await page.getByRole("link", { name: "New objective" }).first().click();
+  // A menu of what the reader may create since 2 November 2026.
+  await page.getByRole("button", { name: "Create something new" }).click();
+  await page.getByRole("menuitem", { name: "Objective" }).click();
   await expect(page).toHaveURL(/\/goals\?new=objective/);
   await expect(
     main().getByRole("textbox", { name: "New objective" }),

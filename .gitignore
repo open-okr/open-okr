@@ -52,3 +52,6 @@ next-env.d.ts
 # findings from the pass are written up in commits and reports, not left
 # sitting here.
 /.manual-uat-scratch/
+
+# Before and after screenshots of UI audits, kept locally and never committed.
+/.audit-screens/

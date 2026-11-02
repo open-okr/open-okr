@@ -2,7 +2,8 @@
 
 import { CopyButton, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
-import { agentSetupPrompt } from "../../../lib/agent-setup-prompt.ts";
+import { agentSetupLine } from "../../../lib/agent-setup-prompt.ts";
+import { useInstanceName } from "../../../lib/instance-name-context";
 import { agentConfiguration } from "./agent-config.ts";
 import { NOTHING_YET, type TokenResult } from "./token-state.ts";
 
@@ -27,6 +28,7 @@ import { NOTHING_YET, type TokenResult } from "./token-state.ts";
 export function TokenForm({
   action,
   agentEndpoint,
+  setupUrl,
   className,
   children,
 }: {
@@ -36,10 +38,13 @@ export function TokenForm({
   ) => Promise<TokenResult>;
   /** The agent endpoint, for the configuration an agent token is shown in. */
   readonly agentEndpoint?: string;
+  /** Where the agent's setup instructions are served, for the pasted line. */
+  readonly setupUrl?: string;
   readonly className?: string;
   readonly children: React.ReactNode;
 }) {
   const { t } = useTranslations();
+  const instanceName = useInstanceName();
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
@@ -53,10 +58,11 @@ export function TokenForm({
             {state.token}
           </code>
           <span>{state.message}</span>
-          {state.audience === "mcp" && agentEndpoint ? (
+          {state.audience === "mcp" && setupUrl ? (
             <CopyButton
-              text={agentSetupPrompt({
-                endpoint: agentEndpoint,
+              text={agentSetupLine({
+                instanceName,
+                setupUrl,
                 token: state.token,
               })}
               variant="primary"

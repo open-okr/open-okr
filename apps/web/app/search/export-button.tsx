@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu } from "@base-ui-components/react/menu";
 import { SelectInput, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 
@@ -46,9 +47,16 @@ const CONTENT_TYPES: Record<ExportFormat, string> = {
 export function ExportButton({
   label,
   onExport,
+  menu = false,
 }: {
   readonly label?: string;
   readonly onExport: (format: ExportFormat) => Promise<ExportOutcome>;
+  /**
+   * One "Export" button whose menu names the formats, for a toolbar that has
+   * no room for a select beside a button (the Goals list, 2 November 2026).
+   * The message about the file appears under it, over the page.
+   */
+  readonly menu?: boolean;
 }) {
   const { t } = useTranslations();
 
@@ -56,6 +64,89 @@ export function ExportButton({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const run = (chosen: ExportFormat) => {
+    setError(null);
+    setMessage(null);
+    startTransition(async () => {
+      const outcome = await onExport(chosen);
+      if (outcome.error) {
+        setError(outcome.error);
+        return;
+      }
+      const bytes = decode(outcome, chosen);
+      if (outcome.queued || !bytes) {
+        setMessage(
+          t("search.exportButton.tooManyToBuild", {
+            rows:
+              outcome.rowCount === 1
+                ? t("common.count.rowOne", { count: outcome.rowCount })
+                : t("common.count.rowOther", { count: outcome.rowCount }),
+          }),
+        );
+        return;
+      }
+      download(outcome.filename, bytes, CONTENT_TYPES[chosen]);
+      setMessage(
+        outcome.rowCount === 1
+          ? t("search.exportButton.rowsDownloadedOne", {
+              count: outcome.rowCount,
+            })
+          : t("search.exportButton.rowsDownloadedOther", {
+              count: outcome.rowCount,
+            }),
+      );
+    });
+  };
+
+  if (menu) {
+    return (
+      <span className="relative inline-flex">
+        <Menu.Root>
+          <Menu.Trigger
+            disabled={pending}
+            className="inline-flex h-7.5 items-center gap-1.5 rounded-control border border-line-2 bg-surface px-2.75 text-[12.5px] font-semibold whitespace-nowrap text-ink-2 hover:border-ink-4 disabled:text-ink-4"
+          >
+            {pending
+              ? t("search.exportButton.preparing")
+              : (label ?? t("search.exportButton.export"))}
+            <span aria-hidden="true" className="text-[10px] opacity-60">
+              ▾
+            </span>
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner sideOffset={4} align="end">
+              <Menu.Popup className="min-w-36 rounded-lg border border-line-2 bg-surface p-1 shadow-(--shadow-popover)">
+                {(Object.keys(LABELS) as ExportFormat[]).map((one) => (
+                  <Menu.Item
+                    key={one}
+                    onClick={() => run(one)}
+                    className="flex w-full cursor-pointer items-center rounded-md px-2.5 py-1.5 text-[12.5px] text-ink-2 outline-none data-[highlighted]:bg-brand-weak data-[highlighted]:text-brand-text"
+                  >
+                    {t(LABELS[one])}
+                  </Menu.Item>
+                ))}
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
+        {message || error ? (
+          <span className="absolute top-full right-0 z-10 mt-1 w-64 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs shadow-(--shadow-popover)">
+            {message ? (
+              <span className="text-ink-3" data-testid="export-result">
+                {message}
+              </span>
+            ) : null}
+            {error ? (
+              <span role="alert" className="text-bad">
+                {error}
+              </span>
+            ) : null}
+          </span>
+        ) : null}
+      </span>
+    );
+  }
 
   return (
     <span className="flex flex-col items-start gap-1">
@@ -82,41 +173,7 @@ export function ExportButton({
         <button
           type="button"
           disabled={pending}
-          onClick={() => {
-            setError(null);
-            setMessage(null);
-            startTransition(async () => {
-              const outcome = await onExport(format);
-              if (outcome.error) {
-                setError(outcome.error);
-                return;
-              }
-              const bytes = decode(outcome, format);
-              if (outcome.queued || !bytes) {
-                setMessage(
-                  t("search.exportButton.tooManyToBuild", {
-                    rows:
-                      outcome.rowCount === 1
-                        ? t("common.count.rowOne", { count: outcome.rowCount })
-                        : t("common.count.rowOther", {
-                            count: outcome.rowCount,
-                          }),
-                  }),
-                );
-                return;
-              }
-              download(outcome.filename, bytes, CONTENT_TYPES[format]);
-              setMessage(
-                outcome.rowCount === 1
-                  ? t("search.exportButton.rowsDownloadedOne", {
-                      count: outcome.rowCount,
-                    })
-                  : t("search.exportButton.rowsDownloadedOther", {
-                      count: outcome.rowCount,
-                    }),
-              );
-            });
-          }}
+          onClick={() => run(format)}
           className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4"
         >
           {pending

@@ -186,11 +186,7 @@ export async function Timeline({
                 {entry.acknowledgedAt ? null : (
                   <ActionForm action={acknowledgeCheckIn}>
                     <input type="hidden" name="checkInId" value={entry.id} />
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs"
-                    >
+                    <Button type="submit" className="h-7 px-2 text-xs">
                       {t("checkIn.timeline.acknowledge")}
                     </Button>
                   </ActionForm>
@@ -259,11 +255,7 @@ export async function Timeline({
                       description={t("checkIn.timeline.keptIfUntouched")}
                     />
                   </div>
-                  <Button
-                    type="submit"
-                    variant="ghost"
-                    className="h-7 px-2 text-xs"
-                  >
+                  <Button type="submit" className="h-7 px-2 text-xs">
                     {t("common.save")}
                   </Button>
                 </ActionForm>

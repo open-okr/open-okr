@@ -409,11 +409,7 @@ export async function Drafting({
                           placeholder={t("cycle.drafting.whereIsItNow")}
                           inputClassName="h-auto w-36 px-2 py-1 text-xs"
                         />
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                        >
+                        <Button type="submit" className="h-7 px-2 text-xs">
                           {t("common.record")}
                         </Button>
                       </ActionForm>
@@ -453,11 +449,7 @@ export async function Drafting({
                           defaultValue={keyResult.dueOn}
                           inputClassName="h-auto px-1.5 py-1 text-xs"
                         />
-                        <Button
-                          type="submit"
-                          variant="ghost"
-                          className="h-7 px-2 text-xs"
-                        >
+                        <Button type="submit" className="h-7 px-2 text-xs">
                           {t("common.save")}
                         </Button>
                       </ActionForm>

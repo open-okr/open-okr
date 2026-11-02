@@ -102,7 +102,9 @@ test("sign in, and make every export too large to build in a request", async () 
 
 test("acceptance: the request comes back with a sentence, not a file", async () => {
   await goTo(page, "/goals");
+  // One Export button with the formats in its menu on the goals toolbar.
   await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "CSV" }).click();
 
   // Straight away, and with no download: the whole point of the branch.
   await expect(page.getByTestId("export-result")).toContainText(
@@ -199,9 +201,9 @@ test("a workbook is offered too, and downloads as one", async () => {
   );
   await goTo(page, "/goals");
 
-  await page.getByLabel("Export format").selectOption("xlsx");
   const download = page.waitForEvent("download", { timeout: 20_000 });
   await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("menuitem", { name: "Excel" }).click();
 
   await expect(page.getByTestId("export-result")).toContainText("downloaded", {
     timeout: 20_000,

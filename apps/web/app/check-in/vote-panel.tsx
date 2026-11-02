@@ -85,7 +85,7 @@ export async function VotePanel({
             defaultValue={vote.own ?? 0.5}
             display={display}
           />
-          <Button type="submit" variant="ghost" className="h-7 px-2 text-xs">
+          <Button type="submit" className="h-7 px-2 text-xs">
             {vote.own === null
               ? t("checkIn.votePanel.vote")
               : t("checkIn.votePanel.change")}

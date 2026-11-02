@@ -139,7 +139,6 @@ function ObjectiveRow({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
             disabled={pending}
             onClick={() => run(() => passMicAction(sessionId, null))}
           >
@@ -150,7 +149,6 @@ function ObjectiveRow({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
             disabled={pending}
             onClick={() => setOpen((was) => !was)}
           >

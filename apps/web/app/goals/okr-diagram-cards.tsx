@@ -139,7 +139,7 @@ function ObjectiveCard({ data }: NodeProps<Node<ObjectiveData, "objective">>) {
       ) : null}
       <div className="flex flex-col gap-1 px-3 pt-2">
         <span
-          className={`flex items-center gap-1.5 pr-10 text-[10px] font-bold uppercase tracking-wider text-ink-3 ${shared.canEdit ? "pl-4" : ""}`}
+          className={`flex items-center gap-1.5 pr-10 text-xs font-semibold capitalize text-ink-3 ${shared.canEdit ? "pl-4" : ""}`}
         >
           {goal.level}
           <span className="truncate font-normal normal-case tracking-normal">
@@ -648,7 +648,7 @@ function DraftCard({ data }: NodeProps<Node<DraftData, "draft">>) {
         isConnectable={false}
         className={HIDDEN_HANDLE}
       />
-      <span className="text-[10px] font-bold uppercase tracking-wider text-brand-text">
+      <span className="text-xs font-semibold text-brand-text">
         {t("okrDiagram.newAligned")}
       </span>
       {parent ? (
@@ -669,7 +669,7 @@ function ContextCard({ data }: NodeProps<Node<ContextData, "context">>) {
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-dashed border-line bg-raised text-left">
       <div className="flex flex-col gap-0.5 px-3 pt-2">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-ink-4">
+        <span className="text-xs font-semibold text-ink-3">
           {context.cycleName ?? t("okrDiagram.anotherCycle")}
         </span>
         {/* Read-only on the canvas: it opens in its own cycle, with the

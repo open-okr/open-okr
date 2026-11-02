@@ -121,3 +121,39 @@ describe("a colour field", () => {
     expect(posted(container)).toBe("#7c3aed");
   });
 });
+
+describe("a colour field with a fallback and a listener", () => {
+  it("shows the colour in force in the picker when the box is empty", () => {
+    const { container } = inEnglish(
+      <ColourInput
+        label="Primary colour"
+        name="primaryColor"
+        fallback="#4f46e5"
+      />,
+    );
+    expect(picker(container).value).toBe("#4f46e5");
+    expect(posted(container)).toBe("");
+  });
+
+  it("tells the caller each whole colour, and null for anything else", async () => {
+    const heard: (string | null)[] = [];
+    const { container } = inEnglish(
+      <ColourInput
+        label="Primary colour"
+        name="primaryColor"
+        check={noGreen}
+        onValueChange={(hex) => heard.push(hex)}
+      />,
+    );
+    const box = screen.getByLabelText("Primary colour");
+    await userEvent.type(box, "#0E7490");
+    expect(heard.at(-1)).toBe("#0e7490");
+    await act(async () => {
+      fireEvent.change(picker(container), { target: { value: "#22c55e" } });
+    });
+    // A refused colour is not one the caller should draw.
+    expect(heard.at(-1)).toBeNull();
+    await userEvent.clear(box);
+    expect(heard.at(-1)).toBeNull();
+  });
+});

@@ -9,7 +9,6 @@ import {
 import {
   AppShell,
   Button,
-  buttonVariants,
   Card,
   CardBody,
   CycleStrip,
@@ -24,7 +23,6 @@ import {
 } from "@openokr/ui";
 import { Ellipsis } from "lucide-react";
 import { headers } from "next/headers";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { AvatarMenu } from "../app/avatar-menu.tsx";
@@ -39,6 +37,7 @@ import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
+import { brandingImageUrl } from "./branding-image.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
@@ -46,6 +45,7 @@ import { loadInboxBadge } from "./inbox-badge.ts";
 import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
+import { NewMenu } from "./new-menu.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
@@ -53,8 +53,12 @@ import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
+import { VersionFooter } from "./version-footer.tsx";
 import { requireWorkspace } from "./workspace.ts";
-import { workspaceTerms } from "./workspace-presentation.ts";
+import {
+  workspaceBrandImages,
+  workspaceTerms,
+} from "./workspace-presentation.ts";
 import { WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
@@ -350,6 +354,9 @@ export async function AppShellLayout({
                 <WorkspaceSwitcher
                   memberships={memberships}
                   active={workspace}
+                  logoUrl={brandingImageUrl(
+                    (await workspaceBrandImages()).logoBlobId,
+                  )}
                 />
               }
             />
@@ -358,23 +365,68 @@ export async function AppShellLayout({
             <Topbar
               breadcrumb={workspace.name}
               search={<TopbarSearch />}
-              // UIUX-PLAN §3's `+ New`, which opens "+ New objective" on the
-              // OKRs screen (P9-T07b-a). A link rather than a menu while an
-              // objective is the one thing it makes; somebody who cannot
-              // write is not offered it.
+              // UIUX-PLAN §3's `+ New`: a menu of what this member may
+              // create, the same on every screen (lib/new-menu.tsx). Somebody
+              // who cannot write is not offered it.
               newAction={
                 level >= ACCESS_LEVELS.edit ? (
-                  <Link
-                    href="/goals?new=objective"
-                    aria-label={t("okrList.newObjectiveFromTopbar")}
-                    className={buttonVariants({
-                      variant: "primary",
-                      size: "sm",
-                    })}
-                  >
-                    <span aria-hidden="true">+</span>
-                    {t("okrList.newInTopbar")}
-                  </Link>
+                  <NewMenu
+                    items={[
+                      {
+                        key: "objective",
+                        label: t("newMenu.objective"),
+                        icon: iconFor("goals"),
+                        href: "/goals?new=objective",
+                        screens: ["/goals", "/cycle", "/map"],
+                      },
+                      {
+                        key: "initiative",
+                        label: t("newMenu.initiative"),
+                        icon: iconFor("initiatives"),
+                        href: "/initiatives#title",
+                        screens: ["/initiatives"],
+                      },
+                      {
+                        key: "task",
+                        label: t("newMenu.task"),
+                        icon: iconFor("board"),
+                        href: "/board#title",
+                        screens: ["/board", "/tasks"],
+                      },
+                      {
+                        key: "kpi",
+                        label: t("newMenu.kpi"),
+                        icon: iconFor("kpis"),
+                        href: "/kpis#title",
+                        screens: ["/kpis"],
+                      },
+                      {
+                        key: "session",
+                        label: t("newMenu.session"),
+                        icon: iconFor("sessions"),
+                        href: "/sessions#schedule",
+                        screens: ["/sessions", "/session"],
+                      },
+                      ...(level >= ACCESS_LEVELS.full
+                        ? [
+                            {
+                              key: "space",
+                              label: t("newMenu.space"),
+                              icon: iconFor("spaces"),
+                              href: "/spaces#space-name",
+                              screens: ["/spaces"],
+                            },
+                            {
+                              key: "invite",
+                              label: t("newMenu.invite"),
+                              icon: iconFor("admin-invitations"),
+                              href: "/admin/invitations",
+                              screens: ["/admin/invitations", "/people"],
+                            },
+                          ]
+                        : []),
+                    ]}
+                  />
                 ) : undefined
               }
               askAi={<CopilotPanel initialAvailability={copilot} />}
@@ -453,7 +505,14 @@ export async function AppShellLayout({
               />
             </div>
           )}
-          {children}
+          {/* The version sits at the foot of the content, on the right
+              (docs/design/version-footer.md §3). At least the pane's height,
+              so it rests at the bottom of a short screen rather than under
+              its last line. */}
+          <div className="flex min-h-full flex-col">
+            <div className="flex-1">{children}</div>
+            <VersionFooter level={level} />
+          </div>
         </AppShell>
         {/*
          * Beside the shell rather than inside the topbar, because the palette is

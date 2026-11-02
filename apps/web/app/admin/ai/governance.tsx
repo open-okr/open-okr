@@ -267,7 +267,7 @@ export async function BudgetsCard({
                     <td className="py-1.5">
                       <AIForm action={removeBudget}>
                         <input type="hidden" name="id" value={budget.id} />
-                        <Button type="submit" variant="ghost" size="sm">
+                        <Button type="submit" size="sm">
                           {t("common.remove")}
                         </Button>
                       </AIForm>
@@ -386,7 +386,7 @@ export async function FeaturesCard({
                   </option>
                 ))}
               </SelectInput>
-              <Button type="submit" variant="ghost" size="sm">
+              <Button type="submit" size="sm">
                 {t("common.save")}
               </Button>
             </AIForm>
@@ -452,7 +452,7 @@ export async function PromptsCard({
                 defaultValue={prompt.systemPrompt}
                 inputClassName="font-mono text-xs"
               />
-              <Button type="submit" variant="ghost" size="sm">
+              <Button type="submit" size="sm">
                 {t("admin.ai.governance.saveANewVersion")}
               </Button>
             </AIForm>

@@ -118,11 +118,7 @@ export async function Diagnose({
                         </option>
                       ))}
                     </SelectInput>
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      className="h-7 px-2 text-xs"
-                    >
+                    <Button type="submit" className="h-7 px-2 text-xs">
                       {t("cycle.diagnose.rank")}
                     </Button>
                   </ActionForm>

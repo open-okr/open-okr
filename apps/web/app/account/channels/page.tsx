@@ -202,7 +202,7 @@ export default async function AccountChannelsPage() {
                   {identity?.verifiedAt ? (
                     <LinkForm action={unlink}>
                       <input type="hidden" name="provider" value={provider} />
-                      <Button type="submit" variant="ghost" size="sm">
+                      <Button type="submit" size="sm">
                         {t("common.unlink")}
                       </Button>
                     </LinkForm>

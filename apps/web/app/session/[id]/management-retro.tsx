@@ -128,7 +128,6 @@ function QuestionRow({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
             disabled={pending}
             onClick={() => setOpen(true)}
           >
