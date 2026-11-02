@@ -235,6 +235,11 @@ export {
   validatePracticeOverrides,
 } from "./practice.ts";
 export {
+  OPERATING_PRINCIPLES,
+  type OperatingPrinciple,
+  principlesCited,
+} from "./principles.ts";
+export {
   compareProfiles,
   type ProfileComparisonRow,
   practiceSettingName,

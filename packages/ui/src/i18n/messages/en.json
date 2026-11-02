@@ -846,6 +846,8 @@
   "admin.rhythm.actions.savedDifferOne": "Saved. {count} threshold on this card differs from the default.",
   "admin.rhythm.actions.savedDifferOther": "Saved. {count} thresholds on this card differ from the default.",
   "admin.rhythm.everyNumberTheMethod": "Every number the method fires on, with its default beside it.\n        Nothing here needs changing: a workspace that leaves this page alone\n        practises the method as written.",
+  "admin.rhythm.hint.from": "Set out in the method under “{section}”.",
+  "admin.rhythm.hint.principle": "Principle {number}: {title}",
   "admin.rhythm.rhythmAndThresholds": "Rhythm and thresholds",
   "admin.rhythm.rhythmForm.anchorDay": "Anchor day",
   "admin.rhythm.rhythmForm.checkInFrequency": "Check-in frequency",
