@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   defaultPractice,
@@ -32,12 +34,24 @@ import { canonThresholds, validateOverrides } from "../src/thresholds.ts";
  * would now refuse. `pnpm method:check` compares the labels with §12.1 itself.
  */
 
+/** Every section number METHOD.md has a heading for: "2", "2.1", "12". */
+const SECTIONS = new Set(
+  [
+    ...readFileSync(
+      join(import.meta.dirname, "../../../docs/specification/METHOD.md"),
+      "utf8",
+    ).matchAll(/^#{2,4} (\d+(?:\.\d+)*)[. ]/gm),
+  ].map((match) => match[1]),
+);
+
 describe("the registry is complete and self-describing", () => {
   it("gives every setting a label, a section, a source and a default among its options", () => {
     for (const key of PRACTICE_KEYS) {
       const entry = PRACTICE[key];
       expect(entry.label, `${key} label`).toBeTruthy();
-      expect(entry.section, `${key} section`).toMatch(/^§/);
+      // The number alone, because the API returns it and a reader never sees
+      // a section sign.
+      expect(SECTIONS.has(entry.section), `${key} section`).toBe(true);
       expect(entry.source, `${key} source`).toBeTruthy();
       expect(entry.options.length, `${key} options`).toBeGreaterThan(1);
       expect(

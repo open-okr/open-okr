@@ -142,7 +142,7 @@ async function once(budget: Budget): Promise<number> {
   return performance.now() - started;
 }
 
-write(`§13.1 budgets against "${workspace.name}", ${runs} runs each.`);
+write(`Performance budgets against "${workspace.name}", ${runs} runs each.`);
 write("");
 
 let failed = 0;

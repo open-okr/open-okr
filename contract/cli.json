@@ -103,7 +103,7 @@
       "method": "POST",
       "path": "/workspace/setState",
       "scope": "write",
-      "summary": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
+      "summary": "Set the workspace to active, read-only or frozen.",
       "flags": [
         {
           "name": "state",
@@ -3693,7 +3693,7 @@
       "method": "POST",
       "path": "/spaces/setHolidays",
       "scope": "write",
-      "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+      "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break.",
       "flags": [
         {
           "name": "id",
@@ -3716,7 +3716,7 @@
       "method": "GET",
       "path": "/spaces/holidays",
       "scope": "read",
-      "summary": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+      "summary": "The spans a space marks as holidays, oldest first.",
       "flags": [
         {
           "name": "id",
@@ -3733,7 +3733,7 @@
       "method": "POST",
       "path": "/people/setLeave",
       "scope": "write",
-      "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+      "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in.",
       "flags": [
         {
           "name": "leave",
@@ -3750,7 +3750,7 @@
       "method": "POST",
       "path": "/people/setMemberLeave",
       "scope": "write",
-      "summary": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+      "summary": "Sets another member's leave, each span with the delegate who stands in. For an administrator.",
       "flags": [
         {
           "name": "member-id",
@@ -3773,7 +3773,7 @@
       "method": "GET",
       "path": "/people/leave",
       "scope": "read",
-      "summary": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+      "summary": "One member's leave, oldest first, with who stands in for each span.",
       "flags": [
         {
           "name": "member-id",
@@ -4194,7 +4194,7 @@
       "method": "POST",
       "path": "/cycles/feedForward",
       "scope": "write",
-      "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
+      "summary": "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
       "flags": [
         {
           "name": "from-cycle-id",
@@ -4355,7 +4355,7 @@
       "method": "GET",
       "path": "/rhythm/read",
       "scope": "read",
-      "summary": "The METHOD.md §11 registry as this workspace resolves it, with its deviations and its terminology.",
+      "summary": "The practice thresholds as this workspace resolves them, with its deviations and its terminology.",
       "flags": [],
       "pages": false
     },
@@ -4365,7 +4365,7 @@
       "method": "POST",
       "path": "/rhythm/update",
       "scope": "write",
-      "summary": "Changes this workspace's deviations from the §11 canon, or its terminology.",
+      "summary": "Changes this workspace's deviations from the method's thresholds, or its terminology.",
       "flags": [
         {
           "name": "default-check-in-frequency",
@@ -4424,7 +4424,7 @@
       "method": "GET",
       "path": "/practice/read",
       "scope": "read",
-      "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "summary": "The practice this workspace runs: its profile, its own changes and every setting resolved.",
       "flags": [],
       "pages": false
     },
@@ -4451,7 +4451,7 @@
       "method": "POST",
       "path": "/practice/applyProfile",
       "scope": "write",
-      "summary": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+      "summary": "Chooses one of the five practice profiles, with the thresholds it sets. This workspace's own changes are kept.",
       "flags": [
         {
           "name": "profile",
@@ -4577,7 +4577,7 @@
       "method": "POST",
       "path": "/workflow/setPackItem",
       "scope": "write",
-      "summary": "Marks one of the seven §2.6 input-pack items gathered, with a note.",
+      "summary": "Marks one of the seven input-pack items gathered, with a note.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4612,7 +4612,7 @@
       "method": "POST",
       "path": "/workflow/distributePack",
       "scope": "write",
-      "summary": "Records that the input pack reached people, which the §2.6 lead time is measured from.",
+      "summary": "Records that the input pack reached people, which the input pack's lead time is measured from.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4775,7 +4775,7 @@
       "method": "POST",
       "path": "/workflow/setBaselineHealth",
       "scope": "write",
-      "summary": "Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual.",
+      "summary": "Records phase 2's KPI reading in its three columns: stable, declining, business as usual.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4810,7 +4810,7 @@
       "method": "POST",
       "path": "/workflow/setCapacityNotes",
       "scope": "write",
-      "summary": "Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked).",
+      "summary": "Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4833,7 +4833,7 @@
       "method": "POST",
       "path": "/workflow/setFocusKeyResults",
       "scope": "write",
-      "summary": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+      "summary": "Chooses which of the year's key results a quarter focuses on.",
       "flags": [
         {
           "name": "cycle-id",
@@ -4920,7 +4920,7 @@
       "method": "GET",
       "path": "/documents/read",
       "scope": "read",
-      "summary": "One document with its body and its version list. Drives screen S-29.",
+      "summary": "One document with its body and its version list.",
       "flags": [
         {
           "name": "id",
@@ -5180,7 +5180,7 @@
       "method": "GET",
       "path": "/search/query",
       "scope": "read",
-      "summary": "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+      "summary": "Everything in this workspace matching a phrase that the caller may read.",
       "flags": [
         {
           "name": "text",
@@ -5209,7 +5209,7 @@
       "method": "GET",
       "path": "/search/jump",
       "scope": "read",
-      "summary": "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+      "summary": "The entity one short identifier means, for the palette's jump.",
       "flags": [
         {
           "name": "short-id",
@@ -5226,7 +5226,7 @@
       "method": "GET",
       "path": "/search/entities",
       "scope": "read",
-      "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+      "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump.",
       "flags": [
         {
           "name": "text",
@@ -5533,7 +5533,7 @@
       "method": "GET",
       "path": "/tasks/board",
       "scope": "read",
-      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
+      "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included.",
       "flags": [
         {
           "name": "space-id",
@@ -5609,7 +5609,7 @@
       "method": "GET",
       "path": "/tasks/read",
       "scope": "read",
-      "summary": "One task with its assignees and its checklist. Drives screen S-28.",
+      "summary": "One task with its assignees and its checklist.",
       "flags": [
         {
           "name": "id",
@@ -5969,7 +5969,7 @@
       "method": "GET",
       "path": "/initiatives/list",
       "scope": "read",
-      "summary": "Initiatives in a space, or the ones serving one key result. Drives screen S-26.",
+      "summary": "Initiatives in a space, or the ones serving one key result.",
       "flags": [
         {
           "name": "space-id",
@@ -6225,7 +6225,7 @@
       "method": "POST",
       "path": "/initiatives/linkKeyResult",
       "scope": "write",
-      "summary": "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
+      "summary": "Records that this initiative is one of the ones that will move a key result.",
       "flags": [
         {
           "name": "id",
@@ -6271,7 +6271,7 @@
       "method": "GET",
       "path": "/initiatives/capacity",
       "scope": "read",
-      "summary": "One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5).",
+      "summary": "One cycle's capacity check: every key result's verdict and every initiative behind it.",
       "flags": [
         {
           "name": "cycle-id",
@@ -6730,7 +6730,7 @@
       "method": "POST",
       "path": "/goals/stop",
       "scope": "write",
-      "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+      "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason.",
       "flags": [
         {
           "name": "id",
@@ -7255,7 +7255,7 @@
       "method": "POST",
       "path": "/goals/setKind",
       "scope": "write",
-      "summary": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+      "summary": "Marks an objective committed or aspirational, recording the change and its reason in the objective's activity.",
       "flags": [
         {
           "name": "id",
@@ -7288,7 +7288,7 @@
       "method": "POST",
       "path": "/goals/moveToSpace",
       "scope": "write",
-      "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces.",
       "flags": [
         {
           "name": "id",
@@ -7311,7 +7311,7 @@
       "method": "POST",
       "path": "/goals/publishDraft",
       "scope": "write",
-      "summary": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+      "summary": "Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
       "flags": [
         {
           "name": "id",
@@ -7328,7 +7328,7 @@
       "method": "POST",
       "path": "/goals/approveDraft",
       "scope": "write",
-      "summary": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+      "summary": "Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts.",
       "flags": [
         {
           "name": "id",
@@ -8056,7 +8056,7 @@
       "method": "POST",
       "path": "/goals/addKeyResultDependency",
       "scope": "write",
-      "summary": "Records a key result's dependency on a providing team, for the register (METHOD.md §5.4).",
+      "summary": "Records a key result's dependency on a providing team, for the register.",
       "flags": [
         {
           "name": "key-result-id",
@@ -8200,7 +8200,7 @@
       "method": "GET",
       "path": "/alignment/graph",
       "scope": "read",
-      "summary": "The cascade as nodes and edges, for the alignment studio canvas (S-16).",
+      "summary": "The cascade as nodes and edges, for the alignment studio canvas.",
       "flags": [
         {
           "name": "cycle-id",
@@ -8477,7 +8477,7 @@
       "method": "GET",
       "path": "/kpis/grid",
       "scope": "read",
-      "summary": "Every KPI with its recent periods, grouped by category. Drives screen S-20.",
+      "summary": "Every KPI with its recent periods, grouped by category.",
       "flags": [
         {
           "name": "periods",
@@ -8494,7 +8494,7 @@
       "method": "GET",
       "path": "/kpis/list",
       "scope": "read",
-      "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+      "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on the draft and goal pages.",
       "flags": [],
       "pages": false
     },
@@ -8556,7 +8556,7 @@
       "method": "POST",
       "path": "/kpis/launchRecovery",
       "scope": "write",
-      "summary": "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
+      "summary": "Creates a recovery objective from the leading drivers under an unhealthy KPI.",
       "flags": [
         {
           "name": "kpi-id",
@@ -8641,7 +8641,7 @@
       "method": "GET",
       "path": "/kpis/recoveryBoard",
       "scope": "read",
-      "summary": "Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19.",
+      "summary": "Every unhealthy or recovering KPI across every tree, with its recovery objective.",
       "flags": [],
       "pages": false
     },
@@ -8651,7 +8651,7 @@
       "method": "GET",
       "path": "/kpis/tree",
       "scope": "read",
-      "summary": "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
+      "summary": "One driver tree as nodes with their corridor state and recovery progress.",
       "flags": [
         {
           "name": "tree-id",
@@ -8685,7 +8685,7 @@
       "method": "GET",
       "path": "/kpis/detail",
       "scope": "read",
-      "summary": "One KPI with its periods, its place in the tree and its formula. Drives screen S-21.",
+      "summary": "One KPI with its periods, its place in the tree and its formula.",
       "flags": [
         {
           "name": "kpi-id",
@@ -8876,7 +8876,7 @@
       "method": "GET",
       "path": "/review/inbox",
       "scope": "read",
-      "summary": "What this member owes right now, overdue first. Drives screen S-02 and the sidebar badge.",
+      "summary": "What this member owes right now, overdue first. Drives the review inbox and the sidebar badge.",
       "flags": [],
       "pages": false
     },
@@ -9180,7 +9180,7 @@
       "method": "GET",
       "path": "/nudges/rules",
       "scope": "read",
-      "summary": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "summary": "Every proactive message rule with this workspace's configuration and its recent volume.",
       "flags": [],
       "pages": false
     },
@@ -9190,7 +9190,7 @@
       "method": "POST",
       "path": "/nudges/setRule",
       "scope": "write",
-      "summary": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "summary": "Enables, mutes, re-routes or exempts one proactive message rule.",
       "flags": [
         {
           "name": "rule-key",
@@ -9765,7 +9765,7 @@
       "method": "POST",
       "path": "/sessions/setWins",
       "scope": "write",
-      "summary": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "summary": "Names the week's wins in a weekly session, for its digest.",
       "flags": [
         {
           "name": "session-id",
@@ -10219,7 +10219,7 @@
       "method": "GET",
       "path": "/sessions/digest",
       "scope": "read",
-      "summary": "The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved.",
+      "summary": "The weekly digest for one session, assembled with no provider involved.",
       "flags": [
         {
           "name": "session-id",
@@ -10270,7 +10270,7 @@
       "method": "GET",
       "path": "/kpis/suggest",
       "scope": "read",
-      "summary": "Suggests a metric, its corridor and its formula from a sentence, with §6's parser checking the formula first.",
+      "summary": "Suggests a metric, its corridor and its formula from a sentence, with the KPI formula parser checking the formula first.",
       "flags": [
         {
           "name": "description",
@@ -10287,7 +10287,7 @@
       "method": "POST",
       "path": "/sessions/addMinute",
       "scope": "write",
-      "summary": "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+      "summary": "Gives the running stage one more minute.",
       "flags": [
         {
           "name": "id",
@@ -10304,7 +10304,7 @@
       "method": "POST",
       "path": "/sessions/givePulse",
       "scope": "write",
-      "summary": "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+      "summary": "Records one participant's pulse and their one word for the cycle.",
       "flags": [
         {
           "name": "session-id",
@@ -10333,7 +10333,7 @@
       "method": "POST",
       "path": "/sessions/scoreKeyResult",
       "scope": "write",
-      "summary": "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+      "summary": "Grades one key result 0.0 to 1.0 with a one-line reason.",
       "flags": [
         {
           "name": "session-id",
@@ -10368,7 +10368,7 @@
       "method": "POST",
       "path": "/sessions/revealObjectiveScore",
       "scope": "write",
-      "summary": "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+      "summary": "Reveals one objective's score to the whole room in a single write.",
       "flags": [
         {
           "name": "session-id",
@@ -10391,7 +10391,7 @@
       "method": "POST",
       "path": "/sessions/passMic",
       "scope": "write",
-      "summary": "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+      "summary": "Hands the mic to one objective's owner, or puts it down.",
       "flags": [
         {
           "name": "session-id",
@@ -10414,7 +10414,7 @@
       "method": "POST",
       "path": "/sessions/setNarrative",
       "scope": "write",
-      "summary": "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+      "summary": "Writes what the number does not show for one objective.",
       "flags": [
         {
           "name": "session-id",
@@ -10460,7 +10460,7 @@
       "method": "POST",
       "path": "/sessions/giveKudos",
       "scope": "write",
-      "summary": "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+      "summary": "Names the effort that deserved to be seen.",
       "flags": [
         {
           "name": "session-id",
@@ -10489,7 +10489,7 @@
       "method": "GET",
       "path": "/sessions/recognition",
       "scope": "read",
-      "summary": "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+      "summary": "The quarterly review's recognition entries, oldest first.",
       "flags": [
         {
           "name": "session-id",
@@ -10506,7 +10506,7 @@
       "method": "POST",
       "path": "/sessions/addRetroNote",
       "scope": "write",
-      "summary": "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+      "summary": "Writes one note into the team retro's worked or did-not column.",
       "flags": [
         {
           "name": "session-id",
@@ -10568,7 +10568,7 @@
       "method": "POST",
       "path": "/sessions/castRetroVote",
       "scope": "write",
-      "summary": "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+      "summary": "Spends or withdraws one dot on a retro note.",
       "flags": [
         {
           "name": "session-id",
@@ -10608,7 +10608,7 @@
       "method": "POST",
       "path": "/sessions/setManagementAnswer",
       "scope": "write",
-      "summary": "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+      "summary": "Records leadership's answer to one of the management retro's four questions.",
       "flags": [
         {
           "name": "session-id",
@@ -10637,7 +10637,7 @@
       "method": "GET",
       "path": "/sessions/managementRetro",
       "scope": "read",
-      "summary": "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+      "summary": "The management retro's four questions with what leadership answered.",
       "flags": [
         {
           "name": "session-id",
@@ -10654,7 +10654,7 @@
       "method": "POST",
       "path": "/sessions/setRootCause",
       "scope": "write",
-      "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+      "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
       "flags": [
         {
           "name": "session-id",
@@ -10695,7 +10695,7 @@
       "method": "GET",
       "path": "/sessions/rootCauses",
       "scope": "read",
-      "summary": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
+      "summary": "Every key result this review graded below its root-cause threshold, with its causes.",
       "flags": [
         {
           "name": "session-id",
@@ -10712,7 +10712,7 @@
       "method": "POST",
       "path": "/sessions/submitProcessHealth",
       "scope": "write",
-      "summary": "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+      "summary": "Scores the five process-health statements anonymously.",
       "flags": [
         {
           "name": "session-id",
@@ -10735,7 +10735,7 @@
       "method": "GET",
       "path": "/sessions/processHealth",
       "scope": "read",
-      "summary": "§8.5's five statements with the room's averages, and the reader's own answers.",
+      "summary": "The five process-health statements with the room's averages, and the reader's own answers.",
       "flags": [
         {
           "name": "session-id",
@@ -10752,7 +10752,7 @@
       "method": "POST",
       "path": "/sessions/recordDiagnostic",
       "scope": "write",
-      "summary": "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+      "summary": "Reads the closing diagnostic and stores what the room was told.",
       "flags": [
         {
           "name": "session-id",
@@ -10769,7 +10769,7 @@
       "method": "GET",
       "path": "/sessions/diagnostic",
       "scope": "read",
-      "summary": "§8.6's verdict for this review, stored or still unreadable.",
+      "summary": "The closing diagnostic's verdict for this review, stored or still unreadable.",
       "flags": [
         {
           "name": "session-id",
@@ -10803,7 +10803,7 @@
       "method": "GET",
       "path": "/sessions/narrateDiagnostic",
       "scope": "read",
-      "summary": "Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
+      "summary": "Narrates the closing diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
       "flags": [
         {
           "name": "session-id",
@@ -10854,7 +10854,7 @@
       "method": "POST",
       "path": "/sessions/decideObjective",
       "scope": "write",
-      "summary": "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+      "summary": "Closes one objective with a keep, modify or abandon decision and a one-line why.",
       "flags": [
         {
           "name": "session-id",
@@ -10913,7 +10913,7 @@
       "method": "POST",
       "path": "/sessions/captureLearning",
       "scope": "write",
-      "summary": "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+      "summary": "Records what the team now knows, optionally carried into the next cycle.",
       "flags": [
         {
           "name": "session-id",
@@ -10948,7 +10948,7 @@
       "method": "POST",
       "path": "/sessions/addAction",
       "scope": "write",
-      "summary": "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+      "summary": "Adds an action with an owner and a date.",
       "flags": [
         {
           "name": "session-id",
@@ -11029,7 +11029,7 @@
       "method": "GET",
       "path": "/sessions/minutes",
       "scope": "read",
-      "summary": "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+      "summary": "The review's minutes: the executive summary and every stage's record.",
       "flags": [
         {
           "name": "session-id",
@@ -11063,7 +11063,7 @@
       "method": "GET",
       "path": "/sessions/roomPulse",
       "scope": "read",
-      "summary": "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+      "summary": "The read of the room for the facilitator, and the caller's own pulse for everybody.",
       "flags": [
         {
           "name": "session-id",
@@ -11080,7 +11080,7 @@
       "method": "POST",
       "path": "/sessions/setStageNote",
       "scope": "write",
-      "summary": "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+      "summary": "Writes the facilitator's private note for the running stage.",
       "flags": [
         {
           "name": "id",
@@ -11103,7 +11103,7 @@
       "method": "POST",
       "path": "/sessions/setTrend",
       "scope": "write",
-      "summary": "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+      "summary": "Records the room's trend for one objective in a monthly review.",
       "flags": [
         {
           "name": "session-id",
@@ -11137,7 +11137,7 @@
       "method": "POST",
       "path": "/sessions/setShifts",
       "scope": "write",
-      "summary": "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+      "summary": "Records the resource or priority shifts noted in a monthly review.",
       "flags": [
         {
           "name": "session-id",
@@ -11160,7 +11160,7 @@
       "method": "POST",
       "path": "/sessions/recordDecision",
       "scope": "write",
-      "summary": "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+      "summary": "Records a decision against the key result or goal it affects.",
       "flags": [
         {
           "name": "session-id",
@@ -11195,7 +11195,7 @@
       "method": "GET",
       "path": "/sessions/monthlyRecord",
       "scope": "read",
-      "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
+      "summary": "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "flags": [
         {
           "name": "session-id",
@@ -11212,7 +11212,7 @@
       "method": "GET",
       "path": "/decisions/forGoal",
       "scope": "read",
-      "summary": "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+      "summary": "Decisions affecting one goal, newest first, for its page.",
       "flags": [
         {
           "name": "goal-id",
@@ -11229,7 +11229,7 @@
       "method": "GET",
       "path": "/decisions/forCycle",
       "scope": "read",
-      "summary": "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+      "summary": "Every decision recorded in one cycle, for the cycle workspace.",
       "flags": [
         {
           "name": "cycle-id",

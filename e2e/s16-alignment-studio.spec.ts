@@ -98,7 +98,7 @@ test("acceptance: the share, its counts and its band agree, in the panel and the
   if (!/No company-level objective/.test(sentence)) {
     expect(sentence).toBe(
       score >= 90
-        ? "At or above 90%, which METHOD.md §5.2 calls healthy."
+        ? "At or above 90%, which counts as healthy."
         : score >= 80
           ? "From 80% to below 90% is watch. Each unaligned goal below opens it."
           : "Below 80% is a gap. Each unaligned goal below opens it.",

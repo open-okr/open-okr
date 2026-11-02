@@ -133,7 +133,7 @@ async function carryLevels(
 export const readPractice = defineReadAction({
   name: "practice.read",
   summary:
-    "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+    "The practice this workspace runs: its profile, its own changes and every setting resolved.",
   input: z.object({}),
   output: practiceState.extend({
     registry: z.array(settingDescriptor),
@@ -332,7 +332,7 @@ export const updatePractice = defineWriteAction({
 export const applyPracticeProfile = defineWriteAction({
   name: "practice.applyProfile",
   summary:
-    "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+    "Chooses one of the five practice profiles, with the thresholds it sets. This workspace's own changes are kept.",
   input: z.object({ profile: profileKey }),
   output: practiceState.extend({
     /** The §11 thresholds the switch wrote. */

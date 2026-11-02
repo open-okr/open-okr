@@ -274,7 +274,7 @@ describe("provisioning a workspace", () => {
       (entry) => entry.key === "cadence.stalenessGraceDays",
     );
     expect(grace?.columnBacked).toBe(false);
-    expect(grace?.section).toBe("§3.5");
+    expect(grace?.section).toBe("3.5");
   });
 });
 
@@ -669,7 +669,7 @@ describe("changing a threshold", () => {
       callAction({ pool: wb.appPool, ...context(OWNER) }, "rhythm.update", {
         overrides: { "cadence.inventedByMe": 4 },
       }),
-    ).rejects.toThrow(/registry/i);
+    ).rejects.toThrow(/is not a threshold/i);
   });
 
   it("refuses a column-backed threshold inside the override map", async () => {

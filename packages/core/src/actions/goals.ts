@@ -1821,7 +1821,7 @@ export const stopGoal = defineWriteAction({
   name: "goals.stop",
   // openokr:policy-exempt: a stop is always allowed and always needs its one-line reason (METHOD.md §2.9), which the input requires; no practice setting governs it.
   summary:
-    "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+    "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason.",
   input: z.object({
     id: z.uuid(),
     /** One line: why it no longer matters. */

@@ -67,7 +67,7 @@ const searchInput = z.object({
 export const runSearch = defineReadAction({
   name: "search.query",
   summary:
-    "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+    "Everything in this workspace matching a phrase that the caller may read.",
   input: searchInput,
   output: z.array(
     z.object({
@@ -149,7 +149,7 @@ const entitiesInput = z.object({
 export const findEntities = defineReadAction({
   name: "search.entities",
   summary:
-    "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+    "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump.",
   input: entitiesInput,
   output: z.array(
     z.object({
@@ -191,8 +191,7 @@ export const findEntities = defineReadAction({
 
 export const readPaletteJump = defineReadAction({
   name: "search.jump",
-  summary:
-    "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+  summary: "The entity one short identifier means, for the palette's jump.",
   input: z.object({ shortId: z.string().trim().min(1).max(40) }),
   output: z
     .object({

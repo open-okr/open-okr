@@ -1,11 +1,11 @@
 {
-  "title": "OpenOKR: the §13.1 budgets",
+  "title": "OpenOKR: performance budgets",
   "uid": "openokr-budgets",
   "schemaVersion": 39,
   "editable": false,
   "refresh": "30s",
   "time": { "from": "now-6h", "to": "now" },
-  "description": "The TECHNICAL-PLAN §13.1 rows this instance can measure from its own series. The six that need a browser or a channel are charted by pnpm perf:budgets and the P7-T05 suites instead, and are named in the text panel below rather than left silently absent.",
+  "description": "The performance budgets this instance can measure from its own series. The six that need a browser or a channel are charted by pnpm perf:budgets and the P7-T05 suites instead, and are named in the text panel below rather than left silently absent.",
   "panels": [
     {
       "type": "timeseries",
@@ -34,7 +34,7 @@
     {
       "type": "timeseries",
       "title": "Save actions, 95th percentile (budget 500 ms)",
-      "description": "Every write the registry declares as `write` or `destructive`, which is what §13.1 means by a save.",
+      "description": "Every write the registry declares as `write` or `destructive`, which is what the budgets mean by a save.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "fieldConfig": {
         "defaults": {
@@ -83,7 +83,7 @@
     {
       "type": "timeseries",
       "title": "Slowest actions, 95th percentile",
-      "description": "No budget of its own. This is where a §13.1 row that has not been given a panel yet shows up first.",
+      "description": "No budget of its own. This is where a budget that has not been given a panel yet shows up first.",
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "fieldConfig": { "defaults": { "unit": "s" } },
       "targets": [
@@ -123,7 +123,7 @@
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 24 },
       "options": {
         "mode": "markdown",
-        "content": "These §13.1 rows cannot be measured from a server-side metric, so they are charted by the tool that can rather than left silently absent.\n\n| Row | Measured by |\n|---|---|\n| Work Map first paint and interactive | `pnpm perf:budgets`, and `e2e/s44-web-vitals.spec.ts` for the browser half |\n| Work Map and list scroll at 60fps | `e2e/s44-web-vitals.spec.ts` |\n| Draft Coach evaluation under 16 ms on the client | `e2e/s44-web-vitals.spec.ts` |\n| Session stage transition to every client | `pnpm perf:load` (P7-T02) |\n| Channel nudge delivery under 60 s | needs a real provider; `openokr_nudges_total` here shows what was sent and why |\n| Core web vitals | `e2e/s44-web-vitals.spec.ts` |"
+        "content": "These budgets cannot be measured from a server-side metric, so they are charted by the tool that can rather than left silently absent.\n\n| Row | Measured by |\n|---|---|\n| Work Map first paint and interactive | `pnpm perf:budgets`, and `e2e/s44-web-vitals.spec.ts` for the browser half |\n| Work Map and list scroll at 60fps | `e2e/s44-web-vitals.spec.ts` |\n| Draft Coach evaluation under 16 ms on the client | `e2e/s44-web-vitals.spec.ts` |\n| Session stage transition to every client | `pnpm perf:load` (P7-T02) |\n| Channel nudge delivery under 60 s | needs a real provider; `openokr_nudges_total` here shows what was sent and why |\n| Core web vitals | `e2e/s44-web-vitals.spec.ts` |"
       }
     }
   ]

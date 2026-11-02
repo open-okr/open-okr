@@ -101,7 +101,7 @@ export const moveGoalToSpace = defineWriteAction({
   name: "goals.moveToSpace",
   // openokr:policy-exempt: moving an objective between spaces changes one that exists, which stays open under every setting (METHOD.md §2.9); edit on both spaces is the access model's to ask, and it is asked.
   summary:
-    "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+    "Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces.",
   input: z.object({ id: z.uuid(), spaceId: z.uuid() }),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,

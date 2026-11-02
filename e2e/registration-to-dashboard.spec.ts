@@ -1014,6 +1014,8 @@ test("launching recovery creates the objective and flips the KPI", async () => {
 
 test("the tree draws the driver added under a node, and the detail reads it back", async () => {
   await page.goto("/kpis/trees?tree=none");
+  // The page no longer lists unbuilt work to the people using it.
+  await expect(page.getByText("Not here yet")).toHaveCount(0);
   const row = page.getByRole("listitem").filter({ hasText: "Operating margin" });
   await row.getByRole("link", { name: "add driver" }).click();
 

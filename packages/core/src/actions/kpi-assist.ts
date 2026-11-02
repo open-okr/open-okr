@@ -81,7 +81,7 @@ export const suggestKpi = defineReadAction({
   name: "kpis.suggest",
   agentSurface: false,
   summary:
-    "Suggests a metric, its corridor and its formula from a sentence, with §6's parser checking the formula first.",
+    "Suggests a metric, its corridor and its formula from a sentence, with the KPI formula parser checking the formula first.",
   input: z.object({
     description: z.string().trim().min(1).max(1000),
   }),

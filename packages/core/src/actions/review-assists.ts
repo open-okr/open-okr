@@ -232,7 +232,7 @@ export const narrateDiagnostic = defineReadAction({
   name: "sessions.narrateDiagnostic",
   agentSurface: false,
   summary:
-    "Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
+    "Narrates the closing diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
   input: z.object({ sessionId: z.uuid() }),
   output: z
     .object({
