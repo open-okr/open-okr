@@ -37,6 +37,7 @@ function block(selector: string): Record<string, string> {
 
 const callAction = vi.fn();
 const revalidatePath = vi.fn();
+const storeUpload = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePath(...args),
@@ -63,15 +64,21 @@ vi.mock("../lib/pool", () => ({ getPool: () => ({}) }));
 vi.mock("@openokr/core", async (original) => ({
   ...(await original<typeof import("@openokr/core")>()),
   callAction: (...args: unknown[]) => callAction(...args),
+  storeUpload: (...args: unknown[]) => storeUpload(...args),
 }));
+vi.mock("../lib/storage", () => ({ getStorage: () => ({}) }));
+vi.mock("../lib/upload-ports", () => ({ getImageProcessor: () => ({}) }));
 
 const { brandStyleSheet } = await import("../lib/workspace-presentation");
-const { submitBranding } = await import("../app/admin/branding/actions");
+const { saveBranding: submitBranding } = await import(
+  "../app/admin/branding/actions"
+);
 const { default: BrandingPage } = await import("../app/admin/branding/page");
 
 beforeEach(() => {
   callAction.mockReset();
   revalidatePath.mockReset();
+  storeUpload.mockReset();
 });
 
 describe("the surfaces the palette is measured against", () => {
@@ -129,13 +136,16 @@ describe("the style sheet the root layout sets", () => {
 });
 
 /** The form a browser submits, with the button that was pressed. */
-function submitted(fields: Record<string, string>): FormData {
+function submitted(fields: Record<string, string | File>): FormData {
   const form = new FormData();
   for (const [name, value] of Object.entries(fields)) {
     form.set(name, value);
   }
   return form;
 }
+
+const png = (name: string) =>
+  new File([new Uint8Array([1, 2, 3])], name, { type: "image/png" });
 
 const NOTHING = { error: null, saved: null };
 
@@ -160,7 +170,7 @@ describe("saving the branding card", () => {
     callAction.mockResolvedValue({});
     await submitBranding(
       NOTHING,
-      submitted({ intent: "save", primaryColor: "" }),
+      submitted({ intent: "save", primaryColor: "", storedColour: "#7c3aed" }),
     );
     expect(callAction).toHaveBeenCalledWith(
       expect.anything(),
@@ -193,6 +203,67 @@ describe("saving the branding card", () => {
       "A hash followed by six hex digits, like #336699.",
     );
     expect(callAction).not.toHaveBeenCalled();
+  });
+
+  it("leaves an untouched colour alone, and says nothing changed", async () => {
+    const state = await submitBranding(
+      NOTHING,
+      submitted({
+        intent: "save",
+        primaryColor: "#7c3aed",
+        storedColour: "#7c3aed",
+      }),
+    );
+    expect(callAction).not.toHaveBeenCalled();
+    expect(state).toEqual({ error: null, saved: "Nothing to save." });
+  });
+
+  it("saves the colour, the logo and the favicon with one press", async () => {
+    // docs/design/branding-page.md §3: one Save for the whole look.
+    callAction.mockResolvedValue({});
+    storeUpload.mockResolvedValueOnce({ blobId: "logo-1" });
+    storeUpload.mockResolvedValueOnce({ blobId: "favicon-1" });
+    const state = await submitBranding(
+      NOTHING,
+      submitted({
+        intent: "save",
+        primaryColor: "#0e7490",
+        storedColour: "",
+        logo: png("mark.png"),
+        favicon: png("tab.png"),
+      }),
+    );
+    expect(state).toEqual({ error: null, saved: "Saved." });
+    expect(callAction).toHaveBeenCalledWith(
+      expect.anything(),
+      "settings.updateWorkspaceBranding",
+      { branding: { primaryColor: "#0e7490" } },
+    );
+    expect(callAction).toHaveBeenCalledWith(
+      expect.anything(),
+      "settings.setWorkspaceBrandingImage",
+      { slot: "logo", blobId: "logo-1" },
+    );
+    expect(callAction).toHaveBeenCalledWith(
+      expect.anything(),
+      "settings.setWorkspaceBrandingImage",
+      { slot: "favicon", blobId: "favicon-1" },
+    );
+  });
+
+  it("refuses a wrong file before anything is written, the colour included", async () => {
+    const state = await submitBranding(
+      NOTHING,
+      submitted({
+        intent: "save",
+        primaryColor: "#0e7490",
+        storedColour: "",
+        logo: new File(["<svg/>"], "mark.svg", { type: "image/svg+xml" }),
+      }),
+    );
+    expect(state.error).toContain("SVG");
+    expect(callAction).not.toHaveBeenCalled();
+    expect(storeUpload).not.toHaveBeenCalled();
   });
 
   it("resets the card from the same form", async () => {

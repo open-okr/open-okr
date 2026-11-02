@@ -88,7 +88,9 @@ keyboard-reachable replacement.
 | Saved colour that was darkened | The mirror shows the darkened fill, the one in force, and the field's sentence says so as today |
 | Drop zone | A `<label>` wrapping the file input, so a click, Enter or Space opens the picker and the label names it. Dragging a file over it outlines it in `brand`. A dropped or chosen file is checked as today (type, size) |
 | Chosen image, not saved | The mirror shows it; the section shows the file name, size, Save and Cancel. "Not saved yet: logo" |
-| Save, Cancel, Remove, messages | As today (workspace-logo-favicon.md §3) |
+| Saving | **One Save for the whole look**, at the product owner's request on 2 November 2026, after three Save buttons on one card read as three separate settings. The page is one form; "Save changes" and "Discard" sit in the preview panel under "Not saved yet". Save writes whatever changed: the colour only when it differs from the one the page was drawn with (a hidden `storedColour` travels with it), and each chosen picture. Every check runs before anything is written, so a wrong file leaves the colour unsaved too. Nothing changed answers "Nothing to save." Discard resets the field and forgets both files |
+| Reset, Remove | Stay with their own section and act at once: Reset to defaults clears the colour only, Remove takes one picture down |
+| Messages | "Saved." or the refusal, under Save in the preview panel |
 | Saved state | The mirror shows what is stored, so after Save it shows exactly what members see |
 
 ## 4. What stays

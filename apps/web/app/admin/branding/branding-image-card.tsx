@@ -4,7 +4,6 @@ import { Button, useTranslations } from "@openokr/ui";
 import { ImageUp } from "lucide-react";
 import {
   type DragEvent,
-  useActionState,
   useEffect,
   useRef,
   useState,
@@ -14,7 +13,7 @@ import {
   type BrandingImageRules,
   brandingImageProblem,
 } from "../../../lib/branding-image.ts";
-import { removeBrandingImage, uploadBrandingImage } from "./actions.ts";
+import { removeBrandingImage } from "./actions.ts";
 import type {
   BrandingImageResult,
   BrandingImageSlot,
@@ -26,8 +25,8 @@ import type {
  *
  * **A chosen file is shown before anything is sent.** It is read in the
  * browser through an object URL and handed to the page's mirror, which draws
- * it in a light and a dark sidebar or a browser tab. Save sends it; Cancel
- * forgets it.
+ * it in a light and a dark sidebar or a browser tab. The page's one Save
+ * sends it with the colour and the other picture; Cancel forgets it.
  *
  * **The drop zone is the file picker.** A label wraps the file input, so a
  * click, Enter or Space opens the picker and the label names the control; a
@@ -51,6 +50,7 @@ export function BrandingImageCard({
   initials,
   rules,
   onChosen,
+  disabled,
 }: {
   readonly slot: BrandingImageSlot;
   /** The stored picture's address, or null for the default. */
@@ -60,6 +60,8 @@ export function BrandingImageCard({
   readonly rules: BrandingImageRules;
   /** An object URL of the chosen, unsaved file, or null when none is. */
   readonly onChosen?: (url: string | null) => void;
+  /** While the page saves, nothing here may change under it. */
+  readonly disabled?: boolean;
 }) {
   const { t } = useTranslations();
   const input = useRef<HTMLInputElement>(null);
@@ -70,10 +72,6 @@ export function BrandingImageCard({
   } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [over, setOver] = useState(false);
-  const [uploaded, upload, uploading] = useActionState(
-    uploadBrandingImage,
-    null,
-  );
   const [removal, setRemoval] = useState<BrandingImageResult | null>(null);
   const [removing, startRemoving] = useTransition();
 
@@ -88,16 +86,6 @@ export function BrandingImageCard({
   useEffect(() => {
     onChosen?.(chosen?.url ?? null);
   }, [chosen, onChosen]);
-
-  // A saved picture is now the stored one, so the pending one has done its job.
-  useEffect(() => {
-    if (uploaded?.ok) {
-      setChosen(null);
-      if (input.current) {
-        input.current.value = "";
-      }
-    }
-  }, [uploaded]);
 
   const forget = () => {
     setChosen(null);
@@ -149,8 +137,8 @@ export function BrandingImageCard({
     choose(file);
   };
 
-  const busy = uploading || removing;
-  const answer = busy ? null : (removal ?? uploaded);
+  const busy = disabled || removing;
+  const answer = busy ? null : removal;
 
   return (
     <section
@@ -187,12 +175,7 @@ export function BrandingImageCard({
         </div>
       </div>
 
-      <form
-        action={upload}
-        className="flex flex-col gap-2"
-        aria-busy={uploading}
-      >
-        <input type="hidden" name="slot" value={slot} />
+      <div className="flex flex-col gap-2">
         <label
           onDragOver={(event) => {
             event.preventDefault();
@@ -219,7 +202,8 @@ export function BrandingImageCard({
           </span>
           <input
             ref={input}
-            name="image"
+            name={slot}
+            disabled={busy}
             type="file"
             accept={rules.types.join(",")}
             onChange={(event) => choose(event.currentTarget.files?.[0])}
@@ -244,17 +228,12 @@ export function BrandingImageCard({
                 size: Math.max(1, Math.round(chosen.size / 1024)),
               })}
             </span>
-            <Button type="submit" variant="primary" size="sm" disabled={busy}>
-              {uploading
-                ? t("admin.branding.images.saving")
-                : t("admin.branding.images.save")}
-            </Button>
             <Button type="button" size="sm" disabled={busy} onClick={forget}>
               {t("admin.branding.images.cancel")}
             </Button>
           </div>
         ) : null}
-      </form>
+      </div>
 
       {storedUrl && !chosen ? (
         <div>

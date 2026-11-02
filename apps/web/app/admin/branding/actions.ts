@@ -9,9 +9,13 @@
  * colour it stored looked exactly alike. A status hue is refused now, and an
  * administrator who typed one has to be told why and what to choose instead.
  *
- * **One action for both buttons.** Save and Reset are two submit buttons in
- * one form, told apart by the `intent` the pressed button carries, because a
- * form cannot nest inside another and the two belong on one row.
+ * **One action for both buttons.** Save and Reset are two submit buttons of
+ * one form, told apart by the `intent` the pressed button carries.
+ *
+ * **One Save for the whole look** (docs/design/branding-page.md §3). The
+ * colour, the logo and the favicon are one form, and Save writes whatever of
+ * the three changed. Everything is checked before anything is written, so a
+ * wrong file does not leave a new colour behind it.
  */
 
 import {
@@ -49,7 +53,15 @@ async function context() {
   };
 }
 
-export async function submitBranding(
+const SLOTS: readonly BrandingImageSlot[] = ["logo", "favicon"];
+
+/** A file the form carried, or null when that picker was left empty. */
+const fileIn = (form: FormData, name: string): File | null => {
+  const value = form.get(name);
+  return value instanceof File && value.size > 0 ? value : null;
+};
+
+export async function saveBranding(
   _previous: BrandingState,
   form: FormData,
 ): Promise<BrandingState> {
@@ -58,7 +70,7 @@ export async function submitBranding(
   if (form.get("intent") === "reset") {
     try {
       // The colour alone. A card reset would clear the logo and favicon too,
-      // and this button is on the colour card
+      // and this button belongs to the colour
       // (docs/design/workspace-logo-favicon.md §3).
       await callAction(await context(), "settings.updateWorkspaceBranding", {
         branding: {},
@@ -78,10 +90,14 @@ export async function submitBranding(
     };
   }
 
-  // Empty means the product's own palette, not an unanswered question, so
-  // clearing the field is a valid save.
+  // Written only when it differs from what the page was drawn with, so saving
+  // a logo never touches the colour. Empty means the product's own palette,
+  // so emptying a stored colour is a change like any other.
   const primaryColor = String(form.get("primaryColor") ?? "").trim();
-  if (primaryColor !== "" && !HEX.test(primaryColor)) {
+  const storedColour = String(form.get("storedColour") ?? "").trim();
+  const colourChanged =
+    primaryColor.toLowerCase() !== storedColour.toLowerCase();
+  if (colourChanged && primaryColor !== "" && !HEX.test(primaryColor)) {
     return {
       error: t("admin.branding.brandingSettingsForm.sixHexDigits"),
       saved: null,
@@ -89,7 +105,8 @@ export async function submitBranding(
   }
   // Asked here as well as by the action's schema, so the refusal reaches the
   // administrator in their own language rather than as the schema's English.
-  const family = primaryColor === "" ? null : statusHueOf(primaryColor);
+  const family =
+    !colourChanged || primaryColor === "" ? null : statusHueOf(primaryColor);
   if (family !== null) {
     return {
       error: t(REFUSED_HUE[family], { colour: primaryColor }),
@@ -97,11 +114,63 @@ export async function submitBranding(
     };
   }
 
+  // The type and size are asked here first so a wrong file is refused before
+  // anything is stored. `settings.setWorkspaceBrandingImage` asks again and is
+  // the enforcement.
+  const files = SLOTS.map((slot) => ({ slot, file: fileIn(form, slot) }));
+  for (const { file } of files) {
+    if (file && !BRANDING_IMAGE_TYPES.has(file.type)) {
+      return { error: t("admin.branding.images.wrongType"), saved: null };
+    }
+    if (file && file.size > BRANDING_IMAGE_MAX_BYTES) {
+      return { error: t("admin.branding.images.tooLarge"), saved: null };
+    }
+  }
+
+  if (!colourChanged && files.every(({ file }) => file === null)) {
+    return { error: null, saved: t("admin.branding.nothingToSave") };
+  }
+
+  const ctx = await context();
   try {
-    await callAction(await context(), "settings.updateWorkspaceBranding", {
-      branding: primaryColor === "" ? {} : { primaryColor },
-    });
+    if (colourChanged) {
+      await callAction(ctx, "settings.updateWorkspaceBranding", {
+        branding: primaryColor === "" ? {} : { primaryColor },
+      });
+    }
+    for (const { slot, file } of files) {
+      if (!file) {
+        continue;
+      }
+      const stored = await storeUpload(
+        ctx,
+        { storage: getStorage(), images: getImageProcessor() },
+        {
+          filename: file.name,
+          contentType: file.type,
+          bytes: Buffer.from(await file.arrayBuffer()),
+        },
+      );
+      await callAction(ctx, "settings.setWorkspaceBrandingImage", {
+        slot,
+        blobId: stored.blobId,
+      });
+    }
   } catch (error) {
+    // Whatever was written before the refusal stays written, and the page is
+    // redrawn so it shows it.
+    revalidatePath("/", "layout");
+    if (error instanceof ImageRefusedError) {
+      return {
+        error:
+          error.reason === "too_many_pixels"
+            ? t("attachmentActions.imageTooLarge", {
+                megapixels: MAX_IMAGE_PIXELS / 1_000_000,
+              })
+            : t("attachmentActions.imageUnreadable"),
+        saved: null,
+      };
+    }
     if (error instanceof OperationError) {
       return { error: error.message, saved: null };
     }
@@ -110,81 +179,6 @@ export async function submitBranding(
 
   revalidatePath("/", "layout");
   return { error: null, saved: t("admin.branding.brandingSettingsForm.saved") };
-}
-
-const slotOf = (form: FormData): BrandingImageSlot | null => {
-  const slot = form.get("slot");
-  return slot === "logo" || slot === "favicon" ? slot : null;
-};
-
-/**
- * Stores a chosen logo or favicon and makes it the workspace's
- * (docs/design/workspace-logo-favicon.md §3).
- *
- * The type and size are asked here first only so a wrong file is refused
- * before it is stored and left behind. `settings.setWorkspaceBrandingImage`
- * asks again and is the enforcement.
- */
-export async function uploadBrandingImage(
-  _previous: BrandingImageResult | null,
-  form: FormData,
-): Promise<BrandingImageResult> {
-  const { t } = await getTranslations();
-  const slot = slotOf(form);
-  const file = form.get("image");
-  if (slot === null || !(file instanceof File) || file.size === 0) {
-    return { ok: false, message: t("admin.branding.images.chooseFirst") };
-  }
-  if (!BRANDING_IMAGE_TYPES.has(file.type)) {
-    return { ok: false, message: t("admin.branding.images.wrongType") };
-  }
-  if (file.size > BRANDING_IMAGE_MAX_BYTES) {
-    return { ok: false, message: t("admin.branding.images.tooLarge") };
-  }
-
-  const ctx = await context();
-  try {
-    const stored = await storeUpload(
-      ctx,
-      { storage: getStorage(), images: getImageProcessor() },
-      {
-        filename: file.name,
-        contentType: file.type,
-        bytes: Buffer.from(await file.arrayBuffer()),
-      },
-    );
-    await callAction(ctx, "settings.setWorkspaceBrandingImage", {
-      slot,
-      blobId: stored.blobId,
-    });
-  } catch (error) {
-    if (error instanceof ImageRefusedError) {
-      return {
-        ok: false,
-        message:
-          error.reason === "too_many_pixels"
-            ? t("attachmentActions.imageTooLarge", {
-                megapixels: MAX_IMAGE_PIXELS / 1_000_000,
-              })
-            : t("attachmentActions.imageUnreadable"),
-      };
-    }
-    if (error instanceof OperationError) {
-      return { ok: false, message: error.message };
-    }
-    throw error;
-  }
-
-  // The sidebar and the tab icon are drawn by the root layout.
-  revalidatePath("/", "layout");
-  return {
-    ok: true,
-    message: t(
-      slot === "logo"
-        ? "admin.branding.images.logoSaved"
-        : "admin.branding.images.faviconSaved",
-    ),
-  };
 }
 
 /** Takes the logo or favicon down, back to the default. */

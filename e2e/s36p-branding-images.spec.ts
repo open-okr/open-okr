@@ -4,7 +4,7 @@
  * Acceptance criteria:
  *   Given an administrator on Branding, when they choose an image, then a
  *   preview shows it before anything is uploaded; Cancel forgets it.
- *   Given the preview, when they save, then the sidebar draws the logo and
+ *   Given the preview, when they press the page's one Save, then the sidebar draws the logo and
  *   the tab icon is the workspace's favicon.
  *   Given an SVG, when it is chosen, then it is refused and nothing previews.
  *   Given a stored logo, when it is removed, then the initials return.
@@ -28,6 +28,11 @@ const PICTURE = Buffer.from(
 );
 
 const logoCard = () => page.getByTestId("branding-logo");
+const saved = () =>
+  page
+    .getByTestId("branding-mirror")
+    .getByRole("status")
+    .filter({ hasText: "Saved." });
 const faviconCard = () => page.getByTestId("branding-favicon");
 
 test.beforeAll(async ({ browser }) => {
@@ -87,13 +92,10 @@ test("a saved logo is the sidebar's brandmark", async () => {
   await logoCard()
     .getByLabel("Choose an image")
     .setInputFiles({ name: "mark.jpg", mimeType: "image/jpeg", buffer: PICTURE });
-  await page
-    .getByTestId("branding-logo-preview")
-    .getByRole("button", { name: "Save" })
-    .click();
-  await expect(logoCard().getByRole("status")).toContainText("Logo saved", {
-    timeout: 15_000,
-  });
+  // One Save for the whole look, under the preview
+  // (docs/design/branding-page.md §3).
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(saved()).toBeVisible({ timeout: 15_000 });
 
   await page.reload();
   const logo = page.getByTestId("workspace-logo");
@@ -109,14 +111,8 @@ test("a saved favicon is the tab icon on signed-in screens", async () => {
     .getByLabel("Choose an image")
     .setInputFiles({ name: "tab.jpg", mimeType: "image/jpeg", buffer: PICTURE });
   await expect(page.getByText("Browser tab, at 16 and 32 pixels")).toBeVisible();
-  await page
-    .getByTestId("branding-favicon-preview")
-    .getByRole("button", { name: "Save" })
-    .click();
-  await expect(faviconCard().getByRole("status")).toContainText(
-    "Favicon saved",
-    { timeout: 15_000 },
-  );
+  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(saved()).toBeVisible({ timeout: 15_000 });
 
   await goTo(page, "/");
   await expect(page.locator("link[rel='icon'][href*='/api/blobs/']")).toHaveCount(

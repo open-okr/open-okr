@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "@openokr/ui";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Mirror } from "../../../lib/branding-mirror.ts";
 
 /**
@@ -41,10 +41,13 @@ export function BrandingMirror({
   mirror,
   workspaceName,
   initials,
+  actions,
 }: {
   readonly mirror: Mirror;
   readonly workspaceName: string;
   readonly initials: string;
+  /** The page's Save and Discard, under the list of what they would save. */
+  readonly actions?: ReactNode;
 }) {
   const { t } = useTranslations();
   // Only the fill is overridden: the stops derived from it are the layout's
@@ -115,6 +118,7 @@ export function BrandingMirror({
           ? t("admin.branding.mirror.notSaved", { parts: unsaved.join(", ") })
           : ""}
       </p>
+      {actions}
     </section>
   );
 }
