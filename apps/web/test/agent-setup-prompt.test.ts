@@ -23,6 +23,10 @@ describe("the OAuth setup prompt", () => {
     expect(prompt).toContain(
       `claude mcp add --transport http openokr ${endpoint}`,
     );
+    expect(prompt).toContain(`codex mcp add openokr --url ${endpoint}`);
+    expect(prompt).toContain("codex mcp login openokr");
+    expect(prompt).toContain("~/.cursor/mcp.json");
+    expect(prompt).toContain(`"url": "${endpoint}"`);
     expect(prompt).toContain(`url: "${endpoint}"`);
     expect(prompt).toContain("auth: oauth");
     expect(prompt).not.toContain("Gemini");
@@ -50,6 +54,15 @@ describe("the token setup prompt", () => {
       `claude mcp add --transport http openokr ${endpoint} --header "Authorization: Bearer ${token}"`,
     );
     expect(prompt).toContain(`Authorization: "Bearer ${token}"`);
+    expect(prompt).toContain(
+      `http_headers = { "Authorization" = "Bearer ${token}" }`,
+    );
+    expect(prompt).toContain(`"Authorization": "Bearer ${token}"`);
+  });
+
+  it("tells Codex to keep its plain-text config out of a repository", () => {
+    expect(prompt).toContain("~/.codex/config.toml");
+    expect(prompt).not.toContain("codex mcp login");
   });
 
   it("says ChatGPT takes OAuth only, and never puts the token in its step", () => {

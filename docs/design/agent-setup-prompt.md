@@ -40,6 +40,8 @@ each supported agent, and asks the agent to do the step for its own runtime.
 | Agent | OAuth prompt step | Token prompt step |
 |---|---|---|
 | Claude Code | `claude mcp add --transport http openokr <endpoint>`, then `/mcp` to sign in | Same, with `--header "Authorization: Bearer <token>"` |
+| Codex | `codex mcp add openokr --url <endpoint>`, then `codex mcp login openokr` | Add to `~/.codex/config.toml`: `[mcp_servers.openokr]` with `url` and `http_headers = { "Authorization" = "Bearer <token>" }`, then `codex mcp list` |
+| Cursor | Add to `~/.cursor/mcp.json` under `mcpServers.openokr`: `"url": "<endpoint>"`, then sign in from Cursor Settings, MCP | `url` plus `headers.Authorization: Bearer <token>` |
 | Hermes Agent | Add to `~/.hermes/config.yaml` under `mcp_servers.openokr`: `url: <endpoint>` and `auth: oauth` | `url` plus `headers.Authorization: Bearer <token>` |
 | ChatGPT, developer mode | Settings, Apps and Connectors, Advanced, developer mode on, then create a connector with the endpoint and OAuth | Not supported: ChatGPT connectors take OAuth only. The token prompt says so |
 
@@ -53,16 +55,28 @@ token and with no `?toolsets=` parameter.
 back as instructions for the person. That is acceptable and the prompt does
 not pretend otherwise.
 
-## 3. The Work Map pill
+Sources for the Codex and Cursor steps, checked on 2 November 2026: the
+Codex MCP page (learn.chatgpt.com/docs/extend/mcp, `codex mcp add --url`,
+`codex mcp login`, `http_headers`) and the Cursor MCP page
+(cursor.com/docs/context/mcp, `~/.cursor/mcp.json`, `url`, `headers`, OAuth
+with dynamic registration and PKCE). Codex keeps `http_headers` in plain text
+in `config.toml`, so the token prompt tells the agent to keep that file out of
+any repository.
+
+## 3. The Home pill
+
+The look follows Cloudflare's "Onboard your agent to Cloudflare" pill, at the
+product owner's request on 2 November 2026.
 
 | Element | Rule |
 |---|---|
-| Place | S-01, directly below the Work Map header, above the first-visit tour and the scope tabs |
-| Content | "Connect your AI agent to {instanceName}", three generic icons (one per agent), and a close button. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
-| Icons | Generic lucide icons, no brand marks: `Terminal` Claude Code, `Bot` Hermes Agent, `MessageSquare` ChatGPT. Each has an accessible name with the agent's name |
-| Click | Copies the OAuth prompt. The label changes to "Copied" for two seconds, announced through `aria-live="polite"` |
+| Place | Home, directly below the trusted-domain offers, above My week |
+| Content | "Connect your AI agent to {instanceName}", then five agent marks. The instance's own name, not "OpenOKR", per the catalogue rule M-33 |
+| Look | One pill: `rounded-full`, a thin `border-line` border, `bg-surface`, 44 px tall, a pointer cursor, the label in `text-base text-ink`, the marks 20 px with 6 px between them, no box behind a mark |
+| Marks | The agents' own marks, in this order: Claude (Claude Code, `#D97757`), Codex, Cursor, Hermes Agent, OpenAI (ChatGPT). All but Claude are drawn in `currentColor` on `text-ink`, so they are black in light mode and white in dark mode. Inline SVG paths in `apps/web/app/agent-marks.tsx`, no network, no runtime dependency. The paths come from LobeHub icons (MIT); the notice is kept in that file. The marks are the owners' trademarks and are shown only to say the prompt works with those agents. Each is `aria-hidden`; the names are read once through the `sr-only` "Copies a setup prompt for {agents}" |
+| Click | Copies the OAuth prompt. "Copied" shows for two seconds to the right of the pill, announced through `role="status"` |
 | Tooltip | "Copies a setup prompt for your AI agent", as the button's `title` |
-| Close | Hides the pill for the rest of the login session |
+| Close | A 32 px round X beside the pill, on its right. Its slot has no width until the pointer is over the pill or the X has keyboard focus; it then opens over 200 ms, so the centred pill slides left to make room. No animation under `prefers-reduced-motion`. Always open on a device with no hover (`@media (hover: none)`), because a phone has no hover and the X would otherwise be unreachable. Hides the pill for the rest of the login session |
 | Who | Every member. The endpoint enforces each member's own access |
 | AI provider off | Still shown. The agent endpoint does not depend on the instance's AI provider |
 
@@ -142,7 +156,7 @@ each header step and naming ChatGPT as OAuth-only.
 
 ## 8. What this change does not do
 
-- No brand logos. Generic icons until the product owner decides on marks.
+- No brand marks on the token page. Only the Home pill shows them.
 - No Gemini CLI step. Left out by the product owner on 26 October 2026; it was never checked against a live client.
 - No per-agent deep links or one-click installers.
 - No server-side record of the dismissal.

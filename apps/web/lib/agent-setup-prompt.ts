@@ -15,6 +15,8 @@
 /** The agents the prompt has a step for, in the order the pill shows them. */
 export const AGENT_PROMPT_AGENTS = [
   { id: "claude-code", name: "Claude Code" },
+  { id: "codex", name: "Codex" },
+  { id: "cursor", name: "Cursor" },
   { id: "hermes", name: "Hermes Agent" },
   { id: "chatgpt", name: "ChatGPT" },
 ] as const;
@@ -54,6 +56,44 @@ export function agentSetupPrompt({
       : "  Then run /mcp, choose openokr and sign in.",
   ];
 
+  // Codex: `codex mcp add --url` takes no header flag, so the token goes into
+  // config.toml, which Codex keeps in plain text.
+  const codex = [
+    "Codex",
+    ...(header
+      ? [
+          "  Add this to ~/.codex/config.toml and keep that file out of any repository:",
+          `    [mcp_servers.${SERVER_NAME}]`,
+          `    url = "${endpoint}"`,
+          `    http_headers = { "Authorization" = "Bearer ${token}" }`,
+          `  Then run: codex mcp list, and check that ${SERVER_NAME} is listed.`,
+        ]
+      : [
+          `  Run: codex mcp add ${SERVER_NAME} --url ${endpoint}`,
+          `  Then run: codex mcp login ${SERVER_NAME}, and I approve the sign-in in my browser.`,
+        ]),
+  ];
+
+  const cursor = [
+    "Cursor",
+    "  Add this to ~/.cursor/mcp.json, keeping any servers already there:",
+    "    {",
+    '      "mcpServers": {',
+    `        "${SERVER_NAME}": {`,
+    ...(header
+      ? [
+          `          "url": "${endpoint}",`,
+          `          "headers": { "Authorization": "Bearer ${token}" }`,
+        ]
+      : [`          "url": "${endpoint}"`]),
+    "        }",
+    "      }",
+    "    }",
+    header
+      ? `  Then open Cursor Settings, MCP, and check that ${SERVER_NAME} is connected.`
+      : `  Then open Cursor Settings, MCP, and sign in to ${SERVER_NAME} when asked.`,
+  ];
+
   const hermes = [
     "Hermes Agent",
     "  Add this to ~/.hermes/config.yaml:",
@@ -85,7 +125,7 @@ export function agentSetupPrompt({
     "When the connection works, call the workspace.overview tool once and tell me the workspace name and my name, so I know it worked.",
   ];
 
-  return [intro, claudeCode, hermes, chatGpt, close]
+  return [intro, claudeCode, codex, cursor, hermes, chatGpt, close]
     .map((section) => section.join("\n"))
     .join("\n\n");
 }
