@@ -255,13 +255,7 @@ export function DiagnosticPanel({
 
         {diagnostic.recorded && canRead ? (
           <span>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={pending}
-              onClick={read}
-            >
+            <Button type="button" size="sm" disabled={pending} onClick={read}>
               {t("session.detail.diagnostic.readItAgain")}
             </Button>
           </span>

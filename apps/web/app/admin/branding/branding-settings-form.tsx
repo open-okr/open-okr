@@ -113,7 +113,6 @@ export function BrandingSettingsForm({
           type="submit"
           name="intent"
           value="reset"
-          variant="ghost"
           size="sm"
           disabled={disabled}
           // Reset whatever the box holds, a refused colour included.

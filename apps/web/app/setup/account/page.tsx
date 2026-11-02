@@ -59,10 +59,7 @@ export default async function SetupAccountPage() {
 
       <SetupAccountForm />
 
-      <Link
-        href="/setup"
-        className={cn(buttonVariants({ variant: "ghost" }), "self-start")}
-      >
+      <Link href="/setup" className={cn(buttonVariants(), "self-start")}>
         {t("setup.account.back")}
       </Link>
     </>

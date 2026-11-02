@@ -249,7 +249,6 @@ export function BrandingImageCard({
           <Button
             type="button"
             size="sm"
-            variant="ghost"
             disabled={busy}
             onClick={() =>
               startRemoving(async () => {

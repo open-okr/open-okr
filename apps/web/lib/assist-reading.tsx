@@ -99,7 +99,6 @@ export function AssistReading({
           ) : null}
           <Button
             type="button"
-            variant="ghost"
             size="sm"
             className="self-start"
             onClick={() => setReading(null)}

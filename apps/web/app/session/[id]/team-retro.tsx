@@ -122,7 +122,6 @@ function NoteRow({
           <Button
             type="button"
             size="sm"
-            variant={note.mine ? "ghost" : "default"}
             disabled={pending || !canSpend}
             onClick={() => run(() => castRetroVoteAction(sessionId, note.id))}
           >

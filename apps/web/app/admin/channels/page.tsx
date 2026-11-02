@@ -298,7 +298,7 @@ export default async function ChannelsPage() {
                           name="ruleKey"
                           value={mapping.ruleKey}
                         />
-                        <Button type="submit" variant="ghost" size="sm">
+                        <Button type="submit" size="sm">
                           {t("common.remove")}
                         </Button>
                       </ChannelForm>

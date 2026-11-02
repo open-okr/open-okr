@@ -105,9 +105,7 @@ export async function SpaceMembership({
               : "",
         })}
       </p>
-      <Button type="submit" variant="ghost">
-        {t("spaces.detail.spaceMembership.leave")}
-      </Button>
+      <Button type="submit">{t("spaces.detail.spaceMembership.leave")}</Button>
     </form>
   );
 }

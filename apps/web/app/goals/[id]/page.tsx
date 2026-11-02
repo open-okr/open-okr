@@ -633,9 +633,7 @@ export default async function GoalPage({
                   className="w-56"
                   inputClassName="text-xs"
                 />
-                <Button type="submit" variant="ghost">
-                  {t("common.reassign")}
-                </Button>
+                <Button type="submit">{t("common.reassign")}</Button>
               </ActionForm>
             </CardBody>
           </Card>
@@ -728,7 +726,7 @@ export default async function GoalPage({
                   <p className="text-sm text-ink-3">
                     {t("goals.detail.reopeningClearsTheOutcome")}
                   </p>
-                  <Button type="submit" variant="ghost" className="self-start">
+                  <Button type="submit" className="self-start">
                     {t("goals.detail.reopenThisGoal")}
                   </Button>
                 </ActionForm>

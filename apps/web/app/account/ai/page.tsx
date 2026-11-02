@@ -177,7 +177,6 @@ export default async function PersonalAIKeysPage() {
                       action={removePersonalKey}
                       submitLabel={t("account.aiKeys.remove")}
                       busyLabel={t("account.aiKeys.removing")}
-                      variant="ghost"
                       className="flex flex-col gap-2 border-t border-line pt-3"
                     >
                       <input

@@ -250,7 +250,6 @@ export default async function InboxPage({
                         <input type="hidden" name="subscribe" value="false" />
                         <Button
                           type="submit"
-                          variant="ghost"
                           size="sm"
                           className="h-5 px-1.5 text-xs font-semibold normal-case"
                         >
@@ -358,7 +357,7 @@ async function NotificationRow({
         {row.readAt === null ? (
           <ActionForm action={markRead}>
             <input type="hidden" name="notificationId" value={row.id} />
-            <Button type="submit" variant="ghost" size="sm">
+            <Button type="submit" size="sm">
               {t("inbox.markRead")}
             </Button>
           </ActionForm>

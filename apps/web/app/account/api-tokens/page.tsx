@@ -276,7 +276,7 @@ export default async function ApiTokensPage() {
                 {token.revokedAt ? null : (
                   <TokenForm action={revokeToken}>
                     <input type="hidden" name="id" value={token.id} />
-                    <Button type="submit" variant="ghost" size="sm">
+                    <Button type="submit" size="sm">
                       {t("common.revoke")}
                     </Button>
                   </TokenForm>

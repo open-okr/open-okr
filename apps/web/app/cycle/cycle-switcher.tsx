@@ -80,7 +80,7 @@ export async function CycleSwitcher({
             className="w-56"
             inputClassName="text-xs"
           />
-          <Button type="submit" variant="ghost" size="sm">
+          <Button type="submit" size="sm">
             {t("cycle.switcher.open")}
           </Button>
         </form>

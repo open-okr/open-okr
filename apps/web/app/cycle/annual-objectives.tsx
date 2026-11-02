@@ -124,7 +124,7 @@ async function Objective({
             className="w-96"
             inputClassName="text-xs"
           />
-          <Button type="submit" variant="ghost" size="sm">
+          <Button type="submit" size="sm">
             {t("common.link")}
           </Button>
         </ActionForm>

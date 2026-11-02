@@ -27,7 +27,7 @@ export function RevokeForm({
   return (
     <form action={formAction} className="w-fit" aria-busy={pending}>
       <input type="hidden" name="id" value={id} />
-      <Button type="submit" variant="ghost" size="sm">
+      <Button type="submit" size="sm">
         {t("common.revoke")}
       </Button>
       {state.ok ? null : (

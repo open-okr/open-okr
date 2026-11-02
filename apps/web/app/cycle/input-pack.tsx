@@ -145,11 +145,7 @@ export async function InputPack({
                         className="min-w-0 flex-1"
                         inputClassName="h-6.5 px-2 text-xs text-ink-2 placeholder:text-ink-4"
                       />
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        className="h-7 px-2 text-xs"
-                      >
+                      <Button type="submit" className="h-7 px-2 text-xs">
                         {t("common.save")}
                       </Button>
                     </ActionForm>

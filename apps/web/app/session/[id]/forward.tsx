@@ -203,7 +203,6 @@ export function ForwardPanel({
                     <Button
                       type="button"
                       size="sm"
-                      variant="ghost"
                       disabled={pending}
                       onClick={() =>
                         run(() =>

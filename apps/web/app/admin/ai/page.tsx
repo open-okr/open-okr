@@ -284,7 +284,7 @@ export default async function AdminAIPage() {
                     defaultValue={config?.baseUrl ?? ""}
                     placeholder={t("admin.ai.leaveEmptyForThe")}
                   />
-                  <Button type="submit" variant="ghost" size="sm">
+                  <Button type="submit" size="sm">
                     {t("common.save")}
                   </Button>
                 </AIForm>
@@ -315,7 +315,7 @@ export default async function AdminAIPage() {
                 {config?.hasWorkspaceCredential ? (
                   <AIForm action={testWorkspaceKeyAction}>
                     <input type="hidden" name="provider" value={kind} />
-                    <Button type="submit" variant="ghost" size="sm">
+                    <Button type="submit" size="sm">
                       {t("admin.ai.testTheConnection")}
                     </Button>
                   </AIForm>
@@ -348,7 +348,7 @@ export default async function AdminAIPage() {
         </CardHeader>
         <CardBody>
           <AIForm action={rotateKeys}>
-            <Button type="submit" variant="ghost" size="sm">
+            <Button type="submit" size="sm">
               {t("admin.ai.rotateNow")}
             </Button>
           </AIForm>
@@ -419,7 +419,7 @@ export default async function AdminAIPage() {
                       {model.source === "custom" && model.id ? (
                         <AIForm action={removeModel}>
                           <input type="hidden" name="id" value={model.id} />
-                          <Button type="submit" variant="ghost" size="sm">
+                          <Button type="submit" size="sm">
                             {t("common.remove")}
                           </Button>
                         </AIForm>
@@ -591,7 +591,7 @@ export default async function AdminAIPage() {
                     placeholder={t("admin.ai.driverSOwn")}
                     inputClassName="w-28"
                   />
-                  <Button type="submit" variant="ghost" size="sm">
+                  <Button type="submit" size="sm">
                     {t("admin.ai.route")}
                   </Button>
                 </AIForm>
