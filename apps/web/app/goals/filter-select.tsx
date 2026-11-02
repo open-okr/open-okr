@@ -26,6 +26,7 @@ export function FilterSelect({
   hrefTemplate,
   anyHref,
   people,
+  bare,
 }: {
   readonly label: string;
   readonly value: string | null;
@@ -37,39 +38,51 @@ export function FilterSelect({
   readonly anyHref: string;
   /** The options are people, so a long list asks the directory. */
   readonly people?: boolean;
+  /**
+   * Only the picker, named by its label, for the filter panel, whose own
+   * column already says "Champion" or "Space".
+   */
+  readonly bare?: boolean;
 }) {
   const router = useRouter();
+  const picker = (
+    <EntityPicker
+      label={label}
+      hideLabel
+      value={value}
+      options={options}
+      noneLabel={anyLabel}
+      {...(people
+        ? {
+            search: (text: string) => searchMembers(text, ["human", "guest"]),
+          }
+        : {})}
+      onValueChange={(next) =>
+        router.push(
+          next === null
+            ? anyHref
+            : hrefTemplate.replace(
+                FILTER_PLACEHOLDER,
+                encodeURIComponent(next),
+              ),
+        )
+      }
+      inputClassName={bare ? "h-7.5 w-full text-[12.5px]" : "h-7 w-44 text-xs"}
+    />
+  );
+  if (bare) {
+    // As wide as its field, so the chevron sits at the field's end.
+    return <div className="w-52 max-w-full">{picker}</div>;
+  }
   return (
     <div className="flex min-w-0 items-center gap-1 rounded-control bg-raised p-0.5 pl-2">
       <span
         aria-hidden="true"
-        className="flex-none text-[10px] font-bold uppercase tracking-wider text-ink-3"
+        className="flex-none text-xs font-semibold text-ink-3"
       >
         {label}
       </span>
-      <EntityPicker
-        label={label}
-        hideLabel
-        value={value}
-        options={options}
-        noneLabel={anyLabel}
-        {...(people
-          ? {
-              search: (text: string) => searchMembers(text, ["human", "guest"]),
-            }
-          : {})}
-        onValueChange={(next) =>
-          router.push(
-            next === null
-              ? anyHref
-              : hrefTemplate.replace(
-                  FILTER_PLACEHOLDER,
-                  encodeURIComponent(next),
-                ),
-          )
-        }
-        inputClassName="h-7 w-44 text-xs"
-      />
+      {picker}
     </div>
   );
 }

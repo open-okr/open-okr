@@ -170,9 +170,13 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "sessions.schedule.space",
   "spaces.spaces",
   "tour.checkIn.title",
-  // Both are a line made only of holes and a slash: the workspace's own
-  // words for the two things the column holds. Nothing to translate.
-  "goals.editor.columnName",
+  // A line made only of holes: the workspace's own word for its key
+  // results and how many there are. Nothing to translate.
+  "okrList.keyResultsBand",
+  // "Group: value", two holes and a colon. Nothing to translate.
+  "goals.filter.chip",
+  // A line made only of holes and a slash: the workspace's own words for
+  // the two things the column holds. Nothing to translate.
   "workMap.goalKeyResult",
   "workMap.keyResult",
   "workMap.objective",

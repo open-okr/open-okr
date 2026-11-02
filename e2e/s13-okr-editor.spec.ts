@@ -37,6 +37,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 import { choose } from "./pickers.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -92,7 +93,7 @@ test("sign in and open the OKR screen", async () => {
 
 test("an objective is added without leaving the screen", async () => {
   const added = page.locator(
-    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+    titleField("Objective title", OBJECTIVE),
   );
   // Retry-safe: a retry runs this serial file from the top, and a second
   // objective with the same title would make every later locator ambiguous.
@@ -109,7 +110,7 @@ test("an objective is added without leaving the screen", async () => {
 
 test("a key result is added under that objective", async () => {
   const added = page.locator(
-    `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+    titleField("Key result title", KEY_RESULT),
   );
   if ((await added.count()) === 0) {
     // A new objective opens with one key result draft under it (P9-T07b-a);
@@ -140,7 +141,7 @@ test("a title changed in one tab shows in another without a reload", async () =>
   const titled = (where: typeof page, value: string) =>
     where
       .locator("#main-content")
-      .locator(`input[aria-label="Objective title"][value="${value}"]`);
+      .locator(titleField("Objective title", value));
   await expect(titled(other, OBJECTIVE)).toBeVisible({ timeout: 15_000 });
 
   const renamed = `${OBJECTIVE}, from the first tab`;
@@ -194,7 +195,7 @@ test("a key result's title, value and due date change with the keyboard alone, a
   const retitled = `${KEY_RESULT}, measured weekly`;
 
   const title = page.locator(
-    `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+    titleField("Key result title", KEY_RESULT),
   );
   await title.focus();
   await page.keyboard.press("ControlOrMeta+a");
@@ -210,6 +211,8 @@ test("a key result's title, value and due date change with the keyboard alone, a
   await page.keyboard.type("55");
   await page.keyboard.press("Enter");
 
+  // The due date reads as text and becomes its field when it is pressed.
+  await page.getByRole("button", { name: `Due date for ${retitled}` }).click();
   const due = page.getByLabel(`Due date for ${retitled}`);
   await due.focus();
   await due.fill("2030-03-31");
@@ -219,26 +222,26 @@ test("a key result's title, value and due date change with the keyboard alone, a
   await expect(async () => {
     await page.reload();
     await expect(
-      page.locator(`input[aria-label="Key result title"][value="${retitled}"]`),
+      page.locator(titleField("Key result title", retitled)),
     ).toBeVisible({ timeout: 5_000 });
     await expect(
       page.getByRole("textbox", { name: `Current value for ${retitled}` }),
     ).toHaveValue("55");
-    await expect(page.getByLabel(`Due date for ${retitled}`)).toHaveValue(
-      "2030-03-31",
-    );
+    await expect(
+      page.getByRole("button", { name: `Due date for ${retitled}` }),
+    ).toHaveText("31 Mar 2030");
   }).toPass({ timeout: 20_000 });
 
   // Back to the title every later case in this file names.
   const back = page.locator(
-    `input[aria-label="Key result title"][value="${retitled}"]`,
+    titleField("Key result title", retitled),
   );
   await back.fill(KEY_RESULT);
   await page.keyboard.press("Enter");
   await persisted(() =>
     expect(
       page.locator(
-        `input[aria-label="Key result title"][value="${KEY_RESULT}"]`,
+        titleField("Key result title", KEY_RESULT),
       ),
     ).toBeVisible({ timeout: 5_000 }),
   );
@@ -299,7 +302,7 @@ test("a title changed since it was read is not overwritten", async ({
   try {
     await goTo(page, "/goals");
     const field = (value: string) =>
-      page.locator(`input[aria-label="Objective title"][value="${value}"]`);
+      page.locator(titleField("Objective title", value));
     await expect(field(OBJECTIVE)).toBeVisible({ timeout: 15_000 });
 
     const listed = await api.get("/api/v1/goals/list", { headers });
@@ -347,7 +350,7 @@ test("a title changed since it was read is not overwritten", async ({
 test("the scope tabs and filters narrow the list, and the address keeps them", async () => {
   await goTo(page, "/goals");
   const ours = page.locator(
-    `input[aria-label="Objective title"][value="${OBJECTIVE}"]`,
+    titleField("Objective title", OBJECTIVE),
   );
   await expect(ours).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("okr-summary")).toContainText("Objectives:");
@@ -355,7 +358,9 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // The level chips offer only the levels this cycle uses (P9-T07a-c), and
   // individual OKRs are off by default.
   // Behind the Filter button since the OKRGoal UX review (N5).
-  await page.locator("#main-content summary", { hasText: "Filter" }).click();
+  await page
+    .getByRole("button", { name: "Filter", exact: true })
+    .click();
   const levels = page.locator("#main-content").getByRole("group", {
     name: "Level",
   });
@@ -379,14 +384,16 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // tab (guided-inputs §4.10).
   await scope.getByRole("link", { name: "All" }).click();
   await expect(page).toHaveURL(/scope=all/);
-  await page.locator("#main-content summary", { hasText: "Filter" }).click();
+  await page
+    .getByRole("button", { name: "Filter", exact: true })
+    .click();
   // Scoped to the page's own content: the screen just left can still be in
   // the document, hidden, while the next one renders.
   const champion = page
     .locator("#main-content")
     .getByRole("combobox", { name: "Champion", exact: true });
   const me = await page
-    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .locator(titleField("Objective title", OBJECTIVE))
     .first()
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]")
     .getByRole("combobox", { name: `Champion of ${OBJECTIVE}` })
@@ -436,14 +443,15 @@ test("the diagram draws the same cycle", async () => {
 
 test("a member can take the key result back off the set", async () => {
   await goTo(page, "/goals");
+  // Deleting waits behind the row's menu since the Goals revamp.
   await page
-    .getByRole("button", { name: "Delete this key result" })
-    .last()
+    .getByRole("button", { name: `More actions for ${KEY_RESULT}` })
     .click();
+  await page.getByRole("menuitem", { name: "Delete this key result" }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
 
   await expect(
-    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
+    page.locator(titleField("Key result title", KEY_RESULT)),
   ).toHaveCount(0, { timeout: 15_000 });
   // The row goes at once; the toast is the server's answer, and what the next
   // case reads is only there once it has given it.
@@ -476,14 +484,15 @@ test("and Deleted items lists it with who removed it, and brings it back", async
 
   await goTo(page, "/goals");
   await expect(
-    page.locator(`input[aria-label="Key result title"][value="${KEY_RESULT}"]`),
+    page.locator(titleField("Key result title", KEY_RESULT)),
   ).toBeVisible({ timeout: 15_000 });
 
   // And off again, so every later spec meets the set it met before.
+  // Deleting waits behind the row's menu since the Goals revamp.
   await page
-    .getByRole("button", { name: "Delete this key result" })
-    .last()
+    .getByRole("button", { name: `More actions for ${KEY_RESULT}` })
     .click();
+  await page.getByRole("menuitem", { name: "Delete this key result" }).click();
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(
     page.getByTestId("toast").filter({ hasText: "Key result removed" }),

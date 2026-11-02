@@ -86,3 +86,111 @@
     --xy-node-boxshadow-selected: 0 0 0 2px var(--color-brand);
   }
 }
+
+/* The OKR list's values read as text until they are used (Goals revamp,
+ * 2 November 2026, prototype in docs/design/okr-writing.md §4.1).
+ *
+ * Every value is still the real field, so the keyboard, a screen reader and
+ * the tests meet the same control. At rest it is text with a dotted
+ * underline, which is how a reader tells a value they can change from one
+ * they cannot; hovered it takes a light fill; in use it is a field with the
+ * brand ring. Outside any layer on purpose: the cells' own utility classes
+ * sit in `utilities`, and an unlayered rule is the one that wins over them. */
+.okr-text-first
+  :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+    [data-kind]
+  ) {
+  border-color: transparent;
+  border-bottom-color: color-mix(in srgb, var(--color-ink-4) 70%, transparent);
+  border-bottom-style: dotted;
+  border-radius: 5px;
+  background-color: transparent;
+  box-shadow: none;
+  field-sizing: content;
+  width: auto;
+  min-width: 1.5rem;
+  padding-left: 3px;
+  padding-right: 3px;
+  text-align: left;
+  color: var(--color-ink-2);
+  cursor: pointer;
+}
+/* A picker's chevron is for the field, not for the text: hidden at rest so
+ * it never sits on the last letter of a name, back while the field is used. */
+.okr-text-first .relative > svg {
+  display: none;
+}
+.okr-text-first .relative:focus-within > svg {
+  display: block;
+}
+.okr-text-first .relative:focus-within > input {
+  padding-right: 22px;
+}
+.okr-text-first
+  :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+    [data-kind]
+  ):hover {
+  border-color: transparent;
+  border-bottom-color: var(--color-ink-3);
+  border-bottom-style: solid;
+  background-color: var(--color-raised);
+  color: var(--color-ink);
+}
+.okr-text-first
+  :is(input, select):not([type="checkbox"]):not([type="radio"]):not(
+    [data-kind]
+  ):focus {
+  padding-left: 5px;
+  border-color: var(--color-brand);
+  border-bottom-style: solid;
+  background-color: var(--color-surface);
+  box-shadow: 0 0 0 2px var(--color-brand-line);
+  color: var(--color-ink);
+  cursor: text;
+}
+/* Room for the caret below, at the same weight as the rule that sets the
+ * padding, so it wins by coming after it. */
+.okr-text-first
+  :is(select):not([type="checkbox"]):not([type="radio"]):not([data-kind]) {
+  padding-right: 14px;
+}
+/* A select keeps a small caret, because it is a choice and not a value. The
+ * kind is a coloured pill rather than underlined text, and keeps its tone. */
+.okr-text-first select {
+  appearance: none;
+  padding-right: 14px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 7px) 55%,
+    calc(100% - 4px) 55%;
+  background-size:
+    3px 3px,
+    3px 3px;
+  background-repeat: no-repeat;
+}
+/* Under the 768 breakpoint tokens.css makes every control 16px so Safari on
+ * iOS does not zoom on focus. Here a value at rest is 12px like the text
+ * around it, and grows to 16px the moment it takes the focus, which is when
+ * the zoom rule is read. */
+@media (max-width: 767px) {
+  :is(.okr-text-first)
+    :is(input, select):not(:focus):not([type="checkbox"]):not(
+      [type="radio"]
+    ):not([type="range"]) {
+    font-size: 12px;
+  }
+}
+
+/* The list's titles keep their size at rest on a phone too (14.5px for an
+ * objective, 13px for a key result) and grow to 16px only while they are
+ * edited, for the same reason as the values above. */
+@media (max-width: 767px) {
+  textarea.okr-title-objective:not(:focus) {
+    font-size: 14.5px;
+  }
+  textarea.okr-title-key-result:not(:focus) {
+    font-size: 13px;
+  }
+}

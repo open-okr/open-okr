@@ -53,6 +53,7 @@ export function TextArea({
   maxLength,
   onChange,
   "aria-describedby": describedBy,
+  ref,
   ...area
 }: TextAreaProps) {
   const { t } = useTranslations();
@@ -90,7 +91,16 @@ export function TextArea({
       )}
       <textarea
         {...area}
-        ref={box}
+        // Its own counter's box, and the caller's when it passes one: a cell
+        // that grows with its text still needs to know when it has focus.
+        ref={(node) => {
+          box.current = node;
+          if (typeof ref === "function") {
+            ref(node);
+          } else if (ref) {
+            ref.current = node;
+          }
+        }}
         id={areaId}
         aria-label={hideLabel ? label : area["aria-label"]}
         rows={rows}

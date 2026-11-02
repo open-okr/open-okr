@@ -19,6 +19,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -41,7 +42,7 @@ const main = () => page.locator("#main-content");
 const drawer = () => page.getByTestId("okr-drawer");
 const keyResultRow = (title: string) =>
   main()
-    .locator(`input[aria-label="Key result title"][value="${title}"]`)
+    .locator(titleField("Key result title", title))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
 
 async function post<T>(action: string, data: unknown): Promise<T> {
@@ -161,7 +162,7 @@ test("sign in, with a token and an objective to hold the key results", async () 
 test("acceptance: a milestone added from the list and checked done reads 100%, and KR-2 passes", async () => {
   await goTo(page, "/goals");
   const objectiveRow = main()
-    .locator(`input[aria-label="Objective title"][value="${OBJECTIVE}"]`)
+    .locator(titleField("Objective title", OBJECTIVE))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await expect(objectiveRow).toBeVisible({ timeout: 15_000 });
   await objectiveRow

@@ -118,7 +118,7 @@ export function AlignmentPanel({
           ) : (
             <>
               <div className="flex items-baseline justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
+                <span className="text-xs font-semibold text-ink-3">
                   {t("goals.studio.studio.alignmentHealth")}
                 </span>
                 <span
@@ -151,7 +151,7 @@ export function AlignmentPanel({
               data-testid="alignment-uncounted"
               className="flex flex-col gap-1"
             >
-              <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-3">
+              <h3 className="text-xs font-semibold text-ink-3">
                 {t("okrDiagram.notCounted", {
                   count: String(alignment.uncounted.length),
                 })}

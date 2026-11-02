@@ -3,6 +3,8 @@ import {
   evaluateKeyResults,
   evaluateObjective,
   isEasing,
+  KEY_RESULT_CHECKS,
+  OBJECTIVE_CHECKS,
   type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
@@ -105,9 +107,28 @@ function keyResultVerdicts(
   );
 }
 
-/** The stored verdicts, at rest: the checks this row failed when last saved. */
+/** Each check's title, which is all a stored flag can say about itself. */
+const CHECK_TITLES = new Map(
+  [...OBJECTIVE_CHECKS, ...KEY_RESULT_CHECKS].map((check) => [
+    check.id,
+    check.title,
+  ]),
+);
+
+/**
+ * The stored verdicts, at rest: the checks this row failed when last saved.
+ *
+ * A stored flag is the rule's key and nothing else, so it cannot say which of
+ * the rule's conditions failed. It shows the rule's title, "Outcome, not
+ * output", where it showed the key a second time; typing in the cell brings
+ * the full coaching prompt.
+ */
 function storedVerdicts(flags: readonly string[]): ShownVerdict[] {
-  return flags.map((id) => ({ id, status: "fail", prompt: id }));
+  return flags.map((id) => ({
+    id,
+    status: "fail",
+    prompt: CHECK_TITLES.get(id) ?? id,
+  }));
 }
 
 /** An objective's title, coached as it is typed and stored verdicts at rest. */

@@ -178,8 +178,12 @@ const field = (label: string) =>
 /** Types into a field the way React hears it, then leaves it. */
 async function type(label: string, value: string) {
   const input = field(label) as HTMLInputElement;
+  // A list title is a textarea that grows with its text (Goals audit), and
+  // the input prototype's setter refuses a textarea.
   const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
+    input instanceof HTMLTextAreaElement
+      ? HTMLTextAreaElement.prototype
+      : HTMLInputElement.prototype,
     "value",
   )?.set;
   await act(async () => {
@@ -487,6 +491,15 @@ describe("the other cells", () => {
 
   test("a due date and a baseline each send only themselves", async () => {
     await render({});
+    // The due date reads as text in the list and becomes its field when it
+    // is pressed (Goals revamp, 2 November 2026).
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Due date for Activation from 30% to 45%"]',
+        )
+        ?.click();
+    });
     await leave(
       await type("Due date for Activation from 30% to 45%", "2027-03-15"),
     );

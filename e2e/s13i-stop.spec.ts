@@ -11,6 +11,7 @@
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -28,7 +29,7 @@ const authed = () => ({ authorization: `Bearer ${token}` });
 const main = () => page.locator("#main-content");
 const row = () =>
   main()
-    .locator(`input[aria-label="Objective title"][value="${EXPANSION}"]`)
+    .locator(titleField("Objective title", EXPANSION))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
 
 async function readGoal(): Promise<{
@@ -88,7 +89,11 @@ test("acceptance: stopped from the list with a reason, it closes as abandoned, a
   await expect(row()).toBeVisible({ timeout: 15_000 });
 
   await row().hover();
-  await row().getByRole("button", { name: `Stop ${EXPANSION}` }).click();
+  // Stopping waits behind the row's menu since the Goals revamp.
+  await row()
+    .getByRole("button", { name: `More actions for ${EXPANSION}` })
+    .click();
+  await page.getByRole("menuitem", { name: `Stop ${EXPANSION}` }).click();
   const reason = row().getByRole("textbox", {
     name: "Why it no longer matters",
   });

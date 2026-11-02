@@ -28,6 +28,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { titleField } from "./okr-title-field.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -171,7 +172,7 @@ test("NW-Q2-13: the list asks why before an addition saves, and marks it", async
   await save.click();
 
   const row = main()
-    .locator(`input[aria-label="Objective title"][value="${LISTED}"]`)
+    .locator(titleField("Objective title", LISTED))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(row.getByTestId("added-mid-cycle")).toHaveText(
@@ -307,7 +308,7 @@ test("acceptance (P9-T13-b-b): a draft its owner publishes waits for its reviewe
 
   await goTo(page, "/goals");
   const row = main()
-    .locator(`input[aria-label="Objective title"][value="${APPROVED}"]`)
+    .locator(titleField("Objective title", APPROVED))
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   const waiting = row.getByTestId("waiting-draft");
   await expect(waiting).toContainText(
