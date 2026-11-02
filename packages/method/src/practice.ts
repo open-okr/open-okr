@@ -58,7 +58,10 @@ export interface PracticeSetting<T extends string = string> {
    */
   readonly item?: string;
   readonly group: PracticeGroup;
-  /** The METHOD.md section that defines the behaviour. */
+  /**
+   * The METHOD.md section that defines the behaviour. Its number alone,
+   * "4.5": the API returns it and a reader never sees "§".
+   */
   readonly section: string;
   /** Who the default comes from, as §12.1's source column says. */
   readonly source: string;
@@ -143,11 +146,11 @@ const checkSettings = Object.fromEntries(
       label: "Check enforcement",
       item: id,
       group: "checks",
-      section: "§4",
-      source: "§4",
+      section: "4",
+      source: "METHOD.md section 4",
       options: CHECK_ENFORCEMENT,
       optionLabels: {
-        asMethod: "As §4",
+        asMethod: "As the method",
         block: "Block",
         warn: "Warn",
         off: "Off",
@@ -177,8 +180,8 @@ const gateSettings = Object.fromEntries(
       label: "Publish gate enforcement",
       item: `Gate ${gate}`,
       group: "gates",
-      section: "§4.5",
-      source: "§4.5",
+      section: "4.5",
+      source: "METHOD.md section 4.5",
       options: GATE_ENFORCEMENT,
       optionLabels: { block: "Block", warn: "Warn", off: "Off" },
       default: GATE_DEFAULTS[gate],
@@ -201,7 +204,7 @@ const levelSettings = Object.fromEntries(
       label: "Levels in use",
       item: level,
       group: "levels",
-      section: "§2.7",
+      section: "2.7",
       source: "Castro; Cagan",
       // Individual OKRs are off by default: "not for everyone and should never
       // be required" (§2.7).
@@ -227,7 +230,7 @@ const keyResultKindSettings = Object.fromEntries(
       label: "Key result kinds",
       item: kind,
       group: "model",
-      section: "§2.10",
+      section: "2.10",
       source: "Lamorte; re:Work",
       options: ON_OFF,
       optionLabels: ON_OFF_LABELS,
@@ -247,7 +250,7 @@ export const PRACTICE = {
   "writing.when": setting({
     label: "Who may write OKRs, and when",
     group: "writing",
-    section: "§2.9",
+    section: "2.9",
     source: "Doerr; Akmal, 1 October 2026",
     options: ["anytime", "planningWindow", "afterPhases"],
     optionLabels: {
@@ -260,7 +263,7 @@ export const PRACTICE = {
   "phases.enforcement": setting({
     label: "Phase enforcement",
     group: "writing",
-    section: "§2.3",
+    section: "2.3",
     source: "No source requires phases before drafting",
     options: ["guided", "binding", "hidden"],
     optionLabels: { guided: "Guided", binding: "Binding", hidden: "Hidden" },
@@ -269,7 +272,7 @@ export const PRACTICE = {
   "writing.midCycleAs": setting({
     label: "New objectives mid-cycle start as",
     group: "writing",
-    section: "§2.9",
+    section: "2.9",
     source: "whatmatters",
     options: ["live", "ownerDraft", "reviewerApproval"],
     optionLabels: {
@@ -282,7 +285,7 @@ export const PRACTICE = {
   "reasons.midCycleAddition": setting({
     label: "Reason when adding mid-cycle",
     group: "writing",
-    section: "§2.9",
+    section: "2.9",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
     optionLabels: OFF_OPTIONAL_REQUIRED,
@@ -291,7 +294,7 @@ export const PRACTICE = {
   "reasons.easingTarget": setting({
     label: "Reason when easing a target",
     group: "writing",
-    section: "§2.9",
+    section: "2.9",
     source: "whatmatters",
     options: ["required", "optional"],
     optionLabels: { required: "Required", optional: "Optional" },
@@ -302,7 +305,7 @@ export const PRACTICE = {
   "okr.kinds": setting({
     label: "OKR kinds",
     group: "model",
-    section: "§2.8",
+    section: "2.8",
     source: "Google's OKR playbook",
     options: ["both", "aspirationalOnly", "committedOnly"],
     optionLabels: {
@@ -316,7 +319,7 @@ export const PRACTICE = {
   reviewer: setting({
     label: "Reviewer per goal",
     group: "model",
-    section: "§2.5",
+    section: "2.5",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
     optionLabels: OFF_OPTIONAL_REQUIRED,
@@ -328,7 +331,7 @@ export const PRACTICE = {
   strictMode: setting({
     label: "Strict mode",
     group: "checks",
-    section: "§4",
+    section: "4",
     source: "OpenOKR default",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -338,8 +341,8 @@ export const PRACTICE = {
   "gates.override": setting({
     label: "Gate override",
     group: "gates",
-    section: "§4.5",
-    source: "REQUIREMENTS §3.2",
+    section: "4.5",
+    source: "REQUIREMENTS section 3.2",
     options: ON_OFF,
     optionLabels: ON_OFF_LABELS,
     default: "on",
@@ -352,7 +355,7 @@ export const PRACTICE = {
   "progress.rollUp": setting({
     label: "Progress roll-up from aligned goals",
     group: "scoring",
-    section: "§3.1",
+    section: "3.1",
     source: "Perdoo (vendor)",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -361,7 +364,7 @@ export const PRACTICE = {
   "confidence.display": setting({
     label: "Confidence shown as",
     group: "scoring",
-    section: "§3.2",
+    section: "3.2",
     source: "Wodtke",
     options: ["xIn10", "decimal", "percent"],
     optionLabels: {
@@ -374,7 +377,7 @@ export const PRACTICE = {
   "scoring.enabled": setting({
     label: "Scoring",
     group: "scoring",
-    section: "§3.3",
+    section: "3.3",
     source: "Lamorte; Castro",
     options: ON_OFF,
     optionLabels: ON_OFF_LABELS,
@@ -383,7 +386,7 @@ export const PRACTICE = {
   "scoring.adjustment": setting({
     label: "Score adjustment at close",
     group: "scoring",
-    section: "§3.3",
+    section: "3.3",
     source: "Doerr",
     options: ["withReason", "notAllowed"],
     optionLabels: {
@@ -395,7 +398,7 @@ export const PRACTICE = {
   "scoring.colours": setting({
     label: "Score colours",
     group: "scoring",
-    section: "§3.3",
+    section: "3.3",
     source: "re:Work; whatmatters",
     options: ["google", "doerr"],
     optionLabels: { google: "Google (0.6, 0.3)", doerr: "Doerr (0.7, 0.4)" },
@@ -404,7 +407,7 @@ export const PRACTICE = {
   "progress.signal": setting({
     label: "Progress signal",
     group: "scoring",
-    section: "§3.7",
+    section: "3.7",
     source: "Microsoft Viva Goals (vendor)",
     options: ["paceAware", "absolute"],
     optionLabels: { paceAware: "Pace-aware", absolute: "Absolute" },
@@ -415,7 +418,7 @@ export const PRACTICE = {
   "escalation.criticalConfidence": setting({
     label: "Critical confidence escalation",
     group: "rhythm",
-    section: "§3.2",
+    section: "3.2",
     source: "OpenOKR default",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -424,7 +427,7 @@ export const PRACTICE = {
   "escalation.sponsorInLadders": setting({
     label: "Sponsor in escalation ladders",
     group: "rhythm",
-    section: "§7.3",
+    section: "7.3",
     source: "OpenOKR default",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -435,7 +438,7 @@ export const PRACTICE = {
   "escalation.peerStep": setting({
     label: "Peer step in the check-in ladder",
     group: "rhythm",
-    section: "§11",
+    section: "11",
     source: "OpenOKR default",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -446,7 +449,7 @@ export const PRACTICE = {
   "review.format": setting({
     label: "Quarterly review format",
     group: "review",
-    section: "§8",
+    section: "8",
     source: "Workpath (vendor)",
     options: ["oneSession", "split"],
     optionLabels: {
@@ -458,16 +461,16 @@ export const PRACTICE = {
   "review.rootCauses": setting({
     label: "Root causes at the review",
     group: "review",
-    section: "§8.4",
+    section: "8.4",
     source: "OpenOKR default",
     options: ["asMethod", "optional"],
-    optionLabels: { asMethod: "As §8.4", optional: "Optional" },
+    optionLabels: { asMethod: "As the method", optional: "Optional" },
     default: "asMethod",
   }),
   "close.carryForward": setting({
     label: "Carry forward unfinished aspirational objectives",
     group: "review",
-    section: "§8.8",
+    section: "8.8",
     source: "Google's OKR playbook",
     options: ["proposed", "notProposed"],
     optionLabels: {
@@ -481,7 +484,7 @@ export const PRACTICE = {
   "kpi.unhealthyResponse": setting({
     label: "Unhealthy KPI response",
     group: "kpi",
-    section: "§6.5",
+    section: "6.5",
     source: "Wodtke",
     options: ["offer", "draftRecovery"],
     optionLabels: {
@@ -715,7 +718,7 @@ export function validatePracticeOverrides(input: unknown): PracticeValidation {
     if (!isPracticeKey(key)) {
       problems.push({
         key,
-        message: `"${key}" is not a practice setting in METHOD.md §12.`,
+        message: `"${key}" is not a practice setting.`,
       });
       continue;
     }

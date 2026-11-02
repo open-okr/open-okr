@@ -357,7 +357,7 @@ async function importWatchers(
       unreachable += 1;
       tally.skip(
         source,
-        "This member is a placeholder, an agent or suspended, and §7.2 excludes all three from subscribing. Nothing was written.",
+        "This member is a placeholder, an agent or suspended, and none of the three may subscribe. Nothing was written.",
       );
       continue;
     }

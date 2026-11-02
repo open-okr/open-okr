@@ -1256,7 +1256,7 @@ export const runCoach = defineWriteAction({
           at: stamp,
           taskIndex: run.ruleKeys.length + 2,
           kind: "applied",
-          message: `§5.3 semantic review: ${run.reviewed} finding(s) written or refreshed.`,
+          message: `Semantic review: ${run.reviewed} finding(s) written or refreshed.`,
         });
       }
 

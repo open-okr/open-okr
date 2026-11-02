@@ -893,7 +893,7 @@ describe("the per-rule escalation ladder (P6-G21b)", () => {
         ruleKey: "blocker.escalated",
         escalationLadder: { owner: 20, coordinator: 24, sponsor: 48 },
       }),
-    ).rejects.toThrow(/§11 would recognise/);
+    ).rejects.toThrow(/the practice recognises/);
   });
 
   it("stores one, hands it back, and returns to the canon when emptied", async () => {

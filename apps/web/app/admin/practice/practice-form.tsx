@@ -451,12 +451,6 @@ function GroupCard({
                   <label htmlFor={fieldId} className="font-medium text-ink">
                     {nameOf(setting)}
                   </label>
-                  <span className="text-xs text-ink-4">
-                    {t("admin.practice.section", {
-                      section: setting.section,
-                      source: setting.source,
-                    })}
-                  </span>
                   {differs ? (
                     <span className="text-xs text-ink-3">
                       {t("admin.practice.profileValue", {

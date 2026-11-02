@@ -73,7 +73,7 @@ Every rule below serves one of these. They are the practice's centre, and the pa
 
 | Horizon | Runs | Sets | Revisited |
 |---|---|---|---|
-| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record |
+| Annual | Once a year, about 6 weeks before the year starts | The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list | Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target: easing it needs a reason, and the original stays on record |
 | Quarterly | Four times a year, planning opens about 4 weeks before the quarter | Quarterly OKRs inside the annual frame | Scored and closed at the end of the quarter |
 
 The annual frame is reference material during a quarterly cycle. Phase 3 of a quarterly cycle revalidates it: it holds, or it changes with a documented reason. *Source:* Castro: company OKRs "are not set in stone"; whatmatters: "it's rare to adjust company-level OKRs … it may be necessary".
@@ -140,10 +140,10 @@ Guidance for people, not machine thresholds (§11).
 | When | Activity |
 |---|---|
 | 4 weeks before | Phase 1: light refresh of the input pack |
-| 2 weeks before | The ending quarter is graded and reviewed (§8). Phase 2: diagnosis with those scores |
+| 2 weeks before | The ending quarter is graded and reviewed. Phase 2: diagnosis with those scores |
 | 2 to 1 weeks before | Phase 3: revalidation. Phase 4: company OKRs drafted |
 | 1 week before | Phase 5: company OKRs aligned and published |
-| Weeks 1 to 2 of the quarter | Department and team OKRs drafted and published, the second publish step (§4.5) |
+| Weeks 1 to 2 of the quarter | Department and team OKRs drafted and published, the second publish step |
 
 *Source:* Wodtke: "Two weeks before the end of the quarter, it's time to grade your OKRs, and plan for the next cycle"; whatmatters' typical cycle.
 
@@ -768,14 +768,14 @@ A member marks their own leave, with a delegate. While they are away nobody nudg
 | Trend per objective | Improving, flat, declining |
 | Dependency and risk log | Status per dependency |
 | Resource or priority shifts | Free text |
-| Continue, update, start or stop | Each move recorded as §2.9 says |
+| Continue, update, start or stop | Each move recorded, with its reason where one is needed |
 | Decisions | A dated decision against the affected key result |
 
 The decision log is the artifact that survives the meeting. Every decision names the key result it affects. *Source:* re:Work: "it can be helpful to have a mid-quarter check-in"; Doerr's continue, update, start, stop.
 
 ### 7.6 Mid-cycle calibration
 
-A target may be changed at any time in the cycle, as §2.9 says. Making a target harder needs no reason. Easing one, toward its baseline, needs a written reason, and the original target stays on record. It got hard is not a reason, and changing a target only because it got hard empties the score of meaning.
+A target may be changed at any time in the cycle. Making a target harder needs no reason. Easing one, toward its baseline, needs a written reason, and the original target stays on record. It got hard is not a reason, and changing a target only because it got hard empties the score of meaning.
 
 ---
 
@@ -1120,7 +1120,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | OKR kinds | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
 | Key result kinds | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
 | Reviewer per goal | Off · Optional · Required | Optional | OpenOKR default |
-| Check enforcement | Each check: Block · Warn · Off | As §4 | §4 |
+| Check enforcement | Each check: Block · Warn · Off | As the method | §4 |
 | Strict mode | Off · On | Off | OpenOKR default |
 | Publish gate enforcement | Each gate: Block · Warn · Off | Gates 1 and 2 block, 3 to 5 warn, 6 off | §4.5 |
 | Gate override | An admin with a recorded reason | On | REQUIREMENTS §3.2 |
@@ -1135,7 +1135,7 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Sponsor in escalation ladders | Off · On | Off | OpenOKR default |
 | Peer step in the check-in ladder | Off · On | Off | OpenOKR default, from the OKRGoal UX review of October 2026 |
 | Quarterly review format | One session · Review and retrospective separately | One session | Workpath (vendor) |
-| Root causes at the review | As §8.4 · Optional | As §8.4 | OpenOKR default |
+| Root causes at the review | As the method · Optional | As the method | OpenOKR default |
 | Carry forward unfinished aspirational objectives | Proposed as Keep · Not proposed | Proposed | Google's OKR playbook |
 | Unhealthy KPI response | Offer the three responses · Draft a recovery OKR at once | Offer the three responses | Wodtke |
 

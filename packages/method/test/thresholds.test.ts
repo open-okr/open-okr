@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   canonThresholds,
@@ -23,6 +25,16 @@ import {
  * `pnpm method:check`. This one checks the registry's own invariants.
  */
 
+/** Every section number METHOD.md has a heading for: "2", "2.1", "11". */
+const SECTIONS = new Set(
+  [
+    ...readFileSync(
+      join(import.meta.dirname, "../../../docs/specification/METHOD.md"),
+      "utf8",
+    ).matchAll(/^#{2,4} (\d+(?:\.\d+)*)[. ]/gm),
+  ].map((match) => match[1]),
+);
+
 describe("the registry is complete and self-describing", () => {
   it("has parameters", () => {
     expect(THRESHOLD_KEYS.length).toBeGreaterThan(40);
@@ -34,7 +46,11 @@ describe("the registry is complete and self-describing", () => {
       expect(parameter.label, `${key} label`).toBeTruthy();
       // A parameter that cannot say which part of the canon it came from is a
       // number somebody invented, which is the thing §11 exists to prevent.
-      expect(parameter.section, `${key} section`).toMatch(/^§/);
+      // The number alone, because the API returns it and a reader never sees
+      // a section sign.
+      for (const section of parameter.section.split(", ")) {
+        expect(SECTIONS.has(section), `${key} section ${section}`).toBe(true);
+      }
       expect(parameter.why.length, `${key} why`).toBeGreaterThan(20);
       expect(parameter.default, `${key} default`).not.toBe(undefined);
     }

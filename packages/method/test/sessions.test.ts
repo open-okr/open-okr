@@ -52,7 +52,7 @@ describe("§7.5's monthly review", () => {
     ).toEqual(MONTHLY_REVIEW_ITEMS);
     expect(MONTHLY_REVIEW_ITEMS[3]).toEqual({
       item: "Continue, update, start or stop",
-      recordedAs: "Each move recorded as §2.9 says",
+      recordedAs: "Each move recorded, with its reason where one is needed",
     });
   });
 

@@ -68,6 +68,10 @@ test("an admin limits writing to the planning window from its card", async () =>
   await expect(
     page.getByRole("heading", { level: 1, name: "Practice" }),
   ).toBeVisible({ timeout: 15_000 });
+  // A setting is named in words. The section it comes from is the
+  // specification's business, not the reader's.
+  await expect(page.getByText("§")).toHaveCount(0);
+  await expect(page.getByText("As the method").first()).toBeAttached();
 
   const card = page.getByTestId("practice-card-writing");
   const who = card.getByLabel("Who may write OKRs, and when");

@@ -902,7 +902,7 @@
     "/workspace/setState": {
       "post": {
         "operationId": "workspace.setState",
-        "summary": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
+        "summary": "Set the workspace to active, read-only or frozen.",
         "tags": [
           "workspace"
         ],
@@ -19077,7 +19077,7 @@
     "/spaces/setHolidays": {
       "post": {
         "operationId": "spaces.setHolidays",
-        "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+        "summary": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break.",
         "tags": [
           "spaces"
         ],
@@ -19198,7 +19198,7 @@
     "/spaces/holidays": {
       "get": {
         "operationId": "spaces.holidays",
-        "summary": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+        "summary": "The spans a space marks as holidays, oldest first.",
         "tags": [
           "spaces"
         ],
@@ -19291,7 +19291,7 @@
     "/people/setLeave": {
       "post": {
         "operationId": "people.setLeave",
-        "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+        "summary": "Sets the signed-in member's own leave, each span with the delegate who stands in.",
         "tags": [
           "people"
         ],
@@ -19404,7 +19404,7 @@
     "/people/setMemberLeave": {
       "post": {
         "operationId": "people.setMemberLeave",
-        "summary": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+        "summary": "Sets another member's leave, each span with the delegate who stands in. For an administrator.",
         "tags": [
           "people"
         ],
@@ -19523,7 +19523,7 @@
     "/people/leave": {
       "get": {
         "operationId": "people.leave",
-        "summary": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+        "summary": "One member's leave, oldest first, with who stands in for each span.",
         "tags": [
           "people"
         ],
@@ -21698,7 +21698,7 @@
     "/cycles/feedForward": {
       "post": {
         "operationId": "cycles.feedForward",
-        "summary": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
+        "summary": "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
         "tags": [
           "cycles"
         ],
@@ -22919,7 +22919,7 @@
     "/rhythm/read": {
       "get": {
         "operationId": "rhythm.read",
-        "summary": "The METHOD.md §11 registry as this workspace resolves it, with its deviations and its terminology.",
+        "summary": "The practice thresholds as this workspace resolves them, with its deviations and its terminology.",
         "tags": [
           "rhythm"
         ],
@@ -23068,7 +23068,7 @@
     "/rhythm/update": {
       "post": {
         "operationId": "rhythm.update",
-        "summary": "Changes this workspace's deviations from the §11 canon, or its terminology.",
+        "summary": "Changes this workspace's deviations from the method's thresholds, or its terminology.",
         "tags": [
           "rhythm"
         ],
@@ -23207,7 +23207,7 @@
     "/practice/read": {
       "get": {
         "operationId": "practice.read",
-        "summary": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+        "summary": "The practice this workspace runs: its profile, its own changes and every setting resolved.",
         "tags": [
           "practice"
         ],
@@ -23545,7 +23545,7 @@
     "/practice/applyProfile": {
       "post": {
         "operationId": "practice.applyProfile",
-        "summary": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+        "summary": "Chooses one of the five practice profiles, with the thresholds it sets. This workspace's own changes are kept.",
         "tags": [
           "practice"
         ],
@@ -25138,7 +25138,7 @@
     "/workflow/setPackItem": {
       "post": {
         "operationId": "workflow.setPackItem",
-        "summary": "Marks one of the seven §2.6 input-pack items gathered, with a note.",
+        "summary": "Marks one of the seven input-pack items gathered, with a note.",
         "tags": [
           "workflow"
         ],
@@ -25252,7 +25252,7 @@
     "/workflow/distributePack": {
       "post": {
         "operationId": "workflow.distributePack",
-        "summary": "Records that the input pack reached people, which the §2.6 lead time is measured from.",
+        "summary": "Records that the input pack reached people, which the input pack's lead time is measured from.",
         "tags": [
           "workflow"
         ],
@@ -25779,7 +25779,7 @@
     "/workflow/setBaselineHealth": {
       "post": {
         "operationId": "workflow.setBaselineHealth",
-        "summary": "Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual.",
+        "summary": "Records phase 2's KPI reading in its three columns: stable, declining, business as usual.",
         "tags": [
           "workflow"
         ],
@@ -25880,7 +25880,7 @@
     "/workflow/setCapacityNotes": {
       "post": {
         "operationId": "workflow.setCapacityNotes",
-        "summary": "Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked).",
+        "summary": "Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked.",
         "tags": [
           "workflow"
         ],
@@ -25974,7 +25974,7 @@
     "/workflow/setFocusKeyResults": {
       "post": {
         "operationId": "workflow.setFocusKeyResults",
-        "summary": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+        "summary": "Chooses which of the year's key results a quarter focuses on.",
         "tags": [
           "workflow"
         ],
@@ -26375,7 +26375,7 @@
     "/documents/read": {
       "get": {
         "operationId": "documents.read",
-        "summary": "One document with its body and its version list. Drives screen S-29.",
+        "summary": "One document with its body and its version list.",
         "tags": [
           "documents"
         ],
@@ -27549,7 +27549,7 @@
     "/search/query": {
       "get": {
         "operationId": "search.query",
-        "summary": "Everything in this workspace matching a phrase that the caller may read. Drives screen S-32.",
+        "summary": "Everything in this workspace matching a phrase that the caller may read.",
         "tags": [
           "search"
         ],
@@ -27681,7 +27681,7 @@
     "/search/jump": {
       "get": {
         "operationId": "search.jump",
-        "summary": "The entity one short identifier means, for the palette's jump. Drives screen S-32.",
+        "summary": "The entity one short identifier means, for the palette's jump.",
         "tags": [
           "search"
         ],
@@ -27781,7 +27781,7 @@
     "/search/entities": {
       "get": {
         "operationId": "search.entities",
-        "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32.",
+        "summary": "The things of every kind whose name matches a phrase, that the caller may open. The palette's jump.",
         "tags": [
           "search"
         ],
@@ -29231,7 +29231,7 @@
     "/tasks/board": {
       "get": {
         "operationId": "tasks.board",
-        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
+        "summary": "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included.",
         "tags": [
           "tasks"
         ],
@@ -29823,7 +29823,7 @@
     "/tasks/read": {
       "get": {
         "operationId": "tasks.read",
-        "summary": "One task with its assignees and its checklist. Drives screen S-28.",
+        "summary": "One task with its assignees and its checklist.",
         "tags": [
           "tasks"
         ],
@@ -31282,7 +31282,7 @@
     "/initiatives/list": {
       "get": {
         "operationId": "initiatives.list",
-        "summary": "Initiatives in a space, or the ones serving one key result. Drives screen S-26.",
+        "summary": "Initiatives in a space, or the ones serving one key result.",
         "tags": [
           "initiatives"
         ],
@@ -32208,7 +32208,7 @@
     "/initiatives/linkKeyResult": {
       "post": {
         "operationId": "initiatives.linkKeyResult",
-        "summary": "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
+        "summary": "Records that this initiative is one of the ones that will move a key result.",
         "tags": [
           "initiatives"
         ],
@@ -32394,7 +32394,7 @@
     "/initiatives/capacity": {
       "get": {
         "operationId": "initiatives.capacity",
-        "summary": "One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5).",
+        "summary": "One cycle's capacity check: every key result's verdict and every initiative behind it.",
         "tags": [
           "initiatives"
         ],
@@ -34818,7 +34818,7 @@
     "/goals/stop": {
       "post": {
         "operationId": "goals.stop",
-        "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+        "summary": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason.",
         "tags": [
           "goals"
         ],
@@ -39012,7 +39012,7 @@
     "/goals/setKind": {
       "post": {
         "operationId": "goals.setKind",
-        "summary": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+        "summary": "Marks an objective committed or aspirational, recording the change and its reason in the objective's activity.",
         "tags": [
           "goals"
         ],
@@ -39618,7 +39618,7 @@
     "/goals/moveToSpace": {
       "post": {
         "operationId": "goals.moveToSpace",
-        "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+        "summary": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces.",
         "tags": [
           "goals"
         ],
@@ -40213,7 +40213,7 @@
     "/goals/publishDraft": {
       "post": {
         "operationId": "goals.publishDraft",
-        "summary": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+        "summary": "Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
         "tags": [
           "goals"
         ],
@@ -40806,7 +40806,7 @@
     "/goals/approveDraft": {
       "post": {
         "operationId": "goals.approveDraft",
-        "summary": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+        "summary": "Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts.",
         "tags": [
           "goals"
         ],
@@ -45326,7 +45326,7 @@
     "/goals/addKeyResultDependency": {
       "post": {
         "operationId": "goals.addKeyResultDependency",
-        "summary": "Records a key result's dependency on a providing team, for the register (METHOD.md §5.4).",
+        "summary": "Records a key result's dependency on a providing team, for the register.",
         "tags": [
           "goals"
         ],
@@ -46180,7 +46180,7 @@
     "/alignment/graph": {
       "get": {
         "operationId": "alignment.graph",
-        "summary": "The cascade as nodes and edges, for the alignment studio canvas (S-16).",
+        "summary": "The cascade as nodes and edges, for the alignment studio canvas.",
         "tags": [
           "alignment"
         ],
@@ -47089,7 +47089,7 @@
     "/kpis/grid": {
       "get": {
         "operationId": "kpis.grid",
-        "summary": "Every KPI with its recent periods, grouped by category. Drives screen S-20.",
+        "summary": "Every KPI with its recent periods, grouped by category.",
         "tags": [
           "kpis"
         ],
@@ -47440,7 +47440,7 @@
     "/kpis/list": {
       "get": {
         "operationId": "kpis.list",
-        "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+        "summary": "Every KPI by title, with its unit, state and achievement. Drives the measure picker on the draft and goal pages.",
         "tags": [
           "kpis"
         ],
@@ -47783,7 +47783,7 @@
     "/kpis/launchRecovery": {
       "post": {
         "operationId": "kpis.launchRecovery",
-        "summary": "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
+        "summary": "Creates a recovery objective from the leading drivers under an unhealthy KPI.",
         "tags": [
           "kpis"
         ],
@@ -48177,7 +48177,7 @@
     "/kpis/recoveryBoard": {
       "get": {
         "operationId": "kpis.recoveryBoard",
-        "summary": "Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19.",
+        "summary": "Every unhealthy or recovering KPI across every tree, with its recovery objective.",
         "tags": [
           "kpis"
         ],
@@ -48475,7 +48475,7 @@
     "/kpis/tree": {
       "get": {
         "operationId": "kpis.tree",
-        "summary": "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
+        "summary": "One driver tree as nodes with their corridor state and recovery progress.",
         "tags": [
           "kpis"
         ],
@@ -48957,7 +48957,7 @@
     "/kpis/detail": {
       "get": {
         "operationId": "kpis.detail",
-        "summary": "One KPI with its periods, its place in the tree and its formula. Drives screen S-21.",
+        "summary": "One KPI with its periods, its place in the tree and its formula.",
         "tags": [
           "kpis"
         ],
@@ -49873,7 +49873,7 @@
     "/review/inbox": {
       "get": {
         "operationId": "review.inbox",
-        "summary": "What this member owes right now, overdue first. Drives screen S-02 and the sidebar badge.",
+        "summary": "What this member owes right now, overdue first. Drives the review inbox and the sidebar badge.",
         "tags": [
           "review"
         ],
@@ -51160,7 +51160,7 @@
     "/nudges/rules": {
       "get": {
         "operationId": "nudges.rules",
-        "summary": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+        "summary": "Every proactive message rule with this workspace's configuration and its recent volume.",
         "tags": [
           "nudges"
         ],
@@ -51347,7 +51347,7 @@
     "/nudges/setRule": {
       "post": {
         "operationId": "nudges.setRule",
-        "summary": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+        "summary": "Enables, mutes, re-routes or exempts one proactive message rule.",
         "tags": [
           "nudges"
         ],
@@ -54277,7 +54277,7 @@
     "/sessions/setWins": {
       "post": {
         "operationId": "sessions.setWins",
-        "summary": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+        "summary": "Names the week's wins in a weekly session, for its digest.",
         "tags": [
           "sessions"
         ],
@@ -56518,7 +56518,7 @@
     "/sessions/digest": {
       "get": {
         "operationId": "sessions.digest",
-        "summary": "The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved.",
+        "summary": "The weekly digest for one session, assembled with no provider involved.",
         "tags": [
           "sessions"
         ],
@@ -56834,7 +56834,7 @@
     "/kpis/suggest": {
       "get": {
         "operationId": "kpis.suggest",
-        "summary": "Suggests a metric, its corridor and its formula from a sentence, with §6's parser checking the formula first.",
+        "summary": "Suggests a metric, its corridor and its formula from a sentence, with the KPI formula parser checking the formula first.",
         "tags": [
           "kpis"
         ],
@@ -57004,7 +57004,7 @@
     "/sessions/addMinute": {
       "post": {
         "operationId": "sessions.addMinute",
-        "summary": "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+        "summary": "Gives the running stage one more minute.",
         "tags": [
           "sessions"
         ],
@@ -57101,7 +57101,7 @@
     "/sessions/givePulse": {
       "post": {
         "operationId": "sessions.givePulse",
-        "summary": "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+        "summary": "Records one participant's pulse and their one word for the cycle.",
         "tags": [
           "sessions"
         ],
@@ -57202,7 +57202,7 @@
     "/sessions/scoreKeyResult": {
       "post": {
         "operationId": "sessions.scoreKeyResult",
-        "summary": "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+        "summary": "Grades one key result 0.0 to 1.0 with a one-line reason.",
         "tags": [
           "sessions"
         ],
@@ -57309,7 +57309,7 @@
     "/sessions/revealObjectiveScore": {
       "post": {
         "operationId": "sessions.revealObjectiveScore",
-        "summary": "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+        "summary": "Reveals one objective's score to the whole room in a single write.",
         "tags": [
           "sessions"
         ],
@@ -57408,7 +57408,7 @@
     "/sessions/passMic": {
       "post": {
         "operationId": "sessions.passMic",
-        "summary": "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+        "summary": "Hands the mic to one objective's owner, or puts it down.",
         "tags": [
           "sessions"
         ],
@@ -57534,7 +57534,7 @@
     "/sessions/setNarrative": {
       "post": {
         "operationId": "sessions.setNarrative",
-        "summary": "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+        "summary": "Writes what the number does not show for one objective.",
         "tags": [
           "sessions"
         ],
@@ -57790,7 +57790,7 @@
     "/sessions/giveKudos": {
       "post": {
         "operationId": "sessions.giveKudos",
-        "summary": "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+        "summary": "Names the effort that deserved to be seen.",
         "tags": [
           "sessions"
         ],
@@ -57891,7 +57891,7 @@
     "/sessions/recognition": {
       "get": {
         "operationId": "sessions.recognition",
-        "summary": "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+        "summary": "The quarterly review's recognition entries, oldest first.",
         "tags": [
           "sessions"
         ],
@@ -58022,7 +58022,7 @@
     "/sessions/addRetroNote": {
       "post": {
         "operationId": "sessions.addRetroNote",
-        "summary": "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+        "summary": "Writes one note into the team retro's worked or did-not column.",
         "tags": [
           "sessions"
         ],
@@ -58224,7 +58224,7 @@
     "/sessions/castRetroVote": {
       "post": {
         "operationId": "sessions.castRetroVote",
-        "summary": "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+        "summary": "Spends or withdraws one dot on a retro note.",
         "tags": [
           "sessions"
         ],
@@ -58487,7 +58487,7 @@
     "/sessions/setManagementAnswer": {
       "post": {
         "operationId": "sessions.setManagementAnswer",
-        "summary": "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+        "summary": "Records leadership's answer to one of the management retro's four questions.",
         "tags": [
           "sessions"
         ],
@@ -58587,7 +58587,7 @@
     "/sessions/managementRetro": {
       "get": {
         "operationId": "sessions.managementRetro",
-        "summary": "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+        "summary": "The management retro's four questions with what leadership answered.",
         "tags": [
           "sessions"
         ],
@@ -58717,7 +58717,7 @@
     "/sessions/setRootCause": {
       "post": {
         "operationId": "sessions.setRootCause",
-        "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+        "summary": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
         "tags": [
           "sessions"
         ],
@@ -58834,7 +58834,7 @@
     "/sessions/rootCauses": {
       "get": {
         "operationId": "sessions.rootCauses",
-        "summary": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
+        "summary": "Every key result this review graded below its root-cause threshold, with its causes.",
         "tags": [
           "sessions"
         ],
@@ -59025,7 +59025,7 @@
     "/sessions/submitProcessHealth": {
       "post": {
         "operationId": "sessions.submitProcessHealth",
-        "summary": "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+        "summary": "Scores the five process-health statements anonymously.",
         "tags": [
           "sessions"
         ],
@@ -59139,7 +59139,7 @@
     "/sessions/processHealth": {
       "get": {
         "operationId": "sessions.processHealth",
-        "summary": "§8.5's five statements with the room's averages, and the reader's own answers.",
+        "summary": "The five process-health statements with the room's averages, and the reader's own answers.",
         "tags": [
           "sessions"
         ],
@@ -59293,7 +59293,7 @@
     "/sessions/recordDiagnostic": {
       "post": {
         "operationId": "sessions.recordDiagnostic",
-        "summary": "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+        "summary": "Reads the closing diagnostic and stores what the room was told.",
         "tags": [
           "sessions"
         ],
@@ -59396,7 +59396,7 @@
     "/sessions/diagnostic": {
       "get": {
         "operationId": "sessions.diagnostic",
-        "summary": "§8.6's verdict for this review, stored or still unreadable.",
+        "summary": "The closing diagnostic's verdict for this review, stored or still unreadable.",
         "tags": [
           "sessions"
         ],
@@ -59679,7 +59679,7 @@
     "/sessions/narrateDiagnostic": {
       "get": {
         "operationId": "sessions.narrateDiagnostic",
-        "summary": "Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
+        "summary": "Narrates the closing diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
         "tags": [
           "sessions"
         ],
@@ -59961,7 +59961,7 @@
     "/sessions/decideObjective": {
       "post": {
         "operationId": "sessions.decideObjective",
-        "summary": "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+        "summary": "Closes one objective with a keep, modify or abandon decision and a one-line why.",
         "tags": [
           "sessions"
         ],
@@ -60243,7 +60243,7 @@
     "/sessions/captureLearning": {
       "post": {
         "operationId": "sessions.captureLearning",
-        "summary": "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+        "summary": "Records what the team now knows, optionally carried into the next cycle.",
         "tags": [
           "sessions"
         ],
@@ -60347,7 +60347,7 @@
     "/sessions/addAction": {
       "post": {
         "operationId": "sessions.addAction",
-        "summary": "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+        "summary": "Adds an action with an owner and a date.",
         "tags": [
           "sessions"
         ],
@@ -60788,7 +60788,7 @@
     "/sessions/minutes": {
       "get": {
         "operationId": "sessions.minutes",
-        "summary": "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+        "summary": "The review's minutes: the executive summary and every stage's record.",
         "tags": [
           "sessions"
         ],
@@ -61599,7 +61599,7 @@
     "/sessions/roomPulse": {
       "get": {
         "operationId": "sessions.roomPulse",
-        "summary": "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+        "summary": "The read of the room for the facilitator, and the caller's own pulse for everybody.",
         "tags": [
           "sessions"
         ],
@@ -61755,7 +61755,7 @@
     "/sessions/setStageNote": {
       "post": {
         "operationId": "sessions.setStageNote",
-        "summary": "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+        "summary": "Writes the facilitator's private note for the running stage.",
         "tags": [
           "sessions"
         ],
@@ -61853,7 +61853,7 @@
     "/sessions/setTrend": {
       "post": {
         "operationId": "sessions.setTrend",
-        "summary": "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+        "summary": "Records the room's trend for one objective in a monthly review.",
         "tags": [
           "sessions"
         ],
@@ -61957,7 +61957,7 @@
     "/sessions/setShifts": {
       "post": {
         "operationId": "sessions.setShifts",
-        "summary": "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+        "summary": "Records the resource or priority shifts noted in a monthly review.",
         "tags": [
           "sessions"
         ],
@@ -62051,7 +62051,7 @@
     "/sessions/recordDecision": {
       "post": {
         "operationId": "sessions.recordDecision",
-        "summary": "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+        "summary": "Records a decision against the key result or goal it affects.",
         "tags": [
           "sessions"
         ],
@@ -62161,7 +62161,7 @@
     "/sessions/monthlyRecord": {
       "get": {
         "operationId": "sessions.monthlyRecord",
-        "summary": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
+        "summary": "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
         "tags": [
           "sessions"
         ],
@@ -62592,7 +62592,7 @@
     "/decisions/forGoal": {
       "get": {
         "operationId": "decisions.forGoal",
-        "summary": "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+        "summary": "Decisions affecting one goal, newest first, for its page.",
         "tags": [
           "decisions"
         ],
@@ -62749,7 +62749,7 @@
     "/decisions/forCycle": {
       "get": {
         "operationId": "decisions.forCycle",
-        "summary": "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+        "summary": "Every decision recorded in one cycle, for the cycle workspace.",
         "tags": [
           "decisions"
         ],
