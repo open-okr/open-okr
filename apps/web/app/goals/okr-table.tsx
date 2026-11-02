@@ -106,10 +106,10 @@ const KEY_RESULT_GRID = "md:grid-cols-[minmax(0,1fr)_140px_160px_76px_64px]";
  * between them on a wide screen and wrapped without dots on a phone. A part
  * that renders nothing leaves an empty wrapper, which is hidden and earns no
  * dot; the phone-only health chip earns none either. Its fields read as text
- * until they are used (`okr-text-first` in globals.css).
+ * until they are used (`data-text-first` in globals.css).
  */
 const META = [
-  "okr-text-first flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ink-3",
+  "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-ink-3",
   "[&>*:empty]:hidden md:gap-x-0",
   "md:[&>*:not(:empty):not([data-phone-only])~*:not(:empty)]:before:mx-[7px]",
   "md:[&>*:not(:empty):not([data-phone-only])~*:not(:empty)]:before:text-ink-4",
@@ -750,7 +750,7 @@ function ObjectiveRow({
           maxLength={500}
           readOnly={!canEdit}
           bold
-          textClass="okr-title-objective text-[14.5px] leading-snug font-bold tracking-[-0.1px]"
+          textClass="text-[14.5px] leading-snug font-bold tracking-[-0.1px]"
           onDraft={cells.onDraft}
           onSave={cells.saveTitle}
         />
@@ -783,10 +783,14 @@ function ObjectiveRow({
           />
         </div>
 
-        <div className={`col-start-2 ${META}`}>
+        <div data-text-first className={`col-start-2 ${META}`}>
           {/* On a phone the health chip leads the meta line instead. */}
           <span className="md:hidden" data-phone-only>
-            <HealthChip health={goal.health} reported={goal.reportedStatus} />
+            <HealthChip
+              health={goal.health}
+              reported={goal.reportedStatus}
+              testId="health-chip-phone"
+            />
           </span>
           <span>
             <KindControl
@@ -941,8 +945,10 @@ function KeyResultRow({
         className={`group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
         {...moverHandlers(mover)}
       >
-        <div className="col-start-1 row-start-1 grid min-w-0 grid-cols-1 gap-x-2 md:col-start-auto md:row-start-auto md:grid-cols-[1.5rem_minmax(0,1fr)]">
-          <span className="hidden h-5 items-center justify-center md:flex">
+        {/* Flex rather than grid: the row is the nearest grid, which is how
+            a row is found from its title. */}
+        <div className="col-start-1 row-start-1 flex min-w-0 gap-x-2 md:col-start-auto md:row-start-auto">
+          <span className="hidden h-5 w-6 flex-none items-center justify-center md:flex">
             {mover ? <Grip id={keyResult.id} mover={mover} /> : null}
           </span>
           <div className="flex min-w-0 flex-col gap-0.5">
@@ -952,12 +958,12 @@ function KeyResultRow({
               wrap
               maxLength={500}
               readOnly={!canEdit}
-              textClass="okr-title-key-result text-[13px] leading-snug font-medium"
+              textClass="text-[13px] leading-snug font-medium"
               onDraft={cells.onDraft}
               onSave={(title) => patch({ title }, { title: keyResult.title })}
             />
             <VerdictChips verdicts={cells.verdicts} />
-            <div className={`text-[11.5px] ${META}`}>
+            <div data-text-first className={`text-[11.5px] ${META}`}>
               <span>
                 <KeyResultKindPicker
                   kind={keyResult.kind}
@@ -1026,7 +1032,10 @@ function KeyResultRow({
           ) : keyResult.kind === "baseline" ? (
             // §2.10: a baseline is recorded by its first value, which then
             // reads as the value it found.
-            <span className="okr-text-first flex flex-col gap-0.5 text-[13px] font-semibold tabular-nums">
+            <span
+              data-text-first
+              className="flex flex-col gap-0.5 text-[13px] font-semibold tabular-nums"
+            >
               <span className="text-[11px] font-medium text-ink-4">
                 {keyResult.doneAt === null
                   ? t("keyResultKind.recordBaseline")
@@ -1044,7 +1053,10 @@ function KeyResultRow({
               />
             </span>
           ) : (
-            <div className="okr-text-first flex flex-wrap items-baseline gap-x-1.5 tabular-nums md:flex-col md:gap-0.5">
+            <div
+              data-text-first
+              className="flex flex-wrap items-baseline gap-x-1.5 tabular-nums md:flex-col md:gap-0.5"
+            >
               <span className="flex items-baseline gap-1 text-[13px] font-semibold text-ink">
                 <InlineNumber
                   value={keyResult.currentValue}
@@ -1375,7 +1387,9 @@ function RowActions({
                 <Menu.Item
                   className={item}
                   aria-label={stop.label}
-                  onClick={() => setStopping(true)}
+                  // After the menu has closed, which hands the focus back to
+                  // its trigger and would take it from the reason field.
+                  onClick={() => window.setTimeout(() => setStopping(true), 50)}
                 >
                   {t("okrList.stopThisObjective")}
                 </Menu.Item>

@@ -54,6 +54,14 @@ let saved: { starts_on: string; ends_on: string; published_at: Date | null };
 const authed = () => ({ authorization: `Bearer ${token}` });
 const main = () => page.locator("#main-content");
 const today = () => new Date().toISOString().slice(0, 10);
+/** Today as the list writes a day since the Goals revamp: "2 Nov 2026". */
+const todayLabel = () =>
+  new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${today()}T00:00:00Z`));
 
 async function post<T>(action: string, data: unknown): Promise<T> {
   const response = await api.post(`/api/v1/${action.replace(".", "/")}`, {
@@ -176,7 +184,7 @@ test("NW-Q2-13: the list asks why before an addition saves, and marks it", async
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]");
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(row.getByTestId("added-mid-cycle")).toHaveText(
-    `Added mid-cycle, ${today()}`,
+    `Added mid-cycle, ${todayLabel()}`,
   );
   const listed = (await (
     await api.get("/api/v1/goals/list", { headers: authed() })
@@ -234,7 +242,7 @@ test("acceptance: the review shows an objective added in week five as added mid-
     timeout: 15_000,
   });
   await expect(page.getByTestId("added-mid-cycle")).toHaveText(
-    `Added mid-cycle, ${today()}`,
+    `Added mid-cycle, ${todayLabel()}`,
   );
 });
 

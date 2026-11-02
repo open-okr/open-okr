@@ -496,7 +496,7 @@ describe("the other cells", () => {
     await act(async () => {
       container
         .querySelector<HTMLButtonElement>(
-          'button[aria-label="Due date for Activation from 30% to 45%"]',
+          'button[aria-label^="Due date for Activation from 30% to 45%"]',
         )
         ?.click();
     });

@@ -69,7 +69,9 @@ export function GoalsToolbar({
             >
               <path d="M3 5h18l-7 8v6l-4-2v-4z" />
             </svg>
-            {t("goals.filter.label")}
+            {/* The count is a badge beside the word, not part of a sentence a
+             * translator would order, so the two are separate elements. */}
+            <span>{t("goals.filter.label")}</span>
             {activeCount > 0 ? (
               <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-brand px-1.25 text-[10.5px] font-bold text-on-brand">
                 <span className="sr-only">, </span>

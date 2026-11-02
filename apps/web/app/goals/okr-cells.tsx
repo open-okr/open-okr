@@ -159,6 +159,8 @@ export function InlineText({
     return (
       <TextArea
         ref={area}
+        // Keeps its size at rest on a phone (globals.css, tokens.css).
+        data-text-first=""
         value={draft}
         label={label}
         hideLabel
@@ -388,7 +390,9 @@ export function InlineDate({
       <span className="inline-flex items-baseline gap-1">
         <button
           type="button"
-          aria-label={label}
+          // The visible day is part of the name, so what is read out and
+          // what is seen agree (WCAG 2.5.3).
+          aria-label={`${label}, ${shown}`}
           onClick={() => setOpen(true)}
           className="cursor-pointer rounded-[5px] border-b border-dotted border-ink-4/70 px-1 text-xs tabular-nums text-ink-2 hover:border-solid hover:border-ink-3 hover:bg-raised hover:text-ink focus-visible:outline-2 focus-visible:outline-brand"
         >
