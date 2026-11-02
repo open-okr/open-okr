@@ -417,17 +417,9 @@ export const PRACTICE = {
     },
     default: "xIn10",
   }),
-  "scoring.enabled": setting({
-    label: "Scoring",
-    group: "scoring",
-    summary:
-      "Whether key results are scored at the close of the cycle, from their progress against the key result as written.",
-    section: "3.3",
-    source: "Lamorte; Castro",
-    options: ON_OFF,
-    optionLabels: ON_OFF_LABELS,
-    default: "on",
-  }),
+  // "Scoring", on or off, was removed in November 2026. METHOD.md never said
+  // what off did and nothing read it, so a workspace that chose off had
+  // changed nothing. A stored value is dropped on read like any unknown key.
   "scoring.adjustment": setting({
     label: "Score adjustment at close",
     group: "scoring",
