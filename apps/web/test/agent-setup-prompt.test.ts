@@ -4,8 +4,9 @@ import {
   isAgentPromptDismissed,
 } from "../lib/agent-prompt-dismissal.ts";
 import {
-  AGENT_PROMPT_AGENTS,
-  agentSetupPrompt,
+  agentSetupLine,
+  agentSetupMarkdown,
+  agentSetupUrl,
 } from "../lib/agent-setup-prompt.ts";
 
 /**
@@ -13,69 +14,85 @@ import {
  * (docs/design/agent-setup-prompt.md §1, §2, §3).
  */
 
+const origin = "https://okr.example";
 const endpoint = "https://okr.example/api/mcp";
+const setupUrl = "https://okr.example/agent-setup/prompt.md";
 const token = "okr_mcp_abc123";
 
-describe("the OAuth setup prompt", () => {
-  const prompt = agentSetupPrompt({ endpoint });
+describe("the line a member pastes (§9.1)", () => {
+  it("builds the address of the instructions from the instance's origin", () => {
+    expect(agentSetupUrl(origin)).toBe(setupUrl);
+    expect(agentSetupUrl(`${origin}/`)).toBe(setupUrl);
+  });
 
-  it("gives every supported agent a step with this instance's address", () => {
-    expect(prompt).toContain(
-      `claude mcp add --transport http openokr ${endpoint}`,
+  it("is one line naming the instance and the instructions", () => {
+    expect(agentSetupLine({ instanceName: "Northwind OKR", setupUrl })).toBe(
+      `Fetch and execute the appropriate instructions to set me up for Northwind OKR from ${setupUrl}`,
     );
-    expect(prompt).toContain(`codex mcp add openokr --url ${endpoint}`);
-    expect(prompt).toContain("codex mcp login openokr");
-    expect(prompt).toContain("~/.cursor/mcp.json");
-    expect(prompt).toContain(`"url": "${endpoint}"`);
-    expect(prompt).toContain(`url: "${endpoint}"`);
-    expect(prompt).toContain("auth: oauth");
-    expect(prompt).not.toContain("Gemini");
-    expect(prompt).toContain("Developer mode");
-    for (const agent of AGENT_PROMPT_AGENTS) {
-      expect(prompt).toContain(agent.name);
-    }
   });
 
-  it("carries no token and no authorization header", () => {
-    expect(prompt).not.toContain("Bearer");
-    expect(prompt).not.toContain("Authorization");
-  });
-
-  it("asks the agent to prove the connection with a core read", () => {
-    expect(prompt).toContain("workspace.overview");
+  it("carries a minted token on a second line, and only then", () => {
+    const line = agentSetupLine({ instanceName: "OpenOKR", setupUrl, token });
+    const [first, second] = line.split("\n");
+    expect(first).toContain(setupUrl);
+    expect(second).toContain(`: ${token}`);
+    expect(second).toContain("treat it as a password");
+    expect(agentSetupLine({ instanceName: "OpenOKR", setupUrl })).not.toContain(
+      "token",
+    );
   });
 });
 
-describe("the token setup prompt", () => {
-  const prompt = agentSetupPrompt({ endpoint, token });
-
-  it("puts the token in a header for each agent that takes one", () => {
-    expect(prompt).toContain(
-      `claude mcp add --transport http openokr ${endpoint} --header "Authorization: Bearer ${token}"`,
-    );
-    expect(prompt).toContain(`Authorization: "Bearer ${token}"`);
-    expect(prompt).toContain(
-      `http_headers = { "Authorization" = "Bearer ${token}" }`,
-    );
-    expect(prompt).toContain(`"Authorization": "Bearer ${token}"`);
+describe("the instructions the agent fetches (§9.2)", () => {
+  const markdown = agentSetupMarkdown({
+    instanceName: "Northwind OKR",
+    origin,
+    endpoint,
   });
 
-  it("tells Codex to keep its plain-text config out of a repository", () => {
-    expect(prompt).toContain("~/.codex/config.toml");
-    expect(prompt).not.toContain("codex mcp login");
-  });
-
-  it("says ChatGPT takes OAuth only, and never puts the token in its step", () => {
-    expect(prompt).toContain("ChatGPT connectors accept OAuth only");
-    const chatGpt = prompt.slice(
-      prompt.indexOf("ChatGPT"),
-      prompt.indexOf("When the connection works"),
+  it("opens by naming the instance and asking the agent to do the work", () => {
+    expect(markdown).toContain(
+      `Northwind OKR, an OpenOKR instance at ${origin}`,
     );
-    expect(chatGpt).not.toContain(token);
+    expect(markdown).toContain("Complete the steps for your agent yourself");
   });
 
-  it("never asks for an OAuth sign-in", () => {
-    expect(prompt).not.toContain("auth: oauth");
+  it("gives every agent a step with this instance's endpoint", () => {
+    for (const heading of [
+      "### Claude Code",
+      "### Codex",
+      "### Cursor",
+      "### GitHub Copilot (VS Code)",
+      "### OpenCode",
+      "### Windsurf",
+      "### Hermes Agent",
+      "### ChatGPT",
+    ]) {
+      expect(markdown).toContain(heading);
+    }
+    expect(markdown).toContain(
+      `claude mcp add --transport http openokr ${endpoint}`,
+    );
+    expect(markdown).toContain(`codex mcp add openokr --url ${endpoint}`);
+    expect(markdown).toContain("codex mcp login openokr");
+    expect(markdown).toContain('"servers"');
+    expect(markdown).toContain('"type": "http"');
+    expect(markdown).toContain('"type": "remote"');
+    expect(markdown).toContain("opencode mcp auth openokr");
+    expect(markdown).toContain(`"serverUrl": "${endpoint}"`);
+    expect(markdown).toContain("auth: oauth");
+  });
+
+  it("explains the token variant without holding a token", () => {
+    expect(markdown).toContain("Bearer <token>");
+    expect(markdown).not.toMatch(/Bearer (?!<token>)/);
+  });
+
+  it("asks for proof, closes with a box, and covers an agent that cannot fetch", () => {
+    expect(markdown).toContain("workspace.overview");
+    expect(markdown).toContain("Northwind OKR Agent Setup Complete");
+    expect(markdown).toContain(`${origin}/account/api-tokens`);
+    expect(markdown).toContain(`${origin}/agent-setup/prompt.md`);
   });
 });
 

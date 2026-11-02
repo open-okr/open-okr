@@ -9,7 +9,7 @@ import {
 } from "../lib/agent-prompt-dismissal.ts";
 import {
   AGENT_PROMPT_AGENTS,
-  agentSetupPrompt,
+  agentSetupLine,
 } from "../lib/agent-setup-prompt.ts";
 import { useInstanceName } from "../lib/instance-name-context";
 import { AgentMark } from "./agent-marks.tsx";
@@ -39,11 +39,11 @@ const storage = (): Storage | null => {
 };
 
 export function AgentSetupPill({
-  endpoint,
+  setupUrl,
   sessionId,
 }: {
-  /** The agent endpoint every grant is checked against. */
-  readonly endpoint: string;
+  /** Where this instance serves the agent's setup instructions. */
+  readonly setupUrl: string;
   /** The login session's row id, never its token. */
   readonly sessionId: string;
 }) {
@@ -68,7 +68,7 @@ export function AgentSetupPill({
     >
       <span className="group inline-flex items-center">
         <CopyButton
-          text={agentSetupPrompt({ endpoint })}
+          text={agentSetupLine({ instanceName, setupUrl })}
           title={t("home.agentPrompt.tooltip")}
           className="h-11 cursor-pointer gap-3 rounded-full border-line bg-surface px-5 text-base font-medium text-ink shadow-none hover:translate-y-0 hover:border-line-2 hover:shadow-none"
         >

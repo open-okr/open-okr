@@ -8,7 +8,9 @@
  *   Given a member closed the pill, when they reload in the same login
  *   session, then it is not shown; when they sign out and in again, it is.
  *   Given a member mints an agent token, when they click the copy button in
- *   the answer, then the clipboard holds the prompt with that token in it.
+ *   the answer, then the clipboard holds the line with that token in it.
+ *   Given no session, when the instructions the line names are fetched, then
+ *   they answer 200 as Markdown and hold no token (§9).
  *
  * A spec because the claim is about the browser: the clipboard, the storage
  * the dismissal lives in, and a real sign-out. What the prompt says is proved
@@ -47,11 +49,28 @@ test("the Work Map pill copies the OAuth prompt", async () => {
     .click();
   await expect(pill().getByRole("status")).toHaveText("Copied");
 
+  // §9.1: one line, the way Cloudflare's agent setup reads.
   const prompt = await clipboard();
-  expect(prompt).toContain("/api/mcp");
-  expect(prompt).toContain("claude mcp add --transport http openokr");
-  expect(prompt).toContain("auth: oauth");
-  expect(prompt).not.toContain("Bearer");
+  expect(prompt).toMatch(
+    /^Fetch and execute the appropriate instructions to set me up for .+ from https?:\/\/\S+\/agent-setup\/prompt\.md$/,
+  );
+});
+
+test("the instructions it names answer without a session", async ({
+  browser,
+}) => {
+  // §9.2: the agent fetching them has no cookie, so a fresh context.
+  const prompt = await clipboard();
+  const address = prompt.slice(prompt.lastIndexOf(" ") + 1);
+  const anonymous = await browser.newContext();
+  const response = await anonymous.request.get(address, { maxRedirects: 0 });
+  expect(response.status()).toBe(200);
+  expect(response.headers()["content-type"]).toContain("text/markdown");
+  const body = await response.text();
+  expect(body).toContain("/api/mcp");
+  expect(body).toContain("claude mcp add --transport http openokr");
+  expect(body).not.toMatch(/Bearer (?!<token>)/);
+  await anonymous.close();
 });
 
 test("closing it holds for the login session", async () => {
@@ -82,8 +101,8 @@ test("the tokens screen copies the OAuth prompt", async () => {
     .getByRole("button", { name: "Copy setup prompt", exact: true })
     .click();
   const prompt = await clipboard();
-  expect(prompt).toContain("/api/mcp");
-  expect(prompt).not.toContain("Bearer");
+  expect(prompt).toContain("/agent-setup/prompt.md");
+  expect(prompt).not.toContain("token");
 });
 
 test("a minted agent token comes with a prompt that carries it", async () => {
@@ -98,8 +117,8 @@ test("a minted agent token comes with a prompt that carries it", async () => {
     .getByRole("button", { name: "Copy setup prompt with this token" })
     .click();
   const prompt = await clipboard();
-  expect(prompt).toContain(`Authorization: Bearer ${token}`);
-  expect(prompt).toContain("ChatGPT connectors accept OAuth only");
+  expect(prompt).toContain("/agent-setup/prompt.md");
+  expect(prompt).toContain(`: ${token}`);
 });
 
 test("a REST token gets no setup prompt", async () => {

@@ -83,6 +83,12 @@ describe("proxy", () => {
     }
   });
 
+  it("leaves the agent setup instructions reachable, because the agent has no session", () => {
+    // docs/design/agent-setup-prompt.md §9.2.
+    const response = proxy(request("/agent-setup/prompt.md"));
+    expect(response.headers.get("location")).toBeNull();
+  });
+
   it("protects everything else", () => {
     for (const path of ["/", "/account/security", "/goals", "/api/goals"]) {
       const response = proxy(request(path));
