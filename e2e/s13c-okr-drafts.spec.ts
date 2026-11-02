@@ -266,7 +266,9 @@ test("the topbar's + New opens the new objective where the reader can write", as
     data: { overrides: { "writing.when": null } },
   });
   await goTo(page, "/");
-  await page.getByRole("link", { name: "New objective" }).first().click();
+  // A menu of what the reader may create since 2 November 2026.
+  await page.getByRole("button", { name: "Create something new" }).click();
+  await page.getByRole("menuitem", { name: "Objective" }).click();
   await expect(page).toHaveURL(/\/goals\?new=objective/);
   await expect(
     main().getByRole("textbox", { name: "New objective" }),

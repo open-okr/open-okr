@@ -173,6 +173,10 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // A line made only of holes: the workspace's own word for its key
   // results and how many there are. Nothing to translate.
   "okrList.keyResultsBand",
+  // The workspace's own word for the thing, and nothing else.
+  "newMenu.kpi",
+  "newMenu.objective",
+  "newMenu.space",
   // "Group: value", two holes and a colon. Nothing to translate.
   "goals.filter.chip",
   // A line made only of holes and a slash: the workspace's own words for
