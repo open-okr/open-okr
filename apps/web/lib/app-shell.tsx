@@ -35,6 +35,7 @@ import {
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
+import { AppFooter } from "./app-footer.tsx";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
 import { brandingImageUrl } from "./branding-image.ts";
@@ -42,6 +43,7 @@ import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
 import { loadInboxBadge } from "./inbox-badge.ts";
+import { getInstanceName } from "./instance-name";
 import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
@@ -53,7 +55,6 @@ import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
-import { VersionFooter } from "./version-footer.tsx";
 import { requireWorkspace } from "./workspace.ts";
 import {
   workspaceBrandImages,
@@ -511,7 +512,11 @@ export async function AppShellLayout({
               its last line. */}
           <div className="flex min-h-full flex-col">
             <div className="flex-1">{children}</div>
-            <VersionFooter level={level} />
+            <AppFooter
+              level={level}
+              instanceName={await getInstanceName()}
+              askAvailable={copilot.available}
+            />
           </div>
         </AppShell>
         {/*

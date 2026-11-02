@@ -255,6 +255,8 @@ const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set([
   "lib.supportBanner.supportIsHere",
   // What the software speaks, whatever the instance is called.
   "admin.sso.connectAnIdentityProvider",
+  // The footer's credit to the software the instance runs.
+  "shell.footer.builtOn",
 ]);
 
 describe("the instance's name is not written into the catalogue (M-33)", () => {
