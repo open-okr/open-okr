@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   brandingImageProblem,
   brandingImageUrl,
+  tabIcons,
 } from "../lib/branding-image.ts";
 
 /**
@@ -54,5 +55,22 @@ describe("a stored branding image", () => {
   it("is drawn from its thumbnail, which every member can read", () => {
     expect(brandingImageUrl("0b0b-id")).toBe("/api/blobs/0b0b-id/thumbnail");
     expect(brandingImageUrl(null)).toBeNull();
+  });
+});
+
+describe("the tab icons a page links", () => {
+  it("are the product's two icons when the workspace has no favicon", () => {
+    expect(tabIcons(null)).toEqual([
+      { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+      { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+    ]);
+  });
+
+  // A browser prefers a link that names its size, so the product's 48-pixel
+  // icon beside the workspace's would win the tab (found 2 November 2026).
+  it("are the workspace's favicon alone when it has one", () => {
+    expect(tabIcons("/api/blobs/b/thumbnail")).toEqual([
+      { url: "/api/blobs/b/thumbnail" },
+    ]);
   });
 });

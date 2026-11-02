@@ -118,6 +118,9 @@ test("a saved favicon is the tab icon on signed-in screens", async () => {
   await expect(page.locator("link[rel='icon'][href*='/api/blobs/']")).toHaveCount(
     1,
   );
+  // The only icon linked: a browser picks the product's sized icon over it
+  // when both are there, and the tab never changes.
+  await expect(page.locator("link[rel~='icon']")).toHaveCount(1);
 });
 
 test("a removed logo gives the sidebar its initials back", async () => {

@@ -45,3 +45,24 @@ export function brandingImageProblem(
 export function brandingImageUrl(blobId: string | null): string | null {
   return blobId ? `/api/blobs/${blobId}/thumbnail` : null;
 }
+
+/**
+ * The icons a page links, and only those.
+ *
+ * **One source, so the workspace's icon is the only one.** Next.js links
+ * `app/favicon.ico` on every page whatever the metadata says, and a browser
+ * prefers that link because it names a size, so the workspace's favicon never
+ * reached the tab. The product's two icons now sit in `public/` at the same
+ * addresses and are linked from here when the workspace has none.
+ */
+export function tabIcons(
+  favicon: string | null,
+): { readonly url: string; readonly sizes?: string; readonly type?: string }[] {
+  if (favicon) {
+    return [{ url: favicon }];
+  }
+  return [
+    { url: "/favicon.ico", sizes: "48x48", type: "image/x-icon" },
+    { url: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+  ];
+}

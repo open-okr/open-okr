@@ -12,7 +12,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
-import { brandingImageUrl } from "../lib/branding-image";
+import { brandingImageUrl, tabIcons } from "../lib/branding-image";
 import { BrowserTimezoneCookie } from "../lib/browser-timezone-cookie";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
@@ -34,14 +34,14 @@ import "./globals.css";
 export async function generateMetadata(): Promise<Metadata> {
   // The workspace's own tab icon on signed-in screens
   // (docs/design/workspace-logo-favicon.md §4). Signed out there is no
-  // workspace, the read answers null, and `app/icon.svg` stays in force.
+  // workspace, the read answers null, and the product's icons stay in force.
   const favicon = brandingImageUrl(
     (await workspaceBrandImages()).faviconBlobId,
   );
   return {
     title: await getInstanceName(),
     description: "Your OKR coach, built in. Open source, AI-native.",
-    ...(favicon ? { icons: { icon: favicon } } : {}),
+    icons: { icon: tabIcons(favicon) },
   };
 }
 

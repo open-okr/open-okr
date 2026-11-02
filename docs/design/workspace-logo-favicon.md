@@ -74,7 +74,7 @@ colour only.
 |---|---|
 | Sidebar header tile (today "AW") | The logo, `object-contain`, in the same 32 px square. No logo: initials |
 | Workspace switcher | The switcher's brandmark is the sidebar tile above, so it shows the active workspace's logo. The list of other workspaces is a native `<select>`, which cannot hold an image, so it keeps names only |
-| Browser tab, signed-in screens | The favicon, through `generateMetadata` `icons` in the root layout. The sign-in page keeps the product icon |
+| Browser tab, signed-in screens | The favicon, through `generateMetadata` `icons` in the root layout, and **the only icon linked**. A browser prefers a link that names its size, so the product's `favicon.ico` beside it would win the tab. The product's two icons therefore live in `apps/web/public/` at the same addresses rather than in `app/`, where Next.js links `favicon.ico` on every page whatever the metadata says, and the layout links them only when the workspace has no favicon (`tabIcons` in `apps/web/lib/branding-image.ts`). The sign-in page keeps the product icon |
 
 ## 5. Settings map
 
