@@ -129,6 +129,9 @@ export async function addKpi(
   const frequency = String(formData.get("frequency") ?? "monthly");
   const target = numberField(formData, "targetDefault");
   const unit = String(formData.get("unit") ?? "").trim();
+  // The category the panel was opened for, or the one chosen in it. Blank is
+  // none, which the grid draws as its own group.
+  const categoryId = String(formData.get("categoryId") ?? "").trim();
   if (title === "") {
     const { t } = await getTranslations();
     return { error: t("kpis.actions.kpiNeedsATitle") };
@@ -151,6 +154,7 @@ export async function addKpi(
       ...ownerAndTier(formData),
       ...(target === null ? {} : { targetDefault: target }),
       ...(unit === "" ? {} : { unit }),
+      ...(categoryId === "" ? {} : { categoryId }),
     }),
   );
 }

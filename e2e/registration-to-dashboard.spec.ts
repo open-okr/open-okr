@@ -951,13 +951,13 @@ test("the review action opens the composer for that goal", async () => {
  */
 test("a KPI recorded below the corridor reaches the recovery board", async () => {
   await page.goto("/kpis");
-  await page.getByLabel("What is being measured").fill("Operating margin");
-  await page.getByLabel("Standing target").fill("100");
-  await page
-    .getByRole("main")
-    .getByRole("button", { name: "Add", exact: true })
-    .first()
-    .click();
+  // The form opens from its button, as a side panel (KPI redesign).
+  await page.getByRole("link", { name: "New KPI", exact: true }).click();
+  const panel = page.getByTestId("kpi-kpi-panel");
+  await panel.getByLabel("What is being measured").fill("Operating margin");
+  await panel.getByLabel("Standing target").fill("100");
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel).toHaveCount(0);
 
   // The period the cell belongs to is the workspace's own answer, so the
   // locator matches on the KPI rather than on a date this spec would have to
@@ -1059,6 +1059,9 @@ test("the grid carries its subtotals, sparklines and filters", async () => {
 
   // One value so far, so no line is drawn and the row says why.
   await expect(page.getByTestId("sparkline-too-short").first()).toBeVisible();
+
+  // The filters sit in a panel behind the Filter button (KPI redesign).
+  await page.getByRole("button", { name: "Filter" }).click();
 
   /*
    * The filters are links, so a combination survives a reload and can be sent

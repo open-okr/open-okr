@@ -398,7 +398,7 @@ export async function AppShellLayout({
                         key: "kpi",
                         label: t("newMenu.kpi"),
                         icon: iconFor("kpis"),
-                        href: "/kpis#title",
+                        href: "/kpis?new=kpi",
                         screens: ["/kpis"],
                       },
                       {

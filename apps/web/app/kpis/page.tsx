@@ -1,52 +1,57 @@
 import { ACCESS_LEVELS, callAction, RHYTHM_ASSIST_KEYS } from "@openokr/core";
 import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
+  buttonVariants,
   EntityPicker,
+  Kbd,
   NumberInput,
   SelectInput,
   TextInput,
   UnitInput,
 } from "@openokr/ui";
+import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
 import { searchHumans } from "../../lib/member-search.ts";
-import { KPI_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
-import { ActionForm } from "../cycle/action-form.tsx";
+import { GoalsToolbar } from "../goals/goals-toolbar.tsx";
 import { addCategory, addKpi } from "./actions.ts";
 import { KpiGrid } from "./grid.tsx";
-import { CategorySubtotal, FilterRow, RowSparkline } from "./grid-extras.tsx";
+import { CategorySubtotal } from "./grid-extras.tsx";
 import { JudgedBy } from "./judged-by.tsx";
+import { kpiCount } from "./kpi-count.ts";
+import { KpiPanel } from "./kpi-panel.tsx";
 import { KpiSuggestion } from "./kpi-suggestion.tsx";
+import { KpiTabs } from "./kpi-tabs.tsx";
 
 /**
- * The KPI grid (UIUX-PLAN.md §4 S-20, P3-T12).
+ * The KPI grid (UIUX-PLAN.md §4 S-20, P3-T12, redesigned 2 November 2026).
  *
  * The data is server-rendered and the entry is client-owned, which is the split
  * §13.3 asks for: a grid is an interactive surface, and the periods behind it are
  * a read.
  *
- * Three of S-20's features are not here and each says why below rather than being
- * quietly absent: sparklines in the row header, the filters, and the calculated
- * cell's formula chip.
+ * The layout follows the Goals list: one card holding the title, the tally and
+ * the two buttons, then the tabs with the Filter button; the grid under it.
+ * New KPI and New category open from their buttons (`?new=kpi`,
+ * `?new=category`) instead of standing open under the grid. **The forms ask
+ * for exactly what they asked for before**, every field with every option,
+ * plus the category, which the read already had and the form never asked.
  */
 
 /** The category filter's value for the KPIs that have no category. */
 const UNCATEGORISED = "none";
 
+const FILTER_KEYS = ["frequency", "state", "owner", "category"] as const;
+
 export default async function KpisPage({
   searchParams,
 }: {
   /**
-   * The filters, in the url (P6-G30).
+   * The filters, in the url (P6-G30), and the form the address opens.
    *
    * **The explorer's own pattern**: a combination survives a reload and can be
    * sent to somebody, which local state loses on both counts.
@@ -56,6 +61,10 @@ export default async function KpisPage({
     owner?: string;
     category?: string;
     state?: string;
+    /** `kpi` or `category`: which form is open. */
+    new?: string;
+    /** The category the New KPI panel was opened for. */
+    in?: string;
   }>;
 }) {
   const { t } = await getTranslations();
@@ -97,10 +106,12 @@ export default async function KpisPage({
   // KPI a workspace has, the read already returns them all, and a filter that
   // went to the database would make the category subtotals answer for the
   // filtered set while the categories themselves came from the whole one.
-  const filters = await searchParams;
-  const query: Record<string, string> = Object.fromEntries(
-    Object.entries(filters).filter(([, value]) => value !== undefined),
-  ) as Record<string, string>;
+  const params = await searchParams;
+  const filters = Object.fromEntries(
+    FILTER_KEYS.flatMap((key) =>
+      params[key] === undefined ? [] : [[key, params[key] as string]],
+    ),
+  ) as Partial<Record<(typeof FILTER_KEYS)[number], string>>;
   const shown = grid.kpis.filter(
     (kpi) =>
       (!filters.frequency || kpi.frequency === filters.frequency) &&
@@ -109,6 +120,26 @@ export default async function KpisPage({
         (kpi.categoryId ?? UNCATEGORISED) === filters.category) &&
       (!filters.state || kpi.state === filters.state),
   );
+
+  /** The grid's address with one filter changed, the form closed. */
+  const href = (patch: Record<string, string | null>): string => {
+    const next = new URLSearchParams(filters);
+    for (const [key, value] of Object.entries(patch)) {
+      if (value === null) {
+        next.delete(key);
+      } else {
+        next.set(key, value);
+      }
+    }
+    const text = next.toString();
+    return text === "" ? "/kpis" : `/kpis?${text}`;
+  };
+  /** The grid's address with a form open, the filters kept. */
+  const opening = (which: "kpi" | "category"): string => {
+    const next = new URLSearchParams(filters);
+    next.set("new", which);
+    return `/kpis?${next.toString()}`;
+  };
 
   const frequencies = [
     ...new Set(grid.kpis.map((kpi) => kpi.frequency)),
@@ -121,6 +152,10 @@ export default async function KpisPage({
         .map((kpi) => [kpi.ownerId as string, kpi.ownerName as string]),
     ).entries(),
   ].sort((left, right) => left[1].localeCompare(right[1]));
+  const categoryChoices = grid.categories.map((one) => ({
+    value: one.id ?? UNCATEGORISED,
+    label: one.name,
+  }));
   // Today in the workspace calendar, resolved on the server. The grid needs it to
   // draw a column for the current period, and the browser clock is the wrong one.
   const settings = await callAction(context, "settings.readForMember", {});
@@ -128,290 +163,432 @@ export default async function KpisPage({
     timeZone: String(settings.settings.timezone ?? "UTC"),
   }).format(new Date());
 
+  // The filters in force, each as the chip that takes it away.
+  const named = (
+    choices: readonly { value: string; label: string }[],
+    value: string,
+  ) => choices.find((one) => one.value === value)?.label ?? value;
+  const chip = (group: string, value: string) =>
+    t("goals.filter.chip", { group, value });
+  const active = [
+    filters.frequency
+      ? {
+          key: "frequency",
+          label: chip(t("common.frequency"), filters.frequency),
+        }
+      : null,
+    filters.state
+      ? {
+          key: "state",
+          label: chip(
+            t("operator.workspaces.columnState"),
+            filters.state.replace("_", " "),
+          ),
+        }
+      : null,
+    filters.owner
+      ? {
+          key: "owner",
+          label: chip(
+            t("common.owner"),
+            named(
+              owners.map(([value, label]) => ({ value, label })),
+              filters.owner,
+            ),
+          ),
+        }
+      : null,
+    filters.category
+      ? {
+          key: "category",
+          label: chip(
+            t("kpis.category"),
+            named(categoryChoices, filters.category),
+          ),
+        }
+      : null,
+  ].filter((one) => one !== null);
+
+  const panel = (
+    <>
+      <PanelRow label={t("common.frequency")}>
+        <Pill
+          href={href({ frequency: null })}
+          on={!filters.frequency}
+          testId="filter-frequency-all"
+        >
+          {t("goals.all")}
+        </Pill>
+        {frequencies.map((one) => (
+          <Pill
+            key={one}
+            href={href({ frequency: one })}
+            on={filters.frequency === one}
+            testId={`filter-frequency-${one}`}
+          >
+            {one}
+          </Pill>
+        ))}
+      </PanelRow>
+      <PanelRow label={t("operator.workspaces.columnState")}>
+        <Pill
+          href={href({ state: null })}
+          on={!filters.state}
+          testId="filter-state-all"
+        >
+          {t("goals.all")}
+        </Pill>
+        {states.map((one) => (
+          <Pill
+            key={one}
+            href={href({ state: one })}
+            on={filters.state === one}
+            testId={`filter-state-${one}`}
+          >
+            {one.replace("_", " ")}
+          </Pill>
+        ))}
+      </PanelRow>
+      {owners.length > 0 ? (
+        <PanelRow label={t("common.owner")}>
+          <Pill
+            href={href({ owner: null })}
+            on={!filters.owner}
+            testId="filter-owner-all"
+          >
+            {t("goals.all")}
+          </Pill>
+          {owners.map(([id, name]) => (
+            <Pill
+              key={id}
+              href={href({ owner: id })}
+              on={filters.owner === id}
+              testId={`filter-owner-${id}`}
+            >
+              {name}
+            </Pill>
+          ))}
+        </PanelRow>
+      ) : null}
+      {categoryChoices.length > 0 ? (
+        <PanelRow label={t("kpis.category")}>
+          <Pill
+            href={href({ category: null })}
+            on={!filters.category}
+            testId="filter-category-all"
+          >
+            {t("goals.all")}
+          </Pill>
+          {/* The KPIs with no category are a choice of their own, not the
+           * empty value, which is "All". */}
+          {categoryChoices.map((one) => (
+            <Pill
+              key={one.value}
+              href={href({ category: one.value })}
+              on={filters.category === one.value}
+              testId={`filter-category-${one.value}`}
+            >
+              {one.label}
+            </Pill>
+          ))}
+        </PanelRow>
+      ) : null}
+    </>
+  );
+
+  const chips =
+    active.length === 0
+      ? null
+      : active.map((one) => (
+          <a
+            key={one.key}
+            href={href({ [one.key]: null })}
+            aria-label={t("goals.filter.removeOne", { filter: one.label })}
+            className="inline-flex h-6.5 items-center gap-1.5 rounded-full bg-brand-weak pr-1 pl-2.5 text-xs font-semibold text-brand-text hover:bg-brand-line"
+          >
+            {one.label}
+            <svg viewBox="0 0 10 10" aria-hidden="true" className="size-2.5">
+              <path
+                d="m2 2 6 6M8 2 2 8"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
+          </a>
+        ));
+
+  const recoveryCount = grid.kpis.filter(
+    (kpi) => kpi.state === "unhealthy" || kpi.recovering,
+  ).length;
+  const chosenCategory =
+    params.in && grid.categories.some((one) => one.id === params.in)
+      ? params.in
+      : "";
+
   return (
     <>
       <AreaTabs area="goals" current="/kpis" t={t} />
       <div className="flex w-full flex-col gap-3.5">
-        <SectionTabs items={KPI_TABS} active="/kpis" />
-        <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+        <section className="rounded-xl border border-line bg-surface">
+          <div className="flex flex-wrap items-start gap-3 border-b border-line px-4 py-3.5 max-md:px-3 max-md:py-3">
+            <div className="flex min-w-0 flex-col gap-1">
               <h1 className="text-lg font-bold text-ink">
                 {t("common.count")}
               </h1>
-              <p className="text-xs text-ink-3">
-                {grid.kpis.length === 0
-                  ? t("kpis.nothingMeasuredYet")
-                  : grid.kpis.length === 1
-                    ? t("kpis.measuresOne", { count: grid.kpis.length })
-                    : t("kpis.measuresOther", { count: grid.kpis.length })}
-              </p>
+              {grid.kpis.length === 0 ? (
+                <p className="text-xs text-ink-3">
+                  {t("kpis.nothingMeasuredYet")}
+                </p>
+              ) : (
+                <CategorySubtotal
+                  states={shown.map((kpi) => kpi.state)}
+                  recovering={shown.filter((kpi) => kpi.recovering).length}
+                  count={kpiCount(t, shown.length)}
+                  testId="kpi-summary"
+                />
+              )}
             </div>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-2.5">
-            {/* S-20's filter row, at last (P6-G30). */}
-            <FilterRow
-              label={t("common.frequency")}
-              param="frequency"
-              active={filters.frequency ?? ""}
-              query={query}
-              choices={frequencies.map((one) => ({ value: one, label: one }))}
-            />
-            <FilterRow
-              label={t("operator.workspaces.columnState")}
-              param="state"
-              active={filters.state ?? ""}
-              query={query}
-              choices={states.map((one) => ({
-                value: one,
-                label: one.replace("_", " "),
-              }))}
-            />
-            {owners.length > 0 ? (
-              <FilterRow
-                label={t("common.owner")}
-                param="owner"
-                active={filters.owner ?? ""}
-                query={query}
-                choices={owners.map(([id, name]) => ({
-                  value: id,
-                  label: name,
-                }))}
-              />
-            ) : null}
-            {grid.categories.length > 0 ? (
-              <FilterRow
-                label={t("kpis.category")}
-                param="category"
-                active={filters.category ?? ""}
-                query={query}
-                // The KPIs with no category are a choice of their own, not
-                // the empty value, which is "All" (and was its React key too).
-                choices={grid.categories.map((one) => ({
-                  value: one.id ?? UNCATEGORISED,
-                  label: one.name,
-                }))}
-              />
-            ) : null}
-          </CardBody>
-          <CardBody className="p-0">
-            <KpiGrid
-              categories={grid.categories}
-              kpis={shown}
-              canEdit={canEdit}
-              today={today}
-            />
-          </CardBody>
-        </Card>
-
-        {/*
-         * What each category adds up to, and what each row has been doing
-         * (P6-G30). Beside the grid rather than inside it: the grid is a
-         * scrolling table of periods and these are answers about the rows.
-         */}
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h2 className="text-sm font-bold text-ink">
-                {t("kpis.byCategory")}
-              </h2>
-              <p className="text-xs text-ink-3">{t("kpis.aTallyOf")}</p>
-            </div>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {/*
-             * `kpis.grid` already returns an entry with a null id for the
-             * uncategorised ones, so adding a second here drew the section
-             * twice. Caught by an end-to-end snapshot rather than by reading
-             * the read's own contract, which is the cheaper way round.
-             */}
-            {grid.categories.map((category) => {
-              const inCategory = shown.filter(
-                (kpi) => (kpi.categoryId ?? null) === category.id,
-              );
-              if (inCategory.length === 0) {
-                return null;
-              }
-              return (
-                <div
-                  key={category.id ?? "none"}
-                  className="flex flex-col gap-1.5"
+            {canEdit ? (
+              <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full">
+                <a
+                  href={opening("category")}
+                  className={buttonVariants({ size: "sm" })}
                 >
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <span className="text-sm font-semibold text-ink">
-                      {category.name}
-                    </span>
-                    <CategorySubtotal
-                      states={inCategory.map((kpi) => kpi.state)}
-                      recovering={
-                        inCategory.filter((kpi) => kpi.recovering).length
-                      }
-                    />
-                  </div>
-                  <ul className="flex flex-col gap-1">
-                    {inCategory.map((kpi) => (
-                      <li
-                        key={kpi.id}
-                        className="flex flex-wrap items-center justify-between gap-2"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <span className="text-xs text-ink-2">
-                            {kpi.title}
-                          </span>
-                          {kpi.isCalculated ? (
-                            <Chip tone="info">
-                              {kpi.formula ?? t("kpis.grid.calculated")}
-                            </Chip>
-                          ) : null}
-                        </span>
-                        <RowSparkline records={kpi.records} />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-          </CardBody>
-        </Card>
-
-        {canEdit ? (
-          <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
-            <Card className="flex-1">
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">
+                  {t("kpis.newCategory")}
+                </a>
+                <a
+                  href={opening("kpi")}
+                  className={`${buttonVariants({ variant: "primary", size: "sm" })} max-md:flex-1 max-md:justify-center`}
+                >
                   {t("kpis.addAKpi")}
-                </h2>
-              </CardHeader>
-              <CardBody>
-                <ActionForm action={addKpi} className="flex flex-col gap-2">
-                  <TextInput
-                    id="title"
-                    label={t("kpis.whatIsBeingMeasured")}
-                    name="title"
-                    required
-                    maxLength={500}
-                    placeholder={t("kpis.mobileActivationRate")}
-                    inputClassName="placeholder:text-ink-4"
-                  />
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <SelectInput
-                      id="frequency"
-                      label={t("common.frequency")}
-                      name="frequency"
-                      defaultValue="monthly"
-                      className="flex-row items-center gap-2.5"
-                      inputClassName="h-6.5 w-auto text-xs text-ink-2"
-                    >
-                      <option value="daily">{t("common.daily")}</option>
-                      <option value="weekly">{t("common.weekly")}</option>
-                      <option value="monthly">{t("common.monthly")}</option>
-                      <option value="quarterly">{t("common.quarterly")}</option>
-                      <option value="yearly">{t("common.yearly")}</option>
-                    </SelectInput>
-                  </div>
-                  {/* guided-inputs §4.8: the target as a number, and the unit
-                    it is measured in, which the form did not ask for. */}
-                  <div className="flex flex-wrap items-end gap-2.5">
-                    <NumberInput
-                      id="targetDefault"
-                      label={t("common.standingTarget")}
-                      name="targetDefault"
-                      inputClassName="h-auto w-24 py-1 text-xs"
-                    />
-                    <UnitInput
-                      id="kpi-unit"
-                      label={t("kpis.unit")}
-                      name="unit"
-                      known={grid.kpis.flatMap((kpi) =>
-                        kpi.unit ? [kpi.unit] : [],
-                      )}
-                      inputClassName="h-auto w-28 py-1 text-xs"
-                    />
-                  </div>
-                  <JudgedBy idPrefix="add" />
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <EntityPicker
-                      id="ownerMemberId"
-                      label={t("kpis.rule.owner")}
-                      name="ownerMemberId"
-                      required
-                      defaultValue={workspace.memberId}
-                      options={people.map((person) =>
-                        memberOption(person, t("common.agent")),
-                      )}
-                      search={searchHumans}
-                      className="w-56"
-                      inputClassName="text-xs"
-                    />
-                    <SelectInput
-                      id="tier"
-                      label={t("kpis.rule.tier")}
-                      name="tier"
-                      defaultValue=""
-                      className="flex-row items-center gap-2.5"
-                      inputClassName="h-6.5 w-auto text-xs text-ink-2"
-                    >
-                      <option value="">{t("kpis.rule.noTier")}</option>
-                      <option value="input">{t("kpis.rule.tierInput")}</option>
-                      <option value="output">
-                        {t("kpis.rule.tierOutput")}
-                      </option>
-                      <option value="outcome">
-                        {t("kpis.rule.tierOutcome")}
-                      </option>
-                      <option value="impact">
-                        {t("kpis.rule.tierImpact")}
-                      </option>
-                    </SelectInput>
-                  </div>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    className="self-start"
-                  >
-                    {t("common.add")}
-                  </Button>
-                  <p className="text-xs text-ink-4">
-                    {t("kpis.theCorridorDefaultsTo")}
-                  </p>
-                </ActionForm>
-                {suggestionOffered ? <KpiSuggestion /> : null}
-              </CardBody>
-            </Card>
-
-            <Card className="w-full lg:w-72">
-              <CardHeader>
-                <h2 className="text-sm font-bold text-ink">
-                  {t("kpis.addACategory")}
-                </h2>
-              </CardHeader>
-              <CardBody>
-                <ActionForm
-                  action={addCategory}
-                  className="flex flex-col gap-2"
-                >
-                  <TextInput
-                    id="name"
-                    label={t("kpis.categoryName")}
-                    hideLabel
-                    name="name"
-                    required
-                    maxLength={120}
-                    placeholder={t("kpis.revenue")}
-                    inputClassName="placeholder:text-ink-4"
-                  />
-                  <Button type="submit" className="self-start">
-                    {t("common.add")}
-                  </Button>
-                  <p className="text-xs text-ink-4">
-                    {t("kpis.categoriesAreHowThe")}
-                  </p>
-                </ActionForm>
-              </CardBody>
-            </Card>
+                </a>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+          <GoalsToolbar
+            tabs={
+              <KpiTabs
+                active="/kpis"
+                label={t("kpis.tabs")}
+                t={t}
+                counts={{
+                  "/kpis": grid.kpis.length,
+                  "/kpis/recovery": recoveryCount,
+                }}
+              />
+            }
+            panel={panel}
+            chips={chips}
+            clearAll={
+              active.length === 0 ? null : (
+                <a
+                  href="/kpis"
+                  className="px-1.5 text-[12.5px] font-semibold text-brand-text hover:underline"
+                >
+                  {t("goals.filter.clearAll")}
+                </a>
+              )
+            }
+            activeCount={active.length}
+            trailing={
+              canEdit ? (
+                <span className="inline-flex items-center gap-1.5 text-[11.5px] text-ink-4 max-md:hidden">
+                  <Kbd>{t("common.enter")}</Kbd>
+                  <span>{t("kpis.grid.keysEnter")}</span>
+                  <Kbd>←</Kbd>
+                  <Kbd>→</Kbd>
+                  <span>{t("kpis.grid.keysMove")}</span>
+                </span>
+              ) : null
+            }
+          />
+        </section>
+
+        <KpiGrid
+          categories={grid.categories}
+          kpis={shown}
+          canEdit={canEdit}
+          today={today}
+          addHref={opening("kpi")}
+        />
       </div>
+
+      {canEdit ? (
+        <>
+          <KpiPanel
+            which="kpi"
+            title={t("kpis.addAKpi")}
+            submitLabel={t("common.add")}
+            action={addKpi}
+            after={suggestionOffered ? <KpiSuggestion /> : null}
+          >
+            <TextInput
+              id="title"
+              label={t("kpis.whatIsBeingMeasured")}
+              name="title"
+              required
+              maxLength={500}
+              placeholder={t("kpis.mobileActivationRate")}
+              inputClassName="placeholder:text-ink-4"
+            />
+            {grid.categories.some((one) => one.id !== null) ? (
+              <SelectInput
+                // Keyed by the category it was opened for, so a second
+                // "Add a KPI to …" preselects its own.
+                key={chosenCategory}
+                id="categoryId"
+                label={t("kpis.category")}
+                name="categoryId"
+                defaultValue={chosenCategory}
+              >
+                <option value="">{t("kpis.noCategory")}</option>
+                {grid.categories.flatMap((one) =>
+                  one.id === null
+                    ? []
+                    : [
+                        <option key={one.id} value={one.id}>
+                          {one.name}
+                        </option>,
+                      ],
+                )}
+              </SelectInput>
+            ) : null}
+            <div className="grid grid-cols-2 gap-2.5">
+              <SelectInput
+                id="frequency"
+                label={t("common.frequency")}
+                name="frequency"
+                defaultValue="monthly"
+              >
+                <option value="daily">{t("common.daily")}</option>
+                <option value="weekly">{t("common.weekly")}</option>
+                <option value="monthly">{t("common.monthly")}</option>
+                <option value="quarterly">{t("common.quarterly")}</option>
+                <option value="yearly">{t("common.yearly")}</option>
+              </SelectInput>
+              {/* guided-inputs §4.8: the unit the target is measured in. */}
+              <UnitInput
+                id="kpi-unit"
+                label={t("kpis.unit")}
+                name="unit"
+                known={grid.kpis.flatMap((kpi) => (kpi.unit ? [kpi.unit] : []))}
+              />
+            </div>
+            <NumberInput
+              id="targetDefault"
+              label={t("common.standingTarget")}
+              name="targetDefault"
+            />
+            <JudgedBy idPrefix="add" />
+            <div className="grid grid-cols-2 gap-2.5">
+              <EntityPicker
+                id="ownerMemberId"
+                label={t("kpis.rule.owner")}
+                name="ownerMemberId"
+                required
+                defaultValue={workspace.memberId}
+                options={people.map((person) =>
+                  memberOption(person, t("common.agent")),
+                )}
+                search={searchHumans}
+              />
+              <SelectInput
+                id="tier"
+                label={t("kpis.rule.tier")}
+                name="tier"
+                defaultValue=""
+              >
+                <option value="">{t("kpis.rule.noTier")}</option>
+                <option value="input">{t("kpis.rule.tierInput")}</option>
+                <option value="output">{t("kpis.rule.tierOutput")}</option>
+                <option value="outcome">{t("kpis.rule.tierOutcome")}</option>
+                <option value="impact">{t("kpis.rule.tierImpact")}</option>
+              </SelectInput>
+            </div>
+            <p className="text-xs text-ink-4">
+              {t("kpis.theCorridorDefaultsTo")}
+            </p>
+          </KpiPanel>
+
+          <KpiPanel
+            which="category"
+            variant="dialog"
+            title={t("kpis.newCategory")}
+            submitLabel={t("common.add")}
+            action={addCategory}
+          >
+            <TextInput
+              id="name"
+              label={t("kpis.categoryName")}
+              name="name"
+              required
+              maxLength={120}
+              placeholder={t("kpis.revenue")}
+              inputClassName="placeholder:text-ink-4"
+            />
+            <p className="text-xs text-ink-3">
+              {t("kpis.categoriesAreHowThe")}
+            </p>
+          </KpiPanel>
+        </>
+      ) : null}
     </>
+  );
+}
+
+const PANEL_LABEL = "text-xs font-semibold text-ink-3 max-md:mt-1.5";
+
+/** One question of the filter panel: its name, then its options. */
+function PanelRow({
+  label,
+  children,
+}: {
+  readonly label: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <>
+      <span aria-hidden="true" className={PANEL_LABEL}>
+        {label}
+      </span>
+      <fieldset
+        aria-label={label}
+        className="flex min-w-0 flex-wrap items-center gap-1.5"
+      >
+        {children}
+      </fieldset>
+    </>
+  );
+}
+
+/**
+ * One option of the panel, a link to the grid with it chosen. Links, not a
+ * form, so a combination survives a reload and can be sent to somebody.
+ */
+function Pill({
+  href,
+  on,
+  testId,
+  children,
+}: {
+  readonly href: string;
+  readonly on: boolean;
+  readonly testId: string;
+  readonly children: ReactNode;
+}) {
+  return (
+    <a
+      href={href}
+      aria-current={on ? "true" : undefined}
+      data-testid={testId}
+      className={`inline-flex h-6.5 items-center rounded-full border px-2.5 text-xs whitespace-nowrap ${
+        on
+          ? "border-brand bg-brand-weak font-semibold text-brand-text"
+          : "border-line-2 bg-surface font-medium text-ink-2 hover:border-ink-4"
+      }`}
+    >
+      {children}
+    </a>
   );
 }

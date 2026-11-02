@@ -66,13 +66,13 @@ const progressOfTheObjective = () =>
 test("a KPI with a standing target and a first reading", async () => {
   await signIn(page);
   await goTo(page, "/kpis");
-  await page.getByLabel("What is being measured").fill(KPI);
-  await page.getByLabel("Standing target").fill("200");
-  await page
-    .getByRole("main")
-    .getByRole("button", { name: "Add", exact: true })
-    .first()
-    .click();
+  // The form opens from its button, as a side panel (KPI redesign).
+  await page.getByRole("link", { name: "New KPI", exact: true }).click();
+  const panel = page.getByTestId("kpi-kpi-panel");
+  await panel.getByLabel("What is being measured").fill(KPI);
+  await panel.getByLabel("Standing target").fill("200");
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel).toHaveCount(0);
 
   // 50 of 200.
   await recordOnTheGrid("50", "25%");

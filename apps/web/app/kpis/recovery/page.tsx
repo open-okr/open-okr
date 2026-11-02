@@ -13,14 +13,16 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../../lib/access";
+import { AreaTabs } from "../../../lib/area-tabs.tsx";
 import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../../lib/entity-options.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
-import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
+import { GoalsToolbar } from "../../goals/goals-toolbar.tsx";
+import { KpiTabs, kpiTabCounts } from "../kpi-tabs.tsx";
 import {
   answerKpiWithKeyResult,
   fixKpiNow,
@@ -64,6 +66,56 @@ const BAND_WORD: Readonly<Record<string, string>> = {
   healthy: "kpis.recovery.stateHealthy",
   no_data: "kpis.recovery.stateNoData",
 };
+
+/**
+ * Where a KPI stands against its corridor (§6.4): the track coloured below
+ * watch, between watch and healthy, and above healthy, with a mark at its
+ * achievement and the two lines named under it (KPI redesign, 2 November
+ * 2026). The plain bar said how full it was and not how far from healthy.
+ *
+ * The track runs to §6.4's 200, as the bar did since P8-G04, so a KPI at 180
+ * and one at exactly 100 still sit apart.
+ */
+function Corridor({
+  achievementPct,
+  watchPct,
+  healthyPct,
+  label,
+}: {
+  readonly achievementPct: number | null;
+  readonly watchPct: number;
+  readonly healthyPct: number;
+  readonly label: string;
+}) {
+  const at = (value: number) =>
+    `${Math.min(Math.max(value, 0), KPI_ACHIEVEMENT_MAX) / (KPI_ACHIEVEMENT_MAX / 100)}%`;
+  return (
+    <div role="img" aria-label={label} className="relative h-6">
+      <div
+        className="absolute inset-x-0 top-2 h-1.5 rounded-full"
+        style={{
+          background: `linear-gradient(to right, var(--color-bad-bg) 0 ${at(watchPct)}, var(--color-warn-bg) ${at(watchPct)} ${at(healthyPct)}, var(--color-ok-bg) ${at(healthyPct)} 100%)`,
+        }}
+      />
+      {achievementPct === null ? null : (
+        <span
+          className="absolute top-0.5 h-4.5 w-0.5 -translate-x-1/2 rounded-full bg-ink"
+          style={{ left: at(achievementPct) }}
+        />
+      )}
+      {[watchPct, healthyPct].map((line) => (
+        <span
+          key={line}
+          aria-hidden="true"
+          className="absolute top-4 -translate-x-1/2 text-[10px] text-ink-4 tabular-nums"
+          style={{ left: at(line) }}
+        >
+          {Math.round(line)}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 type Translate = (key: string, values?: MessageValues) => string;
 
@@ -165,15 +217,15 @@ export default async function RecoveryBoardPage() {
       ).goals
     : [];
 
+  const counts = await kpiTabCounts(context);
+
   return (
-    <div className="flex w-full flex-col gap-3.5">
-      <SectionTabs items={KPI_TABS} active="/kpis/recovery" />
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("kpis.recovery.recoveryBoard")}
-            </h1>
+    <>
+      <AreaTabs area="goals" current="/kpis" t={t} />
+      <div className="flex w-full flex-col gap-3.5">
+        <section className="rounded-xl border border-line bg-surface">
+          <div className="flex min-w-0 flex-col gap-1 border-b border-line px-4 py-3.5 max-md:px-3 max-md:py-3">
+            <h1 className="text-lg font-bold text-ink">{t("common.count")}</h1>
             <p className="text-xs text-ink-3">
               {board.cards.length === 0
                 ? t("kpis.recovery.allKpisHealthy")
@@ -186,234 +238,196 @@ export default async function RecoveryBoardPage() {
                     })}
             </p>
           </div>
-        </CardHeader>
-      </Card>
+          <GoalsToolbar
+            tabs={
+              <KpiTabs
+                active="/kpis/recovery"
+                label={t("kpis.tabs")}
+                t={t}
+                counts={counts}
+              />
+            }
+            panel={null}
+            chips={null}
+            clearAll={null}
+            activeCount={0}
+          />
+        </section>
 
-      {board.cards.length === 0 ? (
-        <Card>
-          <CardBody>
-            <p className="text-sm text-ink-2">
-              {t("kpis.recovery.allKpisHealthy")}
-            </p>
-            <p className="mt-1 text-xs text-ink-4">
-              {t("kpis.recovery.aKpiJoinsThis")}
-            </p>
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {board.cards.map((card) => (
-        // The anchor a proposed recovery in the review inbox links to, so the
-        // other two responses are one click from it (§6.5, P9-T18b).
-        <Card key={card.kpiId} id={`kpi-${card.kpiId}`}>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
-              <div className="flex items-center gap-2">
-                <h2 className="truncate text-sm font-bold text-ink">
-                  {card.title}
-                </h2>
-                <Chip tone={stateTone(card.state)} dot>
-                  {t(BAND_WORD[card.state] ?? "kpis.recovery.stateUnhealthy")}
-                </Chip>
-                {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
-                {card.recovering ? (
-                  <Chip tone="info">{t("kpis.recovery.stateRecovering")}</Chip>
-                ) : null}
-              </div>
-              <p className="text-xs text-ink-3">
-                {card.treeName ?? t("kpis.recovery.noTreeYet")}
+        {board.cards.length === 0 ? (
+          <Card>
+            <CardBody>
+              <p className="text-sm text-ink-2">
+                {t("kpis.recovery.allKpisHealthy")}
               </p>
-            </div>
-            <div className="flex flex-none flex-col items-end">
-              <span className="text-sm font-bold text-ink tabular-nums">
-                {percent(card.achievementPct, t)}
-              </span>
-              <span className="text-xs text-ink-4">
-                {t("common.healthyAt", {
-                  healthyPct: Math.round(card.healthyPct),
-                })}
-              </span>
-            </div>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-2">
-            {/* §6.4 measures achievement 0 to 200, and this drew it on a
+              <p className="mt-1 text-xs text-ink-4">
+                {t("kpis.recovery.aKpiJoinsThis")}
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
+        {board.cards.map((card) => (
+          // The anchor a proposed recovery in the review inbox links to, so the
+          // other two responses are one click from it (§6.5, P9-T18b).
+          <Card key={card.kpiId} id={`kpi-${card.kpiId}`}>
+            <CardHeader className="justify-between">
+              <div className="flex min-w-0 flex-col">
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-sm font-bold text-ink">
+                    {card.title}
+                  </h2>
+                  <Chip tone={stateTone(card.state)} dot>
+                    {t(BAND_WORD[card.state] ?? "kpis.recovery.stateUnhealthy")}
+                  </Chip>
+                  {/* Beside the band, never instead of it (§6.4, P9-T17b-a). */}
+                  {card.recovering ? (
+                    <Chip tone="info">
+                      {t("kpis.recovery.stateRecovering")}
+                    </Chip>
+                  ) : null}
+                </div>
+                <p className="text-xs text-ink-3">
+                  {card.treeName ?? t("kpis.recovery.noTreeYet")}
+                </p>
+              </div>
+              <div className="flex flex-none flex-col items-end">
+                <span className="text-sm font-bold text-ink tabular-nums">
+                  {percent(card.achievementPct, t)}
+                </span>
+                <span className="text-xs text-ink-4">
+                  {t("common.healthyAt", {
+                    healthyPct: Math.round(card.healthyPct),
+                  })}
+                </span>
+              </div>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-2">
+              {/* §6.4 measures achievement 0 to 200, and this drew it on a
                 0-to-100 track, so a KPI at 180 and one at exactly 100 filled
                 the same bar (P8-G04). */}
-            <Bar value={card.achievementPct ?? 0} max={KPI_ACHIEVEMENT_MAX} />
+              <Corridor
+                achievementPct={card.achievementPct}
+                watchPct={card.watchPct}
+                healthyPct={card.healthyPct}
+                label={t("kpis.recovery.corridorLabel", {
+                  achievement: percent(card.achievementPct, t),
+                  watch: Math.round(card.watchPct),
+                  healthy: Math.round(card.healthyPct),
+                })}
+              />
 
-            {card.recovery ? (
-              <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Link
-                    href={`/goals/${card.recovery.goalId}`}
-                    className="truncate text-sm font-semibold text-brand-text hover:underline"
-                  >
-                    {card.recovery.title}
-                  </Link>
-                  <span className="flex-none text-xs text-ink-3 tabular-nums">
-                    {Math.round(card.recovery.progressPct)}%
-                  </span>
-                </div>
-                <Bar value={card.recovery.progressPct} max={ceiling} />
-                <p className="text-xs text-ink-3">
-                  {recoverySummary(card.recovery, t)}
-                </p>
-                {card.recovery.closeProposed && !card.recovery.closed ? (
-                  <p className="text-xs font-semibold text-ok">
-                    {t("kpis.recovery.theRealNumberIs")}
-                  </p>
-                ) : null}
-              </div>
-            ) : card.response?.open ? (
-              <div
-                data-testid="kpi-response"
-                className="flex flex-col gap-1 rounded-md border border-line p-2.5"
-              >
-                <p className="text-xs font-semibold text-ink-3">
-                  {card.response.kind === "fix_now"
-                    ? t("kpis.recovery.respond.beingFixed")
-                    : t("kpis.recovery.respond.answeredByKeyResult")}
-                </p>
-                {card.response.subjectId === null ? (
-                  <p className="text-xs text-ink-4">
-                    {t("kpis.recovery.respond.notYoursToOpen")}
-                  </p>
-                ) : card.response.kind === "fix_now" ? (
-                  <p className="text-sm text-ink">
+              {card.recovery ? (
+                <div className="flex flex-col gap-1.5 rounded-md border border-line p-2.5">
+                  <div className="flex items-center justify-between gap-2">
                     <Link
-                      href={`/tasks/${card.response.subjectId}`}
-                      className="font-semibold text-brand-text hover:underline"
+                      href={`/goals/${card.recovery.goalId}`}
+                      className="truncate text-sm font-semibold text-brand-text hover:underline"
                     >
-                      {card.response.title}
+                      {card.recovery.title}
                     </Link>
-                    {card.response.dueOn ? (
-                      <span className="text-xs text-ink-3">
-                        {" "}
-                        {t("kpis.recovery.respond.dueOn", {
-                          date: card.response.dueOn,
-                        })}
-                      </span>
-                    ) : null}
-                  </p>
-                ) : (
-                  <p className="text-sm text-ink">
-                    <span className="font-semibold">{card.response.title}</span>
-                  </p>
-                )}
-                {card.response.subjectId !== null &&
-                card.response.kind === "key_result" &&
-                card.response.goalId ? (
-                  <p className="flex min-w-0 gap-1.5 text-xs">
-                    <span className="flex-none text-ink-4">
-                      {t("kpis.recovery.respond.objective")}
+                    <span className="flex-none text-xs text-ink-3 tabular-nums">
+                      {Math.round(card.recovery.progressPct)}%
                     </span>
-                    <Link
-                      href={`/goals/${card.response.goalId}`}
-                      className="truncate text-brand-text hover:underline"
-                    >
-                      {card.response.goalTitle}
-                    </Link>
+                  </div>
+                  <Bar value={card.recovery.progressPct} max={ceiling} />
+                  <p className="text-xs text-ink-3">
+                    {recoverySummary(card.recovery, t)}
                   </p>
-                ) : null}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-xs text-ink-3">
-                  {t("kpis.recovery.respond.decideAResponse")}
-                </p>
-                {canEdit ? (
-                  <div
-                    data-testid="kpi-responses"
-                    className="flex flex-col gap-2"
-                  >
-                    <details className="rounded-md border border-line p-2.5">
-                      <summary className="cursor-pointer text-sm font-semibold text-ink">
-                        {t("kpis.recovery.respond.fixItNow")}
-                      </summary>
-                      <p className="mt-1 text-xs text-ink-3">
-                        {t("kpis.recovery.respond.fixItNowWhen")}
-                      </p>
-                      <ActionForm
-                        action={fixKpiNow}
-                        label={t("kpis.recovery.respond.fixItNowFor", {
-                          kpi: card.title,
-                        })}
-                        className="mt-2 flex flex-col gap-2"
+                  {card.recovery.closeProposed && !card.recovery.closed ? (
+                    <p className="text-xs font-semibold text-ok">
+                      {t("kpis.recovery.theRealNumberIs")}
+                    </p>
+                  ) : null}
+                </div>
+              ) : card.response?.open ? (
+                <div
+                  data-testid="kpi-response"
+                  className="flex flex-col gap-1 rounded-md border border-line p-2.5"
+                >
+                  <p className="text-xs font-semibold text-ink-3">
+                    {card.response.kind === "fix_now"
+                      ? t("kpis.recovery.respond.beingFixed")
+                      : t("kpis.recovery.respond.answeredByKeyResult")}
+                  </p>
+                  {card.response.subjectId === null ? (
+                    <p className="text-xs text-ink-4">
+                      {t("kpis.recovery.respond.notYoursToOpen")}
+                    </p>
+                  ) : card.response.kind === "fix_now" ? (
+                    <p className="text-sm text-ink">
+                      <Link
+                        href={`/tasks/${card.response.subjectId}`}
+                        className="font-semibold text-brand-text hover:underline"
                       >
-                        <input type="hidden" name="kpiId" value={card.kpiId} />
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <TextInput
-                            id={`fix-title-${card.kpiId}`}
-                            label={t("kpis.recovery.respond.task")}
-                            name="title"
-                            maxLength={500}
-                            defaultValue={t("kpis.recovery.respond.fixTitle", {
-                              kpi: card.title,
-                            })}
-                            className="min-w-0 flex-1 flex-row items-center gap-2.5"
-                            inputClassName="h-6.5 text-xs"
-                          />
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2.5">
-                          <EntityPicker
-                            id={`fix-owner-${card.kpiId}`}
-                            label={t("kpis.recovery.respond.owner")}
-                            name="ownerId"
-                            required
-                            defaultValue={
-                              card.ownerMemberId ?? workspace.memberId
-                            }
-                            options={people.map((person) =>
-                              memberOption(person, t("common.agent")),
-                            )}
-                            search={searchHumans}
-                            className="w-48"
-                            inputClassName="text-xs"
-                          />
-                          <DateInput
-                            id={`fix-due-${card.kpiId}`}
-                            label={t("kpis.recovery.respond.due")}
-                            name="dueOn"
-                            required
-                            inputClassName="h-auto py-1 text-xs"
-                          />
-                          <EntityPicker
-                            id={`fix-space-${card.kpiId}`}
-                            label={t("kpis.recovery.respond.space")}
-                            name="spaceId"
-                            required
-                            defaultValue={card.spaceId ?? spaces[0]?.id ?? null}
-                            options={spaces.map(namedOption)}
-                            className="w-48"
-                            inputClassName="text-xs"
-                          />
-                        </div>
-                        <div>
-                          <button
-                            type="submit"
-                            className="rounded-md bg-brand px-3 py-1 text-xs font-semibold text-on-brand"
+                        {card.response.title}
+                      </Link>
+                      {card.response.dueOn ? (
+                        <span className="text-xs text-ink-3">
+                          {" "}
+                          {t("kpis.recovery.respond.dueOn", {
+                            date: card.response.dueOn,
+                          })}
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-ink">
+                      <span className="font-semibold">
+                        {card.response.title}
+                      </span>
+                    </p>
+                  )}
+                  {card.response.subjectId !== null &&
+                  card.response.kind === "key_result" &&
+                  card.response.goalId ? (
+                    <p className="flex min-w-0 gap-1.5 text-xs">
+                      <span className="flex-none text-ink-4">
+                        {t("kpis.recovery.respond.objective")}
+                      </span>
+                      <Link
+                        href={`/goals/${card.response.goalId}`}
+                        className="truncate text-brand-text hover:underline"
+                      >
+                        {card.response.goalTitle}
+                      </Link>
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-ink-3">
+                    {t("kpis.recovery.respond.decideAResponse")}
+                  </p>
+                  {canEdit ? (
+                    <div
+                      data-testid="kpi-responses"
+                      className="flex flex-col gap-2"
+                    >
+                      <details className="group rounded-[10px] border border-line-2 bg-surface px-3 py-2.5 hover:border-ink-4 open:border-brand-line open:bg-brand-weak/30">
+                        <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                          <svg
+                            viewBox="0 0 12 12"
+                            aria-hidden="true"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
                           >
-                            {t("kpis.recovery.respond.createTheTask")}
-                          </button>
-                        </div>
-                      </ActionForm>
-                    </details>
-
-                    <details className="rounded-md border border-line p-2.5">
-                      <summary className="cursor-pointer text-sm font-semibold text-ink">
-                        {t("kpis.recovery.respond.addAKeyResult")}
-                      </summary>
-                      <p className="mt-1 text-xs text-ink-3">
-                        {t("kpis.recovery.respond.addAKeyResultWhen")}
-                      </p>
-                      {objectives.length === 0 ? (
-                        <p className="mt-2 text-xs text-ink-4">
-                          {t("kpis.recovery.respond.noOpenObjective")}
+                            <path
+                              d="m4.5 3 3 3-3 3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          {t("kpis.recovery.respond.fixItNow")}
+                        </summary>
+                        <p className="mt-1 text-xs text-ink-3">
+                          {t("kpis.recovery.respond.fixItNowWhen")}
                         </p>
-                      ) : (
                         <ActionForm
-                          action={answerKpiWithKeyResult}
-                          label={t("kpis.recovery.respond.addAKeyResultFor", {
+                          action={fixKpiNow}
+                          label={t("kpis.recovery.respond.fixItNowFor", {
                             kpi: card.title,
                           })}
                           className="mt-2 flex flex-col gap-2"
@@ -423,76 +437,56 @@ export default async function RecoveryBoardPage() {
                             name="kpiId"
                             value={card.kpiId}
                           />
-                          <input
-                            type="hidden"
-                            name="direction"
-                            value={
-                              recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                ?.direction ?? "increase"
-                            }
-                          />
-                          <div className="flex flex-wrap items-center gap-2.5">
-                            {/* Chosen, where the select it replaced opened on
-                             * whichever objective came first. */}
-                            <EntityPicker
-                              id={`kr-goal-${card.kpiId}`}
-                              label={t("kpis.recovery.respond.objective")}
-                              name="goalId"
-                              required
-                              options={objectives.map((goal) => ({
-                                id: goal.id,
-                                label: goal.title,
-                              }))}
-                              className="min-w-0 flex-1"
-                              inputClassName="text-xs"
-                            />
-                          </div>
                           <div className="flex flex-wrap items-center gap-2.5">
                             <TextInput
-                              id={`kr-title-${card.kpiId}`}
-                              label={t("kpis.recovery.respond.keyResult")}
+                              id={`fix-title-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.task")}
                               name="title"
                               maxLength={500}
-                              defaultValue={
-                                recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.title ?? card.title
-                              }
+                              defaultValue={t(
+                                "kpis.recovery.respond.fixTitle",
+                                {
+                                  kpi: card.title,
+                                },
+                              )}
                               className="min-w-0 flex-1 flex-row items-center gap-2.5"
                               inputClassName="h-6.5 text-xs"
-                            />
-                          </div>
-                          {/* guided-inputs §4.8: numbers, grouped as the
-                              reader reads them, and nothing sent empty. */}
-                          <div className="flex flex-wrap items-end gap-2.5">
-                            <NumberInput
-                              id={`kr-baseline-${card.kpiId}`}
-                              label={t("kpis.recovery.respond.from")}
-                              name="baseline"
-                              defaultValue={
-                                recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.baseline ?? null
-                              }
-                              inputClassName="h-auto w-24 py-1 text-xs"
-                            />
-                            <NumberInput
-                              id={`kr-target-${card.kpiId}`}
-                              label={t("kpis.recovery.respond.to")}
-                              name="target"
-                              defaultValue={
-                                recoveryDrafts.get(card.kpiId)?.keyResults[0]
-                                  ?.target ?? null
-                              }
-                              inputClassName="h-auto w-24 py-1 text-xs"
                             />
                           </div>
                           <div className="flex flex-wrap items-center gap-2.5">
-                            <TextInput
-                              id={`kr-reason-${card.kpiId}`}
-                              label={t("kpis.recovery.respond.whyNow")}
-                              name="reason"
-                              maxLength={500}
-                              className="min-w-0 flex-1 flex-row items-center gap-2.5"
-                              inputClassName="h-6.5 text-xs"
+                            <EntityPicker
+                              id={`fix-owner-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.owner")}
+                              name="ownerId"
+                              required
+                              defaultValue={
+                                card.ownerMemberId ?? workspace.memberId
+                              }
+                              options={people.map((person) =>
+                                memberOption(person, t("common.agent")),
+                              )}
+                              search={searchHumans}
+                              className="w-48"
+                              inputClassName="text-xs"
+                            />
+                            <DateInput
+                              id={`fix-due-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.due")}
+                              name="dueOn"
+                              required
+                              inputClassName="h-auto py-1 text-xs"
+                            />
+                            <EntityPicker
+                              id={`fix-space-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.space")}
+                              name="spaceId"
+                              required
+                              defaultValue={
+                                card.spaceId ?? spaces[0]?.id ?? null
+                              }
+                              options={spaces.map(namedOption)}
+                              className="w-48"
+                              inputClassName="text-xs"
                             />
                           </div>
                           <div>
@@ -500,98 +494,239 @@ export default async function RecoveryBoardPage() {
                               type="submit"
                               className="rounded-md bg-brand px-3 py-1 text-xs font-semibold text-on-brand"
                             >
-                              {t("kpis.recovery.respond.addTheKeyResult")}
+                              {t("kpis.recovery.respond.createTheTask")}
                             </button>
                           </div>
                         </ActionForm>
-                      )}
-                      {objectives.some((goal) => goal.keyResults.length > 0) ? (
-                        <ActionForm
-                          action={nameKpiKeyResult}
-                          label={t("kpis.recovery.respond.alreadyAnsweredFor", {
-                            kpi: card.title,
-                          })}
-                          className="mt-2 flex flex-wrap items-center gap-2.5 border-t border-line pt-2"
-                        >
-                          <input
-                            type="hidden"
-                            name="kpiId"
-                            value={card.kpiId}
-                          />
-                          {/* Each key result reads with its objective, where
-                           * the select grouped them under it. */}
-                          <EntityPicker
-                            id={`kr-existing-${card.kpiId}`}
-                            label={t("kpis.recovery.respond.orOneThatExists")}
-                            name="keyResultId"
-                            required
-                            options={objectives.flatMap((goal) =>
-                              goal.keyResults.map((keyResult) => ({
-                                id: keyResult.id,
-                                label: keyResult.title,
-                                detail: goal.title,
-                              })),
-                            )}
-                            className="min-w-0 flex-1"
-                            inputClassName="text-xs"
-                          />
-                          <button
-                            type="submit"
-                            className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-ink-2"
-                          >
-                            {t("kpis.recovery.respond.thatOneAnswersIt")}
-                          </button>
-                        </ActionForm>
-                      ) : null}
-                    </details>
+                      </details>
 
-                    <details className="rounded-md border border-line p-2.5">
-                      <summary className="cursor-pointer text-sm font-semibold text-ink">
-                        {t("kpis.recovery.respond.launchARecovery")}
-                      </summary>
-                      <p className="mt-1 text-xs text-ink-3">
-                        {t("kpis.recovery.respond.launchARecoveryWhen")}
-                      </p>
-                      <div className="mt-2 flex flex-col items-start gap-2">
-                        {recoveryDrafts.has(card.kpiId) ? (
-                          <section
-                            aria-label={t("kpis.recovery.launchingCreates")}
-                            className="flex w-full flex-col gap-1 rounded-md border border-line p-2.5"
+                      <details className="group rounded-[10px] border border-line-2 bg-surface px-3 py-2.5 hover:border-ink-4 open:border-brand-line open:bg-brand-weak/30">
+                        <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                          <svg
+                            viewBox="0 0 12 12"
+                            aria-hidden="true"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
                           >
-                            <p className="text-xs font-semibold text-ink-3">
-                              {t("kpis.recovery.launchingCreates")}
-                            </p>
-                            <p className="text-sm text-ink">
-                              {recoveryDrafts.get(card.kpiId)?.objective}
-                            </p>
-                            <ul className="flex list-disc flex-col gap-0.5 pl-4">
-                              {recoveryDrafts
-                                .get(card.kpiId)
-                                ?.keyResults.map((keyResult) => (
-                                  <li
-                                    key={keyResult.title}
-                                    className="text-xs text-ink-2"
-                                  >
-                                    {keyResult.title}
-                                  </li>
-                                ))}
-                            </ul>
-                          </section>
+                            <path
+                              d="m4.5 3 3 3-3 3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          {t("kpis.recovery.respond.addAKeyResult")}
+                        </summary>
+                        <p className="mt-1 text-xs text-ink-3">
+                          {t("kpis.recovery.respond.addAKeyResultWhen")}
+                        </p>
+                        {objectives.length === 0 ? (
+                          <p className="mt-2 text-xs text-ink-4">
+                            {t("kpis.recovery.respond.noOpenObjective")}
+                          </p>
+                        ) : (
+                          <ActionForm
+                            action={answerKpiWithKeyResult}
+                            label={t("kpis.recovery.respond.addAKeyResultFor", {
+                              kpi: card.title,
+                            })}
+                            className="mt-2 flex flex-col gap-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="kpiId"
+                              value={card.kpiId}
+                            />
+                            <input
+                              type="hidden"
+                              name="direction"
+                              value={
+                                recoveryDrafts.get(card.kpiId)?.keyResults[0]
+                                  ?.direction ?? "increase"
+                              }
+                            />
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              {/* Chosen, where the select it replaced opened on
+                               * whichever objective came first. */}
+                              <EntityPicker
+                                id={`kr-goal-${card.kpiId}`}
+                                label={t("kpis.recovery.respond.objective")}
+                                name="goalId"
+                                required
+                                options={objectives.map((goal) => ({
+                                  id: goal.id,
+                                  label: goal.title,
+                                }))}
+                                className="min-w-0 flex-1"
+                                inputClassName="text-xs"
+                              />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <TextInput
+                                id={`kr-title-${card.kpiId}`}
+                                label={t("kpis.recovery.respond.keyResult")}
+                                name="title"
+                                maxLength={500}
+                                defaultValue={
+                                  recoveryDrafts.get(card.kpiId)?.keyResults[0]
+                                    ?.title ?? card.title
+                                }
+                                className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                                inputClassName="h-6.5 text-xs"
+                              />
+                            </div>
+                            {/* guided-inputs §4.8: numbers, grouped as the
+                              reader reads them, and nothing sent empty. */}
+                            <div className="flex flex-wrap items-end gap-2.5">
+                              <NumberInput
+                                id={`kr-baseline-${card.kpiId}`}
+                                label={t("kpis.recovery.respond.from")}
+                                name="baseline"
+                                defaultValue={
+                                  recoveryDrafts.get(card.kpiId)?.keyResults[0]
+                                    ?.baseline ?? null
+                                }
+                                inputClassName="h-auto w-24 py-1 text-xs"
+                              />
+                              <NumberInput
+                                id={`kr-target-${card.kpiId}`}
+                                label={t("kpis.recovery.respond.to")}
+                                name="target"
+                                defaultValue={
+                                  recoveryDrafts.get(card.kpiId)?.keyResults[0]
+                                    ?.target ?? null
+                                }
+                                inputClassName="h-auto w-24 py-1 text-xs"
+                              />
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2.5">
+                              <TextInput
+                                id={`kr-reason-${card.kpiId}`}
+                                label={t("kpis.recovery.respond.whyNow")}
+                                name="reason"
+                                maxLength={500}
+                                className="min-w-0 flex-1 flex-row items-center gap-2.5"
+                                inputClassName="h-6.5 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <button
+                                type="submit"
+                                className="rounded-md bg-brand px-3 py-1 text-xs font-semibold text-on-brand"
+                              >
+                                {t("kpis.recovery.respond.addTheKeyResult")}
+                              </button>
+                            </div>
+                          </ActionForm>
+                        )}
+                        {objectives.some(
+                          (goal) => goal.keyResults.length > 0,
+                        ) ? (
+                          <ActionForm
+                            action={nameKpiKeyResult}
+                            label={t(
+                              "kpis.recovery.respond.alreadyAnsweredFor",
+                              {
+                                kpi: card.title,
+                              },
+                            )}
+                            className="mt-2 flex flex-wrap items-center gap-2.5 border-t border-line pt-2"
+                          >
+                            <input
+                              type="hidden"
+                              name="kpiId"
+                              value={card.kpiId}
+                            />
+                            {/* Each key result reads with its objective, where
+                             * the select grouped them under it. */}
+                            <EntityPicker
+                              id={`kr-existing-${card.kpiId}`}
+                              label={t("kpis.recovery.respond.orOneThatExists")}
+                              name="keyResultId"
+                              required
+                              options={objectives.flatMap((goal) =>
+                                goal.keyResults.map((keyResult) => ({
+                                  id: keyResult.id,
+                                  label: keyResult.title,
+                                  detail: goal.title,
+                                })),
+                              )}
+                              className="min-w-0 flex-1"
+                              inputClassName="text-xs"
+                            />
+                            <button
+                              type="submit"
+                              className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-ink-2"
+                            >
+                              {t("kpis.recovery.respond.thatOneAnswersIt")}
+                            </button>
+                          </ActionForm>
                         ) : null}
-                        <LaunchRecovery kpiId={card.kpiId} />
-                      </div>
-                    </details>
-                  </div>
-                ) : (
-                  <span className="text-xs text-ink-4">
-                    {t("kpis.recovery.youCanReadThis")}
-                  </span>
-                )}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-      ))}
-    </div>
+                      </details>
+
+                      <details className="group rounded-[10px] border border-line-2 bg-surface px-3 py-2.5 hover:border-ink-4 open:border-brand-line open:bg-brand-weak/30">
+                        <summary className="flex cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-ink [&::-webkit-details-marker]:hidden">
+                          <svg
+                            viewBox="0 0 12 12"
+                            aria-hidden="true"
+                            className="size-3 flex-none text-ink-4 transition-transform group-open:rotate-90"
+                          >
+                            <path
+                              d="m4.5 3 3 3-3 3"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.6"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                          {t("kpis.recovery.respond.launchARecovery")}
+                        </summary>
+                        <p className="mt-1 text-xs text-ink-3">
+                          {t("kpis.recovery.respond.launchARecoveryWhen")}
+                        </p>
+                        <div className="mt-2 flex flex-col items-start gap-2">
+                          {recoveryDrafts.has(card.kpiId) ? (
+                            <section
+                              aria-label={t("kpis.recovery.launchingCreates")}
+                              className="flex w-full flex-col gap-1 rounded-md border border-line p-2.5"
+                            >
+                              <p className="text-xs font-semibold text-ink-3">
+                                {t("kpis.recovery.launchingCreates")}
+                              </p>
+                              <p className="text-sm text-ink">
+                                {recoveryDrafts.get(card.kpiId)?.objective}
+                              </p>
+                              <ul className="flex list-disc flex-col gap-0.5 pl-4">
+                                {recoveryDrafts
+                                  .get(card.kpiId)
+                                  ?.keyResults.map((keyResult) => (
+                                    <li
+                                      key={keyResult.title}
+                                      className="text-xs text-ink-2"
+                                    >
+                                      {keyResult.title}
+                                    </li>
+                                  ))}
+                              </ul>
+                            </section>
+                          ) : null}
+                          <LaunchRecovery kpiId={card.kpiId} />
+                        </div>
+                      </details>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-ink-4">
+                      {t("kpis.recovery.youCanReadThis")}
+                    </span>
+                  )}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        ))}
+      </div>
+    </>
   );
 }

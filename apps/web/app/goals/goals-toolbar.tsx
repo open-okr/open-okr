@@ -24,11 +24,12 @@ export function GoalsToolbar({
   chips,
   clearAll,
   activeCount,
+  trailing,
 }: {
   /** The scope tabs, a named group of links. */
   readonly tabs: ReactNode;
-  /** The displays, drawn here as icons each with its tooltip. */
-  readonly display: {
+  /** The displays, drawn here as icons each with its tooltip. None on KPIs. */
+  readonly display?: {
     readonly label: string;
     readonly options: readonly {
       readonly key: "list" | "diagram" | "tree";
@@ -37,14 +38,19 @@ export function GoalsToolbar({
       readonly on: boolean;
     }[];
   };
-  readonly exportControl: ReactNode;
-  /** The panel's rows, without its foot. */
+  readonly exportControl?: ReactNode;
+  /**
+   * The panel's rows, without its foot. Null draws no Filter button, for a
+   * screen of the same area with nothing to filter (the KPI trees).
+   */
   readonly panel: ReactNode;
   /** The filters in force as chips, or null when none is. */
   readonly chips: ReactNode;
   /** The link that takes every filter away, or null when none is set. */
   readonly clearAll: ReactNode;
   readonly activeCount: number;
+  /** Drawn after the controls, such as the KPI grid's keyboard hint. */
+  readonly trailing?: ReactNode;
 }) {
   const { t } = useTranslations();
   const [open, setOpen] = useState(activeCount > 0);
@@ -55,63 +61,70 @@ export function GoalsToolbar({
         <div className="-mb-px flex min-w-0 max-md:order-2 max-md:w-full">
           {tabs}
         </div>
-        <div className="ml-auto flex items-center gap-2 py-1.75 max-md:w-full max-md:pt-2.5 max-md:pb-1">
-          <button
-            type="button"
-            aria-expanded={open}
-            aria-controls="goals-filter-panel"
-            onClick={() => setOpen((now) => !now)}
-            className={`inline-flex h-7.5 items-center gap-1.5 rounded-control border px-2.75 text-[12.5px] font-semibold whitespace-nowrap max-md:mr-auto ${
-              open
-                ? "border-brand-line bg-brand-weak text-brand-text"
-                : "border-line-2 bg-surface text-ink-2 hover:border-ink-4"
-            }`}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-              className="size-3.25"
-            >
-              <path d="M3 5h18l-7 8v6l-4-2v-4z" />
-            </svg>
-            {/* The count is a badge beside the word, not part of a sentence a
-             * translator would order, so the two are separate elements. */}
-            <span>{t("goals.filter.label")}</span>
-            {activeCount > 0 ? (
-              <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-brand px-1.25 text-[10.5px] font-bold text-on-brand">
-                <span className="sr-only">, </span>
-                {activeCount}
-              </span>
-            ) : null}
-          </button>
-          <fieldset
-            aria-label={display.label}
-            className="inline-flex h-7.5 gap-0.5 rounded-control bg-raised p-0.75"
-          >
-            {display.options.map((option) => (
-              <Tooltip key={option.key} label={option.label}>
-                <a
-                  href={option.href}
-                  aria-current={option.on ? "true" : undefined}
-                  className={`grid w-7 place-items-center rounded-md ${
-                    option.on
-                      ? "bg-surface text-brand-text shadow-control"
-                      : "text-ink-3 hover:text-ink"
-                  }`}
+        {panel || display || exportControl || trailing ? (
+          <div className="ml-auto flex items-center gap-2 py-1.75 max-md:w-full max-md:pt-2.5 max-md:pb-1">
+            {panel ? (
+              <button
+                type="button"
+                aria-expanded={open}
+                aria-controls="goals-filter-panel"
+                onClick={() => setOpen((now) => !now)}
+                className={`inline-flex h-7.5 items-center gap-1.5 rounded-control border px-2.75 text-[12.5px] font-semibold whitespace-nowrap max-md:mr-auto ${
+                  open
+                    ? "border-brand-line bg-brand-weak text-brand-text"
+                    : "border-line-2 bg-surface text-ink-2 hover:border-ink-4"
+                }`}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  aria-hidden="true"
+                  className="size-3.25"
                 >
-                  <span className="sr-only">{option.label}</span>
-                  {DISPLAY_ICON[option.key]}
-                </a>
-              </Tooltip>
-            ))}
-          </fieldset>
-          {exportControl}
-        </div>
+                  <path d="M3 5h18l-7 8v6l-4-2v-4z" />
+                </svg>
+                {/* The count is a badge beside the word, not part of a sentence a
+                 * translator would order, so the two are separate elements. */}
+                <span>{t("goals.filter.label")}</span>
+                {activeCount > 0 ? (
+                  <span className="grid h-4.5 min-w-4.5 place-items-center rounded-full bg-brand px-1.25 text-[10.5px] font-bold text-on-brand">
+                    <span className="sr-only">, </span>
+                    {activeCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
+            {display ? (
+              <fieldset
+                aria-label={display.label}
+                className="inline-flex h-7.5 gap-0.5 rounded-control bg-raised p-0.75"
+              >
+                {display.options.map((option) => (
+                  <Tooltip key={option.key} label={option.label}>
+                    <a
+                      href={option.href}
+                      aria-current={option.on ? "true" : undefined}
+                      className={`grid w-7 place-items-center rounded-md ${
+                        option.on
+                          ? "bg-surface text-brand-text shadow-control"
+                          : "text-ink-3 hover:text-ink"
+                      }`}
+                    >
+                      <span className="sr-only">{option.label}</span>
+                      {DISPLAY_ICON[option.key]}
+                    </a>
+                  </Tooltip>
+                ))}
+              </fieldset>
+            ) : null}
+            {exportControl}
+            {trailing}
+          </div>
+        ) : null}
       </div>
-      {open ? (
+      {open && panel ? (
         <div
           id="goals-filter-panel"
           className="grid grid-cols-1 items-center gap-x-3.5 gap-y-2.5 border-b border-line px-4 pt-3.5 pb-3 md:grid-cols-[92px_minmax(0,1fr)] max-md:gap-y-1.5 max-md:px-3"

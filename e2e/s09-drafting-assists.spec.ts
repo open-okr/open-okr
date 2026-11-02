@@ -151,6 +151,10 @@ test("the goal page offers no assist, and its close form is whole", async () => 
 
 test("the KPI grid offers no suggestion, and its add form is whole", async () => {
   await goTo(page, "/kpis");
+  await page.getByRole("link", { name: "New KPI", exact: true }).click();
+  await expect(page.getByTestId("kpi-kpi-panel")).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByText("Or describe it in a sentence")).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Suggest the fields" }),

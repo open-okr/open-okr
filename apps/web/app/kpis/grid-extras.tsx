@@ -1,19 +1,29 @@
-import { Chip } from "@openokr/ui";
-import Link from "next/link";
-import { getTranslations } from "../../lib/translations";
+"use client";
+
+import { Chip, useTranslations } from "@openokr/ui";
 
 /**
- * The three things S-20 asks for that the grid never had (P6-G30).
+ * Two of the things S-20 asks for in the row and group headers (P6-G30): the
+ * row sparkline and the category subtotal. Pure rendering over what
+ * `kpis.grid` already returns.
  *
- * The row sparkline, the category subtotal and the filter row. All three are
- * pure rendering over what `kpis.grid` already returns, which is why they live
- * beside the page rather than inside it.
+ * **Client components since the KPI redesign (2 November 2026)**, because
+ * they now sit inside the grid's own rows, which the browser draws. They were
+ * a separate "By category" card beside the grid, which said the same thing a
+ * second time.
  */
 
 export interface GridRecord {
   readonly periodStart: string;
   readonly actualValue: number | null;
 }
+
+/** The colour of the newest point: the KPI's band, so the line ends in it. */
+const END_DOT: Readonly<Record<string, string>> = {
+  healthy: "fill-ok-dot",
+  watch: "fill-warn-dot",
+  unhealthy: "fill-bad-dot",
+};
 
 /**
  * Twelve periods of one KPI, as a line.
@@ -25,19 +35,31 @@ export interface GridRecord {
  * Inline SVG rather than a chart library: twelve points and one path need no
  * dependency, and the grid draws one of these per row.
  */
-export async function RowSparkline({
+export function RowSparkline({
   records,
+  state,
+  className = "h-6 w-20",
+  testId = true,
 }: {
   readonly records: readonly GridRecord[];
+  /** The KPI's band, which colours the newest point. */
+  readonly state: string;
+  readonly className?: string;
+  /** False on the phone's copy, so a test id names one element. */
+  readonly testId?: boolean;
 }) {
-  const { t } = await getTranslations();
-  const values = records
+  const { t } = useTranslations();
+  const values = [...records]
+    .sort((left, right) => left.periodStart.localeCompare(right.periodStart))
     .filter((record) => record.actualValue !== null)
     .map((record) => record.actualValue as number);
 
   if (values.length < 2) {
     return (
-      <span className="text-xs text-ink-4" data-testid="sparkline-too-short">
+      <span
+        className="text-[11px] whitespace-nowrap text-ink-4"
+        data-testid={testId ? "sparkline-too-short" : undefined}
+      >
         {values.length === 0
           ? t("kpis.gridExtras.noValuesYet")
           : t("kpis.gridExtras.oneValueSoFar")}
@@ -48,15 +70,13 @@ export async function RowSparkline({
   const lowest = Math.min(...values);
   const highest = Math.max(...values);
   const span = highest - lowest || 1;
-  const step = 100 / (values.length - 1);
-  const points = values
-    .map((value, index) => {
-      const x = index * step;
-      // Inverted, because an SVG's y grows downward and a value does not.
-      const y = 20 - ((value - lowest) / span) * 20;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+  const step = 96 / (values.length - 1);
+  const points = values.map((value, index) => {
+    // Inverted, because an SVG's y grows downward and a value does not.
+    const y = 21 - ((value - lowest) / span) * 18;
+    return [2 + index * step, y] as const;
+  });
+  const last = points[points.length - 1] as readonly [number, number];
 
   const described = t("kpis.gridExtras.periodsFromTo", {
     count: values.length,
@@ -66,45 +86,39 @@ export async function RowSparkline({
 
   return (
     <svg
-      viewBox="0 0 100 20"
+      viewBox="0 0 100 24"
       preserveAspectRatio="none"
-      className="h-5 w-24 text-brand"
+      className={`${className} overflow-visible text-brand`}
       role="img"
       aria-label={described}
-      data-testid="row-sparkline"
+      data-testid={testId ? "row-sparkline" : undefined}
     >
       <title>{described}</title>
       <polyline
-        points={points}
+        points={points
+          .map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`)
+          .join(" ")}
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.5"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+        strokeLinecap="round"
         vectorEffect="non-scaling-stroke"
+      />
+      <circle
+        cx={last[0]}
+        cy={last[1]}
+        r="2.6"
+        vectorEffect="non-scaling-stroke"
+        className={END_DOT[state] ?? "fill-ink-4"}
       />
     </svg>
   );
 }
 
-interface StateTally {
-  readonly healthy: number;
-  readonly watch: number;
-  readonly unhealthy: number;
-  readonly recovering: number;
-  readonly noData: number;
-}
-
-const tally = (states: readonly string[], recovering: number): StateTally => ({
-  healthy: states.filter((state) => state === "healthy").length,
-  watch: states.filter((state) => state === "watch").length,
-  unhealthy: states.filter((state) => state === "unhealthy").length,
-  // Counted beside the bands rather than as one of them since P9-T17b-a: a
-  // recovering KPI is also in its real band, and both are true at once.
-  recovering,
-  noData: states.filter((state) => state === "no_data").length,
-});
-
 /**
- * What a category adds up to (P6-G30).
+ * What a set of KPIs adds up to (P6-G30): a category's, in its header row, and
+ * the whole grid's, under the page title.
  *
  * **It is a tally of corridor states, not a sum of values, and that is a
  * decision rather than a shortcut.** UIUX-PLAN §4 asks for subtotals and
@@ -115,111 +129,56 @@ const tally = (states: readonly string[], recovering: number): StateTally => ({
  * this product may hold mixed units. What a reader wants from a grouped grid
  * is how the group is doing, and §6.4's corridor states answer exactly that.
  */
-export async function CategorySubtotal({
+export function CategorySubtotal({
   states,
   recovering,
+  count,
+  testId = "category-subtotal",
 }: {
   readonly states: readonly string[];
   /** How many of them have an open recovery objective. */
   readonly recovering: number;
+  /** The "4 KPIs" in front of the chips, or nothing. */
+  readonly count?: string;
+  readonly testId?: string;
 }) {
-  // A server component, so the catalogue comes from `getTranslations` rather
-  // than from the client hook (P6-G25 built that seam).
-  const { t } = await getTranslations();
-  const counted = tally(states, recovering);
+  const { t } = useTranslations();
+  // Counted beside the bands rather than as one of them since P9-T17b-a: a
+  // recovering KPI is also in its real band, and both are true at once.
+  const of = (state: string) => states.filter((one) => one === state).length;
+  const healthy = of("healthy");
+  const watch = of("watch");
+  const unhealthy = of("unhealthy");
+  const noData = of("no_data");
   return (
     <span
       className="flex flex-wrap items-center gap-1.5 text-xs"
-      data-testid="category-subtotal"
+      data-testid={testId}
     >
-      <span className="text-ink-3">
-        {t("common.kpis", { length: states.length })}
-      </span>
-      {counted.healthy > 0 ? (
-        <Chip tone="ok">
-          {t("kpi.state.healthy", { healthy: counted.healthy })}
+      {count ? <span className="mr-0.5 text-ink-3">{count}</span> : null}
+      {healthy > 0 ? (
+        <Chip tone="ok" dot>
+          {t("kpi.state.healthy", { healthy })}
         </Chip>
       ) : null}
-      {counted.watch > 0 ? (
-        <Chip tone="warn">
-          {t("kpi.state.watch", { watch: counted.watch })}
+      {watch > 0 ? (
+        <Chip tone="warn" dot>
+          {t("kpi.state.watch", { watch })}
         </Chip>
       ) : null}
-      {counted.unhealthy > 0 ? (
-        <Chip tone="bad">
-          {t("kpi.state.unhealthy", { unhealthy: counted.unhealthy })}
+      {unhealthy > 0 ? (
+        <Chip tone="bad" dot>
+          {t("kpi.state.unhealthy", { unhealthy })}
         </Chip>
       ) : null}
-      {counted.recovering > 0 ? (
-        <Chip tone="info">
-          {t("kpi.state.recovering", { recovering: counted.recovering })}
-        </Chip>
+      {recovering > 0 ? (
+        <Chip tone="info">{t("kpi.state.recovering", { recovering })}</Chip>
       ) : null}
-      {counted.noData > 0 ? (
-        <Chip tone="neutral">
-          {t("kpi.state.noData", { noData: counted.noData })}
+      {noData > 0 ? (
+        <Chip tone="neutral" dot>
+          {t("kpi.state.noData", { noData })}
         </Chip>
       ) : null}
     </span>
-  );
-}
-
-export interface FilterChoice {
-  readonly value: string;
-  readonly label: string;
-}
-
-/**
- * The filter row, following the goals explorer's pattern (P6-G30).
- *
- * **Links, not a form.** The explorer puts its filters in the url so a
- * combination survives a reload and can be sent to somebody; a form with local
- * state would lose both. Every chip is the current query with one key changed,
- * so combinations compose without a control that knows about the others.
- */
-export async function FilterRow({
-  label,
-  param,
-  choices,
-  active,
-  query,
-}: {
-  readonly label: string;
-  readonly param: string;
-  readonly choices: readonly FilterChoice[];
-  readonly active: string;
-  /** The whole current query, so one chip can change one key. */
-  readonly query: Readonly<Record<string, string>>;
-}) {
-  const { t } = await getTranslations();
-  const href = (value: string): string => {
-    const next = new URLSearchParams(query);
-    if (value === "") {
-      next.delete(param);
-    } else {
-      next.set(param, value);
-    }
-    const text = next.toString();
-    return text === "" ? "/kpis" : `/kpis?${text}`;
-  };
-
-  return (
-    <div className="flex flex-wrap items-baseline gap-1.5">
-      <span className="text-xs font-semibold text-ink-4">{label}</span>
-      {[{ value: "", label: t("goals.all") }, ...choices].map((choice) => (
-        <Link
-          key={choice.value || "all"}
-          href={href(choice.value)}
-          data-testid={`filter-${param}-${choice.value || "all"}`}
-          className={
-            choice.value === active
-              ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
-              : "rounded-full bg-raised px-2 py-0.5 text-xs text-ink-3 hover:text-ink"
-          }
-        >
-          {choice.label}
-        </Link>
-      ))}
-    </div>
   );
 }

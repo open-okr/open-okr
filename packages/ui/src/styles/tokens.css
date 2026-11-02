@@ -185,6 +185,11 @@
   --space-row-y: 10px;
   --space-card-p: 16px;
   --space-gap: 8px;
+
+  /* The dropdown's chevron (SelectInput), drawn rather than the browser's
+   * own, which sat 4px from the edge against the text's 8px and looked
+   * pushed into the corner. --ink-4 at rest. */
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23617087' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 :root[data-density="compact"] {
@@ -255,6 +260,7 @@
     0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 32px -8px rgba(0, 0, 0, 0.5);
   --elev-control: 0 1px 2px rgba(0, 0, 0, 0.4);
   --elev-control-hover: 0 2px 6px rgba(0, 0, 0, 0.45);
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%237d8ba1' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
 /* §2: "respects reduced motion." Never gates content — this only removes

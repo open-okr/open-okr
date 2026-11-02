@@ -28,6 +28,14 @@ const stateTone = (state: string) =>
           ? ("info" as const)
           : ("neutral" as const);
 
+/**
+ * One row's columns: the KPI, its type, its achievement, its health and the
+ * two links. On a phone the name and the health share the first line and the
+ * bar takes the second (KPI redesign, 2 November 2026).
+ */
+const ROW_GRID =
+  "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 md:grid-cols-[minmax(0,1fr)_120px_190px_130px_250px]";
+
 export interface KpiTreeNode {
   readonly id: string;
   readonly parentKpiId: string | null;
@@ -102,71 +110,126 @@ export async function KpiTreeRows({
   const rows = flatten(nodes);
 
   return (
-    <ul className="flex flex-col" aria-label={label}>
-      {rows.map(({ node, depth }) => (
-        <li
-          key={node.id}
-          className="flex flex-wrap items-center gap-2 border-line border-b px-3 py-2 last:border-b-0"
-          style={{ paddingLeft: `${0.75 + depth * 1.25}rem` }}
-        >
-          <span className="min-w-0 flex-1 truncate text-sm text-ink">
-            {node.title}
-            {node.unit ? (
-              <span className="text-ink-4"> ({node.unit})</span>
-            ) : null}
-          </span>
-          <span className="text-xs text-ink-4">
-            {node.indicatorType}
-            {node.tier ? ` · ${node.tier}` : ""}
-          </span>
-          {node.link ? (
-            <span data-testid="kpi-link" className="text-xs text-ink-3">
-              {node.link === "formula"
-                ? t("kpis.trees.linkFormula")
-                : t("kpis.trees.linkInfluence")}
-            </span>
-          ) : null}
-          <Bar
-            value={node.achievementPct ?? 0}
-            max={KPI_ACHIEVEMENT_MAX}
-            className="w-24"
-          />
-          <span className="w-12 text-right text-xs text-ink-2 tabular-nums">
-            {node.achievementPct === null
-              ? t("kpis.trees.noData")
-              : `${Math.round(node.achievementPct)}%`}
-          </span>
-          <Chip tone={stateTone(node.state)} dot>
-            {node.state}
-          </Chip>
-          {node.recovering && node.recoveryGoalId ? (
-            <Link
-              href={`/goals/${node.recoveryGoalId}`}
-              className="text-xs font-semibold text-brand-text hover:underline"
-            >
-              {t("kpis.trees.recovery", {
-                recoveryProgressPct: Math.round(node.recoveryProgressPct ?? 0),
-              })}
-            </Link>
-          ) : node.state === "unhealthy" && canEdit ? (
-            <LaunchRecovery kpiId={node.id} />
-          ) : null}
-          <Link
-            href={`/kpis/${node.id}`}
-            className="text-xs text-ink-3 hover:underline"
+    <div>
+      {/* The columns named once, on a screen wide enough to have columns. */}
+      <div
+        aria-hidden="true"
+        className={`${ROW_GRID} border-b border-line bg-bg px-3.5 py-1.75 text-[11.5px] font-semibold text-ink-3 max-md:hidden`}
+      >
+        <span>{t("kpis.grid.kpi")}</span>
+        <span>{t("kpis.trees.columnType")}</span>
+        <span>{t("kpis.trees.columnAchievement")}</span>
+        <span>{t("kpis.trees.columnHealth")}</span>
+        <span />
+      </div>
+      <ul className="flex flex-col" aria-label={label}>
+        {rows.map(({ node, depth }) => (
+          <li
+            key={node.id}
+            className={`${ROW_GRID} border-b border-line px-3.5 py-2.5 last:border-b-0 hover:bg-bg max-md:px-3`}
           >
-            {t("common.open")}
-          </Link>
-          {canEdit && addDriverHref ? (
-            <Link
-              href={addDriverHref(node.id)}
-              className="text-xs font-semibold text-brand-text hover:underline"
+            <span
+              className="flex min-w-0 items-center gap-2"
+              style={{ paddingLeft: `${Math.max(depth - 1, 0) * 1.25}rem` }}
             >
-              {t("kpis.trees.addDriver")}
-            </Link>
-          ) : null}
-        </li>
-      ))}
-    </ul>
+              {depth > 0 ? (
+                <span
+                  aria-hidden="true"
+                  className="-mt-3 ml-1.5 h-5.5 w-4.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2"
+                />
+              ) : null}
+              <span className="flex min-w-0 flex-col">
+                <span
+                  className={`truncate text-ink ${
+                    depth === 0
+                      ? "text-sm font-bold"
+                      : "text-[13px] font-semibold"
+                  }`}
+                >
+                  {node.title}
+                  {node.unit ? (
+                    <span className="font-medium text-ink-4">
+                      {" "}
+                      ({node.unit})
+                    </span>
+                  ) : null}
+                </span>
+                {node.link ? (
+                  <span
+                    data-testid="kpi-link"
+                    className="text-[11px] text-ink-4"
+                  >
+                    {node.link === "formula"
+                      ? t("kpis.trees.linkFormula")
+                      : t("kpis.trees.linkInfluence")}
+                  </span>
+                ) : null}
+              </span>
+            </span>
+            <span className="max-md:hidden">
+              <span
+                className={`rounded-[5px] px-1.75 py-px text-[11px] font-semibold ${
+                  node.indicatorType === "leading"
+                    ? "bg-brand-weak text-brand-text"
+                    : "bg-raised text-ink-2"
+                }`}
+              >
+                {node.indicatorType}
+                {node.tier ? ` · ${node.tier}` : ""}
+              </span>
+            </span>
+            <span className="flex items-center gap-2 max-md:order-last max-md:col-span-2">
+              <Bar
+                value={node.achievementPct ?? 0}
+                max={KPI_ACHIEVEMENT_MAX}
+                className="flex-1"
+              />
+              <span className="w-11 text-right text-xs font-semibold text-ink-2 tabular-nums">
+                {node.achievementPct === null
+                  ? t("kpis.trees.noData")
+                  : `${Math.round(node.achievementPct)}%`}
+              </span>
+            </span>
+            <span className="flex flex-wrap items-center justify-end gap-1.5 md:justify-start">
+              <Chip tone={stateTone(node.state)} dot>
+                {node.state.replace("_", " ")}
+              </Chip>
+              {node.recovering && node.recoveryGoalId ? (
+                <Link
+                  href={`/goals/${node.recoveryGoalId}`}
+                  className="text-xs font-semibold text-brand-text hover:underline"
+                >
+                  {t("kpis.trees.recovery", {
+                    recoveryProgressPct: Math.round(
+                      node.recoveryProgressPct ?? 0,
+                    ),
+                  })}
+                </Link>
+              ) : null}
+            </span>
+            <span className="flex items-center justify-end gap-3 max-md:col-span-2 max-md:justify-start">
+              {!node.recovering && node.state === "unhealthy" && canEdit ? (
+                <LaunchRecovery kpiId={node.id} size="sm" />
+              ) : null}
+              <Link
+                href={`/kpis/${node.id}`}
+                className="text-xs font-medium text-ink-3 hover:text-ink hover:underline"
+              >
+                {t("common.open")}
+              </Link>
+              {canEdit && addDriverHref ? (
+                <Link
+                  href={addDriverHref(node.id)}
+                  scroll={false}
+                  className="text-xs font-semibold text-brand-text hover:underline"
+                >
+                  {t("kpis.trees.addDriver")}
+                </Link>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
