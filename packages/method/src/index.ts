@@ -321,6 +321,7 @@ export {
   type WeightedItem,
   weightedProgress,
 } from "./scoring.ts";
+export { METHOD_SECTIONS, methodSectionAnchor } from "./sections.ts";
 export {
   BLOCKER_TYPE_DEFINITIONS,
   type CheckInRecord,

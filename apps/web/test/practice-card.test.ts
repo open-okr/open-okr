@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
-import { PRACTICE, PRACTICE_KEYS, PROFILE_KEYS } from "@openokr/method";
+import {
+  compareProfiles,
+  methodSectionAnchor,
+  PRACTICE,
+  PRACTICE_KEYS,
+  PROFILE_KEYS,
+} from "@openokr/method";
 import { describe, expect, test } from "vitest";
 import { methodDocumentUrl, RUNNING_VERSION } from "../lib/app-version.ts";
 
@@ -85,18 +91,31 @@ describe("the practice screen", () => {
     expect(methodDocumentUrl("x")).toBe(
       `https://github.com/open-okr/open-okr/blob/v${RUNNING_VERSION}/docs/specification/METHOD.md#x`,
     );
-    const anchors = [...page.matchAll(/methodDocumentUrl\("([^"]+)"\)/g)].map(
-      (match) => match[1],
-    );
-    expect(anchors).toHaveLength(2);
+    // Every link is built from a section number, never a hand-typed anchor.
+    expect(page).toContain("methodSectionAnchor(section)");
+    expect(page).not.toMatch(/methodDocumentUrl\("/);
     const headings = new Set(
       [...methodDocument.matchAll(/^#{2,4} (.+)$/gm)].map((match) =>
         anchorOf(match[1] ?? ""),
       ),
     );
-    for (const anchor of anchors) {
-      expect(headings).toContain(anchor);
+    const linked = [
+      "12",
+      "12.2",
+      "12.3",
+      ...PRACTICE_KEYS.map((key) => PRACTICE[key].section),
+      ...compareProfiles().map((row) => row.section),
+    ];
+    for (const section of linked) {
+      expect(headings, section).toContain(methodSectionAnchor(section));
     }
+  });
+
+  test("explains every setting, profile and comparison row in place", () => {
+    // A reader should not need METHOD.md open to read this screen.
+    expect(form).toContain("<p>{setting.summary}</p>");
+    expect(form).toContain('href={methodLinks["12.2"]}');
+    expect(comparison).toContain("<p>{row.about}</p>");
   });
 
   test("is in the admin navigation for whoever may change it", () => {

@@ -36,6 +36,7 @@ import {
   END_STATE_SHAPES,
   isTriggerKey,
   GATE_TITLES,
+  METHOD_SECTIONS,
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
@@ -261,6 +262,7 @@ for (const label of practiceLabels) {
 // leave out is the default, which §12.1 names in the next column instead: "As
 // §4" is every check's default and is not repeated among Block, Warn and Off.
 let optionRows = 0;
+let summaryRows = 0;
 for (const line of section(
   method,
   "### 12.1 The settings",
@@ -270,7 +272,21 @@ for (const line of section(
     .split("|")
     .slice(1, -1)
     .map((cell) => cell.trim());
-  const [label, optionsCell, defaultCell] = cells;
+  const [label, summaryCell, optionsCell, defaultCell] = cells;
+  const entry = Object.values(PRACTICE).find(
+    (candidate) => candidate.label === label,
+  );
+  // "What it decides" is shown when somebody hovers the setting's name, so
+  // the screen's sentence and the document's are held to be one sentence.
+  if (entry && summaryCell !== entry.summary) {
+    fail(
+      "practice",
+      `"${label}" decides "${summaryCell ?? ""}" in METHOD.md §12.1 and "${entry.summary}" in the registry`,
+    );
+  }
+  if (entry) {
+    summaryRows += 1;
+  }
   if (
     label === undefined ||
     optionsCell === undefined ||
@@ -279,9 +295,6 @@ for (const line of section(
   ) {
     continue;
   }
-  const entry = Object.values(PRACTICE).find(
-    (candidate) => candidate.label === label,
-  );
   if (!entry) {
     continue;
   }
@@ -316,6 +329,63 @@ if (optionRows < 15) {
     "practice",
     `only ${optionRows} option lists compared in METHOD.md §12.1; the parse is wrong, not the document`,
   );
+}
+if (summaryRows !== practiceLabels.size) {
+  fail(
+    "practice",
+    `${summaryRows} of the registry's ${practiceLabels.size} settings were found with a "What it decides" sentence in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
+
+// --- 2b'. Section links -----------------------------------------------------
+//
+// The screens link a reader to the exact section a setting or threshold comes
+// from, through `METHOD_SECTIONS`. Its headings against the document's, both
+// directions, and every section the registries cite against it, so a renamed
+// heading fails here instead of leaving a link to the top of the page.
+
+const documentedHeadings = new Map(
+  [...method.matchAll(/^#{2,3} (\d+(?:\.\d+)*)\.? (.+)$/gm)].map((match) => [
+    match[1] ?? "",
+    (match[2] ?? "").trim(),
+  ]),
+);
+if (documentedHeadings.size < 50) {
+  fail(
+    "sections",
+    `only ${documentedHeadings.size} numbered headings found in METHOD.md; the parse is wrong, not the document`,
+  );
+}
+for (const [number, title] of documentedHeadings) {
+  if (METHOD_SECTIONS[number] !== title) {
+    fail(
+      "sections",
+      `METHOD.md heads section ${number} "${title}", and the package's section table has ${METHOD_SECTIONS[number] === undefined ? "no such section" : `"${METHOD_SECTIONS[number]}"`}`,
+    );
+  }
+}
+for (const number of Object.keys(METHOD_SECTIONS)) {
+  if (!documentedHeadings.has(number)) {
+    fail(
+      "sections",
+      `the package's section table has ${number}, which METHOD.md has no heading for`,
+    );
+  }
+}
+for (const [registry, entries] of [
+  ["practice", Object.entries(PRACTICE)],
+  ["threshold", Object.entries(THRESHOLDS)],
+] as const) {
+  for (const [key, entry] of entries) {
+    for (const cited of entry.section.split(",").map((part) => part.trim())) {
+      if (!documentedHeadings.has(cited)) {
+        fail(
+          "sections",
+          `the ${registry} registry's \`${key}\` cites section ${cited}, which METHOD.md has no heading for`,
+        );
+      }
+    }
+  }
 }
 
 const documentedProfiles = section(method, "### 12.2 Profiles", "### 12.3")
@@ -1031,6 +1101,7 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
     `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
+    `${documentedHeadings.size} section links, ` +
     `${documentedProfiles.length} profiles compared on ${compared.length} rows, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,

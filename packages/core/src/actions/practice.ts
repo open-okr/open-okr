@@ -65,6 +65,8 @@ const settingDescriptor = z.object({
   label: z.string(),
   item: z.string().nullable(),
   group: z.string(),
+  /** What the setting decides, as METHOD.md §12.1 words it. */
+  summary: z.string(),
   section: z.string(),
   source: z.string(),
   options: z.array(z.string()),
@@ -180,6 +182,7 @@ export const readPractice = defineReadAction({
               label: entry.label,
               item: "item" in entry ? (entry.item ?? null) : null,
               group: entry.group,
+              summary: entry.summary,
               section: entry.section,
               source: entry.source,
               options: [...entry.options],

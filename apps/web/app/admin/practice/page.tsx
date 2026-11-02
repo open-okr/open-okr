@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import {
   compareProfiles,
+  methodSectionAnchor,
   PRACTICE_KEYS,
   PROFILE_KEYS,
   practiceSettingName,
@@ -29,6 +30,11 @@ import { PracticeForm } from "./practice-form";
  * show the same table. It and the setting names are worked out here rather
  * than in the browser, which would otherwise download every check's catalogue
  * to read one title from each.
+ *
+ * **Every name the method defines explains itself in place**: a hover on each
+ * setting, profile and comparison row says what it decides and links to the
+ * exact METHOD.md section, so nobody has to open the document to read the
+ * screen. The links are one map from section to address, worked out here.
  */
 export default async function PracticeSettingsPage() {
   const { t } = await getTranslations();
@@ -64,6 +70,18 @@ export default async function PracticeSettingsPage() {
   const settingNames = Object.fromEntries(
     PRACTICE_KEYS.map((key) => [key, practiceSettingName(key)]),
   );
+  const comparison = compareProfiles();
+  const sectionLink = (section: string) =>
+    methodDocumentUrl(methodSectionAnchor(section) ?? undefined);
+  const methodLinks = Object.fromEntries(
+    [
+      "12",
+      "12.2",
+      "12.3",
+      ...practice.registry.map((entry) => entry.section),
+      ...comparison.map((row) => row.section),
+    ].map((section) => [section, sectionLink(section)]),
+  );
 
   return (
     <>
@@ -73,7 +91,7 @@ export default async function PracticeSettingsPage() {
       <p className="text-sm text-ink-3">
         {t("admin.practice.intro")}{" "}
         <a
-          href={methodDocumentUrl("12-practice-settings-and-profiles")}
+          href={methodLinks["12"]}
           target="_blank"
           rel="noreferrer"
           data-testid="practice-method-link"
@@ -88,8 +106,8 @@ export default async function PracticeSettingsPage() {
         previews={previews}
         thresholdLabels={thresholdLabels}
         settingNames={settingNames}
-        comparison={compareProfiles()}
-        comparisonMethodUrl={methodDocumentUrl("123-the-profiles-compared")}
+        comparison={comparison}
+        methodLinks={methodLinks}
         canManage={level >= ACCESS_LEVELS.full}
       />
     </>

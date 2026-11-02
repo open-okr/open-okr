@@ -59,6 +59,12 @@ export interface PracticeSetting<T extends string = string> {
   readonly item?: string;
   readonly group: PracticeGroup;
   /**
+   * What the setting decides, in §12.1's "What it decides" words. Shown when
+   * somebody hovers the setting's name, so it has to make sense to a reader
+   * who has never opened METHOD.md. Every item of one row shares it.
+   */
+  readonly summary: string;
+  /**
    * The METHOD.md section that defines the behaviour. Its number alone,
    * "4.5": the API returns it and a reader never sees "§".
    */
@@ -139,6 +145,14 @@ export const PRACTICE_CHECK_IDS = [
 ] as const;
 export type PracticeCheckId = (typeof PRACTICE_CHECK_IDS)[number];
 
+/** The §4 subsection that sets out each group of checks, by id prefix. */
+const CHECK_SECTIONS: Readonly<Record<string, string>> = {
+  OBJ: "4.1",
+  KR: "4.2",
+  AL: "4.3",
+  CY: "4.4",
+};
+
 const checkSettings = Object.fromEntries(
   PRACTICE_CHECK_IDS.map((id) => [
     `checks.${id}`,
@@ -146,7 +160,9 @@ const checkSettings = Object.fromEntries(
       label: "Check enforcement",
       item: id,
       group: "checks",
-      section: "4",
+      summary:
+        "How hard each quality check is. Block refuses publishing while the check fails, Warn shows it and coaches, and Off does not run it. As the method keeps the level the method gives that check.",
+      section: CHECK_SECTIONS[id.split("-")[0] ?? ""] ?? "4",
       source: "METHOD.md section 4",
       options: CHECK_ENFORCEMENT,
       optionLabels: {
@@ -180,6 +196,8 @@ const gateSettings = Object.fromEntries(
       label: "Publish gate enforcement",
       item: `Gate ${gate}`,
       group: "gates",
+      summary:
+        "How hard each publish gate is when a set of OKRs goes live. Block refuses publishing until the gate is green, Warn shows it, and Off skips it.",
       section: "4.5",
       source: "METHOD.md section 4.5",
       options: GATE_ENFORCEMENT,
@@ -204,6 +222,8 @@ const levelSettings = Object.fromEntries(
       label: "Levels in use",
       item: level,
       group: "levels",
+      summary:
+        "Which levels OKRs are set at. A change applies to cycles that start after it, so no objective is left at a level that no longer exists.",
       section: "2.7",
       source: "Castro; Cagan",
       // Individual OKRs are off by default: "not for everyone and should never
@@ -230,6 +250,8 @@ const keyResultKindSettings = Object.fromEntries(
       label: "Key result kinds",
       item: kind,
       group: "model",
+      summary:
+        "Which kinds of key result can be written: a metric moved from a baseline to a target, a number maintained inside a band, a milestone done or not, or a baseline still to be measured.",
       section: "2.10",
       source: "Lamorte; re:Work",
       options: ON_OFF,
@@ -250,6 +272,8 @@ export const PRACTICE = {
   "writing.when": setting({
     label: "Who may write OKRs, and when",
     group: "writing",
+    summary:
+      "When new objectives may be created: at any time, only inside the planning window, or only once planning phases 1 to 3 are complete.",
     section: "2.9",
     source: "Doerr; Akmal, 1 October 2026",
     options: ["anytime", "planningWindow", "afterPhases"],
@@ -263,6 +287,8 @@ export const PRACTICE = {
   "phases.enforcement": setting({
     label: "Phase enforcement",
     group: "writing",
+    summary:
+      "Whether the planning phases only show what is missing (Guided), hold drafting back until phases 1 to 3 are complete and publishing until phase 4 is (Binding), or are not shown at all (Hidden).",
     section: "2.3",
     source: "No source requires phases before drafting",
     options: ["guided", "binding", "hidden"],
@@ -272,6 +298,8 @@ export const PRACTICE = {
   "writing.midCycleAs": setting({
     label: "New objectives mid-cycle start as",
     group: "writing",
+    summary:
+      "Whether an objective added after the team publication window goes live once it passes the checks set to block, waits as a draft its owner publishes, or waits for its reviewer to approve it.",
     section: "2.9",
     source: "whatmatters",
     options: ["live", "ownerDraft", "reviewerApproval"],
@@ -285,6 +313,8 @@ export const PRACTICE = {
   "reasons.midCycleAddition": setting({
     label: "Reason when adding mid-cycle",
     group: "writing",
+    summary:
+      "Whether somebody adding an objective or key result mid-cycle is not asked for a reason, may give one, or must give one before it is saved.",
     section: "2.9",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
@@ -294,6 +324,8 @@ export const PRACTICE = {
   "reasons.easingTarget": setting({
     label: "Reason when easing a target",
     group: "writing",
+    summary:
+      "Whether making a target easier needs a written reason. Making one harder, or setting a first target, never does.",
     section: "2.9",
     source: "whatmatters",
     options: ["required", "optional"],
@@ -305,6 +337,8 @@ export const PRACTICE = {
   "okr.kinds": setting({
     label: "OKR kinds",
     group: "model",
+    summary:
+      "Whether objectives can be committed, expected to score 1.0, and aspirational, expected to average around 0.7, or the workspace uses one kind only.",
     section: "2.8",
     source: "Google's OKR playbook",
     options: ["both", "aspirationalOnly", "committedOnly"],
@@ -319,6 +353,8 @@ export const PRACTICE = {
   reviewer: setting({
     label: "Reviewer per goal",
     group: "model",
+    summary:
+      "Whether each goal has a reviewer, a second person who acknowledges its check-ins: not used, available, or required before the goal can be published.",
     section: "2.5",
     source: "OpenOKR default",
     options: ["off", "optional", "required"],
@@ -331,6 +367,7 @@ export const PRACTICE = {
   strictMode: setting({
     label: "Strict mode",
     group: "checks",
+    summary: "Raises every quality check to Block at once.",
     section: "4",
     source: "OpenOKR default",
     options: OFF_ON,
@@ -341,6 +378,8 @@ export const PRACTICE = {
   "gates.override": setting({
     label: "Gate override",
     group: "gates",
+    summary:
+      "Whether an admin may publish past a blocking gate by recording a reason.",
     section: "4.5",
     source: "REQUIREMENTS section 3.2",
     options: ON_OFF,
@@ -355,6 +394,8 @@ export const PRACTICE = {
   "progress.rollUp": setting({
     label: "Progress roll-up from aligned goals",
     group: "scoring",
+    summary:
+      "Whether a goal's progress also counts the goals aligned beneath it. Off by default, because their work usually moves the goal's own key results too and would be counted twice.",
     section: "3.1",
     source: "Perdoo (vendor)",
     options: OFF_ON,
@@ -364,6 +405,8 @@ export const PRACTICE = {
   "confidence.display": setting({
     label: "Confidence shown as",
     group: "scoring",
+    summary:
+      "How the confidence asked at every check-in is shown: as x in 10, as a decimal from 0.0 to 1.0, or as a percent.",
     section: "3.2",
     source: "Wodtke",
     options: ["xIn10", "decimal", "percent"],
@@ -377,6 +420,8 @@ export const PRACTICE = {
   "scoring.enabled": setting({
     label: "Scoring",
     group: "scoring",
+    summary:
+      "Whether key results are scored at the close of the cycle, from their progress against the key result as written.",
     section: "3.3",
     source: "Lamorte; Castro",
     options: ON_OFF,
@@ -386,6 +431,8 @@ export const PRACTICE = {
   "scoring.adjustment": setting({
     label: "Score adjustment at close",
     group: "scoring",
+    summary:
+      "Whether a person may adjust a computed score at the close with a written reason. Both numbers are kept.",
     section: "3.3",
     source: "Doerr",
     options: ["withReason", "notAllowed"],
@@ -398,6 +445,8 @@ export const PRACTICE = {
   "scoring.colours": setting({
     label: "Score colours",
     group: "scoring",
+    summary:
+      "Where a score's colour changes: at 0.6 and 0.3, as Google's playbook sets them, or at 0.7 and 0.4, as Doerr does.",
     section: "3.3",
     source: "re:Work; whatmatters",
     options: ["google", "doerr"],
@@ -407,6 +456,8 @@ export const PRACTICE = {
   "progress.signal": setting({
     label: "Progress signal",
     group: "scoring",
+    summary:
+      "How the red, amber or green signal beside health is judged: against the progress expected by today's date (Pace-aware), or against fixed percentages (Absolute).",
     section: "3.7",
     source: "Microsoft Viva Goals (vendor)",
     options: ["paceAware", "absolute"],
@@ -418,6 +469,8 @@ export const PRACTICE = {
   "escalation.criticalConfidence": setting({
     label: "Critical confidence escalation",
     group: "rhythm",
+    summary:
+      "Whether a key result reported at critical confidence is escalated to the cycle's sponsor the same day.",
     section: "3.2",
     source: "OpenOKR default",
     options: OFF_ON,
@@ -427,7 +480,11 @@ export const PRACTICE = {
   "escalation.sponsorInLadders": setting({
     label: "Sponsor in escalation ladders",
     group: "rhythm",
-    section: "7.3",
+    summary:
+      "Whether the cycle's sponsor becomes the last step of the check-in ladder. Without it, the sponsor sees stale goals in the weekly digest.",
+    // §11's check-in ladder is where the sponsor's step is defined. It cited
+    // §7.3, the blocker taxonomy, until a link to it was put on screen.
+    section: "11",
     source: "OpenOKR default",
     options: OFF_ON,
     optionLabels: ON_OFF_LABELS,
@@ -438,6 +495,8 @@ export const PRACTICE = {
   "escalation.peerStep": setting({
     label: "Peer step in the check-in ladder",
     group: "rhythm",
+    summary:
+      "Whether a late check-in is first offered to a peer from the goal's space, in place of the reviewer, before it goes further up the ladder.",
     section: "11",
     source: "OpenOKR default",
     options: OFF_ON,
@@ -449,6 +508,8 @@ export const PRACTICE = {
   "review.format": setting({
     label: "Quarterly review format",
     group: "review",
+    summary:
+      "Whether the quarterly review runs as one session, or as a review session and a separate retrospective.",
     section: "8",
     source: "Workpath (vendor)",
     options: ["oneSession", "split"],
@@ -461,6 +522,8 @@ export const PRACTICE = {
   "review.rootCauses": setting({
     label: "Root causes at the review",
     group: "review",
+    summary:
+      "Whether every key result that missed must be given a root cause at the quarterly review (As the method), or may be left without one (Optional).",
     section: "8.4",
     source: "OpenOKR default",
     options: ["asMethod", "optional"],
@@ -470,6 +533,8 @@ export const PRACTICE = {
   "close.carryForward": setting({
     label: "Carry forward unfinished aspirational objectives",
     group: "review",
+    summary:
+      "Whether the close proposes Keep for an aspirational objective that was not achieved, so it carries into the next cycle's draft.",
     section: "8.8",
     source: "Google's OKR playbook",
     options: ["proposed", "notProposed"],
@@ -484,6 +549,8 @@ export const PRACTICE = {
   "kpi.unhealthyResponse": setting({
     label: "Unhealthy KPI response",
     group: "kpi",
+    summary:
+      "When a KPI turns unhealthy, whether its owner is offered the three responses (fix it now, add a key result for it, or launch a recovery OKR) or a recovery OKR is drafted at once.",
     section: "6.5",
     source: "Wodtke",
     options: ["offer", "draftRecovery"],

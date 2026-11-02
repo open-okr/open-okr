@@ -2,7 +2,7 @@
 
 import { Dialog } from "@base-ui-components/react/dialog";
 import type { ProfileComparisonRow, ProfileKey } from "@openokr/method";
-import { Button, Chip, cn, useTranslations } from "@openokr/ui";
+import { Button, Chip, cn, MethodHint, useTranslations } from "@openokr/ui";
 import { X } from "lucide-react";
 
 /**
@@ -15,13 +15,14 @@ import { X } from "lucide-react";
  *
  * Only what some profile changes is a row. A cell that differs from
  * Recommended is bold on a tint, and the bold is what carries it for a reader
- * who cannot see the tint.
+ * who cannot see the tint. Each row's name has a hint saying what the row
+ * decides, so the table reads without METHOD.md beside it.
  */
 export function ProfileComparison({
   rows,
   profiles,
   inUse,
-  methodUrl,
+  methodLinks,
 }: {
   readonly rows: readonly ProfileComparisonRow[];
   readonly profiles: readonly {
@@ -30,8 +31,8 @@ export function ProfileComparison({
   }[];
   /** The profile this workspace runs, marked in its column's heading. */
   readonly inUse: string;
-  /** METHOD.md's own copy of this table, for the reasons behind each row. */
-  readonly methodUrl: string;
+  /** METHOD.md's address for each section, this table's own included. */
+  readonly methodLinks: Readonly<Record<string, string>>;
 }) {
   const { t } = useTranslations();
   const title = t("admin.practice.compare.title");
@@ -107,7 +108,15 @@ export function ProfileComparison({
                       scope="row"
                       className="sticky left-0 w-40 bg-surface px-3 py-2 text-left align-top font-medium text-ink sm:w-64"
                     >
-                      {row.name}
+                      <span className="flex items-start justify-between gap-1">
+                        {row.name}
+                        <MethodHint
+                          name={row.name}
+                          href={methodLinks[row.section]}
+                        >
+                          <p>{row.about}</p>
+                        </MethodHint>
+                      </span>
                     </th>
                     {profiles.map((profile) => (
                       <td
@@ -130,7 +139,7 @@ export function ProfileComparison({
           <footer className="flex flex-none flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-line px-4 py-3 text-sm">
             <p className="text-ink-3">{t("admin.practice.compare.legend")}</p>
             <a
-              href={methodUrl}
+              href={methodLinks["12.3"]}
               target="_blank"
               rel="noreferrer"
               data-testid="practice-compare-method-link"

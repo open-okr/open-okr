@@ -68,6 +68,20 @@ describe("the rows", () => {
     expect(thresholds.map((entry) => entry.key)).toEqual(thresholdOrder);
   });
 
+  it("say what each row decides and where the method sets it out", () => {
+    for (const entry of rows) {
+      if (entry.kind === "practice") {
+        const setting = PRACTICE[entry.key as keyof typeof PRACTICE];
+        expect(entry.about).toBe(setting.summary);
+        expect(entry.section).toBe(setting.section);
+      } else {
+        const threshold = THRESHOLDS[entry.key as keyof typeof THRESHOLDS];
+        expect(entry.about).toBe(threshold.why);
+        expect(entry.section).toBe(threshold.section);
+      }
+    }
+  });
+
   it("have a distinct name each, so a row in METHOD.md can only mean one", () => {
     const names = rows.map((entry) => entry.name);
     expect(new Set(names).size).toBe(names.length);
