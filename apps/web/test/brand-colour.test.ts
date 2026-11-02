@@ -240,11 +240,14 @@ describe("reading the branding card back", () => {
     expect(html).not.toContain("background-color:#c7d2fe");
   });
 
-  it("says a stored status hue is not applied, and draws no swatch", async () => {
+  it("says a stored status hue is not applied, and draws the colour in force", async () => {
     const html = await renderCard({ primaryColor: "#22c55e" });
     expect(html).toContain("#22c55e reads as red, amber or green");
     expect(html).toContain("so it is not applied");
-    expect(html).not.toContain("background-color");
+    // docs/design/branding-page.md §3: the swatch draws what is in force, the
+    // product's own indigo, never the refused colour and never nothing.
+    expect(html).not.toContain("background-color:#22c55e");
+    expect(html).toContain("background-color:#4f46e5");
   });
 
   it("says the product's own colour is in force when nothing is stored", async () => {

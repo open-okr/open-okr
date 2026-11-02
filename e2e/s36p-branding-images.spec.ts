@@ -55,12 +55,20 @@ test("a chosen logo is previewed before anything is sent, and Cancel forgets it"
     .setInputFiles({ name: "mark.jpg", mimeType: "image/jpeg", buffer: PICTURE });
   const preview = page.getByTestId("branding-logo-preview");
   await expect(preview).toBeVisible();
-  await expect(preview.getByText("Light theme")).toBeVisible();
-  await expect(preview.getByText("Dark theme")).toBeVisible();
   await expect(preview.getByText(/mark\.jpg, \d+ KB/)).toBeVisible();
+  // The page's mirror draws it in both themes before anything is sent
+  // (docs/design/branding-page.md §3).
+  const mirror = page.getByTestId("branding-mirror");
+  await expect(mirror.getByText("Light theme")).toBeVisible();
+  await expect(mirror.getByText("Dark theme")).toBeVisible();
+  await expect(mirror.locator("img[src^='blob:']")).toHaveCount(2);
+  await expect(page.getByTestId("branding-mirror-unsaved")).toHaveText(
+    "Not saved yet: logo",
+  );
 
   await preview.getByRole("button", { name: "Cancel" }).click();
   await expect(preview).toHaveCount(0);
+  await expect(page.getByTestId("branding-mirror-unsaved")).toHaveText("");
 });
 
 test("an SVG is refused and nothing is previewed", async () => {

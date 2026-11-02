@@ -41,6 +41,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.branding.images.faviconTitle",
   "admin.branding.images.fileSummary",
   "admin.branding.images.logoTitle",
+  "admin.branding.mirror.part.favicon",
+  "admin.branding.mirror.part.logo",
   // A version number and nothing else (docs/design/version-footer.md).
   "shell.version.running",
   "method.detail.okrChampion",

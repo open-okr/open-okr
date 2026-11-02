@@ -1,13 +1,7 @@
 "use client";
 
 import { statusHueOf } from "@openokr/formats";
-import {
-  Button,
-  Card,
-  CardBody,
-  ColourInput,
-  useTranslations,
-} from "@openokr/ui";
+import { Button, ColourInput, useTranslations } from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import { submitBranding } from "./actions.ts";
 import { NOTHING_SAVED, REFUSED_HUE } from "./branding-state.ts";
@@ -46,7 +40,17 @@ export interface BrandingStatus {
   readonly adjusted: boolean;
 }
 
-export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
+/** The product's own brand fill, `--brand` in tokens.css: what an empty field means. */
+const PRODUCT_BRAND = "#4f46e5";
+
+export function BrandingSettingsForm({
+  status,
+  onColourChange,
+}: {
+  status: BrandingStatus;
+  /** A whole, accepted colour as it is typed or picked, for the mirror. */
+  onColourChange?: (hex: string | null) => void;
+}) {
   const { t } = useTranslations();
   const [state, formAction, pending] = useActionState(
     submitBranding,
@@ -65,7 +69,7 @@ export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
   const { stored, fill, adjusted } = status;
   const statusLine =
     stored === null
-      ? t("admin.branding.brandingSettingsForm.emptyIsTheDefault")
+      ? `${t("admin.branding.brandingSettingsForm.productDefault", { colour: PRODUCT_BRAND })} ${t("admin.branding.brandingSettingsForm.emptyIsTheDefault")}`
       : fill === null
         ? t("admin.branding.brandingSettingsForm.notApplied", {
             colour: stored,
@@ -79,78 +83,86 @@ export function BrandingSettingsForm({ status }: { status: BrandingStatus }) {
               colour: stored,
             });
 
+  // One section of the page's single card since the revamp
+  // (docs/design/branding-page.md §2), so no card of its own.
   return (
-    <Card>
-      <CardBody>
-        <form
-          // Keyed on what is stored, so a save or a reset shows the new value
-          // rather than the field's first one.
-          key={stored ?? ""}
-          action={formAction}
-          onSubmit={submit}
-          aria-busy={pending}
-          className="flex flex-col gap-3"
-        >
-          {/* Picked or typed, and a status hue refused as it is chosen
+    <section
+      aria-labelledby="branding-colour-title"
+      className="flex flex-col gap-3"
+    >
+      <h2 id="branding-colour-title" className="text-sm font-semibold text-ink">
+        {t("admin.branding.colourTitle")}
+      </h2>
+      <form
+        // Keyed on what is stored, so a save or a reset shows the new value
+        // rather than the field's first one.
+        key={stored ?? ""}
+        action={formAction}
+        onSubmit={submit}
+        aria-busy={pending}
+        className="flex flex-col gap-3"
+      >
+        {/* Picked or typed, and a status hue refused as it is chosen
               rather than after Save (guided-inputs §4.11). */}
-          <ColourInput
-            id="primaryColor"
-            name="primaryColor"
-            label={t("admin.branding.brandingSettingsForm.primaryColourHex")}
-            defaultValue={stored ?? ""}
-            description={statusLine}
-            error={state.error}
-            check={(hex) => {
-              const family = statusHueOf(hex);
-              return family === null
-                ? null
-                : t(REFUSED_HUE[family], { colour: hex });
-            }}
-            className="max-w-sm"
-            trailing={
-              // The colour in force, drawn rather than described. It is the
-              // fill the layout applies, which is not the typed colour when
-              // that one was darkened. `aria-hidden` because the sentence
-              // below says the same in text.
-              <span
-                aria-hidden
-                data-testid="brand-swatch"
-                className="size-7 flex-none rounded-control border border-line-2"
-                style={fill === null ? undefined : { backgroundColor: fill }}
-              />
-            }
-          />
-          {state.saved === null ? null : (
-            <p role="status" className="max-w-sm text-xs text-ink-2">
-              {state.saved}
-            </p>
-          )}
-          <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
-            <Button
-              type="submit"
-              name="intent"
-              value="save"
-              variant="primary"
-              size="sm"
-              disabled={pending}
-            >
-              {t("common.save")}
-            </Button>
-            <Button
-              type="submit"
-              name="intent"
-              value="reset"
-              variant="ghost"
-              size="sm"
-              disabled={pending}
-              // Reset whatever the box holds, a refused colour included.
-              formNoValidate
-            >
-              {t("common.resetToDefaults")}
-            </Button>
-          </div>
-        </form>
-      </CardBody>
-    </Card>
+        <ColourInput
+          id="primaryColor"
+          name="primaryColor"
+          label={t("admin.branding.brandingSettingsForm.primaryColourHex")}
+          defaultValue={stored ?? ""}
+          description={statusLine}
+          error={state.error}
+          check={(hex) => {
+            const family = statusHueOf(hex);
+            return family === null
+              ? null
+              : t(REFUSED_HUE[family], { colour: hex });
+          }}
+          className="max-w-sm"
+          fallback={fill ?? PRODUCT_BRAND}
+          onValueChange={onColourChange}
+          trailing={
+            // The colour in force, drawn rather than described. It is the
+            // fill the layout applies, which is not the typed colour when
+            // that one was darkened. `aria-hidden` because the sentence
+            // below says the same in text.
+            <span
+              aria-hidden
+              data-testid="brand-swatch"
+              className="size-7 flex-none rounded-control border border-line-2"
+              style={{ backgroundColor: fill ?? PRODUCT_BRAND }}
+            />
+          }
+        />
+        {state.saved === null ? null : (
+          <p role="status" className="max-w-sm text-xs text-ink-2">
+            {state.saved}
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-3">
+          <Button
+            type="submit"
+            name="intent"
+            value="save"
+            variant="primary"
+            size="sm"
+            disabled={pending}
+          >
+            {t("common.save")}
+          </Button>
+          <Button
+            type="submit"
+            name="intent"
+            value="reset"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            // Reset whatever the box holds, a refused colour included.
+            formNoValidate
+          >
+            {t("common.resetToDefaults")}
+          </Button>
+        </div>
+      </form>
+    </section>
   );
 }
