@@ -32,6 +32,7 @@ import {
   CLOSE_DECISION_MEANINGS,
   COACH_LINES,
   CYCLE_CHECKS,
+  compareProfiles,
   END_STATE_SHAPES,
   isTriggerKey,
   GATE_TITLES,
@@ -317,7 +318,7 @@ if (optionRows < 15) {
   );
 }
 
-const documentedProfiles = section(method, "### 12.2 Profiles", "\n---")
+const documentedProfiles = section(method, "### 12.2 Profiles", "### 12.3")
   .split(NEWLINE)
   .map((line) => /^\|\s*\*\*([^*]+)\*\*\s*\|/.exec(line)?.[1])
   .filter((label): label is string => label !== undefined);
@@ -326,6 +327,78 @@ if (documentedProfiles.join("|") !== registeredProfiles.join("|")) {
   fail(
     "practice",
     `METHOD.md §12.2 names the profiles ${documentedProfiles.join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
+}
+
+// --- 2c. The profiles compared ----------------------------------------------
+//
+// §12.3's table against `compareProfiles`, cell by cell, row order included,
+// in both directions. Until November 2026 only the names were compared, and
+// §12.2 listed four "differences" that were the defaults already with nothing
+// to notice. The function this is compared with is held to `switchProfile` by
+// its own test, so the table is held to what choosing a profile does.
+
+const comparisonLines = section(
+  method,
+  "### 12.3 The profiles compared",
+  "\n---",
+)
+  .split(NEWLINE)
+  .filter((line) => line.startsWith("|") && !/^\|\s*-/.test(line))
+  .map((line) =>
+    line
+      .slice(1, line.lastIndexOf("|"))
+      .split("|")
+      .map((cell) => cell.trim()),
+  );
+const [comparisonHeader, ...comparisonRows] = comparisonLines;
+if (comparisonHeader?.slice(1).join("|") !== registeredProfiles.join("|")) {
+  fail(
+    "profiles compared",
+    `METHOD.md §12.3's columns are ${comparisonHeader?.slice(1).join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
+}
+if (comparisonRows.length < 10) {
+  fail(
+    "profiles compared",
+    `only ${comparisonRows.length} rows found in METHOD.md §12.3; the parse is wrong, not the document`,
+  );
+}
+const compared = compareProfiles();
+const documentedComparison = new Map(
+  comparisonRows.map((cells) => [cells[0] ?? "", cells.slice(1)]),
+);
+for (const row of compared) {
+  const expected = PROFILE_KEYS.map((key) => row.values[key]);
+  const cells = documentedComparison.get(row.name);
+  if (cells === undefined) {
+    fail(
+      "profiles compared",
+      `${row.differs.map((key) => PROFILES[key].label).join(", ")} set "${row.name}" differently from Recommended, and METHOD.md §12.3 has no row for it`,
+    );
+  } else if (cells.join("|") !== expected.join("|")) {
+    fail(
+      "profiles compared",
+      `"${row.name}" reads ${cells.join(", ")} in METHOD.md §12.3 and ${expected.join(", ")} in the package`,
+    );
+  }
+}
+const comparedNames = compared.map((row) => row.name);
+for (const name of documentedComparison.keys()) {
+  if (!comparedNames.includes(name)) {
+    fail(
+      "profiles compared",
+      `METHOD.md §12.3 has a row "${name}", which no profile sets differently from Recommended`,
+    );
+  }
+}
+if (
+  [...documentedComparison.keys()].join("|") !== comparedNames.join("|") &&
+  documentedComparison.size === compared.length
+) {
+  fail(
+    "profiles compared",
+    "METHOD.md §12.3 lists its rows in another order than the package, which is the order the practice screen shows them in",
   );
 }
 
@@ -958,7 +1031,7 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
     `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
-    `${documentedProfiles.length} profiles, ${terms} word-list terms, ` +
+    `${documentedProfiles.length} profiles compared on ${compared.length} rows, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,
 );

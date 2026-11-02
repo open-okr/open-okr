@@ -1153,6 +1153,28 @@ A profile is a named starting point: choosing one sets the settings above, and e
 
 *Source:* Google's OKR playbook, Wodtke's Radical Focus, Castro's two levels, and the configuration Perdoo and Microsoft Viva Goals offer (vendor).
 
+### 12.3 The profiles compared
+
+Every setting (§12.1) and threshold (§11) that at least one profile sets differently from Recommended, with the value each profile gives a workspace that has changed nothing itself. Anything not listed is the same in all five. The practice screen shows the same table, and the conformance suite compares this one with the package in both directions.
+
+| Setting | Recommended | Google-style | Radical Focus | Lightweight | Governed |
+|---|---|---|---|---|---|
+| Who may write OKRs, and when | Any time | Any time | Any time | Any time | Planning window |
+| Phase enforcement | Guided | Guided | Hidden | Hidden | Binding |
+| New objectives mid-cycle start as | Live | Live | Live | Live | Draft approved by the reviewer |
+| Reviewer per goal | Optional | Off | Optional | Off | Required |
+| AL-3 No level skip | As the method | As the method | As the method | As the method | Warn |
+| Gate 3: Alignment is mapped: each objective states what it contributes to | Warn | Warn | Warn | Off | Block |
+| Gate 4: Every dependency is confirmed, or logged with a named risk owner | Warn | Warn | Warn | Off | Block |
+| Gate 5: Capacity is checked, and nothing is left exceeding it | Warn | Warn | Warn | Off | Block |
+| Levels in use: department | On | Off | On | On | On |
+| Levels in use: individual | Off | On | Off | Off | Off |
+| Sponsor in escalation ladders | Off | Off | Off | Off | On |
+| Root causes at the review | As the method | As the method | As the method | Optional | As the method |
+| Check-in frequency | Weekly | Weekly | Weekly | Every two weeks | Weekly |
+| Key results per objective | 2 to 5 | 2 to 5 | 2 to 3 | 2 to 5 | 2 to 5 |
+| Objectives per unit cap | 3 | 3 | 1 | 3 | 3 |
+
 ---
 
 ## 13. Sources
