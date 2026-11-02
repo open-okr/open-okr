@@ -138,7 +138,7 @@ Every cell follows UIUX-PLAN §4, "Inline edit".
 
 | Action | How |
 |---|---|
-| Reorder | Drag by the grip, within the same parent. The keyboard alternative is Alt+↑ and Alt+↓. The whole order is saved, never just the visible rows |
+| Reorder | Drag by the grip, within the same parent. The keyboard alternative is Alt+↑ and Alt+↓. The whole order is saved (`goals.place`, `goals.placeKeyResult`, the `position` column), never just the visible rows. **Fixed on 2 November 2026:** an objective is dropped anywhere on another objective's card, its key results included, not only on its head; a row answers only a drag from its own set and lets any other pass to the card; a brand line shows where the row will land; and a drag released nowhere is forgotten, so it cannot spoil the next |
 | Delete a key result | More menu, then delete, with the six-second undo toast. A soft delete through `goals.removeKeyResult`, which P8-G12 built, restorable from deleted items (P9-T06b). One removal rather than a second action beside it |
 | Stop an objective | More menu, then stop, with a one-line reason. It closes as abandoned (§2.9 of the method). **As built at P9-T13-c-a**, the row has no more menu, so Stop sits with its open, check-in and delete controls, revealed on hover and reachable by keyboard, and asks the reason in place |
 | Check in | The row's check-in action opens the drawer on its check-in tab |

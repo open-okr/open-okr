@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { Tooltip, useTranslations } from "@openokr/ui";
 import { type ReactNode, useState } from "react";
 
 /**
@@ -27,8 +27,16 @@ export function GoalsToolbar({
 }: {
   /** The scope tabs, a named group of links. */
   readonly tabs: ReactNode;
-  /** The display icons, a named group of links. */
-  readonly display: ReactNode;
+  /** The displays, drawn here as icons each with its tooltip. */
+  readonly display: {
+    readonly label: string;
+    readonly options: readonly {
+      readonly key: "list" | "diagram" | "tree";
+      readonly href: string;
+      readonly label: string;
+      readonly on: boolean;
+    }[];
+  };
   readonly exportControl: ReactNode;
   /** The panel's rows, without its foot. */
   readonly panel: ReactNode;
@@ -79,7 +87,27 @@ export function GoalsToolbar({
               </span>
             ) : null}
           </button>
-          {display}
+          <fieldset
+            aria-label={display.label}
+            className="inline-flex h-7.5 gap-0.5 rounded-control bg-raised p-0.75"
+          >
+            {display.options.map((option) => (
+              <Tooltip key={option.key} label={option.label}>
+                <a
+                  href={option.href}
+                  aria-current={option.on ? "true" : undefined}
+                  className={`grid w-7 place-items-center rounded-md ${
+                    option.on
+                      ? "bg-surface text-brand-text shadow-control"
+                      : "text-ink-3 hover:text-ink"
+                  }`}
+                >
+                  <span className="sr-only">{option.label}</span>
+                  {DISPLAY_ICON[option.key]}
+                </a>
+              </Tooltip>
+            ))}
+          </fieldset>
           {exportControl}
         </div>
       </div>
@@ -109,3 +137,47 @@ export function GoalsToolbar({
     </>
   );
 }
+
+const ICON_CLASS = "size-3.5";
+
+const DISPLAY_ICON = {
+  list: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={ICON_CLASS}
+    >
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
+    </svg>
+  ),
+  diagram: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={ICON_CLASS}
+    >
+      <rect x="9" y="3" width="6" height="5" rx="1" />
+      <rect x="3" y="16" width="6" height="5" rx="1" />
+      <rect x="15" y="16" width="6" height="5" rx="1" />
+      <path d="M12 8v4M6 16v-4h12v4" />
+    </svg>
+  ),
+  tree: (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden="true"
+      className={ICON_CLASS}
+    >
+      <path d="M4 5h6M8 12h6M8 19h6M6 5v14M6 12h2M6 19h2" />
+    </svg>
+  ),
+} as const;
