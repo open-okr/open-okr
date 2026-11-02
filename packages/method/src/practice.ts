@@ -30,6 +30,7 @@
  */
 import { z } from "zod";
 import type { OkrKind } from "./scoring.ts";
+import { checkSection } from "./sections.ts";
 import {
   canonThresholds,
   isThresholdKey,
@@ -145,14 +146,6 @@ export const PRACTICE_CHECK_IDS = [
 ] as const;
 export type PracticeCheckId = (typeof PRACTICE_CHECK_IDS)[number];
 
-/** The §4 subsection that sets out each group of checks, by id prefix. */
-const CHECK_SECTIONS: Readonly<Record<string, string>> = {
-  OBJ: "4.1",
-  KR: "4.2",
-  AL: "4.3",
-  CY: "4.4",
-};
-
 const checkSettings = Object.fromEntries(
   PRACTICE_CHECK_IDS.map((id) => [
     `checks.${id}`,
@@ -162,7 +155,7 @@ const checkSettings = Object.fromEntries(
       group: "checks",
       summary:
         "How hard each quality check is. Block refuses publishing while the check fails, Warn shows it and coaches, and Off does not run it. As the method keeps the level the method gives that check.",
-      section: CHECK_SECTIONS[id.split("-")[0] ?? ""] ?? "4",
+      section: checkSection(id),
       source: "METHOD.md section 4",
       options: CHECK_ENFORCEMENT,
       optionLabels: {

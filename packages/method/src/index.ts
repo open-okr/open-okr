@@ -271,6 +271,7 @@ export {
   type QualityVerdict,
   strengthScore,
 } from "./quality.ts";
+export { describeRule, type RuleDescription } from "./rule-description.ts";
 export {
   belowCommittedFloor,
   type CascadeGoal,
