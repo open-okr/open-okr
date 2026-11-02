@@ -1,6 +1,6 @@
 # The version footer and the update check
 
-The sidebar footer shows the running version to administrators, and the
+The footer of the content area shows the running version to administrators, and the
 newest GitHub release when the instance is behind it. Requested by the product
 owner on 2 November 2026. Authority: REQUIREMENTS.md §7 (air-gapped
 operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
@@ -11,7 +11,7 @@ operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
 |---|---|---|
 | The running version | `apps/web/package.json` `version` (0.4.0 today) | The number to show. The release pull request bumps it, and `check:docs` already pins pages to it |
 | A version is kept behind a session | `apps/web/app/api/app-version/route.ts` | The stance: a version string is reconnaissance, so it is never shown signed out |
-| A footer slot | `packages/ui/src/shell/sidebar.tsx`, `footer` | Where the line goes. Unused today |
+| The content pane | `apps/web/lib/app-shell.tsx`, inside `main` | Where the line goes: at the foot of every signed-in screen, on the right. Moved there from the sidebar footer at the product owner's request on 2 November 2026, so the sidebar holds navigation only |
 | `outboundFetch` | `packages/adapters/src/outbound/guard.ts` | The only way out: timeout, size cap, no redirects, address checks |
 | Instance settings with an environment bootstrap | `packages/core/src/secrets/instance-registry.ts` | The switch, `instance.updateCheck` |
 | GitHub's public release API | `https://api.github.com/repos/open-okr/open-okr/releases/latest` | The newest release, pre-releases skipped, no token. 60 requests an hour per address |
@@ -47,10 +47,10 @@ operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
 | Check off | `v0.4.0` |
 | Managed cloud | `v0.4.0` |
 
-Small text (`text-xs text-ink-4`) at the bottom of the sidebar. At the icon-only
-width below 1280 px, only a dot on the version when behind, with the full
-sentence as its title and accessible name. Members without `full` get no
-footer.
+Small text (`text-xs text-ink-4`), right-aligned, at the foot of the content
+area: after the screen's content, and at the bottom of the pane when the
+content is shorter than it. The same at every width, because the content pane
+has room the icon-only sidebar did not. Members without `full` get no footer.
 
 ## 4. The switch
 

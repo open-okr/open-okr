@@ -6,8 +6,8 @@ import { getTranslations } from "./translations";
 import { createUpdateChecker, isBehind } from "./update-check.ts";
 
 /**
- * The sidebar footer: the running version, and the newest release when this
- * instance is behind it (docs/design/version-footer.md §3).
+ * The content footer, on the right: the running version, and the newest
+ * release when this instance is behind it (docs/design/version-footer.md §3).
  *
  * **Administrators only.** A version string is reconnaissance, which is why
  * `/api/app-version` sits behind a session; here it sits behind `full` as
@@ -43,32 +43,21 @@ export async function VersionFooter({ level }: { readonly level: number }) {
     : null;
 
   return (
-    <div data-testid="version-footer" className="px-2 pb-1 text-xs text-ink-4">
-      {/* Labelled from 1280 px, as the sidebar's rows are. */}
-      <div className="hidden xl:block">
-        <div>{running}</div>
-        {newer && available ? (
-          <a
-            href={newer.url}
-            target="_blank"
-            rel="noreferrer"
-            className="font-semibold text-brand-text underline"
-          >
-            {available}
-          </a>
-        ) : null}
-      </div>
+    <footer
+      data-testid="version-footer"
+      className="mt-6 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 pt-3 text-xs text-ink-4"
+    >
+      <span>{running}</span>
       {newer && available ? (
         <a
           href={newer.url}
           target="_blank"
           rel="noreferrer"
-          title={`${running}. ${available}`}
-          className="mx-auto block size-2 rounded-full bg-brand xl:hidden"
+          className="font-semibold text-brand-text underline"
         >
-          <span className="sr-only">{`${running}. ${available}`}</span>
+          {available}
         </a>
       ) : null}
-    </div>
+    </footer>
   );
 }

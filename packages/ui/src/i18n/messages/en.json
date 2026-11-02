@@ -580,7 +580,7 @@
   "admin.general.tenantFloor.fix": "Connect as a role with neither privilege. The Docker Compose install does this for you on its next up or upgrade; for Kubernetes, point database.url at a role that owns the schema but is not a superuser.",
   "admin.general.tenantFloor.title": "The database is not enforcing workspace isolation",
   "admin.general.tenantFloor.what": "This instance connects to Postgres as a role that bypasses row-level security: a superuser, or a role with BYPASSRLS. The product still checks access on every request, but the second line of defence, the database refusing to return another workspace's rows, is switched off.",
-  "admin.general.updateCheck.hint": "This instance runs v{version}. When a newer release exists, administrators see it at the bottom of the sidebar. The check sends nothing about this instance. Turn it off on an instance with no internet access.",
+  "admin.general.updateCheck.hint": "This instance runs v{version}. When a newer release exists, administrators see it at the bottom right of every screen. The check sends nothing about this instance. Turn it off on an instance with no internet access.",
   "admin.general.updateCheck.label": "Check GitHub once a day for a newer release",
   "admin.general.updateCheck.title": "Update check",
   "admin.imports.actions.fileCouldNotBeRead": "That file could not be read.",

@@ -3,7 +3,7 @@
  *
  * Acceptance criteria:
  *   Given an administrator, when any signed-in screen renders, then the
- *   sidebar footer shows the running version.
+ *   content footer, on the right, shows the running version.
  *   Given the check is off, as it is for this suite so that it never calls
  *   GitHub, then no newer release is named.
  *   Given an administrator on Admin, General, then the Update check card says
@@ -39,7 +39,7 @@ test.afterAll(async () => {
   await context?.close();
 });
 
-test("an administrator sees the running version in the sidebar", async () => {
+test("an administrator sees the running version at the foot of the content", async () => {
   await goTo(page, "/");
   const footer = page.getByTestId("version-footer");
   await expect(footer).toContainText(`v${version}`);

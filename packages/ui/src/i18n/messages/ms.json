@@ -580,7 +580,7 @@
   "admin.general.tenantFloor.fix": "Sambung sebagai peranan tanpa kedua-dua keistimewaan itu. Pemasangan Docker Compose melakukannya untuk anda pada up atau upgrade seterusnya; bagi Kubernetes, halakan database.url kepada peranan yang memiliki skema tetapi bukan superuser.",
   "admin.general.tenantFloor.title": "Pangkalan data tidak menguatkuasakan pengasingan ruang kerja",
   "admin.general.tenantFloor.what": "Instans ini bersambung ke Postgres sebagai peranan yang memintas keselamatan peringkat baris: superuser, atau peranan dengan BYPASSRLS. Produk masih menyemak akses pada setiap permintaan, tetapi barisan pertahanan kedua, iaitu pangkalan data enggan memulangkan baris ruang kerja lain, telah dimatikan.",
-  "admin.general.updateCheck.hint": "Instans ini menjalankan v{version}. Apabila keluaran yang lebih baharu wujud, pentadbir melihatnya di bahagian bawah bar sisi. Semakan ini tidak menghantar apa-apa tentang instans ini. Matikannya pada instans tanpa akses internet.",
+  "admin.general.updateCheck.hint": "Instans ini menjalankan v{version}. Apabila keluaran yang lebih baharu wujud, pentadbir melihatnya di bahagian bawah kanan setiap skrin. Semakan ini tidak menghantar apa-apa tentang instans ini. Matikannya pada instans tanpa akses internet.",
   "admin.general.updateCheck.label": "Semak GitHub sekali sehari untuk keluaran yang lebih baharu",
   "admin.general.updateCheck.title": "Semakan kemas kini",
   "admin.imports.actions.fileCouldNotBeRead": "Fail itu tidak dapat dibaca.",

@@ -351,9 +351,6 @@ export async function AppShellLayout({
             <Sidebar
               groups={groups}
               linkComponent={NavLink}
-              // docs/design/version-footer.md: the running version and a
-              // newer release, for administrators.
-              footer={<VersionFooter level={level} />}
               workspaceSwitcher={
                 <WorkspaceSwitcher
                   memberships={memberships}
@@ -464,7 +461,14 @@ export async function AppShellLayout({
               />
             </div>
           )}
-          {children}
+          {/* The version sits at the foot of the content, on the right
+              (docs/design/version-footer.md §3). At least the pane's height,
+              so it rests at the bottom of a short screen rather than under
+              its last line. */}
+          <div className="flex min-h-full flex-col">
+            <div className="flex-1">{children}</div>
+            <VersionFooter level={level} />
+          </div>
         </AppShell>
         {/*
          * Beside the shell rather than inside the topbar, because the palette is
