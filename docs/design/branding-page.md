@@ -41,36 +41,39 @@ quiet.
 | Radius and elevation | Card borders, no shadow (§2 elevation). The mirror's frames get the control radius, not the card radius, so they read as screens inside a card |
 | Motion | None on load. The mirror's brand fill eases 150 ms when the colour changes, off under reduced motion |
 
-**Layout**
+**Layout** (revised 2 November 2026: the preview in a 20rem column beside the
+settings was too small to read, owner review)
 
 ```
 ≥ 1024 px
 ┌ Branding ───────────────────────────────────────────────────────────┐
-│ How this workspace looks to its members. Changes show here first.   │
-├──────────────────────────────────────┬──────────────────────────────┤
-│ ONE card, three sections, ruled      │  Preview          (sticky)   │
-│                                      │ ┌ light ──────┐┌ dark ──────┐│
-│ Colour                               │ │[■] Name     ││[■] Name    ││
-│ [●picker] [#4f46e5      ] Product    │ │ ▌Home       ││ ▌Home      ││
-│  default, in force on every screen   │ │ [ Button ]  ││ [ Button ] ││
-│ [Save] [Reset to defaults]           │ │ ▬▬▬▬▬───    ││ ▬▬▬▬▬───   ││
-│ ──────────────────────────────────── │ └─────────────┘└────────────┘│
-│ Logo                     [AW] Default│ ┌ tab ─────────────────────┐ │
-│ ┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐  │ │[▪] Name                × │ │
-│   Drop an image or choose a file     │ └──────────────────────────┘ │
-│   PNG, JPEG or WebP, up to 2 MB      │  Not saved yet: logo         │
-│ └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘  │                              │
-│ mark.png, 4 KB   [Save] [Cancel]     │                              │
-│ ──────────────────────────────────── │                              │
-│ Favicon                  [◎] Default │                              │
-│ ( same drop zone )                   │                              │
-└──────────────────────────────────────┴──────────────────────────────┘
-< 1024 px: one column, the preview first, then the card.
+│ How this workspace looks to its members. ...                        │
+├ Preview ────────────────────── Browser tab [▪ Name      ] [▪] ──────┤
+│ ┌ light ─────────────────────────┐ ┌ dark ──────────────────────────┐│
+│ │[■] Name    │ Home      [+ New] │ │[■] Name    │ Home      [+ New] ││
+│ │ ▌Home      │ ┌──────────────┐  │ │ ▌Home      │ ┌──────────────┐  ││
+│ │ ───        │ │ ▬▬▬▬▬▬───     │  │ │ ───        │ │ ▬▬▬▬▬▬───     │  ││
+│ │ ───        │ └──────────────┘  │ │ ───        │ └──────────────┘  ││
+│ └────────────────────────────────┘ └────────────────────────────────┘│
+├──────────────────────┬──────────────────────┬───────────────────────┤
+│ Colour               │ Logo        [AW] Default│ Favicon   [◎] Default│
+│ [●] [#4f46e5     ] ■ │ hint                 │ hint                  │
+│ Product default ...  │ ┌ ─ drop zone ─ ┐    │ ┌ ─ drop zone ─ ┐     │
+│ [Reset to defaults]  │ └ ─ ─ ─ ─ ─ ─ ─ ┘    │ └ ─ ─ ─ ─ ─ ─ ─ ┘     │
+├──────────────────────┴──────────────────────┴───────────────────────┤
+│ Not saved yet: colour, logo                 [Discard] [Save changes] │  sticky
+└──────────────────────────────────────────────────────────────────────┘
+< 1024 px: the three settings stack. < 768 px: the two frames stack too.
+Order is always preview, settings, Save.
 ```
 
-Left-aligned throughout. The card is one card with three sections divided by
-the card's own rule, because the three settings are one look (problem 4), not
-three cards of the same weight.
+Left-aligned throughout. The settings are one card with three columns divided
+by the card's own rule, because the three settings are one look (problem 4),
+not three cards of the same weight. The mirror spans the content width so each
+frame is a readable screen rather than a thumbnail: a sidebar with the
+brandmark and the active row, and a content area with the page title, the
+primary button and two goal cards with progress bars. Rows without text stand
+in for the rest of the navigation, so the mirror needs no new words.
 
 **Review against the brief.** The first draft had three cards with a preview in
 each, which is the generic settings-card kit and is what exists today; it is
@@ -88,9 +91,9 @@ keyboard-reachable replacement.
 | Saved colour that was darkened | The mirror shows the darkened fill, the one in force, and the field's sentence says so as today |
 | Drop zone | A `<label>` wrapping the file input, so a click, Enter or Space opens the picker and the label names it. Dragging a file over it outlines it in `brand`. A dropped or chosen file is checked as today (type, size) |
 | Chosen image, not saved | The mirror shows it; the section shows the file name, size, Save and Cancel. "Not saved yet: logo" |
-| Saving | **One Save for the whole look**, at the product owner's request on 2 November 2026, after three Save buttons on one card read as three separate settings. The page is one form; "Save changes" and "Discard" sit in the preview panel under "Not saved yet". Save writes whatever changed: the colour only when it differs from the one the page was drawn with (a hidden `storedColour` travels with it), and each chosen picture. Every check runs before anything is written, so a wrong file leaves the colour unsaved too. Nothing changed answers "Nothing to save." Discard resets the field and forgets both files |
+| Saving | **One Save for the whole look**, at the product owner's request on 2 November 2026, after three Save buttons on one card read as three separate settings. The page is one form; "Save changes" and "Discard" sit in a bar under the settings, which sticks to the bottom of the window and says "Not saved yet: …", or how to use it when nothing has changed. Save comes after the fields it saves at every width (revised 2 November 2026; it sat in the preview panel, which put Save above the fields on a phone). Save writes whatever changed: the colour only when it differs from the one the page was drawn with (a hidden `storedColour` travels with it), and each chosen picture. Every check runs before anything is written, so a wrong file leaves the colour unsaved too. Nothing changed answers "Nothing to save." Discard resets the field and forgets both files |
 | Reset, Remove | Stay with their own section and act at once: Reset to defaults clears the colour only, Remove takes one picture down |
-| Messages | "Saved." or the refusal, under Save in the preview panel |
+| Messages | "Saved." or the refusal, in the Save bar |
 | Saved state | The mirror shows what is stored, so after Save it shows exactly what members see |
 
 ## 4. What stays
@@ -120,8 +123,8 @@ before Save.
 **Given** a keyboard user, **then** Tab reaches each drop zone, Enter opens
 the file picker, and focus is visible.
 
-**Given** 375 px width, **then** there is no horizontal scroll and the preview
-sits above the settings.
+**Given** 375 px width, **then** there is no horizontal scroll, the preview
+sits above the settings, and Save comes after them.
 
 ## 6. Tests
 

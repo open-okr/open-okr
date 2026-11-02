@@ -457,6 +457,7 @@
   "admin.branding.mirror.part.logo": "logo",
   "admin.branding.mirror.sampleButton": "+ Baharu",
   "admin.branding.mirror.sampleRow": "Utama",
+  "admin.branding.nothingChanged": "Tukar warna, logo atau favicon, kemudian simpan bersama.",
   "admin.branding.nothingToSave": "Tiada apa untuk disimpan.",
   "admin.branding.saveChanges": "Simpan perubahan",
   "admin.channels.actions.everyFieldIsNeeded": "Setiap medan diperlukan. Kad ini menyatakan di mana penyedia menunjukkan setiap satu.",

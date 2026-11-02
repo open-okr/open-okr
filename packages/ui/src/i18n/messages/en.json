@@ -457,6 +457,7 @@
   "admin.branding.mirror.part.logo": "logo",
   "admin.branding.mirror.sampleButton": "+ New",
   "admin.branding.mirror.sampleRow": "Home",
+  "admin.branding.nothingChanged": "Change the colour, logo or favicon, then save them together.",
   "admin.branding.nothingToSave": "Nothing to save.",
   "admin.branding.saveChanges": "Save changes",
   "admin.channels.actions.everyFieldIsNeeded": "Every field is needed. The card says where the provider shows each one.",

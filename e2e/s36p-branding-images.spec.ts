@@ -30,7 +30,7 @@ const PICTURE = Buffer.from(
 const logoCard = () => page.getByTestId("branding-logo");
 const saved = () =>
   page
-    .getByTestId("branding-mirror")
+    .getByTestId("branding-save-bar")
     .getByRole("status")
     .filter({ hasText: "Saved." });
 const faviconCard = () => page.getByTestId("branding-favicon");

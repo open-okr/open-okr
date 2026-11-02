@@ -51,6 +51,8 @@ export function BrandingImageCard({
   rules,
   onChosen,
   disabled,
+  removal = null,
+  onRemoval,
 }: {
   readonly slot: BrandingImageSlot;
   /** The stored picture's address, or null for the default. */
@@ -62,6 +64,12 @@ export function BrandingImageCard({
   readonly onChosen?: (url: string | null) => void;
   /** While the page saves, nothing here may change under it. */
   readonly disabled?: boolean;
+  /**
+   * What the last Remove answered. Held by the page rather than here, because
+   * a removal changes what is stored and that remounts this section.
+   */
+  readonly removal?: BrandingImageResult | null;
+  readonly onRemoval?: (result: BrandingImageResult | null) => void;
 }) {
   const { t } = useTranslations();
   const input = useRef<HTMLInputElement>(null);
@@ -72,7 +80,6 @@ export function BrandingImageCard({
   } | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [over, setOver] = useState(false);
-  const [removal, setRemoval] = useState<BrandingImageResult | null>(null);
   const [removing, startRemoving] = useTransition();
 
   // An object URL holds the file in memory until it is revoked.
@@ -96,7 +103,7 @@ export function BrandingImageCard({
   };
 
   const choose = (file: File | undefined) => {
-    setRemoval(null);
+    onRemoval?.(null);
     if (!file) {
       forget();
       return;
@@ -146,33 +153,35 @@ export function BrandingImageCard({
       aria-labelledby={`branding-${slot}-title`}
       className="flex flex-col gap-3"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
+      {/* Title and what is in use on one line, the hint under both at full
+          width, so the two picture columns line up. */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-3">
           <h2
             id={`branding-${slot}-title`}
             className="text-sm font-semibold text-ink"
           >
             {t(TITLE[slot])}
           </h2>
-          <p className="max-w-prose text-xs text-ink-3">{t(HINT[slot])}</p>
+          <div className="flex flex-none items-center gap-2">
+            {slot === "logo" ? (
+              <LogoTile url={storedUrl} initials={initials} />
+            ) : (
+              // biome-ignore lint/performance/noImgElement: a stored blob behind the session cookie, which next/image cannot fetch.
+              <img
+                src={storedUrl ?? "/icon.svg"}
+                alt=""
+                className="size-7 rounded-control object-contain"
+              />
+            )}
+            <span className="text-xs text-ink-3">
+              {storedUrl === null
+                ? t("admin.branding.images.default")
+                : t("admin.branding.images.inUse")}
+            </span>
+          </div>
         </div>
-        <div className="flex flex-none items-center gap-2">
-          {slot === "logo" ? (
-            <LogoTile url={storedUrl} initials={initials} />
-          ) : (
-            // biome-ignore lint/performance/noImgElement: a stored blob behind the session cookie, which next/image cannot fetch.
-            <img
-              src={storedUrl ?? "/icon.svg"}
-              alt=""
-              className="size-7 rounded-control object-contain"
-            />
-          )}
-          <span className="text-xs text-ink-3">
-            {storedUrl === null
-              ? t("admin.branding.images.default")
-              : t("admin.branding.images.inUse")}
-          </span>
-        </div>
+        <p className="max-w-prose text-xs text-ink-3">{t(HINT[slot])}</p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -244,7 +253,7 @@ export function BrandingImageCard({
             disabled={busy}
             onClick={() =>
               startRemoving(async () => {
-                setRemoval(await removeBrandingImage(slot));
+                onRemoval?.(await removeBrandingImage(slot));
               })
             }
           >
