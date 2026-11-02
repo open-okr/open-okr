@@ -50,6 +50,8 @@ const serverEnv = (port: number, url: string) => ({
   // Production refuses to run without a root key. Fixed rather than generated,
   // so a restart mid-run does not orphan anything sealed before it.
   OPENOKR_ENCRYPTION_KEY: "5UB2Ez1oQ0Rr8sT1n5x7yWl4qKcM9vHfJbGdApXeZi0=",
+  // The suite makes no call to GitHub (docs/design/version-footer.md §6).
+  OPENOKR_UPDATE_CHECK: "off",
 });
 
 export default defineConfig({

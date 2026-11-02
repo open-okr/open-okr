@@ -54,6 +54,7 @@ import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
+import { VersionFooter } from "./version-footer.tsx";
 import { requireWorkspace } from "./workspace.ts";
 import {
   workspaceBrandImages,
@@ -350,6 +351,9 @@ export async function AppShellLayout({
             <Sidebar
               groups={groups}
               linkComponent={NavLink}
+              // docs/design/version-footer.md: the running version and a
+              // newer release, for administrators.
+              footer={<VersionFooter level={level} />}
               workspaceSwitcher={
                 <WorkspaceSwitcher
                   memberships={memberships}

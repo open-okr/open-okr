@@ -1117,6 +1117,7 @@ export {
   type ResolvedMailSettings,
   resolveMailSettings,
 } from "./secrets/mail-settings.ts";
+export { readUpdateCheck, setUpdateCheck } from "./secrets/update-check.ts";
 export {
   type SessionScoresRevealedEvent,
   type SessionStageChangedEvent,

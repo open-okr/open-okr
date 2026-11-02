@@ -3,6 +3,7 @@ import {
   deploymentInstanceName,
   isCloudEnabled,
   readInstanceName,
+  readUpdateCheck,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
@@ -16,6 +17,7 @@ import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
 import { InstanceNameCard } from "./instance-name-card";
 import { SetupCard } from "./setup-card";
+import { UpdateCheckCard } from "./update-check-card";
 import { WorkspaceStateCard } from "./workspace-state-card";
 
 export default async function GeneralSettingsPage() {
@@ -45,9 +47,15 @@ export default async function GeneralSettingsPage() {
   // The instance's own name (M-33). Not offered on a managed cloud, where it
   // is the operator's rather than any customer's, and not fatal when the
   // settings cannot be read: the card is left out rather than the page.
-  const instanceName = (await isCloudEnabled(getPool()).catch(() => true))
+  const cloud = await isCloudEnabled(getPool()).catch(() => true);
+  const instanceName = cloud
     ? null
     : await readInstanceName(getPool()).catch(() => null);
+  // docs/design/version-footer.md §4. Absent on a managed cloud, like the
+  // name, and left out rather than failing the page when it cannot be read.
+  const updateCheck = cloud
+    ? null
+    : await readUpdateCheck(getPool()).catch(() => null);
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -76,6 +84,7 @@ export default async function GeneralSettingsPage() {
           deploymentName={deploymentInstanceName()}
         />
       ) : null}
+      {updateCheck ? <UpdateCheckCard enabled={updateCheck.value} /> : null}
       {/*
        * S-34 offered again (completeness review L-08). The registry's default
        * for `onboardingDone` is true, so only a stored `false` is pending.
