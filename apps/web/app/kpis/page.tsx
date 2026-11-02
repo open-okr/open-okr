@@ -38,6 +38,10 @@ import { KpiSuggestion } from "./kpi-suggestion.tsx";
  * quietly absent: sparklines in the row header, the filters, and the calculated
  * cell's formula chip.
  */
+
+/** The category filter's value for the KPIs that have no category. */
+const UNCATEGORISED = "none";
+
 export default async function KpisPage({
   searchParams,
 }: {
@@ -101,7 +105,8 @@ export default async function KpisPage({
     (kpi) =>
       (!filters.frequency || kpi.frequency === filters.frequency) &&
       (!filters.owner || kpi.ownerId === filters.owner) &&
-      (!filters.category || (kpi.categoryId ?? "") === filters.category) &&
+      (!filters.category ||
+        (kpi.categoryId ?? UNCATEGORISED) === filters.category) &&
       (!filters.state || kpi.state === filters.state),
   );
 
@@ -180,8 +185,10 @@ export default async function KpisPage({
                 param="category"
                 active={filters.category ?? ""}
                 query={query}
+                // The KPIs with no category are a choice of their own, not
+                // the empty value, which is "All" (and was its React key too).
                 choices={grid.categories.map((one) => ({
-                  value: one.id ?? "",
+                  value: one.id ?? UNCATEGORISED,
                   label: one.name,
                 }))}
               />
