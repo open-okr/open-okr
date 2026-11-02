@@ -60,6 +60,36 @@ export async function requireAvatarImage<
     readonly blobId: string;
   },
 ): Promise<AvatarImage> {
+  return requireSharedImage(tx, input, {
+    types: IMAGE_CONTENT_TYPES,
+    wrongType: "An avatar must be a PNG, JPEG, GIF or WebP image.",
+    notReady:
+      "That file is not ready to be an avatar. Upload the picture again.",
+  });
+}
+
+/**
+ * The same checks for any picture the whole workspace is shown: an avatar, or
+ * the workspace's logo and favicon (docs/design/workspace-logo-favicon.md).
+ * `maxBytes` is the stored, re-encoded size, which is what is served.
+ */
+export async function requireSharedImage<
+  TSchema extends Record<string, unknown> = Record<string, never>,
+>(
+  tx: AnyTx<TSchema>,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly blobId: string;
+  },
+  rules: {
+    readonly types: ReadonlySet<string>;
+    readonly wrongType: string;
+    readonly notReady: string;
+    readonly maxBytes?: number;
+    readonly tooLarge?: string;
+  },
+): Promise<AvatarImage> {
   const scoped = await getAccessScoped(tx, {
     workspaceId: input.workspaceId,
     memberId: input.memberId,
@@ -69,7 +99,11 @@ export async function requireAvatarImage<
   });
 
   const [file] = await tx
-    .select({ contentType: blobs.contentType, status: blobs.status })
+    .select({
+      contentType: blobs.contentType,
+      status: blobs.status,
+      filesize: blobs.filesize,
+    })
     .from(blobs)
     .where(
       activeOnly(
@@ -85,17 +119,14 @@ export async function requireAvatarImage<
       "No such blob, or you do not have access to it.",
     );
   }
-  if (!IMAGE_CONTENT_TYPES.has(file.contentType)) {
-    throw new OperationError(
-      "forbidden",
-      "An avatar must be a PNG, JPEG, GIF or WebP image.",
-    );
+  if (!rules.types.has(file.contentType)) {
+    throw new OperationError("forbidden", rules.wrongType);
   }
   if (file.status !== "ok" && file.status !== "scanning") {
-    throw new OperationError(
-      "forbidden",
-      "That file is not ready to be an avatar. Upload the picture again.",
-    );
+    throw new OperationError("forbidden", rules.notReady);
+  }
+  if (rules.maxBytes !== undefined && (file.filesize ?? 0) > rules.maxBytes) {
+    throw new OperationError("forbidden", rules.tooLarge ?? rules.wrongType);
   }
   return { blobId: input.blobId, contextId: scoped.contextId };
 }

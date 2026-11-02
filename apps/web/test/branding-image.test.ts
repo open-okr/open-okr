@@ -1,0 +1,58 @@
+import { BRANDING_IMAGE_MAX_BYTES, BRANDING_IMAGE_TYPES } from "@openokr/core";
+import { describe, expect, it } from "vitest";
+import {
+  brandingImageProblem,
+  brandingImageUrl,
+} from "../lib/branding-image.ts";
+
+/**
+ * The browser's own check on a chosen logo or favicon
+ * (docs/design/workspace-logo-favicon.md §3). The server action is the
+ * enforcement; this is what lets the preview refuse at once.
+ */
+const rules = {
+  types: [...BRANDING_IMAGE_TYPES],
+  maxBytes: BRANDING_IMAGE_MAX_BYTES,
+};
+
+describe("a chosen branding image", () => {
+  it("is accepted as a PNG, JPEG or WebP within the ceiling", () => {
+    for (const type of ["image/png", "image/jpeg", "image/webp"]) {
+      expect(brandingImageProblem({ type, size: 1024 }, rules)).toBeNull();
+    }
+    expect(
+      brandingImageProblem(
+        { type: "image/png", size: BRANDING_IMAGE_MAX_BYTES },
+        rules,
+      ),
+    ).toBeNull();
+  });
+
+  it("is refused as SVG, GIF or anything else", () => {
+    for (const type of ["image/svg+xml", "image/gif", "application/pdf", ""]) {
+      expect(brandingImageProblem({ type, size: 1024 }, rules)).toBe("type");
+    }
+  });
+
+  it("is refused over 2 MB, and when empty", () => {
+    expect(
+      brandingImageProblem(
+        {
+          type: "image/png",
+          size: BRANDING_IMAGE_MAX_BYTES + 1,
+        },
+        rules,
+      ),
+    ).toBe("size");
+    expect(brandingImageProblem({ type: "image/png", size: 0 }, rules)).toBe(
+      "empty",
+    );
+  });
+});
+
+describe("a stored branding image", () => {
+  it("is drawn from its thumbnail, which every member can read", () => {
+    expect(brandingImageUrl("0b0b-id")).toBe("/api/blobs/0b0b-id/thumbnail");
+    expect(brandingImageUrl(null)).toBeNull();
+  });
+});

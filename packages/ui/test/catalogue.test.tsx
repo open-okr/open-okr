@@ -36,6 +36,11 @@ describe("the message catalogue", () => {
  */
 const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Product, vendor and language names.
+  // "Logo" and "Favicon" are the words Malay uses, and the file summary is
+  // two placeholders and a unit (docs/design/workspace-logo-favicon.md).
+  "admin.branding.images.faviconTitle",
+  "admin.branding.images.fileSummary",
+  "admin.branding.images.logoTitle",
   "method.detail.okrChampion",
   "method.detail.okrCoach",
   "admin.ai.providerAnthropic",

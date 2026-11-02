@@ -2392,6 +2392,28 @@
               "primaryColor": {
                 "type": "string",
                 "pattern": "^#[0-9a-fA-F]{6}$"
+              },
+              "logoBlobId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "faviconBlobId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "additionalProperties": {}
@@ -2409,6 +2431,47 @@
       },
       "example": {
         "branding": {}
+      }
+    },
+    {
+      "name": "settings.setWorkspaceBrandingImage",
+      "description": "Set or remove the workspace's logo or favicon.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "slot": {
+            "type": "string",
+            "enum": [
+              "logo",
+              "favicon"
+            ]
+          },
+          "blobId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "slot",
+          "blobId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "slot": "logo",
+        "blobId": {}
       }
     },
     {

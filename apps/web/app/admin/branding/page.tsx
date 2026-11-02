@@ -1,8 +1,16 @@
-import { callAction, deriveBrandPalette } from "@openokr/core";
+import {
+  BRANDING_IMAGE_MAX_BYTES,
+  BRANDING_IMAGE_TYPES,
+  callAction,
+  deriveBrandPalette,
+} from "@openokr/core";
 import { HEX_COLOUR_PATTERN } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
+import { brandingImageUrl } from "../../../lib/branding-image";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { initialsOf } from "../../../lib/workspace-initials";
+import { BrandingImageCard } from "./branding-image-card";
 import {
   BrandingSettingsForm,
   type BrandingStatus,
@@ -41,12 +49,31 @@ export default async function BrandingSettingsPage() {
     adjusted: palette?.adjusted ?? false,
   };
 
+  const rules = {
+    types: [...BRANDING_IMAGE_TYPES],
+    maxBytes: BRANDING_IMAGE_MAX_BYTES,
+  };
+
   return (
     <>
       <h1 className="text-lg font-bold text-ink">
         {t("admin.branding.branding")}
       </h1>
       <BrandingSettingsForm status={status} />
+      {/* docs/design/workspace-logo-favicon.md §3. */}
+      {(["logo", "favicon"] as const).map((slot) => {
+        const id = branding[`${slot}BlobId`];
+        return (
+          <BrandingImageCard
+            key={slot}
+            slot={slot}
+            storedUrl={brandingImageUrl(typeof id === "string" ? id : null)}
+            workspaceName={workspace.name}
+            initials={initialsOf(workspace.name)}
+            rules={rules}
+          />
+        );
+      })}
     </>
   );
 }

@@ -29,8 +29,23 @@ export const workspaceTerms = cache(async (): Promise<TerminologyOverrides> => {
   }
 });
 
-/** The brand colour the workspace chose, or null for the product's own. */
-const workspaceBrandColour = cache(async (): Promise<string | null> => {
+interface WorkspaceBranding {
+  readonly primaryColor: string | null;
+  readonly logoBlobId: string | null;
+  readonly faviconBlobId: string | null;
+}
+
+const NO_BRANDING: WorkspaceBranding = {
+  primaryColor: null,
+  logoBlobId: null,
+  faviconBlobId: null,
+};
+
+/**
+ * The colour, logo and favicon the workspace chose, each null for the
+ * product's own (docs/design/workspace-logo-favicon.md).
+ */
+const workspaceBranding = cache(async (): Promise<WorkspaceBranding> => {
   try {
     const { session, workspace } = await requireWorkspace();
     // The member read rather than the admin one: every member's screens are
@@ -44,11 +59,25 @@ const workspaceBrandColour = cache(async (): Promise<string | null> => {
       "settings.readForMember",
       {},
     );
-    return read.settings.branding?.primaryColor ?? null;
+    const branding = read.settings.branding;
+    return {
+      primaryColor: branding?.primaryColor ?? null,
+      logoBlobId: branding?.logoBlobId ?? null,
+      faviconBlobId: branding?.faviconBlobId ?? null,
+    };
   } catch {
-    return null;
+    return NO_BRANDING;
   }
 });
+
+/** The workspace's logo and favicon for this request, as blob ids or null. */
+export async function workspaceBrandImages(): Promise<{
+  readonly logoBlobId: string | null;
+  readonly faviconBlobId: string | null;
+}> {
+  const { logoBlobId, faviconBlobId } = await workspaceBranding();
+  return { logoBlobId, faviconBlobId };
+}
 
 /**
  * The style sheet that puts the workspace's colour into the brand tokens, or
@@ -87,5 +116,5 @@ export function brandStyleSheet(colour: string | null): string | null {
 
 /** The workspace's brand style sheet for this request, or null. */
 export async function workspaceBrandStyleSheet(): Promise<string | null> {
-  return brandStyleSheet(await workspaceBrandColour());
+  return brandStyleSheet((await workspaceBranding()).primaryColor);
 }

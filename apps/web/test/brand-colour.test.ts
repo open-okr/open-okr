@@ -50,7 +50,11 @@ vi.mock("../lib/translations", () => ({
 vi.mock("../lib/workspace", () => ({
   requireWorkspace: async () => ({
     session: { user: { id: "user-1" } },
-    workspace: { workspaceId: "workspace-1", memberId: "member-1" },
+    workspace: {
+      workspaceId: "workspace-1",
+      memberId: "member-1",
+      name: "Northwind",
+    },
     memberships: [],
   }),
 }));
@@ -194,10 +198,12 @@ describe("saving the branding card", () => {
   it("resets the card from the same form", async () => {
     callAction.mockResolvedValue({});
     const state = await submitBranding(NOTHING, submitted({ intent: "reset" }));
+    // The colour alone: a card reset would clear the logo and favicon too
+    // (docs/design/workspace-logo-favicon.md §3).
     expect(callAction).toHaveBeenCalledWith(
       expect.anything(),
-      "settings.resetWorkspaceSettings",
-      { card: "branding" },
+      "settings.updateWorkspaceBranding",
+      { branding: {} },
     );
     expect(state.saved).toBe("Back to the product’s own colour.");
     expect(revalidatePath).toHaveBeenCalledWith("/", "layout");

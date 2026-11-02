@@ -23,7 +23,12 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import {
+  BRANDING_IMAGE_MAX_BYTES,
+  BRANDING_IMAGE_TYPES,
+} from "../blobs/validation.ts";
 import { OperationError } from "../operations/operation.ts";
+import { requireSharedImage, shareAvatar } from "../people/profile.ts";
 import {
   brandingSchema,
   findWorkspaceSetting,
@@ -154,7 +159,13 @@ export const readSettingsForMember = defineReadAction({
     settings: z.object({
       timezone: z.string().optional(),
       onboardingDone: z.boolean().optional(),
-      branding: z.object({ primaryColor: z.string().optional() }).optional(),
+      branding: z
+        .object({
+          primaryColor: z.string().optional(),
+          logoBlobId: z.uuid().optional(),
+          faviconBlobId: z.uuid().optional(),
+        })
+        .optional(),
     }),
   }),
   access: ACCESS_LEVELS.view,
@@ -216,7 +227,11 @@ export const readSettingsForMember = defineReadAction({
         const settings: {
           timezone?: string;
           onboardingDone?: boolean;
-          branding?: { primaryColor?: string };
+          branding?: {
+            primaryColor?: string;
+            logoBlobId?: string;
+            faviconBlobId?: string;
+          };
         } = {};
         for (const key of MEMBER_VISIBLE_SETTINGS) {
           const value = stored[key];
@@ -234,9 +249,25 @@ export const readSettingsForMember = defineReadAction({
             value !== null &&
             typeof value === "object"
           ) {
-            const colour = (value as Record<string, unknown>).primaryColor;
-            settings.branding =
-              typeof colour === "string" ? { primaryColor: colour } : {};
+            // The colour, and the two pictures every member's screens draw
+            // (docs/design/workspace-logo-favicon.md), which are shared with
+            // the workspace while they are set. Nothing else in the object.
+            const stored = value as Record<string, unknown>;
+            const branding: {
+              primaryColor?: string;
+              logoBlobId?: string;
+              faviconBlobId?: string;
+            } = {};
+            if (typeof stored.primaryColor === "string") {
+              branding.primaryColor = stored.primaryColor;
+            }
+            if (typeof stored.logoBlobId === "string") {
+              branding.logoBlobId = stored.logoBlobId;
+            }
+            if (typeof stored.faviconBlobId === "string") {
+              branding.faviconBlobId = stored.faviconBlobId;
+            }
+            settings.branding = branding;
           }
         }
 
@@ -345,9 +376,25 @@ export const updateWorkspaceBranding = defineWriteAction({
       return current.settings;
     },
     async execute({ tx, workspaceId, loaded }) {
+      // **The pictures are carried over and never taken from the input**
+      // (docs/design/workspace-logo-favicon.md §3). The colour card sends the
+      // colour alone and would drop a logo, and an id set here would skip the
+      // checks and the sharing `settings.setWorkspaceBrandingImage` does.
+      const {
+        logoBlobId: _logo,
+        faviconBlobId: _favicon,
+        ...colour
+      } = input.branding;
+      const current = (loaded.branding ?? {}) as Record<string, unknown>;
+      const images = Object.fromEntries(
+        BRANDING_IMAGE_SLOTS.map((slot) => [
+          `${slot}BlobId`,
+          current[`${slot}BlobId`],
+        ]).filter(([, id]) => typeof id === "string"),
+      );
       const nextSettings: WorkspaceSettings = {
         ...loaded,
-        branding: input.branding,
+        branding: { ...colour, ...images },
       };
 
       // openokr:allow-mutation: same transaction, same reason as
@@ -374,6 +421,112 @@ export const updateWorkspaceBranding = defineWriteAction({
           targetType: "workspace",
           targetId: workspaceId,
           payload: { branding: input.branding },
+        },
+      };
+    },
+  }),
+});
+
+const BRANDING_IMAGE_SLOTS = ["logo", "favicon"] as const;
+
+/**
+ * Sets or removes the workspace's logo or favicon
+ * (docs/design/workspace-logo-favicon.md).
+ *
+ * **Shared the way an avatar is.** A blob is born readable by its uploader
+ * alone; a logo is drawn on every member's sidebar. So setting one binds the
+ * workspace's standard group at `view` on the file, and replacing or removing
+ * it takes the binding back, in the same transaction as the setting.
+ */
+export const setWorkspaceBrandingImage = defineWriteAction({
+  name: "settings.setWorkspaceBrandingImage",
+  summary: "Set or remove the workspace's logo or favicon.",
+  input: z.object({
+    slot: z.enum(BRANDING_IMAGE_SLOTS),
+    /** An uploaded PNG, JPEG or WebP under 2 MB, or null to remove. */
+    blobId: z.uuid().nullable(),
+  }),
+  output: z.object({ workspaceId: z.uuid(), settings: settingsValue }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async load({ tx, workspaceId, actor }) {
+      const [current] = await tx
+        .select({ settings: workspaces.settings })
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      if (!current) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const branding = (current.settings.branding ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const previous = branding[`${input.slot}BlobId`];
+      if (input.blobId === null) {
+        return { settings: current.settings, previous, image: null };
+      }
+      if (!actor.memberId) {
+        throw new OperationError("forbidden", "No member to act as.");
+      }
+      const noun = input.slot === "logo" ? "A logo" : "A favicon";
+      const image = await requireSharedImage(
+        tx,
+        { workspaceId, memberId: actor.memberId, blobId: input.blobId },
+        {
+          types: BRANDING_IMAGE_TYPES,
+          wrongType: `${noun} must be a PNG, JPEG or WebP image.`,
+          notReady: "That file is not ready yet. Upload the picture again.",
+          maxBytes: BRANDING_IMAGE_MAX_BYTES,
+          tooLarge: `${noun} must be 2 MB or smaller.`,
+        },
+      );
+      return { settings: current.settings, previous, image };
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const branding = (loaded.settings.branding ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const nextSettings: WorkspaceSettings = {
+        ...loaded.settings,
+        branding: { ...branding, [`${input.slot}BlobId`]: input.blobId },
+      };
+
+      // openokr:allow-mutation: same transaction, same reason as
+      // settings.updateWorkspaceGeneral above.
+      const [updated] = await tx
+        .update(workspaces)
+        .set({ settings: nextSettings, updatedAt: new Date() })
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .returning({ settings: workspaces.settings });
+      if (!updated) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      await shareAvatar(tx, {
+        workspaceId,
+        previousBlobId:
+          typeof loaded.previous === "string" ? loaded.previous : null,
+        next: loaded.image,
+      });
+
+      // Which slot, and whether it is set, never the file: the id names a
+      // blob, and the trail does not need it.
+      const payload = { slot: input.slot, set: input.blobId !== null };
+      return {
+        result: { workspaceId, settings: updated.settings },
+        activity: {
+          kind: "workspace.branding_updated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload,
+        },
+        audit: {
+          action: "settings.set_workspace_branding_image",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload,
         },
       };
     },

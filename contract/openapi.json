@@ -11445,6 +11445,16 @@
                               "properties": {
                                 "primaryColor": {
                                   "type": "string"
+                                },
+                                "logoBlobId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                                },
+                                "faviconBlobId": {
+                                  "type": "string",
+                                  "format": "uuid",
+                                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
                                 }
                               },
                               "additionalProperties": false
@@ -11693,6 +11703,30 @@
                       "primaryColor": {
                         "type": "string",
                         "pattern": "^#[0-9a-fA-F]{6}$"
+                      },
+                      "logoBlobId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "faviconBlobId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "uuid",
+                            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     },
                     "additionalProperties": {}
@@ -11700,6 +11734,118 @@
                 },
                 "required": [
                   "branding"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/settings/setWorkspaceBrandingImage": {
+      "post": {
+        "operationId": "settings.setWorkspaceBrandingImage",
+        "summary": "Set or remove the workspace's logo or favicon.",
+        "tags": [
+          "settings"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "workspaceId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "settings": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": [
+                        "workspaceId",
+                        "settings"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "slot": {
+                    "type": "string",
+                    "enum": [
+                      "logo",
+                      "favicon"
+                    ]
+                  },
+                  "blobId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "slot",
+                  "blobId"
                 ]
               }
             }

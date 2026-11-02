@@ -162,6 +162,12 @@ export const brandingSchema = z
           "reads as red, amber or green, which mean off track, at risk and on track here, so a brand colour cannot use it (UIUX-PLAN §2, rule 1). Choose a blue, violet, pink or grey",
       })
       .optional(),
+    // Set only through `settings.setWorkspaceBrandingImage`, which checks the
+    // file and shares it with the workspace
+    // (docs/design/workspace-logo-favicon.md). Declared here so a stored
+    // value reads back typed.
+    logoBlobId: z.uuid().nullable().optional(),
+    faviconBlobId: z.uuid().nullable().optional(),
   })
   .catchall(z.unknown());
 
@@ -371,7 +377,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     key: "branding",
     scope: "workspace",
     home: "workspaces.settings",
-    why: "The product's own palette until a brand colour is chosen. Empty means the default theme, not an unanswered question.",
+    why: "The product's own palette until a brand colour is chosen, and the initials tile and the product icon until a logo and favicon are uploaded. Empty means the defaults, not an unanswered question.",
     resolve: () => ({}),
     schema: brandingSchema,
     card: "branding",

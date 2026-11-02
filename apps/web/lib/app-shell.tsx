@@ -39,6 +39,7 @@ import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
+import { brandingImageUrl } from "./branding-image.ts";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
@@ -54,7 +55,10 @@ import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
-import { workspaceTerms } from "./workspace-presentation.ts";
+import {
+  workspaceBrandImages,
+  workspaceTerms,
+} from "./workspace-presentation.ts";
 import { WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
@@ -350,6 +354,9 @@ export async function AppShellLayout({
                 <WorkspaceSwitcher
                   memberships={memberships}
                   active={workspace}
+                  logoUrl={brandingImageUrl(
+                    (await workspaceBrandImages()).logoBlobId,
+                  )}
                 />
               }
             />

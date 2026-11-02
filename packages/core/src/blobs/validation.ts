@@ -33,6 +33,20 @@ export const ALLOWED_CONTENT_TYPES: ReadonlySet<string> = new Set([
 export const MAX_BLOB_BYTES = 25 * 1024 * 1024;
 
 /**
+ * 2 MiB, for a workspace's logo and favicon
+ * (docs/design/workspace-logo-favicon.md). Both are drawn at 32 pixels or
+ * less, so anything larger is a photograph somebody picked by mistake.
+ */
+export const BRANDING_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+/** What a logo or favicon may be. GIF is left out: an animated tab icon is noise. */
+export const BRANDING_IMAGE_TYPES: ReadonlySet<string> = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+]);
+
+/**
  * The allowed types that are images, and so are re-encoded and given a
  * thumbnail before they are stored (§8.2, completeness review M-24).
  */
