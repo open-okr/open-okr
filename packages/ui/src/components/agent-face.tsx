@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useId, useState } from "react";
+import { type CSSProperties, type ReactNode, useId, useState } from "react";
 import { cn } from "../lib/cn.ts";
 import type { AgentFaceKind, AgentMood } from "./agent-face-kinds.ts";
 
@@ -19,11 +19,12 @@ import type { AgentFaceKind, AgentMood } from "./agent-face-kinds.ts";
  * motion lives in `styles/agent-face.css` because the content security
  * policy refuses an inline `<style>`.
  *
- * **Still on first paint** (UIUX-PLAN.md §2, Motion). A face plays its mood
- * when the mood changes after it appeared, which is a state change, and
- * when the row, link or button holding it is hovered or focused. `live`
- * loops it, and is for an agent that is working right now: that is the
- * ambient motion §2 reserves for live meaning.
+ * **Idle blinks; the rest wait for a reason** (UIUX-PLAN.md §2, Motion). An
+ * idle face blinks and glances on the drawing's own loop. Every other mood
+ * is still on first paint, plays when the mood changes after it appeared,
+ * which is a state change, and when the row, link or button holding it is
+ * hovered or focused. `live` loops it, and is for an agent that is working
+ * right now: that is the ambient motion §2 reserves for live meaning.
  */
 
 /**
@@ -104,6 +105,15 @@ const LAST_ANIMATION: Record<AgentMood, string> = {
   sleeping: "af-breathe",
 };
 
+/** A stable number from a string, for a face's start in its idle loop. */
+function phaseOf(seed: string): number {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
 const HEAD =
   "M120 35.4 L132 35.4 138.7 35.6 144.1 35.8 148.9 36.1 153.3 36.5 157.3 37.1 161.1 37.7 164.6 38.4 167.9 39.1 171.1 40 174.1 41 176.9 42 179.7 43.2 182.2 44.5 184.7 45.8 187.1 47.2 189.3 48.8 191.5 50.4 193.5 52.1 195.4 54 197.3 55.9 199 57.9 200.6 60.1 202.2 62.3 203.6 64.7 204.9 67.2 206.2 69.7 207.4 72.5 208.4 75.3 209.4 78.3 210.3 81.5 211 84.8 211.7 88.3 212.3 92.1 212.9 96.1 213.3 100.5 213.6 105.3 213.8 110.7 214 114.6 214 120 214 125.4 213.8 129.3 213.6 134.7 213.3 139.5 212.9 143.9 212.3 147.9 211.7 151.7 211 155.2 210.3 158.5 209.4 161.7 208.4 164.7 207.4 167.5 206.2 170.3 204.9 172.8 203.6 175.3 202.2 177.7 200.6 179.9 199 182.1 197.3 184.1 195.4 186 193.5 187.9 191.5 189.6 189.3 191.2 187.1 192.8 184.7 194.2 182.2 195.5 179.7 196.8 176.9 198 174.1 199 171.1 200 167.9 200.9 164.6 201.6 161.1 202.3 157.3 202.9 153.3 203.5 148.9 203.9 144.1 204.2 138.7 204.4 132 204.6 120 204.6 108 204.6 101.3 204.4 95.9 204.2 91.1 203.9 86.7 203.5 82.7 202.9 78.9 202.3 75.4 201.6 72.1 200.9 68.9 200 65.9 199 63.1 198 60.3 196.8 57.8 195.5 55.3 194.2 52.9 192.8 50.7 191.2 48.5 189.6 46.5 187.9 44.6 186 42.7 184.1 41 182.1 39.4 179.9 37.8 177.7 36.4 175.3 35.1 172.8 33.8 170.3 32.6 167.5 31.6 164.7 30.6 161.7 29.7 158.5 29 155.2 28.3 151.7 27.7 147.9 27.1 143.9 26.7 139.5 26.4 134.7 26.2 129.3 26 125.4 26 120 26 114.6 26.2 110.7 26.4 105.3 26.7 100.5 27.1 96.1 27.7 92.1 28.3 88.3 29 84.8 29.7 81.5 30.6 78.3 31.6 75.3 32.6 72.5 33.8 69.7 35.1 67.2 36.4 64.7 37.8 62.3 39.4 60.1 41 57.9 42.7 55.9 44.6 54 46.5 52.1 48.5 50.4 50.7 48.8 52.9 47.2 55.3 45.8 57.8 44.5 60.3 43.2 63.1 42 65.9 41 68.9 40 72.1 39.1 75.4 38.4 78.9 37.7 82.7 37.1 86.7 36.5 91.1 36.1 95.9 35.8 101.3 35.6 108 35.4Z";
 
@@ -129,11 +139,16 @@ export function AgentFace({
 }: AgentFaceProps) {
   // `useId` returns colons and guillemets, which a `url(#...)` reference
   // does not survive. One clip per face, so two faces never share one.
-  const clip = `af${useId().replace(/[^a-zA-Z0-9-]/g, "")}`;
+  const id = useId();
+  const clip = `af${id.replace(/[^a-zA-Z0-9-]/g, "")}`;
+  // Where in the idle loop this face starts, so a list of them does not
+  // blink in unison. From the id rather than at random, so the server and
+  // the browser agree and hydration does not see two different styles.
+  const phase = `${-(phaseOf(id) % 4600) / 1000}s`;
 
   // A mood that differs from the one last drawn is a state change, so it
   // plays, and the round remounts the parts so it plays from its start.
-  // Settling back to idle is calm and does not.
+  // Idle needs no play: it is always on its own loop.
   const [drawn, setDrawn] = useState(mood);
   const [round, setRound] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -171,6 +186,7 @@ export function AgentFace({
       data-mood={mood}
       data-live={live ? "" : undefined}
       data-playing={playing && !live ? "" : undefined}
+      style={{ "--af-phase": phase } as CSSProperties}
       onAnimationEnd={(event) => {
         if (event.animationName === LAST_ANIMATION[mood]) {
           setPlaying(false);

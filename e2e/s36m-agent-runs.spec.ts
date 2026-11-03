@@ -190,4 +190,25 @@ test("each agent wears its own face, and the general one follows the theme", asy
   await theme("dark");
   expect(await fill()).toBe("rgb(17, 24, 39)");
   await theme("light");
+
+  // Idle is the one mood that always moves: each eye glances on a six-second
+  // loop and blinks on a separate 4.6-second one, with nobody hovering.
+  const loops = await page
+    .locator('a[href="/admin/agents"] svg.agent-face')
+    .first()
+    .evaluate((svg) =>
+      svg
+        .getAnimations({ subtree: true })
+        .map((animation) => {
+          const timing = animation.effect?.getComputedTiming();
+          return `${(animation as CSSAnimation).animationName} ${timing?.duration} ${timing?.iterations}`;
+        })
+        .sort(),
+    );
+  expect(loops).toEqual([
+    "af-blink 4600 Infinity",
+    "af-blink 4600 Infinity",
+    "af-look 6000 Infinity",
+    "af-look 6000 Infinity",
+  ]);
 });

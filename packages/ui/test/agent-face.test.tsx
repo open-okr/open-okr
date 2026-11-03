@@ -99,6 +99,39 @@ describe("AgentFace", () => {
     expect(face(container).dataset.playing).toBeUndefined();
   });
 
+  /**
+   * Idle blinks and glances on its own loop, the one mood that always moves.
+   * Each face starts somewhere else in it, so twenty idle run rows do not
+   * blink at the same instant, and the start is the same on every render, so
+   * the server's markup and the browser's agree.
+   */
+  test("each face has its own place in the idle loop, the same every render", () => {
+    const phases = () =>
+      [
+        ...render(
+          <>
+            <AgentFace />
+            <AgentFace />
+            <AgentFace />
+          </>,
+        ).container.querySelectorAll("svg.agent-face"),
+      ].map((svg) =>
+        (svg as SVGSVGElement).style.getPropertyValue("--af-phase"),
+      );
+
+    const first = phases();
+    expect(new Set(first).size).toBe(3);
+    for (const phase of first) {
+      expect(phase).toMatch(/^-?\d+(\.\d+)?s$/);
+      expect(Number.parseFloat(phase)).toBeGreaterThan(-4.6);
+    }
+
+    const { container, rerender } = render(<AgentFace mood="idle" />);
+    const before = face(container).style.getPropertyValue("--af-phase");
+    rerender(<AgentFace mood="happy" />);
+    expect(face(container).style.getPropertyValue("--af-phase")).toBe(before);
+  });
+
   test("a live face loops rather than playing once", () => {
     const { container, rerender } = render(<AgentFace mood="idle" live />);
     expect(face(container).dataset.live).toBe("");

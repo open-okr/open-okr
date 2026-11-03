@@ -631,9 +631,10 @@ export function CopilotPanel({
           className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
         >
           <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
-            {/* Plays each change once and rests. The face in the reply is
-                the one that keeps moving while the answer is on its way, and
-                one moving face in a panel is enough. */}
+            {/* Blinks while idle, and plays any other change once and
+                rests. The face in the reply is the one that keeps moving
+                while the answer is on its way, and one moving face in a
+                panel is enough. */}
             <AgentFace mood={mood} />
             <h2 className="text-sm font-medium text-ink">
               {t("copilot.copilotPanel.copilot")}

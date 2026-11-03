@@ -46,7 +46,7 @@ the avatar palette, and the face's shape and its mood carry what it means. See
 
 | Mood | Still pose | When it plays | Length |
 |---|---|---|---|
-| `idle` | Open eyes | Glances left and right, blinks | 6 s, on hover only |
+| `idle` | Open eyes | Glances left and right; blinks for about 0.18 s | Always: the glance on a 6 s loop, the blink every 4.6 s |
 | `thinking` | Open eyes | Eyes rise and fall a beat apart | 1.1 s, three times; loops while live |
 | `happy` | Eyes smiling (lower lids) | Two hops, eyes bouncing | 2.4 s, twice |
 | `sad` | Lids tilted down | Head and eyes droop, one slow blink | 4.4 s, once |
@@ -63,14 +63,23 @@ The geometry and timings are the source drawings'. Two keyframes are adapted:
 ## 3. Motion
 
 UIUX-PLAN.md §2 allows motion on hover, focus and state change, keeps first
-paint to half a second, and reserves ambient motion for live meaning.
+paint to half a second, and reserves ambient motion for live meaning. Idle is
+the one exception, decided by the product owner on 3 November 2026 and
+written into §2.
 
 | A face plays | Because |
 |---|---|
-| When its mood changes after it appeared, once | A state change. Returning to `idle` is calm and does not play |
+| Always, when idle | The drawing's own loop. The blink and the glance run on different periods, so a blink lands at a different moment of the glance each time. Each face starts at its own point in the loop (`--af-phase`, from its id), so a list of idle faces does not blink in unison |
+| When its mood changes after it appeared, once | A state change. A change to `idle` starts its loop rather than a play |
 | When the link, button, list row or `.group` around it is hovered, or the link or button is focused | Hover and focus |
 | Continuously, with `live` | The agent is working right now. Used for a running run and an answer on its way |
-| Never on first paint | A list of twenty runs hopping as the page loads is the motion §2 rules out |
+| Never on first paint, except idle | A list of twenty runs hopping as the page loads is the motion §2 rules out |
+
+**WCAG 2.2.2.** Motion that starts on its own and lasts over five seconds
+should have a way to stop it. Reduced motion stops every face, idle
+included; the product has no per-page control of its own, so a reader whose
+system does not ask for reduced motion has none. A setting to still the faces
+is the follow-up if that is wanted.
 
 **Reduced motion.** Every rule that starts an animation sits inside
 `prefers-reduced-motion: no-preference`, so a reader who asked for less sees
@@ -85,7 +94,7 @@ They are in `packages/ui/src/styles/agent-face.css`, imported by `globals.css`.
 
 | Screen | Face | Mood |
 |---|---|---|
-| Admin navigation, "Agents and runs" | General | `idle`, plays on hover |
+| Admin navigation, "Agents and runs" | General | `idle` |
 | S-36 Agents, each agent | Its kind | `idle`, or `sleeping` when switched off |
 | S-36 Agents, each run | Its agent's kind | `moodForRun`: running or planning `thinking` and live; completed `happy`, or `idle` with nothing logged; cancelled `sleeping`; failed `sad` |
 | S-39 Copilot, the top bar trigger | General | `idle` |
@@ -142,5 +151,8 @@ drawn still.
   **then** it wears the Champion's face, sad.
 - **Given** a draft whose checks all pass after an edit, **when** the verdict
   changes, **then** the Coach's face plays happy once and rests.
+- **Given** an idle face and nobody hovering, **when** it is on screen,
+  **then** each eye glances on a six-second loop and blinks on a separate
+  4.6-second one.
 - **Given** a reader with reduced motion, **when** any face is drawn,
   **then** it shows its mood's still pose and nothing moves.

@@ -125,9 +125,8 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-imports": <Upload className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
   // The general agent's own face rather than a Lucide robot, in the row's
-  // text colour like every icon here. Still until the row is hovered or
-  // focused, because a sidebar is not where ambient motion belongs
-  // (docs/design/agent-faces.md).
+  // text colour like every icon here. Idle, so it blinks and glances on its
+  // slow loop (docs/design/agent-faces.md).
   "admin-agents": <AgentFace className="size-full" />,
 };
 

@@ -12,8 +12,8 @@
  * Here a reader who asked for less motion gets each mood's still pose.
  *
  * Each mood names what its four moving parts would run. A face runs them
- * only when one of the rules at the bottom says it may: while it is live,
- * once when its mood changed, and once on hover or focus.
+ * only when one of the rules at the bottom says it may: always when idle,
+ * while it is live, once when its mood changed, and once on hover or focus.
  */
 
 .agent-face :is(.af-head, .af-eye, .af-white) {
@@ -25,17 +25,21 @@
   --af-count: var(--af-times, 1);
 }
 
-.agent-face[data-live] {
+.agent-face[data-live],
+.agent-face[data-mood="idle"] {
   --af-count: infinite;
 }
 
-/* Eyes glancing left, then right, with a blink. Plays on hover only: a face
- * settling back to idle is calm, and a six-second look is past the five
- * seconds WCAG 2.2.2 allows motion to start on its own. */
+/* Idle is the drawing's own loop, and the one mood that always moves
+ * (decided by the product owner on 3 November 2026): a blink of about 0.18
+ * seconds every 4.6, and a glance left then right on its own six-second
+ * loop, so the blinks land at a different moment of the glance each time.
+ * `--af-phase` is each face's own start in that loop, set by the component,
+ * so a list of idle faces does not blink in unison. */
 .agent-face[data-mood="idle"] {
-  --af-eye-left: af-look 6s ease-in-out;
-  --af-eye-right: af-look 6s ease-in-out;
-  --af-white: af-blink 4.6s;
+  --af-eye-left: af-look 6s ease-in-out var(--af-phase, 0s);
+  --af-eye-right: af-look 6s ease-in-out var(--af-phase, 0s);
+  --af-white: af-blink 4.6s var(--af-phase, 0s);
 }
 
 /* Two hops with the eyes bouncing. */
@@ -83,6 +87,7 @@
 @media (prefers-reduced-motion: no-preference) {
   :is(
       .agent-face[data-live],
+      .agent-face[data-mood="idle"],
       .agent-face[data-playing],
       .agent-face:hover,
       :is(a, button, li, .group):hover .agent-face,
@@ -95,6 +100,7 @@
 
   :is(
       .agent-face[data-live],
+      .agent-face[data-mood="idle"],
       .agent-face[data-playing],
       .agent-face:hover,
       :is(a, button, li, .group):hover .agent-face,
@@ -107,6 +113,7 @@
 
   :is(
       .agent-face[data-live],
+      .agent-face[data-mood="idle"],
       .agent-face[data-playing],
       .agent-face:hover,
       :is(a, button, li, .group):hover .agent-face,
@@ -119,6 +126,7 @@
 
   :is(
       .agent-face[data-live],
+      .agent-face[data-mood="idle"],
       .agent-face[data-playing],
       .agent-face:hover,
       :is(a, button, li, .group):hover .agent-face,
