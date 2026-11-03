@@ -226,4 +226,7 @@ Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` 
 | SC1 | "N added mid-cycle" is a grey chip beside the cycle name under What moved. Not seen locally: no cycle has one |
 | C7 cards | Summary and bands sit side by side once the phase column is 672px wide, a container query. At 1280 the column is 364px, so they stay stacked (browser) |
 
+| O2 | Company tab, a divider, and a space picker with "All" first. The company's own space (`isCompany`) is not offered (browser: no root space tab) |
+| O3 | The cycle picker sorts newest start first, and a shorter cycle before a longer one on the same start, so Q1 comes before the year. Not seen with several cycles locally |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

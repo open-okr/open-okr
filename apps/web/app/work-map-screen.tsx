@@ -170,12 +170,15 @@ export async function WorkMapScreen({
       label: t("workMap.scope.company"),
       href: linkTo({ scope: "company", node: null }),
     },
-    ...spaces.map((space) => ({
+  ];
+  // The company's own space is the Company tab, not a team (O2).
+  const spaceTabs: ScopeTab[] = spaces
+    .filter((space) => !space.isCompany)
+    .map((space) => ({
       key: space.id,
       label: space.name,
       href: linkTo({ scope: space.id, node: null }),
-    })),
-  ];
+    }));
 
   const scopeLabel =
     scope === "company"
@@ -204,6 +207,7 @@ export async function WorkMapScreen({
 
       <WorkMapScopeTabs
         tabs={scopeTabs}
+        spaces={spaceTabs}
         active={scope}
         cycles={cycles}
         activeCycleId={cycleId}
