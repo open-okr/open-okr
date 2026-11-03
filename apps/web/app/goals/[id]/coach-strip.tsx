@@ -18,6 +18,8 @@
  * strip says the rules still apply and only the suggestion needs a provider.
  */
 import {
+  AgentFace,
+  type AgentMood,
   Button,
   Card,
   CardBody,
@@ -114,6 +116,12 @@ export function CoachStrip({
 
   const failing = keyResults.filter((kr) => kr.qualityFlags.length > 0);
 
+  // Thinking at rest: the strip only shows when a rule is not met, and the
+  // Coach asks the question rather than judging the goal (METHOD.md §4). A
+  // suggestion the catalogue says fixes the rule is the one good news here.
+  const mood: AgentMood =
+    problem !== null ? "sad" : suggestion?.fixesTheRule ? "happy" : "thinking";
+
   if (flags.length === 0 && failing.length === 0) {
     return null;
   }
@@ -124,6 +132,13 @@ export function CoachStrip({
     <Card role="region" aria-labelledby="coach-strip-heading">
       <CardHeader>
         <span className="flex flex-wrap items-center gap-2">
+          {/* Live only while a suggestion is being drafted. Applying one
+              keeps the face it had, which is not a mood to loop. */}
+          <AgentFace
+            agent="coach"
+            mood={mood}
+            live={pending && mood === "thinking"}
+          />
           <h2 id="coach-strip-heading" className="text-sm font-bold text-ink">
             {t("goals.detail.coachStrip.whatTheCoachSees")}
           </h2>

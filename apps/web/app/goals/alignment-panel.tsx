@@ -1,7 +1,14 @@
 "use client";
 
 import { Tabs } from "@base-ui-components/react/tabs";
-import { Bar, Button, Chip, useTranslations } from "@openokr/ui";
+import {
+  AgentFace,
+  type AgentMood,
+  Bar,
+  Button,
+  Chip,
+  useTranslations,
+} from "@openokr/ui";
 import { useState } from "react";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { applyFinding, dismissFinding } from "./alignment-actions.ts";
@@ -62,6 +69,17 @@ const SEVERITY_TONE: Readonly<Record<string, "bad" | "warn" | "neutral">> = {
   high: "bad",
   medium: "warn",
   low: "neutral",
+};
+
+/**
+ * The Coach's face on one of its own findings. A high one is something it
+ * did not expect to see; the rest are a conversation to have, which is what
+ * the comment on the relink button below says too.
+ */
+const SEVERITY_MOOD: Readonly<Record<string, AgentMood>> = {
+  high: "surprised",
+  medium: "thinking",
+  low: "thinking",
 };
 
 export function AlignmentPanel({
@@ -236,7 +254,10 @@ export function AlignmentPanel({
         <Tabs.Panel value="review" className="flex flex-col gap-2.5 p-3">
           {semantic.length === 0 ? (
             <>
-              <p className="text-sm text-ink-3">{t("common.nothingHereYet")}</p>
+              <p className="flex items-center gap-2 text-sm text-ink-3">
+                <AgentFace agent="coach" className="size-5" />
+                {t("common.nothingHereYet")}
+              </p>
               <p className="text-xs text-ink-4">
                 {t("goals.studio.studio.thisTabHoldsThe")}
               </p>
@@ -248,9 +269,16 @@ export function AlignmentPanel({
                   key={finding.id}
                   className="flex flex-col gap-1 rounded-md border border-line p-2"
                 >
-                  <Chip tone={SEVERITY_TONE[finding.severity] ?? "neutral"}>
-                    {finding.kind}
-                  </Chip>
+                  <span className="flex items-center gap-1.5">
+                    <AgentFace
+                      agent="coach"
+                      mood={SEVERITY_MOOD[finding.severity] ?? "thinking"}
+                      className="size-4.5"
+                    />
+                    <Chip tone={SEVERITY_TONE[finding.severity] ?? "neutral"}>
+                      {finding.kind}
+                    </Chip>
+                  </span>
                   <span className="text-xs text-ink-2">{finding.reason}</span>
                   <Subject finding={finding} onOpen={onOpen} />
                   {canEdit ? (
