@@ -504,9 +504,28 @@ export default async function CyclePage({
                   {t("cycle.stillNeededHere")}
                 </p>
                 <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
-                  {phase.missing.map((reason) => (
-                    <li key={reason}>{reason}</li>
-                  ))}
+                  {phase.missing.map((reason) => {
+                    // A reason that carries its gaps as further sentences,
+                    // one per team, reads as a list under its first sentence
+                    // (usability review C6).
+                    // A quoted title can hold a full stop of its own, so a reason
+                    // that quotes one is never split.
+                    const [head, ...gaps] = reason.includes('"')
+                      ? [reason]
+                      : reason.split(". ");
+                    return (
+                      <li key={reason}>
+                        {gaps.length === 0 ? reason : head}
+                        {gaps.length > 0 ? (
+                          <ul className="mt-0.5 list-[circle] pl-4 text-ink-3">
+                            {gaps.map((gap) => (
+                              <li key={gap}>{gap.replace(/\.$/, "")}</li>
+                            ))}
+                          </ul>
+                        ) : null}
+                      </li>
+                    );
+                  })}
                 </ul>
               </CardBody>
             ) : null}

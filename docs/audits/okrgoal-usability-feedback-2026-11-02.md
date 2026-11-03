@@ -236,4 +236,17 @@ Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` 
 | TB1 | A button at the sidebar's foot, from 1280px, sets `data-sidebar="rail"` on `<html>`; the sidebar's own classes narrow it to the icon rail. Remembered as `openokr.sidebar` (browser: 236px to 68px, kept after a reload) |
 | C3 | No change needed: the note field already takes the row and Save sits at its right end (code) |
 
+| C6, C7 grouping | Phase 6 groups sessions by space and confidence rows by objective; phase 7 groups key results by objective, through `lib/group-rows.ts`. A "still needed" reason that carries its gaps as sentences lists them under it, unless it quotes a title (browser: groups drawn on both phases) |
+
+### Still open
+
+| Item | Why it is not done |
+|---|---|
+| I1 pill counts | A count per reason needs a new read action, which changes the contract. Counting the loaded page would repeat D1 |
+| C6, C7 filters | A team filter on the cadence lists and on Sessions (`?space=`) is not built |
+| K2, K3 | KPI row meta and tree chevrons: not re-measured after the KPI redesign of 2 November |
+| O4, O4a | Indent-only nesting on the Work Map and the maintain KR seed check |
+| IN2 | Needs an initiative with a 200-character title to test |
+| Q7, Q8 | Owner decisions that change METHOD.md |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

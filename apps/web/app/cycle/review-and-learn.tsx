@@ -1,6 +1,7 @@
 import type { ResolvedThresholds, ScoreColoursPractice } from "@openokr/method";
 import { scoreBand, scoreBandsIn } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { groupRows } from "../../lib/group-rows.ts";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { ActionForm } from "./action-form.tsx";
@@ -238,27 +239,32 @@ export async function ReviewAndLearn({
               {t("cycle.reviewAndLearn.nothingToScoreThis")}
             </p>
           ) : (
-            keyResults.map((row) => (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-2.5 border-t border-line pt-1.5 text-sm first:border-0 first:pt-0"
-              >
-                <span className="min-w-0 text-ink">
-                  {row.title}
-                  <span className="ml-1.5 text-xs text-ink-3">
-                    {row.goalTitle}
-                  </span>
-                </span>
-                <span className="flex flex-none items-center gap-2">
-                  {row.carryForward ? (
-                    <Chip tone="warn">{t("cycle.reviewAndLearn.carry")}</Chip>
-                  ) : null}
-                  <span className="tabular-nums text-ink-2">
-                    {row.score === null
-                      ? t("cycle.reviewAndLearn.notScored")
-                      : row.score.toFixed(2)}
-                  </span>
-                </span>
+            // Under their objective, named once (usability review C7).
+            groupRows(keyResults, (row) => row.goalTitle).map((group) => (
+              <div key={group.heading} className="flex flex-col gap-1.5">
+                <p className="pt-1.5 text-[11px] font-bold tracking-wide text-ink-4 uppercase first:pt-0">
+                  {group.heading}
+                </p>
+                {group.rows.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center justify-between gap-2.5 border-t border-line pt-1.5 text-sm"
+                  >
+                    <span className="min-w-0 text-ink">{row.title}</span>
+                    <span className="flex flex-none items-center gap-2">
+                      {row.carryForward ? (
+                        <Chip tone="warn">
+                          {t("cycle.reviewAndLearn.carry")}
+                        </Chip>
+                      ) : null}
+                      <span className="tabular-nums text-ink-2">
+                        {row.score === null
+                          ? t("cycle.reviewAndLearn.notScored")
+                          : row.score.toFixed(2)}
+                      </span>
+                    </span>
+                  </div>
+                ))}
               </div>
             ))
           )}
