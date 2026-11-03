@@ -3659,7 +3659,7 @@
   "signOut.signOut": "Sign out",
   "spaces.aTeamHomeIts": "A team home. Its manager covers the coordinator's duties until\n                somebody else is named.",
   "spaces.createASpace": "New {termSpaceLower}",
-  "spaces.createTheSpace": "Create the {termSpaceLower}",
+  "spaces.createTheSpace": "Create {termSpaceLower}",
   "spaces.detail.allKpiTrees": "All {termKpiLower} trees",
   "spaces.detail.allSessions": "All sessions",
   "spaces.detail.blockers.inTheBoardsOrder": "About the board below, in its order.",

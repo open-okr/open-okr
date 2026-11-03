@@ -67,7 +67,10 @@ export function RichTextField({
       {hideLabel ? null : (
         <legend className="mb-1 text-sm font-medium text-ink-2">{label}</legend>
       )}
-      <div className="rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+      {/* About four lines tall before anything is typed: a one-line box
+          for a diagnosis or a narrative read as a title field (usability
+          review C4). */}
+      <div className="rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line [&_.ProseMirror]:min-h-20">
         <RichTextEditor
           label={label}
           variant="compact"

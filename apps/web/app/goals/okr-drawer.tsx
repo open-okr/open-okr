@@ -21,6 +21,7 @@ import {
 import { X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { dayLabel } from "../../lib/day-label.ts";
 import type { OkrDetail } from "../../lib/okr-tree/actions.ts";
 import {
   OKR_DETAIL_ALL,
@@ -890,7 +891,7 @@ function History({
   /** The workspace's "Confidence shown as" (guided-inputs §4.8). */
   readonly display: ConfidenceDisplay;
 }) {
-  const { t } = useTranslations();
+  const { t, locale } = useTranslations();
   return (
     <>
       <section
@@ -965,7 +966,7 @@ function History({
                           from: formatMeasure(change.from, keyResult.unit),
                           to: formatMeasure(change.to, keyResult.unit),
                           name: change.changedBy ?? t("okrTree.somebody"),
-                          date: change.changedAt.slice(0, 10),
+                          date: dayLabel(change.changedAt, locale),
                         },
                       )}
                     </span>
@@ -980,7 +981,9 @@ function History({
                     data-testid="value-entry"
                     className="flex items-center justify-between gap-2"
                   >
-                    <span className="text-ink-3">{entry.at.slice(0, 10)}</span>
+                    <span className="text-ink-3">
+                      {dayLabel(entry.at, locale)}
+                    </span>
                     <span className="font-semibold tabular-nums">
                       {formatMeasure(entry.value, keyResult.unit)}
                     </span>

@@ -114,12 +114,18 @@ export default async function ReviewPage() {
               <Count
                 label={t("review.overdue")}
                 value={inbox.counts.overdue}
+                target="overdue"
                 urgent
               />
-              <Count label={t("review.today")} value={inbox.counts.today} />
+              <Count
+                label={t("review.today")}
+                value={inbox.counts.today}
+                target="today"
+              />
               <Count
                 label={t("review.thisWeek")}
                 value={inbox.counts.thisWeek}
+                target="this_week"
               />
               {/* The walker through every check-in owed, which this screen
                * already lists one by one (P9-T07a-b). Named apart from each
@@ -163,7 +169,11 @@ export default async function ReviewPage() {
               return null;
             }
             return (
-              <section key={group.id} className="flex flex-col gap-1.5">
+              <section
+                key={group.id}
+                id={`group-${group.id}`}
+                className="flex scroll-mt-4 flex-col gap-1.5"
+              >
                 <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
                   {t(group.label)}
                   <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
@@ -244,14 +254,21 @@ function statusWord(status: string | null, t: (key: string) => string): string {
 function Count({
   label,
   value,
+  target,
   urgent,
 }: {
   readonly label: string;
   readonly value: number;
+  /** The group it counts, so a count above zero jumps to it (review R1). */
+  readonly target: string;
   readonly urgent?: boolean;
 }) {
+  const Wrapper = value > 0 ? "a" : "span";
   return (
-    <span className="flex flex-col items-end">
+    <Wrapper
+      {...(value > 0 ? { href: `#group-${target}` } : {})}
+      className="flex flex-col items-end rounded-md px-1 hover:bg-raised"
+    >
       <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
         {label}
       </span>
@@ -264,7 +281,7 @@ function Count({
       >
         {value}
       </span>
-    </span>
+    </Wrapper>
   );
 }
 

@@ -289,8 +289,21 @@ export default async function ScorecardPage() {
                   data-testid="scorecard-moved"
                   aria-label={row.cycleName}
                 >
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
+                  {/* The mid-cycle count as a marker beside the name, not one
+                   * more line in the list (usability review SC1). Kept
+                   * visible, as METHOD.md §12.1's default asks. */}
+                  <h3 className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-3">
                     {row.cycleName}
+                    {row.moved.addedMidCycle > 0 ? (
+                      <Chip
+                        tone="neutral"
+                        className="normal-case tracking-normal"
+                      >
+                        {t("scorecard.addedMidCycle", {
+                          count: row.moved.addedMidCycle,
+                        })}
+                      </Chip>
+                    ) : null}
                   </h3>
                   <ul className="flex flex-col gap-1 text-sm text-ink-2">
                     {row.moved.adjusted.map((entry) => (
@@ -325,13 +338,6 @@ export default async function ScorecardPage() {
                             })}
                       </li>
                     ))}
-                    {row.moved.addedMidCycle > 0 ? (
-                      <li>
-                        {t("scorecard.addedMidCycle", {
-                          count: row.moved.addedMidCycle,
-                        })}
-                      </li>
-                    ) : null}
                     {row.moved.kindChanges.map((entry) => (
                       <li key={`k-${entry.goalId}-${entry.at}`}>
                         {entry.reason

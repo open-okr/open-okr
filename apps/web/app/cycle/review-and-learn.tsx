@@ -145,75 +145,83 @@ export async function ReviewAndLearn({
 
   return (
     <div className="flex flex-col gap-4.5">
-      <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h2 className="text-sm font-bold text-ink">
-              {t("cycle.reviewAndLearn.reviewAndLearn")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("cycle.reviewAndLearn.closingEveryKeyResultCarries", {
-                cycleName,
-              })}
-            </p>
-          </div>
-          {closure ? (
-            <Chip tone="ok">{t("cycle.reviewAndLearn.closed")}</Chip>
-          ) : (
-            <Chip tone="neutral">{t("common.open")}</Chip>
-          )}
-        </CardHeader>
-        <CardBody className="flex flex-wrap items-end gap-6">
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tabular-nums text-ink">
-              {average === null ? "—" : average.toFixed(2)}
-            </span>
-            <span className="text-xs text-ink-3">
-              {t("cycle.reviewAndLearn.portfolioAverage")}
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-bold tabular-nums text-ink">
-              {t("common.of4", {
-                length: scored.length,
-                length2: keyResults.length,
-              })}
-            </span>
-            <span className="text-xs text-ink-3">
-              {t("cycle.reviewAndLearn.scored")}
-            </span>
-          </div>
-          {band ? <Chip tone="info">{bandWord(band, t)}</Chip> : null}
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <h3 className="text-sm font-bold text-ink">
-            {t("cycle.reviewAndLearn.theBands")}
-          </h3>
-        </CardHeader>
-        <CardBody className="flex flex-col gap-1">
-          {table.map(([name, range]) => {
-            const here = band === name;
-            return (
-              <div
-                key={name}
-                data-testid="score-band-row"
-                data-band={name}
-                className={
-                  here
-                    ? "flex items-center justify-between gap-2.5 rounded-md bg-brand-weak px-2.5 py-1.5 text-sm text-brand-text"
-                    : "flex items-center justify-between gap-2.5 px-2.5 py-1.5 text-sm text-ink-2"
-                }
-              >
-                <span>{bandWord(name, t)}</span>
-                <span className="tabular-nums text-xs">{range}</span>
+      {/* The summary and the bands side by side when the phase column is
+       * wide enough, since one is read against the other (usability review
+       * C7). Measured on the column, not the window: the rail and the
+       * quality panel leave it about 360px at 1280. */}
+      <div className="@container">
+        <div className="grid gap-4.5 @2xl:grid-cols-2">
+          <Card>
+            <CardHeader className="justify-between">
+              <div className="flex min-w-0 flex-col">
+                <h2 className="text-sm font-bold text-ink">
+                  {t("cycle.reviewAndLearn.reviewAndLearn")}
+                </h2>
+                <p className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.closingEveryKeyResultCarries", {
+                    cycleName,
+                  })}
+                </p>
               </div>
-            );
-          })}
-        </CardBody>
-      </Card>
+              {closure ? (
+                <Chip tone="ok">{t("cycle.reviewAndLearn.closed")}</Chip>
+              ) : (
+                <Chip tone="neutral">{t("common.open")}</Chip>
+              )}
+            </CardHeader>
+            <CardBody className="flex flex-wrap items-end gap-6">
+              <div className="flex flex-col">
+                <span className="text-lg font-bold tabular-nums text-ink">
+                  {average === null ? "—" : average.toFixed(2)}
+                </span>
+                <span className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.portfolioAverage")}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-lg font-bold tabular-nums text-ink">
+                  {t("common.of4", {
+                    length: scored.length,
+                    length2: keyResults.length,
+                  })}
+                </span>
+                <span className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.scored")}
+                </span>
+              </div>
+              {band ? <Chip tone="info">{bandWord(band, t)}</Chip> : null}
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <h3 className="text-sm font-bold text-ink">
+                {t("cycle.reviewAndLearn.theBands")}
+              </h3>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1">
+              {table.map(([name, range]) => {
+                const here = band === name;
+                return (
+                  <div
+                    key={name}
+                    data-testid="score-band-row"
+                    data-band={name}
+                    className={
+                      here
+                        ? "flex items-center justify-between gap-2.5 rounded-md bg-brand-weak px-2.5 py-1.5 text-sm text-brand-text"
+                        : "flex items-center justify-between gap-2.5 px-2.5 py-1.5 text-sm text-ink-2"
+                    }
+                  >
+                    <span>{bandWord(name, t)}</span>
+                    <span className="tabular-nums text-xs">{range}</span>
+                  </div>
+                );
+              })}
+            </CardBody>
+          </Card>
+        </div>
+      </div>
 
       <Card>
         <CardHeader className="justify-between">

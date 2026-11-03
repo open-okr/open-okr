@@ -218,4 +218,12 @@ Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Cham
 
 Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` (ten files) still draw "Champion", and the spreadsheet import templates still label the column "Champion" (both headers are accepted). UIUX-PLAN screen entries that say "champion" are left as written; the label comes from the terminology setting.
 
+| C4 | Every `RichTextField` starts 80px tall, about four lines (browser, phase 2) |
+| R1 | To do's counters link to `#group-overdue`, `#group-today` and `#group-this_week` when above zero (browser) |
+| G4 | The goal drawer's target changes and value history use `dayLabel`. The native date input still follows the browser's locale |
+| TM1 | The new space form is one row from 768px, button "Create space" (browser) |
+| IN3 | The attachment input's own button is styled as the kit's secondary button, still the native input |
+| SC1 | "N added mid-cycle" is a grey chip beside the cycle name under What moved. Not seen locally: no cycle has one |
+| C7 cards | Summary and bands sit side by side once the phase column is 672px wide, a container query. At 1280 the column is 364px, so they stay stacked (browser) |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.
