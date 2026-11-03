@@ -62,6 +62,37 @@ describe("chat", () => {
     expect(capturedBody?.system).toBe("Be terse.");
     expect(capturedBody?.messages).toEqual([{ role: "user", content: "hi" }]);
   });
+
+  it("sends no temperature, which API version 2026-10-21 refuses on every model", async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    const client = new AnthropicProvider({
+      apiKey: "test-key",
+      fetch: async (_url, init) => {
+        capturedBody = JSON.parse(String(init?.body));
+        return new Response(
+          JSON.stringify({
+            id: "msg_5",
+            type: "message",
+            role: "assistant",
+            model: "claude-sonnet-5",
+            content: [{ type: "text", text: "ok", citations: null }],
+            stop_reason: "end_turn",
+            usage: { input_tokens: 3, output_tokens: 1 },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      },
+    });
+
+    await client.chat({
+      model: "claude-sonnet-5",
+      messages: [{ role: "user", content: "hi" }],
+      temperature: 0.2,
+    });
+
+    expect(capturedBody).toBeDefined();
+    expect(capturedBody).not.toHaveProperty("temperature");
+  });
 });
 
 describe("chatWithTools", () => {
