@@ -150,7 +150,15 @@ export default async function InboxPage({
 
   // Counted on the server: the rows are one page of at most 50, so counting
   // them said "50 Unread" beside a badge of 257 (usability review D1).
-  const { unread } = await callAction(context, "notifications.unreadCount", {});
+  // One read for the header and every pill (usability review I1).
+  const counts = await callAction(context, "notifications.reasonCounts", {});
+  const { unread } = counts;
+  const countFor = (id: string): number =>
+    id === ""
+      ? counts.total
+      : id === "unread"
+        ? counts.unread
+        : (counts.byReason[id] ?? 0);
 
   return (
     <>
@@ -186,6 +194,9 @@ export default async function InboxPage({
                 }
               >
                 {one.labelKey ? t(one.labelKey) : one.id}
+                <span className="ml-1 font-normal tabular-nums opacity-75">
+                  {countFor(one.id)}
+                </span>
               </Link>
             ))}
           </CardBody>
