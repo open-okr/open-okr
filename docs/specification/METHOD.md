@@ -190,18 +190,18 @@ Every objective carries 2 to 5 key results: block at none, warn at one or above 
 
 ### 2.8 Committed and aspirational OKRs
 
-Every objective is one of two kinds. The kind is chosen when it is written and can be changed, visibly, until the close.
+Every objective is one of two types. The type is chosen when it is written and can be changed, visibly, until the close.
 
 | Kind | Meaning | Expected score | When it misses |
 |---|---|---|---|
 | **Committed** | "OKRs that we agree will be achieved, and we will be willing to adjust schedules and resources to ensure that they are delivered" | 1.0 | "A score of less than 1.0 requires explanation for the miss." A short postmortem, not a punishment. Escalate early when it is at risk |
 | **Aspirational** | "OKRs express how we'd like the world to look, even though we have no clear idea how to get there and/or the resources necessary" | An average around 0.7, "with high variance" | Normal. It may carry forward until it is achieved |
 
-Rules that depend on the kind:
+Rules that depend on the type:
 
 - Stretch coaching (§3.2, KR-6), "too safe" notes (§3.3, §3.4), and capacity allowed to exceed (§5.5) apply to aspirational OKRs only.
 - A committed OKR should credibly consume most, but not all, of the team's resources. Committed and aspirational together may consume somewhat more.
-- New objectives are aspirational by default (§12). A workspace may use one kind only.
+- New objectives are aspirational by default (§12). A workspace may use one type only.
 
 *Source:* Google's OKR playbook, all quotations above. It names "Failing to differentiate between committed and aspirational OKRs" as its first trap.
 
@@ -240,7 +240,7 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 
 *Source:* whatmatters: "OKRs are amendable and revisable", consider "adding an additional OKR or simply taking away one or two KRs" when "something out of your control changes or you become more aware of what the aggressively realistic goal should be"; re:Work: OKRs are "revisited a few times a quarter" to "adjust to new information, abandon objectives".
 
-### 2.10 Kinds of key result
+### 2.10 Types of key result
 
 | Kind | Written as | Progress | Scored |
 |---|---|---|---|
@@ -249,7 +249,7 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 | **Milestone** | A verifiable thing done by a date | 0% until done, then 100% | 1.0 if done, 0 if not, unless a person adjusts it with a reason |
 | **Baseline** | Establish the number nobody measures yet | 0% until the baseline is recorded, then 100% | 1.0 once recorded |
 
-All four kinds are on by default, and a workspace may turn any off (§12). Prefer metric key results where an outcome can be measured. A set made only of milestones is usually a plan, not proof. *Source:* Lamorte names "metric, baseline, and milestone" key results; re:Work: "Sometimes key results are either 0 or 1"; Grove: "Did I do that or did I not do it? Yes/no."
+All four types are on by default, and a workspace may turn any off (§12). Prefer metric key results where an outcome can be measured. A set made only of milestones is usually a plan, not proof. *Source:* Lamorte names "metric, baseline, and milestone" key results; re:Work: "Sometimes key results are either 0 or 1"; Grove: "Did I do that or did I not do it? Yes/no."
 
 ---
 
@@ -472,7 +472,7 @@ There is no lower bound: whatmatters' own "Achieve fiscal sustainability" is thr
 
 **KR-1 Count.** Pass at 2 to 5. Fail at none, which blocks. Warn at 1 ("can a single measure prove this from every angle?"). Warn above 5 ("which would you drop if you had to?").
 
-**KR-2 Verifiable.** Judged by the key result's kind (§2.10).
+**KR-2 Verifiable.** Judged by the key result's type (§2.10).
 
 | Condition | Status | Prompt |
 |---|---|---|
@@ -991,7 +991,7 @@ These are not settings.
 - which checks and gates apply and how strongly;
 - whether phases bind;
 - who may write and when;
-- the kinds of OKR and key result in use;
+- the types of OKR and key result in use;
 - the scales;
 - the cadence;
 - the escalation;
@@ -1121,8 +1121,8 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | New objectives mid-cycle start as | Live · Draft published by its owner · Draft approved by the reviewer | Live, marked added mid-cycle | whatmatters |
 | Reason when adding mid-cycle | Off · Optional · Required | Optional | OpenOKR default |
 | Reason when easing a target | Required · Optional | Required | whatmatters |
-| OKR kinds | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
-| Key result kinds | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
+| OKR types | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
+| Key result types | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
 | Reviewer per goal | Off · Optional · Required | Optional | OpenOKR default |
 | Check enforcement | Each check: Block · Warn · Off | As §4 | §4 |
 | Strict mode | Off · On | Off | OpenOKR default |

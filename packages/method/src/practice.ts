@@ -224,7 +224,7 @@ const keyResultKindSettings = Object.fromEntries(
   KEY_RESULT_KINDS.map((kind) => [
     `keyResultKinds.${kind}`,
     setting({
-      label: "Key result kinds",
+      label: "Key result types",
       item: kind,
       group: "model",
       section: "§2.10",
@@ -300,7 +300,7 @@ export const PRACTICE = {
 
   // --- The model ---------------------------------------------------------
   "okr.kinds": setting({
-    label: "OKR kinds",
+    label: "OKR types",
     group: "model",
     section: "§2.8",
     source: "Google's OKR playbook",

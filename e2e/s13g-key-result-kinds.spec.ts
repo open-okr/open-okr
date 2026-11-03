@@ -179,7 +179,7 @@ test("acceptance: a milestone added from the list and checked done reads 100%, a
   // Written as a metric, its words carry no numbers, so KR-2 warns.
   await expect(keyResultRow(MILESTONE)).toContainText("KR-2");
   await keyResultRow(MILESTONE)
-    .getByRole("combobox", { name: `Kind of key result ${MILESTONE}` })
+    .getByRole("combobox", { name: `Type of key result ${MILESTONE}` })
     .selectOption("milestone");
   await settled();
   await expect(keyResultRow(MILESTONE)).not.toContainText("KR-2", {
@@ -220,7 +220,7 @@ test("NW-Q1-07 and NW-Q2-16: a baseline passes its checks, is recorded by its fi
 
   // Next quarter it becomes a metric from the number it found.
   await keyResultRow(BASELINE)
-    .getByRole("combobox", { name: `Kind of key result ${BASELINE}` })
+    .getByRole("combobox", { name: `Type of key result ${BASELINE}` })
     .selectOption("metric");
   await settled();
   const target = keyResultRow(BASELINE).getByLabel(`Target for ${BASELINE}`);
@@ -238,7 +238,7 @@ test("NW-Q4-04: a maintain key result reads its band", async () => {
   const row = keyResultRow(MAINTAIN);
   await expect(row).toBeVisible({ timeout: 15_000 });
   await expect(
-    row.getByRole("combobox", { name: `Kind of key result ${MAINTAIN}` }),
+    row.getByRole("combobox", { name: `Type of key result ${MAINTAIN}` }),
   ).toHaveValue("maintain");
   await expect(row).toContainText("Band");
   await expect(row).toContainText("100%");

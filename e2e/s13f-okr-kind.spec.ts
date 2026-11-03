@@ -34,7 +34,7 @@ const authed = () => ({ authorization: `Bearer ${token}` });
 const main = () => page.locator("#main-content");
 const drawer = () => page.getByTestId("okr-drawer");
 const kindOf = (title: string) =>
-  main().getByRole("combobox", { name: `Kind of ${title}` });
+  main().getByRole("combobox", { name: `Type of ${title}` });
 const titled = (title: string) =>
   main().locator(titleField("Objective title", title));
 
@@ -96,7 +96,7 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
     if (!(await idOf(PROMISED))) {
       await main().getByRole("button", { name: "New objective" }).click();
       // Aspirational unless somebody says otherwise (decision D2).
-      const kind = main().getByRole("combobox", { name: "Kind", exact: true });
+      const kind = main().getByRole("combobox", { name: "Type", exact: true });
       await expect(kind).toHaveValue("aspirational");
       await kind.selectOption("committed");
       await main().getByRole("textbox", { name: "New objective" }).fill(PROMISED);
@@ -147,7 +147,7 @@ test.describe("NW-Q1-04 and NW-Q2-10: objectives drafted by kind, and a change o
     await row.getByRole("link", { name: "Open this objective" }).click();
     await expect(drawer()).toBeVisible();
     await expect(
-      drawer().getByRole("combobox", { name: `Kind of ${STRETCH}` }),
+      drawer().getByRole("combobox", { name: `Type of ${STRETCH}` }),
     ).toHaveValue("committed");
 
     // And the diagram names it in the card's accessible name.
