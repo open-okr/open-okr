@@ -23278,6 +23278,9 @@
                               "group": {
                                 "type": "string"
                               },
+                              "summary": {
+                                "type": "string"
+                              },
                               "section": {
                                 "type": "string"
                               },
@@ -23308,6 +23311,7 @@
                               "label",
                               "item",
                               "group",
+                              "summary",
                               "section",
                               "source",
                               "options",

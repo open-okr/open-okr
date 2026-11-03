@@ -43,6 +43,13 @@ export interface ProfileComparisonRow {
   readonly key: PracticeKey | ThresholdKey;
   /** The row as a person reads it, the same on the screen and in METHOD.md. */
   readonly name: string;
+  /**
+   * What the row decides, for a reader who has not opened METHOD.md: a
+   * setting's summary, or a threshold's reason.
+   */
+  readonly about: string;
+  /** The METHOD.md section that sets it out, the number alone. */
+  readonly section: string;
   /** What each profile gives a fresh workspace, in words, in profile order. */
   readonly values: Readonly<Record<ProfileKey, string>>;
   /** The profiles whose value is not Recommended's. Never empty. */
@@ -106,15 +113,12 @@ function thresholdWords(value: unknown): string {
 
 /** One row from five values, marking those that are not Recommended's. */
 function rowOf(
-  kind: ProfileComparisonRow["kind"],
-  key: PracticeKey | ThresholdKey,
-  name: string,
-  values: Record<ProfileKey, string>,
+  row: Omit<ProfileComparisonRow, "differs">,
 ): ProfileComparisonRow | null {
   const differs = PROFILE_KEYS.filter(
-    (profile) => values[profile] !== values.recommended,
+    (profile) => row.values[profile] !== row.values.recommended,
   );
-  return differs.length === 0 ? null : { kind, key, name, values, differs };
+  return differs.length === 0 ? null : { ...row, differs };
 }
 
 /**
@@ -137,31 +141,36 @@ export function compareProfiles(): readonly ProfileComparisonRow[] {
 
   const rows: (ProfileComparisonRow | null)[] = [
     ...PRACTICE_KEYS.map((key) => {
-      const options = PRACTICE[key].optionLabels as Record<string, string>;
-      return rowOf(
-        "practice",
+      const setting: PracticeSetting = PRACTICE[key];
+      const options = setting.optionLabels as Record<string, string>;
+      return rowOf({
+        kind: "practice",
         key,
-        practiceSettingName(key),
-        Object.fromEntries(
+        name: practiceSettingName(key),
+        about: setting.summary,
+        section: setting.section,
+        values: Object.fromEntries(
           PROFILE_KEYS.map((profile) => {
             const value = resolved[profile][key];
             return [profile, options[value] ?? value];
           }),
         ) as Record<ProfileKey, string>,
-      );
+      });
     }),
     ...THRESHOLD_KEYS.map((key) =>
-      rowOf(
-        "threshold",
+      rowOf({
+        kind: "threshold",
         key,
-        THRESHOLDS[key].label,
-        Object.fromEntries(
+        name: THRESHOLDS[key].label,
+        about: THRESHOLDS[key].why,
+        section: THRESHOLDS[key].section,
+        values: Object.fromEntries(
           PROFILE_KEYS.map((profile) => [
             profile,
             thresholdWords(thresholdOf(profile, key)),
           ]),
         ) as Record<ProfileKey, string>,
-      ),
+      }),
     ),
   ];
   return rows.filter((entry): entry is ProfileComparisonRow => entry !== null);

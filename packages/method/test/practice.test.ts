@@ -61,6 +61,26 @@ describe("the registry is complete and self-describing", () => {
     }
   });
 
+  it("says in one plain sentence or two what every setting decides, the same for each item of a row", () => {
+    // Shown on the settings screen when somebody hovers a setting's name, so
+    // it is read by people who have not opened METHOD.md: no section signs,
+    // no dashes standing in for a sentence break.
+    const byLabel = new Map<string, string>();
+    for (const key of PRACTICE_KEYS) {
+      const { label, summary } = PRACTICE[key];
+      expect(summary, `${key} summary`).toMatch(/^[A-Z].*\.$/);
+      expect(summary, `${key} summary`).not.toMatch(/[§—]/);
+      expect(summary.length, `${key} summary`).toBeLessThan(260);
+      const shared = byLabel.get(label);
+      if (shared !== undefined) {
+        expect(summary, `${key} shares "${label}" with another item`).toBe(
+          shared,
+        );
+      }
+      byLabel.set(label, summary);
+    }
+  });
+
   it("has one enforcement setting for each of the twenty-six checks", () => {
     const checks = [
       ...OBJECTIVE_CHECKS,

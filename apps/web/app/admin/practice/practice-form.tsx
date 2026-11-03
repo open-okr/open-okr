@@ -9,6 +9,7 @@ import {
   CardHeader,
   Chip,
   cn,
+  MethodHint,
   SelectInput,
   useFormDirty,
   useKeyboardRegistry,
@@ -116,7 +117,7 @@ function ProfileCard({
   thresholdLabels,
   nameOf,
   comparison,
-  comparisonMethodUrl,
+  methodLinks,
   canManage,
 }: {
   readonly practice: Practice;
@@ -124,7 +125,7 @@ function ProfileCard({
   readonly thresholdLabels: Readonly<Record<string, string>>;
   readonly nameOf: (setting: Setting) => string;
   readonly comparison: readonly ProfileComparisonRow[];
-  readonly comparisonMethodUrl: string;
+  readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -162,7 +163,7 @@ function ProfileCard({
               rows={comparison}
               profiles={practice.profiles}
               inUse={practice.profile}
-              methodUrl={comparisonMethodUrl}
+              methodLinks={methodLinks}
             />
             {canManage ? (
               <Button
@@ -181,38 +182,63 @@ function ProfileCard({
         <CardBody className="flex flex-col gap-3">
           <fieldset className="flex flex-col gap-1.5">
             <legend className="sr-only">{title}</legend>
-            {practice.profiles.map((profile) => (
-              <label
-                key={profile.key}
-                className={cn(
-                  "flex items-start gap-2.5 rounded-control border px-3 py-2 text-sm",
-                  chosen === profile.key
-                    ? "border-brand bg-brand-weak"
-                    : "border-line",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="profile"
-                  value={profile.key}
-                  checked={chosen === profile.key}
-                  disabled={!canManage}
-                  onChange={() => setChosen(profile.key)}
-                  className="mt-1"
-                />
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-2 font-medium text-ink">
-                    {profile.label}
-                    {profile.key === practice.profile ? (
-                      <Chip tone="brand">
-                        {t("admin.practice.profile.inUse")}
-                      </Chip>
-                    ) : null}
-                  </span>
-                  <span className="text-ink-3">{profile.for}</span>
-                </span>
-              </label>
-            ))}
+            {practice.profiles.map((profile) => {
+              const sets = comparison.filter((row) =>
+                row.differs.includes(profile.key),
+              );
+              return (
+                // The hint sits beside the label rather than in it, so opening
+                // it does not choose the profile.
+                <div
+                  key={profile.key}
+                  className={cn(
+                    "flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm",
+                    chosen === profile.key
+                      ? "border-brand bg-brand-weak"
+                      : "border-line",
+                  )}
+                >
+                  <label className="flex flex-1 items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="profile"
+                      value={profile.key}
+                      checked={chosen === profile.key}
+                      disabled={!canManage}
+                      onChange={() => setChosen(profile.key)}
+                      className="mt-1"
+                    />
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2 font-medium text-ink">
+                        {profile.label}
+                        {profile.key === practice.profile ? (
+                          <Chip tone="brand">
+                            {t("admin.practice.profile.inUse")}
+                          </Chip>
+                        ) : null}
+                      </span>
+                      <span className="text-ink-3">{profile.for}</span>
+                    </span>
+                  </label>
+                  <MethodHint name={profile.label} href={methodLinks["12.2"]}>
+                    {sets.length === 0 ? (
+                      <p>{t("admin.practice.hint.recommended")}</p>
+                    ) : (
+                      <>
+                        <p>{t("admin.practice.hint.changes")}</p>
+                        <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4">
+                          {sets.map((row) => (
+                            <li key={row.key}>
+                              {row.name}: {row.values[profile.key]}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </MethodHint>
+                </div>
+              );
+            })}
           </fieldset>
 
           {preview ? (
@@ -316,6 +342,7 @@ function GroupCard({
   settings,
   practice,
   nameOf,
+  methodLinks,
   canManage,
 }: {
   readonly id: string;
@@ -323,6 +350,7 @@ function GroupCard({
   readonly settings: readonly Setting[];
   readonly practice: Practice;
   readonly nameOf: (setting: Setting) => string;
+  readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -450,9 +478,17 @@ function GroupCard({
                 className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
               >
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <label htmlFor={fieldId} className="font-medium text-ink">
-                    {nameOf(setting)}
-                  </label>
+                  <span className="flex items-start gap-0.5">
+                    <label htmlFor={fieldId} className="font-medium text-ink">
+                      {nameOf(setting)}
+                    </label>
+                    <MethodHint
+                      name={nameOf(setting)}
+                      href={methodLinks[setting.section]}
+                    >
+                      <p>{setting.summary}</p>
+                    </MethodHint>
+                  </span>
                   {differs ? (
                     <span className="text-xs text-ink-3">
                       {t("admin.practice.profileValue", {
@@ -497,7 +533,7 @@ export function PracticeForm({
   thresholdLabels,
   settingNames,
   comparison,
-  comparisonMethodUrl,
+  methodLinks,
   canManage,
 }: {
   readonly practice: Practice;
@@ -509,7 +545,8 @@ export function PracticeForm({
   readonly settingNames: Readonly<Record<string, string>>;
   /** The five profiles side by side, from `compareProfiles`. */
   readonly comparison: readonly ProfileComparisonRow[];
-  readonly comparisonMethodUrl: string;
+  /** METHOD.md's address for each section a setting or row cites. */
+  readonly methodLinks: Readonly<Record<string, string>>;
   /**
    * `full`, which every practice write requires. The server refuses either
    * way; this says so before somebody fills a card in.
@@ -551,7 +588,7 @@ export function PracticeForm({
         thresholdLabels={thresholdLabels}
         nameOf={nameOf}
         comparison={comparison}
-        comparisonMethodUrl={comparisonMethodUrl}
+        methodLinks={methodLinks}
         canManage={canManage}
       />
       {groups.map((group) => (
@@ -564,6 +601,7 @@ export function PracticeForm({
           settings={practice.registry.filter((entry) => entry.group === group)}
           practice={practice}
           nameOf={nameOf}
+          methodLinks={methodLinks}
           canManage={canManage}
         />
       ))}
