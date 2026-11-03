@@ -204,4 +204,9 @@ Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Cham
 | N3 | "See the rule", "Snooze for a week", the KPI tree "Open" and "Add driver", the phase 4 "Open", and the Goals inline fields are at least 24px tall on a phone (browser: no Goals field under 24px at 375) |
 | N4 | The Draft OKRs card header wraps its actions under the title (browser, 375: titles 309px) |
 
+| D1 | Activity's "Unread" is `notifications.unreadCount`, not the rows on the page. The Updates badge carries "N to do, N unread" as its title and accessible name (browser: 22 = 3 to do + 19 unread, Activity 19) |
+| D7, T1 | The tour outline is dashed and set 4px out, the stop is scrolled into view with `block: nearest`, and Back is not drawn on stop 1 (Q4: the inline card stays) |
+| D9, B1 | A delete button on each Board card, behind a confirmation, through `tasks.delete` (browser: a test task was created and soft-deleted) |
+| N5 | A check-in group in Activity is titled with its objective, read after the access filter (browser) |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

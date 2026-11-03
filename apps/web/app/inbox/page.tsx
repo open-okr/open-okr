@@ -148,7 +148,9 @@ export default async function InboxPage({
     }
   }
 
-  const unread = rows.filter((row) => row.readAt === null).length;
+  // Counted on the server: the rows are one page of at most 50, so counting
+  // them said "50 Unread" beside a badge of 257 (usability review D1).
+  const { unread } = await callAction(context, "notifications.unreadCount", {});
 
   return (
     <>

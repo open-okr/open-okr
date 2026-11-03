@@ -95,7 +95,8 @@ describe("the five stops", () => {
   test("are walked with Next, each outlined as it shows, and Done ends it", async () => {
     await mount();
     expect(progress()).toContain("1 / 5");
-    expect(button("tour-back")?.disabled).toBe(true);
+    // Nothing to go back to, so no Back (usability review T1).
+    expect(button("tour-back")).toBeNull();
 
     for (const [index, stop] of TOUR_STOPS.entries()) {
       expect(stopShown()?.dataset.stop).toBe(stop.id);
@@ -126,7 +127,7 @@ describe("the five stops", () => {
     button("tour-back")?.focus();
     await click("tour-back");
     expect(outlined()).toBe("work-map");
-    expect(button("tour-back")?.disabled).toBe(true);
+    expect(button("tour-back")).toBeNull();
     expect(document.activeElement).toBe(button("tour-next"));
   });
 

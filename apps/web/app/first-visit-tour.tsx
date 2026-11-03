@@ -47,6 +47,18 @@ export const TOUR_STOPS = [
 /** The attribute on `<html>` that says which stop is showing. */
 const STOP_ATTRIBUTE = "data-tour-stop";
 
+/**
+ * Where each stop's thing is, the same selectors as the outline rules in
+ * globals.css, so the stop can be scrolled into view: the card sits at the top
+ * and the thing it names can be a screen below (usability review T1).
+ */
+const STOP_TARGETS: Readonly<Record<string, string>> = {
+  "work-map": '[data-tour-target="work-map"]',
+  review: 'nav a[href="/review"]',
+  "cycle-strip": '.cycle-strip, [data-tour-target="cycle-strip"]',
+  search: '.topbar-shell label:has(input[type="search"])',
+};
+
 export function FirstVisitTour() {
   const { t } = useTranslations();
   const headingId = useId();
@@ -64,6 +76,11 @@ export function FirstVisitTour() {
     }
     const root = document.documentElement;
     root.setAttribute(STOP_ATTRIBUTE, stop.id);
+    const selector = STOP_TARGETS[stop.id];
+    const target = selector ? document.querySelector(selector) : null;
+    // `nearest` moves nothing when the thing is already in view, so the card
+    // the reader is pressing stays where it is.
+    target?.scrollIntoView?.({ block: "nearest" });
     // Removed on the way out too, so leaving the Work Map mid-tour leaves no
     // outline behind on the next screen.
     return () => root.removeAttribute(STOP_ATTRIBUTE);
@@ -93,8 +110,8 @@ export function FirstVisitTour() {
   const back = () => {
     const previous = Math.max(0, index - 1);
     setIndex(previous);
-    // Back is disabled on the first stop, and a disabled button drops the
-    // focus it held. Next is always there to take it.
+    // Back is not drawn on the first stop, so the focus it held would be
+    // lost. Next is always there to take it.
     if (previous === 0) {
       nextRef.current?.focus();
     }
@@ -147,15 +164,18 @@ export function FirstVisitTour() {
             >
               {last ? t("tour.finish") : t("tour.next")}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending || index === 0}
-              data-testid="tour-back"
-              onClick={back}
-            >
-              {t("tour.back")}
-            </Button>
+            {/* Not on the first stop, where there is nothing to go back to. */}
+            {index === 0 ? null : (
+              <Button
+                type="button"
+                size="sm"
+                disabled={pending}
+                data-testid="tour-back"
+                onClick={back}
+              >
+                {t("tour.back")}
+              </Button>
+            )}
             {/* Not on the last stop, where Done already is the same press. */}
             {last ? null : (
               <Button

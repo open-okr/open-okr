@@ -274,7 +274,13 @@ export async function AppShellLayout({
         // than looked up in a map, because each one comes from a different read
         // and a map would hide which.
         ...(item.id === "review" && updatesBadge !== null
-          ? { badge: updatesBadge }
+          ? {
+              badge: updatesBadge,
+              badgeLabel: t("nav.updatesBadge", {
+                owed: reviewBadge ?? 0,
+                unread: inboxBadge ?? 0,
+              }),
+            }
           : {}),
       })),
     }),

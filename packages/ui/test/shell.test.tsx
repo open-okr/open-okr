@@ -137,7 +137,9 @@ describe("the sidebar badge", () => {
                 label: "Review",
                 href: "/review",
                 icon: <span />,
-                ...(badge === undefined ? {} : { badge }),
+                ...(badge === undefined
+                  ? {}
+                  : { badge, badgeLabel: `${badge} to do, 0 unread` }),
               },
             ],
           },
@@ -146,9 +148,11 @@ describe("the sidebar badge", () => {
       />,
     );
 
-  test("puts the count in the link's accessible name at every width", () => {
+  test("puts what the count is made of in the link's accessible name", () => {
     withBadge(3);
-    expect(screen.getByRole("link", { name: /3 waiting on you/ })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /3 to do, 0 unread/ }),
+    ).toBeTruthy();
   });
 
   test("keeps a dot on the icon where the chip is hidden", () => {
@@ -165,7 +169,7 @@ describe("the sidebar badge", () => {
   test("draws nothing at all when there is no badge", () => {
     const { container } = withBadge();
     expect(container.querySelector("span.rounded-full.bg-bad")).toBeNull();
-    expect(screen.queryByText(/waiting on you/)).toBeNull();
+    expect(screen.queryByText(/unread/)).toBeNull();
   });
 });
 

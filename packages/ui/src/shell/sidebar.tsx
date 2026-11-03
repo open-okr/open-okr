@@ -28,6 +28,12 @@ export interface SidebarNavItem {
   readonly active?: boolean;
   /** A live count (e.g. Review's overdue badge, §3). Omitted renders no badge. */
   readonly badge?: number;
+  /**
+   * What the count is made of, in the reader's language, read out and shown
+   * on hover. Updates adds what is owed to what is unread, which reads as a
+   * mismatch beside either screen's own number unless it says so.
+   */
+  readonly badgeLabel?: string;
 }
 
 export interface SidebarGroup {
@@ -150,7 +156,9 @@ export function Sidebar({
                 <>
                   {/* Read out at every width, including the collapsed rail
                       where the dot alone says "something", not "how much". */}
-                  <span className="sr-only">{item.badge} waiting on you</span>
+                  <span className="sr-only">
+                    {item.badgeLabel ?? item.badge}
+                  </span>
                   {/* A solid field, per the mockup's `.navitem .badge`: an
                       overdue count has to read as overdue, and the tinted chip
                       it shipped as read as information. The pair is
@@ -159,6 +167,8 @@ export function Sidebar({
                       4.5:1 floor. */}
                   <span
                     data-sidebar-badge=""
+                    title={item.badgeLabel}
+                    aria-hidden="true"
                     className="ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex"
                   >
                     {item.badge}

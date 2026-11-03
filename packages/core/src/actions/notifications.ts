@@ -8,6 +8,7 @@
 import {
   activeOnly,
   activities,
+  checkIns,
   cycles,
   goals,
   initiatives,
@@ -374,6 +375,32 @@ async function subjectTitles(
     idsByType.set(type, held);
   }
   const titles = new Map<string, string>();
+  // A check-in has no title of its own, so its group is named after the
+  // objective it is about: "1 day after publication" under a bare
+  // "Check-in" said nothing about which one (usability review N5).
+  const checkInIds = [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.subjectType === "check_in" && row.subjectId ? [row.subjectId] : [],
+      ),
+    ),
+  ];
+  if (checkInIds.length > 0) {
+    const found = await tx
+      .select({ id: checkIns.id, title: goals.title })
+      .from(checkIns)
+      .innerJoin(goals, eq(goals.id, checkIns.subjectId))
+      .where(
+        activeOnly(
+          checkIns,
+          eq(checkIns.workspaceId, workspaceId),
+          inArray(checkIns.id, checkInIds),
+        ),
+      );
+    for (const one of found) {
+      titles.set(`check_in:${one.id}`, one.title);
+    }
+  }
   for (const [type, ids] of idsByType) {
     const source = TITLE_SOURCES[type];
     const found = await tx
