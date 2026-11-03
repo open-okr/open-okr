@@ -55,7 +55,7 @@ export const keyResultsTemplate: EntityTemplate = {
     },
     {
       field: "kind",
-      describe: `One of: ${KEY_RESULT_KINDS.join(", ")} (METHOD.md §2.10). A metric if the file does not say, or a maintain where the direction says maintain.`,
+      describe: `One of: ${KEY_RESULT_KINDS.join(", ")}. A metric if the file does not say, or a maintain where the direction says maintain.`,
       aliases: ["kind", "keyResultKind", "measureKind"],
       required: false,
       example: "metric",

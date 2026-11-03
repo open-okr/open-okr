@@ -134,7 +134,7 @@ export const HORIZONS: Readonly<Record<"annual" | "quarterly", Horizon>> = {
     runs: "Once a year, about 6 weeks before the year starts",
     sets: "The annual frame (mission, vision, mid-term strategy), 2 to 5 annual strategies, up to 5 annual OKRs, the year's not-doing list",
     revisited:
-      "Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target (§2.9): easing it needs a reason, and the original stays on record",
+      "Mission and vision stay stable. Annual OKRs and the not-doing list may be revised at a quarterly revalidation, with a written reason. An annual target changes under the same rules as any target: easing it needs a reason, and the original stays on record",
     note: "Phases 0 to 5 happen before the cycle starts. Phase 6 runs through it. Phase 7 closes it and feeds the next one.",
   },
   quarterly: {
@@ -194,7 +194,7 @@ export const SUGGESTED_TIMELINE: Readonly<
     {
       weeksBefore: "2 weeks before",
       activity:
-        "The ending quarter is graded and reviewed (§8). Phase 2: diagnosis with those scores",
+        "The ending quarter is graded and reviewed. Phase 2: diagnosis with those scores",
     },
     {
       weeksBefore: "2 to 1 weeks before",
@@ -208,7 +208,7 @@ export const SUGGESTED_TIMELINE: Readonly<
       weeksBefore: "Weeks 1 to 2 of the quarter",
       afterStart: true,
       activity:
-        "Department and team OKRs drafted and published, the second publish step (§4.5)",
+        "Department and team OKRs drafted and published, the second publish step",
     },
   ],
 };

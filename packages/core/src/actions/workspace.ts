@@ -197,8 +197,7 @@ export const reopenOnboarding = defineWriteAction({
 
 export const setWorkspaceState = defineWriteAction({
   name: "workspace.setState",
-  summary:
-    "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
+  summary: "Set the workspace to active, read-only or frozen.",
   input: z.object({ state: z.enum(["active", "read_only", "frozen"]) }),
   output: workspaceSummary.extend({
     state: z.enum(["active", "read_only", "frozen"]),

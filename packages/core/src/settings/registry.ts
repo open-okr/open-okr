@@ -159,7 +159,7 @@ export const brandingSchema = z
       // brand puts a green pixel that does not mean on track on every screen.
       .refine((colour) => statusHueOf(colour) === null, {
         message:
-          "reads as red, amber or green, which mean off track, at risk and on track here, so a brand colour cannot use it (UIUX-PLAN §2, rule 1). Choose a blue, violet, pink or grey",
+          "reads as red, amber or green, which mean off track, at risk and on track here, so a brand colour cannot use it. Choose a blue, violet, pink or grey",
       })
       .optional(),
     // Set only through `settings.setWorkspaceBrandingImage`, which checks the
@@ -425,7 +425,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "5000 rows: enough that every ordinary export is a file somebody gets " +
       "in the moment they ask, small enough that a request never spends a " +
       "minute building one. Above it the relay builds the file and the " +
-      "person collects it from their own list. TECHNICAL-PLAN §4.9 says to " +
+      "person collects it from their own list. TECHNICAL-PLAN section 4.9 says to " +
       "run large sets asynchronously and names no figure; P5-T15 picked " +
       "this one. No S-36 card names it yet, so it has none here.",
     resolve: () => 5000,
@@ -486,7 +486,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "space",
     home: "spaces.settings",
     why:
-      "On. §8.1's retro has a voting stage, so a fresh space practises the " +
+      "On. Section 8.1's retro has a voting stage, so a fresh space practises the " +
       "method as written and a space that does not want it turns it off. The " +
       "action refuses a vote in a space that has, rather than the screen " +
       "merely hiding the control.",
@@ -501,7 +501,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "Null, meaning the workspace's own. A space that has decided nothing " +
       "has not decided to be lenient. Storing the workspace's current value " +
       "would freeze it: changing the workspace's strictness would leave every " +
-      "space holding the old one, which is the trap the §11 override map " +
+      "space holding the old one, which is the trap the section 11 override map " +
       "avoids by storing deviations rather than resolved values.",
     resolve: () => null,
     schema: z.enum(COACH_STRICTNESS).nullable(),
@@ -511,7 +511,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "space",
     home: "spaces.settings",
     why:
-      "Null, meaning the workspace's own §11 cadence. §4.14 calls this row " +
+      "Null, meaning the workspace's own section 11 cadence. Section 4.14 calls this row " +
       '"space defaults" without naming which; the check-in frequency is the ' +
       "one default a space plausibly differs on, because a team shipping " +
       "daily and a team shipping quarterly are the same workspace. Null " +
@@ -524,7 +524,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "space",
     home: "spaces.settings",
     why:
-      "Null, meaning this space posts nowhere. AI-NATIVE-PLAN §5.2 gives " +
+      "Null, meaning this space posts nowhere. AI-NATIVE-PLAN section 5.2 gives " +
       "Slack per-space channel posts and UIUX-PLAN S-22 lets a coordinator " +
       "post the week's digest to the space's channel; this is which channel " +
       "that is, as Slack's own channel id. No channel is the only safe " +
@@ -573,7 +573,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "member",
     home: "workspace_members",
     why:
-      "Null, which the shell reads as comfortable. UIUX-PLAN §9 asks every " +
+      "Null, which the shell reads as comfortable. UIUX-PLAN section 9 asks every " +
       "interface task to verify both densities, and until P6-G23 neither was " +
       "reachable from the product.",
     resolve: () => null,
@@ -611,7 +611,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "member",
     home: "notification_settings",
     why:
-      "On. §11's worked example makes a mention the one reason that does not " +
+      "On. Section 11's worked example makes a mention the one reason that does not " +
       "wait for a window: somebody wrote your name and expects you to read " +
       "it, and a mention held for half an hour is a conversation missed.",
     resolve: () => true,
@@ -622,7 +622,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "member",
     home: "notification_settings",
     why:
-      "Thirty minutes, from §11's worked example. Short enough that a busy " +
+      "Thirty minutes, from section 11's worked example. Short enough that a busy " +
       "morning still reaches somebody the same morning, long enough that a " +
       "fan-out across a goal's watchers arrives as one mail.",
     resolve: () => DEFAULT_BATCH_WINDOW_MINUTES,
@@ -633,7 +633,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "member",
     home: "notification_settings",
     why:
-      "On. §4.14 makes this the default and it outranks AI-NATIVE-PLAN §6.4's " +
+      "On. Section 4.14 makes this the default and it outranks AI-NATIVE-PLAN section 6.4's " +
       '"everyone opted in", which reads as opt-out in practice. A member ' +
       "who never opens their settings still gets the summary.",
     resolve: () => true,
@@ -689,7 +689,7 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
     scope: "workspace",
     home: "workspaces.settings",
     why:
-      "On. AI-NATIVE-PLAN §10 asks for no personal data in prompts, and an " +
+      "On. AI-NATIVE-PLAN section 10 asks for no personal data in prompts, and an " +
       "email address or a phone number is never what an assist needs to " +
       "draft a sentence about a goal. Replacing them costs a draft nothing, " +
       "so the safe answer is also the one that keeps working.",
@@ -731,8 +731,8 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "Thirty minutes. Long enough that somebody can answer three questions " +
       "between meetings, short enough that a half-finished check-in does not " +
       "wait overnight to be resumed by a message about something else. " +
-      "Design §8.1 named the figure and put it in METHOD.md's §11 registry; " +
-      "it is here instead, because §11 is the OKR practice canon and how long " +
+      "Design section 8.1 named the figure and put it in METHOD.md's section 11 registry; " +
+      "it is here instead, because section 11 is the OKR practice canon and how long " +
       "a chat window stays open is an interaction timeout rather than a " +
       "practice rule. Corrected in the design document at P5-T06b.",
     resolve: () => DEFAULT_CHAT_CONVERSATION_MINUTES,

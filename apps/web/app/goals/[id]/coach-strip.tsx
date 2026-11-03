@@ -25,8 +25,8 @@ import {
   Chip,
   useTranslations,
 } from "@openokr/ui";
-import Link from "next/link";
 import { useCallback, useState, useTransition } from "react";
+import { RulePreview } from "../../../lib/rule-preview";
 import { applyRewrite, rewriteKeyResultAction } from "./actions";
 
 export interface CoachStripKeyResult {
@@ -147,10 +147,11 @@ export function CoachStrip({
             <span className="flex flex-wrap gap-1.5">
               {flags.map((rule) => (
                 // Every verdict links to the rule, so a writer can read it and
-                // disagree with it rather than guessing what it wants.
-                <Link key={rule} href={`/method/${rule}`}>
+                // disagree with it rather than guessing what it wants. Resting
+                // on it previews the rule, because "KR-3" alone says nothing.
+                <RulePreview key={rule} ruleKey={rule}>
                   <Chip tone="warn">{rule}</Chip>
-                </Link>
+                </RulePreview>
               ))}
             </span>
           </div>
@@ -162,9 +163,9 @@ export function CoachStrip({
             <span className="flex flex-wrap items-center gap-1.5">
               {kr.qualityFlags.map((rule) => (
                 <span key={rule} className="flex items-center gap-1">
-                  <Link href={`/method/${rule}`}>
+                  <RulePreview ruleKey={rule}>
                     <Chip tone="warn">{rule}</Chip>
-                  </Link>
+                  </RulePreview>
                   {/* The assist is an `edit` action, so offering it to a
                       reader would produce a refusal rather than a suggestion. */}
                   {drafting && canEdit ? (

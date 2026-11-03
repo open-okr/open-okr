@@ -1,7 +1,7 @@
 "use client";
 
 import type { callAction } from "@openokr/core";
-import type { ProfileSwitch } from "@openokr/method";
+import type { ProfileComparisonRow, ProfileSwitch } from "@openokr/method";
 import {
   Button,
   Card,
@@ -9,6 +9,7 @@ import {
   CardHeader,
   Chip,
   cn,
+  MethodHint,
   SelectInput,
   useFormDirty,
   useKeyboardRegistry,
@@ -29,6 +30,7 @@ import {
 } from "react";
 import { applyProfile, resetPractice, savePractice } from "./practice-actions";
 import { NOTHING_SAVED, type PracticeState } from "./practice-state.ts";
+import { ProfileComparison } from "./profile-comparison";
 
 /**
  * Choosing and changing the METHOD.md §12 practice (S-36, P9-T05).
@@ -95,27 +97,16 @@ function useOutcomeToast(
   }, [outcome, title, source, toast]);
 }
 
-/** The name a person reads for one setting, with its item where it has one. */
+/**
+ * The name a person reads for one setting, with its item where it has one.
+ * `practiceSettingName`'s, so a card and the comparison name a row alike.
+ */
 function useSettingName(
-  checkTitles: Readonly<Record<string, string>>,
-  gateTitles: readonly string[],
+  settingNames: Readonly<Record<string, string>>,
 ): (setting: Setting) => string {
   return useCallback(
-    (setting: Setting) => {
-      if (setting.item === null) {
-        return setting.label;
-      }
-      if (setting.group === "checks" && checkTitles[setting.item]) {
-        return `${setting.item} ${checkTitles[setting.item]}`;
-      }
-      if (setting.group === "gates") {
-        const gate = Number(setting.item.replace(/\D/g, ""));
-        const title = gateTitles[gate - 1];
-        return title ? `${setting.item}: ${title}` : setting.item;
-      }
-      return `${setting.label}: ${setting.item}`;
-    },
-    [checkTitles, gateTitles],
+    (setting: Setting) => settingNames[setting.key] ?? setting.label,
+    [settingNames],
   );
 }
 
@@ -125,12 +116,16 @@ function ProfileCard({
   previews,
   thresholdLabels,
   nameOf,
+  comparison,
+  methodLinks,
   canManage,
 }: {
   readonly practice: Practice;
   readonly previews: Readonly<Record<string, ProfileSwitch>>;
   readonly thresholdLabels: Readonly<Record<string, string>>;
   readonly nameOf: (setting: Setting) => string;
+  readonly comparison: readonly ProfileComparisonRow[];
+  readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -163,54 +158,87 @@ function ProfileCard({
               {t("admin.practice.profile.description")}
             </p>
           </div>
-          {canManage ? (
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={pending || chosen === practice.profile}
-            >
-              {pending
-                ? t("admin.practice.profile.applying")
-                : t("admin.practice.profile.use")}
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <ProfileComparison
+              rows={comparison}
+              profiles={practice.profiles}
+              inUse={practice.profile}
+              methodLinks={methodLinks}
+            />
+            {canManage ? (
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={pending || chosen === practice.profile}
+              >
+                {pending
+                  ? t("admin.practice.profile.applying")
+                  : t("admin.practice.profile.use")}
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <fieldset className="flex flex-col gap-1.5">
             <legend className="sr-only">{title}</legend>
-            {practice.profiles.map((profile) => (
-              <label
-                key={profile.key}
-                className={cn(
-                  "flex items-start gap-2.5 rounded-control border px-3 py-2 text-sm",
-                  chosen === profile.key
-                    ? "border-brand bg-brand-weak"
-                    : "border-line",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="profile"
-                  value={profile.key}
-                  checked={chosen === profile.key}
-                  disabled={!canManage}
-                  onChange={() => setChosen(profile.key)}
-                  className="mt-1"
-                />
-                <span className="flex flex-col gap-0.5">
-                  <span className="flex items-center gap-2 font-medium text-ink">
-                    {profile.label}
-                    {profile.key === practice.profile ? (
-                      <Chip tone="brand">
-                        {t("admin.practice.profile.inUse")}
-                      </Chip>
-                    ) : null}
-                  </span>
-                  <span className="text-ink-3">{profile.for}</span>
-                </span>
-              </label>
-            ))}
+            {practice.profiles.map((profile) => {
+              const sets = comparison.filter((row) =>
+                row.differs.includes(profile.key),
+              );
+              return (
+                // The hint sits beside the label rather than in it, so opening
+                // it does not choose the profile.
+                <div
+                  key={profile.key}
+                  className={cn(
+                    "flex items-start gap-1 rounded-control border py-2 pr-2 pl-3 text-sm",
+                    chosen === profile.key
+                      ? "border-brand bg-brand-weak"
+                      : "border-line",
+                  )}
+                >
+                  <label className="flex flex-1 items-start gap-2.5">
+                    <input
+                      type="radio"
+                      name="profile"
+                      value={profile.key}
+                      checked={chosen === profile.key}
+                      disabled={!canManage}
+                      onChange={() => setChosen(profile.key)}
+                      className="mt-1"
+                    />
+                    <span className="flex flex-col gap-0.5">
+                      <span className="flex items-center gap-2 font-medium text-ink">
+                        {profile.label}
+                        {profile.key === practice.profile ? (
+                          <Chip tone="brand">
+                            {t("admin.practice.profile.inUse")}
+                          </Chip>
+                        ) : null}
+                      </span>
+                      <span className="text-ink-3">{profile.for}</span>
+                    </span>
+                  </label>
+                  <MethodHint name={profile.label} href={methodLinks["12.2"]}>
+                    {sets.length === 0 ? (
+                      <p>{t("admin.practice.hint.recommended")}</p>
+                    ) : (
+                      <>
+                        <p>{t("admin.practice.hint.changes")}</p>
+                        <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4">
+                          {sets.map((row) => (
+                            <li key={row.key}>
+                              {row.name}: {row.values[profile.key]}
+                            </li>
+                          ))}
+                        </ul>
+                      </>
+                    )}
+                  </MethodHint>
+                </div>
+              );
+            })}
           </fieldset>
 
           {preview ? (
@@ -314,6 +342,7 @@ function GroupCard({
   settings,
   practice,
   nameOf,
+  methodLinks,
   canManage,
 }: {
   readonly id: string;
@@ -321,6 +350,7 @@ function GroupCard({
   readonly settings: readonly Setting[];
   readonly practice: Practice;
   readonly nameOf: (setting: Setting) => string;
+  readonly methodLinks: Readonly<Record<string, string>>;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -448,14 +478,16 @@ function GroupCard({
                 className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
               >
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <label htmlFor={fieldId} className="font-medium text-ink">
-                    {nameOf(setting)}
-                  </label>
-                  <span className="text-xs text-ink-4">
-                    {t("admin.practice.section", {
-                      section: setting.section,
-                      source: setting.source,
-                    })}
+                  <span className="flex items-start gap-0.5">
+                    <label htmlFor={fieldId} className="font-medium text-ink">
+                      {nameOf(setting)}
+                    </label>
+                    <MethodHint
+                      name={nameOf(setting)}
+                      href={methodLinks[setting.section]}
+                    >
+                      <p>{setting.summary}</p>
+                    </MethodHint>
                   </span>
                   {differs ? (
                     <span className="text-xs text-ink-3">
@@ -499,8 +531,9 @@ export function PracticeForm({
   practice,
   previews,
   thresholdLabels,
-  checkTitles,
-  gateTitles,
+  settingNames,
+  comparison,
+  methodLinks,
   canManage,
 }: {
   readonly practice: Practice;
@@ -508,9 +541,12 @@ export function PracticeForm({
   readonly previews: Readonly<Record<string, ProfileSwitch>>;
   /** §11's own labels, for the thresholds a profile moves. */
   readonly thresholdLabels: Readonly<Record<string, string>>;
-  /** §4's title for each check, so a check reads as more than its id. */
-  readonly checkTitles: Readonly<Record<string, string>>;
-  readonly gateTitles: readonly string[];
+  /** Each setting's name from `practiceSettingName`, keyed by setting. */
+  readonly settingNames: Readonly<Record<string, string>>;
+  /** The five profiles side by side, from `compareProfiles`. */
+  readonly comparison: readonly ProfileComparisonRow[];
+  /** METHOD.md's address for each section a setting or row cites. */
+  readonly methodLinks: Readonly<Record<string, string>>;
   /**
    * `full`, which every practice write requires. The server refuses either
    * way; this says so before somebody fills a card in.
@@ -518,7 +554,7 @@ export function PracticeForm({
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
-  const nameOf = useSettingName(checkTitles, gateTitles);
+  const nameOf = useSettingName(settingNames);
   const groups = [...new Set(practice.registry.map((entry) => entry.group))];
   const { register, unregister } = useKeyboardRegistry();
 
@@ -551,6 +587,8 @@ export function PracticeForm({
         previews={previews}
         thresholdLabels={thresholdLabels}
         nameOf={nameOf}
+        comparison={comparison}
+        methodLinks={methodLinks}
         canManage={canManage}
       />
       {groups.map((group) => (
@@ -563,6 +601,7 @@ export function PracticeForm({
           settings={practice.registry.filter((entry) => entry.group === group)}
           practice={practice}
           nameOf={nameOf}
+          methodLinks={methodLinks}
           canManage={canManage}
         />
       ))}

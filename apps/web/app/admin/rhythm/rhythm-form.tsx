@@ -8,6 +8,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  MethodHint,
   NumberInput,
   SelectInput,
   TextInput,
@@ -70,6 +71,65 @@ import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
 
 type Rhythm = Awaited<ReturnType<typeof callAction<"rhythm.read">>>;
 type RegistryEntry = Rhythm["registry"][number];
+
+/** One threshold's hint, worked out on the server by the page. */
+export interface ThresholdHint {
+  readonly why: string;
+  /** The METHOD.md section's heading, without its number. */
+  readonly section: string | null;
+  readonly href: string;
+  /** The principles the reason cites by number, each with its title. */
+  readonly principles: readonly {
+    readonly number: number;
+    readonly title: string;
+  }[];
+}
+
+/**
+ * The "i" beside a threshold's name (UIUX-PLAN §4, method hint).
+ *
+ * **It does not repeat the reason the card already shows** under the name. It
+ * says what that reason leans on: each principle it cites by number, with the
+ * principle's title, and the part of the method the threshold comes from,
+ * with a link to it. This puts back the pointer to the clause that P8-G11b
+ * took away with the section chip, without the chip. A threshold whose reason
+ * is not on the card, the two the check-in card shows as dropdowns, carries
+ * its reason in the hint instead.
+ */
+function ThresholdHintButton({
+  name,
+  hint,
+  withReason = false,
+}: {
+  readonly name: string;
+  readonly hint: ThresholdHint | undefined;
+  readonly withReason?: boolean;
+}) {
+  const { t } = useTranslations();
+  if (hint === undefined) {
+    return null;
+  }
+  return (
+    <MethodHint name={name} href={hint.href}>
+      <div className="flex flex-col gap-1">
+        {withReason ? <p>{hint.why}</p> : null}
+        {hint.principles.map((principle) => (
+          <p key={principle.number}>
+            {t("admin.rhythm.hint.principle", {
+              number: String(principle.number),
+              title: principle.title,
+            })}
+          </p>
+        ))}
+        {hint.section ? (
+          <p className="text-ink-3">
+            {t("admin.rhythm.hint.from", { section: hint.section })}
+          </p>
+        ) : null}
+      </div>
+    </MethodHint>
+  );
+}
 
 /** Catalogue keys for each group's card title. */
 const GROUP_TITLES: Record<string, string> = {
@@ -227,11 +287,13 @@ function Parameter({
   entry,
   resolved,
   override,
+  hint,
   canManage,
 }: {
   readonly entry: RegistryEntry;
   readonly resolved: unknown;
   readonly override: unknown;
+  readonly hint: ThresholdHint | undefined;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -254,7 +316,10 @@ function Parameter({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-medium text-ink">{entry.label}</span>
+        <span className="flex items-center gap-0.5">
+          <span className="font-medium text-ink">{entry.label}</span>
+          <ThresholdHintButton name={entry.label} hint={hint} />
+        </span>
         <span className="flex items-center gap-2">
           {/*
            * **The METHOD §x chip is gone (P8-G11b).** Measured on this screen:
@@ -677,9 +742,18 @@ function SettingsCard({
 
 export function RhythmForm({
   rhythm,
+  hints,
+  checkInHints,
   canManage,
 }: {
   readonly rhythm: Rhythm;
+  /** Each threshold's hint, keyed by threshold. */
+  readonly hints: Readonly<Record<string, ThresholdHint>>;
+  /** The check-in card's two dropdowns' hints, keyed by field. */
+  readonly checkInHints: {
+    readonly defaultCheckInFrequency: ThresholdHint | undefined;
+    readonly checkInAnchorDay: ThresholdHint | undefined;
+  };
   /**
    * `manage_coaching`, which `rhythm.update` requires as `full`.
    *
@@ -726,36 +800,52 @@ export function RhythmForm({
         canManage={canManage}
       >
         <div className="flex flex-col gap-3 text-sm">
-          <SelectInput
-            label={t("admin.rhythm.rhythmForm.checkInFrequency")}
-            name="defaultCheckInFrequency"
-            disabled={!canManage}
-            defaultValue={rhythm.defaultCheckInFrequency}
-            className="flex-row items-center justify-between gap-3"
-            inputClassName="w-auto"
-          >
-            {["daily", "weekly", "biweekly", "monthly", "quarterly"].map(
-              (option) => (
-                <option key={option} value={option}>
-                  {option}
+          {/* The hint sits beside the field rather than in its label, so
+              opening it does not move focus to the dropdown. */}
+          <div className="flex items-center gap-1">
+            <SelectInput
+              label={t("admin.rhythm.rhythmForm.checkInFrequency")}
+              name="defaultCheckInFrequency"
+              disabled={!canManage}
+              defaultValue={rhythm.defaultCheckInFrequency}
+              className="flex-1 flex-row items-center justify-between gap-3"
+              inputClassName="w-auto"
+            >
+              {["daily", "weekly", "biweekly", "monthly", "quarterly"].map(
+                (option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ),
+              )}
+            </SelectInput>
+            <ThresholdHintButton
+              name={t("admin.rhythm.rhythmForm.checkInFrequency")}
+              hint={checkInHints.defaultCheckInFrequency}
+              withReason
+            />
+          </div>
+          <div className="flex items-center gap-1">
+            <SelectInput
+              label={t("admin.rhythm.rhythmForm.anchorDay")}
+              name="checkInAnchorDay"
+              disabled={!canManage}
+              defaultValue={String(rhythm.checkInAnchorDay)}
+              className="flex-1 flex-row items-center justify-between gap-3"
+              inputClassName="w-auto"
+            >
+              {WEEKDAYS.map(([value, labelKey]) => (
+                <option key={value} value={value}>
+                  {t(labelKey)}
                 </option>
-              ),
-            )}
-          </SelectInput>
-          <SelectInput
-            label={t("admin.rhythm.rhythmForm.anchorDay")}
-            name="checkInAnchorDay"
-            disabled={!canManage}
-            defaultValue={String(rhythm.checkInAnchorDay)}
-            className="flex-row items-center justify-between gap-3"
-            inputClassName="w-auto"
-          >
-            {WEEKDAYS.map(([value, labelKey]) => (
-              <option key={value} value={value}>
-                {t(labelKey)}
-              </option>
-            ))}
-          </SelectInput>
+              ))}
+            </SelectInput>
+            <ThresholdHintButton
+              name={t("admin.rhythm.rhythmForm.anchorDay")}
+              hint={checkInHints.checkInAnchorDay}
+              withReason
+            />
+          </div>
           {/*
            * **Coach strictness left this card at P9-T05.** Every check now has
            * its own level (METHOD.md §4), and strict mode, which raises them
@@ -790,6 +880,7 @@ export function RhythmForm({
                 entry={entry}
                 resolved={rhythm.thresholds[entry.key]}
                 override={rhythm.overrides[entry.key]}
+                hint={hints[entry.key]}
                 canManage={canManage}
               />
             ))}

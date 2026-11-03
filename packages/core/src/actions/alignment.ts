@@ -386,7 +386,7 @@ export const removeGoalDependency = defineWriteAction({
 export const addKeyResultDependency = defineWriteAction({
   name: "goals.addKeyResultDependency",
   summary:
-    "Records a key result's dependency on a providing team, for the register (METHOD.md §5.4).",
+    "Records a key result's dependency on a providing team, for the register.",
   input: z
     .object({
       keyResultId: z.uuid(),
@@ -985,8 +985,7 @@ export const dismissAlignmentFinding = defineWriteAction({
 
 export const readAlignmentGraph = defineReadAction({
   name: "alignment.graph",
-  summary:
-    "The cascade as nodes and edges, for the alignment studio canvas (S-16).",
+  summary: "The cascade as nodes and edges, for the alignment studio canvas.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.object({
     nodes: z.array(

@@ -132,7 +132,7 @@ async function moveDraft(
 export const publishDraft = defineWriteAction({
   name: "goals.publishDraft",
   summary:
-    "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+    "Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
   input: z.object({ id: z.uuid() }),
   output: z.object({
     goal: treeGoal,
@@ -203,7 +203,7 @@ export const publishDraft = defineWriteAction({
 export const approveDraft = defineWriteAction({
   name: "goals.approveDraft",
   summary:
-    "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+    "Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts.",
   input: z.object({ id: z.uuid() }),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,
