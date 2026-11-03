@@ -77,7 +77,7 @@ export default async function NudgeVolumePage() {
     // Said rather than hidden. Somebody who cannot see this should know it
     // exists and who to ask, which is what a permission-denied state is for.
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.nudges.nudgeVolume")}
         </h1>
@@ -88,7 +88,7 @@ export default async function NudgeVolumePage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -109,15 +109,17 @@ export default async function NudgeVolumePage() {
   );
 
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.nudges.nudgeVolume")}
-      </h1>
-      <p className="text-sm text-ink-3">
-        {t("admin.nudges.theLastDaysNoiseIs", {
-          windowDays: volume.windowDays,
-        })}
-      </p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.nudges.nudgeVolume")}
+        </h1>
+        <p className="text-sm text-ink-3">
+          {t("admin.nudges.theLastDaysNoiseIs", {
+            windowDays: volume.windowDays,
+          })}
+        </p>
+      </div>
 
       <Card>
         <CardHeader className="justify-between">
@@ -231,6 +233,6 @@ export default async function NudgeVolumePage() {
         quietMode={rules.quietMode}
         channels={NUDGE_CHANNELS}
       />
-    </>
+    </div>
   );
 }
