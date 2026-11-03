@@ -198,6 +198,18 @@ describe("resolution", () => {
     expect(Object.hasOwn(resolved, "not.a.setting")).toBe(false);
   });
 
+  it("no longer offers Scoring, and reads a workspace that stored it as if it never had", () => {
+    // Removed in November 2026: METHOD.md never said what Off did, and nothing
+    // in the product read it, so Off had never changed anything.
+    expect(isPracticeKey("scoring.enabled")).toBe(false);
+    expect(
+      resolvePractice("recommended", { "scoring.enabled": "off" }),
+    ).toEqual(defaultPractice());
+    expect(
+      validatePracticeOverrides({ "scoring.enabled": "off" }).problems,
+    ).toHaveLength(1);
+  });
+
   it("reads an unknown profile as Recommended", () => {
     expect(resolvePractice("bespoke")).toEqual(defaultPractice());
   });

@@ -1127,7 +1127,6 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | Levels in use | Which levels OKRs are set at. A change applies to cycles that start after it, so no objective is left at a level that no longer exists. | Company, department, team, individual: each on or off | Company, department and team on, individual off | Castro; Cagan |
 | Progress roll-up from aligned goals | Whether a goal's progress also counts the goals aligned beneath it. Off by default, because their work usually moves the goal's own key results too and would be counted twice. | On · Off | Off | Perdoo (vendor) |
 | Confidence shown as | How the confidence asked at every check-in is shown: as x in 10, as a decimal from 0.0 to 1.0, or as a percent. | x in 10 · 0.0 to 1.0 · Percent | x in 10 | Wodtke |
-| Scoring | Whether key results are scored at the close of the cycle, from their progress against the key result as written. | On · Off | On | Lamorte; Castro |
 | Score adjustment at close | Whether a person may adjust a computed score at the close with a written reason. Both numbers are kept. | Allowed with a reason · Not allowed | Allowed with a reason | Doerr |
 | Score colours | Where a score's colour changes: at 0.6 and 0.3, as Google's playbook sets them, or at 0.7 and 0.4, as Doerr does. | Google (0.6, 0.3) · Doerr (0.7, 0.4) | Google | re:Work; whatmatters |
 | Progress signal | How the red, amber or green signal beside health is judged: against the progress expected by today's date (Pace-aware), or against fixed percentages (Absolute). | Pace-aware · Absolute | Pace-aware | Microsoft Viva Goals (vendor) |
@@ -1148,7 +1147,7 @@ A profile is a named starting point: choosing one sets the settings above, and e
 | **Recommended** | Most organisations | The defaults in this document |
 | **Google-style** | Organisations following Google's playbook closely | Individual level on. Department level off. Reviewer off. Google's score colours |
 | **Radical Focus** | Small companies and teams starting out, following Wodtke | One objective per team, three key results, warn above. Confidence as x in 10. Phases hidden. Weekly commitments and wins |
-| **Lightweight** | Teams that want to track OKRs without the planning workflow | Phases hidden. Reviewer off. Only gates 1 and 2. Check-ins every two weeks. Scoring on, root causes optional |
+| **Lightweight** | Teams that want to track OKRs without the planning workflow | Phases hidden. Reviewer off. Only gates 1 and 2. Check-ins every two weeks. Root causes optional |
 | **Governed** | Organisations that run a formal planning process | Phases binding. Writing in the planning window. New objectives mid-cycle as drafts approved by the reviewer. Reviewer required. Gates 1 to 5 block. AL-3 on. Sponsor in the escalation ladders |
 
 *Source:* Google's OKR playbook, Wodtke's Radical Focus, Castro's two levels, and the configuration Perdoo and Microsoft Viva Goals offer (vendor).
