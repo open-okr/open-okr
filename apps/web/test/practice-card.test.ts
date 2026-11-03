@@ -1,8 +1,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
-import { PRACTICE, PRACTICE_KEYS } from "@openokr/method";
+import { PRACTICE, PRACTICE_KEYS, PROFILE_KEYS } from "@openokr/method";
 import { describe, expect, test } from "vitest";
+import { methodDocumentUrl, RUNNING_VERSION } from "../lib/app-version.ts";
 
 /**
  * The practice settings screen (S-36, METHOD.md §12, P9-T05).
@@ -20,7 +21,17 @@ const at = (path: string) =>
 const form = at("../app/admin/practice/practice-form.tsx");
 const actions = at("../app/admin/practice/practice-actions.ts");
 const page = at("../app/admin/practice/page.tsx");
+const comparison = at("../app/admin/practice/profile-comparison.tsx");
 const rhythmForm = at("../app/admin/rhythm/rhythm-form.tsx");
+const methodDocument = at("../../../docs/specification/METHOD.md");
+
+/** The anchor GitHub gives a heading: "12.3 The profiles compared" is "123-the-profiles-compared". */
+const anchorOf = (heading: string) =>
+  heading
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s/g, "-");
 
 describe("the practice screen", () => {
   test("is generated from the registry, and names no setting", () => {
@@ -54,6 +65,38 @@ describe("the practice screen", () => {
     expect(at("../../../packages/core/src/actions/practice.ts")).toContain(
       "switchProfile(",
     );
+  });
+
+  test("compares the profiles with the function METHOD.md's table is held to", () => {
+    // `method:check` compares METHOD.md §12.3 with `compareProfiles`, so the
+    // dialog drawing anything else would be a second table to drift.
+    expect(page).toContain("compareProfiles()");
+    for (const key of [...PRACTICE_KEYS, ...PROFILE_KEYS]) {
+      expect(comparison).not.toContain(`"${key}"`);
+    }
+  });
+
+  test("names a setting the way the comparison does", () => {
+    expect(page).toContain("practiceSettingName(key)");
+    expect(form).not.toContain("checkTitles");
+  });
+
+  test("sends a reader to METHOD.md as this release shipped it, at a heading it has", () => {
+    expect(methodDocumentUrl("x")).toBe(
+      `https://github.com/open-okr/open-okr/blob/v${RUNNING_VERSION}/docs/specification/METHOD.md#x`,
+    );
+    const anchors = [...page.matchAll(/methodDocumentUrl\("([^"]+)"\)/g)].map(
+      (match) => match[1],
+    );
+    expect(anchors).toHaveLength(2);
+    const headings = new Set(
+      [...methodDocument.matchAll(/^#{2,4} (.+)$/gm)].map((match) =>
+        anchorOf(match[1] ?? ""),
+      ),
+    );
+    for (const anchor of anchors) {
+      expect(headings).toContain(anchor);
+    }
   });
 
   test("is in the admin navigation for whoever may change it", () => {

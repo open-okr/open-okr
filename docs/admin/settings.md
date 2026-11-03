@@ -22,7 +22,7 @@ no administrator overrides it.
 | `importRowLimit` | Set by the registry | An import is bigger than the default ceiling |
 | `messageLogRetentionDays` | Set by the registry | Your policy says chat message records live for a different span |
 | `agentRunCostCapUsd` | Set by the registry | You want a harder or softer ceiling on what an agent run may spend |
-| Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice shows what a profile changes before it is applied, keeps anything the workspace changed itself, and lets any one setting be changed or reset on its own card. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
+| Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice compares the five side by side under "Compare profiles", links to the method behind them, shows what a profile changes before it is applied, keeps anything the workspace changed itself, and lets any one setting be changed or reset on its own card. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
 
 ### Trusted email domains
 

@@ -7,12 +7,15 @@
  * records the change. Then every §12.2 profile is applied from the profile
  * card in turn, with Lightweight's check-in frequency proved on the rhythm
  * card, because a profile's thresholds are written and its practice is not.
+ * Last, the five are compared side by side in a dialog, and the page links to
+ * the method itself.
  *
  * **The practice is put back** after the last test, whatever happened,
  * because every later spec writes on the recommended profile. The policy
  * behind the refusal is proved for every caller in `s04c-binding-phases` and
  * `packages/core/test/policy-gate.test.ts`; this is the screen that sets it.
  */
+import AxeBuilder from "@axe-core/playwright";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
@@ -186,4 +189,63 @@ test("every profile can be applied, and Lightweight moves the check-in frequency
   await expect(
     page.locator("select[name='defaultCheckInFrequency']"),
   ).toHaveValue("weekly", { timeout: 15_000 });
+});
+
+test("the five profiles compared side by side, and the method behind them", async () => {
+  await goTo(page, "/admin/practice");
+  // The whole method, as this release shipped it rather than as main reads.
+  await expect(page.getByTestId("practice-method-link")).toHaveAttribute(
+    "href",
+    /\/blob\/v[^/]+\/docs\/specification\/METHOD\.md#12-practice-settings-and-profiles$/,
+    { timeout: 15_000 },
+  );
+
+  const open = page.getByTestId("practice-compare-open");
+  await open.click();
+  const dialog = page.getByRole("dialog", {
+    name: "The five profiles compared",
+  });
+  await expect(dialog).toBeVisible();
+  const table = dialog.getByRole("table");
+  for (const label of [
+    "Recommended",
+    "Google-style",
+    "Radical Focus",
+    "Lightweight",
+    "Governed",
+  ]) {
+    await expect(
+      table.getByRole("columnheader", { name: new RegExp(`^${label}`) }),
+    ).toBeVisible();
+  }
+  // The profile this workspace runs is marked in its heading.
+  await expect(
+    table.getByRole("columnheader", { name: /^Recommended\s*In use/ }),
+  ).toBeVisible();
+  // One row read across, cell by cell.
+  await expect(
+    table.getByRole("row", { name: /^Phase enforcement/ }).getByRole("cell"),
+  ).toHaveText(["Guided", "Guided", "Hidden", "Hidden", "Binding"]);
+  await expect(
+    table.getByRole("row", { name: /^Check-in frequency/ }).getByRole("cell"),
+  ).toHaveText(["Weekly", "Weekly", "Weekly", "Every two weeks", "Weekly"]);
+  await expect(dialog.getByTestId("practice-compare-method-link")).toHaveAttribute(
+    "href",
+    /METHOD\.md#123-the-profiles-compared$/,
+  );
+  // The screen-wide scan never opens a dialog, so this one is scanned open.
+  const scan = await new AxeBuilder({ page })
+    .include('[data-testid="practice-compare"]')
+    .analyze();
+  expect(
+    scan.violations.filter(
+      (violation) =>
+        violation.impact === "serious" || violation.impact === "critical",
+    ),
+  ).toEqual([]);
+
+  // Escape closes it, and focus goes back to the button that opened it.
+  await page.keyboard.press("Escape");
+  await expect(dialog).toBeHidden();
+  await expect(open).toBeFocused();
 });

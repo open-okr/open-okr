@@ -1,7 +1,7 @@
 "use client";
 
 import type { callAction } from "@openokr/core";
-import type { ProfileSwitch } from "@openokr/method";
+import type { ProfileComparisonRow, ProfileSwitch } from "@openokr/method";
 import {
   Button,
   Card,
@@ -29,6 +29,7 @@ import {
 } from "react";
 import { applyProfile, resetPractice, savePractice } from "./practice-actions";
 import { NOTHING_SAVED, type PracticeState } from "./practice-state.ts";
+import { ProfileComparison } from "./profile-comparison";
 
 /**
  * Choosing and changing the METHOD.md §12 practice (S-36, P9-T05).
@@ -95,27 +96,16 @@ function useOutcomeToast(
   }, [outcome, title, source, toast]);
 }
 
-/** The name a person reads for one setting, with its item where it has one. */
+/**
+ * The name a person reads for one setting, with its item where it has one.
+ * `practiceSettingName`'s, so a card and the comparison name a row alike.
+ */
 function useSettingName(
-  checkTitles: Readonly<Record<string, string>>,
-  gateTitles: readonly string[],
+  settingNames: Readonly<Record<string, string>>,
 ): (setting: Setting) => string {
   return useCallback(
-    (setting: Setting) => {
-      if (setting.item === null) {
-        return setting.label;
-      }
-      if (setting.group === "checks" && checkTitles[setting.item]) {
-        return `${setting.item} ${checkTitles[setting.item]}`;
-      }
-      if (setting.group === "gates") {
-        const gate = Number(setting.item.replace(/\D/g, ""));
-        const title = gateTitles[gate - 1];
-        return title ? `${setting.item}: ${title}` : setting.item;
-      }
-      return `${setting.label}: ${setting.item}`;
-    },
-    [checkTitles, gateTitles],
+    (setting: Setting) => settingNames[setting.key] ?? setting.label,
+    [settingNames],
   );
 }
 
@@ -125,12 +115,16 @@ function ProfileCard({
   previews,
   thresholdLabels,
   nameOf,
+  comparison,
+  comparisonMethodUrl,
   canManage,
 }: {
   readonly practice: Practice;
   readonly previews: Readonly<Record<string, ProfileSwitch>>;
   readonly thresholdLabels: Readonly<Record<string, string>>;
   readonly nameOf: (setting: Setting) => string;
+  readonly comparison: readonly ProfileComparisonRow[];
+  readonly comparisonMethodUrl: string;
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
@@ -163,18 +157,26 @@ function ProfileCard({
               {t("admin.practice.profile.description")}
             </p>
           </div>
-          {canManage ? (
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              disabled={pending || chosen === practice.profile}
-            >
-              {pending
-                ? t("admin.practice.profile.applying")
-                : t("admin.practice.profile.use")}
-            </Button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            <ProfileComparison
+              rows={comparison}
+              profiles={practice.profiles}
+              inUse={practice.profile}
+              methodUrl={comparisonMethodUrl}
+            />
+            {canManage ? (
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={pending || chosen === practice.profile}
+              >
+                {pending
+                  ? t("admin.practice.profile.applying")
+                  : t("admin.practice.profile.use")}
+              </Button>
+            ) : null}
+          </div>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
           <fieldset className="flex flex-col gap-1.5">
@@ -493,8 +495,9 @@ export function PracticeForm({
   practice,
   previews,
   thresholdLabels,
-  checkTitles,
-  gateTitles,
+  settingNames,
+  comparison,
+  comparisonMethodUrl,
   canManage,
 }: {
   readonly practice: Practice;
@@ -502,9 +505,11 @@ export function PracticeForm({
   readonly previews: Readonly<Record<string, ProfileSwitch>>;
   /** §11's own labels, for the thresholds a profile moves. */
   readonly thresholdLabels: Readonly<Record<string, string>>;
-  /** §4's title for each check, so a check reads as more than its id. */
-  readonly checkTitles: Readonly<Record<string, string>>;
-  readonly gateTitles: readonly string[];
+  /** Each setting's name from `practiceSettingName`, keyed by setting. */
+  readonly settingNames: Readonly<Record<string, string>>;
+  /** The five profiles side by side, from `compareProfiles`. */
+  readonly comparison: readonly ProfileComparisonRow[];
+  readonly comparisonMethodUrl: string;
   /**
    * `full`, which every practice write requires. The server refuses either
    * way; this says so before somebody fills a card in.
@@ -512,7 +517,7 @@ export function PracticeForm({
   readonly canManage: boolean;
 }) {
   const { t } = useTranslations();
-  const nameOf = useSettingName(checkTitles, gateTitles);
+  const nameOf = useSettingName(settingNames);
   const groups = [...new Set(practice.registry.map((entry) => entry.group))];
   const { register, unregister } = useKeyboardRegistry();
 
@@ -545,6 +550,8 @@ export function PracticeForm({
         previews={previews}
         thresholdLabels={thresholdLabels}
         nameOf={nameOf}
+        comparison={comparison}
+        comparisonMethodUrl={comparisonMethodUrl}
         canManage={canManage}
       />
       {groups.map((group) => (

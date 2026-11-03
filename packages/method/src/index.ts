@@ -235,6 +235,11 @@ export {
   validatePracticeOverrides,
 } from "./practice.ts";
 export {
+  compareProfiles,
+  type ProfileComparisonRow,
+  practiceSettingName,
+} from "./profile-comparison.ts";
+export {
   ALIGNMENT_CHECKS,
   type AlignmentCheckInput,
   type ConditionRow,
