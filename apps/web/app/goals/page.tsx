@@ -750,10 +750,12 @@ function countChip(
   filtered: boolean,
   tree: boolean,
 ): string {
+  // "Objectives", the word the page's own heading uses (usability review G1,
+  // owner decision Q2).
   const goals =
     count === 1
-      ? t("common.count.goalOne", { count })
-      : t("common.count.goalOther", { count });
+      ? t("common.count.objectiveOne", { count })
+      : t("common.count.objectiveOther", { count });
   if (filtered && tree) {
     return t("goals.countFilteredAsATree", { goals });
   }

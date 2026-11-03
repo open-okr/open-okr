@@ -111,7 +111,7 @@ test("creating the first account finishes setup", async ({ page }) => {
   // The first thing setup asks is the clock, and its answer is already the
   // browser's: every workspace used to start on UTC whatever it said.
   await expect(
-    page.getByRole("combobox", { name: "Which clock does it keep?" }),
+    page.getByRole("combobox", { name: "Time zone" }),
   ).toHaveValue(/Kuala Lumpur/, { timeout: 15_000 });
 
   /**

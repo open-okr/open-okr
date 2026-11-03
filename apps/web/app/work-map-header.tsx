@@ -1,4 +1,5 @@
-import { Chip, type MessageValues } from "@openokr/ui";
+import { Chip, type MessageValues, Tooltip } from "@openokr/ui";
+import { Info } from "lucide-react";
 import Link from "next/link";
 import { getTranslations } from "../lib/translations";
 
@@ -139,11 +140,14 @@ function Stat({
   value,
   unit,
   tone,
+  hint,
 }: {
   readonly label: string;
   readonly value: string;
   readonly unit?: string;
   readonly tone?: "ok" | "warn" | "bad" | "brand";
+  /** What the figure counts, on hover and focus (usability review O1). */
+  readonly hint?: string;
 }) {
   const toneClass =
     tone === "ok"
@@ -155,8 +159,19 @@ function Stat({
           : "text-ink";
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold tracking-wider text-ink-4 uppercase">
+      <span className="flex items-center gap-1 text-[10px] font-bold tracking-wider text-ink-4 uppercase">
         {label}
+        {hint ? (
+          <Tooltip label={hint}>
+            <button
+              type="button"
+              aria-label={hint}
+              className="inline-flex size-6 items-center justify-center rounded text-ink-4 hover:text-ink-2"
+            >
+              <Info aria-hidden="true" className="size-3" />
+            </button>
+          </Tooltip>
+        ) : null}
       </span>
       <span className="flex items-baseline gap-1">
         <span className={`text-lg font-bold tabular-nums ${toneClass}`}>
@@ -222,6 +237,7 @@ export async function WorkMapHeader({
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Stat
           label={t("common.onTrack")}
+          hint={t("workMapHeader.onTrackHint")}
           value={
             stats.onTrackPct === null ? "—" : `${Math.round(stats.onTrackPct)}%`
           }
@@ -242,6 +258,7 @@ export async function WorkMapHeader({
         />
         <Stat
           label={t("workMapHeader.outdated")}
+          hint={t("workMapHeader.outdatedHint")}
           value={String(stats.outdatedGoals)}
           unit={
             stats.outdatedGoals === 1
@@ -252,6 +269,7 @@ export async function WorkMapHeader({
         />
         <Stat
           label={t("goals.alignment")}
+          hint={t("workMapHeader.alignmentHint")}
           value={
             stats.alignmentScore === null
               ? "—"

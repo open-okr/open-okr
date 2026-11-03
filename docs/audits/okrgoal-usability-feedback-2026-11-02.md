@@ -209,4 +209,9 @@ Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Cham
 | D9, B1 | A delete button on each Board card, behind a confirmation, through `tasks.delete` (browser: a test task was created and soft-deleted) |
 | N5 | A check-in group in Activity is titled with its objective, read after the access filter (browser) |
 
+| W1 to W5 | Q6 copy on every step. "Step 1 of 5" with a bar, "Local time now", "Skip for now", Back from step 2, "Check-in frequency" with "Weekly (recommended)" and 44px buttons, "Invite a teammate" and "Invite and continue", templates as a radio group, "Use template", "Explore with sample data?", "Add sample data" and "Skip and finish". Continue stays enabled (S-34). "You can remove the sample data later" is not said: there is no removal path (browser, every step) |
+| O1 | On track, Outdated and Alignment carry an info button with what each counts. Outdated reads "0 objectives". The on-track colour band stays as it is until Q7 |
+| Q5, O4 | The Work Map confidence chip reads "High, 8 in 10", with the bands on hover and read out with the chip (browser) |
+| S1, G1 | Search and the Goals count chip say objectives (browser: "2 objectives, filtered") |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

@@ -105,7 +105,9 @@ describe("the five steps", () => {
       't("welcome.explains", { count: STEPS.length })',
     );
     // The counter beside it, built from the same list.
-    expect(wizard).toContain(`$\{index + 1} / $\{STEPS.length}`);
+    expect(wizard.replace(/\s+/g, " ")).toContain(
+      't("welcome.stepOf", { step: index + 1, total: STEPS.length })',
+    );
     for (const locale of ["en", "ms"] as const) {
       const explains = CATALOGUES[locale]["welcome.explains"] ?? "";
       expect(explains, locale).toContain("{count}");

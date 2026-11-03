@@ -235,7 +235,7 @@ export async function skipOnboarding(
   const templateStep = 4;
   for (let step = 1; step <= steps; step += 1) {
     await expect(page.getByTestId("welcome-progress")).toContainText(
-      `${step} / ${steps}`,
+      `Step ${step} of ${steps}`,
     );
     if (step === templateStep && options.template) {
       await page.getByTestId(`template-${options.template}`).click();

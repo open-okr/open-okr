@@ -14,6 +14,7 @@ import {
   type ConfidenceDisplay,
   formatConfidence,
   type MessageValues,
+  Tooltip,
 } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
@@ -118,7 +119,24 @@ function ConfidenceChip({
       : verdict.band === "medium"
         ? t("workMap.confidenceMed", value)
         : t("workMap.confidenceLow", value);
-  return <Chip tone={tone}>{label}</Chip>;
+  // The bands on hover, in the same display as the figure, so "High, 8 in
+  // 10" says where High starts (owner decision Q5: keep the number).
+  const bands = t("workMap.confidenceBands", {
+    high: formatConfidence(thresholds["scoring.confidenceHigh"], display, t),
+    low: formatConfidence(thresholds["scoring.confidenceLow"], display, t),
+  });
+  return (
+    // Not a tab stop: one per row would put dozens in the tree's way. The
+    // bands are read out with the chip instead.
+    <Tooltip label={bands}>
+      <span className="inline-flex">
+        <Chip tone={tone}>
+          {label}
+          <span className="sr-only">. {bands}</span>
+        </Chip>
+      </span>
+    </Tooltip>
+  );
 }
 
 /**

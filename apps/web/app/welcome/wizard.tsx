@@ -84,10 +84,23 @@ const STARTING_TEMPLATES = [
 ] as const;
 
 const FREQUENCIES = [
-  { value: "weekly", key: "welcome.rhythm.weekly" },
+  { value: "weekly", key: "welcome.rhythm.weeklyRecommended" },
   { value: "biweekly", key: "welcome.rhythm.biweekly" },
   { value: "monthly", key: "welcome.rhythm.monthly" },
 ] as const;
+
+/** The time now on a zone's clock, so the reader can tell the zone is theirs. */
+function localTimeIn(zone: string): string | null {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: zone,
+    }).format(new Date());
+  } catch {
+    return null;
+  }
+}
 
 export function Wizard({
   workspaceName,
@@ -160,12 +173,24 @@ export function Wizard({
           <p className="text-xs text-ink-3">
             {t("welcome.explains", { count: STEPS.length })}
           </p>
-          {/* The counter is digits and a slash, which is the same in every
-              language; the catalogue names it for a screen reader instead. */}
+          {/* "Step 1 of 5" and a bar, both from the list's own length
+              (usability review W1). */}
           <p className="mt-1 text-xs text-ink-3" data-testid="welcome-progress">
-            <span className="sr-only">{t("welcome.progress")}</span>
-            {`${index + 1} / ${STEPS.length}`}
+            {t("welcome.stepOf", { step: index + 1, total: STEPS.length })}
           </p>
+          <div
+            role="progressbar"
+            aria-label={t("welcome.progress")}
+            aria-valuemin={1}
+            aria-valuemax={STEPS.length}
+            aria-valuenow={index + 1}
+            className="mt-1.5 h-1 w-full max-w-60 overflow-hidden rounded-full bg-raised"
+          >
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${((index + 1) / STEPS.length) * 100}%` }}
+            />
+          </div>
         </div>
       </CardHeader>
 
@@ -187,6 +212,16 @@ export function Wizard({
               value={zone}
               onValueChange={(chosen) => setZone(chosen ?? "")}
             />
+            {/* The clock it keeps, so a wrong zone shows before it is saved
+                (usability review W1). Continue stays enabled: every step
+                is skippable (UIUX-PLAN S-34). */}
+            {zone && localTimeIn(zone) ? (
+              <span className="text-xs text-ink-3" data-testid="local-time">
+                {t("welcome.basics.localTime", {
+                  time: localTimeIn(zone) ?? "",
+                })}
+              </span>
+            ) : null}
           </div>
         ) : null}
 
@@ -205,8 +240,8 @@ export function Wizard({
                   onClick={() => setFrequency(one.value)}
                   className={
                     frequency === one.value
-                      ? "rounded-md border border-brand-600 bg-brand px-2.5 py-1 text-xs font-semibold text-on-brand"
-                      : "rounded-md border border-line px-2.5 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
+                      ? "min-h-11 rounded-md border border-brand-600 bg-brand px-3.5 text-sm font-semibold text-on-brand"
+                      : "min-h-11 rounded-md border border-line px-3.5 text-sm font-semibold text-ink-2 hover:border-ink-4"
                   }
                 >
                   {t(one.key)}
@@ -236,27 +271,35 @@ export function Wizard({
             <span className="text-xs text-ink-3">
               {t("welcome.template.question")}
             </span>
-            <div className="flex flex-col gap-1.5">
+            {/* One choice of three, so radios rather than three toggles
+                (usability review W4). */}
+            <fieldset
+              aria-label={t("welcome.template.question")}
+              className="flex flex-col gap-1.5"
+            >
               {STARTING_TEMPLATES.map((one) => (
-                <button
+                <label
                   key={one.value}
-                  type="button"
                   data-testid={`template-${one.value}`}
-                  aria-pressed={template === one.value}
-                  onClick={() => setTemplate(one.value)}
-                  className={
-                    template === one.value
-                      ? "flex flex-col gap-0.5 rounded-md border border-brand-600 bg-brand-weak px-2.5 py-2 text-left"
-                      : "flex flex-col gap-0.5 rounded-md border border-line px-2.5 py-2 text-left hover:border-ink-4"
-                  }
+                  className="flex cursor-pointer items-start gap-2.5 rounded-md border border-line px-2.5 py-2 hover:border-ink-4 has-[:checked]:border-brand-600 has-[:checked]:bg-brand-weak"
                 >
-                  <span className="text-xs font-semibold text-ink">
-                    {t(one.key)}
+                  <input
+                    type="radio"
+                    name="template"
+                    value={one.value}
+                    checked={template === one.value}
+                    onChange={() => setTemplate(one.value)}
+                    className="mt-0.5 size-4 flex-none accent-brand"
+                  />
+                  <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="text-xs font-semibold text-ink">
+                      {t(one.key)}
+                    </span>
+                    <span className="text-xs text-ink-3">{t(one.help)}</span>
                   </span>
-                  <span className="text-xs text-ink-3">{t(one.help)}</span>
-                </button>
+                </label>
               ))}
-            </div>
+            </fieldset>
             <span className="text-xs text-ink-3">
               {t("welcome.template.help")}
             </span>
@@ -279,6 +322,25 @@ export function Wizard({
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Back from step 2 on: nothing is lost, each step already saved
+              its answer or kept the default (usability review W2). */}
+          {index > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              data-testid="welcome-back"
+              onClick={() => {
+                setProblem(null);
+                const previous = STEPS[index - 1];
+                if (previous) {
+                  setStep(previous);
+                }
+              }}
+            >
+              {t("welcome.back")}
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="primary"
@@ -312,7 +374,9 @@ export function Wizard({
               ? t("welcome.demo.build")
               : step === "template"
                 ? t("welcome.template.apply")
-                : t("welcome.continue")}
+                : step === "people" && email.trim() !== ""
+                  ? t("welcome.people.inviteAndContinue")
+                  : t("welcome.continue")}
           </Button>
           <Button
             type="button"
@@ -321,10 +385,10 @@ export function Wizard({
             onClick={skip}
           >
             {step === "demo"
-              ? t("welcome.demo.empty")
+              ? t("welcome.demo.finish")
               : step === "template"
                 ? t("welcome.template.empty")
-                : t("common.skip")}
+                : t("welcome.skipForNow")}
           </Button>
         </div>
       </CardBody>

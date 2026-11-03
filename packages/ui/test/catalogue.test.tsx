@@ -198,6 +198,9 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMap.objective",
   // The coordinator role is the term's own hole, like "common.caution".
   "spaces.role.coordinator",
+  // The Outdated stat's unit is the objective term's own hole.
+  "workMapHeader.outdatedUnitOne",
+  "workMapHeader.outdatedUnitOther",
 ]);
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {
