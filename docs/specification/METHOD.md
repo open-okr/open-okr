@@ -242,7 +242,7 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 
 ### 2.10 Types of key result
 
-| Kind | Written as | Progress | Scored |
+| Type | Written as | Progress | Scored |
 |---|---|---|---|
 | **Metric** | Move a number from a baseline to a target by a date (increase, reduce or move) | Linear from baseline to target (§3.1) | From progress at the close |
 | **Maintain** | Hold a number inside a band through the cycle | 100% while inside the band, otherwise the distance back | From the share of the cycle spent inside the band, by default |

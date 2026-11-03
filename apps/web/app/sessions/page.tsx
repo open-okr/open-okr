@@ -3,6 +3,7 @@ import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { NavSelect } from "../../lib/nav-select.tsx";
 import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -81,11 +82,11 @@ async function SessionRow({ row }: { readonly row: Row }) {
 export default async function SessionsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ finished?: string }>;
+  searchParams: Promise<{ finished?: string; space?: string }>;
 }) {
   const { t } = await getTranslations();
 
-  const { finished } = await searchParams;
+  const { finished, space } = await searchParams;
   const { session, workspace } = await requireWorkspace();
   const includeFinished = finished === "1";
 
@@ -99,9 +100,37 @@ export default async function SessionsPage({
     includeFinished ? { includeFinished: true } : {},
   );
 
-  const running = rows.filter((row) => row.state === "running");
-  const ahead = rows.filter((row) => row.state === "scheduled");
-  const over = rows.filter(
+  // A team filter, for a facilitator who runs one team's sessions among
+  // many (usability review C7). Offered from the spaces the list holds.
+  const spaces = [
+    ...new Map(
+      rows.flatMap((row) =>
+        row.spaceId && row.spaceName
+          ? [[row.spaceId, row.spaceName] as const]
+          : [],
+      ),
+    ),
+  ];
+  const activeSpace =
+    space && spaces.some(([id]) => id === space) ? space : null;
+  const address = (spaceId: string | null): string => {
+    const params = new URLSearchParams();
+    if (includeFinished) {
+      params.set("finished", "1");
+    }
+    if (spaceId) {
+      params.set("space", spaceId);
+    }
+    const search = params.toString();
+    return search ? `/sessions?${search}` : "/sessions";
+  };
+  const shown = activeSpace
+    ? rows.filter((row) => row.spaceId === activeSpace)
+    : rows;
+
+  const running = shown.filter((row) => row.state === "running");
+  const ahead = shown.filter((row) => row.state === "scheduled");
+  const over = shown.filter(
     (row) => row.state === "closed" || row.state === "skipped",
   );
 
@@ -118,14 +147,39 @@ export default async function SessionsPage({
               {t("sessions.everySessionInA")}
             </p>
           </div>
-          <Link
-            className={buttonVariants({ size: "sm" })}
-            href={includeFinished ? "/sessions" : "/sessions?finished=1"}
-          >
-            {includeFinished
-              ? t("sessions.hideFinished")
-              : t("sessions.showFinished")}
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            {spaces.length > 1 ? (
+              <NavSelect
+                label={t("workMap.scope.space")}
+                value={activeSpace ?? ""}
+                testId="sessions-space"
+                options={[
+                  { value: "", label: t("goals.all"), href: address(null) },
+                  ...spaces.map(([id, name]) => ({
+                    value: id,
+                    label: name,
+                    href: address(id),
+                  })),
+                ]}
+              />
+            ) : null}
+            <Link
+              className={buttonVariants({ size: "sm" })}
+              href={
+                includeFinished
+                  ? activeSpace
+                    ? `/sessions?space=${activeSpace}`
+                    : "/sessions"
+                  : activeSpace
+                    ? `/sessions?finished=1&space=${activeSpace}`
+                    : "/sessions?finished=1"
+              }
+            >
+              {includeFinished
+                ? t("sessions.hideFinished")
+                : t("sessions.showFinished")}
+            </Link>
+          </div>
         </CardHeader>
       </Card>
 

@@ -158,15 +158,20 @@ export default async function InitiativePage({
   return (
     <div className="flex w-full flex-col gap-3.5">
       <Card>
-        <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col gap-0.5">
+        {/* Wraps the controls under the title, and a long unbroken title
+         * breaks rather than squeezing to a few pixels (usability review
+         * IN2: 21px wide at 375 with a 200-character title). */}
+        <CardHeader className="flex-wrap justify-between">
+          <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5 md:max-w-8/12">
             <Link
               href="/initiatives"
               className="text-xs text-ink-3 hover:text-brand-text"
             >
               {t("common.initiatives")}
             </Link>
-            <h1 className="text-lg font-bold text-ink">{initiative.title}</h1>
+            <h1 className="text-lg font-bold text-ink [overflow-wrap:anywhere]">
+              {initiative.title}
+            </h1>
             <p className="text-xs text-ink-3">
               {t("initiatives.detail.ownedBy", {
                 spaceName: initiative.spaceName,
@@ -184,7 +189,7 @@ export default async function InitiativePage({
             {canEdit ? (
               <>
                 <InlineSelect
-                  label="Status"
+                  label={t("checkIn.composer.status")}
                   value={initiative.status}
                   options={STATUS_OPTIONS.map((one) => ({
                     value: one.value,
@@ -193,7 +198,7 @@ export default async function InitiativePage({
                   onSave={setStatusAction.bind(null, initiative.id)}
                 />
                 <InlineSelect
-                  label="Capacity"
+                  label={t("cycle.capacity.capacity")}
                   value={initiative.capacity ?? ""}
                   options={CAPACITY_OPTIONS.map((one) => ({
                     value: one.value,

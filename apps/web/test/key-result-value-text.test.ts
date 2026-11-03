@@ -69,7 +69,7 @@ describe("a key result's value line", () => {
         currentValue: 99.95,
         unit: "%",
       }),
-    ).toBe("99.95 now, hold 99.9 to 100 %");
+    ).toBe("99.95% now, hold 99.9% to 100%");
     // Endpoints stored high to low still print low to high.
     expect(
       keyResultValueText(t, {

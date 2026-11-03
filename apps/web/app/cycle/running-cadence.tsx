@@ -12,6 +12,7 @@ import { confidenceDisplay } from "../../lib/confidence-display.ts";
 import { dayLabel } from "../../lib/day-label.ts";
 import { groupRows } from "../../lib/group-rows.ts";
 import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { NavSelect } from "../../lib/nav-select.tsx";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -110,13 +111,18 @@ function trend(
 }
 
 export async function RunningCadence({
-  sessions,
-  blockers,
+  team,
+  teamHref,
+  sessions: allSessions,
+  blockers: allBlockers,
   decisions,
   confidence,
   streak,
   calibration,
 }: {
+  /** A space's name to narrow sessions and blockers to (review C6). */
+  readonly team: string | null;
+  readonly teamHref: (team: string | null) => string;
   readonly sessions: readonly SessionRow[];
   readonly blockers: readonly BlockerRow[];
   readonly decisions: readonly DecisionRow[];
@@ -129,6 +135,20 @@ export async function RunningCadence({
   // The workspace's "Confidence shown as", as the Work Map reads it (D4).
   const display = await confidenceDisplay();
   const calibratedOn = calibration ? calibration.at.slice(0, 10) : null;
+
+  const teams = [
+    ...new Set([
+      ...allSessions.map((one) => one.spaceName),
+      ...allBlockers.map((one) => one.spaceName),
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
+  const activeTeam = team && teams.includes(team) ? team : null;
+  const sessions = activeTeam
+    ? allSessions.filter((one) => one.spaceName === activeTeam)
+    : allSessions;
+  const blockers = activeTeam
+    ? allBlockers.filter((one) => one.spaceName === activeTeam)
+    : allBlockers;
 
   const held = sessions.filter((one) => one.closed);
   const upcoming = sessions.filter((one) => !one.closed);
@@ -145,7 +165,22 @@ export async function RunningCadence({
               {t("cycle.runningCadence.howTheCycleIs")}
             </p>
           </div>
-          <div className="flex flex-none items-center gap-3.5">
+          <div className="flex flex-none flex-wrap items-center gap-3.5">
+            {teams.length > 1 ? (
+              <NavSelect
+                label={t("workMap.scope.space")}
+                value={activeTeam ?? ""}
+                testId="cadence-team"
+                options={[
+                  { value: "", label: t("goals.all"), href: teamHref(null) },
+                  ...teams.map((name) => ({
+                    value: name,
+                    label: name,
+                    href: teamHref(name),
+                  })),
+                ]}
+              />
+            ) : null}
             <div className="flex flex-col items-end">
               <span className="text-lg font-bold tabular-nums text-ink">
                 {streak}

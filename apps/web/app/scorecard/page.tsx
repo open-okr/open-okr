@@ -369,61 +369,66 @@ export default async function ScorecardPage() {
        * 7 because the cycle screen shows the current cycle, and the one
        * waiting to close has usually just stopped being current.
        */}
-      {canClose && closable.length > 0 ? (
+      {/* Close and Points side by side on a wide screen: two short cards
+       * stacked read as two more sections to scroll past (usability review
+       * SC1). */}
+      <div className="grid gap-4.5 lg:grid-cols-2">
+        {canClose && closable.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("scorecard.closeACycleOut")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+              <ActionForm
+                action={closeCycle}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <SelectInput
+                  label={t("scorecard.cycleToClose")}
+                  id="cycleId"
+                  name="cycleId"
+                  required
+                  className="flex-row items-center gap-2"
+                  inputClassName="h-6.5 w-auto text-xs"
+                >
+                  {closable.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.name}
+                    </option>
+                  ))}
+                </SelectInput>
+                <button
+                  type="submit"
+                  className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+                >
+                  {t("scorecard.close")}
+                </button>
+              </ActionForm>
+
+              <p className="text-xs text-ink-4">
+                {t("scorecard.closingRecordsAndFeeds")}
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("scorecard.closeACycleOut")}
+              {t("scorecard.points")}
             </h2>
           </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            <ActionForm
-              action={closeCycle}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <SelectInput
-                label={t("scorecard.cycleToClose")}
-                id="cycleId"
-                name="cycleId"
-                required
-                className="flex-row items-center gap-2"
-                inputClassName="h-6.5 w-auto text-xs"
-              >
-                {closable.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </SelectInput>
-              <button
-                type="submit"
-                className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("scorecard.close")}
-              </button>
-            </ActionForm>
-
-            <p className="text-xs text-ink-4">
-              {t("scorecard.closingRecordsAndFeeds")}
+          <CardBody>
+            <p className="text-sm text-ink-3">
+              {scorecard.pointsEnabled
+                ? t("scorecard.thePointsLayerIsOn")
+                : t("scorecard.thePointsLayerIsOff")}
             </p>
           </CardBody>
         </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("scorecard.points")}
-          </h2>
-        </CardHeader>
-        <CardBody>
-          <p className="text-sm text-ink-3">
-            {scorecard.pointsEnabled
-              ? t("scorecard.thePointsLayerIsOn")
-              : t("scorecard.thePointsLayerIsOff")}
-          </p>
-        </CardBody>
-      </Card>
+      </div>
     </div>
   );
 }

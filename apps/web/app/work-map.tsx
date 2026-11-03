@@ -284,8 +284,19 @@ export async function GoalTable({
                     <a
                       href={rowHref(node)}
                       className="flex items-center gap-2"
-                      style={{ paddingLeft: `${node.depth * 18}px` }}
+                      style={{
+                        paddingLeft: `${Math.max(node.depth - 1, 0) * 18}px`,
+                      }}
                     >
+                      {/* An elbow to the parent, as the KPI trees draw it,
+                       * where indentation alone left the nesting to be
+                       * guessed (usability review O4). */}
+                      {node.depth > 0 ? (
+                        <span
+                          aria-hidden="true"
+                          className="-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2"
+                        />
+                      ) : null}
                       <RowKindChip
                         kind={node.kind}
                         label={rowKind[node.kind]}

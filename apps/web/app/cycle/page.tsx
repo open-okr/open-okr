@@ -83,6 +83,7 @@ export default async function CyclePage({
     cycle?: string;
     mode?: string;
     space?: string;
+    team?: string;
   }>;
 }) {
   const { t } = await getTranslations();
@@ -702,6 +703,18 @@ export default async function CyclePage({
 
           {viewing === 6 && cadence ? (
             <RunningCadence
+              team={query.team ?? null}
+              teamHref={(team) => {
+                const params = new URLSearchParams();
+                params.set("phase", "6");
+                if (query.cycle) {
+                  params.set("cycle", query.cycle);
+                }
+                if (team) {
+                  params.set("team", team);
+                }
+                return `/cycle?${params.toString()}`;
+              }}
               sessions={cadence.sessions}
               blockers={cadence.blockers}
               decisions={cycleDecisions.map((decision) => ({

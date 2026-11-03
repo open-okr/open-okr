@@ -431,10 +431,13 @@ async function Row({
        * width: the title truncated to "Rebui…" and the owner line to "Ada L…",
        * leaving a row nobody could tell apart from the one under it.
        */}
-      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:flex-1">
+      {/* The title column is held to about eight twelfths of the row and
+       * wraps, a long unbroken title included, rather than cutting it to
+       * "Rebuild the…" (usability review IN2, owner's call 3 November). */}
+      <div className="flex w-full min-w-0 flex-col gap-0.5 sm:w-auto sm:max-w-8/12 sm:flex-1">
         <Link
           href={`/initiatives/${initiative.id}`}
-          className="truncate text-sm font-semibold text-ink hover:text-brand-text"
+          className="text-sm font-semibold text-ink [overflow-wrap:anywhere] hover:text-brand-text"
         >
           {initiative.title}
         </Link>
