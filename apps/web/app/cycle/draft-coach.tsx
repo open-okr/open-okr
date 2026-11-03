@@ -14,7 +14,12 @@ import {
   type ResolvedThresholds,
   strengthScore,
 } from "@openokr/method";
-import { TextInput, useTranslations } from "@openokr/ui";
+import {
+  AgentFace,
+  type AgentMood,
+  TextInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useId, useMemo, useState } from "react";
 import {
   RuleVerdict,
@@ -71,6 +76,18 @@ export interface CoachObjective {
    */
   readonly kind: "committed" | "aspirational";
 }
+
+/**
+ * The Coach's face, at the same worst verdict as the dot. Thinking rather
+ * than cross at a warning, because a warning is a question to answer.
+ */
+const COACH_MOOD: Record<QualityStatus, AgentMood> = {
+  pass: "happy",
+  info: "happy",
+  warn: "thinking",
+  fail: "sad",
+  todo: "thinking",
+};
 
 /** The field's dot, at the worst verdict on screen. `.vd` in the mockup. */
 const WORST_DOT: Record<QualityStatus, string> = {
@@ -199,9 +216,19 @@ export function DraftCoach({
        * and the hint, so a screen reader would announce all three as the
        * field's name. */}
       <div className="flex flex-col gap-1">
-        <label htmlFor={fieldId} className="text-xs font-semibold text-ink-2">
-          {t("cycle.draftCoach.objectiveCheckedAsYou")}
-        </label>
+        <span className="flex items-center gap-1.5">
+          {/* Still as the page loads, and it plays as the verdict changes
+              under somebody's typing, which is the state change §2 lets
+              move. */}
+          <AgentFace
+            agent="coach"
+            mood={COACH_MOOD[worst]}
+            className="size-5"
+          />
+          <label htmlFor={fieldId} className="text-xs font-semibold text-ink-2">
+            {t("cycle.draftCoach.objectiveCheckedAsYou")}
+          </label>
+        </span>
         {/* `.field` from `03b-rule-card`: the worst verdict as a dot on the
          * left, the sentence at the size somebody is actually writing at, and
          * the count of what is firing on the right. The field was a plain

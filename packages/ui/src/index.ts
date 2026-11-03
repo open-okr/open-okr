@@ -4,6 +4,8 @@ import { PACKAGE_NAME as METHOD } from "@openokr/method";
 export const PACKAGE_NAME = "@openokr/ui";
 export const DEPENDS_ON = [FORMATS, METHOD] as const;
 
+export * from "./components/agent-face.tsx";
+export * from "./components/agent-face-kinds.ts";
 export * from "./components/avatar.tsx";
 export * from "./components/bar.tsx";
 export * from "./components/button.tsx";

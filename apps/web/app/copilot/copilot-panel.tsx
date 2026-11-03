@@ -23,6 +23,8 @@
  * Capped is a budget or a switch, and it says which.
  */
 import {
+  AgentFace,
+  type AgentMood,
   Button,
   Chip,
   Kbd,
@@ -30,15 +32,7 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import {
-  Check,
-  Loader2,
-  MessageSquare,
-  Send,
-  Square,
-  Undo2,
-  X,
-} from "lucide-react";
+import { Check, Send, Square, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -342,7 +336,7 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
         aria-label={t("copilot.copilotPanel.askTheCopilot")}
         aria-keyshortcuts="Control+J Meta+J"
       >
-        <MessageSquare className="size-4" />
+        <AgentFace className="size-4" />
         <span className="hidden sm:inline">
           {t("copilot.copilotPanel.ask")}
         </span>
@@ -609,6 +603,15 @@ export function CopilotPanel({
   }
 
   const canAsk = availability.available;
+  // The copilot's face, in the order a reader would want the reason: off
+  // before working, working before a problem with the last answer.
+  const mood: AgentMood = !availability.providerConfigured
+    ? "sleeping"
+    : busy || running
+      ? "thinking"
+      : notice
+        ? "sad"
+        : "idle";
 
   return (
     <>
@@ -628,6 +631,10 @@ export function CopilotPanel({
           className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
         >
           <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
+            {/* Plays each change once and rests. The face in the reply is
+                the one that keeps moving while the answer is on its way, and
+                one moving face in a panel is enough. */}
+            <AgentFace mood={mood} />
             <h2 className="text-sm font-medium text-ink">
               {t("copilot.copilotPanel.copilot")}
             </h2>
@@ -696,7 +703,9 @@ export function CopilotPanel({
                   <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
                     {streaming === "" ? (
                       <span className="flex items-center gap-2 text-ink-4">
-                        <Loader2 className="size-3.5 animate-spin" />
+                        {/* The face is the progress indicator here, so it
+                            loops while the answer has not started. */}
+                        <AgentFace mood="thinking" live className="size-4" />
                         {t("copilot.copilotPanel.readingYourWorkspace")}
                       </span>
                     ) : (

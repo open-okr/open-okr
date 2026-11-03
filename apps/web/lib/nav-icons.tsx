@@ -1,9 +1,9 @@
+import { AgentFace } from "@openokr/ui";
 import {
   ArchiveRestore,
   Armchair,
   BarChart3,
   Bell,
-  Bot,
   CalendarDays,
   CheckCircle2,
   Circle,
@@ -124,7 +124,11 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-deleted": <ArchiveRestore className="size-full" />,
   "admin-imports": <Upload className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
-  "admin-agents": <Bot className="size-full" />,
+  // The general agent's own face rather than a Lucide robot, in the row's
+  // text colour like every icon here. Still until the row is hovered or
+  // focused, because a sidebar is not where ambient motion belongs
+  // (docs/design/agent-faces.md).
+  "admin-agents": <AgentFace className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */
