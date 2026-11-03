@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { canonThresholds, onTrackShareBand } from "@openokr/method";
 import { workspaceReaderLevel } from "../lib/access";
 import { getPool } from "../lib/auth";
 import { getTranslations } from "../lib/translations";
@@ -121,6 +122,15 @@ export async function WorkMapScreen({
     keyResultCount,
     onTrackPct:
       keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
+    // The band is METHOD.md §3.5's, from the §11 registry: it was 70 and 40
+    // written here (usability review N1, owner decision Q7).
+    onTrackBand:
+      keyResultCount === 0
+        ? null
+        : onTrackShareBand(
+            (onTrackKeyResults / keyResultCount) * 100,
+            canonThresholds(),
+          ),
     outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
     alignmentScore: alignment?.score ?? null,
     alignmentBand: alignment?.band ?? null,

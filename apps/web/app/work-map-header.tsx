@@ -21,6 +21,8 @@ import { getTranslations } from "../lib/translations";
 export interface WorkMapStats {
   /** Key results on track, as a percentage of those with a health of their own. */
   readonly onTrackPct: number | null;
+  /** §3.5's reading of the share, which is what colours it. */
+  readonly onTrackBand: "healthy" | "watch" | "at_risk" | null;
   readonly keyResultCount: number;
   readonly objectiveCount: number;
   readonly outdatedGoals: number;
@@ -248,11 +250,11 @@ export async function WorkMapHeader({
               : t("workMapHeader.ofKrs")
           }
           tone={
-            stats.onTrackPct === null
+            stats.onTrackBand === null
               ? undefined
-              : stats.onTrackPct >= 70
+              : stats.onTrackBand === "healthy"
                 ? "ok"
-                : stats.onTrackPct >= 40
+                : stats.onTrackBand === "watch"
                   ? "warn"
                   : "bad"
           }

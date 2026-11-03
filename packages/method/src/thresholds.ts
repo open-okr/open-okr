@@ -252,6 +252,22 @@ export const THRESHOLDS = {
     default: 0.7,
     schema: unit,
   }),
+  "scoring.onTrackShareHealthy": param({
+    group: "scoring",
+    label: "On-track share healthy line",
+    section: "§3.5",
+    why: "70% or more of the key results under goals on track or achieved reads healthy in a set's summary.",
+    default: 70,
+    schema: z.number().int().min(0).max(100),
+  }),
+  "scoring.onTrackShareWatch": param({
+    group: "scoring",
+    label: "On-track share watch line",
+    section: "§3.5",
+    why: "40% to below the healthy line reads watch; below 40% reads at risk. It colours a summary and changes no goal's health.",
+    default: 40,
+    schema: z.number().int().min(0).max(100),
+  }),
   "scoring.confidenceLow": param({
     group: "scoring",
     label: "Confidence low boundary",

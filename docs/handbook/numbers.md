@@ -48,6 +48,8 @@ escalation about somebody else's work always gets through.
 | `scoring.confidenceHigh` | 0.7 | §3.2 |
 | `scoring.confidenceLow` | 0.4 | §3.2 |
 | `scoring.confidenceCritical` | 0.3 | §3.2 |
+| `scoring.onTrackShareHealthy` | 70 | §3.5 |
+| `scoring.onTrackShareWatch` | 40 | §3.5 |
 | `scoring.aspirationalDraftTarget` | 0.5 | §3.2 |
 | `scoring.draftSandbagging` | 0.9 | §3.2 |
 | `scoring.draftComfortable` | 0.7 | §3.2 |

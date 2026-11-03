@@ -10,6 +10,7 @@ import {
   keyResultProgress,
   needsRootCause,
   objectiveScore,
+  onTrackShareBand,
   portfolioVerdictOf,
   progressSignal,
   SCORE_BAND_TEXT,
@@ -410,5 +411,15 @@ describe("§3.5's health says what happened (P9-T15b-a)", () => {
         graceDays: 3,
       }),
     ).toBe("outdated");
+  });
+});
+
+describe("the on-track share (§3.5)", () => {
+  const thresholds = canonThresholds();
+  it("is healthy from 70, watch from 40, at risk below", () => {
+    expect(onTrackShareBand(70, thresholds)).toBe("healthy");
+    expect(onTrackShareBand(69.9, thresholds)).toBe("watch");
+    expect(onTrackShareBand(40, thresholds)).toBe("watch");
+    expect(onTrackShareBand(39.9, thresholds)).toBe("at_risk");
   });
 });

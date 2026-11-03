@@ -364,6 +364,8 @@ Health is derived, never typed in. Precedence, first match wins:
 
 A goal that has never been checked in is `pending`, not `on track`, and reads "No check-in yet": "Pending" read as waiting for somebody's approval (OKRGoal UX review, October 2026). Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
+**The on-track share.** Over a set of goals, the share of key results under goals that read on track or achieved. At or above the healthy line it reads healthy, from the watch line to below it reads watch, and below the watch line it reads at risk (§11). It colours the summary a reader sees first and changes no goal's health. *Source:* OpenOKR default, from the okrgoal.com usability review of November 2026.
+
 **Reported health against the data.** When a goal reports on track and one of its metric key results has not moved within the divergence window (§11), the coach says so (§10).
 
 ### 3.6 Trend forecast
@@ -1045,6 +1047,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Progress signal fail | 50%, for the absolute signal |
 | Trend forecast minimum values | 4 |
 | Divergence window | 4 weeks with no movement while reported on track |
+| On-track share healthy line | 70% of key results under goals on track or achieved |
+| On-track share watch line | 40% |
 
 **Quality and planning**
 
