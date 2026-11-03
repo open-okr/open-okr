@@ -158,7 +158,12 @@ test("the front door shows what provisioning resolved, with nothing configured",
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Q[1-4] \d{4}$/ })).toBeVisible();
+  // The cycle is a picker since the usability review's O3, so the generated
+  // cycle is its chosen option rather than a link.
+  await expect(page.getByTestId("work-map-cycle")).toHaveValue(/.+/);
+  await expect(
+    page.getByTestId("work-map-cycle").locator("option:checked"),
+  ).toHaveText(/^Q[1-4] \d{4}$/);
   // And the three ways out of it, which is the front door's other job.
   await expect(
     page.getByRole("link", { name: "Filter and search in the explorer" }),
