@@ -391,12 +391,12 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // the document, hidden, while the next one renders.
   const champion = page
     .locator("#main-content")
-    .getByRole("combobox", { name: "Champion", exact: true });
+    .getByRole("combobox", { name: "Owner", exact: true });
   const me = await page
     .locator(titleField("Objective title", OBJECTIVE))
     .first()
     .locator("xpath=ancestor::div[contains(@class, 'grid')][1]")
-    .getByRole("combobox", { name: `Champion of ${OBJECTIVE}` })
+    .getByRole("combobox", { name: `Owner of ${OBJECTIVE}` })
     .inputValue();
   await choose(champion, me);
   await expect(page).toHaveURL(/champion=[0-9a-f-]{36}/);

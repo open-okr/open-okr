@@ -214,4 +214,8 @@ Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Cham
 | Q5, O4 | The Work Map confidence chip reads "High, 8 in 10", with the bands on hover and read out with the chip (browser) |
 | S1, G1 | Search and the Goals count chip say objectives (browser: "2 objectives, filtered") |
 
+| Q1 | Owner is the canon term in METHOD.md §0 and §2.5 and in `TERMINOLOGY.champion`, with Champion as the suggested alternative. The stored key stays `champion`, so no data moves and a workspace's own label is kept. Quality checks, gate 1, trigger recipients, the export column and about twenty catalogue strings follow. Space is kept. Coaching messages use the method's word, which is now Owner, so the sub-question resolves itself. The OKR Champion agent keeps its name |
+
+Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` (ten files) still draw "Champion", and the spreadsheet import templates still label the column "Champion" (both headers are accepted). UIUX-PLAN screen entries that say "champion" are left as written; the label comes from the terminology setting.
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

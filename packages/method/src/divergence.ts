@@ -90,7 +90,7 @@ export function divergences(
       // High: this is the case where nobody finds out until the cycle ends.
       severity: "high",
       reason:
-        "This goal is reported on track, and its own progress is in the red band. One of the two is wrong, and only the champion can say which.",
+        "This goal is reported on track, and its own progress is in the red band. One of the two is wrong, and only the owner can say which.",
     });
   }
 
@@ -162,7 +162,7 @@ export function stalledWhileOnTrack(
   return {
     kind: "stalled_while_on_track",
     severity: "high",
-    reason: `Reported on track, but ${input.keyResultTitle} has not moved in ${weeks} weeks. One of the two is wrong, and only the champion can say which.`,
+    reason: `Reported on track, but ${input.keyResultTitle} has not moved in ${weeks} weeks. One of the two is wrong, and only the owner can say which.`,
   };
 }
 

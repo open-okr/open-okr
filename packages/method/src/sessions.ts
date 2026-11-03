@@ -166,7 +166,7 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
     step: 1,
     title: "Confidence round",
     purpose:
-      "Every key result gets a confidence. Votes reveal together so nobody anchors on the champion, and the champion confirms it and writes what changed this week. Facts first",
+      "Every key result gets a confidence. Votes reveal together so nobody anchors on the owner, and the owner confirms it and writes what changed this week. Facts first",
   },
   {
     step: 2,

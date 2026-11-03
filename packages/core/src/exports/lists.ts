@@ -131,7 +131,7 @@ const GOAL_COLUMNS = [
   "Level",
   "Health",
   "Progress %",
-  "Champion",
+  "Owner",
   "Reviewer",
   "Key results",
 ] as const;

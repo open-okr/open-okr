@@ -77,5 +77,5 @@ test("an objective drafted with no reviewer reads as having none", async ({
 
   // The objective's own line says so, rather than naming somebody.
   const card = page.locator("div", { has: drafted }).first();
-  await expect(card.getByText(/champions it, no reviewer/).first()).toBeVisible();
+  await expect(card.getByText(/owned by .+, no reviewer/).first()).toBeVisible();
 });

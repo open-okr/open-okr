@@ -272,7 +272,7 @@ describe("the export, which is the one action that takes data out", () => {
 
     const lines = (exported.csv ?? "").trim().split("\r\n");
     expect(lines[0]).toContain('"Objective"');
-    expect(lines[0]).toContain('"Champion"');
+    expect(lines[0]).toContain('"Owner"');
     expect(lines[1]).toContain(PHRASE);
     // One header and one row, which is exactly what the explorer draws.
     expect(lines).toHaveLength(2);

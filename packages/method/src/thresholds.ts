@@ -151,7 +151,7 @@ export const THRESHOLDS = {
     section: "§11",
     // The sponsor step is conditional, as METHOD §11 and `escalation.ts` say;
     // this sentence named it unconditionally until the OKRGoal UX review.
-    why: "Champion at due, champion again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
+    why: "Owner at due, owner again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
     default: { championRepeat: 1, coordinator: 7, sponsor: 14 },
     schema: z.object({
       championRepeat: wholeDays,

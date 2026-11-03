@@ -57,12 +57,13 @@ export const TERMINOLOGY = {
       "A team home: the unit that owns goals and holds a weekly session.",
   },
   champion: {
-    singular: "Champion",
-    plural: "Champions",
+    singular: "Owner",
+    plural: "Owners",
     meaning:
       "The one person accountable for a goal. They post the check-in. Never a team, never a committee.",
-    // METHOD.md's terms: "'Owner' is a common alternative" (decision D6).
-    suggested: { singular: "Owner", plural: "Owners" },
+    // METHOD.md's terms: "'Champion' is a common alternative" (decision D6).
+    // Owner since 3 November 2026 (usability review Q1).
+    suggested: { singular: "Champion", plural: "Champions" },
   },
   reviewer: {
     singular: "Reviewer",

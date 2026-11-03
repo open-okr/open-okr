@@ -58,9 +58,9 @@ describe("renaming", () => {
 
   it("leaves every other term at the canon word", () => {
     const resolved = resolveTerminology({
-      champion: { singular: "Owner", plural: "Owners" },
+      champion: { singular: "Champion", plural: "Champions" },
     });
-    expect(resolved.champion.singular).toBe("Owner");
+    expect(resolved.champion.singular).toBe("Champion");
     expect(resolved.objective.singular).toBe("Objective");
   });
 
@@ -96,15 +96,15 @@ describe("renaming", () => {
       champion: { singular: "" },
     });
     expect(resolved.objective.singular).toBe("Ambition");
-    expect(resolved.champion.singular).toBe("Champion");
+    expect(resolved.champion.singular).toBe("Owner");
   });
 });
 
 describe("the suggested alternative (METHOD.md terms, D6, P9-T21)", () => {
-  it('offers "Owner" for "Champion", and nothing where the method names none', () => {
+  it('offers "Champion" for "Owner", and nothing where the method names none', () => {
     expect(suggestedTerm("champion")).toEqual({
-      singular: "Owner",
-      plural: "Owners",
+      singular: "Champion",
+      plural: "Champions",
     });
     expect(suggestedTerm("objective")).toBeUndefined();
   });

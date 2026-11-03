@@ -198,6 +198,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMap.objective",
   // The coordinator role is the term's own hole, like "common.caution".
   "spaces.role.coordinator",
+  // The owner column heading is the champion term's own hole.
+  "okrList.champion",
   // The Outdated stat's unit is the objective term's own hole.
   "workMapHeader.outdatedUnitOne",
   "workMapHeader.outdatedUnitOther",
