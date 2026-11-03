@@ -4057,8 +4057,7 @@ async function requireMonthly(
 
 export const setTrend = defineWriteAction({
   name: "sessions.setTrend",
-  summary:
-    "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+  summary: "Records the room's trend for one objective in a monthly review.",
   input: z.object({
     sessionId: z.uuid(),
     goalId: z.uuid(),
@@ -4182,8 +4181,7 @@ function decisionTextColumns(document: RichTextDocument | null): {
 
 export const setShifts = defineWriteAction({
   name: "sessions.setShifts",
-  summary:
-    "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+  summary: "Records the resource or priority shifts noted in a monthly review.",
   input: z.object({
     sessionId: z.uuid(),
     /**
@@ -4251,8 +4249,7 @@ export const setShifts = defineWriteAction({
  */
 export const setSessionWins = defineWriteAction({
   name: "sessions.setWins",
-  summary:
-    "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+  summary: "Names the week's wins in a weekly session, for its digest.",
   input: z.object({
     sessionId: z.uuid(),
     wins: z.array(z.string().trim().min(1).max(200)).max(10),
@@ -4315,8 +4312,7 @@ export const setSessionWins = defineWriteAction({
 
 export const recordDecision = defineWriteAction({
   name: "sessions.recordDecision",
-  summary:
-    "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+  summary: "Records a decision against the key result or goal it affects.",
   input: z
     .object({
       sessionId: z.uuid(),
@@ -4520,7 +4516,7 @@ const decisionColumns = {
 export const readMonthlyRecord = defineReadAction({
   name: "sessions.monthlyRecord",
   summary:
-    "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
+    "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     /** The shifts as plain text, from their document since 0.4. */
@@ -4904,8 +4900,7 @@ export const readMonthlyRecord = defineReadAction({
 
 export const decisionsForGoal = defineReadAction({
   name: "decisions.forGoal",
-  summary:
-    "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+  summary: "Decisions affecting one goal, newest first, for its page.",
   input: z.object({ goalId: z.uuid() }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
@@ -4959,8 +4954,7 @@ export const decisionsForGoal = defineReadAction({
 
 export const decisionsForCycle = defineReadAction({
   name: "decisions.forCycle",
-  summary:
-    "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+  summary: "Every decision recorded in one cycle, for the cycle workspace.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
@@ -5043,8 +5037,7 @@ async function requireFacilitator(
 
 export const addStageMinute = defineWriteAction({
   name: "sessions.addMinute",
-  summary:
-    "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+  summary: "Gives the running stage one more minute.",
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid(), stageKey: z.string(), added: z.number() }),
   access: ACCESS_LEVELS.edit,
@@ -5106,8 +5099,7 @@ export const addStageMinute = defineWriteAction({
 
 export const setStageNote = defineWriteAction({
   name: "sessions.setStageNote",
-  summary:
-    "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+  summary: "Writes the facilitator's private note for the running stage.",
   input: z.object({
     id: z.uuid(),
     /**
@@ -5190,8 +5182,7 @@ export const setStageNote = defineWriteAction({
 
 export const givePulse = defineWriteAction({
   name: "sessions.givePulse",
-  summary:
-    "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+  summary: "Records one participant's pulse and their one word for the cycle.",
   input: z.object({
     sessionId: z.uuid(),
     pulse: z.number().int().min(1).max(5),
@@ -5327,7 +5318,7 @@ function countWords(
 export const readRoomPulse = defineReadAction({
   name: "sessions.roomPulse",
   summary:
-    "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+    "The read of the room for the facilitator, and the caller's own pulse for everybody.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     /** Null for anybody but the facilitator, and until somebody has spoken. */
@@ -5497,8 +5488,7 @@ async function requireQuarterly(
 
 export const scoreKeyResult = defineWriteAction({
   name: "sessions.scoreKeyResult",
-  summary:
-    "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+  summary: "Grades one key result 0.0 to 1.0 with a one-line reason.",
   input: z.object({
     sessionId: z.uuid(),
     keyResultId: z.uuid(),
@@ -5777,8 +5767,7 @@ function reviewObjectiveConditions(
 
 export const passMic = defineWriteAction({
   name: "sessions.passMic",
-  summary:
-    "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+  summary: "Hands the mic to one objective's owner, or puts it down.",
   input: z.object({
     sessionId: z.uuid(),
     /**
@@ -5953,8 +5942,7 @@ export const passMic = defineWriteAction({
 
 export const setNarrative = defineWriteAction({
   name: "sessions.setNarrative",
-  summary:
-    "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+  summary: "Writes what the number does not show for one objective.",
   input: z.object({
     sessionId: z.uuid(),
     goalId: z.uuid(),
@@ -6101,8 +6089,7 @@ export const setNarrative = defineWriteAction({
 
 export const giveKudos = defineWriteAction({
   name: "sessions.giveKudos",
-  summary:
-    "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+  summary: "Names the effort that deserved to be seen.",
   input: z.object({
     sessionId: z.uuid(),
     toMemberId: z.uuid(),
@@ -6299,7 +6286,7 @@ export const readNarratives = defineReadAction({
 
 export const readRecognition = defineReadAction({
   name: "sessions.recognition",
-  summary: "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+  summary: "The quarterly review's recognition entries, oldest first.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     entries: z.array(
@@ -6496,8 +6483,7 @@ async function dotsLeftFor(
 
 export const addRetroNote = defineWriteAction({
   name: "sessions.addRetroNote",
-  summary:
-    "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+  summary: "Writes one note into the team retro's worked or did-not column.",
   input: z.object({
     sessionId: z.uuid(),
     // §8.1's two columns are canon structure. A third would be a different
@@ -6668,8 +6654,7 @@ export const removeRetroNote = defineWriteAction({
 
 export const castRetroVote = defineWriteAction({
   name: "sessions.castRetroVote",
-  summary:
-    "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+  summary: "Spends or withdraws one dot on a retro note.",
   input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
   output: z.object({
     noteId: z.uuid(),
@@ -6931,7 +6916,7 @@ export const readRetro = defineReadAction({
 export const setManagementAnswer = defineWriteAction({
   name: "sessions.setManagementAnswer",
   summary:
-    "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+    "Records leadership's answer to one of the management retro's four questions.",
   input: z.object({
     sessionId: z.uuid(),
     // 1 to 4, indexing the canon questions. The text lives in
@@ -7038,7 +7023,7 @@ export const setManagementAnswer = defineWriteAction({
 export const readManagementRetro = defineReadAction({
   name: "sessions.managementRetro",
   summary:
-    "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+    "The management retro's four questions with what leadership answered.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     questions: z.array(
@@ -7180,7 +7165,7 @@ async function missedKeyResultsInTx(
 export const setRootCause = defineWriteAction({
   name: "sessions.setRootCause",
   summary:
-    "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+    "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
   input: z
     .object({
       sessionId: z.uuid(),
@@ -7341,7 +7326,7 @@ export const setRootCause = defineWriteAction({
 export const readRootCauses = defineReadAction({
   name: "sessions.rootCauses",
   summary:
-    "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
+    "Every key result this review graded below its root-cause threshold, with its causes.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     /**
@@ -7488,8 +7473,7 @@ function respondentHash(salt: string, memberId: string) {
 
 export const submitProcessHealth = defineWriteAction({
   name: "sessions.submitProcessHealth",
-  summary:
-    "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+  summary: "Scores the five process-health statements anonymously.",
   input: z.object({
     sessionId: z.uuid(),
     /**
@@ -7620,7 +7604,7 @@ export const submitProcessHealth = defineWriteAction({
 export const readProcessHealth = defineReadAction({
   name: "sessions.processHealth",
   summary:
-    "§8.5's five statements with the room's averages, and the reader's own answers.",
+    "The five process-health statements with the room's averages, and the reader's own answers.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     statements: z.array(
@@ -7840,8 +7824,7 @@ async function diagnosticInputsInTx(
 
 export const recordDiagnostic = defineWriteAction({
   name: "sessions.recordDiagnostic",
-  summary:
-    "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+  summary: "Reads the closing diagnostic and stores what the room was told.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     verdict: z.enum(DIAGNOSIS_VERDICTS),
@@ -7892,7 +7875,7 @@ export const recordDiagnostic = defineWriteAction({
         throw new OperationError(
           "not_found",
           committed !== null
-            ? `The diagnostic reads the aspirational key results' scores (METHOD.md §8.6), and this review graded only committed ones. Their result is the share of commitments met: ${Math.round(committed * 100)}%.`
+            ? `The diagnostic reads the aspirational key results' scores, and this review graded only committed ones. Their result is the share of commitments met: ${Math.round(committed * 100)}%.`
             : "The diagnostic needs a cycle score. Grade the aspirational key results first.",
         );
       }
@@ -7992,7 +7975,8 @@ export const recordDiagnostic = defineWriteAction({
 
 export const readDiagnostic = defineReadAction({
   name: "sessions.diagnostic",
-  summary: "§8.6's verdict for this review, stored or still unreadable.",
+  summary:
+    "The closing diagnostic's verdict for this review, stored or still unreadable.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     /** The stored numbers when recorded, else what the room has so far. */
@@ -8120,7 +8104,7 @@ export const readDiagnostic = defineReadAction({
 export const decideObjective = defineWriteAction({
   name: "sessions.decideObjective",
   summary:
-    "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+    "Closes one objective with a keep, modify or abandon decision and a one-line why.",
   input: z.object({
     sessionId: z.uuid(),
     goalId: z.uuid(),
@@ -8402,7 +8386,7 @@ export const readReset = defineReadAction({
 export const captureLearning = defineWriteAction({
   name: "sessions.captureLearning",
   summary:
-    "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+    "Records what the team now knows, optionally carried into the next cycle.",
   input: z.object({
     sessionId: z.uuid(),
     text: z.string().trim().min(1).max(1000),
@@ -8532,7 +8516,7 @@ export const captureLearning = defineWriteAction({
 
 export const addReviewAction = defineWriteAction({
   name: "sessions.addAction",
-  summary: "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+  summary: "Adds an action with an owner and a date.",
   input: z.object({
     sessionId: z.uuid(),
     what: z.string().trim().min(1).max(500),
@@ -8924,7 +8908,7 @@ export const readForward = defineReadAction({
 export const readMinutes = defineReadAction({
   name: "sessions.minutes",
   summary:
-    "§8.10's minutes: the executive summary and every stage's record (screen S-25).",
+    "The review's minutes: the executive summary and every stage's record.",
   input: z.object({ sessionId: z.uuid() }),
   output: z.object({
     title: z.string(),
@@ -9398,8 +9382,7 @@ export const readMinutes = defineReadAction({
 
 export const revealObjectiveScore = defineWriteAction({
   name: "sessions.revealObjectiveScore",
-  summary:
-    "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+  summary: "Reveals one objective's score to the whole room in a single write.",
   input: z.object({
     sessionId: z.uuid(),
     goalId: z.uuid(),

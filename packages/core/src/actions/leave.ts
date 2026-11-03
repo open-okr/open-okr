@@ -159,7 +159,7 @@ const sorted = (leave: readonly LeaveSpan[]) =>
 export const setOwnLeave = defineWriteAction({
   name: "people.setLeave",
   summary:
-    "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+    "Sets the signed-in member's own leave, each span with the delegate who stands in.",
   input: z.object({ leave: z.array(leaveSpan).max(LEAVE_HISTORY_LIMIT) }),
   output: z.object({ memberId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -196,7 +196,7 @@ export const setOwnLeave = defineWriteAction({
 export const setMemberLeave = defineWriteAction({
   name: "people.setMemberLeave",
   summary:
-    "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+    "Sets another member's leave, each span with the delegate who stands in. For an administrator.",
   input: z.object({
     memberId: z.uuid(),
     leave: z.array(leaveSpan).max(LEAVE_HISTORY_LIMIT),
@@ -233,7 +233,7 @@ export const setMemberLeave = defineWriteAction({
 export const readLeave = defineReadAction({
   name: "people.leave",
   summary:
-    "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+    "One member's leave, oldest first, with who stands in for each span.",
   input: z.object({ memberId: z.uuid() }),
   output: z.array(leaveRow),
   access: ACCESS_LEVELS.view,

@@ -170,7 +170,7 @@ async function canSeeGoal(
 export const reviewInbox = defineReadAction({
   name: "review.inbox",
   summary:
-    "What this member owes right now, overdue first. Drives screen S-02 and the sidebar badge.",
+    "What this member owes right now, overdue first. Drives the review inbox and the sidebar badge.",
   input: z.object({}),
   output: z.object({
     obligations: z.array(obligationSchema),

@@ -70,7 +70,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     kind: "string",
     fallback: "en",
     environment: "OPENOKR_DEFAULT_LANGUAGE",
-    summary: "The default language for new workspaces (§4.2: English).",
+    summary: "The default language for new workspaces. English unless set.",
   },
   {
     key: "registration.policy",
@@ -308,7 +308,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "",
     environment: "OPENOKR_AI_PROVIDER",
     summary:
-      "The deployment-wide fallback AI provider (§4.14: 'the deployment-level AI key'). Empty means no deployment default; AI is off until a workspace or member supplies their own key.",
+      "The deployment-wide fallback AI provider: the deployment-level AI key. Empty means no deployment default; AI is off until a workspace or member supplies their own key.",
   },
   {
     key: "ai.deployment.apiKey",

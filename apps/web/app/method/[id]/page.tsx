@@ -1,21 +1,28 @@
 import {
   ALIGNMENT_CHECKS,
   CYCLE_CHECKS,
+  describeRule,
   examplesFor,
   KEY_RESULT_CHECKS,
+  methodSectionAnchor,
   OBJECTIVE_CHECKS,
   type QualityCheck,
   TRIGGER_CATALOGUE,
   type Trigger,
 } from "@openokr/method";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { AgentFace, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { faceForTrigger } from "../../../lib/agent-moods.ts";
+import { methodDocumentUrl } from "../../../lib/app-version";
 import { nameOf, TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 
 export const generateMetadata = pageTitle("pageTitle.methodRule");
+
+/** Where METHOD.md sets a check out, as `describeRule` places it. */
+const checkSection = (id: string): string => describeRule(id)?.section ?? "4";
 
 /**
  * One rule, as METHOD.md defines it (P4-T02b).
@@ -88,6 +95,21 @@ export default async function RulePage({
               {check.id} · {check.title}
             </h1>
             <p className="text-xs text-ink-3">{t(GROUP_LABEL[check.group])}</p>
+            {/* This page is the rule in full as the product runs it. The
+                link is for the reasoning and sources around it, in the
+                METHOD.md the running release shipped. */}
+            <a
+              href={methodDocumentUrl(
+                methodSectionAnchor(checkSection(check.id)) ?? undefined,
+              )}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="rule-method-link"
+              className="mt-1 text-xs font-semibold text-brand-text underline"
+            >
+              {t("methodHint.readMore")}
+              <span className="sr-only"> {t("methodHint.opensInNewTab")}</span>
+            </a>
           </div>
           <Chip tone={check.feedsStrengthScore ? "info" : "neutral"}>
             {check.feedsStrengthScore
@@ -183,26 +205,38 @@ export default async function RulePage({
  */
 async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
   const { t } = await getTranslations();
+  const owner =
+    trigger.owner === "coach"
+      ? t("method.detail.okrCoach")
+      : t("method.detail.okrChampion");
+  // The face the message wears in the inbox, so the two read as one sender.
+  const face = faceForTrigger(trigger.key);
 
   return (
     <div className="flex w-full flex-col gap-3.5">
       <Card>
         <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            {/* The rule's name, with the key it is cited by under it: "See
-             * the rule" opened on the bare key (usability review D8). */}
-            <h1 className="text-lg font-bold text-ink">
-              {nameOf(TRIGGER_NAME_KEYS, trigger.key, t)}
-            </h1>
-            <p className="font-mono text-xs text-ink-4">{trigger.key}</p>
-            <p className="text-xs text-ink-3">
-              {t("method.detail.proactiveMessageAiNativePlan", {
-                Champion:
-                  trigger.owner === "coach"
-                    ? t("method.detail.okrCoach")
-                    : t("method.detail.okrChampion"),
-              })}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            {face ? (
+              <AgentFace
+                agent={face.agent}
+                mood={face.mood}
+                className="size-9"
+              />
+            ) : null}
+            <div className="flex min-w-0 flex-col">
+              {/* The rule's name, with the key it is cited by under it: "See
+               * the rule" opened on the bare key (usability review D8). */}
+              <h1 className="text-lg font-bold text-ink">
+                {nameOf(TRIGGER_NAME_KEYS, trigger.key, t)}
+              </h1>
+              <p className="font-mono text-xs text-ink-4">{trigger.key}</p>
+              <p className="text-xs text-ink-3">
+                {t("method.detail.proactiveMessageAiNativePlan", {
+                  Champion: owner,
+                })}
+              </p>
+            </div>
           </div>
           <Chip tone={trigger.escalates ? "warn" : "neutral"}>
             {trigger.escalates

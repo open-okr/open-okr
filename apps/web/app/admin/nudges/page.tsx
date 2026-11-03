@@ -4,6 +4,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
+import { RulePreview } from "../../../lib/rule-preview";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NudgeRuleCards } from "./rule-cards.tsx";
@@ -79,7 +80,7 @@ export default async function NudgeVolumePage() {
     // Said rather than hidden. Somebody who cannot see this should know it
     // exists and who to ask, which is what a permission-denied state is for.
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.nudges.nudgeVolume")}
         </h1>
@@ -90,7 +91,7 @@ export default async function NudgeVolumePage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -111,15 +112,17 @@ export default async function NudgeVolumePage() {
   );
 
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.nudges.nudgeVolume")}
-      </h1>
-      <p className="text-sm text-ink-3">
-        {t("admin.nudges.theLastDaysNoiseIs", {
-          windowDays: volume.windowDays,
-        })}
-      </p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.nudges.nudgeVolume")}
+        </h1>
+        <p className="text-sm text-ink-3">
+          {t("admin.nudges.theLastDaysNoiseIs", {
+            windowDays: volume.windowDays,
+          })}
+        </p>
+      </div>
 
       <Card>
         <CardHeader className="justify-between">
@@ -140,12 +143,12 @@ export default async function NudgeVolumePage() {
                   key={rule.ruleKey}
                   className="flex flex-wrap items-center justify-between gap-2 border-line border-b px-3 py-2 last:border-b-0"
                 >
-                  <a
-                    href={`/method/${rule.ruleKey}`}
+                  <RulePreview
+                    ruleKey={rule.ruleKey}
                     className="text-sm text-brand-text hover:underline"
                   >
                     {ruleName(rule.ruleKey, t)}
-                  </a>
+                  </RulePreview>
                   <span className="flex items-center gap-2 text-xs tabular-nums">
                     <span className="text-ink">
                       {t("admin.nudges.sent", { sent: rule.sent })}
@@ -233,6 +236,6 @@ export default async function NudgeVolumePage() {
         quietMode={rules.quietMode}
         channels={NUDGE_CHANNELS}
       />
-    </>
+    </div>
   );
 }

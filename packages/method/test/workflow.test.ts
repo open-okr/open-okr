@@ -385,7 +385,7 @@ describe("phases that cannot answer yet", () => {
     // The task named here moved from P4-T01 to P4-T03 once the catalogue and
     // the stored verdicts existed and only the reading across a set did not.
     // A blocked note that names a task already done sends the reader nowhere.
-    expect(result?.blocked.join(" ")).toMatch(/§4 verdicts/);
+    expect(result?.blocked.join(" ")).toMatch(/quality verdicts/);
     // Not a failure: nothing is wrong with the cycle.
     expect(result?.missing).toEqual([]);
   });
@@ -1001,7 +1001,7 @@ describe("phase 4 and gate 2 over the drafted set", () => {
 
   it("stays unanswered while the set cannot be read", () => {
     expect(phase(base(), 4)?.blocked).toEqual([
-      "The §4 verdicts across the set could not be read",
+      "The quality verdicts across the set could not be read",
     ]);
   });
 
@@ -1114,7 +1114,7 @@ describe("phase 0 reads the workspace's strategy bounds (H-17)", () => {
       tuned,
     )[0];
     expect(zero?.missing).toContain(
-      "2 annual strategies, and §2.1 asks for 3 to 4",
+      "2 annual strategies, and the practice asks for 3 to 4",
     );
   });
 });

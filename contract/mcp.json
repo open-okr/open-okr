@@ -151,7 +151,7 @@
     },
     {
       "name": "workspace.setState",
-      "description": "Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay).",
+      "description": "Set the workspace to active, read-only or frozen.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4385,7 +4385,7 @@
     },
     {
       "name": "spaces.setHolidays",
-      "description": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+      "description": "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4440,7 +4440,7 @@
     },
     {
       "name": "spaces.holidays",
-      "description": "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+      "description": "The spans a space marks as holidays, oldest first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4466,7 +4466,7 @@
     },
     {
       "name": "people.setLeave",
-      "description": "Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4).",
+      "description": "Sets the signed-in member's own leave, each span with the delegate who stands in.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4515,7 +4515,7 @@
     },
     {
       "name": "people.setMemberLeave",
-      "description": "Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator.",
+      "description": "Sets another member's leave, each span with the delegate who stands in. For an administrator.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4571,7 +4571,7 @@
     },
     {
       "name": "people.leave",
-      "description": "One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4).",
+      "description": "One member's leave, oldest first, with who stands in for each span.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5160,7 +5160,7 @@
     },
     {
       "name": "cycles.feedForward",
-      "description": "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
+      "description": "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5451,7 +5451,7 @@
     },
     {
       "name": "rhythm.read",
-      "description": "The METHOD.md §11 registry as this workspace resolves it, with its deviations and its terminology.",
+      "description": "The practice thresholds as this workspace resolves them, with its deviations and its terminology.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -5466,7 +5466,7 @@
     },
     {
       "name": "rhythm.update",
-      "description": "Changes this workspace's deviations from the §11 canon, or its terminology.",
+      "description": "Changes this workspace's deviations from the method's thresholds, or its terminology.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5522,7 +5522,7 @@
     },
     {
       "name": "practice.read",
-      "description": "The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved.",
+      "description": "The practice this workspace runs: its profile, its own changes and every setting resolved.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -5570,7 +5570,7 @@
     },
     {
       "name": "practice.applyProfile",
-      "description": "Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept.",
+      "description": "Chooses one of the five practice profiles, with the thresholds it sets. This workspace's own changes are kept.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5777,7 +5777,7 @@
     },
     {
       "name": "workflow.setPackItem",
-      "description": "Marks one of the seven §2.6 input-pack items gathered, with a note.",
+      "description": "Marks one of the seven input-pack items gathered, with a note.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5827,7 +5827,7 @@
     },
     {
       "name": "workflow.distributePack",
-      "description": "Records that the input pack reached people, which the §2.6 lead time is measured from.",
+      "description": "Records that the input pack reached people, which the input pack's lead time is measured from.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6033,7 +6033,7 @@
     },
     {
       "name": "workflow.setBaselineHealth",
-      "description": "Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual.",
+      "description": "Records phase 2's KPI reading in its three columns: stable, declining, business as usual.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6071,7 +6071,7 @@
     },
     {
       "name": "workflow.setCapacityNotes",
-      "description": "Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked).",
+      "description": "Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6103,7 +6103,7 @@
     },
     {
       "name": "workflow.setFocusKeyResults",
-      "description": "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+      "description": "Chooses which of the year's key results a quarter focuses on.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7805,7 +7805,7 @@
     },
     {
       "name": "initiatives.linkKeyResult",
-      "description": "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
+      "description": "Records that this initiative is one of the ones that will move a key result.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7871,7 +7871,7 @@
     },
     {
       "name": "initiatives.capacity",
-      "description": "One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5).",
+      "description": "One cycle's capacity check: every key result's verdict and every initiative behind it.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -8447,7 +8447,7 @@
     },
     {
       "name": "goals.stop",
-      "description": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9).",
+      "description": "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9197,7 +9197,7 @@
     },
     {
       "name": "goals.setKind",
-      "description": "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+      "description": "Marks an objective committed or aspirational, recording the change and its reason in the objective's activity.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9239,7 +9239,7 @@
     },
     {
       "name": "goals.moveToSpace",
-      "description": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces.",
+      "description": "Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9272,7 +9272,7 @@
     },
     {
       "name": "goals.publishDraft",
-      "description": "Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
+      "description": "Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -9298,7 +9298,7 @@
     },
     {
       "name": "goals.approveDraft",
-      "description": "Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts.",
+      "description": "Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10057,7 +10057,7 @@
     },
     {
       "name": "goals.addKeyResultDependency",
-      "description": "Records a key result's dependency on a providing team, for the register (METHOD.md §5.4).",
+      "description": "Records a key result's dependency on a providing team, for the register.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10670,7 +10670,7 @@
     },
     {
       "name": "kpis.launchRecovery",
-      "description": "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
+      "description": "Creates a recovery objective from the leading drivers under an unhealthy KPI.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11338,7 +11338,7 @@
     },
     {
       "name": "nudges.rules",
-      "description": "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+      "description": "Every proactive message rule with this workspace's configuration and its recent volume.",
       "inputSchema": {
         "type": "object",
         "properties": {}
@@ -11353,7 +11353,7 @@
     },
     {
       "name": "nudges.setRule",
-      "description": "Enables, mutes, re-routes or exempts one §6.4 rule.",
+      "description": "Enables, mutes, re-routes or exempts one proactive message rule.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12140,7 +12140,7 @@
     },
     {
       "name": "sessions.setWins",
-      "description": "Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3).",
+      "description": "Names the week's wins in a weekly session, for its digest.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12820,7 +12820,7 @@
     },
     {
       "name": "sessions.digest",
-      "description": "The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved.",
+      "description": "The weekly digest for one session, assembled with no provider involved.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12845,7 +12845,7 @@
     },
     {
       "name": "sessions.addMinute",
-      "description": "Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control).",
+      "description": "Gives the running stage one more minute.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12871,7 +12871,7 @@
     },
     {
       "name": "sessions.givePulse",
-      "description": "Records one participant's pulse and their one word for the cycle (METHOD.md §8.2).",
+      "description": "Records one participant's pulse and their one word for the cycle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12910,7 +12910,7 @@
     },
     {
       "name": "sessions.scoreKeyResult",
-      "description": "Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for.",
+      "description": "Grades one key result 0.0 to 1.0 with a one-line reason.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12957,7 +12957,7 @@
     },
     {
       "name": "sessions.revealObjectiveScore",
-      "description": "Reveals one objective's score to the whole room in a single write (METHOD.md §8.3).",
+      "description": "Reveals one objective's score to the whole room in a single write.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -12989,7 +12989,7 @@
     },
     {
       "name": "sessions.passMic",
-      "description": "Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3).",
+      "description": "Hands the mic to one objective's owner, or puts it down.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13028,7 +13028,7 @@
     },
     {
       "name": "sessions.setNarrative",
-      "description": "Writes what the number does not show for one objective (METHOD.md §8.1 stage 3).",
+      "description": "Writes what the number does not show for one objective.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13091,7 +13091,7 @@
     },
     {
       "name": "sessions.giveKudos",
-      "description": "Names the effort that deserved to be seen (METHOD.md §8.1 stage 4).",
+      "description": "Names the effort that deserved to be seen.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13129,7 +13129,7 @@
     },
     {
       "name": "sessions.recognition",
-      "description": "Stage four's entries, oldest first (METHOD.md §8.1 stage 4).",
+      "description": "The quarterly review's recognition entries, oldest first.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13154,7 +13154,7 @@
     },
     {
       "name": "sessions.addRetroNote",
-      "description": "Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5).",
+      "description": "Writes one note into the team retro's worked or did-not column.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13230,7 +13230,7 @@
     },
     {
       "name": "sessions.castRetroVote",
-      "description": "Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5).",
+      "description": "Spends or withdraws one dot on a retro note.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13286,7 +13286,7 @@
     },
     {
       "name": "sessions.setManagementAnswer",
-      "description": "Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6).",
+      "description": "Records leadership's answer to one of the management retro's four questions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13324,7 +13324,7 @@
     },
     {
       "name": "sessions.managementRetro",
-      "description": "§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6).",
+      "description": "The management retro's four questions with what leadership answered.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13349,7 +13349,7 @@
     },
     {
       "name": "sessions.setRootCause",
-      "description": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4).",
+      "description": "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13404,7 +13404,7 @@
     },
     {
       "name": "sessions.rootCauses",
-      "description": "Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4).",
+      "description": "Every key result this review graded below its root-cause threshold, with its causes.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13429,7 +13429,7 @@
     },
     {
       "name": "sessions.submitProcessHealth",
-      "description": "Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8).",
+      "description": "Scores the five process-health statements anonymously.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13480,7 +13480,7 @@
     },
     {
       "name": "sessions.processHealth",
-      "description": "§8.5's five statements with the room's averages, and the reader's own answers.",
+      "description": "The five process-health statements with the room's averages, and the reader's own answers.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13505,7 +13505,7 @@
     },
     {
       "name": "sessions.recordDiagnostic",
-      "description": "Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6).",
+      "description": "Reads the closing diagnostic and stores what the room was told.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13530,7 +13530,7 @@
     },
     {
       "name": "sessions.diagnostic",
-      "description": "§8.6's verdict for this review, stored or still unreadable.",
+      "description": "The closing diagnostic's verdict for this review, stored or still unreadable.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13555,7 +13555,7 @@
     },
     {
       "name": "sessions.decideObjective",
-      "description": "Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8).",
+      "description": "Closes one objective with a keep, modify or abandon decision and a one-line why.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13631,7 +13631,7 @@
     },
     {
       "name": "sessions.captureLearning",
-      "description": "Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9).",
+      "description": "Records what the team now knows, optionally carried into the next cycle.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13672,7 +13672,7 @@
     },
     {
       "name": "sessions.addAction",
-      "description": "Adds an action with an owner and a date (METHOD.md §8.1 stage 11).",
+      "description": "Adds an action with an owner and a date.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13780,7 +13780,7 @@
     },
     {
       "name": "sessions.minutes",
-      "description": "§8.10's minutes: the executive summary and every stage's record.",
+      "description": "The review's minutes: the executive summary and every stage's record.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13830,7 +13830,7 @@
     },
     {
       "name": "sessions.roomPulse",
-      "description": "§8.2's read of the room for the facilitator, and the caller's own pulse for everybody.",
+      "description": "The read of the room for the facilitator, and the caller's own pulse for everybody.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13855,7 +13855,7 @@
     },
     {
       "name": "sessions.setStageNote",
-      "description": "Writes the facilitator's private note for the running stage (METHOD.md §8.1).",
+      "description": "Writes the facilitator's private note for the running stage.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13887,7 +13887,7 @@
     },
     {
       "name": "sessions.setTrend",
-      "description": "Records the room's trend for one objective in a monthly review (METHOD.md §7.5).",
+      "description": "Records the room's trend for one objective in a monthly review.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13929,7 +13929,7 @@
     },
     {
       "name": "sessions.setShifts",
-      "description": "Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5).",
+      "description": "Records the resource or priority shifts noted in a monthly review.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -13960,7 +13960,7 @@
     },
     {
       "name": "sessions.recordDecision",
-      "description": "Records a decision against the key result or goal it affects (METHOD.md §7.5).",
+      "description": "Records a decision against the key result or goal it affects.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14001,7 +14001,7 @@
     },
     {
       "name": "sessions.monthlyRecord",
-      "description": "Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
+      "description": "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14026,7 +14026,7 @@
     },
     {
       "name": "decisions.forGoal",
-      "description": "Decisions affecting one goal, newest first, for its page (METHOD.md §7.5).",
+      "description": "Decisions affecting one goal, newest first, for its page.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -14052,7 +14052,7 @@
     },
     {
       "name": "decisions.forCycle",
-      "description": "Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5).",
+      "description": "Every decision recorded in one cycle, for the cycle workspace.",
       "inputSchema": {
         "type": "object",
         "properties": {

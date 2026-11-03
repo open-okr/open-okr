@@ -6,6 +6,7 @@ import {
   CHANNEL_NAME_KEYS,
   TRIGGER_NAME_KEYS,
 } from "../../lib/identifier-names.ts";
+import { RulePreview } from "../../lib/rule-preview";
 import { snoozeNudge } from "./actions.ts";
 
 /**
@@ -136,12 +137,12 @@ export function NudgeProvenance({
           )}
 
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={`/method/${nudge.ruleKey}`}
+            <RulePreview
+              ruleKey={nudge.ruleKey}
               className="inline-flex min-h-6 items-center text-xs font-semibold text-brand-text hover:underline"
             >
               {t("review.nudgeProvenance.seeTheRule")}
-            </a>
+            </RulePreview>
             <button
               type="button"
               disabled={busy === nudge.id}

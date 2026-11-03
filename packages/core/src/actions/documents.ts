@@ -247,8 +247,7 @@ export const listDocuments = defineReadAction({
 
 export const readDocument = defineReadAction({
   name: "documents.read",
-  summary:
-    "One document with its body and its version list. Drives screen S-29.",
+  summary: "One document with its body and its version list.",
   input: z.object({ id: z.uuid() }),
   output: documentSummary.extend({
     body: z.unknown().nullable(),

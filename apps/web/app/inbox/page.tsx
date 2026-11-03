@@ -1,8 +1,16 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { trigger } from "@openokr/method";
-import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  AgentFace,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access.ts";
+import { faceForTrigger } from "../../lib/agent-moods.ts";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
@@ -322,6 +330,8 @@ async function NotificationRow({
       : named === undefined
         ? row.ruleKey
         : t(named);
+  // Who sent it, the Coach or the Champion, and how they look saying it.
+  const face = row.ruleKey ? faceForTrigger(row.ruleKey) : null;
   // Who did it, when a person did (UAT M10-04): "Commented on a goal" alone
   // left the reader guessing who had written to them.
   const line =
@@ -334,7 +344,8 @@ async function NotificationRow({
       : t("inbox.reminder", { rule: ruleName }));
 
   return (
-    <div className="flex items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
+    // `group`, so resting anywhere on the row plays the sender's face.
+    <div className="group flex items-start gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5">
       <span
         aria-hidden
         className={
@@ -353,7 +364,18 @@ async function NotificationRow({
           {row.readAt === null ? (
             <span className="sr-only">{t("inbox.unread")}</span>
           ) : null}
-          {ruleName === null ? null : <Chip tone="agent">{ruleName}</Chip>}
+          {ruleName === null ? null : (
+            <span className="inline-flex items-center gap-1">
+              {face ? (
+                <AgentFace
+                  agent={face.agent}
+                  mood={face.mood}
+                  className="size-4.5"
+                />
+              ) : null}
+              <Chip tone="agent">{ruleName}</Chip>
+            </span>
+          )}
           <span className="text-xs text-ink-3">
             {new Date(row.createdAt)
               .toISOString()

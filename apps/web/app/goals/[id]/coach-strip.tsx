@@ -18,6 +18,8 @@
  * strip says the rules still apply and only the suggestion needs a provider.
  */
 import {
+  AgentFace,
+  type AgentMood,
   Button,
   Card,
   CardBody,
@@ -25,8 +27,8 @@ import {
   Chip,
   useTranslations,
 } from "@openokr/ui";
-import Link from "next/link";
 import { useCallback, useState, useTransition } from "react";
+import { RulePreview } from "../../../lib/rule-preview";
 import { applyRewrite, rewriteKeyResultAction } from "./actions";
 
 export interface CoachStripKeyResult {
@@ -114,6 +116,12 @@ export function CoachStrip({
 
   const failing = keyResults.filter((kr) => kr.qualityFlags.length > 0);
 
+  // Thinking at rest: the strip only shows when a rule is not met, and the
+  // Coach asks the question rather than judging the goal (METHOD.md §4). A
+  // suggestion the catalogue says fixes the rule is the one good news here.
+  const mood: AgentMood =
+    problem !== null ? "sad" : suggestion?.fixesTheRule ? "happy" : "thinking";
+
   if (flags.length === 0 && failing.length === 0) {
     return null;
   }
@@ -124,6 +132,13 @@ export function CoachStrip({
     <Card role="region" aria-labelledby="coach-strip-heading">
       <CardHeader>
         <span className="flex flex-wrap items-center gap-2">
+          {/* Live only while a suggestion is being drafted. Applying one
+              keeps the face it had, which is not a mood to loop. */}
+          <AgentFace
+            agent="coach"
+            mood={mood}
+            live={pending && mood === "thinking"}
+          />
           <h2 id="coach-strip-heading" className="text-sm font-bold text-ink">
             {t("goals.detail.coachStrip.whatTheCoachSees")}
           </h2>
@@ -147,10 +162,11 @@ export function CoachStrip({
             <span className="flex flex-wrap gap-1.5">
               {flags.map((rule) => (
                 // Every verdict links to the rule, so a writer can read it and
-                // disagree with it rather than guessing what it wants.
-                <Link key={rule} href={`/method/${rule}`}>
+                // disagree with it rather than guessing what it wants. Resting
+                // on it previews the rule, because "KR-3" alone says nothing.
+                <RulePreview key={rule} ruleKey={rule}>
                   <Chip tone="warn">{rule}</Chip>
-                </Link>
+                </RulePreview>
               ))}
             </span>
           </div>
@@ -162,9 +178,9 @@ export function CoachStrip({
             <span className="flex flex-wrap items-center gap-1.5">
               {kr.qualityFlags.map((rule) => (
                 <span key={rule} className="flex items-center gap-1">
-                  <Link href={`/method/${rule}`}>
+                  <RulePreview ruleKey={rule}>
                     <Chip tone="warn">{rule}</Chip>
-                  </Link>
+                  </RulePreview>
                   {/* The assist is an `edit` action, so offering it to a
                       reader would produce a refusal rather than a suggestion. */}
                   {drafting && canEdit ? (

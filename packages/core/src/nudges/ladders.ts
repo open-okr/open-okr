@@ -88,7 +88,7 @@ export function ladderProblem(
 ): string | null {
   const parsed = THRESHOLDS[owner.threshold].schema.safeParse(value);
   if (!parsed.success) {
-    return `That is not a ${THRESHOLDS[owner.threshold].label.toLowerCase()} §11 would recognise.`;
+    return `That is not a ${THRESHOLDS[owner.threshold].label.toLowerCase()} the practice recognises.`;
   }
   const rungs = parsed.data as Record<string, number>;
   for (let i = 1; i < owner.rungs.length; i++) {

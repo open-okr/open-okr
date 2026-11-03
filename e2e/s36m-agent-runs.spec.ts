@@ -142,3 +142,73 @@ test("a scope names a goal found by typing, not a pasted id", async () => {
   ).toBeVisible({ timeout: 15_000 });
   await expect(runner.getByRole("alert")).toHaveCount(0);
 });
+
+/**
+ * docs/design/agent-faces.md §6: each agent wears its own face, a halted run's
+ * agent is asleep, and the general face follows the theme the reader chose
+ * rather than the system's, which an `<img>` of the drawing could not.
+ */
+test("each agent wears its own face, and the general one follows the theme", async () => {
+  await goTo(page, "/admin/agents");
+  const agents = page.getByRole("list", { name: "The agents" });
+  const faceOf = (name: string) =>
+    agents
+      .getByRole("listitem")
+      .filter({ hasText: name })
+      .first()
+      .locator("svg.agent-face")
+      .first();
+  await expect(faceOf("OKR Coach")).toHaveAttribute("data-agent", "coach");
+  await expect(faceOf("OKR Champion")).toHaveAttribute(
+    "data-agent",
+    "champion",
+  );
+  await expect(faceOf("E2E runner")).toHaveAttribute("data-agent", "agent");
+
+  // The first test's run stopped for want of a provider: a halt, not a failure.
+  const run = page
+    .getByRole("listitem")
+    .filter({ hasText: "E2E runner" })
+    .filter({ hasText: "Steps done" });
+  await expect(run.locator("svg.agent-face").first()).toHaveAttribute(
+    "data-mood",
+    "sleeping",
+  );
+
+  // The navigation's face is the general one, with eyes of the surface token.
+  const eye = page
+    .locator('a[href="/admin/agents"] svg.agent-face .af-white')
+    .first();
+  const fill = () => eye.evaluate((element) => getComputedStyle(element).fill);
+  const theme = (value: string) =>
+    page.evaluate((next) => {
+      document.documentElement.dataset.theme = next;
+    }, value);
+
+  await theme("light");
+  expect(await fill()).toBe("rgb(255, 255, 255)");
+  await theme("dark");
+  expect(await fill()).toBe("rgb(17, 24, 39)");
+  await theme("light");
+
+  // Idle is the one mood that always moves: each eye glances on a six-second
+  // loop and blinks on a separate 4.6-second one, with nobody hovering.
+  const loops = await page
+    .locator('a[href="/admin/agents"] svg.agent-face')
+    .first()
+    .evaluate((svg) =>
+      svg
+        .getAnimations({ subtree: true })
+        .map((animation) => {
+          const timing = animation.effect?.getComputedTiming();
+          return `${(animation as CSSAnimation).animationName} ${timing?.duration} ${timing?.iterations}`;
+        })
+        .sort(),
+    );
+  expect(loops).toEqual([
+    "af-blink 4600 Infinity",
+    "af-blink 4600 Infinity",
+    "af-look 6000 Infinity",
+    "af-look 6000 Infinity",
+  ]);
+});

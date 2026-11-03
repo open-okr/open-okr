@@ -1,14 +1,14 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import {
-  ALIGNMENT_CHECKS,
-  CYCLE_CHECKS,
-  GATE_TITLES,
-  KEY_RESULT_CHECKS,
-  OBJECTIVE_CHECKS,
+  compareProfiles,
+  methodSectionAnchor,
+  PRACTICE_KEYS,
   PROFILE_KEYS,
+  practiceSettingName,
   switchProfile,
 } from "@openokr/method";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { methodDocumentUrl } from "../../../lib/app-version";
 import { getPool } from "../../../lib/auth";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
@@ -27,6 +27,17 @@ export const generateMetadata = pageTitle("pageTitle.adminPractice");
  * **What each profile would change is worked out here, before anything is
  * chosen**, by the same `switchProfile` the action runs. The preview and the
  * write cannot disagree, because they are one function.
+ *
+ * **The comparison of all five is `compareProfiles`**, the function
+ * `method:check` holds METHOD.md §12.3 to, so this screen and the document
+ * show the same table. It and the setting names are worked out here rather
+ * than in the browser, which would otherwise download every check's catalogue
+ * to read one title from each.
+ *
+ * **Every name the method defines explains itself in place**: a hover on each
+ * setting, profile and comparison row says what it decides and links to the
+ * exact METHOD.md section, so nobody has to open the document to read the
+ * screen. The links are one map from section to address, worked out here.
  */
 export default async function PracticeSettingsPage() {
   const { t } = await getTranslations();
@@ -59,13 +70,20 @@ export default async function PracticeSettingsPage() {
   const thresholdLabels = Object.fromEntries(
     rhythm.registry.map((entry) => [entry.key, entry.label]),
   );
-  const checkTitles = Object.fromEntries(
+  const settingNames = Object.fromEntries(
+    PRACTICE_KEYS.map((key) => [key, practiceSettingName(key)]),
+  );
+  const comparison = compareProfiles();
+  const sectionLink = (section: string) =>
+    methodDocumentUrl(methodSectionAnchor(section) ?? undefined);
+  const methodLinks = Object.fromEntries(
     [
-      ...OBJECTIVE_CHECKS,
-      ...KEY_RESULT_CHECKS,
-      ...ALIGNMENT_CHECKS,
-      ...CYCLE_CHECKS,
-    ].map((check) => [check.id, check.title]),
+      "12",
+      "12.2",
+      "12.3",
+      ...practice.registry.map((entry) => entry.section),
+      ...comparison.map((row) => row.section),
+    ].map((section) => [section, sectionLink(section)]),
   );
 
   return (
@@ -73,13 +91,26 @@ export default async function PracticeSettingsPage() {
       <h1 className="text-lg font-bold text-ink">
         {t("admin.practice.title")}
       </h1>
-      <p className="text-sm text-ink-3">{t("admin.practice.intro")}</p>
+      <p className="text-sm text-ink-3">
+        {t("admin.practice.intro")}{" "}
+        <a
+          href={methodLinks["12"]}
+          target="_blank"
+          rel="noreferrer"
+          data-testid="practice-method-link"
+          className="font-semibold text-brand-text underline"
+        >
+          {t("admin.practice.readMethod")}
+          <span className="sr-only"> {t("admin.practice.opensInNewTab")}</span>
+        </a>
+      </p>
       <PracticeForm
         practice={practice}
         previews={previews}
         thresholdLabels={thresholdLabels}
-        checkTitles={checkTitles}
-        gateTitles={[...GATE_TITLES]}
+        settingNames={settingNames}
+        comparison={comparison}
+        methodLinks={methodLinks}
         canManage={level >= ACCESS_LEVELS.full}
       />
     </>

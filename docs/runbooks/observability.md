@@ -170,7 +170,7 @@ Three dashboards are provisioned from files in
 `deploy/docker/observability/dashboards/`, so they are reviewable in a diff
 and an edit in the browser is not silently kept.
 
-- **The §13.1 budgets.** The rows this instance can measure from its own
+- **Performance budgets.** The rows this instance can measure from its own
   series, each with its budget drawn as a threshold line.
 - **Delivery and the background.** Queue lag, dead letters, nudges, channels,
   scheduled jobs, agent runs, AI spend, and authorisation refusals.

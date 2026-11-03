@@ -79,7 +79,7 @@ test("the annual cycle is made and opened from the cycle screen, and phase 6 sta
   await expect(calibration).toBeVisible();
   // §7.6 itself, from packages/method: the one rule a target moves by.
   await expect(page.getByTestId("calibration-rule")).toHaveText(
-    /^A target may be changed at any time in the cycle, as §2\.9 says\. Making a target harder needs no reason\. /,
+    /^A target may be changed at any time in the cycle\. Making a target harder needs no reason\. /,
   );
   // Nothing to record once a cycle any more.
   await expect(calibration.getByRole("button")).toHaveCount(0);

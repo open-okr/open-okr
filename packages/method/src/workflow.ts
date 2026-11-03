@@ -413,7 +413,7 @@ function phaseZero(
     const bounds = thresholds["quality.annualStrategyBounds"];
     if (frame.strategyCount < bounds.low || frame.strategyCount > bounds.high) {
       missing.push(
-        `${frame.strategyCount} annual strategies, and §2.1 asks for ${bounds.low} to ${bounds.high}`,
+        `${frame.strategyCount} annual strategies, and the practice asks for ${bounds.low} to ${bounds.high}`,
       );
     }
   }
@@ -481,7 +481,7 @@ function phaseOne(
     );
     if (actual < lead) {
       missing.push(
-        `The pack reached people ${actual} working day(s) before session one, and §2.6 asks for ${lead}`,
+        `The pack reached people ${actual} working day(s) before session one, and the practice asks for ${lead}`,
       );
     }
   }
@@ -526,7 +526,7 @@ function phaseTwo(
   const minimum = thresholds["quality.strategicIssueMinimum"];
   if (input.issues.length < minimum) {
     missing.push(
-      `${input.issues.length} strategic issue(s) ranked, and §2.3 asks for at least ${minimum}`,
+      `${input.issues.length} strategic issue(s) ranked, and the practice asks for at least ${minimum}`,
     );
   }
 
@@ -556,7 +556,7 @@ function phaseThree(
       input.priorities.length > bounds.high
     ) {
       missing.push(
-        `${input.priorities.length} priorities, and §2.3 asks for ${bounds.low} to ${bounds.high}`,
+        `${input.priorities.length} priorities, and the practice asks for ${bounds.low} to ${bounds.high}`,
       );
     }
     const withoutSuccess = input.priorities.filter((priority) =>
@@ -717,7 +717,7 @@ function phaseFour(
     // A caller that has already decided, which a test may be.
     const missing = input.qualityChecksPass
       ? []
-      : ["Some objectives or key results do not pass the §4 quality checks"];
+      : ["Some objectives or key results do not pass the quality checks"];
     return {
       ...base,
       state: input.qualityChecksPass ? "pass" : "todo",
@@ -732,7 +732,7 @@ function phaseFour(
       ...base,
       state: "todo",
       missing: [],
-      blocked: ["The §4 verdicts across the set could not be read"],
+      blocked: ["The quality verdicts across the set could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
@@ -981,7 +981,7 @@ export function publishGates(
         input.qualityChecksPass,
         input.qualityChecksPass
           ? []
-          : ["Some key results do not pass the §4.2 checks"],
+          : ["Some key results do not pass the key result checks"],
       ),
     );
   } else if (!goals || !thresholds) {
@@ -994,7 +994,10 @@ export function publishGates(
   } else {
     if (unjudgedIn(goals)) {
       results.push(
-        unevaluable(2, "some key results carry nothing for §4.2 to judge"),
+        unevaluable(
+          2,
+          "some key results carry nothing for the key result checks to judge",
+        ),
       );
     } else {
       const failures: string[] = [];
@@ -1064,9 +1067,7 @@ export function publishGates(
       goal.keyResults.some((keyResult) => keyResult.dependencies === undefined),
     )
   ) {
-    results.push(
-      unevaluable(4, "the §5.4 dependency register could not be read"),
-    );
+    results.push(unevaluable(4, "the dependency register could not be read"));
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults.flatMap((keyResult) =>
@@ -1094,9 +1095,7 @@ export function publishGates(
     // §5.5 is one sentence about two things: the measures and the initiatives
     // that will move them. Passing on the half that exists would be the exact
     // failure this file's header records from Phase 1.
-    results.push(
-      unevaluable(5, "the §5.5 initiative register could not be read"),
-    );
+    results.push(unevaluable(5, "the initiative register could not be read"));
   } else {
     const missing = goals.flatMap((goal) =>
       goal.keyResults

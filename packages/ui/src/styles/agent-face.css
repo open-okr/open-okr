@@ -1,0 +1,363 @@
+/*
+ * The agent faces' motion (components/agent-face.tsx, docs/design/agent-faces.md).
+ *
+ * In a style sheet because the content security policy refuses an inline
+ * <style>, which is where the drawings these come from kept theirs.
+ *
+ * **Nothing moves under reduced motion, and nothing jumps either.** Every
+ * rule that starts an animation sits inside `no-preference`. The global
+ * reduced-motion rule in tokens.css shortens an animation to one frame
+ * rather than removing it, which would park each face on its last frame:
+ * for the surprised face that is the small-eyed pose before the surprise.
+ * Here a reader who asked for less motion gets each mood's still pose.
+ *
+ * Each mood names what its four moving parts would run. A face runs them
+ * only when one of the rules at the bottom says it may: always when idle,
+ * while it is live, once when its mood changed, and once on hover or focus.
+ */
+
+.agent-face :is(.af-head, .af-eye, .af-white) {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.agent-face {
+  --af-count: var(--af-times, 1);
+}
+
+.agent-face[data-live],
+.agent-face[data-mood="idle"] {
+  --af-count: infinite;
+}
+
+/* Idle is the drawing's own loop, and the one mood that always moves
+ * (decided by the product owner on 3 November 2026): a blink of about 0.18
+ * seconds every 4.6, and a glance left then right on its own six-second
+ * loop, so the blinks land at a different moment of the glance each time.
+ * `--af-phase` is each face's own start in that loop, set by the component,
+ * so a list of idle faces does not blink in unison. */
+.agent-face[data-mood="idle"] {
+  --af-eye-left: af-look 6s ease-in-out var(--af-phase, 0s);
+  --af-eye-right: af-look 6s ease-in-out var(--af-phase, 0s);
+  --af-white: af-blink 4.6s var(--af-phase, 0s);
+}
+
+/* Two hops with the eyes bouncing. */
+.agent-face[data-mood="happy"] {
+  --af-head: af-hop 2.4s ease-in-out;
+  --af-eye-left: af-bob 2.4s ease-in-out;
+  --af-eye-right: af-bob 2.4s ease-in-out;
+  --af-times: 2;
+}
+
+/* The head and eyes droop, with one slow blink at the bottom. */
+.agent-face[data-mood="sad"] {
+  --af-head: af-droop 4.4s ease-in-out;
+  --af-eye-left: af-sink 4.4s ease-in-out;
+  --af-eye-right: af-sink 4.4s ease-in-out;
+  --af-white: af-slow-blink 4.4s;
+}
+
+/* One breath. */
+.agent-face[data-mood="sleeping"] {
+  --af-head: af-breathe 4.8s ease-in-out;
+}
+
+/* The eyes squeeze, then pop wide and wobble, and stay wide. */
+.agent-face[data-mood="surprised"] {
+  --af-head: af-swell 2.72s;
+  --af-eye-left: af-in-left 2.72s;
+  --af-eye-right: af-in-right 2.72s;
+  --af-white: af-pop 2.72s;
+}
+
+/* The eyes rise and fall a beat apart. Three times from rest, and back to
+ * rest, when it plays once; the original wave, end to end, while live. */
+.agent-face[data-mood="thinking"] {
+  --af-eye-left: af-ponder 1.1s ease-in-out;
+  --af-eye-right: af-ponder 1.1s ease-in-out -0.12s;
+  --af-times: 3;
+}
+
+.agent-face[data-mood="thinking"][data-live] {
+  --af-eye-left: af-wave 1.1s ease-in-out;
+  --af-eye-right: af-wave 1.1s ease-in-out -0.12s;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  :is(
+      .agent-face[data-live],
+      .agent-face[data-mood="idle"],
+      .agent-face[data-playing],
+      .agent-face:hover,
+      :is(a, button, li, .group):hover .agent-face,
+      :is(a, button):focus-visible .agent-face
+    )
+    .af-head {
+    animation: var(--af-head, none);
+    animation-iteration-count: var(--af-count);
+  }
+
+  :is(
+      .agent-face[data-live],
+      .agent-face[data-mood="idle"],
+      .agent-face[data-playing],
+      .agent-face:hover,
+      :is(a, button, li, .group):hover .agent-face,
+      :is(a, button):focus-visible .agent-face
+    )
+    .af-eye-left {
+    animation: var(--af-eye-left, none);
+    animation-iteration-count: var(--af-count);
+  }
+
+  :is(
+      .agent-face[data-live],
+      .agent-face[data-mood="idle"],
+      .agent-face[data-playing],
+      .agent-face:hover,
+      :is(a, button, li, .group):hover .agent-face,
+      :is(a, button):focus-visible .agent-face
+    )
+    .af-eye-right {
+    animation: var(--af-eye-right, none);
+    animation-iteration-count: var(--af-count);
+  }
+
+  :is(
+      .agent-face[data-live],
+      .agent-face[data-mood="idle"],
+      .agent-face[data-playing],
+      .agent-face:hover,
+      :is(a, button, li, .group):hover .agent-face,
+      :is(a, button):focus-visible .agent-face
+    )
+    .af-white {
+    animation: var(--af-white, none);
+    animation-iteration-count: var(--af-count);
+  }
+}
+
+@keyframes af-look {
+  0%,
+  30%,
+  82%,
+  100% {
+    transform: translate(0, 0);
+  }
+  38%,
+  50% {
+    transform: translate(-11px, -3px);
+  }
+  58%,
+  74% {
+    transform: translate(10px, 2px);
+  }
+}
+
+@keyframes af-blink {
+  0%,
+  90%,
+  94%,
+  100% {
+    transform: scaleY(1);
+  }
+  92% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes af-hop {
+  0%,
+  32%,
+  100% {
+    transform: translateY(0);
+  }
+  13% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes af-bob {
+  0%,
+  28%,
+  100% {
+    transform: translateY(0);
+  }
+  3.5% {
+    transform: translateY(8px);
+  }
+  10.5% {
+    transform: translateY(-7px);
+  }
+  17.5% {
+    transform: translateY(6px);
+  }
+  24.5% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes af-droop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(5.5px);
+  }
+}
+
+@keyframes af-sink {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25%,
+  75% {
+    transform: translateY(4.8px);
+  }
+}
+
+@keyframes af-slow-blink {
+  0%,
+  48%,
+  52%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes af-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+/* The surprise, as drawn, up to the moment it would close again: the
+ * drawing's own loop shrinks the eyes back before it repeats, and a face
+ * that plays once should end wide-eyed rather than jump there. Times are
+ * the drawing's, scaled from its first 80 percent of 3.4 seconds. */
+@keyframes af-swell {
+  0% {
+    transform: scale(1);
+  }
+  8.75% {
+    transform: scale(1);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  15% {
+    transform: scale(1.035);
+  }
+  80% {
+    transform: scale(1.035);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes af-pop {
+  0% {
+    transform: scale(0.794, 0.853);
+    animation-timing-function: cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  8.75% {
+    transform: scale(0.5, 0.529);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  15% {
+    transform: scale(1);
+  }
+  15.96% {
+    transform: scale(1.0218);
+  }
+  17.9% {
+    transform: scale(0.9787);
+  }
+  19.83% {
+    transform: scale(1.0208);
+  }
+  21.75% {
+    transform: scale(0.9797);
+  }
+  23.69% {
+    transform: scale(1.0198);
+  }
+  25.61% {
+    transform: scale(0.9807);
+  }
+  27.54% {
+    transform: scale(1.0188);
+  }
+  29.48% {
+    transform: scale(0.9817);
+  }
+  30.44%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes af-in-left {
+  0% {
+    transform: translateX(3.4px);
+  }
+  8.75% {
+    transform: translateX(3.4px);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  15%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@keyframes af-in-right {
+  0% {
+    transform: translateX(-3.4px);
+  }
+  8.75% {
+    transform: translateX(-3.4px);
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  15%,
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* The drawing's wave, which starts and ends with the eyes raised. Right for
+ * a loop; a single play would end with the eyes jumping back to centre. */
+@keyframes af-wave {
+  0%,
+  100% {
+    transform: translateY(-10px);
+  }
+  50% {
+    transform: translateY(10px);
+  }
+}
+
+/* The same wave from rest and back to rest, for a play that ends. */
+@keyframes af-ponder {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-10px);
+  }
+  75% {
+    transform: translateY(10px);
+  }
+}

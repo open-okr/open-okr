@@ -229,6 +229,18 @@ Every one is mixed from a token with `color-mix` rather than written as a raw `r
 
 That leaves the blue-to-pink arc plus one grey: `#6265F0`, `#4338CA`, `#2563EB`, `#0B7EB2`, `#7C3AED`, `#A21CAF`, `#DB2777`, `#6B6A63`.
 
+### The agent face exemption
+
+`packages/ui/src/components/agent-face.tsx` draws the agents' faces ([agent-faces.md](agent-faces.md)). Rule 1 has one exemption here, decided by the product owner on 3 November 2026:
+
+| Face | Ink | Eyes | Both themes |
+|---|---|---|---|
+| General | `currentColor` | `--surface` | Follows the theme, inverting in dark |
+| OKR Coach | `#3A80ED` | White | Unchanged |
+| OKR Champion | `#27A959` | White | Unchanged |
+
+The Champion's green is an identity colour, not a status. Three things keep it from reading as "on track": the face is a shape, never a dot or a fill; its mood says what the message is, so an overdue check-in wears a sad face; and the general face, not a coloured one, is the one in navigation.
+
 ---
 
 ## Accessibility

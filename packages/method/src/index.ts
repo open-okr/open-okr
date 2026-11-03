@@ -235,6 +235,16 @@ export {
   validatePracticeOverrides,
 } from "./practice.ts";
 export {
+  OPERATING_PRINCIPLES,
+  type OperatingPrinciple,
+  principlesCited,
+} from "./principles.ts";
+export {
+  compareProfiles,
+  type ProfileComparisonRow,
+  practiceSettingName,
+} from "./profile-comparison.ts";
+export {
   ALIGNMENT_CHECKS,
   type AlignmentCheckInput,
   type ConditionRow,
@@ -261,6 +271,7 @@ export {
   type QualityVerdict,
   strengthScore,
 } from "./quality.ts";
+export { describeRule, type RuleDescription } from "./rule-description.ts";
 export {
   belowCommittedFloor,
   type CascadeGoal,
@@ -317,6 +328,7 @@ export {
   type WeightedItem,
   weightedProgress,
 } from "./scoring.ts";
+export { METHOD_SECTIONS, methodSectionAnchor } from "./sections.ts";
 export {
   BLOCKER_TYPE_DEFINITIONS,
   type CheckInRecord,

@@ -22,7 +22,7 @@ Source: `okrgoal.com usability & UX feedback.docx` (Downloads, 2 November 2026).
 | Open | Still as the screenshot shows, in the new layout |
 | Decide | Changes a product term, a default, a practice setting or an approved design. Goes to section 10 |
 
-`(browser)` marks a status confirmed on screen. Paths are relative to the repository root. `en.json` is `packages/ui/src/i18n/messages/en.json`. Every copy change goes to `en.json` and `id.json` together.
+`(browser)` marks a status confirmed on screen. Paths are relative to the repository root. `en.json` is `packages/ui/src/i18n/messages/en.json`. Every copy change goes to `en.json` and `ms.json` together.
 
 ## Summary
 

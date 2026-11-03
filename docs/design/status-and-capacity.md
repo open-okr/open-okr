@@ -14,7 +14,7 @@ document.
 |---|---|---|---|
 | `/api/health` | `apps/web/app/api/health/route.ts` | P1-T09 | Unauthenticated. `SELECT 1` against Postgres. Returns `{status: "ok"}` or 503. Used by compose `healthcheck` and the Caddy dependency graph. Says almost nothing on purpose |
 | `/api/metrics` | `apps/web/app/api/metrics/route.ts` | P7-T06a | Authenticated (instance admin). Prometheus text exposition. 16 series. Per-action duration, queue depth, relay liveness, nudges, channels, agents, AI usage |
-| Two Grafana dashboards | `deploy/docker/observability/dashboards/` | P7-T06c | "The SS13.1 budgets" and "Delivery and the background". Provisioned from committed JSON. Off unless the observability profile is started |
+| Two Grafana dashboards | `deploy/docker/observability/dashboards/` | P7-T06c | "Performance budgets" and "Delivery and the background". Provisioned from committed JSON. Off unless the observability profile is started |
 | The observability profile | `deploy/docker/compose.yaml` | P7-T06c | Prometheus + Grafana behind `profiles: ["observability"]`. Published on `127.0.0.1:3001`. Nothing leaves the compose network |
 | Outbox gauges | `packages/adapters/src/relay.ts` | P7-T06b | `openokr_outbox_pending` and `openokr_outbox_oldest_pending_seconds`, read at scrape time. The relay registers them at construction; a stopped relay keeps reporting a growing lag |
 | Per-tenant admission | `packages/core/src/tenancy/admission.ts` | P8-T06a | `actionsPerMinute` and `concurrentActions` in `callAction`, before the metrics span. Refused calls throw `AdmissionError` with a reset time |
@@ -192,7 +192,7 @@ alongside the two that P7-T06c ships:
 
 | Dashboard | File | What it answers |
 |---|---|---|
-| "The SS13.1 budgets" (existing) | `openokr-budgets.json` | Is each action inside its budget? |
+| "Performance budgets" (existing) | `openokr-budgets.json` | Is each action inside its budget? |
 | "Delivery and the background" (existing) | `openokr-delivery.json` | Are nudges, channels and jobs moving? |
 | **"Capacity and limits"** (new) | `openokr-capacity.json` | How much room is left, and are limits engaging? |
 

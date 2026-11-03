@@ -1,7 +1,15 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { AGENT_AUTONOMIES } from "@openokr/db";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  AgentFace,
+  agentFaceKind,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+} from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { moodForRun } from "../../../lib/agent-moods.ts";
 import { getPool } from "../../../lib/auth";
 import { SCHEDULE_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -97,7 +105,7 @@ export default async function AgentsPage() {
 
   if (level < ACCESS_LEVELS.full) {
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.agents.agentsAndRuns")}
         </h1>
@@ -108,7 +116,7 @@ export default async function AgentsPage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -119,6 +127,12 @@ export default async function AgentsPage() {
   };
   const agents = await callAction(context, "agents.list", {});
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
+  // Which face a run wears, by the agent that ran it. A run carries the
+  // agent's id and name but not its kind, and every run's agent is in the
+  // list above, so this is a lookup rather than a second query.
+  const faceOf = new Map(
+    agents.map((agent) => [agent.id, agentFaceKind(agent.kind)]),
+  );
   // What a scope can name, by name rather than by a pasted id: every space,
   // and every KPI tree (`kpis.tree` lists them all beside its first).
   const bindable = {
@@ -150,11 +164,13 @@ export default async function AgentsPage() {
   );
 
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.agents.agentsAndRuns")}
-      </h1>
-      <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.agents.agentsAndRuns")}
+        </h1>
+        <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
+      </div>
 
       <RunControls drafting={drafting} />
 
@@ -185,6 +201,12 @@ export default async function AgentsPage() {
                   className="flex flex-col gap-1 border-line border-b px-3 py-2 last:border-b-0"
                 >
                   <span className="flex flex-wrap items-center gap-2">
+                    {/* Asleep while switched off, so the row says it before
+                        the chip does. */}
+                    <AgentFace
+                      agent={agentFaceKind(agent.kind)}
+                      mood={agent.enabled ? "idle" : "sleeping"}
+                    />
                     <span className="text-sm font-medium text-ink">
                       {agent.name}
                     </span>
@@ -251,6 +273,13 @@ export default async function AgentsPage() {
                 >
                   <span className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex items-center gap-2">
+                      {/* Thinking, and moving, only while the run is; the
+                          status chip beside it stays the record. */}
+                      <AgentFace
+                        agent={faceOf.get(run.agentId) ?? "agent"}
+                        {...moodForRun(run.status, run.log.length)}
+                        className="size-5"
+                      />
                       <span className="text-sm font-medium text-ink">
                         {run.agentName}
                       </span>
@@ -313,6 +342,6 @@ export default async function AgentsPage() {
           )}
         </CardBody>
       </Card>
-    </>
+    </div>
   );
 }

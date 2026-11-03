@@ -134,7 +134,7 @@ export default async function AdminAIPage() {
     // workspace, so somebody who cannot set one should still know the product
     // has AI and who to ask for it.
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
         <Card>
           <CardBody>
@@ -146,7 +146,7 @@ export default async function AdminAIPage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -225,117 +225,119 @@ export default async function AdminAIPage() {
         <h2 className="px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
           {t("admin.ai.providersAndKeys")}
         </h2>
-        {AI_PROVIDER_KINDS.map((kind) => {
-          const config = providers.find((one) => one.provider === kind);
-          return (
-            <Card key={kind}>
-              <CardHeader className="justify-between">
-                <span className="flex items-center gap-2 text-sm font-medium text-ink">
-                  {providerWord(kind)}
-                  {config?.enabled ? (
-                    <Chip tone="ok">{t("admin.ai.on")}</Chip>
-                  ) : (
-                    <Chip tone="neutral">{t("admin.ai.off")}</Chip>
-                  )}
-                  {config?.hasWorkspaceCredential &&
-                  config.workspaceKeyStatus ? (
-                    <Chip
-                      tone={STATUS_TONE[config.workspaceKeyStatus] ?? "warn"}
-                    >
-                      {config.workspaceKeyStatus}
-                    </Chip>
+        <div className="flex flex-col gap-4">
+          {AI_PROVIDER_KINDS.map((kind) => {
+            const config = providers.find((one) => one.provider === kind);
+            return (
+              <Card key={kind}>
+                <CardHeader className="justify-between">
+                  <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                    {providerWord(kind)}
+                    {config?.enabled ? (
+                      <Chip tone="ok">{t("admin.ai.on")}</Chip>
+                    ) : (
+                      <Chip tone="neutral">{t("admin.ai.off")}</Chip>
+                    )}
+                    {config?.hasWorkspaceCredential &&
+                    config.workspaceKeyStatus ? (
+                      <Chip
+                        tone={STATUS_TONE[config.workspaceKeyStatus] ?? "warn"}
+                      >
+                        {config.workspaceKeyStatus}
+                      </Chip>
+                    ) : null}
+                  </span>
+                  {config?.workspaceKeyHint ? (
+                    <code className="font-mono text-xs text-ink-3">
+                      {config.workspaceKeyHint}
+                    </code>
                   ) : null}
-                </span>
-                {config?.workspaceKeyHint ? (
-                  <code className="font-mono text-xs text-ink-3">
-                    {config.workspaceKeyHint}
-                  </code>
-                ) : null}
-              </CardHeader>
-              <CardBody className="flex flex-col gap-3">
-                <AIForm action={saveProvider} className="flex flex-col gap-2">
-                  <input type="hidden" name="provider" value={kind} />
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      name="enabled"
-                      defaultChecked={config?.enabled ?? false}
-                      className="size-4"
-                    />
-                    {t("admin.ai.useThisProvider")}
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-ink">
-                    <input
-                      type="checkbox"
-                      name="allowUserKeys"
-                      defaultChecked={config?.allowUserKeys ?? false}
-                      className="size-4"
-                    />
-                    {t("admin.ai.letMembersSupplyTheir")}
-                  </label>
-                  {/* Where the other half of this switch lives, since it is
+                </CardHeader>
+                <CardBody className="flex flex-col gap-3">
+                  <AIForm action={saveProvider} className="flex flex-col gap-2">
+                    <input type="hidden" name="provider" value={kind} />
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        name="enabled"
+                        defaultChecked={config?.enabled ?? false}
+                        className="size-4"
+                      />
+                      {t("admin.ai.useThisProvider")}
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-ink">
+                      <input
+                        type="checkbox"
+                        name="allowUserKeys"
+                        defaultChecked={config?.allowUserKeys ?? false}
+                        className="size-4"
+                      />
+                      {t("admin.ai.letMembersSupplyTheir")}
+                    </label>
+                    {/* Where the other half of this switch lives, since it is
                       on the member's own account rather than here (M-36). */}
-                  <p className="pl-6 text-xs text-ink-3">
-                    {t("admin.ai.membersStoreTheirs")}
-                  </p>
-                  {/* A whole http or https address, the server's rule: a
+                    <p className="pl-6 text-xs text-ink-3">
+                      {t("admin.ai.membersStoreTheirs")}
+                    </p>
+                    {/* A whole http or https address, the server's rule: a
                       local Ollama is plain http (guided-inputs §4.11). */}
-                  <UrlInput
-                    id={`${kind}-baseUrl`}
-                    label={t("admin.ai.baseUrlForA")}
-                    name="baseUrl"
-                    defaultValue={config?.baseUrl ?? ""}
-                    placeholder={t("admin.ai.leaveEmptyForThe")}
-                  />
-                  <Button type="submit" size="sm">
-                    {t("common.save")}
-                  </Button>
-                </AIForm>
-
-                <AIForm
-                  action={saveWorkspaceKey}
-                  className="flex flex-col gap-2 border-t border-line pt-3"
-                >
-                  <input type="hidden" name="provider" value={kind} />
-                  <SecretInput
-                    label={
-                      config?.hasWorkspaceCredential
-                        ? t("admin.ai.replaceTheKeyHelp")
-                        : t("admin.ai.pasteTheProviderKey")
-                    }
-                    name="apiKey"
-                    autoComplete="off"
-                    required
-                    maxLength={4096}
-                  />
-                  <Button type="submit" variant="default" size="sm">
-                    {config?.hasWorkspaceCredential
-                      ? t("admin.ai.replace")
-                      : t("admin.ai.store")}
-                  </Button>
-                </AIForm>
-
-                {config?.hasWorkspaceCredential ? (
-                  <AIForm action={testWorkspaceKeyAction}>
-                    <input type="hidden" name="provider" value={kind} />
+                    <UrlInput
+                      id={`${kind}-baseUrl`}
+                      label={t("admin.ai.baseUrlForA")}
+                      name="baseUrl"
+                      defaultValue={config?.baseUrl ?? ""}
+                      placeholder={t("admin.ai.leaveEmptyForThe")}
+                    />
                     <Button type="submit" size="sm">
-                      {t("admin.ai.testTheConnection")}
+                      {t("common.save")}
                     </Button>
                   </AIForm>
-                ) : null}
 
-                {config?.hasWorkspaceCredential ? (
-                  <AIForm action={removeWorkspaceKey}>
+                  <AIForm
+                    action={saveWorkspaceKey}
+                    className="flex flex-col gap-2 border-t border-line pt-3"
+                  >
                     <input type="hidden" name="provider" value={kind} />
-                    <Button type="submit" variant="ghost" size="sm">
-                      {t("admin.ai.removeTheKey")}
+                    <SecretInput
+                      label={
+                        config?.hasWorkspaceCredential
+                          ? t("admin.ai.replaceTheKeyHelp")
+                          : t("admin.ai.pasteTheProviderKey")
+                      }
+                      name="apiKey"
+                      autoComplete="off"
+                      required
+                      maxLength={4096}
+                    />
+                    <Button type="submit" variant="default" size="sm">
+                      {config?.hasWorkspaceCredential
+                        ? t("admin.ai.replace")
+                        : t("admin.ai.store")}
                     </Button>
                   </AIForm>
-                ) : null}
-              </CardBody>
-            </Card>
-          );
-        })}
+
+                  {config?.hasWorkspaceCredential ? (
+                    <AIForm action={testWorkspaceKeyAction}>
+                      <input type="hidden" name="provider" value={kind} />
+                      <Button type="submit" size="sm">
+                        {t("admin.ai.testTheConnection")}
+                      </Button>
+                    </AIForm>
+                  ) : null}
+
+                  {config?.hasWorkspaceCredential ? (
+                    <AIForm action={removeWorkspaceKey}>
+                      <input type="hidden" name="provider" value={kind} />
+                      <Button type="submit" variant="ghost" size="sm">
+                        {t("admin.ai.removeTheKey")}
+                      </Button>
+                    </AIForm>
+                  ) : null}
+                </CardBody>
+              </Card>
+            );
+          })}
+        </div>
       </section>
 
       <Card>

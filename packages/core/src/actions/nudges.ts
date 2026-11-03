@@ -579,7 +579,7 @@ function ladderFor(
 export const listNudgeRules = defineReadAction({
   name: "nudges.rules",
   summary:
-    "Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume.",
+    "Every proactive message rule with this workspace's configuration and its recent volume.",
   input: z.object({}),
   output: z.object({
     /** Whether the workspace is holding every non-exempt rule quiet. */
@@ -710,7 +710,7 @@ export const listNudgeRules = defineReadAction({
  */
 export const setNudgeRule = defineWriteAction({
   name: "nudges.setRule",
-  summary: "Enables, mutes, re-routes or exempts one §6.4 rule.",
+  summary: "Enables, mutes, re-routes or exempts one proactive message rule.",
   input: z.object({
     ruleKey: z.string().min(1),
     enabled: z.boolean().optional(),
@@ -746,7 +746,7 @@ export const setNudgeRule = defineWriteAction({
             // The idiom `rhythm.update` set for a value §11 would not accept.
             "forbidden",
             input.ruleKey +
-              " does not own a ladder. §11 defines three, and each is set " +
+              " does not own a ladder. The practice has three, and each is set " +
               "on the rule it escalates to: " +
               LADDER_OWNERS.map((owner) => owner.ruleKey).join(", ") +
               ".",

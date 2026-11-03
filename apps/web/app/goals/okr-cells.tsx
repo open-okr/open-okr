@@ -29,6 +29,7 @@ import { dayLabel } from "../../lib/day-label.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { searchMembers } from "../../lib/member-search.ts";
+import { RulePreview } from "../../lib/rule-preview";
 
 /**
  * The cells of the OKR list, each edited where it is read (P9-T07a-a,
@@ -1051,12 +1052,12 @@ export function VerdictChips({
             {verdict.id}
           </span>
           <span className="min-w-0 flex-1 text-ink-2">{verdict.prompt}</span>
-          <a
-            href={`/method/${verdict.id}`}
+          <RulePreview
+            ruleKey={verdict.id}
             className="flex-none font-semibold text-brand-text no-underline hover:underline"
           >
             {t("okrList.readTheRule")}
-          </a>
+          </RulePreview>
         </li>
       ))}
     </ul>

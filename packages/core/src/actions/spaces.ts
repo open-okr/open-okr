@@ -608,7 +608,7 @@ const holidayRow = z.object({
 export const setSpaceHolidays = defineWriteAction({
   name: "spaces.setHolidays",
   summary:
-    "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4).",
+    "Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break.",
   input: z.object({
     id: z.uuid(),
     holidays: z.array(holidaySpan).max(60),
@@ -712,8 +712,7 @@ export const setSpaceHolidays = defineWriteAction({
 
 export const readSpaceHolidays = defineReadAction({
   name: "spaces.holidays",
-  summary:
-    "The spans a space marks as holidays, oldest first (METHOD.md §7.4).",
+  summary: "The spans a space marks as holidays, oldest first.",
   input: z.object({ id: z.uuid() }),
   output: z.array(holidayRow),
   access: ACCESS_LEVELS.view,

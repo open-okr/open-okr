@@ -1231,7 +1231,7 @@ export const CYCLE_CHECKS: readonly QualityCheck[] = [
         condition: "Items missing, or distributed too late",
         status: "fail",
         prompt:
-          "The input pack is not ready. Complete it and get it to people the working days ahead that §2.6 asks for, or session one becomes the meeting where everybody reads.",
+          "The input pack is not ready. Complete it and get it to people the working days ahead the practice asks for, or session one becomes the meeting where everybody reads.",
       },
       {
         condition: "Complete and distributed in time",

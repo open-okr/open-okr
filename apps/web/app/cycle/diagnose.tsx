@@ -1,4 +1,5 @@
 import {
+  AgentFace,
   Button,
   Card,
   CardBody,
@@ -87,7 +88,16 @@ export async function Diagnose({
               >
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="text-sm text-ink">{issue.text}</span>
-                  <span className="text-xs text-ink-3">
+                  <span className="flex items-center gap-1 text-xs text-ink-3">
+                    {/* The one source that is an agent, so it shows whose
+                        thinking this was. */}
+                    {issue.source === "coach" ? (
+                      <AgentFace
+                        agent="coach"
+                        mood="thinking"
+                        className="size-4"
+                      />
+                    ) : null}
                     {issue.promotedToPriorityId
                       ? t("cycle.diagnose.promotedToAPriority", {
                           source: sourceLabel(issue.source, t),

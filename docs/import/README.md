@@ -96,7 +96,7 @@ Objectives, one per row, with their champion and their reviewer.
 | `title` | Yes | The objective itself. |
 | `description` | No | Context, as plain text. Blank lines separate paragraphs. |
 | `level` | Yes | One of: company, department, team, individual. |
-| `kind` | No | One of: committed, aspirational (METHOD.md §2.8). The workspace's default if the file does not say. |
+| `kind` | No | One of: committed, aspirational. The workspace's default if the file does not say. |
 | `cycle` | No | The cycle this objective belongs to, by name or label. Leave it empty and give a start and an end instead. |
 | `startsOn` | No | The first day, when the objective carries its own timeframe. |
 | `endsOn` | No | The last day, when the objective carries its own timeframe. |
@@ -115,7 +115,7 @@ Key results, one per row, each against an objective.
 | `externalId` | Yes | The identifier the source system uses for this key result. |
 | `goal` | Yes | The objective it measures, by the identifier the goals file used or by its id here. |
 | `title` | Yes | The measure itself. |
-| `kind` | No | One of: metric, maintain, milestone, baseline (METHOD.md §2.10). A metric if the file does not say, or a maintain where the direction says maintain. |
+| `kind` | No | One of: metric, maintain, milestone, baseline. A metric if the file does not say, or a maintain where the direction says maintain. |
 | `direction` | No | One of: increase, reduce, maintain, move. Needed for a metric or a maintain. |
 | `indicatorType` | No | One of: leading, lagging. Lagging by default. |
 | `unit` | No | What the numbers are in, such as % or customers. |
