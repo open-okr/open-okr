@@ -36,10 +36,7 @@ import { readSetupState } from "../setup/state.ts";
 import { browserTimezoneFromCookies } from "../workspaces/browser-timezone.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
-import {
-  REGISTRATION_CLOSED_MESSAGE,
-  registrationOpenOrInvited,
-} from "../workspaces/registration.ts";
+import { registrationRefusal } from "../workspaces/registration.ts";
 import {
   processOnlyKeyRing,
   withSealedAccountTokens,
@@ -559,15 +556,15 @@ export function createAuth(options: AuthOptions) {
             // address from opening registration for any address (manual UAT,
             // 29 September 2026, M04-03 — see `registrationOpenOrInvited`'s
             // own comment for the failure this closes).
-            const allowed = await registrationOpenOrInvited(
+            // The refusal says which rule refused: closed, or open to
+            // company addresses only (docs/design/registration-policy.md §3).
+            const refusal = await registrationRefusal(
               options.pool,
               cookieHeaderFrom(hookContext),
               user.email,
             );
-            if (!allowed) {
-              throw new APIError("FORBIDDEN", {
-                message: REGISTRATION_CLOSED_MESSAGE,
-              });
+            if (refusal !== null) {
+              throw new APIError("FORBIDDEN", { message: refusal });
             }
             // **The account that claims the instance arrives verified** (UAT
             // BUG-028). The setup wizard signs up and finishes setup in one

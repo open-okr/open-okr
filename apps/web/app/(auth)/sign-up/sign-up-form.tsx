@@ -7,8 +7,17 @@ import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { AuthCard, Field, FormError } from "../auth-card";
 
-/** The registration form (screen S-35). Rendered only when registration is open. */
-export function SignUpForm() {
+/**
+ * The registration form (screen S-35). Rendered only when registration is
+ * open, or open to company addresses, which `companyOnly` says under the
+ * email field (docs/design/registration-policy.md §4). The server refuses a
+ * free mail address either way; the line saves somebody a wasted try.
+ */
+export function SignUpForm({
+  companyOnly = false,
+}: {
+  readonly companyOnly?: boolean;
+}) {
   const { t } = useTranslations();
 
   const router = useRouter();
@@ -59,6 +68,11 @@ export function SignUpForm() {
           name="email"
           required
         />
+        {companyOnly ? (
+          <p className="-mt-1.5 text-xs text-ink-3" data-testid="company-only">
+            {t("auth.signUp.signUpForm.useCompanyEmail")}
+          </p>
+        ) : null}
         <SecretInput
           label={t("auth.signUp.signUpForm.password")}
           name="password"

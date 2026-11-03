@@ -26,6 +26,11 @@ export {
 } from "./device-code.ts";
 export { DOMAIN_PATTERN, isDomain } from "./domain.ts";
 export { EMAIL_PATTERN, isEmailAddress } from "./email.ts";
+export {
+  FREE_MAIL_DOMAINS,
+  isFreeMailAddress,
+  isFreeMailDomain,
+} from "./free-mail.ts";
 export { hostOf, isHostName } from "./host.ts";
 export {
   IDENTIFIER_MAX_LENGTH,

@@ -21,7 +21,7 @@ import {
   OperationError,
   trustedEmailDomainsSchema,
 } from "@openokr/core";
-import { isListedTimezone } from "@openokr/formats";
+import { isFreeMailDomain, isListedTimezone } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
@@ -72,6 +72,17 @@ export async function submitGeneral(
     return {
       error: t("admin.general.generalSettingsForm.unknownTimezone", {
         timezone,
+      }),
+      saved: null,
+    };
+  }
+  // A free mail provider is refused by the action too; said here in the
+  // reader's language (docs/design/registration-policy.md D9).
+  const free = trustedEmailDomains.find((domain) => isFreeMailDomain(domain));
+  if (free !== undefined) {
+    return {
+      error: t("admin.general.generalSettingsForm.freeMailDomain", {
+        domain: free,
       }),
       saved: null,
     };

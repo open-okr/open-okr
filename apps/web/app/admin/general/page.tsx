@@ -3,6 +3,7 @@ import {
   deploymentInstanceName,
   isCloudEnabled,
   readInstanceName,
+  readRegistrationPolicy,
   readUpdateCheck,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
@@ -17,6 +18,7 @@ import { ConsoleMailNotice } from "./console-mail-notice";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
 import { InstanceNameCard } from "./instance-name-card";
+import { RegistrationCard } from "./registration-card";
 import { SetupCard } from "./setup-card";
 import { UpdateCheckCard } from "./update-check-card";
 import { WorkspaceStateCard } from "./workspace-state-card";
@@ -54,6 +56,11 @@ export default async function GeneralSettingsPage() {
   const instanceName = cloud
     ? null
     : await readInstanceName(getPool()).catch(() => null);
+  // Who may register (docs/design/registration-policy.md). Absent on a cloud
+  // like the name, and left out rather than failing the page.
+  const registration = cloud
+    ? null
+    : await readRegistrationPolicy(getPool()).catch(() => null);
   // docs/design/version-footer.md §4. Absent on a managed cloud, like the
   // name, and left out rather than failing the page when it cannot be read.
   const updateCheck = cloud
@@ -85,6 +92,12 @@ export default async function GeneralSettingsPage() {
           name={instanceName.value}
           source={instanceName.source}
           deploymentName={deploymentInstanceName()}
+        />
+      ) : null}
+      {registration ? (
+        <RegistrationCard
+          policy={registration.value}
+          source={registration.source}
         />
       ) : null}
       {updateCheck ? <UpdateCheckCard enabled={updateCheck.value} /> : null}
