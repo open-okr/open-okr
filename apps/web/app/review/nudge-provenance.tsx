@@ -138,7 +138,7 @@ export function NudgeProvenance({
           <div className="flex flex-wrap items-center gap-2">
             <a
               href={`/method/${nudge.ruleKey}`}
-              className="text-xs font-semibold text-brand-text hover:underline"
+              className="inline-flex min-h-6 items-center text-xs font-semibold text-brand-text hover:underline"
             >
               {t("review.nudgeProvenance.seeTheRule")}
             </a>
@@ -155,7 +155,7 @@ export function NudgeProvenance({
                   setBusy(null);
                 }
               }}
-              className="rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
+              className="min-h-6 rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
             >
               {busy === nudge.id
                 ? t("review.nudgeProvenance.snoozing")

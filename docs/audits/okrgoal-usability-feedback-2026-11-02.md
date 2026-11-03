@@ -198,4 +198,10 @@ Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Cham
 | D8 | A trigger's rule page is titled with the rule's name, with the key under it |
 | G2, IN1 | "Any" reads "All" on the Goals and Initiatives filter rows |
 
+| D5 | The annual strategy inputs are full width below 768px. Not opened in the browser: still no annual cycle locally |
+| D6 | To do wraps its counters under the title, and each item's due label and action under its text on a phone (browser, 375: titles 291px) |
+| N2 | Not a defect: Goals fields carry `data-text-first`, and `globals.css` makes them 16px on focus, which is when Safari decides to zoom. The audit measured them at rest |
+| N3 | "See the rule", "Snooze for a week", the KPI tree "Open" and "Add driver", the phase 4 "Open", and the Goals inline fields are at least 24px tall on a phone (browser: no Goals field under 24px at 375) |
+| N4 | The Draft OKRs card header wraps its actions under the title (browser, 375: titles 309px) |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

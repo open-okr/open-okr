@@ -99,8 +99,10 @@ export default async function ReviewPage() {
       <AreaTabs area="updates" current="/review" t={t} />
       <div className="flex flex-col gap-4.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+          {/* Wraps below about 360px of title, rather than squeezing it to
+           * one word a line beside the counters (usability review D6). */}
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col">
               <h1 className="text-lg font-bold text-ink">
                 {t("common.whatYouOwe")}
               </h1>
@@ -108,7 +110,7 @@ export default async function ReviewPage() {
                 {t("review.computedOnTheServer")}
               </p>
             </div>
-            <div className="flex flex-none items-center gap-3.5">
+            <div className="flex flex-wrap items-center gap-3.5">
               <Count
                 label={t("review.overdue")}
                 value={inbox.counts.overdue}
@@ -294,7 +296,7 @@ function Row({
         obligation.proposal ? `proposal-${obligation.proposal.id}` : undefined
       }
     >
-      <CardBody className="flex items-start justify-between gap-3.5 py-2.5">
+      <CardBody className="flex flex-wrap items-start justify-between gap-3.5 py-2.5">
         <span
           aria-hidden="true"
           className={
@@ -325,7 +327,9 @@ function Row({
             />
           ) : null}
         </div>
-        <span className="flex flex-none items-center gap-2.5">
+        {/* Under the text on a phone, so the title keeps the row's width
+         * (usability review D6). */}
+        <span className="flex flex-none items-center gap-2.5 max-sm:basis-full max-sm:justify-end">
           <span
             className={
               overdue

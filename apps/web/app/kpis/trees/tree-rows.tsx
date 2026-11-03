@@ -221,7 +221,7 @@ export async function KpiTreeRows({
               ) : null}
               <Link
                 href={`/kpis/${node.id}`}
-                className="text-xs font-medium text-ink-3 hover:text-ink hover:underline"
+                className="inline-flex min-h-6 items-center text-xs font-medium text-ink-3 hover:text-ink hover:underline"
               >
                 {t("common.open")}
               </Link>
@@ -229,7 +229,7 @@ export async function KpiTreeRows({
                 <Link
                   href={addDriverHref(node.id)}
                   scroll={false}
-                  className="text-xs font-semibold text-brand-text hover:underline"
+                  className="inline-flex min-h-6 items-center text-xs font-semibold text-brand-text hover:underline"
                 >
                   {t("kpis.trees.addDriver")}
                 </Link>

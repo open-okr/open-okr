@@ -252,8 +252,10 @@ export async function Drafting({
 
       {goals.map((goal) => (
         <Card key={goal.id}>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+          {/* The actions wrap under the title rather than squeezing it to a
+           * few characters (usability review N4). */}
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-64 flex-col">
               <h2 className="text-sm font-bold text-ink">{goal.title}</h2>
               <p className="text-xs text-ink-3">
                 {goal.reviewer
@@ -268,7 +270,7 @@ export async function Drafting({
                     })}
               </p>
             </div>
-            <span className="flex flex-none items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               <Chip tone={HEALTH_TONE[goal.health] ?? "neutral"}>
                 {healthWord(t, goal.health)}
               </Chip>
@@ -276,7 +278,7 @@ export async function Drafting({
                 <SuggestParent goalId={goal.id} />
               ) : null}
               <a
-                className="text-xs text-brand-text underline"
+                className="inline-flex min-h-6 items-center text-xs text-brand-text underline"
                 href={`/goals/${goal.id}`}
               >
                 {t("cycle.drafting.open")}
