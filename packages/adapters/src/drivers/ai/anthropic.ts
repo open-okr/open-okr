@@ -9,6 +9,11 @@
  * response format either; `extract()` gets the same effect by forcing
  * exactly one tool call whose `input_schema` is the caller's schema, since a
  * forced tool call's only legal output is that tool's arguments.
+ *
+ * `temperature` is never sent. The SDK speaks API version 2026-10-21, which
+ * refuses `temperature`, `top_p` and `top_k` on every model, and Claude 4.7
+ * and later refused them before that. So a request's `temperature`, and the
+ * sampling a workspace sets per tier, do not reach Anthropic models.
  */
 import Anthropic from "@anthropic-ai/sdk";
 import {
@@ -146,7 +151,6 @@ export class AnthropicProvider implements AIProvider {
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system,
       messages: toMessages(rest),
-      temperature: request.temperature,
     });
     return fromMessage(message);
   }
@@ -158,7 +162,6 @@ export class AnthropicProvider implements AIProvider {
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system,
       messages: toMessages(rest),
-      temperature: request.temperature,
       stream: true,
     });
     for await (const event of stream) {
@@ -180,7 +183,6 @@ export class AnthropicProvider implements AIProvider {
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system,
       messages: toMessages(rest),
-      temperature: request.temperature,
       tools: request.tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
@@ -203,7 +205,6 @@ export class AnthropicProvider implements AIProvider {
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system,
       messages: toMessages(rest),
-      temperature: request.temperature,
       tools: [
         {
           name: "extract",
