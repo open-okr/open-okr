@@ -10,9 +10,10 @@ import {
   TRIGGER_CATALOGUE,
   type Trigger,
 } from "@openokr/method";
-import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { AgentFace, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { faceForTrigger } from "../../../lib/agent-moods.ts";
 import { methodDocumentUrl } from "../../../lib/app-version";
 import { getTranslations } from "../../../lib/translations";
 
@@ -200,21 +201,33 @@ export default async function RulePage({
  */
 async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
   const { t } = await getTranslations();
+  const owner =
+    trigger.owner === "coach"
+      ? t("method.detail.okrCoach")
+      : t("method.detail.okrChampion");
+  // The face the message wears in the inbox, so the two read as one sender.
+  const face = faceForTrigger(trigger.key);
 
   return (
     <div className="flex w-full flex-col gap-3.5">
       <Card>
         <CardHeader className="justify-between">
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
-            <p className="text-xs text-ink-3">
-              {t("method.detail.proactiveMessageAiNativePlan", {
-                Champion:
-                  trigger.owner === "coach"
-                    ? t("method.detail.okrCoach")
-                    : t("method.detail.okrChampion"),
-              })}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            {face ? (
+              <AgentFace
+                agent={face.agent}
+                mood={face.mood}
+                className="size-9"
+              />
+            ) : null}
+            <div className="flex min-w-0 flex-col">
+              <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
+              <p className="text-xs text-ink-3">
+                {t("method.detail.proactiveMessageAiNativePlan", {
+                  Champion: owner,
+                })}
+              </p>
+            </div>
           </div>
           <Chip tone={trigger.escalates ? "warn" : "neutral"}>
             {trigger.escalates

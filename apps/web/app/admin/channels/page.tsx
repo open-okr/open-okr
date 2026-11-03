@@ -108,7 +108,7 @@ export default async function ChannelsPage() {
     // Said rather than hidden. Somebody who cannot install a provider should
     // know the product has them and who to ask.
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.channels.notificationsAndChannels")}
         </h1>
@@ -122,7 +122,7 @@ export default async function ChannelsPage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -164,13 +164,15 @@ export default async function ChannelsPage() {
   const attempt = new Date().toISOString();
 
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.channels.notificationsAndChannels")}
-      </h1>
-      <p className="text-xs text-ink-3">
-        {t("admin.channels.emailAlwaysWorksAnd")}
-      </p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.channels.notificationsAndChannels")}
+        </h1>
+        <p className="text-xs text-ink-3">
+          {t("admin.channels.emailAlwaysWorksAnd")}
+        </p>
+      </div>
 
       {whatsAppConnected ? (
         <Card>
@@ -464,7 +466,7 @@ export default async function ChannelsPage() {
           )}
         </CardBody>
       </Card>
-    </>
+    </div>
   );
 }
 
