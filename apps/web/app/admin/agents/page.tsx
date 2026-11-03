@@ -94,7 +94,7 @@ export default async function AgentsPage() {
 
   if (level < ACCESS_LEVELS.full) {
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <h1 className="text-lg font-bold text-ink">
           {t("admin.agents.agentsAndRuns")}
         </h1>
@@ -105,7 +105,7 @@ export default async function AgentsPage() {
             </p>
           </CardBody>
         </Card>
-      </>
+      </div>
     );
   }
 
@@ -147,11 +147,13 @@ export default async function AgentsPage() {
   );
 
   return (
-    <>
-      <h1 className="text-lg font-bold text-ink">
-        {t("admin.agents.agentsAndRuns")}
-      </h1>
-      <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-lg font-bold text-ink">
+          {t("admin.agents.agentsAndRuns")}
+        </h1>
+        <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
+      </div>
 
       <RunControls drafting={drafting} />
 
@@ -310,6 +312,6 @@ export default async function AgentsPage() {
           )}
         </CardBody>
       </Card>
-    </>
+    </div>
   );
 }
