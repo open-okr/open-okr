@@ -31,14 +31,14 @@ Status on 3 November 2026, after the fixes on branch `agung`. Each row in sectio
 | Area | Items | Fixed | Partial | Open |
 |---|---|---|---|---|
 | Welcome wizard | 5 | 5 | 0 | 0 |
-| Overview (Work Map) and tour | 6 | 4 | 1 | 1 |
+| Overview (Work Map) and tour | 6 | 6 | 0 | 0 |
 | Updates (Inbox, Review), Search | 4 | 4 | 0 | 0 |
-| Cycle | 7 | 4 | 3 | 0 |
-| Scorecard | 1 | 0 | 1 | 0 |
-| OKRs (Goals) | 4 | 3 | 1 | 0 |
-| KPIs | 5 | 3 | 2 | 0 |
-| Topbar, Initiatives, Board, Teams | 6 | 5 | 1 | 0 |
-| **Reviewer items** | **38** | **28** | **9** | **1** |
+| Cycle | 7 | 6 | 1 | 0 |
+| Scorecard | 1 | 1 | 0 | 0 |
+| OKRs (Goals) | 4 | 3 | 0 | 0, and G4 won't fix |
+| KPIs | 5 | 5 | 0 | 0 |
+| Topbar, Initiatives, Board, Teams | 6 | 6 | 0 | 0 |
+| **Reviewer items** | **38** | **36** | **1** | **0, and 1 won't fix** |
 | Found by this audit, not in the review | 5 | 4 | | 0 (N2 is not a defect) |
 | Defects D1 to D9 | 9 | 9 | | 0 |
 | Owner decisions Q1 to Q8 | 8 | 8 decided and built | | 0 |
@@ -92,8 +92,8 @@ Files: `apps/web/app/work-map-header.tsx`, `work-map-screen.tsx`, `work-map.tsx`
 | O1 | "On track 50%" orange with no explanation; "Outdated 0 goals"; "Alignment 100%" needs a tooltip | **Fixed** (ff7b2d5c, e73b7aa0) | Nothing left |
 | O2 | The root space shows as a team tab; nine tabs overflow; "Company" tab, divider, "Team: All" dropdown | **Fixed** (0385402b) | Nothing left |
 | O3 | Periods out of order (the annual cycle between Q2 and Q1); use a dropdown | **Fixed** (0385402b) | Nothing left |
-| O4 | Indent-only nesting; "High 0.8"; "99.95 of 100 %"; "101 of 95 $"; "Champion" header; relative dates; narrower columns | **Partial** (ff7b2d5c, 0c03fdfd) | Done: Owner header, High, 8 in 10. Left: indent-only nesting, unit spacing, relative dates |
-| O4a | Maintain KR shows target 100, not the 99.9 floor | **Open** | Left: check the seed's maintain key result |
+| O4 | Indent-only nesting; "High 0.8"; "99.95 of 100 %"; "101 of 95 $"; "Champion" header; relative dates; narrower columns | **Fixed** (ff7b2d5c, 0c03fdfd, 49a2b7f8) | Nothing left. Dates stay relative only within 7 days and absolute after, by design (`date-format.ts`) |
+| O4a | Maintain KR shows target 100, not the 99.9 floor | **Fixed** (no change needed) | Nothing left. The seed stores the band 99.9 to 100 as baseline and target, and the Work Map reads it as a band (`goal-nodes.ts`) |
 | T1 | Tour highlight looks like focus; card stays at the top; dim and anchor; scroll into view; hide Back on step 1 | **Fixed** (02e97c48) | Nothing left |
 
 ## 5. Updates (Inbox and Review), Search
@@ -111,19 +111,19 @@ The Cycle screen is now three columns: phase rail, the phase, and a quality pane
 
 | ID | Phase | Reviewer asks | Status | Still to fix |
 |---|---|---|---|---|
-| C1 | Switcher | "Open" as a button labelled "View"; narrower select | **Partial** | Left: the button still reads Open, not View |
+| C1 | Switcher | "Open" as a button labelled "View"; narrower select | **Fixed** (49a2b7f8) | Nothing left |
 | C2 | 0, Annual strategy | Widen or stack both inputs; fix mobile | **Fixed** (1c05b1e9) | Nothing left |
 | C3 | 1, Prepare | Input stretches so Save aligns right | **Fixed** (no change needed) | Nothing left |
 | C4 | 2, Diagnose | Editors in a tiny one-line box | **Fixed** (6b2969f0) | Nothing left |
 | C5 | 4, Draft OKRs | Each objective collapsible | **Fixed** (6afac778) | Nothing left |
-| C6 | 6, Run the cadence | "Still needed" per team; sessions grouped by team with filters; KRs under objective; lowercase labels | **Partial** (6f4b2513, 72e3bbbe) | Done: lowercase labels, grouping by space and objective, gaps one per line. Left: team filters |
-| C7 | 7, Review and learn | Gaps per team; summary and bands side by side; KRs grouped; team filter on Sessions | **Partial** (6b2969f0, 72e3bbbe) | Done: summary beside bands, key results grouped. Left: gaps per team, team filter on Sessions |
+| C6 | 6, Run the cadence | "Still needed" per team; sessions grouped by team with filters; KRs under objective; lowercase labels | **Fixed** (6f4b2513, 72e3bbbe, 49a2b7f8) | Nothing left. A space picker on Running the cadence (`?team=`) |
+| C7 | 7, Review and learn | Gaps per team; summary and bands side by side; KRs grouped; team filter on Sessions | **Partial** (6b2969f0, 72e3bbbe, 49a2b7f8) | Done: summary beside bands, key results grouped, space filter on Sessions. Left: phase 7 gaps per team, which the method's phase 7 does not break down by space |
 
 ## 7. Scorecard
 
 | ID | Reviewer asks | Status | Still to fix |
 |---|---|---|---|
-| SC1 | "N added mid-cycle" as a grey pill beside the cycle name; "Close a cycle out" and "Points" side by side | **Partial** (6b2969f0) | Done: the mid-cycle chip beside the cycle name. Left: Close and Points side by side |
+| SC1 | "N added mid-cycle" as a grey pill beside the cycle name; "Close a cycle out" and "Points" side by side | **Fixed** (6b2969f0, 49a2b7f8) | Nothing left |
 
 ## 8. OKRs (Goals > OKRs)
 
@@ -134,7 +134,7 @@ Revamped on 2 November 2026 (`89443a42`, `96b2089a`).
 | G1 | "12 goals" chip beside "Objectives: 12"; "+" unclear | **Fixed** (ff7b2d5c) | Nothing left |
 | G2 | Filters: no "\|"; sentence case; "Any" to "All"; "Kind" to "Type"; "Space" to "Team"; what is "Closed" | **Fixed** (6f4b2513, 8c204380) | Nothing left |
 | G3 | Objectives only by default; red OBJ-5; "Space" to "Team"; due date twice | **Fixed** (6afac778) | Nothing left |
-| G4 | Three date formats on one page | **Partial** (6b2969f0) | Left: the native date input follows the browser's locale |
+| G4 | Three date formats on one page | **Won't fix** | The native date input follows the browser's locale. Changing it means a date picker of our own; every date the product writes reads one way |
 
 ## 9. KPIs, Topbar, Initiatives, Board, Teams
 
@@ -142,12 +142,12 @@ Revamped on 2 November 2026 (`89443a42`, `96b2089a`).
 |---|---|---|---|
 | K1 | Lowercase frequency and state; "All" and "Uncategorised" both selected | **Fixed** (6f4b2513) | Nothing left |
 | K2 | Row meta and "recovering" misaligned; footer hint misaligned | **Fixed** (6f4b2513) | Nothing left |
-| K3 | Tree connector lines or chevrons; check the stack | **Partial** | Left: chevrons, and the stack checked on a large tree |
-| K4 | Recovery board: sentence case; progress bar placement | **Partial** (6f4b2513) | Done: sentence case. Left: the progress bar placement |
+| K3 | Tree connector lines or chevrons; check the stack | **Fixed** (761b450b) | Nothing left. Elbow connectors from the KPI redesign; checked on a three-level tree |
+| K4 | Recovery board: sentence case; progress bar placement | **Fixed** (6f4b2513, 761b450b) | Nothing left. The bar became the corridor in the approved KPI redesign |
 | K5 | Trees: "watch", "open", "add driver" | **Fixed** (6f4b2513) | Nothing left |
 | TB1 | "+ New" lacks context; collapsible sidebar | **Fixed** (d8404db9) | Nothing left |
 | IN1 | Team filter as a dropdown; "Any" to "All" | **Fixed** (6f4b2513, 6afac778) | Nothing left |
-| IN2 | Long unbroken title overflows; selects and "Watch this" in one row | **Partial** | Left: test with a 200-character title |
+| IN2 | Long unbroken title overflows; selects and "Watch this" in one row | **Fixed** (49a2b7f8) | Nothing left. Tested with a 200-character title: the list holds the title to 8/12 and wraps it, the detail header wraps (21px to 309px at 375) |
 | IN3 | Styled file button | **Fixed** (6b2969f0) | Nothing left |
 | B1 | Delete on a Board card | **Fixed** (02e97c48) | Nothing left |
 | TM1 | New team: one row; "Create team" | **Fixed** (6b2969f0) | Nothing left |
@@ -246,14 +246,9 @@ Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` 
 
 | Item | What is left |
 |---|---|
-| C1 | The cycle switcher's button still reads Open, not View |
-| C6, C7 | A team filter on the cadence lists and on Sessions (`?space=`), and phase 7 gaps per team |
-| SC1 | Close a cycle out and Points side by side |
-| G4 | The native date input follows the browser's locale |
-| K3, K4 | KPI tree chevrons and a large-tree check; the recovery card's progress bar placement |
-| O4, O4a | Indent-only nesting on the Work Map, unit spacing, relative dates; the maintain KR seed check |
-| IN2 | Needs an initiative with a 200-character title to test |
-| Follow-ups | The reference mockups in `docs/mockups/src` and the spreadsheet import templates still say Champion |
+| C7 | Phase 7 gaps per team: the method's phase 7 reports "not every key result is scored" for the whole cycle, with no breakdown by space. Needs a change in `packages/method` workflow |
+| G4 | Won't fix: the native date input follows the browser's locale |
+| Follow-ups | The reference mockups in `docs/mockups/src` (ten files) still draw "Champion". The spreadsheet import template's goal column is the field `champion`; "owner" is accepted as a header |
 
 Decided and built after the first pass: Q7 (`e73b7aa0`, the on-track share band in METHOD.md §3.5 and §11), Q8 (`8c204380`, Kind reads Type), I1 (`6f01dbb3`, `notifications.reasonCounts` and counts on Activity's pills).
 
