@@ -135,13 +135,13 @@ export function buildReport(input: {
       // so the report says what everything took.
       ...(input.selected?.includes("objectives")
         ? [
-            "FlowyTeam does not say what kind of promise an objective is, or what kind a key result is. Every objective arrives as the workspace's default kind, aspirational unless it uses committed OKRs only, and every key result as a metric, or as a maintain where its baseline and target are the same number (METHOD.md §2.8, §2.10). Mark the commitments, milestones and baselines in the product.",
+            "FlowyTeam does not say what kind of promise an objective is, or what kind a key result is. Every objective arrives as the workspace's default kind, aspirational unless it uses committed OKRs only, and every key result as a metric, or as a maintain where its baseline and target are the same number. Mark the commitments, milestones and baselines in the product.",
           ]
         : []),
       ...(input.extraNotes ?? []),
       ...(input.company.timezone
         ? [
-            `The company's timezone is ${input.company.timezone}. It is offered as an edit to the workspace and never applied silently (TECHNICAL-PLAN §7.2).`,
+            `The company's timezone is ${input.company.timezone}. It is offered as an edit to the workspace and never applied silently.`,
           ]
         : []),
     ],

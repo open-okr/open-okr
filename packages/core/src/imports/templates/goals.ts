@@ -55,7 +55,7 @@ export const goalsTemplate: EntityTemplate = {
     },
     {
       field: "kind",
-      describe: `One of: ${GOAL_KINDS.join(", ")} (METHOD.md §2.8). The workspace's default if the file does not say.`,
+      describe: `One of: ${GOAL_KINDS.join(", ")}. The workspace's default if the file does not say.`,
       aliases: ["kind", "okrKind", "promise", "commitment"],
       required: false,
       example: "aspirational",

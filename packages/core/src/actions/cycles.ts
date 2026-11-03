@@ -851,7 +851,7 @@ const thresholdDescriptor = z.object({
 export const readRhythmSettings = defineReadAction({
   name: "rhythm.read",
   summary:
-    "The METHOD.md §11 registry as this workspace resolves it, with its deviations and its terminology.",
+    "The practice thresholds as this workspace resolves them, with its deviations and its terminology.",
   input: z.object({}),
   output: z.object({
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES),
@@ -922,7 +922,7 @@ export const readRhythmSettings = defineReadAction({
 export const updateRhythmSettings = defineWriteAction({
   name: "rhythm.update",
   summary:
-    "Changes this workspace's deviations from the §11 canon, or its terminology.",
+    "Changes this workspace's deviations from the method's thresholds, or its terminology.",
   input: z.object({
     defaultCheckInFrequency: z.enum(CHECK_IN_FREQUENCIES).optional(),
     checkInAnchorDay: z.number().int().min(1).max(7).optional(),
@@ -1458,7 +1458,7 @@ export const setAnnualFrame = defineWriteAction({
           if (!input.reason) {
             throw new OperationError(
               "forbidden",
-              "This year's frame is agreed, so a revision needs a written reason (METHOD.md §2.1): what changed, and why it changes now.",
+              "This year's frame is agreed, so a revision needs a written reason: what changed, and why it changes now.",
             );
           }
           const before = Object.fromEntries(
@@ -1888,7 +1888,7 @@ const feedForwardOutput = z.object({
 export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
-    "Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
+    "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
   input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
   output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,

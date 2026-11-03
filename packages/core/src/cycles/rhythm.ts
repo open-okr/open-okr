@@ -175,7 +175,7 @@ export function validateRhythmPatch(patch: RhythmPatch): RhythmValidation {
         if (!isThresholdKey(key)) {
           problems.push({
             key,
-            message: `"${key}" is not a threshold in the METHOD.md §11 registry, so there is nothing to reset.`,
+            message: `"${key}" is not a threshold this practice has, so there is nothing to reset.`,
           });
           continue;
         }

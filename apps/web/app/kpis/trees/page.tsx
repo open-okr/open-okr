@@ -311,20 +311,6 @@ export default async function KpiTreesPage({
           </CardBody>
         </Card>
       ) : null}
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("common.notHereYet")}
-          </h2>
-        </CardHeader>
-        <CardBody>
-          <ul className="flex flex-col gap-1 text-xs text-ink-3">
-            <li>{t("kpis.trees.theRightHandPanel")}</li>
-            <li>{t("kpis.trees.draggingANodeOnto")}</li>
-          </ul>
-        </CardBody>
-      </Card>
     </div>
   );
 }

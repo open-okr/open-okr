@@ -699,8 +699,7 @@ export const readWorkflow = defineReadAction({
 
 export const setPackItem = defineWriteAction({
   name: "workflow.setPackItem",
-  summary:
-    "Marks one of the seven §2.6 input-pack items gathered, with a note.",
+  summary: "Marks one of the seven input-pack items gathered, with a note.",
   input: z.object({
     cycleId: z.uuid(),
     itemKey: z.number().int().min(1).max(INPUT_PACK_ITEMS.length),
@@ -757,7 +756,7 @@ export const setPackItem = defineWriteAction({
 export const distributePack = defineWriteAction({
   name: "workflow.distributePack",
   summary:
-    "Records that the input pack reached people, which the §2.6 lead time is measured from.",
+    "Records that the input pack reached people, which the input pack's lead time is measured from.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.object({ distributedAt: z.string() }),
   access: ACCESS_LEVELS.edit,
@@ -1000,7 +999,7 @@ export const setRevalidation = defineWriteAction({
       (value) => !(value.changed && documentOfInput(value.changeNote) === null),
       {
         message:
-          "A frame recorded as changed needs a note saying what changed (§2.1: it holds, or it changes with a documented reason)",
+          "A frame recorded as changed needs a note saying what changed: it holds, or it changes with a documented reason",
       },
     ),
   output: z.object({ cycleId: z.uuid() }),
@@ -1072,7 +1071,7 @@ export const setRevalidation = defineWriteAction({
 export const setBaselineHealth = defineWriteAction({
   name: "workflow.setBaselineHealth",
   summary:
-    "Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual.",
+    "Records phase 2's KPI reading in its three columns: stable, declining, business as usual.",
   input: z.object({
     cycleId: z.uuid(),
     stable: cycleNote.optional(),
@@ -1151,7 +1150,7 @@ export const setBaselineHealth = defineWriteAction({
 export const setCapacityNotes = defineWriteAction({
   name: "workflow.setCapacityNotes",
   summary:
-    "Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked).",
+    "Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked.",
   input: z.object({ cycleId: z.uuid(), cuts: cycleNote }),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
@@ -1223,8 +1222,7 @@ export const setCapacityNotes = defineWriteAction({
  */
 export const setFocusKeyResults = defineWriteAction({
   name: "workflow.setFocusKeyResults",
-  summary:
-    "Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3).",
+  summary: "Chooses which of the year's key results a quarter focuses on.",
   input: z.object({
     cycleId: z.uuid(),
     keyResultIds: z.array(z.uuid()).max(50),

@@ -50,7 +50,10 @@ export interface ThresholdParameter<T> {
   readonly group: ThresholdGroup;
   /** What §11's own table calls it, so the two can be read side by side. */
   readonly label: string;
-  /** The METHOD.md section that defines the behaviour, not just §11's table. */
+  /**
+   * The METHOD.md section that defines the behaviour, not just §11's table.
+   * Its number alone, "7.1": the API returns it and a reader never sees "§".
+   */
   readonly section: string;
   /** One line on why this default is the right one to ship. */
   readonly why: string;
@@ -108,7 +111,7 @@ export const THRESHOLDS = {
   "cadence.checkInFrequency": param({
     group: "cadence",
     label: "Check-in frequency",
-    section: "§7.1",
+    section: "7.1",
     why: "Weekly. The rhythm is the product (principle 5), and a week is short enough to act on and long enough to have moved.",
     default: "weekly" as CheckInFrequency,
     schema: z.enum(CHECK_IN_FREQUENCIES),
@@ -116,7 +119,7 @@ export const THRESHOLDS = {
   "cadence.anchorDay": param({
     group: "cadence",
     label: "Check-in anchor day",
-    section: "§7.1",
+    section: "7.1",
     why: "Monday, so the week is planned rather than reported on after the fact.",
     default: 1,
     schema: z.union([
@@ -132,7 +135,7 @@ export const THRESHOLDS = {
   "cadence.toleranceDays": param({
     group: "cadence",
     label: "Cadence tolerance",
-    section: "§7.1",
+    section: "7.1",
     why: "One day either side of the due date, so a check-in a day early or late does not double-advance the rhythm or count as missed.",
     default: 1,
     schema: wholeDays,
@@ -140,7 +143,7 @@ export const THRESHOLDS = {
   "cadence.stalenessGraceDays": param({
     group: "cadence",
     label: "Staleness grace",
-    section: "§3.5",
+    section: "3.5",
     why: "Three days past the due date, after which the goal reads outdated. Neglect must be visible (principle 8), and three days is late rather than busy.",
     default: 3,
     schema: wholeDays,
@@ -148,7 +151,7 @@ export const THRESHOLDS = {
   "cadence.checkInLadderDays": param({
     group: "cadence",
     label: "Check-in escalation ladder",
-    section: "§11",
+    section: "11",
     // The sponsor step is conditional, as METHOD §11 and `escalation.ts` say;
     // this sentence named it unconditionally until the OKRGoal UX review.
     why: "Champion at due, champion again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
@@ -162,7 +165,7 @@ export const THRESHOLDS = {
   "cadence.acknowledgementLadderDays": param({
     group: "cadence",
     label: "Acknowledgement ladder",
-    section: "§11",
+    section: "11",
     why: "The reviewer is nudged one day after publication and escalated at three. A check-in nobody acknowledged is a loop left open.",
     default: { nudge: 1, escalate: 3 },
     schema: z.object({ nudge: wholeDays, escalate: wholeDays }),
@@ -170,7 +173,7 @@ export const THRESHOLDS = {
   "cadence.acknowledgementWindowDays": param({
     group: "cadence",
     label: "Acknowledgement window",
-    section: "§11",
+    section: "11",
     why: "A check-in nobody acknowledged within this many days lapses: it leaves Review and the ladder stops asking. It is history by then, and a backlog nobody can clear teaches people to ignore the list.",
     default: 14,
     schema: wholeDays,
@@ -178,15 +181,15 @@ export const THRESHOLDS = {
   "cadence.blockerLadderDays": param({
     group: "cadence",
     label: "Blocker ladder",
-    section: "§11",
-    why: "A blocker's next action is due by the next check-in of the goal it blocks (§7.3). The owner is reminded this many days before that check-in, and the coordinator hears when it passes with the action still open.",
+    section: "11",
+    why: "A blocker's next action is due by the next check-in of the goal it blocks. The owner is reminded this many days before that check-in, and the coordinator hears when it passes with the action still open.",
     default: { reminder: 1 },
     schema: z.object({ reminder: wholeDays }),
   }),
   "cadence.nudgeDeduplicationHours": param({
     group: "cadence",
     label: "Nudge deduplication window",
-    section: "§11",
+    section: "11",
     why: "One nudge per subject per member per day unless the escalation step increases. The alternative is a product nobody reads.",
     default: 24,
     schema: positiveHours,
@@ -194,7 +197,7 @@ export const THRESHOLDS = {
   "cadence.nudgeCeilingPerWeek": param({
     group: "cadence",
     label: "Nudge volume ceiling",
-    section: "§11",
+    section: "11",
     why: "Five per member per week, so noise is bounded and measurable rather than emergent. Anything past it waits for the member's next daily digest.",
     default: 5,
     schema: z.number().int().min(0).max(200),
@@ -202,7 +205,7 @@ export const THRESHOLDS = {
   "cadence.dueSoonLeadDays": param({
     group: "cadence",
     label: "Due-soon lead",
-    section: "§11",
+    section: "11",
     why: "One day before the anchor day. Long enough to act on, short enough not to be forgotten.",
     default: 1,
     schema: wholeDays,
@@ -210,7 +213,7 @@ export const THRESHOLDS = {
   "cadence.planningOpenLeadWeeks": param({
     group: "cadence",
     label: "Planning-open lead",
-    section: "§2.4",
+    section: "2.4",
     why: "Six weeks before an annual cycle starts, four before a quarterly. Planning that starts in the cycle it plans is already late.",
     default: { annual: 6, quarterly: 4 },
     schema: z.object({
@@ -221,7 +224,7 @@ export const THRESHOLDS = {
   "cadence.teamPublicationWindowWeeks": param({
     group: "cadence",
     label: "Team publication window",
-    section: "§2.9",
+    section: "2.9",
     why: "Two weeks after the cycle starts. Company OKRs publish before day one and team OKRs in the first fortnight, which is when most published cycles share them; an OKR created after it is marked as added mid-cycle.",
     default: 2,
     schema: z.number().int().min(0).max(13),
@@ -229,7 +232,7 @@ export const THRESHOLDS = {
   "cadence.publicationCountdownDays": param({
     group: "cadence",
     label: "Publication deadline countdown",
-    section: "§11",
+    section: "11",
     why: "Fourteen, seven and one days before the deadline. Three reminders spaced so the last one is still actionable.",
     default: [14, 7, 1],
     schema: z.array(wholeDays).min(1).max(6),
@@ -237,7 +240,7 @@ export const THRESHOLDS = {
   "cadence.reviewPreparationLeadWeeks": param({
     group: "cadence",
     label: "Review preparation lead",
-    section: "§11",
+    section: "11",
     why: "Two weeks before the cycle ends, so scoring is prepared rather than improvised in the room.",
     default: 2,
     schema: z.number().int().min(0).max(52),
@@ -247,7 +250,7 @@ export const THRESHOLDS = {
   "scoring.confidenceHigh": param({
     group: "scoring",
     label: "Confidence high boundary",
-    section: "§3.2",
+    section: "3.2",
     why: "0.7 and above is high: move on to the next key result.",
     default: 0.7,
     schema: unit,
@@ -255,7 +258,7 @@ export const THRESHOLDS = {
   "scoring.confidenceLow": param({
     group: "scoring",
     label: "Confidence low boundary",
-    section: "§3.2",
+    section: "3.2",
     why: "Below 0.4 is low: a next action due by the next check-in, with an owner, and a blocker where something is actually blocked. A key result that falls below it tells the coordinator.",
     default: 0.4,
     schema: unit,
@@ -263,7 +266,7 @@ export const THRESHOLDS = {
   "scoring.confidenceCritical": param({
     group: "scoring",
     label: "Critical confidence",
-    section: "§3.2",
+    section: "3.2",
     why: "0.3 and below reaches the sponsor the same day, only where the workspace turns critical escalation on.",
     default: 0.3,
     schema: unit,
@@ -275,7 +278,7 @@ export const THRESHOLDS = {
   "scoring.aspirationalDraftTarget": param({
     group: "scoring",
     label: "Aspirational draft target",
-    section: "§3.2",
+    section: "3.2",
     why: "About 5 in 10 when an aspirational key result is drafted: a difficult number you are half sure of.",
     default: 0.5,
     schema: unit,
@@ -283,7 +286,7 @@ export const THRESHOLDS = {
   "scoring.draftSandbagging": param({
     group: "scoring",
     label: "Draft near-certain threshold",
-    section: "§3.2",
+    section: "3.2",
     why: "An aspirational set averaging above 0.90 is near certain: mark it committed if it must be delivered, or raise the targets if it is a stretch.",
     default: 0.9,
     schema: unit,
@@ -291,7 +294,7 @@ export const THRESHOLDS = {
   "scoring.draftComfortable": param({
     group: "scoring",
     label: "Draft comfortable boundary",
-    section: "§3.2",
+    section: "3.2",
     why: "Above 0.70 up to 0.90 is comfortable. A stretch usually feels like 5 in 10.",
     default: 0.7,
     schema: unit,
@@ -299,7 +302,7 @@ export const THRESHOLDS = {
   "scoring.draftAmbitious": param({
     group: "scoring",
     label: "Draft moonshot boundary",
-    section: "§3.2",
+    section: "3.2",
     why: "Below 0.30 is a moonshot: make sure there is a credible path, and expect a low score.",
     default: 0.3,
     schema: unit,
@@ -307,7 +310,7 @@ export const THRESHOLDS = {
   "scoring.committedConfidenceFloor": param({
     group: "scoring",
     label: "Committed confidence floor",
-    section: "§3.2",
+    section: "3.2",
     why: "A committed key result below 0.7, drafted there or falling there at any check-in, is a risk to escalate now, or a sign it should be aspirational.",
     default: 0.7,
     schema: unit,
@@ -315,7 +318,7 @@ export const THRESHOLDS = {
   "scoring.scoreBands": param({
     group: "scoring",
     label: "Score band boundaries",
-    section: "§3.3",
+    section: "3.3",
     why: "1.0 achieved or met, 0.6 on target, 0.3 partial. 0.6 to below 1.0 is the expected range for a stretch; for a committed key result anything below 1.0 is a miss.",
     default: { achieved: 1, strong: 0.6, partial: 0.3 },
     schema: z.object({ achieved: unit, strong: unit, partial: unit }),
@@ -323,7 +326,7 @@ export const THRESHOLDS = {
   "scoring.committedExpectedScore": param({
     group: "scoring",
     label: "Committed expected score",
-    section: "§3.3",
+    section: "3.3",
     why: "A committed key result is expected to be delivered in full. Below it is a miss, and the miss is explained.",
     default: 1,
     schema: unit,
@@ -331,7 +334,7 @@ export const THRESHOLDS = {
   "scoring.aspirationalExpectedAverage": param({
     group: "scoring",
     label: "Aspirational expected average",
-    section: "§3.3",
+    section: "3.3",
     why: "Around 0.7 across a set of aspirational key results is the healthy result of a real stretch.",
     default: 0.7,
     schema: unit,
@@ -339,7 +342,7 @@ export const THRESHOLDS = {
   "scoring.portfolioVerdicts": param({
     group: "scoring",
     label: "Portfolio verdict boundaries",
-    section: "§3.4",
+    section: "3.4",
     why: "Over aspirational key results: above 0.85 the targets may not have been ambitious enough, 0.60 to 0.85 is healthy, 0.40 to 0.60 partial, below that investigate the strategy, the capacity or the cadence.",
     default: { tooSafe: 0.85, healthy: 0.6, partial: 0.4 },
     schema: z.object({ tooSafe: unit, healthy: unit, partial: unit }),
@@ -347,7 +350,7 @@ export const THRESHOLDS = {
   "scoring.closeTooSafeShare": param({
     group: "scoring",
     label: "Close too-safe pattern",
-    section: "§3.3",
+    section: "3.3",
     why: "When three quarters or more of a closed cycle's aspirational key results scored 1.0, the targets were too safe, and the next cycle's drafting should hear about it.",
     default: 0.75,
     schema: unit,
@@ -355,7 +358,7 @@ export const THRESHOLDS = {
   "scoring.rootCauseThreshold": param({
     group: "scoring",
     label: "Root-cause threshold",
-    section: "§8.4",
+    section: "8.4",
     why: "Below it a key result needs a named cause: an aspirational one below 0.6, a committed one below 1.0. Diagnose before you prescribe (principle 10).",
     default: { aspirational: 0.6, committed: 1 },
     schema: z.object({ aspirational: unit, committed: unit }),
@@ -363,7 +366,7 @@ export const THRESHOLDS = {
   "scoring.progressCeilingPct": param({
     group: "scoring",
     label: "Progress ceiling",
-    section: "§3.1",
+    section: "3.1",
     why: "100 by default, so a key result that hit its target reads as done and no further. A workspace that wants over-achievement on the page raises it, as far as the 200 already allowed for a KPI.",
     default: 100,
     // Floored at 100, not at 0. A ceiling below 100 would make a key result
@@ -376,7 +379,7 @@ export const THRESHOLDS = {
   "scoring.progressSignalPaceGaps": param({
     group: "scoring",
     label: "Progress signal pace gaps",
-    section: "§3.7",
+    section: "3.7",
     why: "Behind the progress expected for the date by more than 10 points is amber, by more than 25 is red. A young cycle is not red for being young.",
     default: { amber: 10, red: 25 },
     schema: z.object({ amber: percent, red: percent }),
@@ -384,7 +387,7 @@ export const THRESHOLDS = {
   "scoring.forecastMinimumValues": param({
     group: "scoring",
     label: "Trend forecast minimum values",
-    section: "§3.6",
+    section: "3.6",
     why: "Four values before a line is fitted. Two points make a line through anything, which is a guess presented as a projection.",
     default: 4,
     schema: z.number().int().min(2).max(52),
@@ -392,7 +395,7 @@ export const THRESHOLDS = {
   "quality.divergenceWindowWeeks": param({
     group: "quality",
     label: "Divergence window",
-    section: "§3.5",
+    section: "3.5",
     why: "Four weeks with no movement in a metric key result while its goal is reported on track: long enough for a real number to have moved, short enough to say so before the close.",
     default: 4,
     schema: z.number().int().min(1).max(26),
@@ -400,7 +403,7 @@ export const THRESHOLDS = {
   "scoring.progressSignalPass": param({
     group: "scoring",
     label: "Progress signal pass",
-    section: "§3.7",
+    section: "3.7",
     why: "For the absolute signal: green at or above 75% of the way. Shown beside health, never instead of it.",
     default: 75,
     schema: percent,
@@ -408,7 +411,7 @@ export const THRESHOLDS = {
   "scoring.progressSignalFail": param({
     group: "scoring",
     label: "Progress signal fail",
-    section: "§3.7",
+    section: "3.7",
     why: "For the absolute signal: red below 50%. Amber is everything between, which is most of a cycle.",
     default: 50,
     schema: percent,
@@ -418,15 +421,15 @@ export const THRESHOLDS = {
   "quality.coachStrictness": param({
     group: "quality",
     label: "Coach strictness",
-    section: "§4",
-    why: "Warn: each check keeps its own level from §4. Strict, for a space, raises every check on its goals to block, which is what the practice's strict mode does for the whole workspace.",
+    section: "4",
+    why: "Warn: each check keeps the level the method gives it. Strict, for a space, raises every check on its goals to block, which is what the practice's strict mode does for the whole workspace.",
     default: "warn" as CoachStrictness,
     schema: z.enum(COACH_STRICTNESS),
   }),
   "quality.wordLists": param({
     group: "quality",
     label: "Quality word lists",
-    section: "§4.1, §4.2",
+    section: "4.1, 4.2",
     why: "The lists the quality checks match on. A workspace adds its own vocabulary; the built-in terms remain, so a local addition can never disable a rule.",
     default: QUALITY_WORD_LISTS as unknown as Record<string, readonly string[]>,
     schema: z.record(z.string(), z.array(z.string())),
@@ -434,7 +437,7 @@ export const THRESHOLDS = {
   "sessions.quarterlyStageMinutes": param({
     group: "sessions",
     label: "Quarterly stage minutes",
-    section: "§8.1",
+    section: "8.1",
     why: "The quarterly session durations, eleven of them in stage order. Pacing rather than a rule: going over is normal and visible, and the facilitator lands it.",
     // Ninety minutes since P9-T20a (METHOD v2 §8.1), where it was sixty.
     default: [5, 20, 12, 5, 10, 8, 8, 4, 8, 5, 5] as readonly number[],
@@ -443,7 +446,7 @@ export const THRESHOLDS = {
   "quality.strengthScoreBands": param({
     group: "quality",
     label: "Strength score boundaries",
-    section: "§4",
+    section: "4",
     why: "Red below 45%, green at 75% and above. Amber between is a set worth another pass.",
     default: { red: 45, green: 75 },
     schema: z.object({ red: percent, green: percent }),
@@ -451,7 +454,7 @@ export const THRESHOLDS = {
   "quality.strengthScoreWarnWeight": param({
     group: "quality",
     label: "Strength score warn weight",
-    section: "§4",
+    section: "4",
     why: "Half. A warning is worth another look, not a defect, so it counts for half a pass. A product heuristic rather than a published measure.",
     default: 0.5,
     schema: unit,
@@ -459,7 +462,7 @@ export const THRESHOLDS = {
   "quality.keyResultsPerObjective": param({
     group: "quality",
     label: "Key results per objective",
-    section: "§2.7",
+    section: "2.7",
     why: "Two to five. One measure cannot prove an objective from every angle, and six is a to-do list.",
     default: { low: 2, high: 5 },
     schema: bounds(0, 20),
@@ -467,7 +470,7 @@ export const THRESHOLDS = {
   "quality.objectiveLengthLimit": param({
     group: "quality",
     label: "Objective length limit",
-    section: "§4.1",
+    section: "4.1",
     // No lower bound since P9-T02's review: whatmatters' own "Achieve fiscal
     // sustainability" is three words. The history stays here, not in the
     // sentence Admin shows (OKRGoal UX review, N7).
@@ -478,7 +481,7 @@ export const THRESHOLDS = {
   "quality.companyObjectiveCap": param({
     group: "quality",
     label: "Company objective cap",
-    section: "§2.7",
+    section: "2.7",
     why: "Five, hard. If the annual set already contains everything, no quarter can choose (principle 3).",
     default: 5,
     schema: z.number().int().min(1).max(50),
@@ -486,7 +489,7 @@ export const THRESHOLDS = {
   "quality.objectivesPerUnitCap": param({
     group: "quality",
     label: "Objectives per unit cap",
-    section: "§2.7",
+    section: "2.7",
     why: "Three per department or team. Focus is a decision, not a wish.",
     default: 3,
     schema: z.number().int().min(1).max(50),
@@ -494,7 +497,7 @@ export const THRESHOLDS = {
   "quality.contributionMinimum": param({
     group: "quality",
     label: "Contribution minimum",
-    section: "§4.3",
+    section: "4.3",
     why: "Three words. A stated contribution shorter than that names a theme rather than a goal: growth is not a priority, it is a word.",
     default: 3,
     schema: z.number().int().min(1).max(20),
@@ -502,7 +505,7 @@ export const THRESHOLDS = {
   "quality.strategicIssueMinimum": param({
     group: "quality",
     label: "Strategic issue minimum",
-    section: "§2.3",
+    section: "2.3",
     // The floor was five until 2026-08-17: it held for a mid-sized company and
     // blocked a team of eight on day one, which taught them to invent two
     // issues rather than to diagnose. No ceiling since P9-T02: the old upper
@@ -515,7 +518,7 @@ export const THRESHOLDS = {
   "quality.priorityBounds": param({
     group: "quality",
     label: "Priority bounds",
-    section: "§2.3",
+    section: "2.3",
     why: "Three to five, each with a twelve-month success statement.",
     default: { low: 3, high: 5 },
     schema: bounds(0, 50),
@@ -523,7 +526,7 @@ export const THRESHOLDS = {
   "quality.annualStrategyBounds": param({
     group: "quality",
     label: "Annual strategy bounds",
-    section: "§2.1",
+    section: "2.1",
     why: "Two to five strategic thrusts for the year.",
     default: { low: 2, high: 5 },
     schema: bounds(0, 50),
@@ -531,7 +534,7 @@ export const THRESHOLDS = {
   "quality.carryForwardIssueImpact": param({
     group: "quality",
     label: "Carry-forward issue impact",
-    section: "§8.9",
+    section: "8.9",
     why: "A carried-forward key result enters the next cycle's issue list at impact four, high enough to be looked at and short of automatic.",
     default: 4,
     schema: z.number().int().min(1).max(5),
@@ -539,7 +542,7 @@ export const THRESHOLDS = {
   "quality.inputPackLeadWorkingDays": param({
     group: "quality",
     label: "Input pack lead time",
-    section: "§2.6",
+    section: "2.6",
     why: "Three working days before session one. An incomplete pack delivered on time beats a complete pack delivered late.",
     default: 3,
     schema: wholeDays,
@@ -549,7 +552,7 @@ export const THRESHOLDS = {
   "alignment.healthyThreshold": param({
     group: "alignment",
     label: "Alignment healthy threshold",
-    section: "§5.2",
+    section: "5.2",
     why: "90% of goals below company level aligned or standing alone with a reason is healthy. Fewer than 10% without a traceable parent is the published line.",
     default: 90,
     schema: z.number().int().min(0).max(100),
@@ -557,7 +560,7 @@ export const THRESHOLDS = {
   "alignment.watchThreshold": param({
     group: "alignment",
     label: "Alignment watch threshold",
-    section: "§5.2",
+    section: "5.2",
     why: "80% to below the healthy threshold is watch. Below 80%, more than one goal in five supports nothing it names, and that is a gap.",
     default: 80,
     schema: z.number().int().min(0).max(100),
@@ -567,7 +570,7 @@ export const THRESHOLDS = {
   "kpi.healthyThreshold": param({
     group: "kpi",
     label: "KPI healthy threshold",
-    section: "§6.4",
+    section: "6.4",
     why: "90% of target and above is healthy.",
     default: 90,
     schema: percent,
@@ -575,7 +578,7 @@ export const THRESHOLDS = {
   "kpi.watchThreshold": param({
     group: "kpi",
     label: "KPI watch threshold",
-    section: "§6.4",
+    section: "6.4",
     why: "70% to below 90% is watch: watch the leading drivers. Below 70% launch a recovery OKR.",
     default: 70,
     schema: percent,
@@ -583,7 +586,7 @@ export const THRESHOLDS = {
   "kpi.recoveryKeyResultCap": param({
     group: "kpi",
     label: "Recovery key result cap",
-    section: "§6.5",
+    section: "6.5",
     why: "Four, the KPI itself included: the KPI and up to three drivers. A recovery that names more has not chosen.",
     default: 4,
     schema: z.number().int().min(1).max(20),
@@ -591,7 +594,7 @@ export const THRESHOLDS = {
   "kpi.recoveryProposalDelayPeriods": param({
     group: "kpi",
     label: "Recovery proposal delay",
-    section: "§6.5",
+    section: "6.5",
     why: "Two consecutive unhealthy periods before the coach proposes anything, so one month that slipped never generates an unsolicited OKR. A fall from healthy to unhealthy in one period is proposed at once. The draft is available for one-click launch immediately regardless.",
     default: 2,
     schema: z.number().int().min(1).max(12),
@@ -601,7 +604,7 @@ export const THRESHOLDS = {
   "sessions.weeklyMinutes": param({
     group: "sessions",
     label: "Weekly session length",
-    section: "§7.1",
+    section: "7.1",
     why: "Fifteen to thirty minutes. Long enough for four steps, short enough to hold weekly.",
     default: { low: 15, high: 30 },
     schema: bounds(1, 600),
@@ -609,7 +612,7 @@ export const THRESHOLDS = {
   "sessions.monthlyMinutes": param({
     group: "sessions",
     label: "Monthly review length",
-    section: "§7.5",
+    section: "7.5",
     why: "Thirty to sixty minutes.",
     default: { low: 30, high: 60 },
     schema: bounds(1, 600),
@@ -617,7 +620,7 @@ export const THRESHOLDS = {
   "sessions.quarterlyMinutes": param({
     group: "sessions",
     label: "Quarterly review length",
-    section: "§8.1",
+    section: "8.1",
     why: "Ninety minutes across the quarterly session stages, four acts, enough to grade every key result and still hold the retrospective.",
     default: 90,
     schema: z.number().int().min(1).max(600),
@@ -625,7 +628,7 @@ export const THRESHOLDS = {
   "sessions.annualRevalidationMinutes": param({
     group: "sessions",
     label: "Annual revalidation length",
-    section: "§2.1",
+    section: "2.1",
     why: "Thirty to sixty minutes. The annual frame is revalidated each quarter: it holds, or it changes with a written reason.",
     default: { low: 30, high: 60 },
     schema: bounds(1, 600),
@@ -633,7 +636,7 @@ export const THRESHOLDS = {
   "sessions.weeklyCommitmentBounds": param({
     group: "sessions",
     label: "Weekly commitment bounds",
-    section: "§7.2",
+    section: "7.2",
     why: "Three or four commitments per team per week: the few moves that shift a key result. More than four is a list nobody keeps.",
     default: { low: 3, high: 4 },
     schema: bounds(0, 20),
@@ -641,7 +644,7 @@ export const THRESHOLDS = {
   "sessions.retroDotsPerMember": param({
     group: "sessions",
     label: "Retro dots per member",
-    section: "§8.1",
+    section: "8.1",
     why: "Three dots in a seven-minute stage forces a room to choose. More turns the vote into a full ranking, which is a different exercise and does not fit the time the stage gives it.",
     default: 3,
     schema: z.number().int().min(1).max(10),
@@ -649,7 +652,7 @@ export const THRESHOLDS = {
   "sessions.roomPulseBands": param({
     group: "sessions",
     label: "Room pulse read boundaries",
-    section: "§8.2",
+    section: "8.2",
     why: "4.0 and 3.0 on a five-point read, so the facilitator knows whether to open the room or move on.",
     default: { high: 4, low: 3 },
     schema: z.object({
@@ -660,15 +663,15 @@ export const THRESHOLDS = {
   "sessions.diagnosticCycleScore": param({
     group: "sessions",
     label: "Diagnostic cycle-score threshold",
-    section: "§8.6",
-    why: "0.6, the aspirational average §3.4 calls healthy. Below it the cycle missed, and the measured rhythm decides whether that is a strategy problem or a cadence one (principle 10).",
+    section: "8.6",
+    why: "0.6, the aspirational average the method calls healthy. Below it the cycle missed, and the measured rhythm decides whether that is a strategy problem or a cadence one (principle 10).",
     default: 0.6,
     schema: unit,
   }),
   "sessions.diagnosticRhythm": param({
     group: "sessions",
     label: "Diagnostic rhythm threshold",
-    section: "§8.6",
+    section: "8.6",
     why: "75% of due check-ins published on time, measured rather than asked. A missed cycle with a strong rhythm and a missed cycle with a weak one need opposite fixes.",
     default: 0.75,
     schema: unit,
@@ -743,7 +746,7 @@ export function validateOverrides(input: unknown): ValidationResult {
     if (!isThresholdKey(key)) {
       problems.push({
         key,
-        message: `"${key}" is not a threshold in the METHOD.md §11 registry.`,
+        message: `"${key}" is not a threshold this practice has.`,
       });
       continue;
     }

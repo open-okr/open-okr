@@ -368,8 +368,7 @@ const LIST_COLUMNS = {
 
 export const listInitiatives = defineReadAction({
   name: "initiatives.list",
-  summary:
-    "Initiatives in a space, or the ones serving one key result. Drives screen S-26.",
+  summary: "Initiatives in a space, or the ones serving one key result.",
   input: z.object({
     spaceId: z.uuid().optional(),
     keyResultId: z.uuid().optional(),
@@ -729,7 +728,7 @@ export const linkInitiativeKeyResult = defineWriteAction({
   name: "initiatives.linkKeyResult",
   domain: "initiative",
   summary:
-    "Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5).",
+    "Records that this initiative is one of the ones that will move a key result.",
   input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
   output: z.object({ linked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
@@ -1032,7 +1031,7 @@ export const restoreInitiative = defineWriteAction({
 export const readCapacity = defineReadAction({
   name: "initiatives.capacity",
   summary:
-    "One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5).",
+    "One cycle's capacity check: every key result's verdict and every initiative behind it.",
   input: z.object({ cycleId: z.uuid() }),
   output: z.object({
     keyResults: z.array(

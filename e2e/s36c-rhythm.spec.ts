@@ -103,6 +103,37 @@ test("the card renders the registry, not a fixed list of fields", async () => {
   await expect(page.getByText("METHOD §")).toHaveCount(0);
 });
 
+test("a threshold says what its reason cites, and links to where the method sets it out", async () => {
+  await goTo(page, "/admin/rhythm");
+  const hint = page.getByTestId("method-hint-popup");
+
+  // The card says "(principle 8)"; the hint says what principle 8 is, and
+  // puts back the pointer to the clause the section chip used to be.
+  await page
+    .getByRole("button", { name: "About Staleness grace", exact: true })
+    .hover();
+  await expect(hint).toContainText("Principle 8: Neglect must be visible.", {
+    timeout: 15_000,
+  });
+  await expect(hint).toContainText("Set out in the method under “Health”.");
+  await expect(hint.getByRole("link")).toHaveAttribute(
+    "href",
+    /\/blob\/v[^/]+\/docs\/specification\/METHOD\.md#35-health$/,
+  );
+  await page.keyboard.press("Escape");
+  await expect(hint).toBeHidden();
+
+  // A dropdown in the check-in card has no reason under it, so its hint
+  // carries the reason as well.
+  await page
+    .getByTestId("rhythm-card-check-in")
+    .getByRole("button", { name: "About Check-in frequency", exact: true })
+    .click();
+  await expect(hint).toContainText("a week is short enough");
+  await expect(hint).toContainText("Principle 5: The rhythm is the product.");
+  await page.keyboard.press("Escape");
+});
+
 test("an impossible value is refused in words", async () => {
   await grace().fill("99999");
   await save(page).click();

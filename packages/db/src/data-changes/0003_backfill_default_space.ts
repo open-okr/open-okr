@@ -44,7 +44,7 @@ interface Candidate {
 export const backfillDefaultSpace: DataChangeScript = {
   name: "0003_backfill_default_space",
   summary:
-    "Creates the §4.14 default space, named after the workspace with its founding member as manager, for every workspace that has none.",
+    "Creates the default space, named after the workspace with its founding member as manager, for every workspace that has none.",
   expects: [
     { table: "workspaces", column: "id", dataType: "uuid" },
     { table: "workspaces", column: "name", dataType: "text" },
