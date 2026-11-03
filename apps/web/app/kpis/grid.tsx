@@ -569,7 +569,10 @@ export function KpiGrid({
                                 </span>
                               )}
                               {target !== null ? (
-                                <span className="block text-[10.5px] leading-tight text-ink-4 tabular-nums">
+                                // ink-3, not ink-4: the target sits on the
+                                // unhealthy cell's tint too, where ink-4
+                                // measured 4.31 to 1 (s43).
+                                <span className="block text-[10.5px] leading-tight text-ink-3 tabular-nums">
                                   /{figure(target, language)}
                                 </span>
                               ) : null}

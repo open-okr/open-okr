@@ -148,12 +148,17 @@ function moverHandlers(mover: Mover | null) {
       if (!event.altKey) {
         return;
       }
+      // Stopped where it is handled: the objective's whole card carries a
+      // mover too since the drag fix, and a key result's Alt and arrow
+      // bubbling to it moved the objective as well (s13c).
       if (event.key === "ArrowUp") {
         event.preventDefault();
+        event.stopPropagation();
         mover.move(-1);
       }
       if (event.key === "ArrowDown") {
         event.preventDefault();
+        event.stopPropagation();
         mover.move(1);
       }
     },
