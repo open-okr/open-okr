@@ -846,6 +846,8 @@
   "admin.rhythm.actions.savedDifferOne": "Disimpan. {count} ambang pada kad ini berbeza daripada nilai lalai.",
   "admin.rhythm.actions.savedDifferOther": "Disimpan. {count} ambang pada kad ini berbeza daripada nilai lalai.",
   "admin.rhythm.everyNumberTheMethod": "Setiap nombor yang digunakan oleh kaedah untuk mencetus, dengan nilai lalainya di sebelah. Tiada apa di sini yang perlu diubah: ruang kerja yang membiarkan halaman ini mengamalkan kaedah seperti yang tertulis.",
+  "admin.rhythm.hint.from": "Diterangkan dalam kaedah di bawah “{section}”.",
+  "admin.rhythm.hint.principle": "Prinsip {number}: {title}",
   "admin.rhythm.rhythmAndThresholds": "Irama dan ambang",
   "admin.rhythm.rhythmForm.anchorDay": "Hari rujukan",
   "admin.rhythm.rhythmForm.checkInFrequency": "Kekerapan kemas kini",

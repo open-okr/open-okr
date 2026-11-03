@@ -37,6 +37,7 @@ import {
   isTriggerKey,
   GATE_TITLES,
   METHOD_SECTIONS,
+  OPERATING_PRINCIPLES,
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
@@ -372,6 +373,39 @@ for (const number of Object.keys(METHOD_SECTIONS)) {
     );
   }
 }
+// §1's principles, which threshold reasons cite by number: a screen shows the
+// title beside "(principle 5)", so the two are held to one wording.
+const documentedPrinciples = new Map(
+  [
+    ...section(method, "## 1. The operating principles", "\n---").matchAll(
+      /^(\d+)\. \*\*(.+?)\*\*/gm,
+    ),
+  ].map((match) => [Number(match[1]), match[2] ?? ""]),
+);
+if (documentedPrinciples.size < 10) {
+  fail(
+    "principles",
+    `only ${documentedPrinciples.size} principles found in METHOD.md §1; the parse is wrong, not the document`,
+  );
+}
+for (const [number, title] of documentedPrinciples) {
+  const coded = OPERATING_PRINCIPLES.find((entry) => entry.number === number);
+  if (coded?.title !== title) {
+    fail(
+      "principles",
+      `METHOD.md §1 names principle ${number} "${title}", and the package has ${coded ? `"${coded.title}"` : "no such principle"}`,
+    );
+  }
+}
+for (const { number } of OPERATING_PRINCIPLES) {
+  if (!documentedPrinciples.has(number)) {
+    fail(
+      "principles",
+      `the package has principle ${number}, which METHOD.md §1 does not`,
+    );
+  }
+}
+
 for (const [registry, entries] of [
   ["practice", Object.entries(PRACTICE)],
   ["threshold", Object.entries(THRESHOLDS)],
@@ -1101,7 +1135,7 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
     `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
-    `${documentedHeadings.size} section links, ` +
+    `${documentedHeadings.size} section links, ${documentedPrinciples.size} principles, ` +
     `${documentedProfiles.length} profiles compared on ${compared.length} rows, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,
