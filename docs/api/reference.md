@@ -131,7 +131,7 @@ the machine-readable document.
 |---|---|---|
 | `alignment.applyFinding`<br/>Applies a relink finding by re-parenting the goal through the normal update path. | `POST /api/v1/alignment/applyFinding` | writes |
 | `alignment.dismissFinding`<br/>Dismisses a finding. It stays dismissed while the condition is unchanged. | `POST /api/v1/alignment/dismissFinding` | writes |
-| `alignment.graph`<br/>The cascade as nodes and edges, for the alignment studio canvas (S-16). | `GET /api/v1/alignment/graph` | reads |
+| `alignment.graph`<br/>The cascade as nodes and edges, for the alignment studio canvas. | `GET /api/v1/alignment/graph` | reads |
 | `alignment.read`<br/>The alignment health score for one cycle, with every open finding and the goal each one opens. | `GET /api/v1/alignment/read` | reads |
 
 ## attachments
@@ -236,7 +236,7 @@ the machine-readable document.
 | `cycles.create`<br/>Creates a named cycle for the period containing a chosen date. | `POST /api/v1/cycles/create` | writes |
 | `cycles.current`<br/>The cycle to show: the one containing today, else the soonest ahead, else the most recent behind. | `GET /api/v1/cycles/current` | reads |
 | `cycles.ensureCurrent`<br/>Creates the cycle containing today if the workspace has none. Idempotent. | `POST /api/v1/cycles/ensureCurrent` | writes |
-| `cycles.feedForward`<br/>Re-runs METHOD.md §8.9's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this. | `POST /api/v1/cycles/feedForward` | writes |
+| `cycles.feedForward`<br/>Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this. | `POST /api/v1/cycles/feedForward` | writes |
 | `cycles.levelsInUse`<br/>The OKR levels one cycle offers: the levels it began with, plus any its objectives already use. | `GET /api/v1/cycles/levelsInUse` | reads |
 | `cycles.list`<br/>Every cycle this workspace has, newest first. | `GET /api/v1/cycles/list` | reads |
 | `cycles.rules`<br/>The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after. | `GET /api/v1/cycles/rules` | reads |
@@ -248,8 +248,8 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `decisions.forCycle`<br/>Every decision recorded in one cycle, for the cycle workspace (METHOD.md §7.5). | `GET /api/v1/decisions/forCycle` | reads |
-| `decisions.forGoal`<br/>Decisions affecting one goal, newest first, for its page (METHOD.md §7.5). | `GET /api/v1/decisions/forGoal` | reads |
+| `decisions.forCycle`<br/>Every decision recorded in one cycle, for the cycle workspace. | `GET /api/v1/decisions/forCycle` | reads |
+| `decisions.forGoal`<br/>Decisions affecting one goal, newest first, for its page. | `GET /api/v1/decisions/forGoal` | reads |
 
 ## documents
 
@@ -260,7 +260,7 @@ the machine-readable document.
 | `documents.difference`<br/>What changed between two published versions of a document, line by line. | `GET /api/v1/documents/difference` | reads |
 | `documents.list`<br/>The documents on one subject. Somebody else's draft is not among them. | `GET /api/v1/documents/list` | reads |
 | `documents.publish`<br/>Publishes a document, writing a version and telling the subject's watchers. | `POST /api/v1/documents/publish` | writes |
-| `documents.read`<br/>One document with its body and its version list. Drives screen S-29. | `GET /api/v1/documents/read` | reads |
+| `documents.read`<br/>One document with its body and its version list. | `GET /api/v1/documents/read` | reads |
 | `documents.restore`<br/>Brings back a deleted document. Its versions were never removed, so they come back with it. | `POST /api/v1/documents/restore` | writes |
 | `documents.update`<br/>Edits a document. Editing a published one changes it without publishing a version. | `POST /api/v1/documents/update` | writes |
 
@@ -286,8 +286,8 @@ the machine-readable document.
 | `goals.acknowledgeCheckIn`<br/>The reviewer of record closes the loop. Nobody else can. | `POST /api/v1/goals/acknowledgeCheckIn` | writes |
 | `goals.addDependency`<br/>Links two goals as depending on each other. Stored once; direction carries no meaning. | `POST /api/v1/goals/addDependency` | writes |
 | `goals.addKeyResult`<br/>Adds a key result to a goal, with its baseline recorded as history. | `POST /api/v1/goals/addKeyResult` | writes |
-| `goals.addKeyResultDependency`<br/>Records a key result's dependency on a providing team, for the register (METHOD.md §5.4). | `POST /api/v1/goals/addKeyResultDependency` | writes |
-| `goals.approveDraft`<br/>Approves a published draft, which only its reviewer does (METHOD.md §2.9). It goes live, and its check-in rhythm starts. | `POST /api/v1/goals/approveDraft` | writes |
+| `goals.addKeyResultDependency`<br/>Records a key result's dependency on a providing team, for the register. | `POST /api/v1/goals/addKeyResultDependency` | writes |
+| `goals.approveDraft`<br/>Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts. | `POST /api/v1/goals/approveDraft` | writes |
 | `goals.changeTarget`<br/>Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one. | `POST /api/v1/goals/changeTarget` | writes |
 | `goals.checkDraft`<br/>Checks an unsaved objective and its key results against the quality checks, with each check's condition and coaching prompt. Saves nothing. | `GET /api/v1/goals/checkDraft` | reads |
 | `goals.checkIns`<br/>One goal's check-in timeline, newest first, with each one's snapshot differences. | `GET /api/v1/goals/checkIns` | reads |
@@ -308,7 +308,7 @@ the machine-readable document.
 | `goals.linkKpi`<br/>Links a KPI to a key result, which from then on reads its value and progress from it. | `POST /api/v1/goals/linkKpi` | writes |
 | `goals.list`<br/>Goals in a cycle, or the whole workspace, with their key results attached. | `GET /api/v1/goals/list` | reads |
 | `goals.moveToCycle`<br/>Moves a goal into another cycle, taking its check-in history with it. Arriving in a running cycle is judged as starting it there. | `POST /api/v1/goals/moveToCycle` | writes |
-| `goals.moveToSpace`<br/>Moves an objective to another space, with its key results, check-ins, dependencies and alignment (METHOD.md §2.9). Needs edit on both spaces. | `POST /api/v1/goals/moveToSpace` | writes |
+| `goals.moveToSpace`<br/>Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces. | `POST /api/v1/goals/moveToSpace` | writes |
 | `goals.myStreak`<br/>The reader's own check-in streak, and the goal pausing it where one reads on track while a key result has not moved. | `GET /api/v1/goals/myStreak` | reads |
 | `goals.parseFilter`<br/>Turns a sentence into a validated goals filter, or refuses it with the reason. | `GET /api/v1/goals/parseFilter` | reads |
 | `goals.patch`<br/>Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them. | `POST /api/v1/goals/patch` | writes |
@@ -316,7 +316,7 @@ the machine-readable document.
 | `goals.place`<br/>Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place. | `POST /api/v1/goals/place` | writes |
 | `goals.placeKeyResult`<br/>Puts a key result straight after another under its objective, or first, and renumbers the objective's key results. | `POST /api/v1/goals/placeKeyResult` | writes |
 | `goals.publishCheckIn`<br/>Publishes a check-in: snapshot, value history, cadence, and the reviewer's obligation. | `POST /api/v1/goals/publishCheckIn` | writes |
-| `goals.publishDraft`<br/>Publishes an objective that waits as a draft (METHOD.md §2.9). Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve. | `POST /api/v1/goals/publishDraft` | writes |
+| `goals.publishDraft`<br/>Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve. | `POST /api/v1/goals/publishDraft` | writes |
 | `goals.publishDraftedCheckIn`<br/>Opens the author's draft check-in on a goal and publishes it in one action, for a proposal a human applies. | `POST /api/v1/goals/publishDraftedCheckIn` | writes |
 | `goals.read`<br/>One goal with its key results and its retrospective, if it has one. | `GET /api/v1/goals/read` | reads |
 | `goals.readVotes`<br/>The votes on one key result: only your own until the reveal, all of them and the average after it. | `GET /api/v1/goals/readVotes` | reads |
@@ -333,9 +333,9 @@ the machine-readable document.
 | `goals.reviewDecision`<br/>The keep/modify/abandon decision the last quarterly review reached for this goal. | `GET /api/v1/goals/reviewDecision` | reads |
 | `goals.rewriteKeyResult`<br/>Suggests a corrected key result for one failing check, and reports which checks the suggestion actually passes. | `GET /api/v1/goals/rewriteKeyResult` | reads |
 | `goals.setDependencyRiskOwner`<br/>Names who carries the risk of an unconfirmed dependency. Clears publish gate 4 without claiming a confirmation. | `POST /api/v1/goals/setDependencyRiskOwner` | writes |
-| `goals.setKind`<br/>Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity. | `POST /api/v1/goals/setKind` | writes |
+| `goals.setKind`<br/>Marks an objective committed or aspirational, recording the change and its reason in the objective's activity. | `POST /api/v1/goals/setKind` | writes |
 | `goals.startCheckIn`<br/>Opens or reopens the author's draft check-in on a goal. Completely silent. | `POST /api/v1/goals/startCheckIn` | writes |
-| `goals.stop`<br/>Stops an objective that no longer matters: closes it as abandoned, with a one-line reason (METHOD.md §2.9). | `POST /api/v1/goals/stop` | writes |
+| `goals.stop`<br/>Stops an objective that no longer matters: closes it as abandoned, with a one-line reason. | `POST /api/v1/goals/stop` | writes |
 | `goals.suggestMeasure`<br/>Suggests a unit, a direction, a baseline and a target for a key result, with the checks they pass. | `GET /api/v1/goals/suggestMeasure` | reads |
 | `goals.suggestParent`<br/>Suggests which objective this one should align to, from the ones the reader may see. | `GET /api/v1/goals/suggestParent` | reads |
 | `goals.targetHistory`<br/>Every change to a key result's target, oldest first, with who made it and the reason given for easing it. | `GET /api/v1/goals/targetHistory` | reads |
@@ -360,11 +360,11 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `initiatives.capacity`<br/>One cycle's capacity check: every key result's verdict and every initiative behind it (METHOD.md §5.5). | `GET /api/v1/initiatives/capacity` | reads |
+| `initiatives.capacity`<br/>One cycle's capacity check: every key result's verdict and every initiative behind it. | `GET /api/v1/initiatives/capacity` | reads |
 | `initiatives.create`<br/>Creates an initiative in a space, owned by one member. | `POST /api/v1/initiatives/create` | writes |
 | `initiatives.delete`<br/>Soft-deletes an initiative and the links it held. | `POST /api/v1/initiatives/delete` | destroys |
-| `initiatives.linkKeyResult`<br/>Records that this initiative is one of the ones that will move a key result (METHOD.md §5.5). | `POST /api/v1/initiatives/linkKeyResult` | writes |
-| `initiatives.list`<br/>Initiatives in a space, or the ones serving one key result. Drives screen S-26. | `GET /api/v1/initiatives/list` | reads |
+| `initiatives.linkKeyResult`<br/>Records that this initiative is one of the ones that will move a key result. | `POST /api/v1/initiatives/linkKeyResult` | writes |
+| `initiatives.list`<br/>Initiatives in a space, or the ones serving one key result. | `GET /api/v1/initiatives/list` | reads |
 | `initiatives.read`<br/>One initiative with the key results it serves. | `GET /api/v1/initiatives/read` | reads |
 | `initiatives.restore`<br/>Brings back a deleted initiative and the key result links that were deleted with it. | `POST /api/v1/initiatives/restore` | writes |
 | `initiatives.unlinkKeyResult`<br/>Removes the link between an initiative and a key result. | `POST /api/v1/initiatives/unlinkKeyResult` | destroys |
@@ -388,19 +388,19 @@ the machine-readable document.
 | `kpis.create`<br/>Adds a KPI with its frequency, unit, direction, tier and corridor thresholds. | `POST /api/v1/kpis/create` | writes |
 | `kpis.createCategory`<br/>Adds a KPI category, which is how the grid groups its rows. | `POST /api/v1/kpis/createCategory` | writes |
 | `kpis.createTree`<br/>Names a driver tree. The parent pointers shape it; this row is the tree itself. | `POST /api/v1/kpis/createTree` | writes |
-| `kpis.detail`<br/>One KPI with its periods, its place in the tree and its formula. Drives screen S-21. | `GET /api/v1/kpis/detail` | reads |
-| `kpis.grid`<br/>Every KPI with its recent periods, grouped by category. Drives screen S-20. | `GET /api/v1/kpis/grid` | reads |
-| `kpis.launchRecovery`<br/>Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI. | `POST /api/v1/kpis/launchRecovery` | writes |
-| `kpis.list`<br/>Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14. | `GET /api/v1/kpis/list` | reads |
+| `kpis.detail`<br/>One KPI with its periods, its place in the tree and its formula. | `GET /api/v1/kpis/detail` | reads |
+| `kpis.grid`<br/>Every KPI with its recent periods, grouped by category. | `GET /api/v1/kpis/grid` | reads |
+| `kpis.launchRecovery`<br/>Creates a recovery objective from the leading drivers under an unhealthy KPI. | `POST /api/v1/kpis/launchRecovery` | writes |
+| `kpis.list`<br/>Every KPI by title, with its unit, state and achievement. Drives the measure picker on the draft and goal pages. | `GET /api/v1/kpis/list` | reads |
 | `kpis.narrateTrend`<br/>Narrates a KPI's trend and its anomalies, refusing any narration that states a number the series does not hold. | `GET /api/v1/kpis/narrateTrend` | reads |
 | `kpis.record`<br/>Records a value for the period a date falls in. Re-recording updates rather than duplicating. | `POST /api/v1/kpis/record` | writes |
 | `kpis.recordResponse`<br/>Records how an unhealthy KPI was answered: fixed now as a task, or by a key result on an existing objective. | `POST /api/v1/kpis/recordResponse` | writes |
-| `kpis.recoveryBoard`<br/>Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19. | `GET /api/v1/kpis/recoveryBoard` | reads |
+| `kpis.recoveryBoard`<br/>Every unhealthy or recovering KPI across every tree, with its recovery objective. | `GET /api/v1/kpis/recoveryBoard` | reads |
 | `kpis.recoveryDraft`<br/>The recovery objective a KPI would get, so it can be read before it is committed to. | `GET /api/v1/kpis/recoveryDraft` | reads |
 | `kpis.setFormula`<br/>Makes a KPI calculated from a formula over other KPIs, refusing self-reference and cycles. | `POST /api/v1/kpis/setFormula` | writes |
 | `kpis.spaceTrees`<br/>One space's KPIs, grouped by the driver tree each is filed in. Drives the space home. | `GET /api/v1/kpis/spaceTrees` | reads |
-| `kpis.suggest`<br/>Suggests a metric, its corridor and its formula from a sentence, with §6's parser checking the formula first. | `GET /api/v1/kpis/suggest` | reads |
-| `kpis.tree`<br/>One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18. | `GET /api/v1/kpis/tree` | reads |
+| `kpis.suggest`<br/>Suggests a metric, its corridor and its formula from a sentence, with the KPI formula parser checking the formula first. | `GET /api/v1/kpis/suggest` | reads |
+| `kpis.tree`<br/>One driver tree as nodes with their corridor state and recovery progress. | `GET /api/v1/kpis/tree` | reads |
 | `kpis.update`<br/>Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. | `POST /api/v1/kpis/update` | writes |
 
 ## notifications
@@ -420,9 +420,9 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `nudges.list`<br/>This member's nudges, newest first, with the rule that caused each one. | `GET /api/v1/nudges/list` | reads |
-| `nudges.rules`<br/>Every rule in the METHOD.md §6.4 catalogue with this workspace's configuration and its recent volume. | `GET /api/v1/nudges/rules` | reads |
+| `nudges.rules`<br/>Every proactive message rule with this workspace's configuration and its recent volume. | `GET /api/v1/nudges/rules` | reads |
 | `nudges.run`<br/>Computes what is due for every member, records a nudge row for each, and delivers what is due to the inbox and the member's own channel. | `POST /api/v1/nudges/run` | writes |
-| `nudges.setRule`<br/>Enables, mutes, re-routes or exempts one §6.4 rule. | `POST /api/v1/nudges/setRule` | writes |
+| `nudges.setRule`<br/>Enables, mutes, re-routes or exempts one proactive message rule. | `POST /api/v1/nudges/setRule` | writes |
 | `nudges.snooze`<br/>Silences nudges about one subject for this member until a time they choose. Never silences the obligation itself. | `POST /api/v1/nudges/snooze` | writes |
 | `nudges.volume`<br/>How many nudges each rule produced over a window, and how many were suppressed and why. | `GET /api/v1/nudges/volume` | reads |
 
@@ -436,15 +436,15 @@ the machine-readable document.
 | `people.exportMine`<br/>Everything this workspace holds about the signed-in member, as one document. | `GET /api/v1/people/exportMine` | reads |
 | `people.finishOwnTour`<br/>Mark the first-visit tour as finished for the signed-in member, on every machine. | `POST /api/v1/people/finishOwnTour` | writes |
 | `people.importMember`<br/>Creates a placeholder member for somebody an import found, with the address to claim it by. | `POST /api/v1/people/importMember` | writes |
-| `people.leave`<br/>One member's leave, oldest first, with who stands in for each span (METHOD.md §7.4). | `GET /api/v1/people/leave` | reads |
+| `people.leave`<br/>One member's leave, oldest first, with who stands in for each span. | `GET /api/v1/people/leave` | reads |
 | `people.orgChart`<br/>The manager chain as a tree. | `GET /api/v1/people/orgChart` | reads |
 | `people.possibleManagers`<br/>Every member who could safely become this member's manager. | `GET /api/v1/people/possibleManagers` | reads |
 | `people.readMember`<br/>One member's profile. | `GET /api/v1/people/readMember` | reads |
 | `people.readOwnTour`<br/>Whether the signed-in member has finished the first-visit tour. | `GET /api/v1/people/readOwnTour` | reads |
 | `people.restore`<br/>Restore a suspended member's access. | `POST /api/v1/people/restore` | writes |
 | `people.setAdministrator`<br/>Makes a member an administrator with full access to the workspace, or returns them to the standard level. | `POST /api/v1/people/setAdministrator` | writes |
-| `people.setLeave`<br/>Sets the signed-in member's own leave, each span with the delegate who stands in (METHOD.md §7.4). | `POST /api/v1/people/setLeave` | writes |
-| `people.setMemberLeave`<br/>Sets another member's leave, each span with the delegate who stands in (METHOD.md §7.4). For an administrator. | `POST /api/v1/people/setMemberLeave` | writes |
+| `people.setLeave`<br/>Sets the signed-in member's own leave, each span with the delegate who stands in. | `POST /api/v1/people/setLeave` | writes |
+| `people.setMemberLeave`<br/>Sets another member's leave, each span with the delegate who stands in. For an administrator. | `POST /api/v1/people/setMemberLeave` | writes |
 | `people.suspend`<br/>Suspend a member, removing every access they had. | `POST /api/v1/people/suspend` | writes |
 | `people.updateMember`<br/>Update another member's name, title or manager (org fields). | `POST /api/v1/people/updateMember` | writes |
 | `people.updateOwnProfile`<br/>Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours. | `POST /api/v1/people/updateOwnProfile` | writes |
@@ -453,8 +453,8 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `practice.applyProfile`<br/>Chooses one of the five METHOD.md §12.2 profiles, with the §11 thresholds it sets. This workspace's own changes are kept. | `POST /api/v1/practice/applyProfile` | writes |
-| `practice.read`<br/>The METHOD.md §12 practice this workspace runs: its profile, its own changes and every setting resolved. | `GET /api/v1/practice/read` | reads |
+| `practice.applyProfile`<br/>Chooses one of the five practice profiles, with the thresholds it sets. This workspace's own changes are kept. | `POST /api/v1/practice/applyProfile` | writes |
+| `practice.read`<br/>The practice this workspace runs: its profile, its own changes and every setting resolved. | `GET /api/v1/practice/read` | reads |
 | `practice.update`<br/>Changes some of this workspace's practice settings. A setting set to null goes back to its profile's value. | `POST /api/v1/practice/update` | writes |
 
 ## proposals
@@ -479,14 +479,14 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `review.inbox`<br/>What this member owes right now, overdue first. Drives screen S-02 and the sidebar badge. | `GET /api/v1/review/inbox` | reads |
+| `review.inbox`<br/>What this member owes right now, overdue first. Drives the review inbox and the sidebar badge. | `GET /api/v1/review/inbox` | reads |
 
 ## rhythm
 
 | Action | Method and path | Class |
 |---|---|---|
-| `rhythm.read`<br/>The METHOD.md §11 registry as this workspace resolves it, with its deviations and its terminology. | `GET /api/v1/rhythm/read` | reads |
-| `rhythm.update`<br/>Changes this workspace's deviations from the §11 canon, or its terminology. | `POST /api/v1/rhythm/update` | writes |
+| `rhythm.read`<br/>The practice thresholds as this workspace resolves them, with its deviations and its terminology. | `GET /api/v1/rhythm/read` | reads |
+| `rhythm.update`<br/>Changes this workspace's deviations from the method's thresholds, or its terminology. | `POST /api/v1/rhythm/update` | writes |
 
 ## roles
 
@@ -502,23 +502,23 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `search.entities`<br/>The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. Drives screen S-32. | `GET /api/v1/search/entities` | reads |
-| `search.jump`<br/>The entity one short identifier means, for the palette's jump. Drives screen S-32. | `GET /api/v1/search/jump` | reads |
-| `search.query`<br/>Everything in this workspace matching a phrase that the caller may read. Drives screen S-32. | `GET /api/v1/search/query` | reads |
+| `search.entities`<br/>The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. | `GET /api/v1/search/entities` | reads |
+| `search.jump`<br/>The entity one short identifier means, for the palette's jump. | `GET /api/v1/search/jump` | reads |
+| `search.query`<br/>Everything in this workspace matching a phrase that the caller may read. | `GET /api/v1/search/query` | reads |
 
 ## sessions
 
 | Action | Method and path | Class |
 |---|---|---|
-| `sessions.addAction`<br/>Adds an action with an owner and a date (METHOD.md §8.1 stage 11). | `POST /api/v1/sessions/addAction` | writes |
-| `sessions.addMinute`<br/>Gives the running stage one more minute (METHOD.md §8.1's add-a-minute control). | `POST /api/v1/sessions/addMinute` | writes |
-| `sessions.addRetroNote`<br/>Writes one note into the team retro's worked or did-not column (METHOD.md §8.1 stage 5). | `POST /api/v1/sessions/addRetroNote` | writes |
+| `sessions.addAction`<br/>Adds an action with an owner and a date. | `POST /api/v1/sessions/addAction` | writes |
+| `sessions.addMinute`<br/>Gives the running stage one more minute. | `POST /api/v1/sessions/addMinute` | writes |
+| `sessions.addRetroNote`<br/>Writes one note into the team retro's worked or did-not column. | `POST /api/v1/sessions/addRetroNote` | writes |
 | `sessions.advanceStage`<br/>Advances a running session to its next stage, recording elapsed time. | `POST /api/v1/sessions/advanceStage` | writes |
 | `sessions.blockerStatus`<br/>Blockers for a session, with aging information. | `GET /api/v1/sessions/blockerStatus` | reads |
 | `sessions.bookCycle`<br/>Books every weekly check-in, monthly review and the quarterly review a space needs for a whole cycle, around what is already booked. | `POST /api/v1/sessions/bookCycle` | writes |
-| `sessions.captureLearning`<br/>Records what the team now knows, optionally carried into the next cycle (METHOD.md §8.9). | `POST /api/v1/sessions/captureLearning` | writes |
+| `sessions.captureLearning`<br/>Records what the team now knows, optionally carried into the next cycle. | `POST /api/v1/sessions/captureLearning` | writes |
 | `sessions.carriedCommitments`<br/>Commitments set by earlier sessions in this session's space and not yet closed. | `GET /api/v1/sessions/carriedCommitments` | reads |
-| `sessions.castRetroVote`<br/>Spends or withdraws one dot on a retro note (METHOD.md §8.1 stage 5). | `POST /api/v1/sessions/castRetroVote` | writes |
+| `sessions.castRetroVote`<br/>Spends or withdraws one dot on a retro note. | `POST /api/v1/sessions/castRetroVote` | writes |
 | `sessions.castVote`<br/>A private confidence vote on one key result within a session. Upserts: a second vote replaces the first. | `POST /api/v1/sessions/castVote` | writes |
 | `sessions.close`<br/>Closes a running session. | `POST /api/v1/sessions/close` | writes |
 | `sessions.closeCommitments`<br/>Closes last week's commitments with a delivered/not-delivered verdict. | `POST /api/v1/sessions/closeCommitments` | writes |
@@ -529,56 +529,56 @@ the machine-readable document.
 | `sessions.confirmConfidence`<br/>The champion confirms the final confidence and writes the what-changed note. | `POST /api/v1/sessions/confirmConfidence` | writes |
 | `sessions.create`<br/>Creates a scheduled session for a space. A time with no offset is read in the workspace timezone. | `POST /api/v1/sessions/create` | writes |
 | `sessions.createBlocker`<br/>Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in. | `POST /api/v1/sessions/createBlocker` | writes |
-| `sessions.decideObjective`<br/>Closes one objective with §8.8's decision and a one-line why (METHOD.md §8.8). | `POST /api/v1/sessions/decideObjective` | writes |
-| `sessions.diagnostic`<br/>§8.6's verdict for this review, stored or still unreadable. | `GET /api/v1/sessions/diagnostic` | reads |
-| `sessions.digest`<br/>The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved. | `GET /api/v1/sessions/digest` | reads |
+| `sessions.decideObjective`<br/>Closes one objective with a keep, modify or abandon decision and a one-line why. | `POST /api/v1/sessions/decideObjective` | writes |
+| `sessions.diagnostic`<br/>The closing diagnostic's verdict for this review, stored or still unreadable. | `GET /api/v1/sessions/diagnostic` | reads |
+| `sessions.digest`<br/>The weekly digest for one session, assembled with no provider involved. | `GET /api/v1/sessions/digest` | reads |
 | `sessions.draftMinutes`<br/>Drafts the review minutes as prose over the record the session already holds. | `GET /api/v1/sessions/draftMinutes` | reads |
 | `sessions.forward`<br/>Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting. | `GET /api/v1/sessions/forward` | reads |
-| `sessions.giveKudos`<br/>Names the effort that deserved to be seen (METHOD.md §8.1 stage 4). | `POST /api/v1/sessions/giveKudos` | writes |
-| `sessions.givePulse`<br/>Records one participant's pulse and their one word for the cycle (METHOD.md §8.2). | `POST /api/v1/sessions/givePulse` | writes |
+| `sessions.giveKudos`<br/>Names the effort that deserved to be seen. | `POST /api/v1/sessions/giveKudos` | writes |
+| `sessions.givePulse`<br/>Records one participant's pulse and their one word for the cycle. | `POST /api/v1/sessions/givePulse` | writes |
 | `sessions.list`<br/>Sessions for a space, newest first. | `GET /api/v1/sessions/list` | reads |
 | `sessions.listCommitments`<br/>Commitments for a session. | `GET /api/v1/sessions/listCommitments` | reads |
 | `sessions.lowScores`<br/>The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked. | `GET /api/v1/sessions/lowScores` | reads |
-| `sessions.managementRetro`<br/>§8.7's four questions with what leadership answered (METHOD.md §8.1 stage 6). | `GET /api/v1/sessions/managementRetro` | reads |
+| `sessions.managementRetro`<br/>The management retro's four questions with what leadership answered. | `GET /api/v1/sessions/managementRetro` | reads |
 | `sessions.mine`<br/>Sessions in every space this member can read, running first. | `GET /api/v1/sessions/mine` | reads |
-| `sessions.minutes`<br/>§8.10's minutes: the executive summary and every stage's record (screen S-25). | `GET /api/v1/sessions/minutes` | reads |
-| `sessions.monthlyRecord`<br/>Everything METHOD.md §7.5 records for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions. | `GET /api/v1/sessions/monthlyRecord` | reads |
-| `sessions.narrateDiagnostic`<br/>Narrates §8.6's diagnostic with this cycle's specifics, beside the verdict and never instead of it. | `GET /api/v1/sessions/narrateDiagnostic` | reads |
+| `sessions.minutes`<br/>The review's minutes: the executive summary and every stage's record. | `GET /api/v1/sessions/minutes` | reads |
+| `sessions.monthlyRecord`<br/>Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions. | `GET /api/v1/sessions/monthlyRecord` | reads |
+| `sessions.narrateDiagnostic`<br/>Narrates the closing diagnostic with this cycle's specifics, beside the verdict and never instead of it. | `GET /api/v1/sessions/narrateDiagnostic` | reads |
 | `sessions.narrateDigest`<br/>Rewrites the weekly digest as prose, refusing any narration that states a number the product did not compute. | `GET /api/v1/sessions/narrateDigest` | reads |
 | `sessions.narratives`<br/>Stage three's state: who holds the mic, who has spoken, and what was written. | `GET /api/v1/sessions/narratives` | reads |
 | `sessions.open`<br/>Opens a scheduled session, setting it to running and starting the first stage. | `POST /api/v1/sessions/open` | writes |
 | `sessions.participants`<br/>Active space members for a session's space. | `GET /api/v1/sessions/participants` | reads |
-| `sessions.passMic`<br/>Hands the mic to one objective's owner, or puts it down (METHOD.md §8.1 stage 3). | `POST /api/v1/sessions/passMic` | writes |
+| `sessions.passMic`<br/>Hands the mic to one objective's owner, or puts it down. | `POST /api/v1/sessions/passMic` | writes |
 | `sessions.postDigest`<br/>Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel. | `POST /api/v1/sessions/postDigest` | writes |
-| `sessions.processHealth`<br/>§8.5's five statements with the room's averages, and the reader's own answers. | `GET /api/v1/sessions/processHealth` | reads |
+| `sessions.processHealth`<br/>The five process-health statements with the room's averages, and the reader's own answers. | `GET /api/v1/sessions/processHealth` | reads |
 | `sessions.read`<br/>One session by id. Returns not-found when the caller lacks access. | `GET /api/v1/sessions/read` | reads |
 | `sessions.readStreak`<br/>The rhythm streak for a space. | `GET /api/v1/sessions/readStreak` | reads |
 | `sessions.reassignBlocker`<br/>Moves a blocker to a different owner. | `POST /api/v1/sessions/reassignBlocker` | writes |
-| `sessions.recognition`<br/>Stage four's entries, oldest first (METHOD.md §8.1 stage 4). | `GET /api/v1/sessions/recognition` | reads |
-| `sessions.recordDecision`<br/>Records a decision against the key result or goal it affects (METHOD.md §7.5). | `POST /api/v1/sessions/recordDecision` | writes |
-| `sessions.recordDiagnostic`<br/>Reads §8.6's diagnostic and stores what the room was told (METHOD.md §8.6). | `POST /api/v1/sessions/recordDiagnostic` | writes |
+| `sessions.recognition`<br/>The quarterly review's recognition entries, oldest first. | `GET /api/v1/sessions/recognition` | reads |
+| `sessions.recordDecision`<br/>Records a decision against the key result or goal it affects. | `POST /api/v1/sessions/recordDecision` | writes |
+| `sessions.recordDiagnostic`<br/>Reads the closing diagnostic and stores what the room was told. | `POST /api/v1/sessions/recordDiagnostic` | writes |
 | `sessions.removeRetroNote`<br/>Removes one retro note, with the dots spent on it. | `POST /api/v1/sessions/removeRetroNote` | destroys |
 | `sessions.reset`<br/>Stage nine's state: every objective in the review and how it was closed. | `GET /api/v1/sessions/reset` | reads |
 | `sessions.resolveBlocker`<br/>Marks a blocker as resolved. | `POST /api/v1/sessions/resolveBlocker` | writes |
 | `sessions.retro`<br/>The team retro board: both columns, their notes and the reader's dots. | `GET /api/v1/sessions/retro` | reads |
-| `sessions.revealObjectiveScore`<br/>Reveals one objective's score to the whole room in a single write (METHOD.md §8.3). | `POST /api/v1/sessions/revealObjectiveScore` | writes |
+| `sessions.revealObjectiveScore`<br/>Reveals one objective's score to the whole room in a single write. | `POST /api/v1/sessions/revealObjectiveScore` | writes |
 | `sessions.revealVotes`<br/>Reveals every vote on a key result in one session, atomically. | `POST /api/v1/sessions/revealVotes` | writes |
-| `sessions.roomPulse`<br/>§8.2's read of the room for the facilitator, and the caller's own pulse for everybody. | `GET /api/v1/sessions/roomPulse` | reads |
-| `sessions.rootCauses`<br/>Every key result this review graded below its root-cause threshold, with its causes (METHOD.md §8.4). | `GET /api/v1/sessions/rootCauses` | reads |
-| `sessions.scoreKeyResult`<br/>Grades one key result 0.0 to 1.0 with the one-line reason §8.3 asks for. | `POST /api/v1/sessions/scoreKeyResult` | writes |
+| `sessions.roomPulse`<br/>The read of the room for the facilitator, and the caller's own pulse for everybody. | `GET /api/v1/sessions/roomPulse` | reads |
+| `sessions.rootCauses`<br/>Every key result this review graded below its root-cause threshold, with its causes. | `GET /api/v1/sessions/rootCauses` | reads |
+| `sessions.scoreKeyResult`<br/>Grades one key result 0.0 to 1.0 with a one-line reason. | `POST /api/v1/sessions/scoreKeyResult` | writes |
 | `sessions.scoringStatus`<br/>Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed. | `GET /api/v1/sessions/scoringStatus` | reads |
 | `sessions.setCommitments`<br/>Sets this week's commitments (2-3 actions, each with owner and optional KR link). | `POST /api/v1/sessions/setCommitments` | writes |
 | `sessions.setCoordinatorNote`<br/>Adds the coordinator's note to the session digest. | `POST /api/v1/sessions/setCoordinatorNote` | writes |
-| `sessions.setManagementAnswer`<br/>Records leadership's answer to one of §8.7's four questions (METHOD.md §8.1 stage 6). | `POST /api/v1/sessions/setManagementAnswer` | writes |
-| `sessions.setNarrative`<br/>Writes what the number does not show for one objective (METHOD.md §8.1 stage 3). | `POST /api/v1/sessions/setNarrative` | writes |
+| `sessions.setManagementAnswer`<br/>Records leadership's answer to one of the management retro's four questions. | `POST /api/v1/sessions/setManagementAnswer` | writes |
+| `sessions.setNarrative`<br/>Writes what the number does not show for one objective. | `POST /api/v1/sessions/setNarrative` | writes |
 | `sessions.setNextAction`<br/>Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in. | `POST /api/v1/sessions/setNextAction` | writes |
-| `sessions.setRootCause`<br/>Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold (METHOD.md §8.4). | `POST /api/v1/sessions/setRootCause` | writes |
-| `sessions.setShifts`<br/>Records the resource or priority shifts noted in a monthly review (METHOD.md §7.5). | `POST /api/v1/sessions/setShifts` | writes |
-| `sessions.setStageNote`<br/>Writes the facilitator's private note for the running stage (METHOD.md §8.1). | `POST /api/v1/sessions/setStageNote` | writes |
-| `sessions.setTrend`<br/>Records the room's trend for one objective in a monthly review (METHOD.md §7.5). | `POST /api/v1/sessions/setTrend` | writes |
-| `sessions.setWins`<br/>Names the week's wins in a weekly session, for its digest (METHOD.md §7.2 step 3). | `POST /api/v1/sessions/setWins` | writes |
+| `sessions.setRootCause`<br/>Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold. | `POST /api/v1/sessions/setRootCause` | writes |
+| `sessions.setShifts`<br/>Records the resource or priority shifts noted in a monthly review. | `POST /api/v1/sessions/setShifts` | writes |
+| `sessions.setStageNote`<br/>Writes the facilitator's private note for the running stage. | `POST /api/v1/sessions/setStageNote` | writes |
+| `sessions.setTrend`<br/>Records the room's trend for one objective in a monthly review. | `POST /api/v1/sessions/setTrend` | writes |
+| `sessions.setWins`<br/>Names the week's wins in a weekly session, for its digest. | `POST /api/v1/sessions/setWins` | writes |
 | `sessions.skip`<br/>Marks a scheduled session as skipped. | `POST /api/v1/sessions/skip` | writes |
-| `sessions.submitProcessHealth`<br/>Scores §8.5's five statements anonymously (METHOD.md §8.1 stage 8). | `POST /api/v1/sessions/submitProcessHealth` | writes |
+| `sessions.submitProcessHealth`<br/>Scores the five process-health statements anonymously. | `POST /api/v1/sessions/submitProcessHealth` | writes |
 | `sessions.votes`<br/>Votes for one KR in a session. Before reveal: own vote only. After reveal: all. | `GET /api/v1/sessions/votes` | reads |
 
 ## settings
@@ -599,13 +599,13 @@ the machine-readable document.
 | `spaces.addMember`<br/>Adds a member to a space in a role, granting that role's access. | `POST /api/v1/spaces/addMember` | writes |
 | `spaces.archive`<br/>Archives a space. Its goals and history stay readable. | `POST /api/v1/spaces/archive` | destroys |
 | `spaces.create`<br/>Creates a space, with an optional first manager. | `POST /api/v1/spaces/create` | writes |
-| `spaces.holidays`<br/>The spans a space marks as holidays, oldest first (METHOD.md §7.4). | `GET /api/v1/spaces/holidays` | reads |
+| `spaces.holidays`<br/>The spans a space marks as holidays, oldest first. | `GET /api/v1/spaces/holidays` | reads |
 | `spaces.join`<br/>Joins a space as an ordinary member. | `POST /api/v1/spaces/join` | writes |
 | `spaces.leave`<br/>Leaves a space. The space stays visible and rejoinable. | `POST /api/v1/spaces/leave` | writes |
 | `spaces.list`<br/>Every space this member can see, with their own role in each. | `GET /api/v1/spaces/list` | reads |
 | `spaces.read`<br/>One space with its members and who runs its weekly session. | `GET /api/v1/spaces/read` | reads |
 | `spaces.removeMember`<br/>Removes a member from a space and takes back its access. | `POST /api/v1/spaces/removeMember` | destroys |
-| `spaces.setHolidays`<br/>Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break (METHOD.md §7.4). | `POST /api/v1/spaces/setHolidays` | writes |
+| `spaces.setHolidays`<br/>Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break. | `POST /api/v1/spaces/setHolidays` | writes |
 | `spaces.setMemberRole`<br/>Changes a space member's role, replacing what that role grants. | `POST /api/v1/spaces/setMemberRole` | writes |
 | `spaces.update`<br/>Renames a space or rewrites its mission. | `POST /api/v1/spaces/update` | writes |
 | `spaces.updateSettings`<br/>Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to. | `POST /api/v1/spaces/updateSettings` | writes |
@@ -633,13 +633,13 @@ the machine-readable document.
 |---|---|---|
 | `tasks.addChecklistItem`<br/>Adds one line to a task's checklist. | `POST /api/v1/tasks/addChecklistItem` | writes |
 | `tasks.assign`<br/>Assigns a member, which grants them edit on this task and notifies them. | `POST /api/v1/tasks/assign` | writes |
-| `tasks.board`<br/>One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27. | `GET /api/v1/tasks/board` | reads |
+| `tasks.board`<br/>One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. | `GET /api/v1/tasks/board` | reads |
 | `tasks.create`<br/>Creates a task in a space, optionally behind a key result. | `POST /api/v1/tasks/create` | writes |
 | `tasks.delete`<br/>Soft-deletes a task, its assignments and its checklist. | `POST /api/v1/tasks/delete` | destroys |
 | `tasks.linkedWork`<br/>Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure. | `GET /api/v1/tasks/linkedWork` | reads |
 | `tasks.list`<br/>Tasks, optionally only the caller's own or only the ones due by a date. | `GET /api/v1/tasks/list` | reads |
 | `tasks.move`<br/>Moves a card to a column and a slot, under a lock so two drags cannot lose one. | `POST /api/v1/tasks/move` | writes |
-| `tasks.read`<br/>One task with its assignees and its checklist. Drives screen S-28. | `GET /api/v1/tasks/read` | reads |
+| `tasks.read`<br/>One task with its assignees and its checklist. | `GET /api/v1/tasks/read` | reads |
 | `tasks.removeChecklistItem`<br/>Removes one checklist line. | `POST /api/v1/tasks/removeChecklistItem` | destroys |
 | `tasks.restore`<br/>Brings back a deleted task with the assignments and checklist lines deleted with it. | `POST /api/v1/tasks/restore` | writes |
 | `tasks.setChecklistItem`<br/>Ticks or unticks one checklist line. | `POST /api/v1/tasks/setChecklistItem` | writes |
@@ -662,14 +662,14 @@ the machine-readable document.
 |---|---|---|
 | `workflow.addIssue`<br/>Adds a ranked strategic issue to a cycle's phase 2 list. | `POST /api/v1/workflow/addIssue` | writes |
 | `workflow.addPriority`<br/>Adds a phase 3 priority, optionally promoting the issue it came from. | `POST /api/v1/workflow/addPriority` | writes |
-| `workflow.distributePack`<br/>Records that the input pack reached people, which the §2.6 lead time is measured from. | `POST /api/v1/workflow/distributePack` | writes |
+| `workflow.distributePack`<br/>Records that the input pack reached people, which the input pack's lead time is measured from. | `POST /api/v1/workflow/distributePack` | writes |
 | `workflow.publish`<br/>Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated. | `POST /api/v1/workflow/publish` | writes |
 | `workflow.read`<br/>A cycle's phase completion, its six publish gates and the rows they are computed from. | `GET /api/v1/workflow/read` | reads |
-| `workflow.setBaselineHealth`<br/>Records phase 2's KPI reading in the three §8.5 columns: stable, declining, business as usual. | `POST /api/v1/workflow/setBaselineHealth` | writes |
-| `workflow.setCapacityNotes`<br/>Records what was cut, which publish gate 5 reads (§5.5: if nothing was cut, capacity was not checked). | `POST /api/v1/workflow/setCapacityNotes` | writes |
-| `workflow.setFocusKeyResults`<br/>Chooses which of the year's key results a quarter focuses on (METHOD.md §2.3 phase 3). | `POST /api/v1/workflow/setFocusKeyResults` | writes |
+| `workflow.setBaselineHealth`<br/>Records phase 2's KPI reading in its three columns: stable, declining, business as usual. | `POST /api/v1/workflow/setBaselineHealth` | writes |
+| `workflow.setCapacityNotes`<br/>Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked. | `POST /api/v1/workflow/setCapacityNotes` | writes |
+| `workflow.setFocusKeyResults`<br/>Chooses which of the year's key results a quarter focuses on. | `POST /api/v1/workflow/setFocusKeyResults` | writes |
 | `workflow.setIssueImpact`<br/>Reranks a strategic issue. The list is ordered by impact. | `POST /api/v1/workflow/setIssueImpact` | writes |
-| `workflow.setPackItem`<br/>Marks one of the seven §2.6 input-pack items gathered, with a note. | `POST /api/v1/workflow/setPackItem` | writes |
+| `workflow.setPackItem`<br/>Marks one of the seven input-pack items gathered, with a note. | `POST /api/v1/workflow/setPackItem` | writes |
 | `workflow.setRevalidation`<br/>Records the quarterly revalidation: the frame holds, or changed with a note. | `POST /api/v1/workflow/setRevalidation` | writes |
 
 ## workspace
@@ -686,4 +686,4 @@ the machine-readable document.
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |
 | `workspace.reopenOnboarding`<br/>Offer the workspace's own setup again, keeping every answer it already holds. | `POST /api/v1/workspace/reopenOnboarding` | writes |
 | `workspace.setLifecycle`<br/>Move a cloud workspace between active, suspended and closed. | `POST /api/v1/workspace/setLifecycle` | writes |
-| `workspace.setState`<br/>Set the workspace to active, read-only or frozen (TECHNICAL-PLAN §4.1, the freeze overlay). | `POST /api/v1/workspace/setState` | writes |
+| `workspace.setState`<br/>Set the workspace to active, read-only or frozen. | `POST /api/v1/workspace/setState` | writes |

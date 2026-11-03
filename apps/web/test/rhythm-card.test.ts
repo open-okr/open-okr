@@ -135,6 +135,23 @@ describe("the rhythm and thresholds card", () => {
     expect(form).toContain("useFormDirty");
   });
 
+  test("every threshold explains what its reason cites and where the method sets it out", () => {
+    // A reason that says "(principle 5)" sent the reader to a document they
+    // did not have open. The page works each hint out from the package, so a
+    // principle or section can only be named the way METHOD.md names it.
+    const page = at("../app/admin/rhythm/page.tsx");
+    expect(page).toContain("principlesCited(entry.why)");
+    expect(page).toContain("methodSectionAnchor(cited)");
+    expect(form).toContain(
+      "<ThresholdHintButton name={entry.label} hint={hint} />",
+    );
+    // The two thresholds the check-in card shows as dropdowns have no reason
+    // on the card, so theirs is in the hint.
+    expect(form).toContain("hint={checkInHints.defaultCheckInFrequency}");
+    expect(form).toContain("hint={checkInHints.checkInAnchorDay}");
+    expect(form.match(/withReason\n/g)).toHaveLength(2);
+  });
+
   test("a blank box is the canon, not zero", () => {
     // `Number("")` is 0, which would have written a real override of zero
     // every time somebody cleared a field.

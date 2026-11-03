@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   defaultPractice,
@@ -32,18 +34,50 @@ import { canonThresholds, validateOverrides } from "../src/thresholds.ts";
  * would now refuse. `pnpm method:check` compares the labels with §12.1 itself.
  */
 
+/** Every section number METHOD.md has a heading for: "2", "2.1", "12". */
+const SECTIONS = new Set(
+  [
+    ...readFileSync(
+      join(import.meta.dirname, "../../../docs/specification/METHOD.md"),
+      "utf8",
+    ).matchAll(/^#{2,4} (\d+(?:\.\d+)*)[. ]/gm),
+  ].map((match) => match[1]),
+);
+
 describe("the registry is complete and self-describing", () => {
   it("gives every setting a label, a section, a source and a default among its options", () => {
     for (const key of PRACTICE_KEYS) {
       const entry = PRACTICE[key];
       expect(entry.label, `${key} label`).toBeTruthy();
-      expect(entry.section, `${key} section`).toMatch(/^§/);
+      // The number alone, because the API returns it and a reader never sees
+      // a section sign.
+      expect(SECTIONS.has(entry.section), `${key} section`).toBe(true);
       expect(entry.source, `${key} source`).toBeTruthy();
       expect(entry.options.length, `${key} options`).toBeGreaterThan(1);
       expect(
         (entry.options as readonly string[]).includes(entry.default),
         `${key} default "${entry.default}" is one of its options`,
       ).toBe(true);
+    }
+  });
+
+  it("says in one plain sentence or two what every setting decides, the same for each item of a row", () => {
+    // Shown on the settings screen when somebody hovers a setting's name, so
+    // it is read by people who have not opened METHOD.md: no section signs,
+    // no dashes standing in for a sentence break.
+    const byLabel = new Map<string, string>();
+    for (const key of PRACTICE_KEYS) {
+      const { label, summary } = PRACTICE[key];
+      expect(summary, `${key} summary`).toMatch(/^[A-Z].*\.$/);
+      expect(summary, `${key} summary`).not.toMatch(/[§—]/);
+      expect(summary.length, `${key} summary`).toBeLessThan(260);
+      const shared = byLabel.get(label);
+      if (shared !== undefined) {
+        expect(summary, `${key} shares "${label}" with another item`).toBe(
+          shared,
+        );
+      }
+      byLabel.set(label, summary);
     }
   });
 
@@ -162,6 +196,18 @@ describe("resolution", () => {
     expect(resolved["writing.when"]).toBe("anytime");
     expect(resolved.reviewer).toBe("off");
     expect(Object.hasOwn(resolved, "not.a.setting")).toBe(false);
+  });
+
+  it("no longer offers Scoring, and reads a workspace that stored it as if it never had", () => {
+    // Removed in November 2026: METHOD.md never said what Off did, and nothing
+    // in the product read it, so Off had never changed anything.
+    expect(isPracticeKey("scoring.enabled")).toBe(false);
+    expect(
+      resolvePractice("recommended", { "scoring.enabled": "off" }),
+    ).toEqual(defaultPractice());
+    expect(
+      validatePracticeOverrides({ "scoring.enabled": "off" }).problems,
+    ).toHaveLength(1);
   });
 
   it("reads an unknown profile as Recommended", () => {

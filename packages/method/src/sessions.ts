@@ -139,7 +139,7 @@ export const MONTHLY_REVIEW_ITEMS: readonly MonthlyReviewItem[] = [
   { item: "Resource or priority shifts", recordedAs: "Free text" },
   {
     item: "Continue, update, start or stop",
-    recordedAs: "Each move recorded as §2.9 says",
+    recordedAs: "Each move recorded, with its reason where one is needed",
   },
   {
     item: "Decisions",
@@ -202,7 +202,7 @@ export const WEEKLY_STEPS: readonly WeeklyStep[] = [
  * word.
  */
 export const MID_CYCLE_CALIBRATION: readonly string[] = [
-  "A target may be changed at any time in the cycle, as §2.9 says",
+  "A target may be changed at any time in the cycle",
   "Making a target harder needs no reason",
   "Easing one, toward its baseline, needs a written reason, and the original target stays on record",
   "It got hard is not a reason, and changing a target only because it got hard empties the score of meaning",

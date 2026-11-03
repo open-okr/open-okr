@@ -1,8 +1,10 @@
 import {
   ALIGNMENT_CHECKS,
   CYCLE_CHECKS,
+  describeRule,
   examplesFor,
   KEY_RESULT_CHECKS,
+  methodSectionAnchor,
   OBJECTIVE_CHECKS,
   type QualityCheck,
   TRIGGER_CATALOGUE,
@@ -11,7 +13,11 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { methodDocumentUrl } from "../../../lib/app-version";
 import { getTranslations } from "../../../lib/translations";
+
+/** Where METHOD.md sets a check out, as `describeRule` places it. */
+const checkSection = (id: string): string => describeRule(id)?.section ?? "4";
 
 /**
  * One rule, as METHOD.md defines it (P4-T02b).
@@ -84,6 +90,21 @@ export default async function RulePage({
               {check.id} · {check.title}
             </h1>
             <p className="text-xs text-ink-3">{t(GROUP_LABEL[check.group])}</p>
+            {/* This page is the rule in full as the product runs it. The
+                link is for the reasoning and sources around it, in the
+                METHOD.md the running release shipped. */}
+            <a
+              href={methodDocumentUrl(
+                methodSectionAnchor(checkSection(check.id)) ?? undefined,
+              )}
+              target="_blank"
+              rel="noreferrer"
+              data-testid="rule-method-link"
+              className="mt-1 text-xs font-semibold text-brand-text underline"
+            >
+              {t("methodHint.readMore")}
+              <span className="sr-only"> {t("methodHint.opensInNewTab")}</span>
+            </a>
           </div>
           <Chip tone={check.feedsStrengthScore ? "info" : "neutral"}>
             {check.feedsStrengthScore

@@ -32,9 +32,12 @@ import {
   CLOSE_DECISION_MEANINGS,
   COACH_LINES,
   CYCLE_CHECKS,
+  compareProfiles,
   END_STATE_SHAPES,
   isTriggerKey,
   GATE_TITLES,
+  METHOD_SECTIONS,
+  OPERATING_PRINCIPLES,
   KEY_RESULT_CHECKS,
   MANAGEMENT_RETRO_QUESTIONS,
   MID_CYCLE_CALIBRATION,
@@ -260,6 +263,7 @@ for (const label of practiceLabels) {
 // leave out is the default, which §12.1 names in the next column instead: "As
 // §4" is every check's default and is not repeated among Block, Warn and Off.
 let optionRows = 0;
+let summaryRows = 0;
 for (const line of section(
   method,
   "### 12.1 The settings",
@@ -269,7 +273,21 @@ for (const line of section(
     .split("|")
     .slice(1, -1)
     .map((cell) => cell.trim());
-  const [label, optionsCell, defaultCell] = cells;
+  const [label, summaryCell, optionsCell, defaultCell] = cells;
+  const entry = Object.values(PRACTICE).find(
+    (candidate) => candidate.label === label,
+  );
+  // "What it decides" is shown when somebody hovers the setting's name, so
+  // the screen's sentence and the document's are held to be one sentence.
+  if (entry && summaryCell !== entry.summary) {
+    fail(
+      "practice",
+      `"${label}" decides "${summaryCell ?? ""}" in METHOD.md §12.1 and "${entry.summary}" in the registry`,
+    );
+  }
+  if (entry) {
+    summaryRows += 1;
+  }
   if (
     label === undefined ||
     optionsCell === undefined ||
@@ -278,9 +296,6 @@ for (const line of section(
   ) {
     continue;
   }
-  const entry = Object.values(PRACTICE).find(
-    (candidate) => candidate.label === label,
-  );
   if (!entry) {
     continue;
   }
@@ -316,8 +331,98 @@ if (optionRows < 15) {
     `only ${optionRows} option lists compared in METHOD.md §12.1; the parse is wrong, not the document`,
   );
 }
+if (summaryRows !== practiceLabels.size) {
+  fail(
+    "practice",
+    `${summaryRows} of the registry's ${practiceLabels.size} settings were found with a "What it decides" sentence in METHOD.md §12.1; the parse is wrong, not the document`,
+  );
+}
 
-const documentedProfiles = section(method, "### 12.2 Profiles", "\n---")
+// --- 2b'. Section links -----------------------------------------------------
+//
+// The screens link a reader to the exact section a setting or threshold comes
+// from, through `METHOD_SECTIONS`. Its headings against the document's, both
+// directions, and every section the registries cite against it, so a renamed
+// heading fails here instead of leaving a link to the top of the page.
+
+const documentedHeadings = new Map(
+  [...method.matchAll(/^#{2,3} (\d+(?:\.\d+)*)\.? (.+)$/gm)].map((match) => [
+    match[1] ?? "",
+    (match[2] ?? "").trim(),
+  ]),
+);
+if (documentedHeadings.size < 50) {
+  fail(
+    "sections",
+    `only ${documentedHeadings.size} numbered headings found in METHOD.md; the parse is wrong, not the document`,
+  );
+}
+for (const [number, title] of documentedHeadings) {
+  if (METHOD_SECTIONS[number] !== title) {
+    fail(
+      "sections",
+      `METHOD.md heads section ${number} "${title}", and the package's section table has ${METHOD_SECTIONS[number] === undefined ? "no such section" : `"${METHOD_SECTIONS[number]}"`}`,
+    );
+  }
+}
+for (const number of Object.keys(METHOD_SECTIONS)) {
+  if (!documentedHeadings.has(number)) {
+    fail(
+      "sections",
+      `the package's section table has ${number}, which METHOD.md has no heading for`,
+    );
+  }
+}
+// §1's principles, which threshold reasons cite by number: a screen shows the
+// title beside "(principle 5)", so the two are held to one wording.
+const documentedPrinciples = new Map(
+  [
+    ...section(method, "## 1. The operating principles", "\n---").matchAll(
+      /^(\d+)\. \*\*(.+?)\*\*/gm,
+    ),
+  ].map((match) => [Number(match[1]), match[2] ?? ""]),
+);
+if (documentedPrinciples.size < 10) {
+  fail(
+    "principles",
+    `only ${documentedPrinciples.size} principles found in METHOD.md §1; the parse is wrong, not the document`,
+  );
+}
+for (const [number, title] of documentedPrinciples) {
+  const coded = OPERATING_PRINCIPLES.find((entry) => entry.number === number);
+  if (coded?.title !== title) {
+    fail(
+      "principles",
+      `METHOD.md §1 names principle ${number} "${title}", and the package has ${coded ? `"${coded.title}"` : "no such principle"}`,
+    );
+  }
+}
+for (const { number } of OPERATING_PRINCIPLES) {
+  if (!documentedPrinciples.has(number)) {
+    fail(
+      "principles",
+      `the package has principle ${number}, which METHOD.md §1 does not`,
+    );
+  }
+}
+
+for (const [registry, entries] of [
+  ["practice", Object.entries(PRACTICE)],
+  ["threshold", Object.entries(THRESHOLDS)],
+] as const) {
+  for (const [key, entry] of entries) {
+    for (const cited of entry.section.split(",").map((part) => part.trim())) {
+      if (!documentedHeadings.has(cited)) {
+        fail(
+          "sections",
+          `the ${registry} registry's \`${key}\` cites section ${cited}, which METHOD.md has no heading for`,
+        );
+      }
+    }
+  }
+}
+
+const documentedProfiles = section(method, "### 12.2 Profiles", "### 12.3")
   .split(NEWLINE)
   .map((line) => /^\|\s*\*\*([^*]+)\*\*\s*\|/.exec(line)?.[1])
   .filter((label): label is string => label !== undefined);
@@ -326,6 +431,78 @@ if (documentedProfiles.join("|") !== registeredProfiles.join("|")) {
   fail(
     "practice",
     `METHOD.md §12.2 names the profiles ${documentedProfiles.join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
+}
+
+// --- 2c. The profiles compared ----------------------------------------------
+//
+// §12.3's table against `compareProfiles`, cell by cell, row order included,
+// in both directions. Until November 2026 only the names were compared, and
+// §12.2 listed four "differences" that were the defaults already with nothing
+// to notice. The function this is compared with is held to `switchProfile` by
+// its own test, so the table is held to what choosing a profile does.
+
+const comparisonLines = section(
+  method,
+  "### 12.3 The profiles compared",
+  "\n---",
+)
+  .split(NEWLINE)
+  .filter((line) => line.startsWith("|") && !/^\|\s*-/.test(line))
+  .map((line) =>
+    line
+      .slice(1, line.lastIndexOf("|"))
+      .split("|")
+      .map((cell) => cell.trim()),
+  );
+const [comparisonHeader, ...comparisonRows] = comparisonLines;
+if (comparisonHeader?.slice(1).join("|") !== registeredProfiles.join("|")) {
+  fail(
+    "profiles compared",
+    `METHOD.md §12.3's columns are ${comparisonHeader?.slice(1).join(", ") || "(none found)"}; the package defines ${registeredProfiles.join(", ")}`,
+  );
+}
+if (comparisonRows.length < 10) {
+  fail(
+    "profiles compared",
+    `only ${comparisonRows.length} rows found in METHOD.md §12.3; the parse is wrong, not the document`,
+  );
+}
+const compared = compareProfiles();
+const documentedComparison = new Map(
+  comparisonRows.map((cells) => [cells[0] ?? "", cells.slice(1)]),
+);
+for (const row of compared) {
+  const expected = PROFILE_KEYS.map((key) => row.values[key]);
+  const cells = documentedComparison.get(row.name);
+  if (cells === undefined) {
+    fail(
+      "profiles compared",
+      `${row.differs.map((key) => PROFILES[key].label).join(", ")} set "${row.name}" differently from Recommended, and METHOD.md §12.3 has no row for it`,
+    );
+  } else if (cells.join("|") !== expected.join("|")) {
+    fail(
+      "profiles compared",
+      `"${row.name}" reads ${cells.join(", ")} in METHOD.md §12.3 and ${expected.join(", ")} in the package`,
+    );
+  }
+}
+const comparedNames = compared.map((row) => row.name);
+for (const name of documentedComparison.keys()) {
+  if (!comparedNames.includes(name)) {
+    fail(
+      "profiles compared",
+      `METHOD.md §12.3 has a row "${name}", which no profile sets differently from Recommended`,
+    );
+  }
+}
+if (
+  [...documentedComparison.keys()].join("|") !== comparedNames.join("|") &&
+  documentedComparison.size === compared.length
+) {
+  fail(
+    "profiles compared",
+    "METHOD.md §12.3 lists its rows in another order than the package, which is the order the practice screen shows them in",
   );
 }
 
@@ -958,7 +1135,8 @@ const terms = Object.values(QUALITY_WORD_LISTS).reduce(
 console.log(
   `Conformance passed. ${triggerKeys.length} trigger keys, ${CHECK_IDS.size} checks, ` +
     `${documented.size} thresholds, ${practiceRows.size} practice settings, ` +
-    `${documentedProfiles.length} profiles, ${terms} word-list terms, ` +
+    `${documentedHeadings.size} section links, ${documentedPrinciples.size} principles, ` +
+    `${documentedProfiles.length} profiles compared on ${compared.length} rows, ${terms} word-list terms, ` +
     `${corpusEntries.length} corpus entries and ${ENUMERATIONS_CHECKED} enumerations ` +
     `agree with the documents.`,
 );

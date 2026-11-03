@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import {
+  METHOD_SECTIONS,
+  methodSectionAnchor,
+  OPERATING_PRINCIPLES,
+  principlesCited,
+} from "@openokr/method";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { methodDocumentUrl } from "../../../lib/app-version";
 import { getPool } from "../../../lib/auth";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -14,6 +21,11 @@ import { RhythmForm } from "./rhythm-form";
  * the canon says, which METHOD.md section defines it and why that default is the
  * one shipped, because an admin about to change a threshold should be able to
  * read the argument for leaving it alone.
+ *
+ * **Each threshold's hint is worked out here**: the principles its reason
+ * cites by number, each with its title, the part of the method it comes from,
+ * and a link to that section. A reason that says "(principle 5)" otherwise
+ * sends the reader to a document they do not have open.
  */
 export default async function RhythmSettingsPage() {
   const { t } = await getTranslations();
@@ -37,6 +49,32 @@ export default async function RhythmSettingsPage() {
     workspace.memberId,
   );
 
+  const hints = Object.fromEntries(
+    rhythm.registry.map((entry) => {
+      const cited = entry.section.split(",")[0]?.trim() ?? "";
+      return [
+        entry.key,
+        {
+          why: entry.why,
+          section: METHOD_SECTIONS[cited] ?? null,
+          href: methodDocumentUrl(methodSectionAnchor(cited) ?? undefined),
+          principles: principlesCited(entry.why).flatMap((number) =>
+            OPERATING_PRINCIPLES.filter(
+              (principle) => principle.number === number,
+            ),
+          ),
+        },
+      ];
+    }),
+  );
+  // The two thresholds with a column of their own are the check-in card's
+  // dropdowns, named by their fields there. Handed over under those names so
+  // the form itself never writes a threshold key.
+  const checkInHints = {
+    defaultCheckInFrequency: hints["cadence.checkInFrequency"],
+    checkInAnchorDay: hints["cadence.anchorDay"],
+  };
+
   return (
     <>
       <h1 className="text-lg font-bold text-ink">
@@ -45,7 +83,12 @@ export default async function RhythmSettingsPage() {
       <p className="text-sm text-ink-3">
         {t("admin.rhythm.everyNumberTheMethod")}
       </p>
-      <RhythmForm rhythm={rhythm} canManage={level >= ACCESS_LEVELS.full} />
+      <RhythmForm
+        rhythm={rhythm}
+        hints={hints}
+        checkInHints={checkInHints}
+        canManage={level >= ACCESS_LEVELS.full}
+      />
     </>
   );
 }

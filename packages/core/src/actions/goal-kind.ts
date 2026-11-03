@@ -54,7 +54,7 @@ async function actingMember(
 export const setGoalKind = defineWriteAction({
   name: "goals.setKind",
   summary:
-    "Marks an objective committed or aspirational (METHOD.md §2.8), recording the change and its reason in the objective's activity.",
+    "Marks an objective committed or aspirational, recording the change and its reason in the objective's activity.",
   input: z.object({
     id: z.uuid(),
     kind: z.enum(GOAL_KINDS),

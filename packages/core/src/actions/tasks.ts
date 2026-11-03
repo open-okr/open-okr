@@ -350,7 +350,7 @@ const boardInput = z
 export const readBoard = defineReadAction({
   name: "tasks.board",
   summary:
-    "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included. Drives screen S-27.",
+    "One board: every task in a space, an initiative or a key result, grouped by status. A key result's board holds its linked work, its initiatives' tasks included.",
   input: boardInput,
   output: z.object({
     /**
@@ -713,7 +713,7 @@ export const listTasks = defineReadAction({
 
 export const readTask = defineReadAction({
   name: "tasks.read",
-  summary: "One task with its assignees and its checklist. Drives screen S-28.",
+  summary: "One task with its assignees and its checklist.",
   input: z.object({ id: z.uuid() }),
   output: taskCard.extend({
     spaceName: z.string(),

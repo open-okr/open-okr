@@ -634,8 +634,7 @@ export const recordKpiValue = defineWriteAction({
 
 export const readKpiGrid = defineReadAction({
   name: "kpis.grid",
-  summary:
-    "Every KPI with its recent periods, grouped by category. Drives screen S-20.",
+  summary: "Every KPI with its recent periods, grouped by category.",
   input: z.object({
     /** How many periods to return per KPI, newest first. */
     periods: z.number().int().min(1).max(48).default(12),
@@ -850,7 +849,7 @@ export const readKpiGrid = defineReadAction({
 export const listKpis = defineReadAction({
   name: "kpis.list",
   summary:
-    "Every KPI by title, with its unit, state and achievement. Drives the measure picker on S-09 and S-14.",
+    "Every KPI by title, with its unit, state and achievement. Drives the measure picker on the draft and goal pages.",
   input: z.object({}),
   output: z.object({
     kpis: z.array(
@@ -1270,7 +1269,7 @@ export const launchKpiRecovery = defineWriteAction({
   name: "kpis.launchRecovery",
   domain: "kpi",
   summary:
-    "Creates METHOD.md §6.5's recovery objective from the leading drivers under an unhealthy KPI.",
+    "Creates a recovery objective from the leading drivers under an unhealthy KPI.",
   input: z.object({
     kpiId: z.uuid(),
     /** The cycle the objective lives in. The caller resolves the current one. */
@@ -1539,7 +1538,7 @@ export const recordKpiResponse = defineWriteAction({
 export const readRecoveryBoard = defineReadAction({
   name: "kpis.recoveryBoard",
   summary:
-    "Every unhealthy or recovering KPI across every tree, with its recovery objective. Drives screen S-19.",
+    "Every unhealthy or recovering KPI across every tree, with its recovery objective.",
   input: z.object({}),
   output: z.object({
     cards: z.array(
@@ -1870,7 +1869,7 @@ function toTreeNode(
 export const readKpiTree = defineReadAction({
   name: "kpis.tree",
   summary:
-    "One driver tree as nodes with their corridor state and recovery progress. Drives screen S-18.",
+    "One driver tree as nodes with their corridor state and recovery progress.",
   /**
    * Absent means the first tree, which is what a bare visit should show. An
    * explicit null means the KPIs in no tree at all, which is a real set
@@ -2057,8 +2056,7 @@ export const readSpaceKpiTrees = defineReadAction({
 
 export const readKpiDetail = defineReadAction({
   name: "kpis.detail",
-  summary:
-    "One KPI with its periods, its place in the tree and its formula. Drives screen S-21.",
+  summary: "One KPI with its periods, its place in the tree and its formula.",
   input: z.object({
     kpiId: z.uuid(),
     periods: z.number().int().min(1).max(48).default(24),

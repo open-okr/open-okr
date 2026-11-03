@@ -180,7 +180,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
   {
     table: "accounts",
     decision: "exclude",
-    reason: "Better Auth credentials. §7.3 excludes secrets.",
+    reason: "Better Auth credentials. An export never carries secrets.",
   },
   {
     table: "sessions",
@@ -208,7 +208,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "api_tokens",
     decision: "exclude",
     reason:
-      "Tokens, hashed at rest and scoped to this instance. §7.3 excludes tokens.",
+      "Tokens, hashed at rest and scoped to this instance. An export never carries tokens.",
   },
   {
     table: "device_authorisations",
@@ -219,13 +219,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "sso_connections",
     decision: "exclude",
     reason:
-      "SSO provider configuration with envelope-encrypted client secrets. §7.3 excludes secrets, and the connection is between this instance and a specific identity provider.",
+      "SSO provider configuration with envelope-encrypted client secrets. An export never carries secrets, and the connection is between this instance and a specific identity provider.",
   },
   {
     table: "directory_sync_tokens",
     decision: "exclude",
     reason:
-      "SCIM bearer tokens, hashed at rest and scoped to this instance. §7.3 excludes tokens.",
+      "SCIM bearer tokens, hashed at rest and scoped to this instance. An export never carries tokens.",
   },
   {
     table: "directory_sync_log",
@@ -303,7 +303,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "channel_installations",
     decision: "exclude",
     reason:
-      "A chat provider's installation, granted to this instance. §7.3 excludes channel credentials.",
+      "A chat provider's installation, granted to this instance. An export never carries channel credentials.",
   },
   {
     table: "channel_connections",
@@ -340,7 +340,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "notifications",
     decision: "exclude",
     reason:
-      "Notification rows, which §7.2 already refuses for an import: a notification is a message that was delivered, and re-delivering somebody's year of alerts is the opposite of a migration.",
+      "Notification rows, which an import already refuses: a notification is a message that was delivered, and re-delivering somebody's year of alerts is the opposite of a migration.",
   },
   {
     table: "notification_batches",
@@ -457,7 +457,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "rhythm_settings",
     decision: "export",
     reason:
-      "Check-in day, frequency, grace and the escalation ladders, and the practice profile and settings (METHOD.md §12).",
+      "Check-in day, frequency, grace and the escalation ladders, and the practice profile and settings.",
   },
   {
     table: "scorecard_settings",

@@ -360,7 +360,7 @@ async function digestChannelsFor(
 export const readDigest = defineReadAction({
   name: "sessions.digest",
   summary:
-    "The weekly digest for one session, assembled from METHOD.md §7.2 step 4 with no provider involved.",
+    "The weekly digest for one session, assembled with no provider involved.",
   input: z.object({ sessionId: z.uuid() }),
   output: z
     .object({
