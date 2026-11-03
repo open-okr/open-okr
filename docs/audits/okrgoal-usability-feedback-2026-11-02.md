@@ -233,4 +233,7 @@ Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` 
 | C5 | Each draft objective's body is a native `details`, open by default, "Hide the draft" and "Show the draft" (browser) |
 | IN1 | The Initiatives space filter is a picker with "Every space" first (browser) |
 
+| TB1 | A button at the sidebar's foot, from 1280px, sets `data-sidebar="rail"` on `<html>`; the sidebar's own classes narrow it to the icon rail. Remembered as `openokr.sidebar` (browser: 236px to 68px, kept after a reload) |
+| C3 | No change needed: the note field already takes the row and Save sits at its right end (code) |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

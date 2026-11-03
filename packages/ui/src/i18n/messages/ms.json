@@ -3654,6 +3654,8 @@
   "shell.shortcuts.empty": "Tiada pintasan didaftarkan pada skrin ini lagi.",
   "shell.shortcuts.overlayDescription": "Tunjukkan pintasan papan kekunci",
   "shell.shortcuts.title": "Pintasan papan kekunci",
+  "shell.sidebar.collapse": "Ciutkan bar sisi",
+  "shell.sidebar.expand": "Kembangkan bar sisi",
   "shell.suspended.body": "Akses anda ke ruang kerja ini telah digantung. Log keluar, atau hubungi pentadbir jika anda percaya ini satu kesilapan.",
   "shell.suspended.signOut": "Log keluar",
   "shell.suspended.title": "Akses digantung",

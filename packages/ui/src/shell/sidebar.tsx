@@ -91,7 +91,9 @@ export function Sidebar({
         // the app background, 14px/10px padding, 2px between rows. It shipped
         // flat with 8px padding and 4px gaps, which read as a different panel.
         "bg-linear-to-b from-surface to-bg px-2.5 py-3.5",
-        "md:w-17 xl:w-59",
+        // `data-sidebar="rail"` on an ancestor keeps the icon rail at xl
+        // too, the reader's choice (usability review TB1).
+        "md:w-17 xl:w-59 xl:in-data-[sidebar=rail]:w-17",
       )}
     >
       {/* `.brandmark { padding: 4px 8px 14px }`. */}
@@ -99,7 +101,7 @@ export function Sidebar({
       {groups.map((group) => (
         <div key={group.id} className="flex flex-col gap-0.5">
           {group.label ? (
-            <div className="hidden px-2.5 pt-3.5 pb-1 text-[10.5px] font-bold tracking-wider text-ink-4 uppercase xl:block">
+            <div className="hidden px-2.5 pt-3.5 pb-1 text-[10.5px] font-bold tracking-wider text-ink-4 uppercase xl:block xl:in-data-[sidebar=rail]:hidden">
               {group.label}
             </div>
           ) : null}
@@ -126,7 +128,7 @@ export function Sidebar({
                 // `test/shell.test.tsx` so an audit does not read it as drift
                 // and put it back.
                 "flex items-center gap-2.5 rounded-control px-2.5 py-2 text-sm font-[520] text-ink-2 transition-colors duration-fast ease-out",
-                "hover:bg-ink/[0.045] md:justify-center xl:justify-start",
+                "hover:bg-ink/[0.045] md:justify-center xl:justify-start xl:in-data-[sidebar=rail]:justify-center",
                 item.active &&
                   "bg-brand-weak font-[650] text-brand-text shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--brand)_12%,transparent)] hover:bg-brand-weak",
               )}
@@ -148,10 +150,12 @@ export function Sidebar({
                     with the label, and the accessible name below carries it at
                     every width. */}
                 {item.badge !== undefined ? (
-                  <span className="absolute -top-1 -right-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden" />
+                  <span className="absolute -top-1 -right-1 size-2 rounded-full bg-bad ring-2 ring-surface xl:hidden xl:in-data-[sidebar=rail]:block" />
                 ) : null}
               </span>
-              <span className="hidden truncate xl:inline">{item.label}</span>
+              <span className="hidden truncate xl:inline xl:in-data-[sidebar=rail]:hidden">
+                {item.label}
+              </span>
               {item.badge !== undefined ? (
                 <>
                   {/* Read out at every width, including the collapsed rail
@@ -169,7 +173,7 @@ export function Sidebar({
                     data-sidebar-badge=""
                     title={item.badgeLabel}
                     aria-hidden="true"
-                    className="ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex"
+                    className="ml-auto hidden h-4.25 items-center rounded-full bg-bad-solid px-1.5 text-[10.5px] font-bold text-on-bad-solid xl:inline-flex xl:in-data-[sidebar=rail]:hidden"
                   >
                     {item.badge}
                   </span>

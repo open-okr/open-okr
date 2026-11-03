@@ -51,6 +51,7 @@ import { NewMenu } from "./new-menu.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
+import { SidebarToggle } from "./sidebar-toggle.tsx";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
@@ -357,6 +358,7 @@ export async function AppShellLayout({
             <Sidebar
               groups={groups}
               linkComponent={NavLink}
+              footer={<SidebarToggle />}
               workspaceSwitcher={
                 <WorkspaceSwitcher
                   memberships={memberships}
