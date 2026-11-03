@@ -22,7 +22,7 @@ Source: `okrgoal.com usability & UX feedback.docx` (Downloads, 2 November 2026).
 | Open | Still as the screenshot shows, in the new layout |
 | Decide | Changes a product term, a default, a practice setting or an approved design. Goes to section 10 |
 
-`(browser)` marks a status confirmed on screen. Paths are relative to the repository root. `en.json` is `packages/ui/src/i18n/messages/en.json`. Every copy change goes to `en.json` and `id.json` together.
+`(browser)` marks a status confirmed on screen. Paths are relative to the repository root. `en.json` is `packages/ui/src/i18n/messages/en.json`. Every copy change goes to `en.json` and `ms.json` together.
 
 ## Summary
 
@@ -48,7 +48,7 @@ Bugs, not wording. None needs an owner decision.
 | # | Class | Defect | Evidence | Fix |
 |---|---|---|---|---|
 | D1 | RISK | Unread counts disagree. The demo showed 257 against "50 Unread". Locally the Updates badge reads 21 and Activity reads "18 Unread" (browser). The header counts only the rows loaded, capped at 50 | `apps/web/app/inbox/page.tsx:148`, `INBOX_PAGE_SIZE` = 50 in `packages/core/src/actions/notifications.ts:115` | Count unread on the server. Say in the badge tooltip what it counts, because it now covers To do and Activity |
-| D2 | VIOLATION, UIUX-PLAN §8 | Hard-coded English skips the catalogue: the "Company" scope tab, the To do counters "Overdue", "Today", "This week" and their group labels | `apps/web/app/work-map-screen.tsx:170`, `apps/web/app/review/page.tsx:51-53`, `:109-111` | Catalogue keys in `en` and `id` |
+| D2 | VIOLATION, UIUX-PLAN §8 | Hard-coded English skips the catalogue: the "Company" scope tab, the To do counters "Overdue", "Today", "This week" and their group labels | `apps/web/app/work-map-screen.tsx:170`, `apps/web/app/review/page.tsx:51-53`, `:109-111` | Catalogue keys in `en` and `ms` |
 | D3 | VIOLATION, UIUX-PLAN §8 ("taxonomy labels all live in the catalogues") | Raw stored values reach the screen lowercase and untranslated. Measured on screen: "to come", "no trend yet", "none open", "week streak" (phase 6), "open", "portfolio average", "scored", "not scored" (phase 7), "open", "add driver" (KPI trees), "manager" (Spaces), "via in the app" (To do). Code also prints raw KPI frequency, state and indicator type | `cycle/running-cadence.tsx:177`, `kpis/page.tsx:229`, `:249`, `kpis/grid.tsx:428`, `kpis/trees/tree-rows.tsx:195` | Map every value to a catalogue key in sentence case. Covers K1, K2, K4, K5 and the C6 labels |
 | D4 | VIOLATION, METHOD.md §12.1 confidence display | Running cadence prints confidence as the stored decimal and ignores "Confidence shown as" | `cycle/running-cadence.tsx:227` | `formatConfidence`, as the Work Map uses |
 | D5 | RISK | Annual strategy note is a fixed `w-96` (384px) beside a `w-72` input, wider than a 375px phone | `cycle/annual-frame.tsx:203`, `:213` | Stack full width below `md`. Not opened in the browser (no annual cycle locally) |
