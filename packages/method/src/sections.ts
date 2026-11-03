@@ -80,6 +80,23 @@ export const METHOD_SECTIONS: Readonly<Record<string, string>> = {
   "13": "Sources",
 };
 
+/** The §4 subsection that sets out each group of checks, by id prefix. */
+const CHECK_SECTIONS: Readonly<Record<string, string>> = {
+  OBJ: "4.1",
+  KR: "4.2",
+  AL: "4.3",
+  CY: "4.4",
+};
+
+/**
+ * Where METHOD.md sets out a quality check: its group's subsection, because a
+ * check is a bold paragraph rather than a heading of its own. §4 for an id
+ * with no known prefix.
+ */
+export function checkSection(checkId: string): string {
+  return CHECK_SECTIONS[checkId.split("-")[0] ?? ""] ?? "4";
+}
+
 /**
  * The anchor a Markdown renderer gives a section's heading: "2.9 Writing and
  * changing OKRs at any time" is `29-writing-and-changing-okrs-at-any-time`.
