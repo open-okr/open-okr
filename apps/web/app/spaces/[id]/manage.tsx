@@ -40,18 +40,18 @@ import { SpaceForm } from "../space-form.tsx";
 const ROLES = [
   {
     id: "member",
-    label: "Member",
-    hint: "Works in the space.",
+    label: "spaces.role.member",
+    hint: "spaces.role.memberHint",
   },
   {
     id: "coordinator",
-    label: "Coordinator",
-    hint: "Runs the weekly session.",
+    label: "spaces.role.coordinator",
+    hint: "spaces.role.coordinatorHint",
   },
   {
     id: "manager",
-    label: "Manager",
-    hint: "Owns the space, and covers the coordinator when there is none.",
+    label: "spaces.role.manager",
+    hint: "spaces.role.managerHint",
   },
 ] as const;
 
@@ -154,7 +154,7 @@ export async function SpaceManagement({
                     >
                       {ROLES.map((role) => (
                         <option key={role.id} value={role.id}>
-                          {role.label}
+                          {t(role.label)}
                         </option>
                       ))}
                     </SelectInput>
@@ -186,8 +186,10 @@ export async function SpaceManagement({
           <ul className="flex flex-col gap-0.5 text-xs text-ink-4">
             {ROLES.map((role) => (
               <li key={role.id}>
-                <span className="font-semibold text-ink-3">{role.label}</span>:{" "}
-                {role.hint}
+                <span className="font-semibold text-ink-3">
+                  {t(role.label)}
+                </span>
+                : {t(role.hint)}
               </li>
             ))}
           </ul>
@@ -218,7 +220,7 @@ export async function SpaceManagement({
             >
               {ROLES.map((role) => (
                 <option key={role.id} value={role.id}>
-                  {role.label}
+                  {t(role.label)}
                 </option>
               ))}
             </SelectInput>

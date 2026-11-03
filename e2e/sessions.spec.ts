@@ -472,7 +472,7 @@ test("the weekly figures read the tables the placeholder used to name", async ()
   await expect(
     page.getByRole("heading", { name: "Confidence trend" }),
   ).toBeVisible();
-  await expect(page.getByText("week streak")).toBeVisible();
+  await expect(page.getByText("Week streak")).toBeVisible();
 
   // At least one bar, drawn from a digest rather than from nothing, and the
   // empty state absent because a week has closed.
@@ -533,7 +533,7 @@ test("the space home shows the trend, the streak and last week", async () => {
   await expect(
     page.getByRole("heading", { name: "Confidence trend" }),
   ).toBeVisible();
-  await expect(page.getByText("week streak")).toBeVisible();
+  await expect(page.getByText("Week streak")).toBeVisible();
 
   // Last week is the closed session's digest, not the running one's figures.
   await expect(page.getByText("Last week", { exact: true })).toBeVisible();

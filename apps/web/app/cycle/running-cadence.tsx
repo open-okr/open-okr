@@ -4,9 +4,12 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  formatConfidence,
   type MessageValues,
 } from "@openokr/ui";
 import Link from "next/link";
+import { confidenceDisplay } from "../../lib/confidence-display.ts";
+import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -121,6 +124,8 @@ export async function RunningCadence({
   readonly calibration: CalibrationRecord | null;
 }) {
   const { t } = await getTranslations();
+  // The workspace's "Confidence shown as", as the Work Map reads it (D4).
+  const display = await confidenceDisplay();
   const calibratedOn = calibration ? calibration.at.slice(0, 10) : null;
 
   const held = sessions.filter((one) => one.closed);
@@ -174,7 +179,7 @@ export async function RunningCadence({
                 className="flex items-center justify-between gap-2.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink hover:border-ink-4"
               >
                 <span>
-                  {session.kind}
+                  {nameOf(SESSION_KIND_NAME_KEYS, session.kind, t)}
                   <span className="ml-1.5 text-xs text-ink-3">
                     {session.spaceName}
                   </span>
@@ -225,7 +230,9 @@ export async function RunningCadence({
                   </span>
                   <span className="flex flex-none items-center gap-2">
                     <span className="tabular-nums text-ink-2">
-                      {row.confidence === null ? "—" : row.confidence}
+                      {row.confidence === null
+                        ? "—"
+                        : formatConfidence(row.confidence, display, t)}
                     </span>
                     <Chip tone={moved.tone}>{moved.word}</Chip>
                   </span>

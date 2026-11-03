@@ -14,6 +14,7 @@ import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { nameOf, SPACE_ROLE_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { SectionBoundary } from "../../../lib/section-boundary.tsx";
 import { SectionLoading } from "../../../lib/segment-loading.tsx";
@@ -257,7 +258,7 @@ export default async function SpacePage({
                   <span className="text-ink">{member.name}</span>
                   <span className="flex items-center gap-2">
                     <Chip tone={member.role === "member" ? "neutral" : "brand"}>
-                      {member.role}
+                      {nameOf(SPACE_ROLE_NAME_KEYS, member.role, t)}
                     </Chip>
                     {member.memberId === space.coordinatorMemberId ? (
                       <Chip tone="info">

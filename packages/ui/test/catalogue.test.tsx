@@ -196,6 +196,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMap.goalKeyResult",
   "workMap.keyResult",
   "workMap.objective",
+  // The coordinator role is the term's own hole, like "common.caution".
+  "spaces.role.coordinator",
 ]);
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {

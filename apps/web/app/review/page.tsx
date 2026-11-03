@@ -51,10 +51,10 @@ export const generateMetadata = pageTitle("pageTitle.review");
  */
 
 const GROUPS = [
-  { id: "overdue", label: "Overdue" },
-  { id: "today", label: "Due today" },
-  { id: "this_week", label: "This week" },
-  { id: "upcoming", label: "Upcoming" },
+  { id: "overdue", label: "review.overdue" },
+  { id: "today", label: "review.dueToday" },
+  { id: "this_week", label: "review.thisWeek" },
+  { id: "upcoming", label: "review.upcoming" },
 ] as const;
 
 type Obligation = Awaited<
@@ -109,9 +109,16 @@ export default async function ReviewPage() {
               </p>
             </div>
             <div className="flex flex-none items-center gap-3.5">
-              <Count label="Overdue" value={inbox.counts.overdue} urgent />
-              <Count label="Today" value={inbox.counts.today} />
-              <Count label="This week" value={inbox.counts.thisWeek} />
+              <Count
+                label={t("review.overdue")}
+                value={inbox.counts.overdue}
+                urgent
+              />
+              <Count label={t("review.today")} value={inbox.counts.today} />
+              <Count
+                label={t("review.thisWeek")}
+                value={inbox.counts.thisWeek}
+              />
               {/* The walker through every check-in owed, which this screen
                * already lists one by one (P9-T07a-b). Named apart from each
                * row's own "Check in", which opens that one goal. */}
@@ -156,7 +163,7 @@ export default async function ReviewPage() {
             return (
               <section key={group.id} className="flex flex-col gap-1.5">
                 <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-                  {group.label}
+                  {t(group.label)}
                   <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
                     {rows.length}
                   </span>

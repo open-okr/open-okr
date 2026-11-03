@@ -10,6 +10,7 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { INDICATOR_NAME_KEYS, nameOf } from "../../lib/identifier-names.ts";
 import { recordCell } from "./actions.ts";
 import { CategorySubtotal, RowSparkline } from "./grid-extras.tsx";
 import { kpiCount } from "./kpi-count.ts";
@@ -425,7 +426,9 @@ export function KpiGrid({
                             <span className="truncate">{owner}</span>
                           </span>
                         ) : null}
-                        <Meta>{kpi.indicatorType}</Meta>
+                        <Meta>
+                          {nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t)}
+                        </Meta>
                         {kpi.unit ? <Meta>{kpi.unit}</Meta> : null}
                         {kpi.isCalculated ? (
                           <Tooltip label={kpi.formula ?? ""}>
@@ -645,7 +648,9 @@ export function KpiGrid({
                   </span>
                   <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[11.5px] text-ink-3">
                     {owner ? <span className="truncate">{owner}</span> : null}
-                    <Meta>{kpi.indicatorType}</Meta>
+                    <Meta>
+                      {nameOf(INDICATOR_NAME_KEYS, kpi.indicatorType, t)}
+                    </Meta>
                     {kpi.unit ? <Meta>{kpi.unit}</Meta> : null}
                   </span>
                   <span className="mt-2 flex items-center gap-2.5">

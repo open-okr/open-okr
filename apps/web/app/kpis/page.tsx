@@ -14,6 +14,11 @@ import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
+import {
+  KPI_FREQUENCY_NAME_KEYS,
+  KPI_STATE_NAME_KEYS,
+  nameOf,
+} from "../../lib/identifier-names.ts";
 import { searchHumans } from "../../lib/member-search.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
@@ -177,7 +182,10 @@ export default async function KpisPage({
     filters.frequency
       ? {
           key: "frequency",
-          label: chip(t("common.frequency"), filters.frequency),
+          label: chip(
+            t("common.frequency"),
+            nameOf(KPI_FREQUENCY_NAME_KEYS, filters.frequency, t),
+          ),
         }
       : null,
     filters.state
@@ -185,7 +193,7 @@ export default async function KpisPage({
           key: "state",
           label: chip(
             t("operator.workspaces.columnState"),
-            filters.state.replace("_", " "),
+            nameOf(KPI_STATE_NAME_KEYS, filters.state, t),
           ),
         }
       : null,
@@ -229,7 +237,7 @@ export default async function KpisPage({
             on={filters.frequency === one}
             testId={`filter-frequency-${one}`}
           >
-            {one}
+            {nameOf(KPI_FREQUENCY_NAME_KEYS, one, t)}
           </Pill>
         ))}
       </PanelRow>
@@ -248,7 +256,7 @@ export default async function KpisPage({
             on={filters.state === one}
             testId={`filter-state-${one}`}
           >
-            {one.replace("_", " ")}
+            {nameOf(KPI_STATE_NAME_KEYS, one, t)}
           </Pill>
         ))}
       </PanelRow>

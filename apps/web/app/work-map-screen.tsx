@@ -167,7 +167,7 @@ export async function WorkMapScreen({
   const scopeTabs: ScopeTab[] = [
     {
       key: "company",
-      label: "Company",
+      label: t("workMap.scope.company"),
       href: linkTo({ scope: "company", node: null }),
     },
     ...spaces.map((space) => ({
@@ -179,8 +179,9 @@ export async function WorkMapScreen({
 
   const scopeLabel =
     scope === "company"
-      ? "Company-wide tree"
-      : (spaces.find((space) => space.id === scope)?.name ?? "One space");
+      ? t("workMap.scope.companyTree")
+      : (spaces.find((space) => space.id === scope)?.name ??
+        t("workMap.scope.oneSpace"));
 
   return (
     <>

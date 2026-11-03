@@ -88,12 +88,12 @@ test("the filter state the assist would set is editable in the chips", async () 
   await expect(health).toBeVisible();
   await expect(page.getByRole("link", { name: "Mine" })).toBeVisible();
 
-  // And editable: clicking Any in the Health group clears that half of it and
-  // keeps the other. Scoped to the group, because "Any" and "All" both appear
+  // And editable: clicking All in the Health group clears that half of it and
+  // keeps the other. Scoped to the group, because "All" appears
   // more than once on this bar.
   await page
     .getByRole("group", { name: "Health" })
-    .getByRole("link", { name: "Any" })
+    .getByRole("link", { name: "All" })
     .click();
   await expect(page).toHaveURL(/mine=1/);
   await expect(page).not.toHaveURL(/health=/);
@@ -116,7 +116,7 @@ test("a hand-edited band the product does not have is ignored, not obeyed", asyn
   await expect(
     page
       .getByRole("group", { name: "Health" })
-      .getByRole("link", { name: "Any" }),
+      .getByRole("link", { name: "All" }),
   ).toBeVisible();
   await expect(page).not.toHaveURL(/health=off_track/);
 });

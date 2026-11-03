@@ -2,6 +2,7 @@ import { callAction } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
@@ -29,14 +30,6 @@ export const generateMetadata = pageTitle("pageTitle.sessions");
 
 type Row = Awaited<ReturnType<typeof callAction<"sessions.mine">>>[number];
 
-/** Catalogue keys, one per ritual kind. */
-const KIND_LABEL: Record<string, string> = {
-  weekly: "welcome.rhythm.weekly",
-  monthly: "welcome.rhythm.monthly",
-  quarterly: "sessions.kindQuarterly",
-  annual: "sessions.kindAnnual",
-};
-
 /** The date a member reads, in the workspace's own words rather than an ISO string. */
 function whenLabel(iso: string): string {
   return new Date(iso).toLocaleDateString("en-GB", {
@@ -50,7 +43,6 @@ async function SessionRow({ row }: { readonly row: Row }) {
   const { t } = await getTranslations();
 
   const running = row.state === "running";
-  const kindKey = KIND_LABEL[row.kind];
   return (
     <Link
       href={`/session/${row.id}`}
@@ -71,7 +63,7 @@ async function SessionRow({ row }: { readonly row: Row }) {
           ) : null}
         </div>
         <p className="truncate text-xs text-ink-3">
-          {kindKey ? t(kindKey) : row.kind}
+          {nameOf(SESSION_KIND_NAME_KEYS, row.kind, t)}
           {row.spaceName ? ` · ${row.spaceName}` : ""}
           {` · ${whenLabel(row.scheduledFor)}`}
           {running && row.stageKey ? (

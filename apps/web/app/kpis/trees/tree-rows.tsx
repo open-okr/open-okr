@@ -1,6 +1,12 @@
 import { Bar, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
+import {
+  INDICATOR_NAME_KEYS,
+  KPI_STATE_NAME_KEYS,
+  KPI_TIER_NAME_KEYS,
+  nameOf,
+} from "../../../lib/identifier-names.ts";
 import { getTranslations } from "../../../lib/translations";
 import { LaunchRecovery } from "../recovery/launch.tsx";
 
@@ -174,8 +180,10 @@ export async function KpiTreeRows({
                     : "bg-raised text-ink-2"
                 }`}
               >
-                {node.indicatorType}
-                {node.tier ? ` · ${node.tier}` : ""}
+                {nameOf(INDICATOR_NAME_KEYS, node.indicatorType, t)}
+                {node.tier
+                  ? ` · ${nameOf(KPI_TIER_NAME_KEYS, node.tier, t)}`
+                  : ""}
               </span>
             </span>
             <span className="flex items-center gap-2 max-md:order-last max-md:col-span-2">
@@ -192,7 +200,7 @@ export async function KpiTreeRows({
             </span>
             <span className="flex flex-wrap items-center justify-end gap-1.5 md:justify-start">
               <Chip tone={stateTone(node.state)} dot>
-                {node.state.replace("_", " ")}
+                {nameOf(KPI_STATE_NAME_KEYS, node.state, t)}
               </Chip>
               {node.recovering && node.recoveryGoalId ? (
                 <Link

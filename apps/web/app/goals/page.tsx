@@ -1172,7 +1172,7 @@ function PanelRow({
       <span aria-hidden="true" className={PANEL_LABEL}>
         {label}
       </span>
-      {/* A named group, because "Any" and "All" appear in more than one row
+      {/* A named group, because "All" appears in more than one row
        * and a test that clicks the wrong one passes for the wrong reason;
        * the name is also what a screen reader needs. */}
       <fieldset

@@ -181,3 +181,21 @@ Recommendations are from the `okr-practitioner` review, with the sections it cit
 | Dark theme, compact density, loading, empty, error, permission-denied states | Out of this pass's scope | `ui-audit` per screen |
 | Screen reader output, contrast ratios | Not measured | The procedure in `docs/design/accessibility.md` |
 | Cycle phase 6 load time | The first request timed out at 120 s, the second loaded in 2.7 s. Read as a dev-server first compile | Time it on a production build |
+
+## 13. Progress
+
+### Owner decisions, 3 November 2026
+
+Q1 to Q6 follow the `okr-practitioner` recommendation in section 10: rename Champion to Owner and keep Space (Q1), "Objectives" where a user reads it (Q2), key results stay open with "collapse all" (Q3), keep the inline tour card (Q4), keep the confidence number (Q5), adopt the plain welcome copy (Q6). Q7 and Q8 stay open, because both change METHOD.md. None of the six is built yet. Q1 changes METHOD.md §0 and §2.5 and needs its own change.
+
+### Fixed
+
+| Item | What changed |
+|---|---|
+| D2 | The Work Map's "Company" scope tab and its two scope labels, the To do groups and counters, and the space role picker read the catalogue |
+| D3 | Session kinds, KPI frequency, state, indicator and tier, and space roles are named through maps in `apps/web/lib/identifier-names.ts`, tested against the method's own lists. The phase 6 and 7 chips, KPI tree links, recovery bands, rule chips, nudge provenance, the frequency options and the "done" and "open" chips are in sentence case in `en` and `ms`. "Via in the app" reads "Via the app" |
+| D4 | Running the cadence formats confidence with the workspace's "Confidence shown as" |
+| D8 | A trigger's rule page is titled with the rule's name, with the key under it |
+| G2, IN1 | "Any" reads "All" on the Goals and Initiatives filter rows |
+
+A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

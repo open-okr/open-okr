@@ -11,6 +11,7 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { nameOf, TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 
@@ -188,7 +189,12 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
       <Card>
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
+            {/* The rule's name, with the key it is cited by under it: "See
+             * the rule" opened on the bare key (usability review D8). */}
+            <h1 className="text-lg font-bold text-ink">
+              {nameOf(TRIGGER_NAME_KEYS, trigger.key, t)}
+            </h1>
+            <p className="font-mono text-xs text-ink-4">{trigger.key}</p>
             <p className="text-xs text-ink-3">
               {t("method.detail.proactiveMessageAiNativePlan", {
                 Champion:
