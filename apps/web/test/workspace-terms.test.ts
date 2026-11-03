@@ -98,7 +98,7 @@ describe("the Spaces screen", () => {
     expect(html).toContain(">Teams</h1>");
     expect(html).toContain("No teams yet.");
     expect(html).toContain("New team");
-    expect(html).toContain("Create the team");
+    expect(html).toContain("Create team");
     expect(html).not.toContain(">Spaces</h1>");
   });
 
@@ -108,7 +108,7 @@ describe("the Spaces screen", () => {
 
     expect(html).toContain(">Spaces</h1>");
     expect(html).toContain("No spaces yet.");
-    expect(html).toContain("Create the space");
+    expect(html).toContain("Create space");
   });
 
   it("still renders when the rhythm cannot be read, in the product's own words", async () => {

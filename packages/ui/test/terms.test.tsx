@@ -156,7 +156,7 @@ describe("a renamed term follows into every message that holds it", () => {
     );
     expect(
       translate(CATALOGUES.en, "spaces.createTheSpace", undefined, renamed),
-    ).toBe("Create the team");
+    ).toBe("Create team");
   });
 
   test("is the organisation's word in Bahasa Melayu too, because it holds one", () => {

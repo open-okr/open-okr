@@ -183,7 +183,7 @@ describe("published by its owner", () => {
 
     await expect(
       callAs(TEAMMATE, "goals.publishDraft", { id: goalId }),
-    ).rejects.toThrow(/Only its champion can publish it/);
+    ).rejects.toThrow(/Only its owner can publish it/);
 
     const published = await call<{ awaitingApproval: boolean }>(
       "goals.publishDraft",
