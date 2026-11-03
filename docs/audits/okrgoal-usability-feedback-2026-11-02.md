@@ -229,4 +229,8 @@ Follow-ups recorded, not done here: the reference mockups in `docs/mockups/src` 
 | O2 | Company tab, a divider, and a space picker with "All" first. The company's own space (`isCompany`) is not offered (browser: no root space tab) |
 | O3 | The cycle picker sorts newest start first, and a shorter cycle before a longer one on the same start, so Q1 comes before the year. Not seen with several cycles locally |
 
+| Q3, G3 | Key results stay open. "Collapse all" and "Expand all" above the cards, remembered in `localStorage` as `openokr.goals.fold` (browser: survives a reload) |
+| C5 | Each draft objective's body is a native `details`, open by default, "Hide the draft" and "Show the draft" (browser) |
+| IN1 | The Initiatives space filter is a picker with "Every space" first (browser) |
+
 A count inside a phrase ("6 healthy, 3 watch") stays lowercase on purpose.

@@ -15,6 +15,7 @@ import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { searchHumans } from "../../lib/member-search.ts";
+import { NavSelect } from "../../lib/nav-select.tsx";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -270,20 +271,25 @@ async function Filters({
 
   return (
     <div className="flex flex-col gap-2">
-      <FilterRow label={t("initiatives.space")}>
-        <FilterLink href={href({ space: null })} active={activeSpace === null}>
-          {t("initiatives.everySpace")}
-        </FilterLink>
-        {spaces.map((space) => (
-          <FilterLink
-            key={space.id}
-            href={href({ space: space.id })}
-            active={activeSpace === space.id}
-          >
-            {space.name}
-          </FilterLink>
-        ))}
-      </FilterRow>
+      {/* A picker rather than one pill per space, which ran onto several
+       * lines in a workspace with many teams (usability review IN1). */}
+      <NavSelect
+        label={t("initiatives.space")}
+        value={activeSpace ?? ""}
+        testId="initiatives-space"
+        options={[
+          {
+            value: "",
+            label: t("initiatives.everySpace"),
+            href: href({ space: null }),
+          },
+          ...spaces.map((space) => ({
+            value: space.id,
+            label: space.name,
+            href: href({ space: space.id }),
+          })),
+        ]}
+      />
 
       <FilterRow label={t("checkIn.composer.status")}>
         <FilterLink

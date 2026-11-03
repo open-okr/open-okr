@@ -255,6 +255,9 @@ function Grip({ id, mover }: { readonly id: string; readonly mover: Mover }) {
   );
 }
 
+/** Where "Collapse all" is remembered, per browser (owner decision Q3). */
+const FOLD_KEY = "openokr.goals.fold";
+
 export function OkrTable({
   initialTree,
   initialAt,
@@ -519,6 +522,34 @@ function LiveOkrTable({
         : [...current, id],
     );
 
+  // Key results are open by default, because they are the proof (METHOD.md
+  // §1, owner decision Q3). "Collapse all" is remembered in this browser, so
+  // somebody who reads objectives only gets that view back.
+  const goalIds = goals.map((goal) => goal.id).join(",");
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(FOLD_KEY) === "collapsed") {
+        setCollapsed(goalIds === "" ? [] : goalIds.split(","));
+      }
+    } catch {
+      // Storage refused: the default, every card open.
+    }
+  }, [goalIds]);
+  const allCollapsed =
+    goals.length > 0 && goals.every((goal) => collapsed.includes(goal.id));
+  const foldAll = (fold: boolean) => {
+    setCollapsed(fold ? goals.map((goal) => goal.id) : []);
+    try {
+      if (fold) {
+        window.localStorage.setItem(FOLD_KEY, "collapsed");
+      } else {
+        window.localStorage.removeItem(FOLD_KEY);
+      }
+    } catch {
+      // Not remembered, which is the only cost.
+    }
+  };
+
   return (
     <div
       className="flex flex-col gap-2"
@@ -561,6 +592,20 @@ function LiveOkrTable({
        * a short bar in a narrow column (Goals audit, 2 November 2026). Every
        * cell is still edited where it is read. */}
       <div className="flex flex-col gap-3">
+        {goals.length > 1 ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="okr-fold-all"
+              aria-pressed={allCollapsed}
+              onClick={() => foldAll(!allCollapsed)}
+            >
+              {allCollapsed ? t("okrList.expandAll") : t("okrList.collapseAll")}
+            </Button>
+          </div>
+        ) : null}
         {tree.goals.length === 0 ? (
           <p
             className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-2"

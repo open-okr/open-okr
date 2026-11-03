@@ -21,6 +21,7 @@ import {
   TextInput,
   UnitInput,
 } from "@openokr/ui";
+import { ChevronDown } from "lucide-react";
 import {
   type MemberLike,
   memberOption,
@@ -285,334 +286,358 @@ export async function Drafting({
               </a>
             </span>
           </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            <DraftCoach
-              objective={{
-                id: goal.id,
-                title: goal.title,
-                hasCycle: true,
-                hasTimeframe: false,
-                championId: goal.champion.id,
-                reviewerId: goal.reviewer?.id ?? null,
-                // OBJ-5 counts within the objective's own unit at its level,
-                // the way the stored verdict does, never across every space.
-                objectivesInUnit: objectivesInUnit(goals, goal),
-                level: goal.level as
-                  | "company"
-                  | "department"
-                  | "team"
-                  | "individual",
-                kind: goal.kind,
-              }}
-              keyResults={goal.keyResults.map((keyResult) => ({
-                id: keyResult.id,
-                title: keyResult.title,
-                baseline: keyResult.baselineValue,
-                target: keyResult.targetValue,
-                dueOn: keyResult.dueOn,
-                ownerId: keyResult.ownerId,
-                indicatorType: keyResult.indicatorType as "leading" | "lagging",
-                direction: keyResult.direction as
-                  | "increase"
-                  | "reduce"
-                  | "maintain"
-                  | "move",
-                confidence: keyResult.confidence,
-                keyResultKind: keyResult.kind,
-              }))}
-              thresholds={thresholds}
-              practice={practice}
-              checkTitles={checkTitles}
-            />
-
-            <div className="flex items-center gap-2.5">
-              <Bar
-                value={goal.progressPct}
-                max={thresholds["scoring.progressCeilingPct"]}
-                label={t("cycle.drafting.progressOf", { title: goal.title })}
-                className="h-1.5 flex-1"
+          {/* Each objective folds, so a long draft set can be read as a
+           * list of titles (usability review C5). Open by default; a native
+           * disclosure, so it needs no script and keeps the keyboard. */}
+          <details open className="group">
+            <summary className="flex min-h-8 cursor-pointer list-none items-center gap-1.5 border-line border-b px-3.5 text-xs font-medium text-ink-3 hover:text-ink [&::-webkit-details-marker]:hidden">
+              <ChevronDown
+                aria-hidden="true"
+                className="size-3.5 -rotate-90 transition-transform group-open:rotate-0 motion-reduce:transition-none"
               />
-              <span className="text-xs font-semibold text-ink-3">
-                {Math.round(goal.progressPct)}%
+              <span className="group-open:hidden">
+                {t("cycle.drafting.showDraft")}
               </span>
-            </div>
+              <span className="hidden group-open:inline">
+                {t("cycle.drafting.hideDraft")}
+              </span>
+            </summary>
+            <CardBody className="flex flex-col gap-3">
+              <DraftCoach
+                objective={{
+                  id: goal.id,
+                  title: goal.title,
+                  hasCycle: true,
+                  hasTimeframe: false,
+                  championId: goal.champion.id,
+                  reviewerId: goal.reviewer?.id ?? null,
+                  // OBJ-5 counts within the objective's own unit at its level,
+                  // the way the stored verdict does, never across every space.
+                  objectivesInUnit: objectivesInUnit(goals, goal),
+                  level: goal.level as
+                    | "company"
+                    | "department"
+                    | "team"
+                    | "individual",
+                  kind: goal.kind,
+                }}
+                keyResults={goal.keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  title: keyResult.title,
+                  baseline: keyResult.baselineValue,
+                  target: keyResult.targetValue,
+                  dueOn: keyResult.dueOn,
+                  ownerId: keyResult.ownerId,
+                  indicatorType: keyResult.indicatorType as
+                    | "leading"
+                    | "lagging",
+                  direction: keyResult.direction as
+                    | "increase"
+                    | "reduce"
+                    | "maintain"
+                    | "move",
+                  confidence: keyResult.confidence,
+                  keyResultKind: keyResult.kind,
+                }))}
+                thresholds={thresholds}
+                practice={practice}
+                checkTitles={checkTitles}
+              />
 
-            {goal.contributionStatement ? (
-              <p className="text-xs text-ink-3">
-                {t("cycle.drafting.contributes", {
+              <div className="flex items-center gap-2.5">
+                <Bar
+                  value={goal.progressPct}
+                  max={thresholds["scoring.progressCeilingPct"]}
+                  label={t("cycle.drafting.progressOf", { title: goal.title })}
+                  className="h-1.5 flex-1"
+                />
+                <span className="text-xs font-semibold text-ink-3">
+                  {Math.round(goal.progressPct)}%
+                </span>
+              </div>
+
+              {goal.contributionStatement ? (
+                <p className="text-xs text-ink-3">
+                  {t("cycle.drafting.contributes", {
+                    contributionStatement: goal.contributionStatement,
+                  })}
+                </p>
+              ) : alignmentMapped({
+                  hasParent: Boolean(goal.parentGoalId),
                   contributionStatement: goal.contributionStatement,
-                })}
-              </p>
-            ) : alignmentMapped({
-                hasParent: Boolean(goal.parentGoalId),
-                contributionStatement: goal.contributionStatement,
-                standaloneReason: goal.standaloneReason ?? null,
-              }) ? null : (
-              <p className="text-xs text-warn">
-                {t("cycle.drafting.noParentAndNo")}
-              </p>
-            )}
+                  standaloneReason: goal.standaloneReason ?? null,
+                }) ? null : (
+                <p className="text-xs text-warn">
+                  {t("cycle.drafting.noParentAndNo")}
+                </p>
+              )}
 
-            {goal.keyResults.length === 0 ? (
-              <p className="text-sm text-ink-3">
-                {t("cycle.drafting.noKeyResultsYet")}
-              </p>
-            ) : (
-              <ul className="flex flex-col divide-y divide-line">
-                {goal.keyResults.map((keyResult) => (
-                  <li
-                    key={keyResult.id}
-                    className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0"
-                  >
-                    <div className="flex items-start justify-between gap-2.5">
-                      <span className="flex min-w-0 flex-col">
-                        <span className="text-sm text-ink">
-                          {keyResult.title}
+              {goal.keyResults.length === 0 ? (
+                <p className="text-sm text-ink-3">
+                  {t("cycle.drafting.noKeyResultsYet")}
+                </p>
+              ) : (
+                <ul className="flex flex-col divide-y divide-line">
+                  {goal.keyResults.map((keyResult) => (
+                    <li
+                      key={keyResult.id}
+                      className="flex flex-col gap-1.5 py-2.5 first:pt-0 last:pb-0"
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <span className="flex min-w-0 flex-col">
+                          <span className="text-sm text-ink">
+                            {keyResult.title}
+                          </span>
+                          <span className="text-xs text-ink-3">
+                            {t("common.toWeight", {
+                              direction: keyResult.direction,
+                              indicatorType: keyResult.indicatorType,
+                              baselineValue: formatMeasure(
+                                keyResult.baselineValue,
+                              ),
+                              targetValue:
+                                keyResult.targetValue === null
+                                  ? t("common.noTargetYet")
+                                  : formatMeasure(keyResult.targetValue),
+                              unit: keyResult.unit ? ` ${keyResult.unit}` : "",
+                              weight: keyResult.weight,
+                            })}
+                          </span>
                         </span>
-                        <span className="text-xs text-ink-3">
-                          {t("common.toWeight", {
-                            direction: keyResult.direction,
-                            indicatorType: keyResult.indicatorType,
-                            baselineValue: formatMeasure(
-                              keyResult.baselineValue,
-                            ),
-                            targetValue:
-                              keyResult.targetValue === null
-                                ? t("common.noTargetYet")
-                                : formatMeasure(keyResult.targetValue),
-                            unit: keyResult.unit ? ` ${keyResult.unit}` : "",
-                            weight: keyResult.weight,
-                          })}
+                        <span className="flex-none text-sm font-bold text-ink">
+                          {formatMeasure(
+                            keyResult.currentValue,
+                            keyResult.unit,
+                          )}
                         </span>
-                      </span>
-                      <span className="flex-none text-sm font-bold text-ink">
-                        {formatMeasure(keyResult.currentValue, keyResult.unit)}
-                      </span>
-                    </div>
-                    {canEdit && !keyResult.kpiId ? (
-                      <ActionForm
-                        action={recordValue}
-                        className="flex items-center gap-1.5"
-                      >
-                        <input type="hidden" name="id" value={keyResult.id} />
-                        {/* guided-inputs §4.8: the unit beside it, and
+                      </div>
+                      {canEdit && !keyResult.kpiId ? (
+                        <ActionForm
+                          action={recordValue}
+                          className="flex items-center gap-1.5"
+                        >
+                          <input type="hidden" name="id" value={keyResult.id} />
+                          {/* guided-inputs §4.8: the unit beside it, and
                             nothing sent from an empty field, which the
                             action refuses in words. */}
-                        <MetricInput
-                          id={`value-${keyResult.id}`}
-                          label={t("common.newValueFor3", {
-                            title: keyResult.title,
-                          })}
-                          hideLabel
-                          name="value"
-                          unit={keyResult.unit}
-                          baseline={keyResult.baselineValue}
-                          target={keyResult.targetValue}
-                          placeholder={t("cycle.drafting.whereIsItNow")}
-                          inputClassName="h-auto w-36 px-2 py-1 text-xs"
-                        />
-                        <Button type="submit" className="h-7 px-2 text-xs">
-                          {t("common.record")}
-                        </Button>
-                      </ActionForm>
-                    ) : null}
-                    {keyResult.kpiId ? (
-                      <p className="text-xs text-ink-3">
-                        {t("cycle.drafting.readsItsValueFrom")}
-                      </p>
-                    ) : null}
-                    {canEdit ? (
-                      <ActionForm
-                        action={setKeyResultOwnerAndDate}
-                        className="flex flex-wrap items-center gap-1.5"
-                      >
-                        <input type="hidden" name="id" value={keyResult.id} />
+                          <MetricInput
+                            id={`value-${keyResult.id}`}
+                            label={t("common.newValueFor3", {
+                              title: keyResult.title,
+                            })}
+                            hideLabel
+                            name="value"
+                            unit={keyResult.unit}
+                            baseline={keyResult.baselineValue}
+                            target={keyResult.targetValue}
+                            placeholder={t("cycle.drafting.whereIsItNow")}
+                            inputClassName="h-auto w-36 px-2 py-1 text-xs"
+                          />
+                          <Button type="submit" className="h-7 px-2 text-xs">
+                            {t("common.record")}
+                          </Button>
+                        </ActionForm>
+                      ) : null}
+                      {keyResult.kpiId ? (
+                        <p className="text-xs text-ink-3">
+                          {t("cycle.drafting.readsItsValueFrom")}
+                        </p>
+                      ) : null}
+                      {canEdit ? (
+                        <ActionForm
+                          action={setKeyResultOwnerAndDate}
+                          className="flex flex-wrap items-center gap-1.5"
+                        >
+                          <input type="hidden" name="id" value={keyResult.id} />
+                          <EntityPicker
+                            id={`owner-${keyResult.id}`}
+                            label={t("cycle.drafting.ownerOf", {
+                              title: keyResult.title,
+                            })}
+                            hideLabel
+                            name="ownerId"
+                            defaultValue={keyResult.ownerId}
+                            options={people}
+                            noneLabel={t("cycle.drafting.noOwner")}
+                            search={searchPeople}
+                            className="w-44"
+                            inputClassName="text-xs"
+                          />
+                          <DateInput
+                            id={`due-${keyResult.id}`}
+                            label={t("cycle.drafting.dueDateOf", {
+                              title: keyResult.title,
+                            })}
+                            hideLabel
+                            name="dueOn"
+                            defaultValue={keyResult.dueOn}
+                            inputClassName="h-auto px-1.5 py-1 text-xs"
+                          />
+                          <Button type="submit" className="h-7 px-2 text-xs">
+                            {t("common.save")}
+                          </Button>
+                        </ActionForm>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {canDraft ? (
+                <ActionForm
+                  action={addKeyResult}
+                  label={t("cycle.drafting.addKeyResultTo", {
+                    title: goal.title,
+                  })}
+                  className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
+                >
+                  <input type="hidden" name="goalId" value={goal.id} />
+                  <TextInput
+                    id={`kr-title-${goal.id}`}
+                    label={t("cycle.drafting.theKeyResult")}
+                    hideLabel
+                    name="title"
+                    required
+                    maxLength={500}
+                    placeholder={t("cycle.drafting.whatChangesMeasuredHow")}
+                    inputClassName="placeholder:text-ink-4"
+                  />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {kpis && kpis.length > 0 ? (
+                      <>
+                        {/*
+                         * By hand unless somebody chooses otherwise, because
+                         * that is what every key result was before a KPI could
+                         * be named here, and a default that quietly wired a
+                         * measure to a metric would be a decision nobody made.
+                         */}
                         <EntityPicker
-                          id={`owner-${keyResult.id}`}
-                          label={t("cycle.drafting.ownerOf", {
-                            title: keyResult.title,
-                          })}
+                          id={`kr-kpi-${goal.id}`}
+                          label={t("cycle.drafting.measuredBy")}
                           hideLabel
-                          name="ownerId"
-                          defaultValue={keyResult.ownerId}
-                          options={people}
-                          noneLabel={t("cycle.drafting.noOwner")}
-                          search={searchPeople}
-                          className="w-44"
+                          name="kpiId"
+                          defaultValue={null}
+                          options={kpis.map((kpi) => ({
+                            id: kpi.id,
+                            label: kpi.title,
+                            detail: kpi.unit
+                              ? `${kpi.shortId} · ${kpi.unit}`
+                              : kpi.shortId,
+                          }))}
+                          noneLabel={t("cycle.drafting.measuredByHand")}
+                          className="w-56"
                           inputClassName="text-xs"
                         />
-                        <DateInput
-                          id={`due-${keyResult.id}`}
-                          label={t("cycle.drafting.dueDateOf", {
-                            title: keyResult.title,
-                          })}
-                          hideLabel
-                          name="dueOn"
-                          defaultValue={keyResult.dueOn}
-                          inputClassName="h-auto px-1.5 py-1 text-xs"
-                        />
-                        <Button type="submit" className="h-7 px-2 text-xs">
-                          {t("common.save")}
-                        </Button>
-                      </ActionForm>
+                      </>
                     ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {canDraft ? (
-              <ActionForm
-                action={addKeyResult}
-                label={t("cycle.drafting.addKeyResultTo", {
-                  title: goal.title,
-                })}
-                className="flex flex-col gap-1.5 rounded-md border border-line border-dashed p-2.5"
-              >
-                <input type="hidden" name="goalId" value={goal.id} />
-                <TextInput
-                  id={`kr-title-${goal.id}`}
-                  label={t("cycle.drafting.theKeyResult")}
-                  hideLabel
-                  name="title"
-                  required
-                  maxLength={500}
-                  placeholder={t("cycle.drafting.whatChangesMeasuredHow")}
-                  inputClassName="placeholder:text-ink-4"
-                />
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {kpis && kpis.length > 0 ? (
-                    <>
-                      {/*
-                       * By hand unless somebody chooses otherwise, because
-                       * that is what every key result was before a KPI could
-                       * be named here, and a default that quietly wired a
-                       * measure to a metric would be a decision nobody made.
-                       */}
-                      <EntityPicker
-                        id={`kr-kpi-${goal.id}`}
-                        label={t("cycle.drafting.measuredBy")}
-                        hideLabel
-                        name="kpiId"
-                        defaultValue={null}
-                        options={kpis.map((kpi) => ({
-                          id: kpi.id,
-                          label: kpi.title,
-                          detail: kpi.unit
-                            ? `${kpi.shortId} · ${kpi.unit}`
-                            : kpi.shortId,
-                        }))}
-                        noneLabel={t("cycle.drafting.measuredByHand")}
-                        className="w-56"
-                        inputClassName="text-xs"
-                      />
-                    </>
-                  ) : null}
-                  <SelectInput
-                    id={`kr-dir-${goal.id}`}
-                    label={t("cycle.drafting.direction")}
-                    hideLabel
-                    name="direction"
-                    defaultValue="increase"
-                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
-                  >
-                    {["increase", "reduce", "maintain", "move"].map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </SelectInput>
-                  <SelectInput
-                    id={`kr-ind-${goal.id}`}
-                    label={t("common.indicator")}
-                    hideLabel
-                    name="indicatorType"
-                    defaultValue="leading"
-                    inputClassName="w-auto px-1.5 text-xs text-ink-2"
-                  >
-                    {["leading", "lagging"].map((value) => (
-                      <option key={value} value={value}>
-                        {value}
-                      </option>
-                    ))}
-                  </SelectInput>
-                  {/* `w-32`, because a measure in rupiah or impressions
+                    <SelectInput
+                      id={`kr-dir-${goal.id}`}
+                      label={t("cycle.drafting.direction")}
+                      hideLabel
+                      name="direction"
+                      defaultValue="increase"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
+                    >
+                      {["increase", "reduce", "maintain", "move"].map(
+                        (value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ),
+                      )}
+                    </SelectInput>
+                    <SelectInput
+                      id={`kr-ind-${goal.id}`}
+                      label={t("common.indicator")}
+                      hideLabel
+                      name="indicatorType"
+                      defaultValue="leading"
+                      inputClassName="w-auto px-1.5 text-xs text-ink-2"
+                    >
+                      {["leading", "lagging"].map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </SelectInput>
+                    {/* `w-32`, because a measure in rupiah or impressions
                       runs to nine digits. No `max`: the ceiling on a measure
                       is the unit's, not the product's. */}
-                  <NumberInput
-                    id={`kr-base-${goal.id}`}
-                    label={t("cycle.drafting.baseline")}
-                    hideLabel
-                    name="baselineValue"
-                    required
-                    placeholder={t("cycle.drafting.baseline")}
-                    inputClassName="w-32 text-xs"
-                  />
-                  <NumberInput
-                    id={`kr-target-${goal.id}`}
-                    label={t("common.target")}
-                    hideLabel
-                    name="targetValue"
-                    required
-                    placeholder={t("common.target")}
-                    inputClassName="w-32 text-xs"
-                  />
-                  <EntityPicker
-                    id={`kr-owner-${goal.id}`}
-                    label={t("cycle.drafting.owner")}
-                    hideLabel
-                    name="ownerId"
-                    required
-                    defaultValue={goal.champion.id}
-                    options={people}
-                    search={searchPeople}
-                    className="w-44"
-                    inputClassName="text-xs"
-                  />
-                  <DateInput
-                    id={`kr-due-${goal.id}`}
-                    label={t("cycle.drafting.dueOn")}
-                    hideLabel
-                    name="dueOn"
-                    defaultValue={endsOn}
-                    inputClassName="h-auto px-1.5 py-1.5 text-xs"
-                  />
-                  <UnitInput
-                    id={`kr-unit-${goal.id}`}
-                    label={t("cycle.drafting.unit")}
-                    hideLabel
-                    name="unit"
-                    known={units}
-                    placeholder={t("cycle.drafting.unit")}
-                    inputClassName="w-24 text-xs"
-                  />
-                  <Button type="submit">
-                    {t("cycle.drafting.addKeyResult")}
-                  </Button>
-                </div>
-                {kpis === null ? (
-                  <p role="status" className="text-xs text-warn">
-                    {t("cycle.drafting.kpisUnavailable")}
-                  </p>
-                ) : kpis.length === 0 ? (
-                  <p className="text-xs text-ink-4">
-                    {t("cycle.drafting.noKpisYet")}{" "}
-                    <a className="underline" href="/kpis">
-                      {t("cycle.drafting.addAKpi")}
-                    </a>
-                  </p>
-                ) : (
-                  <p className="text-xs text-ink-4">
-                    {t("cycle.drafting.readFromKpiHelp")}
-                  </p>
-                )}
-              </ActionForm>
-            ) : null}
+                    <NumberInput
+                      id={`kr-base-${goal.id}`}
+                      label={t("cycle.drafting.baseline")}
+                      hideLabel
+                      name="baselineValue"
+                      required
+                      placeholder={t("cycle.drafting.baseline")}
+                      inputClassName="w-32 text-xs"
+                    />
+                    <NumberInput
+                      id={`kr-target-${goal.id}`}
+                      label={t("common.target")}
+                      hideLabel
+                      name="targetValue"
+                      required
+                      placeholder={t("common.target")}
+                      inputClassName="w-32 text-xs"
+                    />
+                    <EntityPicker
+                      id={`kr-owner-${goal.id}`}
+                      label={t("cycle.drafting.owner")}
+                      hideLabel
+                      name="ownerId"
+                      required
+                      defaultValue={goal.champion.id}
+                      options={people}
+                      search={searchPeople}
+                      className="w-44"
+                      inputClassName="text-xs"
+                    />
+                    <DateInput
+                      id={`kr-due-${goal.id}`}
+                      label={t("cycle.drafting.dueOn")}
+                      hideLabel
+                      name="dueOn"
+                      defaultValue={endsOn}
+                      inputClassName="h-auto px-1.5 py-1.5 text-xs"
+                    />
+                    <UnitInput
+                      id={`kr-unit-${goal.id}`}
+                      label={t("cycle.drafting.unit")}
+                      hideLabel
+                      name="unit"
+                      known={units}
+                      placeholder={t("cycle.drafting.unit")}
+                      inputClassName="w-24 text-xs"
+                    />
+                    <Button type="submit">
+                      {t("cycle.drafting.addKeyResult")}
+                    </Button>
+                  </div>
+                  {kpis === null ? (
+                    <p role="status" className="text-xs text-warn">
+                      {t("cycle.drafting.kpisUnavailable")}
+                    </p>
+                  ) : kpis.length === 0 ? (
+                    <p className="text-xs text-ink-4">
+                      {t("cycle.drafting.noKpisYet")}{" "}
+                      <a className="underline" href="/kpis">
+                        {t("cycle.drafting.addAKpi")}
+                      </a>
+                    </p>
+                  ) : (
+                    <p className="text-xs text-ink-4">
+                      {t("cycle.drafting.readFromKpiHelp")}
+                    </p>
+                  )}
+                </ActionForm>
+              ) : null}
 
-            {assistsAvailable && canDraft ? (
-              <SuggestMeasure goalId={goal.id} />
-            ) : null}
-          </CardBody>
+              {assistsAvailable && canDraft ? (
+                <SuggestMeasure goalId={goal.id} />
+              ) : null}
+            </CardBody>
+          </details>
         </Card>
       ))}
 
