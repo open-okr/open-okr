@@ -1,6 +1,9 @@
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { DirectoryTokenForm } from "./directory-form";
+
+export const generateMetadata = pageTitle("pageTitle.adminDirectory");
 
 /**
  * Admin directory sync configuration (P8-T08).

@@ -23,6 +23,7 @@ import { progressCeiling } from "../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { healthWord } from "../../lib/health-words.ts";
 import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
@@ -39,6 +40,8 @@ import { NewObjectiveButton } from "./new-objective.tsx";
 import { OkrDiagram } from "./okr-diagram.tsx";
 import { OkrTable } from "./okr-table.tsx";
 import { CYCLE_PLACEHOLDER, FILTER_PLACEHOLDER } from "./placeholders.ts";
+
+export const generateMetadata = pageTitle("pageTitle.goals");
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).

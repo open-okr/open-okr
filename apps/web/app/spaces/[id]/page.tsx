@@ -14,6 +14,7 @@ import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { SectionBoundary } from "../../../lib/section-boundary.tsx";
 import { SectionLoading } from "../../../lib/segment-loading.tsx";
 import { getTranslations } from "../../../lib/translations";
@@ -31,6 +32,19 @@ import { SpaceHolidaysCard } from "./space-holidays.tsx";
 import { SpaceMembership } from "./space-membership";
 import { SpaceSettingsCard } from "./space-settings.tsx";
 import { SpaceGoals, SpaceKpiTrees } from "./space-work.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.space",
+    async (context) => (await callAction(context, "spaces.read", { id })).name,
+  );
+}
 
 /**
  * A workspace-wide read the reader is not allowed, as null.

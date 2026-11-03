@@ -15,6 +15,7 @@ import { assistOffered } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
 import { searchHumans } from "../../lib/member-search.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { GoalsToolbar } from "../goals/goals-toolbar.tsx";
@@ -26,6 +27,8 @@ import { kpiCount } from "./kpi-count.ts";
 import { KpiPanel } from "./kpi-panel.tsx";
 import { KpiSuggestion } from "./kpi-suggestion.tsx";
 import { KpiTabs } from "./kpi-tabs.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.kpis");
 
 /**
  * The KPI grid (UIUX-PLAN.md §4 S-20, P3-T12, redesigned 2 November 2026).

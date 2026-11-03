@@ -11,7 +11,10 @@ import {
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
+
+export const generateMetadata = pageTitle("pageTitle.methodRule");
 
 /**
  * One rule, as METHOD.md defines it (P4-T02b).

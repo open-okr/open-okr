@@ -2,10 +2,13 @@ import { callAction } from "@openokr/core";
 import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ScheduleSessions } from "./schedule.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.sessions");
 
 /**
  * The session list (UIUX-PLAN.md §4 S-22 to S-25, P5-T01c).

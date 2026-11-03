@@ -2,10 +2,13 @@ import { loadEnv } from "@openokr/config";
 import { callAction, samlServiceProviderUrls } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ConnectionControls } from "./connection-controls";
 import { SSOForm } from "./sso-form";
+
+export const generateMetadata = pageTitle("pageTitle.adminSso");
 
 /**
  * Admin SSO configuration (P8-T07, screen S-36 extension).

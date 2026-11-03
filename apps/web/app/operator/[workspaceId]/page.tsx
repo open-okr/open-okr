@@ -8,6 +8,7 @@ import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { moveLifecycle } from "./lifecycle-actions";
@@ -15,6 +16,30 @@ import { LifecycleForm } from "./lifecycle-form";
 import { setPlan } from "./plan-actions";
 import { OperatorPlanForm } from "./plan-form";
 import { SupportRequest } from "./support-request";
+
+/**
+ * The tab reads the workspace's name, from the list this operator may see;
+ * anything else reads "Workspace" (lib/page-title.ts).
+ */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ workspaceId: string }>;
+}) {
+  const { workspaceId } = await params;
+  try {
+    const operator = await requireOperator();
+    const tenant = (
+      await listTenantsAsOperator(getPool(), operator.userId)
+    ).find((row) => row.workspaceId === workspaceId);
+    if (tenant) {
+      return { title: tenant.name };
+    }
+  } catch {
+    // Not an operator, or the read refused: the page answers that.
+  }
+  return pageTitle("pageTitle.operatorWorkspace")();
+}
 
 /**
  * S-46 Operator workspace detail: one tenant (P8-T03b).

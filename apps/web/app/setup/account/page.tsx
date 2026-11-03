@@ -2,9 +2,12 @@ import { readSetupState } from "@openokr/core";
 import { buttonVariants, cn } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { FinishSetup } from "./finish-setup";
 import { SetupAccountForm } from "./setup-account-form";
+
+export const generateMetadata = pageTitle("pageTitle.setupAccount");
 
 /**
  * The wizard's account step (P1-T09).

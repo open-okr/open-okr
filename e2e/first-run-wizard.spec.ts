@@ -50,7 +50,8 @@ test("an unconfigured instance sends you to the wizard, not to sign in", async (
   await expect(
     page.getByRole("heading", { name: "Set up OKR Goal" }),
   ).toBeVisible();
-  await expect(page).toHaveTitle("OKR Goal");
+  // The screen first, then the instance (UIUX-PLAN §3, browser tab title).
+  await expect(page).toHaveTitle("Set up · OKR Goal");
 });
 
 test("it reports the deployment honestly, including what is not built yet", async ({
@@ -179,7 +180,7 @@ test("the sign-in page carries the deployment's name after setup", async ({
   await expect(
     page.getByRole("heading", { name: "Sign in to OKR Goal" }),
   ).toBeVisible();
-  await expect(page).toHaveTitle("OKR Goal");
+  await expect(page).toHaveTitle("Sign in · OKR Goal");
 });
 
 test("the admin can sign in again", async ({ page }) => {
@@ -251,11 +252,11 @@ test("an administrator renames the instance, and can hand the name back", async 
   const card = page.locator("form").filter({ has: field });
   await field.fill("Acme OKR");
   await card.getByRole("button", { name: "Save" }).click();
-  await expect(page).toHaveTitle("Acme OKR");
+  await expect(page).toHaveTitle("General settings · Acme OKR");
   await expect(field).toHaveValue("Acme OKR");
 
   await field.fill("");
   await card.getByRole("button", { name: "Save" }).click();
-  await expect(page).toHaveTitle("OKR Goal");
+  await expect(page).toHaveTitle("General settings · OKR Goal");
   await expect(field).toHaveValue("OKR Goal");
 });

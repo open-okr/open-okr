@@ -2,8 +2,11 @@ import { listTenantsAsOperator, readUsageAsOperator } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireOperator } from "../../lib/operator";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
+
+export const generateMetadata = pageTitle("pageTitle.operator");
 
 /**
  * S-45 Operator workspaces: the list, and the only screen that shows more

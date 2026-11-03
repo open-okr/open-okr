@@ -13,10 +13,13 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
 import { searchAnyone } from "../../lib/member-search.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { createSpace } from "./actions.ts";
 import { SpaceForm } from "./space-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.spaces");
 
 /**
  * The space list (TECHNICAL-PLAN §4.2, P3-T01).

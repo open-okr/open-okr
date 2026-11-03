@@ -7,6 +7,7 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -31,6 +32,20 @@ import {
   STATUS_OPTIONS,
 } from "../labels.ts";
 import { UnlinkButton } from "./unlink-button.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.initiative",
+    async (context) =>
+      (await callAction(context, "initiatives.read", { id })).title,
+  );
+}
 
 /**
  * One initiative (UIUX-PLAN.md §6 S-26, P5-T10b).

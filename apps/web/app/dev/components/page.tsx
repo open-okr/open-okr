@@ -11,7 +11,10 @@ import {
   VerdictDot,
 } from "@openokr/ui";
 import { notFound } from "next/navigation";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
+
+export const generateMetadata = pageTitle("pageTitle.devComponents");
 
 /**
  * The core component preview page (UIUX-PLAN.md §5: "Each gets a preview

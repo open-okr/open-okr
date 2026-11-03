@@ -12,6 +12,7 @@ import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { AreaTabs } from "../../../lib/area-tabs.tsx";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
@@ -20,6 +21,8 @@ import { KpiPanel } from "../kpi-panel.tsx";
 import { KpiTabs, kpiTabCounts } from "../kpi-tabs.tsx";
 import { addDriver, addTree, fileIntoTree } from "./actions.ts";
 import { KpiTreeRows } from "./tree-rows.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.trees");
 
 /**
  * The KPI driver tree (UIUX-PLAN.md §4 S-18, METHOD.md §6.3, P3-T14).

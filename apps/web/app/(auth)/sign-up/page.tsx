@@ -5,9 +5,12 @@ import {
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
 import { SignUpForm } from "./sign-up-form";
+
+export const generateMetadata = pageTitle("pageTitle.signUp");
 
 /**
  * Registration (screen S-35), which the plan describes as available "where

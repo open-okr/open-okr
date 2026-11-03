@@ -7,12 +7,27 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
 import { publishDocumentAction, updateDocumentAction } from "../actions.ts";
 import { DocumentEditor } from "../document-editor.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.document",
+    async (context) =>
+      (await callAction(context, "documents.read", { id })).title,
+  );
+}
 
 /**
  * One document (UIUX-PLAN.md §6 S-29, P5-T12).

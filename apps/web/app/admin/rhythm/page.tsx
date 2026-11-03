@@ -1,9 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { RhythmForm } from "./rhythm-form";
+
+export const generateMetadata = pageTitle("pageTitle.adminRhythm");
 
 /**
  * The rhythm and thresholds card (UIUX-PLAN.md §4 S-36, TECHNICAL-PLAN §4.14,

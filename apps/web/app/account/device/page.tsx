@@ -1,11 +1,14 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { decide } from "./actions.ts";
 import { DeviceCodeEntry } from "./code-entry.tsx";
 import { DecisionForm } from "./decision-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.device");
 
 /**
  * Authorising a terminal (TECHNICAL-PLAN §14, P5-T07c-b).

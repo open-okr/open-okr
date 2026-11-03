@@ -15,6 +15,7 @@ import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
 import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -46,6 +47,8 @@ import { PhaseRail } from "./phase-rail.tsx";
 import { QualityPanel } from "./quality-panel.tsx";
 import { ReviewAndLearn } from "./review-and-learn.tsx";
 import { RunningCadence } from "./running-cadence.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.cycle");
 
 /**
  * The cycle workspace (UIUX-PLAN.md §4 S-04, S-06 to S-08, P3-T03).

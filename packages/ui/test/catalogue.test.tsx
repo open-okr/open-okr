@@ -148,6 +148,16 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.keyResult",
   "common.kpis",
   "kpis.countOne",
+  // Tab titles that are only the workspace term, or "Import", which Malay
+  // borrows.
+  "pageTitle.adminImports",
+  "pageTitle.checkIn",
+  "pageTitle.cycle",
+  "pageTitle.kpi",
+  "pageTitle.kpis",
+  "pageTitle.objective",
+  "pageTitle.space",
+  "pageTitle.spaces",
   "common.reviewer",
   "cycle.admin.title",
   "cycle.reviewAndLearn.keyResults",

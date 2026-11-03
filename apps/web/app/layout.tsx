@@ -25,7 +25,8 @@ import {
 import "./globals.css";
 
 /**
- * The tab title is the instance's name (completeness review M-33).
+ * The tab title ends in the instance's name (completeness review M-33), after
+ * the screen's own name since 3 November 2026.
  *
  * It was the literal "OpenOKR", so an operator who named their instance saw
  * the software's name on every tab. Resolved per request, like everything
@@ -38,8 +39,11 @@ export async function generateMetadata(): Promise<Metadata> {
   const favicon = brandingImageUrl(
     (await workspaceBrandImages()).faviconBlobId,
   );
+  const name = await getInstanceName();
   return {
-    title: await getInstanceName(),
+    // Each screen names itself in front (lib/page-title.ts); one that does
+    // not, such as a redirect, keeps the instance's name alone.
+    title: { default: name, template: `%s · ${name}` },
     description: "Your OKR coach, built in. Open source, AI-native.",
     icons: { icon: tabIcons(favicon) },
   };

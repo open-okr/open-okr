@@ -1,12 +1,15 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip, SecretInput } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { removePersonalKey, savePersonalKey } from "./actions.ts";
 import { KeyForm } from "./key-form.tsx";
 import { providerWord, STATUS_WORDS } from "./words.ts";
+
+export const generateMetadata = pageTitle("pageTitle.accountAi");
 
 /**
  * A member's own AI keys (completeness review M-36, P2-T14, AI-NATIVE-PLAN

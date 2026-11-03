@@ -10,10 +10,13 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { changePlan } from "./actions";
 import { PlanForm } from "./plan-form";
+
+export const generateMetadata = pageTitle("pageTitle.adminPlan");
 
 /**
  * S-49 Plan and seats: the customer's own side (P8-T05).

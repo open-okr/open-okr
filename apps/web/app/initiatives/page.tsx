@@ -15,6 +15,7 @@ import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { searchHumans } from "../../lib/member-search.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -31,6 +32,8 @@ import {
   STATUS_LABEL,
   STATUS_OPTIONS,
 } from "./labels.ts";
+
+export const generateMetadata = pageTitle("pageTitle.initiatives");
 
 /**
  * The initiative list (UIUX-PLAN.md §6 S-26, P5-T10b).

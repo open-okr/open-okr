@@ -18,6 +18,7 @@ import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX, progressCeiling } from "../../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../../lib/entity-options.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
@@ -29,6 +30,8 @@ import {
   nameKpiKeyResult,
 } from "./actions.ts";
 import { LaunchRecovery } from "./launch.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.recovery");
 
 /**
  * The recovery board (UIUX-PLAN.md §4 S-19, METHOD.md §6.6, P3-T14).

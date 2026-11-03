@@ -4,9 +4,12 @@ import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
 import { FeedLive } from "../../lib/feed-live.tsx";
 import { getInstanceName } from "../../lib/instance-name";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+
+export const generateMetadata = pageTitle("pageTitle.activity");
 
 /**
  * The activity feed (UIUX-PLAN.md §6 S-31, TECHNICAL-PLAN §4.11, P6-G11a).

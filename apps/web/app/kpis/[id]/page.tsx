@@ -21,6 +21,7 @@ import { getPool } from "../../../lib/auth";
 import { KPI_ACHIEVEMENT_MAX } from "../../../lib/ceilings.ts";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { searchHumans } from "../../../lib/member-search.ts";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -29,6 +30,21 @@ import { updateKpiRule } from "../actions.ts";
 import { JudgedBy } from "../judged-by.tsx";
 import { FormulaBuilder } from "./formula-builder.tsx";
 import { TrendNarration } from "./trend-narration.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.kpi",
+    async (context) =>
+      (await callAction(context, "kpis.detail", { kpiId: id, periods: 1 })).kpi
+        .title,
+  );
+}
 
 /**
  * The KPI detail (UIUX-PLAN.md §4 S-21, METHOD.md §6, P3-T14).

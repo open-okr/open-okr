@@ -2,11 +2,14 @@ import { callAction, TEMPLATES } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ArchiveImportCard } from "./archive-import-card.tsx";
 import { ExportCard } from "./export-card.tsx";
 import { ImportWizard } from "./wizard.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.adminImports");
 
 /**
  * The import card (UIUX-PLAN.md §6 S-36, P6-T01b-b).

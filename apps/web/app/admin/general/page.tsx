@@ -8,6 +8,7 @@ import {
 import { listTimezones } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
 import { getMailSettings } from "../../../lib/mail";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { schedulerState } from "../../../lib/scheduler";
 import { tenantFloor } from "../../../lib/tenant-floor";
 import { getTranslations } from "../../../lib/translations";
@@ -19,6 +20,8 @@ import { InstanceNameCard } from "./instance-name-card";
 import { SetupCard } from "./setup-card";
 import { UpdateCheckCard } from "./update-check-card";
 import { WorkspaceStateCard } from "./workspace-state-card";
+
+export const generateMetadata = pageTitle("pageTitle.adminGeneral");
 
 export default async function GeneralSettingsPage() {
   const { t } = await getTranslations();

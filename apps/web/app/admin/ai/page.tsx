@@ -15,6 +15,7 @@ import {
   UrlInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
@@ -40,6 +41,8 @@ import {
   PromptsCard,
   UsageCard,
 } from "./governance.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.adminAi");
 
 /**
  * The AI console: provider, keys and models (UIUX-PLAN.md §6 S-37, P6-G12a).

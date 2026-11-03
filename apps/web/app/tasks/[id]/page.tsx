@@ -7,6 +7,7 @@ import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -23,6 +24,19 @@ import {
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { InlineSelect } from "../../initiatives/inline-select.tsx";
 import { ChecklistLine, DueDateField, RailButton } from "./controls.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.task",
+    async (context) => (await callAction(context, "tasks.read", { id })).title,
+  );
+}
 
 /**
  * One task (UIUX-PLAN.md §6 S-28, P5-T11).

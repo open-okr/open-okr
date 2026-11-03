@@ -9,12 +9,15 @@ import {
 } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { closeCycle } from "../cycle/frame-actions.ts";
+
+export const generateMetadata = pageTitle("pageTitle.scorecard");
 
 /** A result coloured by its own cycle's bands (METHOD.md §3.3, §12). */
 const BAND_TONE = {

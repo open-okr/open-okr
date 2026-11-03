@@ -18,10 +18,27 @@ import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../../lib/access";
 import { assistOffered } from "../../../../lib/assists";
 import { getPool } from "../../../../lib/auth";
+import { itemTitle } from "../../../../lib/page-title.ts";
 import { getTranslations } from "../../../../lib/translations";
 import { requireWorkspace } from "../../../../lib/workspace";
 import type { Minutes } from "./minutes-document";
 import { MinutesWriteUp } from "./minutes-write-up.tsx";
+
+/** The tab reads "Minutes: <session>" (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const { t } = await getTranslations();
+  return itemTitle("pageTitle.minutes", async (context) => {
+    const minutes = await callAction(context, "sessions.minutes", {
+      sessionId: id,
+    });
+    return t("pageTitle.minutesOf", { title: minutes.title });
+  });
+}
 
 /** Catalogue keys, so the words are the reader's language. */
 const VERDICTS: Record<string, string> = {

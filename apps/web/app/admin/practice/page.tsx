@@ -10,9 +10,12 @@ import {
 } from "@openokr/method";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { PracticeForm } from "./practice-form";
+
+export const generateMetadata = pageTitle("pageTitle.adminPractice");
 
 /**
  * The practice settings (UIUX-PLAN.md S-36, METHOD.md §12, P9-T05).

@@ -44,6 +44,7 @@ import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
@@ -63,6 +64,19 @@ import { Rail } from "./rail.tsx";
 import { RetrospectiveField } from "./retrospective-field.tsx";
 import { Sparkline } from "./sparkline.tsx";
 import { ThreadSummary } from "./thread-summary.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.objective",
+    async (context) => (await callAction(context, "goals.read", { id })).title,
+  );
+}
 
 /**
  * A goal (UIUX-PLAN.md §4 S-14, P3-T04).

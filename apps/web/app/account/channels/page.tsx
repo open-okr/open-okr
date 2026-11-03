@@ -8,12 +8,15 @@ import {
   Chip,
   TimeRangeInput,
 } from "@openokr/ui";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { saveCadence, saveDelivery, startLink, unlink } from "./actions.ts";
 import { CadenceForm } from "./cadence-form.tsx";
 import { LinkForm } from "./link-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.accountChannels");
 
 /**
  * Where the product reaches me (UIUX-PLAN.md §6 S-36, P5-T02c).

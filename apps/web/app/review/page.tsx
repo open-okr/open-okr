@@ -10,12 +10,15 @@ import {
 import Link from "next/link";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge, acknowledgeAll } from "./actions.ts";
 import { NudgeProvenance } from "./nudge-provenance.tsx";
 import { ProposalDecision } from "./proposal-decision.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.review");
 
 /**
  * Review, "what I owe" (UIUX-PLAN.md §4 S-02, P3-T08).

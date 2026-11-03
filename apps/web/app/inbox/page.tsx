@@ -6,6 +6,7 @@ import { resolveAccessLevelFor } from "../../lib/access.ts";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -18,6 +19,8 @@ import {
   subjectLink,
   subjectNameKey,
 } from "./subject-link.ts";
+
+export const generateMetadata = pageTitle("pageTitle.inbox");
 
 /**
  * Inbox, "what happened" (UIUX-PLAN.md §4 S-03, P6-G07a).

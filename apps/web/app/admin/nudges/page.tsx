@@ -3,9 +3,12 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NudgeRuleCards } from "./rule-cards.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.adminNudges");
 
 /**
  * The nudge volume card (UIUX-PLAN.md §4 S-36, P4-T04c).
