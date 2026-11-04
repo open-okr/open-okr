@@ -3658,6 +3658,8 @@
   "setup.layout.setupIsAlreadyDone": "Setup is already done",
   "setup.nothingHereNeedsConfiguring": "Nothing here needs configuring. Every setting has a working default, so\n        you can create your account and start. You can change any of it later.",
   "setup.thisDeployment": "This deployment",
+  "shell.activity.offline": "You are offline, so the server cannot answer. What you sent will not arrive until the connection is back.",
+  "shell.activity.stalled": "The server has not answered yet. Keep this page open: what you sent is still on its way.",
   "shell.avatar.workspaceAdmin": "Workspace admin",
   "shell.cycleStrip.andMore": "{first} (and {count} more)",
   "shell.cycleStrip.dueToday": "Due today",

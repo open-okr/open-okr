@@ -3658,6 +3658,8 @@
   "setup.layout.setupIsAlreadyDone": "Persediaan sudah selesai",
   "setup.nothingHereNeedsConfiguring": "Tiada apa di sini yang perlu dikonfigurasi. Setiap tetapan mempunyai nilai lalai yang berfungsi, jadi anda boleh mencipta akaun anda dan bermula. Anda boleh mengubah mana-mana daripadanya kemudian.",
   "setup.thisDeployment": "Pemasangan ini",
+  "shell.activity.offline": "Anda di luar talian, jadi pelayan tidak dapat menjawab. Apa yang anda hantar tidak akan sampai sehingga sambungan kembali.",
+  "shell.activity.stalled": "Pelayan belum menjawab. Biarkan halaman ini terbuka: apa yang anda hantar masih dalam perjalanan.",
   "shell.avatar.workspaceAdmin": "Pentadbiran ruang kerja",
   "shell.cycleStrip.andMore": "{first} (dan {count} lagi)",
   "shell.cycleStrip.dueToday": "Tarikh akhir hari ini",
