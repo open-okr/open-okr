@@ -106,7 +106,7 @@ The owner asked for the footer to be separated from the content by a rule and a 
 | Part | Rule |
 |---|---|
 | Band | A hairline (`line`) over a `surface` band, the width of the content pane: it takes `main`'s padding back as negative margins |
-| Left, everyone | The instance's name, then "Built on OpenOKR, open source", a link to the source repository |
+| Left, everyone | The instance's name, when somebody has named it. The "Built on OpenOKR, open source" link moved on 4 November 2026, at the owner's request, to the avatar menu as "OpenOKR on GitHub", still shown to every member because AGPL-3.0 §13 offers the source to every network user |
 | Right, everyone | ⌘K Search, and ⌘J Ask only while the copilot can answer (an AI affordance is hidden when the provider is off). Hidden on a phone, which has no ⌘ key |
 | Right, full access | The running version, and the newer release as a brand chip, as §3 |
 | Position | Sticky to the foot of the content pane, always in view while the page scrolls under it (the owner asked for it to stay put). On a phone it sits on the fixed tab bar |

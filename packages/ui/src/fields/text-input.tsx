@@ -85,6 +85,16 @@ export function TextInput({
       )}
       <div className={trailing ? "relative" : undefined}>
         <Field.Control
+          // A saved form re-renders from the server with the stored value as
+          // its new default. Base UI refuses a changed default on a mounted
+          // uncontrolled control and logs an error (renaming a space showed
+          // the dev overlay, 4 November 2026), so a new default mounts a
+          // fresh control. A controlled field keeps its one control.
+          key={
+            input.value === undefined
+              ? String(input.defaultValue ?? "")
+              : undefined
+          }
           {...input}
           aria-label={hideLabel ? label : input["aria-label"]}
           name={name}

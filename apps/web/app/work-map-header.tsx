@@ -1,5 +1,4 @@
-import { Chip, type MessageValues, Tooltip } from "@openokr/ui";
-import { Info } from "lucide-react";
+import { Chip, type MessageValues, MethodHint } from "@openokr/ui";
 import Link from "next/link";
 import { NavSelect } from "../lib/nav-select.tsx";
 import { getTranslations } from "../lib/translations";
@@ -164,17 +163,11 @@ function Stat({
     <div className="flex flex-col gap-0.5">
       <span className="flex items-center gap-1 text-[10px] font-bold tracking-wider text-ink-4 uppercase">
         {label}
-        {hint ? (
-          <Tooltip label={hint}>
-            <button
-              type="button"
-              aria-label={hint}
-              className="inline-flex size-6 items-center justify-center rounded text-ink-4 hover:text-ink-2"
-            >
-              <Info aria-hidden="true" className="size-3" />
-            </button>
-          </Tooltip>
-        ) : null}
+        {/* MethodHint, not Tooltip: this is a server component, and Tooltip
+         * clones its child through Base UI's `render`. A child element sent
+         * from the server arrives as a lazy reference, so the clone had no
+         * type and the whole Home page fell to its error boundary. */}
+        {hint ? <MethodHint name={label}>{hint}</MethodHint> : null}
       </span>
       <span className="flex items-baseline gap-1">
         <span className={`text-lg font-bold tabular-nums ${toneClass}`}>
