@@ -1,5 +1,32 @@
 # @openokr/core
 
+## 0.5.0
+
+### Minor Changes
+
+- [#178](https://github.com/open-okr/open-okr/pull/178) [`6f01dbb`](https://github.com/open-okr/open-okr/commit/6f01dbb3e9c7029505643777d3d6aadfef6d8cd4) Thanks [@agungksidik](https://github.com/agungksidik)! - A new read, `notifications.reasonCounts`, returns how many unsnoozed notifications a member has in all, unread and per reason. Activity shows the number on each filter pill, counted on the server rather than over the page it lists. It is in the REST, command line and agent surfaces with the other notification reads.
+
+- [#168](https://github.com/open-okr/open-okr/pull/168) [`3dbba8c`](https://github.com/open-okr/open-okr/commit/3dbba8cabe4736ebe041dec8eb365a4f5ee0bfc9) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Every setting, profile and comparison row on Admin, Practice has a small "i" that says what it decides, in a sentence or two, with a link to its exact section of the method for the full write-up. It opens on hover, on tap and from the keyboard. The practice read in the API now returns each setting's summary as well.
+
+- [#178](https://github.com/open-okr/open-okr/pull/178) [`c426fe2`](https://github.com/open-okr/open-okr/commit/c426fe2115bfdd5ce7eab2edd526fa1b89d0585f) Thanks [@agungksidik](https://github.com/agungksidik)! - An administrator can now choose who may create an account from Admin > General > Registration. The choices are Invitation only, Company email addresses and Anyone. Under Company email addresses, a company address can sign up and start a workspace. A Gmail, Yahoo, Outlook or other free mail address is refused with the reason, unless an invitation admits it. Every change is written to the instance audit chain. `OPENOKR_REGISTRATION` is now read when nothing has been saved in the application. A free mail provider can no longer be added as a trusted email domain.
+
+- [#165](https://github.com/open-okr/open-okr/pull/165) [`8c0fd5b`](https://github.com/open-okr/open-okr/commit/8c0fd5b19d111ce1facb70aa2674aa80b1366be8) Thanks [@agungksidik](https://github.com/agungksidik)! - Administrators see the running version at the foot of every screen, on the right, and a link to the newest GitHub release when the instance is behind it. The check asks GitHub at most once a day, never delays a page and sends nothing about the instance. It is off on a managed cloud, and an administrator turns it off in Admin, General, or the operator with `OPENOKR_UPDATE_CHECK=off`.
+
+- [#165](https://github.com/open-okr/open-okr/pull/165) [`df256ec`](https://github.com/open-okr/open-okr/commit/df256ec8665a698323d33d5af363e4131ce26905) Thanks [@agungksidik](https://github.com/agungksidik)! - Admin, Branding takes a logo and a favicon. A chosen image is previewed in a light and a dark sidebar, or a browser tab, before it is saved. The logo replaces the initials in the sidebar for every member and the favicon is the tab icon on signed-in screens. New action `settings.setWorkspaceBrandingImage`; the colour save now keeps the images.
+
+### Patch Changes
+
+- [#178](https://github.com/open-okr/open-okr/pull/178) [`02e97c4`](https://github.com/open-okr/open-okr/commit/02e97c486934e38c5abd09108d9385aeed732f3e) Thanks [@agungksidik](https://github.com/agungksidik)! - Activity counts unread on the server, so its number no longer stops at the 50 rows a page holds, and the Updates badge says what it adds up ("3 to do, 19 unread"). A check-in group in Activity is named after its objective. A Board card can be deleted, after a confirmation. The first-visit tour outlines its stop with a dashed line that does not read as keyboard focus, scrolls the stop into view, and shows no Back on the first stop.
+
+- [#166](https://github.com/open-okr/open-okr/pull/166) [`28b8ee0`](https://github.com/open-okr/open-okr/commit/28b8ee02b6c0f6c63ae5a1927115dbc33f932a21) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - No screen, message, API description, command help or import report cites a specification section ("§2.9") any more, and no API description names a screen code ("Drives screen S-27"). Each sentence now says what it means in words. The Grafana dashboard "the §13.1 budgets" is now "Performance budgets". The practice settings screen no longer prints a section and source under each setting, and its "As §4" and "As §8.4" options read "As the method". The KPI trees page no longer lists unbuilt work under "Not here yet". The `section` field that `practice.read` and `rhythm.read` return is now the section number alone, "4.5" rather than "§4.5".
+
+- [#178](https://github.com/open-okr/open-okr/pull/178) [`0c03fdf`](https://github.com/open-okr/open-okr/commit/0c03fdfd59290e68f1f67349297858ce2ef08357) Thanks [@agungksidik](https://github.com/agungksidik)! - The person accountable for a goal is called the Owner by default, where it was the Champion. "Champion" is now the suggested alternative on the terminology card, and a workspace that renamed the term keeps its own word. The OKR Champion agent keeps its name. METHOD.md §0 and §2.5 say Owner, and the quality checks, gates, rule pages and goal exports follow. Goal list exports head the column "Owner".
+- Updated dependencies [[`8c20438`](https://github.com/open-okr/open-okr/commit/8c204380b6c21e1984a2a3de321bca7e238b74fd), [`28b8ee0`](https://github.com/open-okr/open-okr/commit/28b8ee02b6c0f6c63ae5a1927115dbc33f932a21), [`e73b7aa`](https://github.com/open-okr/open-okr/commit/e73b7aa0a1d54c84a2619f7337d18121bea3f685), [`0c03fdf`](https://github.com/open-okr/open-okr/commit/0c03fdfd59290e68f1f67349297858ce2ef08357), [`3dbba8c`](https://github.com/open-okr/open-okr/commit/3dbba8cabe4736ebe041dec8eb365a4f5ee0bfc9), [`570a0a2`](https://github.com/open-okr/open-okr/commit/570a0a2f6023efa1b5a613e63b68dbb42b1834b1), [`c426fe2`](https://github.com/open-okr/open-okr/commit/c426fe2115bfdd5ce7eab2edd526fa1b89d0585f), [`f016dd5`](https://github.com/open-okr/open-okr/commit/f016dd5caf2ec0a842d2365fad2a72dc73918660), [`91af1bf`](https://github.com/open-okr/open-okr/commit/91af1bfb6bcc8c82045a752e8e35dcd9cb5f8ab2), [`80354db`](https://github.com/open-okr/open-okr/commit/80354dbe05088a837c1bcef61fff31ac9d067f80)]:
+  - @openokr/method@0.5.0
+  - @openokr/formats@0.5.0
+  - @openokr/config@0.5.0
+  - @openokr/db@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
