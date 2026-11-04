@@ -355,9 +355,7 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
           {t("copilot.copilotPanel.ask")}
         </span>
       </Button>
-      <Kbd className="hidden md:inline-flex">
-        ⌘J
-      </Kbd>
+      <Kbd className="hidden md:inline-flex">⌘J</Kbd>
     </span>
   );
 }
