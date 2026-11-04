@@ -4,6 +4,7 @@ import {
   CardHeader,
   EntityPicker,
   SelectInput,
+  SubmitButton,
   TextArea,
   TextInput,
 } from "@openokr/ui";
@@ -115,12 +116,12 @@ export async function SpaceManagement({
             description={t("spaces.detail.manage.leavingItEmptyClears")}
             rows={2}
           />
-          <button
-            type="submit"
+          <SubmitButton
+            bare
             className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
           >
             {t("common.save")}
-          </button>
+          </SubmitButton>
         </SpaceForm>
 
         <div className="flex flex-col gap-2">
@@ -158,12 +159,12 @@ export async function SpaceManagement({
                         </option>
                       ))}
                     </SelectInput>
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      bare
                       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
                     >
                       {t("common.set")}
-                    </button>
+                    </SubmitButton>
                   </SpaceForm>
                   <SpaceForm action={removeSpaceMember}>
                     <input type="hidden" name="spaceId" value={spaceId} />
@@ -172,12 +173,12 @@ export async function SpaceManagement({
                       name="memberId"
                       value={member.memberId}
                     />
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      bare
                       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-3"
                     >
                       {t("common.remove")}
-                    </button>
+                    </SubmitButton>
                   </SpaceForm>
                 </span>
               </li>
@@ -224,12 +225,12 @@ export async function SpaceManagement({
                 </option>
               ))}
             </SelectInput>
-            <button
-              type="submit"
+            <SubmitButton
+              bare
               className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
             >
               {t("common.add")}
-            </button>
+            </SubmitButton>
           </SpaceForm>
         ) : (
           <p className="text-xs text-ink-4">
@@ -250,12 +251,12 @@ export async function SpaceManagement({
               <p className="text-xs text-ink-3">
                 {t("spaces.detail.manage.itsGoalsSessionsAnd")}
               </p>
-              <button
-                type="submit"
+              <SubmitButton
+                bare
                 className="self-start rounded-md border border-line px-2.5 py-1.5 text-xs font-semibold text-ink-2"
               >
                 {t("common.archive")}
-              </button>
+              </SubmitButton>
             </SpaceForm>
           </details>
         ) : null}

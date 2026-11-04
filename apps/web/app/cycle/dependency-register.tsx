@@ -5,6 +5,7 @@ import {
   Chip,
   EntityPicker,
   type MessageValues,
+  SubmitButton,
   TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -207,12 +208,12 @@ export async function DependencyRegister({
                       {entry.confirmed ? null : (
                         <ActionForm action={confirmDependency}>
                           <input type="hidden" name="id" value={entry.id} />
-                          <button
-                            type="submit"
+                          <SubmitButton
+                            bare
                             className="rounded-md bg-brand px-2 py-1 text-xs font-semibold text-on-brand"
                           >
                             {t("cycle.dependencyRegister.confirm")}
-                          </button>
+                          </SubmitButton>
                         </ActionForm>
                       )}
 
@@ -221,14 +222,14 @@ export async function DependencyRegister({
                       entry.escalatedAt ? null : sponsor ? (
                         <ActionForm action={escalateDependency}>
                           <input type="hidden" name="id" value={entry.id} />
-                          <button
-                            type="submit"
+                          <SubmitButton
+                            bare
                             className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
                           >
                             {t("cycle.dependencyRegister.escalateTo", {
                               name: sponsor.name,
                             })}
-                          </button>
+                          </SubmitButton>
                         </ActionForm>
                       ) : (
                         <span className="text-xs text-ink-4">
@@ -264,22 +265,22 @@ export async function DependencyRegister({
                           className="w-56"
                           inputClassName="text-xs"
                         />
-                        <button
-                          type="submit"
+                        <SubmitButton
+                          bare
                           className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
                         >
                           {t("common.set")}
-                        </button>
+                        </SubmitButton>
                       </ActionForm>
 
                       <ActionForm action={removeDependency}>
                         <input type="hidden" name="id" value={entry.id} />
-                        <button
-                          type="submit"
+                        <SubmitButton
+                          bare
                           className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-3"
                         >
                           {t("common.remove")}
-                        </button>
+                        </SubmitButton>
                       </ActionForm>
                     </div>
                   ) : null}
@@ -335,12 +336,12 @@ export async function DependencyRegister({
               maxLength={500}
               placeholder={t("cycle.dependencyRegister.theRateLimitChange")}
             />
-            <button
-              type="submit"
+            <SubmitButton
+              bare
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
             >
               {t("cycle.dependencyRegister.addToTheRegister")}
-            </button>
+            </SubmitButton>
             <p className="text-xs text-ink-4">
               {t("cycle.dependencyRegister.aNewEntryIs")}
             </p>

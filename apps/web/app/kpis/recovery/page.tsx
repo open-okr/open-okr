@@ -9,6 +9,7 @@ import {
   EntityPicker,
   type MessageValues,
   NumberInput,
+  SubmitButton,
   TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
@@ -493,12 +494,12 @@ export default async function RecoveryBoardPage() {
                             />
                           </div>
                           <div>
-                            <button
-                              type="submit"
+                            <SubmitButton
+                              bare
                               className="rounded-md bg-brand px-3 py-1 text-xs font-semibold text-on-brand"
                             >
                               {t("kpis.recovery.respond.createTheTask")}
-                            </button>
+                            </SubmitButton>
                           </div>
                         </ActionForm>
                       </details>
@@ -614,12 +615,12 @@ export default async function RecoveryBoardPage() {
                               />
                             </div>
                             <div>
-                              <button
-                                type="submit"
+                              <SubmitButton
+                                bare
                                 className="rounded-md bg-brand px-3 py-1 text-xs font-semibold text-on-brand"
                               >
                                 {t("kpis.recovery.respond.addTheKeyResult")}
-                              </button>
+                              </SubmitButton>
                             </div>
                           </ActionForm>
                         )}
@@ -658,12 +659,12 @@ export default async function RecoveryBoardPage() {
                               className="min-w-0 flex-1"
                               inputClassName="text-xs"
                             />
-                            <button
-                              type="submit"
+                            <SubmitButton
+                              bare
                               className="rounded-md border border-line px-3 py-1 text-xs font-semibold text-ink-2"
                             >
                               {t("kpis.recovery.respond.thatOneAnswersIt")}
-                            </button>
+                            </SubmitButton>
                           </ActionForm>
                         ) : null}
                       </details>

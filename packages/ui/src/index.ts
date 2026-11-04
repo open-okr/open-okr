@@ -14,6 +14,7 @@ export * from "./components/chip.tsx";
 export * from "./components/copy-button.tsx";
 export * from "./components/kbd.tsx";
 export * from "./components/method-hint.tsx";
+export * from "./components/submit-button.tsx";
 export * from "./components/tooltip.tsx";
 export * from "./components/verdict-dot.tsx";
 export * from "./feedback/toast.tsx";

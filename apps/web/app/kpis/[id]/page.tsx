@@ -12,6 +12,7 @@ import {
   Chip,
   EntityPicker,
   SelectInput,
+  SubmitButton,
 } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -319,12 +320,12 @@ export default async function KpiDetailPage({
                   <option value="impact">{t("kpis.rule.tierImpact")}</option>
                 </SelectInput>
               </div>
-              <button
-                type="submit"
+              <SubmitButton
+                bare
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
                 {t("common.save")}
-              </button>
+              </SubmitButton>
             </ActionForm>
           </CardBody>
         ) : null}

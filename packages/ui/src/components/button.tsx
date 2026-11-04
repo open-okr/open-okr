@@ -1,4 +1,5 @@
 import { cva, type VariantProps } from "class-variance-authority";
+import { LoaderCircle } from "lucide-react";
 import { type ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "../lib/cn.ts";
 
@@ -53,16 +54,46 @@ export const buttonVariants = cva(
 
 export interface ButtonProps
   extends ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {}
+    VariantProps<typeof buttonVariants> {
+  /**
+   * The server is working on what this button started (UIUX-PLAN §4,
+   * "Acting"): a spinner before the label, and disabled, so a second press
+   * cannot send it twice.
+   */
+  readonly pending?: boolean;
+}
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, type = "button", ...props }, ref) => (
+  (
+    {
+      className,
+      variant,
+      size,
+      type = "button",
+      pending,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => (
     <button
       ref={ref}
       type={type}
       className={cn(buttonVariants({ variant, size }), className)}
+      disabled={disabled || pending}
+      aria-busy={pending || undefined}
       {...props}
-    />
+    >
+      {pending ? (
+        <LoaderCircle
+          aria-hidden="true"
+          data-testid="button-pending"
+          className="size-3.5 animate-spin motion-reduce:animate-none"
+        />
+      ) : null}
+      {children}
+    </button>
   ),
 );
 Button.displayName = "Button";

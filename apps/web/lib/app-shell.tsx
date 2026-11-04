@@ -35,6 +35,7 @@ import {
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
+import { ActivityIndicator } from "./activity-indicator.tsx";
 import { AppFooter } from "./app-footer.tsx";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
@@ -527,6 +528,10 @@ export async function AppShellLayout({
             />
           </div>
         </AppShell>
+        {/* Mounted once, so every save, create, edit and refresh on every
+         * screen shows the bar without each form remembering to (UIUX-PLAN
+         * §4, "Acting"). */}
+        <ActivityIndicator />
         {/*
          * Beside the shell rather than inside the topbar, because the palette is
          * an overlay over the whole page. Mounted once here, so ⌘K works on every

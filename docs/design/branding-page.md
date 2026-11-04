@@ -140,3 +140,15 @@ sits above the settings, and Save comes after them.
 - No new setting, action, migration or message rule.
 - No preset palette.
 - No change to how the colour is derived or refused.
+
+## 8. The workspace name (4 November 2026)
+
+The owner asked where an administrator renames the workspace, after renaming the only space changed nothing in the header. Only setup (S-34) could set it.
+
+| Part | Rule |
+|---|---|
+| Where | A **Workspace name** field across the top of the Branding card, above colour, logo and favicon, because the sidebar shows the name beside the logo |
+| Mirror | Shows the name as it is typed, with its initials, before it is saved |
+| Save | The same one Save button. The name is written through `workspace.rename` only when it differs from the stored one; "Not saved: name" lists it like the other parts. Discard restores it |
+| Refusal | An emptied name is refused with a sentence; the field is also `required` |
+| Not here | A space's name, which is a team's and is renamed under Spaces. The hint says so |

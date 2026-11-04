@@ -127,12 +127,28 @@ export async function saveBranding(
     }
   }
 
-  if (!colourChanged && files.every(({ file }) => file === null)) {
+  // Written only when it differs from the name the page was drawn with, like
+  // the colour. An emptied name is refused: a workspace always has one.
+  const workspaceName = String(form.get("workspaceName") ?? "").trim();
+  const storedName = String(form.get("storedName") ?? "").trim();
+  const nameChanged = workspaceName !== storedName;
+  if (nameChanged && workspaceName === "") {
+    return { error: t("admin.branding.workspaceName.required"), saved: null };
+  }
+
+  if (
+    !nameChanged &&
+    !colourChanged &&
+    files.every(({ file }) => file === null)
+  ) {
     return { error: null, saved: t("admin.branding.nothingToSave") };
   }
 
   const ctx = await context();
   try {
+    if (nameChanged) {
+      await callAction(ctx, "workspace.rename", { name: workspaceName });
+    }
     if (colourChanged) {
       await callAction(ctx, "settings.updateWorkspaceBranding", {
         branding: primaryColor === "" ? {} : { primaryColor },
