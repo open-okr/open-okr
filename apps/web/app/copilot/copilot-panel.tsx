@@ -328,20 +328,36 @@ function ProposalCard({
 function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
   const { t } = useTranslations();
 
+  // One pill, so the hint reads as part of the control rather than a stray
+  // key beside it (owner, 4 November 2026). The hint stays outside the
+  // button for the reason above, and a press on it opens the panel too.
   return (
-    <span className="inline-flex items-center gap-1">
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the button inside is the keyboard path; this only widens the pointer target.
+    // biome-ignore lint/a11y/noStaticElementInteractions: as above.
+    <span
+      onClick={(event) => {
+        // The button handles its own press; only a press beside it lands here.
+        if (!(event.target as HTMLElement).closest("button")) {
+          onClick();
+        }
+      }}
+      className="inline-flex h-7.5 cursor-pointer items-center rounded-control border border-line bg-surface pr-1.5 transition-colors duration-fast ease-out hover:border-line-2"
+    >
       <Button
         variant="ghost"
         onClick={onClick}
         aria-label={t("copilot.copilotPanel.askTheCopilot")}
         aria-keyshortcuts="Control+J Meta+J"
+        className="h-full px-2 hover:bg-transparent"
       >
         <AgentFace className="size-4" />
         <span className="hidden sm:inline">
           {t("copilot.copilotPanel.ask")}
         </span>
       </Button>
-      <Kbd>⌘J</Kbd>
+      <Kbd className="hidden md:inline-flex">
+        ⌘J
+      </Kbd>
     </span>
   );
 }
