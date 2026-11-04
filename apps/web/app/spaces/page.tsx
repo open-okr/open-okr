@@ -5,6 +5,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  SubmitButton,
   TextArea,
   TextInput,
 } from "@openokr/ui";
@@ -160,12 +161,12 @@ export default async function SpacesPage() {
                 search={searchAnyone}
                 className="w-60 md:w-full"
               />
-              <button
-                type="submit"
+              <SubmitButton
+                bare
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand md:mt-6"
               >
                 {t("spaces.createTheSpace")}
-              </button>
+              </SubmitButton>
             </SpaceForm>
           </CardBody>
         </Card>

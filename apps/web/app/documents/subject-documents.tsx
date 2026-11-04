@@ -1,5 +1,12 @@
 import { type ActionCallContext, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, TextInput } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  SubmitButton,
+  TextInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -153,12 +160,12 @@ export async function SubjectDocuments({
               placeholder={t("documents.subjectDocuments.howWeWillWin")}
               className="flex-1"
             />
-            <button
-              type="submit"
+            <SubmitButton
+              bare
               className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
             >
               {t("documents.subjectDocuments.start")}
-            </button>
+            </SubmitButton>
           </ActionForm>
         ) : null}
       </CardBody>

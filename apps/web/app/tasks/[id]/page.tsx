@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, TextInput } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  SubmitButton,
+  TextInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -201,12 +208,12 @@ export default async function TaskPage({
                   placeholder={t("tasks.detail.draftTheCopy")}
                   className="flex-1"
                 />
-                <button
-                  type="submit"
+                <SubmitButton
+                  bare
                   className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
                 >
                   {t("common.add")}
-                </button>
+                </SubmitButton>
               </ActionForm>
             ) : null}
           </CardBody>

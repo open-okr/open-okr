@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, EntityPicker } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  EntityPicker,
+  SubmitButton,
+} from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -304,12 +311,12 @@ export default async function InitiativePage({
                   }))}
                 />
               </div>
-              <button
-                type="submit"
+              <SubmitButton
+                bare
                 className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand"
               >
                 {t("common.link")}
-              </button>
+              </SubmitButton>
             </ActionForm>
           ) : null}
         </CardBody>

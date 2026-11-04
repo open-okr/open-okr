@@ -6,6 +6,7 @@ import {
   CardHeader,
   Chip,
   SelectInput,
+  SubmitButton,
 } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
@@ -399,12 +400,12 @@ export default async function ScorecardPage() {
                     </option>
                   ))}
                 </SelectInput>
-                <button
-                  type="submit"
+                <SubmitButton
+                  bare
                   className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
                 >
                   {t("scorecard.close")}
-                </button>
+                </SubmitButton>
               </ActionForm>
 
               <p className="text-xs text-ink-4">

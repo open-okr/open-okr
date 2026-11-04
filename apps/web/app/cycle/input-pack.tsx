@@ -5,6 +5,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  SubmitButton,
   TextInput,
 } from "@openokr/ui";
 import { getTranslations } from "../../lib/translations";
@@ -80,8 +81,8 @@ export async function InputPack({
                       name="gathered"
                       value={String(item.gathered)}
                     />
-                    <button
-                      type="submit"
+                    <SubmitButton
+                      bare
                       aria-pressed={item.gathered}
                       aria-label={
                         item.gathered
@@ -99,7 +100,7 @@ export async function InputPack({
                       }
                     >
                       ✓
-                    </button>
+                    </SubmitButton>
                   </ActionForm>
                 ) : (
                   <span
