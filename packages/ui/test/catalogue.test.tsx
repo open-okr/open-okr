@@ -277,8 +277,9 @@ const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set([
   "lib.supportBanner.supportIsHere",
   // What the software speaks, whatever the instance is called.
   "admin.sso.connectAnIdentityProvider",
-  // The footer's credit to the software the instance runs.
-  "shell.footer.builtOn",
+  // The avatar menu's link to the software's source, offered to every
+  // member because the licence is AGPL-3.0 (§13).
+  "avatarMenu.sourceCode",
 ]);
 
 describe("the instance's name is not written into the catalogue (M-33)", () => {
