@@ -11,6 +11,7 @@ import {
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { namedOption } from "../../../lib/entity-options.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -21,6 +22,8 @@ import {
 } from "./actions";
 import { InviteForm } from "./invite-form";
 import { RevokeButton } from "./revoke-button";
+
+export const generateMetadata = pageTitle("pageTitle.adminInvitations");
 
 /**
  * Invitations (UIUX-PLAN.md §6 S-36, TECHNICAL-PLAN §4.1, P6-G06).

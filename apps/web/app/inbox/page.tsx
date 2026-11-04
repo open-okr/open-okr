@@ -14,6 +14,7 @@ import { faceForTrigger } from "../../lib/agent-moods.ts";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { TRIGGER_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -26,6 +27,8 @@ import {
   subjectLink,
   subjectNameKey,
 } from "./subject-link.ts";
+
+export const generateMetadata = pageTitle("pageTitle.inbox");
 
 /**
  * Inbox, "what happened" (UIUX-PLAN.md §4 S-03, P6-G07a).
@@ -153,7 +156,17 @@ export default async function InboxPage({
     }
   }
 
-  const unread = rows.filter((row) => row.readAt === null).length;
+  // Counted on the server: the rows are one page of at most 50, so counting
+  // them said "50 Unread" beside a badge of 257 (usability review D1).
+  // One read for the header and every pill (usability review I1).
+  const counts = await callAction(context, "notifications.reasonCounts", {});
+  const { unread } = counts;
+  const countFor = (id: string): number =>
+    id === ""
+      ? counts.total
+      : id === "unread"
+        ? counts.unread
+        : (counts.byReason[id] ?? 0);
 
   return (
     <>
@@ -189,6 +202,9 @@ export default async function InboxPage({
                 }
               >
                 {one.labelKey ? t(one.labelKey) : one.id}
+                <span className="ml-1 font-normal tabular-nums opacity-75">
+                  {countFor(one.id)}
+                </span>
               </Link>
             ))}
           </CardBody>

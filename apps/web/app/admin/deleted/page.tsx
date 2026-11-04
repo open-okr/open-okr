@@ -2,10 +2,13 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { resolveLocale } from "../../../lib/locale";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { RestoreButton } from "./restore-button";
+
+export const generateMetadata = pageTitle("pageTitle.adminDeleted");
 
 /**
  * Deleted items (screen S-36, completeness review M-13).

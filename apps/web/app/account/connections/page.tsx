@@ -1,11 +1,14 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getInstanceName } from "../../../lib/instance-name";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { revoke } from "./actions.ts";
 import { RevokeForm } from "./revoke-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.connections");
 
 /**
  * The agents this person connected, and how they end one (screen S-40,

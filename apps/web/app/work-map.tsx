@@ -14,6 +14,7 @@ import {
   type ConfidenceDisplay,
   formatConfidence,
   type MessageValues,
+  Tooltip,
 } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
@@ -118,7 +119,24 @@ function ConfidenceChip({
       : verdict.band === "medium"
         ? t("workMap.confidenceMed", value)
         : t("workMap.confidenceLow", value);
-  return <Chip tone={tone}>{label}</Chip>;
+  // The bands on hover, in the same display as the figure, so "High, 8 in
+  // 10" says where High starts (owner decision Q5: keep the number).
+  const bands = t("workMap.confidenceBands", {
+    high: formatConfidence(thresholds["scoring.confidenceHigh"], display, t),
+    low: formatConfidence(thresholds["scoring.confidenceLow"], display, t),
+  });
+  return (
+    // Not a tab stop: one per row would put dozens in the tree's way. The
+    // bands are read out with the chip instead.
+    <Tooltip label={bands}>
+      <span className="inline-flex">
+        <Chip tone={tone}>
+          {label}
+          <span className="sr-only">. {bands}</span>
+        </Chip>
+      </span>
+    </Tooltip>
+  );
 }
 
 /**
@@ -266,8 +284,19 @@ export async function GoalTable({
                     <a
                       href={rowHref(node)}
                       className="flex items-center gap-2"
-                      style={{ paddingLeft: `${node.depth * 18}px` }}
+                      style={{
+                        paddingLeft: `${Math.max(node.depth - 1, 0) * 18}px`,
+                      }}
                     >
+                      {/* An elbow to the parent, as the KPI trees draw it,
+                       * where indentation alone left the nesting to be
+                       * guessed (usability review O4). */}
+                      {node.depth > 0 ? (
+                        <span
+                          aria-hidden="true"
+                          className="-mt-3 ml-1 h-5 w-3.5 flex-none rounded-bl-md border-b-[1.5px] border-l-[1.5px] border-line-2"
+                        />
+                      ) : null}
                       <RowKindChip
                         kind={node.kind}
                         label={rowKind[node.kind]}

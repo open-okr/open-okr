@@ -219,7 +219,10 @@ export function Attachments({
               disabled={pending}
               aria-label={t("attachments.field")}
               data-testid="attachment-input"
-              className="text-xs text-ink-2"
+              // The browser's own "Choose file" drawn as the kit's secondary
+              // button, still the native input so keyboard and drop work
+              // (usability review IN3).
+              className="text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4"
             />
             <Button
               type="button"

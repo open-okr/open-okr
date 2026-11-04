@@ -94,7 +94,8 @@ describe("a workspace that renamed nothing reads exactly what it read before", (
       undefined,
       "We could not load the check-in composer",
     ],
-    ["common.champion", undefined, "Champion"],
+    // "Owner" since the usability review's Q1, 3 November 2026.
+    ["common.champion", undefined, "Owner"],
     ["workMap.keyResult", undefined, "key result"],
   ] as const)("%s", (key, values, expected) => {
     expect(translate(CATALOGUES.en, key, values)).toBe(expected);
@@ -155,7 +156,7 @@ describe("a renamed term follows into every message that holds it", () => {
     );
     expect(
       translate(CATALOGUES.en, "spaces.createTheSpace", undefined, renamed),
-    ).toBe("Create the team");
+    ).toBe("Create team");
   });
 
   test("is the organisation's word in Bahasa Melayu too, because it holds one", () => {

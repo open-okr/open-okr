@@ -533,3 +533,36 @@ describe("subscriptions.read (P6-G07b)", () => {
     ).rejects.toThrow(/no such subject/i);
   });
 });
+
+describe("notifications.reasonCounts (usability review I1)", () => {
+  it("counts every row, the unread ones, and each reason, not one page", async () => {
+    const first = await writeNotification({
+      recipientMemberId: ownerMemberId,
+      subjectType: null,
+      subjectId: null,
+      reason: "mentioned",
+    });
+    await writeNotification({
+      recipientMemberId: ownerMemberId,
+      subjectType: null,
+      subjectId: null,
+      reason: "mentioned",
+    });
+    await callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "notifications.markRead",
+      { notificationId: first },
+    );
+
+    const counts = await callAction(
+      { pool: await pool(), ...context(OWNER) },
+      "notifications.reasonCounts",
+      {},
+    );
+    expect(counts).toEqual({
+      total: 2,
+      unread: 1,
+      byReason: { mentioned: 2 },
+    });
+  });
+});

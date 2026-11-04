@@ -85,6 +85,7 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.sso.ssoForm.signOnUrlPlaceholder",
   "admin.sso.ssoForm.urlPlaceholder",
   "common.esc",
+  "common.enter",
   // The shortcut itself, as the tour's last stop is named for it (L-08).
   "tour.search.title",
   // Abbreviations the method keeps in English in every language.
@@ -146,6 +147,17 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "common.count.objectiveOther",
   "common.keyResult",
   "common.kpis",
+  "kpis.countOne",
+  // Tab titles that are only the workspace term, or "Import", which Malay
+  // borrows.
+  "pageTitle.adminImports",
+  "pageTitle.checkIn",
+  "pageTitle.cycle",
+  "pageTitle.kpi",
+  "pageTitle.kpis",
+  "pageTitle.objective",
+  "pageTitle.space",
+  "pageTitle.spaces",
   "common.reviewer",
   "cycle.admin.title",
   "cycle.reviewAndLearn.keyResults",
@@ -184,6 +196,16 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "workMap.goalKeyResult",
   "workMap.keyResult",
   "workMap.objective",
+  // The coordinator role is the term's own hole, like "common.caution".
+  "spaces.role.coordinator",
+  // The Work Map's two pickers are named by the term's own hole.
+  "workMap.scope.cycle",
+  "workMap.scope.space",
+  // The owner column heading is the champion term's own hole.
+  "okrList.champion",
+  // The Outdated stat's unit is the objective term's own hole.
+  "workMapHeader.outdatedUnitOne",
+  "workMapHeader.outdatedUnitOther",
 ]);
 
 describe("Bahasa Melayu is translated (completeness review M-15)", () => {
@@ -255,6 +277,8 @@ const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set([
   "lib.supportBanner.supportIsHere",
   // What the software speaks, whatever the instance is called.
   "admin.sso.connectAnIdentityProvider",
+  // The footer's credit to the software the instance runs.
+  "shell.footer.builtOn",
 ]);
 
 describe("the instance's name is not written into the catalogue (M-33)", () => {

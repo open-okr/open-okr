@@ -244,7 +244,7 @@ describe("a title", () => {
 });
 
 describe("the kind (METHOD.md §2.8, P9-T11b-a)", () => {
-  const LABEL = "Kind of Make onboarding the reason teams stay";
+  const LABEL = "Type of Make onboarding the reason teams stay";
 
   async function choose(value: string) {
     const select = field(LABEL) as HTMLSelectElement;
@@ -339,7 +339,7 @@ describe("the key result's kind (METHOD.md §2.10, P9-T12c-a)", () => {
     expect(
       field("Current value for Activation from 30% to 45%"),
     ).not.toBeNull();
-    await choose("Kind of key result Activation from 30% to 45%", "milestone");
+    await choose("Type of key result Activation from 30% to 45%", "milestone");
     expect(runOkrMutation).toHaveBeenCalledWith({
       kind: "patchKeyResult",
       id: "k",
@@ -357,7 +357,7 @@ describe("the key result's kind (METHOD.md §2.10, P9-T12c-a)", () => {
     const options = [
       ...((
         field(
-          "Kind of key result Activation from 30% to 45%",
+          "Type of key result Activation from 30% to 45%",
         ) as HTMLSelectElement
       )?.options ?? []),
     ].map((option) => option.value);

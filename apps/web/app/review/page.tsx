@@ -10,12 +10,15 @@ import {
 import Link from "next/link";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { acknowledge, acknowledgeAll } from "./actions.ts";
 import { NudgeProvenance } from "./nudge-provenance.tsx";
 import { ProposalDecision } from "./proposal-decision.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.review");
 
 /**
  * Review, "what I owe" (UIUX-PLAN.md §4 S-02, P3-T08).
@@ -48,10 +51,10 @@ import { ProposalDecision } from "./proposal-decision.tsx";
  */
 
 const GROUPS = [
-  { id: "overdue", label: "Overdue" },
-  { id: "today", label: "Due today" },
-  { id: "this_week", label: "This week" },
-  { id: "upcoming", label: "Upcoming" },
+  { id: "overdue", label: "review.overdue" },
+  { id: "today", label: "review.dueToday" },
+  { id: "this_week", label: "review.thisWeek" },
+  { id: "upcoming", label: "review.upcoming" },
 ] as const;
 
 type Obligation = Awaited<
@@ -96,8 +99,10 @@ export default async function ReviewPage() {
       <AreaTabs area="updates" current="/review" t={t} />
       <div className="flex flex-col gap-4.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+          {/* Wraps below about 360px of title, rather than squeezing it to
+           * one word a line beside the counters (usability review D6). */}
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col">
               <h1 className="text-lg font-bold text-ink">
                 {t("common.whatYouOwe")}
               </h1>
@@ -105,10 +110,23 @@ export default async function ReviewPage() {
                 {t("review.computedOnTheServer")}
               </p>
             </div>
-            <div className="flex flex-none items-center gap-3.5">
-              <Count label="Overdue" value={inbox.counts.overdue} urgent />
-              <Count label="Today" value={inbox.counts.today} />
-              <Count label="This week" value={inbox.counts.thisWeek} />
+            <div className="flex flex-wrap items-center gap-3.5">
+              <Count
+                label={t("review.overdue")}
+                value={inbox.counts.overdue}
+                target="overdue"
+                urgent
+              />
+              <Count
+                label={t("review.today")}
+                value={inbox.counts.today}
+                target="today"
+              />
+              <Count
+                label={t("review.thisWeek")}
+                value={inbox.counts.thisWeek}
+                target="this_week"
+              />
               {/* The walker through every check-in owed, which this screen
                * already lists one by one (P9-T07a-b). Named apart from each
                * row's own "Check in", which opens that one goal. */}
@@ -151,9 +169,13 @@ export default async function ReviewPage() {
               return null;
             }
             return (
-              <section key={group.id} className="flex flex-col gap-1.5">
+              <section
+                key={group.id}
+                id={`group-${group.id}`}
+                className="flex scroll-mt-4 flex-col gap-1.5"
+              >
                 <h2 className="flex items-center gap-2 px-0.5 text-xs font-bold uppercase tracking-wide text-ink-3">
-                  {group.label}
+                  {t(group.label)}
                   <span className="rounded-full bg-raised px-1.5 py-0.5 text-xs font-semibold text-ink-3">
                     {rows.length}
                   </span>
@@ -232,14 +254,21 @@ function statusWord(status: string | null, t: (key: string) => string): string {
 function Count({
   label,
   value,
+  target,
   urgent,
 }: {
   readonly label: string;
   readonly value: number;
+  /** The group it counts, so a count above zero jumps to it (review R1). */
+  readonly target: string;
   readonly urgent?: boolean;
 }) {
+  const Wrapper = value > 0 ? "a" : "span";
   return (
-    <span className="flex flex-col items-end">
+    <Wrapper
+      {...(value > 0 ? { href: `#group-${target}` } : {})}
+      className="flex flex-col items-end rounded-md px-1 hover:bg-raised"
+    >
       <span className="text-xs font-semibold uppercase tracking-wide text-ink-4">
         {label}
       </span>
@@ -252,7 +281,7 @@ function Count({
       >
         {value}
       </span>
-    </span>
+    </Wrapper>
   );
 }
 
@@ -284,7 +313,7 @@ function Row({
         obligation.proposal ? `proposal-${obligation.proposal.id}` : undefined
       }
     >
-      <CardBody className="flex items-start justify-between gap-3.5 py-2.5">
+      <CardBody className="flex flex-wrap items-start justify-between gap-3.5 py-2.5">
         <span
           aria-hidden="true"
           className={
@@ -315,7 +344,9 @@ function Row({
             />
           ) : null}
         </div>
-        <span className="flex flex-none items-center gap-2.5">
+        {/* Under the text on a phone, so the title keeps the row's width
+         * (usability review D6). */}
+        <span className="flex flex-none items-center gap-2.5 max-sm:basis-full max-sm:justify-end">
           <span
             className={
               overdue

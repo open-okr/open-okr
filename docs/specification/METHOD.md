@@ -33,8 +33,8 @@ Terms used throughout:
 | Committed OKR | An OKR the team agrees will be achieved, adjusting schedules and resources to deliver it. Expected to score 1.0 (§2.8) |
 | Aspirational OKR | An OKR that describes how the team would like the world to look, without a clear path or all the resources. Expected to average around 0.7 (§2.8) |
 | Cycle | The time box the OKRs are set and scored against. Usually a quarter, sometimes a year |
-| Champion | The one person accountable for a goal. They post the check-in. The label is a terminology setting; "Owner" is a common alternative |
-| Key result owner | The one person who moves and reports a key result. Defaults to the goal's champion |
+| Owner | The one person accountable for a goal. They post the check-in. The label is a terminology setting; "Champion" is a common alternative |
+| Key result owner | The one person who moves and reports a key result. Defaults to the goal's owner |
 | Reviewer | The person who acknowledges a goal's check-ins, where the workspace uses reviewers (§2.5) |
 | Sponsor | The senior leader accountable for the whole cycle |
 | Facilitator | The person who runs the sessions and guards quality |
@@ -153,13 +153,13 @@ Guidance for people, not machine thresholds (§11).
 |---|---|---|
 | Sponsor | The cycle. Accountable senior leader | One per cycle. Sees escalations in the weekly digest |
 | Facilitator | The sessions and the quality bar | One per cycle. May decline to run a drafting session without its inputs. That is their judgement; the product never refuses on their behalf unless phases are binding |
-| Champion | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee. Block. *Source:* whatmatters: "only one owner per OKR, even if Key Results are distributed across a team" |
-| Key result owner | One key result | Exactly one per key result, defaulting to the champion |
-| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the champion where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. One left unacknowledged past the acknowledgement window (§11) lapses: it leaves the review inbox and the ladder, and is not recorded as acknowledged. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer. The window follows the OKRGoal UX review of October 2026 |
+| Owner | One goal. Posts its check-ins | Exactly one per goal. Never a team, never a committee. Block. *Source:* whatmatters: "only one owner per OKR, even if Key Results are distributed across a team" |
+| Key result owner | One key result | Exactly one per key result, defaulting to the goal's owner |
+| Reviewer | Acknowledging that goal's check-ins | Practice setting: off, optional (default) or required. Where used, a different person from the owner where possible. The reviewer owes one acknowledgement per goal, on its latest check-in: acknowledging it also closes every earlier one still open, because the latest says where the goal stands. A closed goal, or a goal in a closed cycle, owes none. One left unacknowledged past the acknowledgement window (§11) lapses: it leaves the review inbox and the ladder, and is not recorded as acknowledged. *Source:* OpenOKR default; no OKR source defines a per-goal reviewer. The window follows the OKRGoal UX review of October 2026 |
 | Contributor | Work that moves a key result | Any number |
 | Coordinator | The weekly session for a space | One per space. Runs the check-in, chases blockers. *Source:* OpenOKR default |
 
-A **peer** of a goal's champion, for the ladder's optional peer step (§11, §12.1), is a member of the goal's space who champions another goal in the same cycle, is up to date on their own check-ins, can read the goal, and is not its reviewer or its space's coordinator. One is asked at a time, the one asked least recently, and only to offer a hand: the message names the goal and how late it is, and nothing else. Where nobody qualifies, the step is skipped. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
+A **peer** of a goal's owner, for the ladder's optional peer step (§11, §12.1), is a member of the goal's space who owns another goal in the same cycle, is up to date on their own check-ins, can read the goal, and is not its reviewer or its space's coordinator. One is asked at a time, the one asked least recently, and only to offer a hand: the message names the goal and how late it is, and nothing else. Where nobody qualifies, the step is skipped. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
 
 ### 2.6 The input pack
 
@@ -190,18 +190,18 @@ Every objective carries 2 to 5 key results: block at none, warn at one or above 
 
 ### 2.8 Committed and aspirational OKRs
 
-Every objective is one of two kinds. The kind is chosen when it is written and can be changed, visibly, until the close.
+Every objective is one of two types. The type is chosen when it is written and can be changed, visibly, until the close.
 
 | Kind | Meaning | Expected score | When it misses |
 |---|---|---|---|
 | **Committed** | "OKRs that we agree will be achieved, and we will be willing to adjust schedules and resources to ensure that they are delivered" | 1.0 | "A score of less than 1.0 requires explanation for the miss." A short postmortem, not a punishment. Escalate early when it is at risk |
 | **Aspirational** | "OKRs express how we'd like the world to look, even though we have no clear idea how to get there and/or the resources necessary" | An average around 0.7, "with high variance" | Normal. It may carry forward until it is achieved |
 
-Rules that depend on the kind:
+Rules that depend on the type:
 
 - Stretch coaching (§3.2, KR-6), "too safe" notes (§3.3, §3.4), and capacity allowed to exceed (§5.5) apply to aspirational OKRs only.
 - A committed OKR should credibly consume most, but not all, of the team's resources. Committed and aspirational together may consume somewhat more.
-- New objectives are aspirational by default (§12). A workspace may use one kind only.
+- New objectives are aspirational by default (§12). A workspace may use one type only.
 
 *Source:* Google's OKR playbook, all quotations above. It names "Failing to differentiate between committed and aspirational OKRs" as its first trap.
 
@@ -240,16 +240,16 @@ Access still applies everywhere: a member writes only where they may edit. Quali
 
 *Source:* whatmatters: "OKRs are amendable and revisable", consider "adding an additional OKR or simply taking away one or two KRs" when "something out of your control changes or you become more aware of what the aggressively realistic goal should be"; re:Work: OKRs are "revisited a few times a quarter" to "adjust to new information, abandon objectives".
 
-### 2.10 Kinds of key result
+### 2.10 Types of key result
 
-| Kind | Written as | Progress | Scored |
+| Type | Written as | Progress | Scored |
 |---|---|---|---|
 | **Metric** | Move a number from a baseline to a target by a date (increase, reduce or move) | Linear from baseline to target (§3.1) | From progress at the close |
 | **Maintain** | Hold a number inside a band through the cycle | 100% while inside the band, otherwise the distance back | From the share of the cycle spent inside the band, by default |
 | **Milestone** | A verifiable thing done by a date | 0% until done, then 100% | 1.0 if done, 0 if not, unless a person adjusts it with a reason |
 | **Baseline** | Establish the number nobody measures yet | 0% until the baseline is recorded, then 100% | 1.0 once recorded |
 
-All four kinds are on by default, and a workspace may turn any off (§12). Prefer metric key results where an outcome can be measured. A set made only of milestones is usually a plan, not proof. *Source:* Lamorte names "metric, baseline, and milestone" key results; re:Work: "Sometimes key results are either 0 or 1"; Grove: "Did I do that or did I not do it? Yes/no."
+All four types are on by default, and a workspace may turn any off (§12). Prefer metric key results where an outcome can be measured. A set made only of milestones is usually a plan, not proof. *Source:* Lamorte names "metric, baseline, and milestone" key results; re:Work: "Sometimes key results are either 0 or 1"; Grove: "Did I do that or did I not do it? Yes/no."
 
 ---
 
@@ -364,6 +364,8 @@ Health is derived, never typed in. Precedence, first match wins:
 
 A goal that has never been checked in is `pending`, not `on track`, and reads "No check-in yet": "Pending" read as waiting for somebody's approval (OKRGoal UX review, October 2026). Silence is never green. *Source:* Perdoo (vendor) uses the same "no status" grey and an "outdated" flag.
 
+**The on-track share.** Over a set of goals, the share of key results under goals that read on track or achieved. At or above the healthy line it reads healthy, from the watch line to below it reads watch, and below the watch line it reads at risk (§11). It colours the summary a reader sees first and changes no goal's health. *Source:* OpenOKR default, from the okrgoal.com usability review of November 2026.
+
 **Reported health against the data.** When a goal reports on track and one of its metric key results has not moved within the divergence window (§11), the coach says so (§10).
 
 ### 3.6 Trend forecast
@@ -393,7 +395,7 @@ Statuses: **pass**, **warn** (worth another look), **fail** (a structural defect
 | Check | Default level |
 |---|---|
 | OBJ-1 Outcome, OBJ-2 Qualitative, OBJ-5 Counted | Warn |
-| OBJ-3 Timebound, OBJ-4 Owned (champion) | Block |
+| OBJ-3 Timebound, OBJ-4 Owned (owner) | Block |
 | KR-1 Count | Block at none; warn at one or above five |
 | KR-2 Verifiable | Warn |
 | KR-3 Complete | Block on a missing target (metric and maintain), due date or owner. Warn on a missing baseline |
@@ -462,7 +464,7 @@ There is no lower bound: whatmatters' own "Achieve fiscal sustainability" is thr
 
 **OBJ-3 Timebound.** Block. Fail without a cycle or an explicit timeframe. An OKR without a deadline is a wish. *Source:* Wodtke: "Time Bound"; Doerr: key results are "time-bound".
 
-**OBJ-4 Owned.** Block. Fail without a named champion. A named reviewer is required only where the workspace requires reviewers (§2.5).
+**OBJ-4 Owned.** Block. Fail without a named owner. A named reviewer is required only where the workspace requires reviewers (§2.5).
 
 **OBJ-5 Counted.** Warn when a unit exceeds 3 objectives, or the company level exceeds 5.
 
@@ -470,7 +472,7 @@ There is no lower bound: whatmatters' own "Achieve fiscal sustainability" is thr
 
 **KR-1 Count.** Pass at 2 to 5. Fail at none, which blocks. Warn at 1 ("can a single measure prove this from every angle?"). Warn above 5 ("which would you drop if you had to?").
 
-**KR-2 Verifiable.** Judged by the key result's kind (§2.10).
+**KR-2 Verifiable.** Judged by the key result's type (§2.10).
 
 | Condition | Status | Prompt |
 |---|---|---|
@@ -538,7 +540,7 @@ Info by default, shown as the phase checklist. Under binding phase enforcement t
 
 Publishing makes a cycle's planned OKRs live, in up to two steps: the company set before the cycle starts, then the department and team sets by the time the team publication window closes (§11). Each publish runs the gates over what it publishes. Each gate has an enforcement level (§12). A gate at block refuses publishing until it is green, and an admin may override it with a recorded reason. OKRs added after the team publication window go live as §2.9 says: they must pass the checks set to block, not the set-level gates.
 
-1. Every objective has a title and a named champion, and a reviewer where reviewers are required. Block.
+1. Every objective has a title and a named owner, and a reviewer where reviewers are required. Block.
 2. Every objective has at least one key result, and every key result passes the checks set to block (by default a target where it needs one, a due date and an owner). Block.
 3. Alignment is mapped. Each objective states what it contributes to, or why it stands alone. Warn.
 4. Every dependency is confirmed, escalated or logged with a named risk owner. Warn.
@@ -716,7 +718,7 @@ Keep check-ins forward-looking. Status lives in the product. The meeting is for 
 
 ### 7.2 The weekly check-in, in four steps
 
-**Step 1. Confidence round.** Every key result gets a confidence. Where the team votes, each member submits privately and the votes reveal together with a team average, so nobody anchors on the champion. The champion confirms the confidence and writes one or two lines: what changed this week. Facts first.
+**Step 1. Confidence round.** Every key result gets a confidence. Where the team votes, each member submits privately and the votes reveal together with a team average, so nobody anchors on the owner. The owner confirms the confidence and writes one or two lines: what changed this week. Facts first.
 
 **Step 2. Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner. Where something is actually blocked, it gets a blocker too:
 
@@ -757,9 +759,9 @@ Consecutive check-in periods in which a space held its check-in, at whatever fre
 
 A space marks its holiday periods. No check-in is due in them, nobody is nudged for them, the streak does not break, and the measured rhythm (§8.6) does not count them. Shown on the space home. A light touch that keeps the heartbeat visible. *Source:* Tability (vendor) shows check-in streaks.
 
-Each member also has their own streak: the periods in a row in which they posted a check-in on a goal they champion, by the same rule, shown on their check-in page. It is paused, not counted, while one of their goals reads on track with a key result flat past the divergence window (§3.5, §11), so a streak cannot be kept by re-entering the same number. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
+Each member also has their own streak: the periods in a row in which they posted a check-in on a goal they own, by the same rule, shown on their check-in page. It is paused, not counted, while one of their goals reads on track with a key result flat past the divergence window (§3.5, §11), so a streak cannot be kept by re-entering the same number. *Source:* OpenOKR default, from the OKRGoal UX review of October 2026.
 
-A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they champion is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
+A member marks their own leave, with a delegate. While they are away nobody nudges them, their reviews and acknowledgements go to the delegate, and a check-in on a goal they own is the delegate's to post, so their absence never breaks the space's streak. Leave never moves a role for good: that is a reassignment, recorded as one.
 
 ### 7.5 Monthly review
 
@@ -989,7 +991,7 @@ These are not settings.
 - which checks and gates apply and how strongly;
 - whether phases bind;
 - who may write and when;
-- the kinds of OKR and key result in use;
+- the types of OKR and key result in use;
 - the scales;
 - the cadence;
 - the escalation;
@@ -1008,7 +1010,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |
-| Check-in escalation ladder | Champion at due, champion again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it. Where the workspace turns on the peer step, one peer from the goal's space is offered the goal once grace is exceeded, in place of the reviewer, and the reviewer joins at the coordinator's day |
+| Check-in escalation ladder | Owner at due, owner again at 1 day overdue, reviewer when grace is exceeded where the goal has one, coordinator at 7 days. The sponsor sees stale goals in the weekly digest, and is a ladder step, at 14 days, only where the workspace adds it. Where the workspace turns on the peer step, one peer from the goal's space is offered the goal once grace is exceeded, in place of the reviewer, and the reviewer joins at the coordinator's day |
 | Acknowledgement ladder | Reviewer nudged 1 day after publication, escalated at 3 days. Only where the goal has a reviewer |
 | Acknowledgement window | 14 days after publication, after which an unacknowledged check-in lapses from the review inbox and the ladder |
 | Blocker clock | The next action is due by the next check-in |
@@ -1045,6 +1047,8 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 | Progress signal fail | 50%, for the absolute signal |
 | Trend forecast minimum values | 4 |
 | Divergence window | 4 weeks with no movement while reported on track |
+| On-track share healthy line | 70% of key results under goals on track or achieved |
+| On-track share watch line | 40% |
 
 **Quality and planning**
 
@@ -1117,8 +1121,8 @@ The non-numeric choices a workspace makes about its practice. Each has the recom
 | New objectives mid-cycle start as | Whether an objective added after the team publication window goes live once it passes the checks set to block, waits as a draft its owner publishes, or waits for its reviewer to approve it. | Live · Draft published by its owner · Draft approved by the reviewer | Live, marked added mid-cycle | whatmatters |
 | Reason when adding mid-cycle | Whether somebody adding an objective or key result mid-cycle is not asked for a reason, may give one, or must give one before it is saved. | Off · Optional · Required | Optional | OpenOKR default |
 | Reason when easing a target | Whether making a target easier needs a written reason. Making one harder, or setting a first target, never does. | Required · Optional | Required | whatmatters |
-| OKR kinds | Whether objectives can be committed, expected to score 1.0, and aspirational, expected to average around 0.7, or the workspace uses one kind only. | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
-| Key result kinds | Which kinds of key result can be written: a metric moved from a baseline to a target, a number maintained inside a band, a milestone done or not, or a baseline still to be measured. | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
+| OKR types | Whether objectives can be committed, expected to score 1.0, and aspirational, expected to average around 0.7, or the workspace uses one type only. | Committed and aspirational · Aspirational only · Committed only | Both, new objectives aspirational | Google's OKR playbook |
+| Key result types | Which types of key result can be written: a metric moved from a baseline to a target, a number maintained inside a band, a milestone done or not, or a baseline still to be measured. | Metric, maintain, milestone, baseline: each on or off | All on | Lamorte; re:Work |
 | Reviewer per goal | Whether each goal has a reviewer, a second person who acknowledges its check-ins: not used, available, or required before the goal can be published. | Off · Optional · Required | Optional | OpenOKR default |
 | Check enforcement | How hard each quality check is. Block refuses publishing while the check fails, Warn shows it and coaches, and Off does not run it. As the method keeps the level the method gives that check. | Each check: Block · Warn · Off | As the method | §4 |
 | Strict mode | Raises every quality check to Block at once. | Off · On | Off | OpenOKR default |

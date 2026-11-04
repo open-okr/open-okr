@@ -1,11 +1,14 @@
 import { previewInvite } from "@openokr/core";
 import { Button, Card, CardBody } from "@openokr/ui";
 import Link from "next/link";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { currentSession } from "../../../lib/session";
 import { getTranslations } from "../../../lib/translations";
 import { acceptInvitation, startSignUp } from "./actions.ts";
 import { JoinButton } from "./join-button.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.invitation");
 
 /**
  * Accepting an invitation (GAP-AUDIT B-07, P6-G06b).

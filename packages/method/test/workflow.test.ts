@@ -452,7 +452,7 @@ describe("the six publish gates", () => {
       (entry) => entry.gateKey === 1,
     );
     expect(optional?.passed).toBe(false);
-    expect(optional?.detail.missing.join(" ")).toMatch(/has no champion/);
+    expect(optional?.detail.missing.join(" ")).toMatch(/has no owner/);
     // Optional by default (METHOD.md §2.5, P9-T04): no reviewer is no defect.
     expect(optional?.detail.missing.join(" ")).not.toMatch(/has no reviewer/);
     const required = publishGates(

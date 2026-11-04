@@ -200,7 +200,7 @@ export async function AnnualFrame({
                       name="strategyText"
                       maxLength={280}
                       defaultValue={strategies[index]?.text ?? ""}
-                      className="w-72"
+                      className="w-full md:w-72"
                     />
                     <TextArea
                       label={t("cycle.annualFrame.strategyNoteLabel", {
@@ -210,7 +210,7 @@ export async function AnnualFrame({
                       maxLength={1000}
                       rows={1}
                       defaultValue={strategies[index]?.note ?? ""}
-                      className="w-96"
+                      className="w-full md:w-96"
                     />
                   </div>
                 ))}

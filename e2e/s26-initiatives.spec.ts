@@ -198,7 +198,7 @@ async function markKind(kind: "committed" | "aspirational") {
   await goTo(page, `/goals?okr=${served.id}`);
   const drawer = page.getByTestId("okr-drawer");
   const picker = drawer.getByRole("combobox", {
-    name: `Kind of ${served.title}`,
+    name: `Type of ${served.title}`,
   });
   await expect(picker).toBeVisible({ timeout: 15_000 });
   if ((await picker.inputValue()) === kind) {

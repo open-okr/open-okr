@@ -7,10 +7,13 @@ import {
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireOperator } from "../../../lib/operator";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { publishSiteMessage } from "./site-message-actions";
 import { SiteMessageForm } from "./site-message-form";
+
+export const generateMetadata = pageTitle("pageTitle.operatorInstance");
 
 /**
  * S-47 Operator instance: what is true of the deployment rather than of one

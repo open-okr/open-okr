@@ -45,7 +45,9 @@
  * to know a tour exists; a stop whose thing is not on screen outlines nothing.
  *
  * The focus ring's own colour and width, because it is the one outline the
- * design system already holds to §7's 3 to 1 on both themes. No animation, so
+ * design system already holds to §7's 3 to 1 on both themes. Dashed and set
+ * further out, because a solid ring in that colour read as keyboard focus
+ * (usability review D7). No animation, so
  * there is nothing for reduced motion to switch off. */
 @layer components {
   :root[data-tour-stop="work-map"] [data-tour-target="work-map"],
@@ -53,8 +55,8 @@
   :root[data-tour-stop="cycle-strip"] .cycle-strip,
   :root[data-tour-stop="cycle-strip"] [data-tour-target="cycle-strip"],
   :root[data-tour-stop="search"] .topbar-shell label:has(input[type="search"]) {
-    outline: 2px solid var(--color-brand-strong);
-    outline-offset: 3px;
+    outline: 2px dashed var(--color-brand-strong);
+    outline-offset: 4px;
   }
 }
 

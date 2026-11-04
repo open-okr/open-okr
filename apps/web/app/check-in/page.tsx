@@ -12,12 +12,15 @@ import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
 import { healthWord } from "../../lib/health-words.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Composer, Votes } from "./composer.tsx";
 import { RaiseBlocker } from "./raise-blocker.tsx";
 import { Timeline } from "./timeline.tsx";
 import type { VoteState } from "./vote-panel.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.checkIn");
 
 /**
  * The check-in composer and the session walker (UIUX-PLAN.md §4 S-15, P3-T07).

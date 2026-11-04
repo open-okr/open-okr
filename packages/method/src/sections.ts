@@ -22,7 +22,7 @@ export const METHOD_SECTIONS: Readonly<Record<string, string>> = {
   "2.7": "Levels and quantities",
   "2.8": "Committed and aspirational OKRs",
   "2.9": "Writing and changing OKRs at any time",
-  "2.10": "Kinds of key result",
+  "2.10": "Types of key result",
   "3": "Scoring, confidence and health",
   "3.1": "Progress",
   "3.2": "Confidence bands",

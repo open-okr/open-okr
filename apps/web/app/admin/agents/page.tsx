@@ -12,12 +12,15 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { moodForRun } from "../../../lib/agent-moods.ts";
 import { getPool } from "../../../lib/auth";
 import { SCHEDULE_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { AgentPolicy } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
 import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
+
+export const generateMetadata = pageTitle("pageTitle.adminAgents");
 
 /**
  * The agents and their run log (UIUX-PLAN.md §4 S-36, P4-T05a).

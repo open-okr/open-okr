@@ -328,22 +328,22 @@ test("a renamed term is what every screen calls it, and the canon comes back", a
  * "Champion"; the page is left by navigating away, which the unsaved guard
  * allows for a programmatic navigation.
  */
-test('the terminology card offers "Owner" for "Champion", and saves nothing by itself', async () => {
+test('the terminology card offers "Champion" for "Owner", and saves nothing by itself', async () => {
   await goTo(page, "/admin/rhythm");
   const terminology = page.getByTestId("rhythm-card-terminology");
   const singular = terminology.locator("input[name='label:champion:singular']");
   const plural = terminology.locator("input[name='label:champion:plural']");
-  await expect(singular).toHaveValue("Champion", { timeout: 15_000 });
+  await expect(singular).toHaveValue("Owner", { timeout: 15_000 });
 
-  await terminology.getByRole("button", { name: "Use “Owner”" }).click();
-  await expect(singular).toHaveValue("Owner");
-  await expect(plural).toHaveValue("Owners");
+  await terminology.getByRole("button", { name: "Use “Champion”" }).click();
+  await expect(singular).toHaveValue("Champion");
+  await expect(plural).toHaveValue("Champions");
 
-  // Nothing was stored: a fresh read still says Champion.
+  // Nothing was stored: a fresh read still says Owner.
   await goTo(page, "/admin/rhythm");
   await expect(
     page
       .getByTestId("rhythm-card-terminology")
       .locator("input[name='label:champion:singular']"),
-  ).toHaveValue("Champion", { timeout: 15_000 });
+  ).toHaveValue("Owner", { timeout: 15_000 });
 });

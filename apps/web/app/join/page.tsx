@@ -6,11 +6,14 @@ import {
 import { Button, Card, CardBody } from "@openokr/ui";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { requireSession } from "../../lib/session";
 import { getTranslations } from "../../lib/translations";
 import { startOwnWorkspace } from "./trusted-actions.ts";
 import { TrustedOfferForm } from "./trusted-offer-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.join");
 
 /**
  * The workspaces your email domain lets you join (REQUIREMENTS §4 People and

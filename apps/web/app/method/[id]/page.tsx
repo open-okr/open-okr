@@ -15,7 +15,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { faceForTrigger } from "../../../lib/agent-moods.ts";
 import { methodDocumentUrl } from "../../../lib/app-version";
+import { nameOf, TRIGGER_NAME_KEYS } from "../../../lib/identifier-names.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
+
+export const generateMetadata = pageTitle("pageTitle.methodRule");
 
 /** Where METHOD.md sets a check out, as `describeRule` places it. */
 const checkSection = (id: string): string => describeRule(id)?.section ?? "4";
@@ -221,7 +225,12 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
               />
             ) : null}
             <div className="flex min-w-0 flex-col">
-              <h1 className="text-lg font-bold text-ink">{trigger.key}</h1>
+              {/* The rule's name, with the key it is cited by under it: "See
+               * the rule" opened on the bare key (usability review D8). */}
+              <h1 className="text-lg font-bold text-ink">
+                {nameOf(TRIGGER_NAME_KEYS, trigger.key, t)}
+              </h1>
+              <p className="font-mono text-xs text-ink-4">{trigger.key}</p>
               <p className="text-xs text-ink-3">
                 {t("method.detail.proactiveMessageAiNativePlan", {
                   Champion: owner,

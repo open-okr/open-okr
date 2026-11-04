@@ -1,7 +1,7 @@
 "use client";
 
 import { Chip, useTranslations } from "@openokr/ui";
-import { GripVertical } from "lucide-react";
+import { GripVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -14,6 +14,7 @@ import {
   useTransition,
 } from "react";
 import type { WriteState } from "../cycle/write-state.ts";
+import { deleteTaskAction } from "./actions.ts";
 import {
   afterTaskIdOf,
   isMoveKey,
@@ -253,6 +254,24 @@ export function Board({
     });
   };
 
+  const remove = (card: BoardCard) => {
+    if (
+      !window.confirm(t("board.board.deleteConfirm", { title: card.title }))
+    ) {
+      return;
+    }
+    setError(null);
+    startTransition(async () => {
+      const state = await deleteTaskAction(card.id);
+      if (state.error) {
+        setError(state.error);
+        return;
+      }
+      setAnnouncement(t("board.board.deleted", { title: card.title }));
+      router.refresh();
+    });
+  };
+
   const pickUp = (id: string) => {
     setHeld({ id, before: shown });
     setOptimistic(shown);
@@ -451,6 +470,7 @@ export function Board({
                     }
                   }}
                   onHandle={() => onHandle(card.id)}
+                  onDelete={() => remove(card)}
                   onHandleKey={onHandleKey}
                   onShift={(direction) => {
                     const index = ORDER.indexOf(
@@ -487,6 +507,7 @@ function Card({
   onHandle,
   onHandleKey,
   onShift,
+  onDelete,
 }: {
   readonly card: BoardCard;
   readonly canEdit: boolean;
@@ -498,6 +519,7 @@ function Card({
   readonly onHandle: () => void;
   readonly onHandleKey: (event: KeyboardEvent<HTMLButtonElement>) => void;
   readonly onShift: (direction: 1 | -1) => void;
+  readonly onDelete: () => void;
 }) {
   const { t } = useTranslations();
   return (
@@ -563,6 +585,16 @@ function Card({
               className="rounded border border-line px-1 text-xs text-ink-3 hover:border-brand"
             >
               →
+            </button>
+            <button
+              type="button"
+              aria-label={t("board.board.delete", { title: card.title })}
+              title={t("board.board.delete", { title: card.title })}
+              onClick={onDelete}
+              data-testid="board-card-delete"
+              className="rounded border border-line px-1 text-ink-3 hover:border-bad hover:text-bad"
+            >
+              <Trash2 aria-hidden="true" className="size-3" />
             </button>
           </span>
         ) : null}

@@ -1,9 +1,12 @@
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { requireSession } from "../../../lib/session";
 import { getTranslations } from "../../../lib/translations";
 import { DataExport } from "./data-export";
 import { SecuritySettings } from "./security-settings";
 import { Sessions } from "./sessions";
+
+export const generateMetadata = pageTitle("pageTitle.security");
 
 /**
  * A protected page: `requireSession` redirects a signed-out visitor to sign

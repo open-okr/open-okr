@@ -1,5 +1,7 @@
-import { Chip, type MessageValues } from "@openokr/ui";
+import { Chip, type MessageValues, Tooltip } from "@openokr/ui";
+import { Info } from "lucide-react";
 import Link from "next/link";
+import { NavSelect } from "../lib/nav-select.tsx";
 import { getTranslations } from "../lib/translations";
 
 /**
@@ -19,6 +21,8 @@ import { getTranslations } from "../lib/translations";
 export interface WorkMapStats {
   /** Key results on track, as a percentage of those with a health of their own. */
   readonly onTrackPct: number | null;
+  /** §3.5's reading of the share, which is what colours it. */
+  readonly onTrackBand: "healthy" | "watch" | "at_risk" | null;
   readonly keyResultCount: number;
   readonly objectiveCount: number;
   readonly outdatedGoals: number;
@@ -139,11 +143,14 @@ function Stat({
   value,
   unit,
   tone,
+  hint,
 }: {
   readonly label: string;
   readonly value: string;
   readonly unit?: string;
   readonly tone?: "ok" | "warn" | "bad" | "brand";
+  /** What the figure counts, on hover and focus (usability review O1). */
+  readonly hint?: string;
 }) {
   const toneClass =
     tone === "ok"
@@ -155,8 +162,19 @@ function Stat({
           : "text-ink";
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-bold tracking-wider text-ink-4 uppercase">
+      <span className="flex items-center gap-1 text-[10px] font-bold tracking-wider text-ink-4 uppercase">
         {label}
+        {hint ? (
+          <Tooltip label={hint}>
+            <button
+              type="button"
+              aria-label={hint}
+              className="inline-flex size-6 items-center justify-center rounded text-ink-4 hover:text-ink-2"
+            >
+              <Info aria-hidden="true" className="size-3" />
+            </button>
+          </Tooltip>
+        ) : null}
       </span>
       <span className="flex items-baseline gap-1">
         <span className={`text-lg font-bold tabular-nums ${toneClass}`}>
@@ -222,6 +240,7 @@ export async function WorkMapHeader({
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Stat
           label={t("common.onTrack")}
+          hint={t("workMapHeader.onTrackHint")}
           value={
             stats.onTrackPct === null ? "—" : `${Math.round(stats.onTrackPct)}%`
           }
@@ -231,17 +250,18 @@ export async function WorkMapHeader({
               : t("workMapHeader.ofKrs")
           }
           tone={
-            stats.onTrackPct === null
+            stats.onTrackBand === null
               ? undefined
-              : stats.onTrackPct >= 70
+              : stats.onTrackBand === "healthy"
                 ? "ok"
-                : stats.onTrackPct >= 40
+                : stats.onTrackBand === "watch"
                   ? "warn"
                   : "bad"
           }
         />
         <Stat
           label={t("workMapHeader.outdated")}
+          hint={t("workMapHeader.outdatedHint")}
           value={String(stats.outdatedGoals)}
           unit={
             stats.outdatedGoals === 1
@@ -252,6 +272,7 @@ export async function WorkMapHeader({
         />
         <Stat
           label={t("goals.alignment")}
+          hint={t("workMapHeader.alignmentHint")}
           value={
             stats.alignmentScore === null
               ? "—"
@@ -277,20 +298,41 @@ export async function WorkMapHeader({
   );
 }
 
+/**
+ * Company, then one picker for a space and one for the cycle (usability
+ * review O2, O3). Nine space tabs and a year of cycle links wrapped onto
+ * three lines, and the workspace's own first space sat among them as if it
+ * were a team: it is the company, which the Company tab already is.
+ */
 export async function WorkMapScopeTabs({
   tabs,
   active,
+  spaces,
   cycles,
   activeCycleId,
   cycleHrefFor,
 }: {
   readonly tabs: readonly ScopeTab[];
   readonly active: string;
-  readonly cycles: readonly { readonly id: string; readonly name: string }[];
+  /** Every space but the company's own, each with its address. */
+  readonly spaces: readonly ScopeTab[];
+  readonly cycles: readonly {
+    readonly id: string;
+    readonly name: string;
+    readonly startsOn: string;
+    readonly endsOn: string;
+  }[];
   readonly activeCycleId: string | null;
   readonly cycleHrefFor: (cycleId: string) => string;
 }) {
   const { t } = await getTranslations();
+  // Newest first, and a quarter before the year that starts with it, so the
+  // year no longer sits between two of its quarters (O3).
+  const ordered = [...cycles].sort(
+    (a, b) =>
+      b.startsOn.localeCompare(a.startsOn) || a.endsOn.localeCompare(b.endsOn),
+  );
+  const company = tabs[0];
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -298,42 +340,57 @@ export async function WorkMapScopeTabs({
         aria-label={t("common.scope")}
         className="flex flex-wrap items-center gap-1"
       >
-        {tabs.map((tab) => (
+        {company ? (
           <Link
-            key={tab.key}
-            href={tab.href}
-            aria-current={tab.key === active ? "page" : undefined}
+            href={company.href}
+            aria-current={active === company.key ? "page" : undefined}
             className={
-              tab.key === active
+              active === company.key
                 ? "rounded-md bg-ink px-3 py-1.5 text-xs font-semibold text-surface"
                 : "rounded-md px-3 py-1.5 text-xs font-medium text-ink-2 hover:bg-raised"
             }
           >
-            {tab.label}
+            {company.label}
           </Link>
-        ))}
+        ) : null}
+        {spaces.length > 0 && company ? (
+          <>
+            <span aria-hidden="true" className="mx-1 h-4 w-px bg-line" />
+            <NavSelect
+              label={t("workMap.scope.space")}
+              value={active}
+              testId="work-map-space"
+              options={[
+                {
+                  value: company.key,
+                  label: t("goals.all"),
+                  href: company.href,
+                },
+                ...spaces.map((space) => ({
+                  value: space.key,
+                  label: space.label,
+                  href: space.href,
+                })),
+              ]}
+            />
+          </>
+        ) : null}
       </nav>
 
-      <div className="flex flex-wrap items-center gap-1">
-        {cycles.length === 0 ? (
-          <Chip tone="neutral">{t("workMapHeader.noCycle")}</Chip>
-        ) : (
-          cycles.map((cycle) => (
-            <Link
-              key={cycle.id}
-              href={cycleHrefFor(cycle.id)}
-              aria-current={cycle.id === activeCycleId ? "true" : undefined}
-              className={
-                cycle.id === activeCycleId
-                  ? "rounded-md border border-line bg-raised px-2.5 py-1.5 text-xs font-semibold text-ink"
-                  : "rounded-md border border-transparent px-2.5 py-1.5 text-xs text-ink-3 hover:border-line"
-              }
-            >
-              {cycle.name}
-            </Link>
-          ))
-        )}
-      </div>
+      {ordered.length === 0 || activeCycleId === null ? (
+        <Chip tone="neutral">{t("workMapHeader.noCycle")}</Chip>
+      ) : (
+        <NavSelect
+          label={t("workMap.scope.cycle")}
+          value={activeCycleId}
+          testId="work-map-cycle"
+          options={ordered.map((cycle) => ({
+            value: cycle.id,
+            label: cycle.name,
+            href: cycleHrefFor(cycle.id),
+          }))}
+        />
+      )}
     </div>
   );
 }

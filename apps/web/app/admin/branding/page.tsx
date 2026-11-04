@@ -7,11 +7,14 @@ import {
 import { HEX_COLOUR_PATTERN } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
 import { brandingImageUrl } from "../../../lib/branding-image";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { initialsOf } from "../../../lib/workspace-initials";
 import type { BrandingStatus } from "./branding-settings-form";
 import { BrandingStudio } from "./branding-studio";
+
+export const generateMetadata = pageTitle("pageTitle.adminBranding");
 
 /**
  * Matched before a stored value is used, never after. It reaches an inline

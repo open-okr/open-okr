@@ -216,6 +216,20 @@ describe("settings.readForMember", () => {
     expect(read.settings.timezone).toBe("Asia/Jakarta");
   });
 
+  it("refuses to trust a free mail provider (docs/design/registration-policy.md D9)", async () => {
+    // Trusting gmail.com would offer this workspace to anybody with an
+    // address there.
+    await expect(
+      callAction(
+        { pool: (await workerDb()).appPool, ...context(OWNER) },
+        "settings.updateWorkspaceGeneral",
+        { trustedEmailDomains: ["northwind.example", "gmail.com"] },
+      ),
+    ).rejects.toThrow(/gmail\.com is a free mail provider/);
+    const stored = await readSettings();
+    expect(stored.trustedEmailDomains ?? []).not.toContain("gmail.com");
+  });
+
   it("gives out the listed keys and nothing else", async () => {
     // The allow-list is the point. A filter over the stored map would make the
     // next setting somebody adds member-visible until a reviewer noticed; this

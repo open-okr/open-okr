@@ -1,8 +1,7 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import {
-  Card,
-  CardBody,
-  CardHeader,
+  Button,
+  buttonVariants,
   EntityPicker,
   NumberInput,
   SelectInput,
@@ -11,13 +10,19 @@ import {
 } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { AreaTabs } from "../../../lib/area-tabs.tsx";
 import { getPool } from "../../../lib/auth";
-import { KPI_TABS, SectionTabs } from "../../../lib/section-tabs.tsx";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ActionForm } from "../../cycle/action-form.tsx";
+import { GoalsToolbar } from "../../goals/goals-toolbar.tsx";
+import { KpiPanel } from "../kpi-panel.tsx";
+import { KpiTabs, kpiTabCounts } from "../kpi-tabs.tsx";
 import { addDriver, addTree, fileIntoTree } from "./actions.ts";
 import { KpiTreeRows } from "./tree-rows.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.trees");
 
 /**
  * The KPI driver tree (UIUX-PLAN.md §4 S-18, METHOD.md §6.3, P3-T14).
@@ -28,6 +33,13 @@ import { KpiTreeRows } from "./tree-rows.tsx";
  *
  * Adding a driver hangs off the node it will drive: the link carries the parent
  * in the URL, so the form always knows what the new KPI is meant to move.
+ *
+ * **KPI redesign (2 November 2026).** The same card as the grid, with the
+ * trees as tabs under it; Add driver opens a side panel (`?under=…&new=driver`)
+ * and Name a tree a dialog (`?new=tree`), each with every field it had. The
+ * "Not here yet" card is gone from the screen: S-18's right-hand edit panel and
+ * re-parenting by dragging are still not built, and re-parenting works through
+ * the KPI's own page.
  */
 export default async function KpiTreesPage({
   searchParams,
@@ -70,61 +82,86 @@ export default async function KpiTreesPage({
     ? tree.nodes.find((node) => node.id === params.under)?.title
     : undefined;
 
+  const viewHref = (id: string) => `/kpis/trees?tree=${id}`;
+  const current = tree.treeId ?? "none";
+  const counts = await kpiTabCounts(context);
+
   return (
-    <div className="flex w-full flex-col gap-3.5">
-      <SectionTabs items={KPI_TABS} active="/kpis/trees" />
-      <Card>
-        <CardHeader>
-          <div className="flex min-w-0 flex-col">
-            <h1 className="text-lg font-bold text-ink">
-              {t("kpis.trees.kpiTrees")}
-            </h1>
-            <p className="text-xs text-ink-3">
-              {t("kpis.trees.eachChildDrivesIts")}
-            </p>
+    <>
+      <AreaTabs area="goals" current="/kpis" t={t} />
+      <div className="flex w-full flex-col gap-3.5">
+        <section className="rounded-xl border border-line bg-surface">
+          <div className="flex flex-wrap items-start gap-3 border-b border-line px-4 py-3.5 max-md:px-3 max-md:py-3">
+            <div className="flex min-w-0 flex-col gap-1">
+              <h1 className="text-lg font-bold text-ink">
+                {t("common.count")}
+              </h1>
+              <p className="text-xs text-ink-3">
+                {t("kpis.trees.eachChildDrivesIts")}
+              </p>
+            </div>
+            {canEdit ? (
+              <a
+                href={`/kpis/trees?tree=${current}&new=tree`}
+                className={`${buttonVariants({ variant: "primary", size: "sm" })} ml-auto max-md:ml-0 max-md:w-full max-md:justify-center`}
+              >
+                {t("kpis.trees.newTree")}
+              </a>
+            ) : null}
           </div>
-        </CardHeader>
+          <GoalsToolbar
+            tabs={
+              <KpiTabs
+                active="/kpis/trees"
+                label={t("kpis.tabs")}
+                t={t}
+                counts={counts}
+              />
+            }
+            panel={null}
+            chips={null}
+            clearAll={null}
+            activeCount={0}
+          />
+        </section>
+
         {tree.trees.length > 0 ? (
-          <CardBody className="flex flex-wrap gap-1.5">
-            {tree.trees.map((named) => (
+          <nav
+            aria-label={t("kpis.trees.kpiTrees")}
+            className="flex gap-0.5 overflow-x-auto border-b border-line [scrollbar-width:none]"
+          >
+            {[
+              ...tree.trees.map((named) => ({
+                id: named.id,
+                name: named.name,
+              })),
+              { id: "none", name: t("kpis.trees.noTree") },
+            ].map((named) => (
               <Link
                 key={named.id}
-                href={`/kpis/trees?tree=${named.id}`}
-                className={
-                  named.id === tree.treeId
-                    ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                    : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-                }
+                href={viewHref(named.id)}
+                aria-current={named.id === current ? "page" : undefined}
+                className={`-mb-px border-b-2 px-2.5 pt-1 pb-2 text-[13px] whitespace-nowrap ${
+                  named.id === current
+                    ? "border-brand font-semibold text-brand-text"
+                    : "border-transparent font-medium text-ink-3 hover:text-ink"
+                }`}
               >
                 {named.name}
               </Link>
             ))}
-            <Link
-              href="/kpis/trees?tree=none"
-              className={
-                tree.treeId === null
-                  ? "rounded-full bg-brand-weak px-2.5 py-1 text-xs font-semibold text-brand-text"
-                  : "rounded-full border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand"
-              }
-            >
-              {t("kpis.trees.noTree")}
-            </Link>
-          </CardBody>
+          </nav>
         ) : null}
-      </Card>
 
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
+        <section className="overflow-hidden rounded-xl border border-line bg-surface">
+          <h2 className="sr-only">
             {tree.treeId === null
               ? t("kpis.trees.kpisInNoTree")
               : (tree.trees.find((named) => named.id === tree.treeId)?.name ??
                 t("goals.tree"))}
           </h2>
-        </CardHeader>
-        <CardBody className="p-0">
           {tree.nodes.length === 0 ? (
-            <p className="p-3 text-sm text-ink-3">
+            <p className="p-4 text-sm text-ink-3">
               {t("kpis.trees.nothingInThisTree")}
             </p>
           ) : (
@@ -133,124 +170,22 @@ export default async function KpiTreesPage({
               canEdit={canEdit}
               addDriverHref={(nodeId) =>
                 `/kpis/trees?${new URLSearchParams({
-                  // Carried so the form returns to the view it was opened
+                  // Carried so the panel returns to the view it was opened
                   // from, including the unfiled one.
-                  tree: tree.treeId ?? "none",
+                  tree: current,
                   under: nodeId,
+                  new: "driver",
                 }).toString()}`
               }
             />
           )}
-        </CardBody>
-      </Card>
+        </section>
 
-      {canEdit && params.under ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {underTitle === undefined
-                ? t("kpis.trees.addADriverUnderThisKpi")
-                : t("kpis.trees.addADriverUnder", { KPI: underTitle })}
-            </h2>
-          </CardHeader>
-          <CardBody>
-            <ActionForm action={addDriver} className="flex flex-col gap-2">
-              <input type="hidden" name="parentKpiId" value={params.under} />
-              <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
-              <TextInput
-                id="driver-title"
-                label={t("kpis.trees.whatTheDriverMeasures")}
-                hideLabel
-                name="title"
-                required
-                maxLength={500}
-                placeholder={t("kpis.trees.qualifiedLeads")}
-                inputClassName="placeholder:text-ink-4"
-              />
-              <div className="flex flex-wrap items-center gap-2.5">
-                <SelectInput
-                  id="indicatorType"
-                  label={t("common.indicator")}
-                  name="indicatorType"
-                  defaultValue="leading"
-                  className="flex-row items-center gap-2.5"
-                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
-                >
-                  <option value="leading">{t("kpis.trees.leading")}</option>
-                  <option value="lagging">{t("kpis.trees.lagging")}</option>
-                </SelectInput>
-                <SelectInput
-                  id="driver-freq"
-                  label={t("common.frequency")}
-                  name="frequency"
-                  defaultValue="monthly"
-                  className="flex-row items-center gap-2.5"
-                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
-                >
-                  <option value="daily">{t("common.daily")}</option>
-                  <option value="weekly">{t("common.weekly")}</option>
-                  <option value="monthly">{t("common.monthly")}</option>
-                  <option value="quarterly">{t("common.quarterly")}</option>
-                  <option value="yearly">{t("common.yearly")}</option>
-                </SelectInput>
-                <SelectInput
-                  id="driver-dir"
-                  label={t("common.betterWhen")}
-                  name="direction"
-                  defaultValue="higher_better"
-                  className="flex-row items-center gap-2.5"
-                  inputClassName="h-6.5 w-auto text-xs text-ink-2"
-                >
-                  <option value="higher_better">{t("common.higher")}</option>
-                  <option value="lower_better">{t("common.lower")}</option>
-                </SelectInput>
-              </div>
-              {/* guided-inputs §4.8: the target as a number, and the unit
-                  it is measured in, which the form did not ask for. */}
-              <div className="flex flex-wrap items-end gap-2.5">
-                <NumberInput
-                  id="driver-target"
-                  label={t("common.standingTarget")}
-                  name="targetDefault"
-                  inputClassName="h-auto w-24 py-1 text-xs"
-                />
-                <UnitInput
-                  id="driver-unit"
-                  label={t("kpis.unit")}
-                  name="unit"
-                  inputClassName="h-auto w-28 py-1 text-xs"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="submit"
-                  className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-                >
-                  {t("kpis.trees.addTheDriver")}
-                </button>
-                <Link
-                  href={`/kpis/trees?tree=${tree.treeId ?? "none"}`}
-                  className="text-xs text-ink-3 hover:underline"
-                >
-                  {t("common.cancel")}
-                </Link>
-              </div>
-              <p className="text-xs text-ink-4">
-                {t("kpis.trees.aLeadingDriverIs")}
-              </p>
-            </ActionForm>
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {canEdit && tree.treeId !== null && tree.nodes.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
+        {canEdit && tree.treeId !== null && tree.nodes.length === 0 ? (
+          <section className="rounded-xl border border-line bg-surface p-4">
+            <h2 className="mb-2.5 text-sm font-bold text-ink">
               {t("kpis.trees.fileAKpiInto")}
             </h2>
-          </CardHeader>
-          <CardBody>
             <ActionForm action={fileIntoTree} className="flex flex-col gap-2">
               <input type="hidden" name="treeId" value={tree.treeId} />
               <EntityPicker
@@ -265,52 +200,110 @@ export default async function KpiTreesPage({
                 }))}
                 className="max-w-96"
               />
-              <button
-                type="submit"
-                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
+              <Button type="submit" variant="primary" className="self-start">
                 {t("kpis.trees.fileIt")}
-              </button>
+              </Button>
               <p className="text-xs text-ink-4">
                 {t("kpis.trees.theRootGoesIn")}
               </p>
             </ActionForm>
-          </CardBody>
-        </Card>
+          </section>
+        ) : null}
+      </div>
+
+      {canEdit && params.under ? (
+        <KpiPanel
+          which="driver"
+          clear={["new", "under"]}
+          title={
+            underTitle === undefined
+              ? t("kpis.trees.addADriverUnderThisKpi")
+              : t("kpis.trees.addADriverUnder", { KPI: underTitle })
+          }
+          submitLabel={t("kpis.trees.addTheDriver")}
+          action={addDriver}
+        >
+          <input type="hidden" name="parentKpiId" value={params.under} />
+          <input type="hidden" name="treeId" value={tree.treeId ?? ""} />
+          <TextInput
+            id="driver-title"
+            label={t("kpis.trees.whatTheDriverMeasures")}
+            name="title"
+            required
+            maxLength={500}
+            placeholder={t("kpis.trees.qualifiedLeads")}
+            inputClassName="placeholder:text-ink-4"
+          />
+          <div className="grid grid-cols-2 gap-2.5">
+            <SelectInput
+              id="indicatorType"
+              label={t("common.indicator")}
+              name="indicatorType"
+              defaultValue="leading"
+            >
+              <option value="leading">{t("kpis.trees.leading")}</option>
+              <option value="lagging">{t("kpis.trees.lagging")}</option>
+            </SelectInput>
+            <SelectInput
+              id="driver-freq"
+              label={t("common.frequency")}
+              name="frequency"
+              defaultValue="monthly"
+            >
+              <option value="daily">{t("common.daily")}</option>
+              <option value="weekly">{t("common.weekly")}</option>
+              <option value="monthly">{t("common.monthly")}</option>
+              <option value="quarterly">{t("common.quarterly")}</option>
+              <option value="yearly">{t("common.yearly")}</option>
+            </SelectInput>
+          </div>
+          <SelectInput
+            id="driver-dir"
+            label={t("common.betterWhen")}
+            name="direction"
+            defaultValue="higher_better"
+          >
+            <option value="higher_better">{t("common.higher")}</option>
+            <option value="lower_better">{t("common.lower")}</option>
+          </SelectInput>
+          {/* guided-inputs §4.8: the target as a number, and the unit it is
+              measured in. */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <NumberInput
+              id="driver-target"
+              label={t("common.standingTarget")}
+              name="targetDefault"
+            />
+            <UnitInput id="driver-unit" label={t("kpis.unit")} name="unit" />
+          </div>
+          <p className="text-xs text-ink-4">
+            {t("kpis.trees.aLeadingDriverIs")}
+          </p>
+        </KpiPanel>
       ) : null}
 
       {canEdit ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("kpis.trees.nameATree")}
-            </h2>
-          </CardHeader>
-          <CardBody>
-            <ActionForm action={addTree} className="flex flex-col gap-2">
-              <TextInput
-                id="name"
-                label={t("kpis.trees.treeName")}
-                hideLabel
-                name="name"
-                required
-                maxLength={120}
-                placeholder={t("kpis.trees.operatingMargin")}
-                inputClassName="placeholder:text-ink-4"
-              />
-              <button
-                type="submit"
-                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("common.nameIt")}
-              </button>
-              <p className="text-xs text-ink-4">
-                {t("kpis.trees.aWorkspaceMayHave")}
-              </p>
-            </ActionForm>
-          </CardBody>
-        </Card>
+        <KpiPanel
+          which="tree"
+          variant="dialog"
+          title={t("kpis.trees.nameATree")}
+          submitLabel={t("common.nameIt")}
+          action={addTree}
+        >
+          <TextInput
+            id="name"
+            label={t("kpis.trees.treeName")}
+            name="name"
+            required
+            maxLength={120}
+            placeholder={t("kpis.trees.operatingMargin")}
+            inputClassName="placeholder:text-ink-4"
+          />
+          <p className="text-xs text-ink-3">
+            {t("kpis.trees.aWorkspaceMayHave")}
+          </p>
+        </KpiPanel>
       ) : null}
-    </div>
+    </>
   );
 }

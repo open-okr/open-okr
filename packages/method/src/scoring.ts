@@ -886,6 +886,22 @@ export interface ConfidenceVerdict {
   readonly escalatesSameDay: boolean;
 }
 
+/**
+ * Where a set's on-track share sits (§3.5): the share of key results under
+ * goals on track or achieved, from 0 to 100.
+ */
+export function onTrackShareBand(
+  percent: number,
+  thresholds: ResolvedThresholds,
+): "healthy" | "watch" | "at_risk" {
+  if (percent >= thresholds["scoring.onTrackShareHealthy"]) {
+    return "healthy";
+  }
+  return percent >= thresholds["scoring.onTrackShareWatch"]
+    ? "watch"
+    : "at_risk";
+}
+
 export function confidenceBand(
   confidence: number,
   thresholds: ResolvedThresholds,

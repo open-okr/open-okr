@@ -6,12 +6,15 @@ import { getPool } from "../../lib/auth";
 import { seesCycle } from "../../lib/cycle-visibility.ts";
 import { instanceIssuer } from "../../lib/issuer";
 import { myWeek, rhythmByTeam } from "../../lib/my-week.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { AgentSetupPill } from "../agent-setup-pill.tsx";
 import { TrustedDomainOffers } from "../trusted-domain-offers.tsx";
 import { WorkMapScreen } from "../work-map-screen.tsx";
 import { MyWeek, RhythmByTeam, TeamDigest } from "./role-home.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.home");
 
 /**
  * Home, by role (OKRGoal UX review, backlog 12; UIUX-PLAN.md §4 S-01).

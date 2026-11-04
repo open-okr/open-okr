@@ -78,7 +78,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "auto",
     environment: "OPENOKR_REGISTRATION",
     summary:
-      "'auto' is open until the instance is claimed and closed afterwards. 'open' and 'invite_only' fix it either way.",
+      "'auto' is open until the instance is claimed and closed afterwards. 'open', 'company_domains' and 'invite_only' fix it; 'company_domains' refuses free mail addresses without an invitation. A value saved on General wins.",
   },
   // The cloud tenancy settings (P8-T02a). All three default to the
   // self-hosted answer, so an instance that never touches them is a

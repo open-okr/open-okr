@@ -141,8 +141,8 @@ test("acceptance: a recovering KPI reads its real band, with recovering beside i
     .locator("div")
     .filter({ has: page.getByRole("heading", { name: TITLE }) })
     .last();
-  await expect(card.getByText("unhealthy", { exact: true })).toBeVisible({
+  await expect(card.getByText("Unhealthy", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(card.getByText("recovering", { exact: true })).toBeVisible();
+  await expect(card.getByText("Recovering", { exact: true })).toBeVisible();
 });

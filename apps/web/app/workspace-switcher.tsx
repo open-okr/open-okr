@@ -90,7 +90,7 @@ export async function WorkspaceSwitcher({
           {initialsOf(active.name)}
         </span>
       )}
-      <div className="hidden min-w-0 flex-1 xl:block">
+      <div className="hidden min-w-0 flex-1 xl:block xl:in-data-[sidebar=rail]:hidden">
         <div className="truncate text-sm font-semibold tracking-tight text-ink">
           {active.name}
         </div>

@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { canonThresholds, onTrackShareBand } from "@openokr/method";
 import { workspaceReaderLevel } from "../lib/access";
 import { getPool } from "../lib/auth";
 import { getTranslations } from "../lib/translations";
@@ -121,6 +122,15 @@ export async function WorkMapScreen({
     keyResultCount,
     onTrackPct:
       keyResultCount === 0 ? null : (onTrackKeyResults / keyResultCount) * 100,
+    // The band is METHOD.md §3.5's, from the §11 registry: it was 70 and 40
+    // written here (usability review N1, owner decision Q7).
+    onTrackBand:
+      keyResultCount === 0
+        ? null
+        : onTrackShareBand(
+            (onTrackKeyResults / keyResultCount) * 100,
+            canonThresholds(),
+          ),
     outdatedGoals: goals.filter((goal) => goal.health === "outdated").length,
     alignmentScore: alignment?.score ?? null,
     alignmentBand: alignment?.band ?? null,
@@ -167,20 +177,24 @@ export async function WorkMapScreen({
   const scopeTabs: ScopeTab[] = [
     {
       key: "company",
-      label: "Company",
+      label: t("workMap.scope.company"),
       href: linkTo({ scope: "company", node: null }),
     },
-    ...spaces.map((space) => ({
+  ];
+  // The company's own space is the Company tab, not a team (O2).
+  const spaceTabs: ScopeTab[] = spaces
+    .filter((space) => !space.isCompany)
+    .map((space) => ({
       key: space.id,
       label: space.name,
       href: linkTo({ scope: space.id, node: null }),
-    })),
-  ];
+    }));
 
   const scopeLabel =
     scope === "company"
-      ? "Company-wide tree"
-      : (spaces.find((space) => space.id === scope)?.name ?? "One space");
+      ? t("workMap.scope.companyTree")
+      : (spaces.find((space) => space.id === scope)?.name ??
+        t("workMap.scope.oneSpace"));
 
   return (
     <>
@@ -203,6 +217,7 @@ export async function WorkMapScreen({
 
       <WorkMapScopeTabs
         tabs={scopeTabs}
+        spaces={spaceTabs}
         active={scope}
         cycles={cycles}
         activeCycleId={cycleId}

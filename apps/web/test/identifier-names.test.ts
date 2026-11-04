@@ -3,13 +3,23 @@ import {
   REVIEW_ASSIST_KEYS,
   RHYTHM_ASSIST_KEYS,
 } from "@openokr/core";
-import { TRIGGER_CATALOGUE } from "@openokr/method";
+import {
+  KPI_FREQUENCIES,
+  KPI_STATES,
+  TRIGGER_CATALOGUE,
+} from "@openokr/method";
 import { CATALOGUES } from "@openokr/ui";
 import { describe, expect, test } from "vitest";
 import {
   ASSIST_NAME_KEYS,
+  INDICATOR_NAME_KEYS,
+  KPI_FREQUENCY_NAME_KEYS,
+  KPI_STATE_NAME_KEYS,
+  KPI_TIER_NAME_KEYS,
   PROMPT_NAME_KEYS,
   SCHEDULE_NAME_KEYS,
+  SESSION_KIND_NAME_KEYS,
+  SPACE_ROLE_NAME_KEYS,
   TRIGGER_NAME_KEYS,
 } from "../lib/identifier-names.ts";
 
@@ -63,6 +73,12 @@ describe("every identifier on an admin screen has a name", () => {
       ...Object.values(ASSIST_NAME_KEYS),
       ...Object.values(SCHEDULE_NAME_KEYS),
       ...Object.values(PROMPT_NAME_KEYS),
+      ...Object.values(SESSION_KIND_NAME_KEYS),
+      ...Object.values(KPI_FREQUENCY_NAME_KEYS),
+      ...Object.values(KPI_STATE_NAME_KEYS),
+      ...Object.values(INDICATOR_NAME_KEYS),
+      ...Object.values(KPI_TIER_NAME_KEYS),
+      ...Object.values(SPACE_ROLE_NAME_KEYS),
     ];
     const unresolved = all.filter((key) => en[key] === undefined);
     expect(unresolved).toEqual([]);
@@ -81,6 +97,23 @@ describe("every identifier on an admin screen has a name", () => {
     const assists = new Set<string>(ASSIST_KEYS);
     expect(
       Object.keys(ASSIST_NAME_KEYS).filter((key) => !assists.has(key)),
+    ).toEqual([]);
+  });
+});
+
+/**
+ * Stored values are named rather than printed (usability review D3). Counted
+ * from the method, so a new frequency or state fails here first.
+ */
+describe("every stored KPI value has a name", () => {
+  test("every frequency and every state", () => {
+    expect(
+      KPI_FREQUENCIES.filter(
+        (one) => KPI_FREQUENCY_NAME_KEYS[one] === undefined,
+      ),
+    ).toEqual([]);
+    expect(
+      KPI_STATES.filter((one) => KPI_STATE_NAME_KEYS[one] === undefined),
     ).toEqual([]);
   });
 });

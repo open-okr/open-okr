@@ -1,6 +1,9 @@
 import { AreaTabs } from "../../lib/area-tabs.tsx";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { WorkMapScreen } from "../work-map-screen.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.map");
 
 /**
  * The company tree, the Map tab of Goals (OKRGoal UX review, backlog 12):

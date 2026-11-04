@@ -355,7 +355,7 @@ export function decide(
         outcome: "block",
         rules: ["writing.midCycleAs"],
         reasons: [
-          "This workspace has an objective added mid-cycle published by its owner. Only its champion can publish it.",
+          "This workspace has an objective added mid-cycle published by its owner. Only its owner can publish it.",
         ],
       };
     }

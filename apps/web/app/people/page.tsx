@@ -2,9 +2,12 @@ import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip, SearchInput } from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
+
+export const generateMetadata = pageTitle("pageTitle.people");
 
 /**
  * The people directory and org chart (UIUX-PLAN.md SS6 S-33, P6-G09).

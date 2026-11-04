@@ -1741,6 +1741,21 @@
       "example": {}
     },
     {
+      "name": "notifications.reasonCounts",
+      "description": "How many unsnoozed notifications the member has in all, unread, and per reason.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "notifications.markRead",
       "description": "Marks one of the signed-in member's own notifications read.",
       "inputSchema": {

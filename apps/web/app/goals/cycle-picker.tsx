@@ -6,6 +6,7 @@ import {
   DateInput,
   SelectInput,
   TextInput,
+  Tooltip,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -149,17 +150,19 @@ export function CyclePicker({
       </div>
 
       {canCreate ? (
-        <Button
-          type="button"
-          aria-label={t("goals.editor.addCycle")}
-          aria-haspopup="dialog"
-          onClick={() => {
-            setOpen(false);
-            setCreating(true);
-          }}
-        >
-          +
-        </Button>
+        <Tooltip label={t("goals.editor.addCycle")}>
+          <Button
+            type="button"
+            aria-label={t("goals.editor.addCycle")}
+            aria-haspopup="dialog"
+            onClick={() => {
+              setOpen(false);
+              setCreating(true);
+            }}
+          >
+            +
+          </Button>
+        </Tooltip>
       ) : null}
 
       {creating ? (

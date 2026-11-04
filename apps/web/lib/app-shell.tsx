@@ -35,6 +35,7 @@ import {
 import { SignOut } from "../app/sign-out.tsx";
 import { WorkspaceSwitcher } from "../app/workspace-switcher.tsx";
 import { resolveAccessLevelFor } from "./access.ts";
+import { AppFooter } from "./app-footer.tsx";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
 import { brandingImageUrl } from "./branding-image.ts";
@@ -42,6 +43,7 @@ import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
 import { loadInboxBadge } from "./inbox-badge.ts";
+import { getInstanceName } from "./instance-name";
 import { navBlocks, navLabel } from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
@@ -49,11 +51,11 @@ import { NewMenu } from "./new-menu.tsx";
 import { getPool } from "./pool";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
+import { SidebarToggle } from "./sidebar-toggle.tsx";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
 import { getTranslations } from "./translations";
-import { VersionFooter } from "./version-footer.tsx";
 import { requireWorkspace } from "./workspace.ts";
 import {
   workspaceBrandImages,
@@ -273,7 +275,13 @@ export async function AppShellLayout({
         // than looked up in a map, because each one comes from a different read
         // and a map would hide which.
         ...(item.id === "review" && updatesBadge !== null
-          ? { badge: updatesBadge }
+          ? {
+              badge: updatesBadge,
+              badgeLabel: t("nav.updatesBadge", {
+                owed: reviewBadge ?? 0,
+                unread: inboxBadge ?? 0,
+              }),
+            }
           : {}),
       })),
     }),
@@ -350,6 +358,7 @@ export async function AppShellLayout({
             <Sidebar
               groups={groups}
               linkComponent={NavLink}
+              footer={<SidebarToggle />}
               workspaceSwitcher={
                 <WorkspaceSwitcher
                   memberships={memberships}
@@ -397,7 +406,7 @@ export async function AppShellLayout({
                         key: "kpi",
                         label: t("newMenu.kpi"),
                         icon: iconFor("kpis"),
-                        href: "/kpis#title",
+                        href: "/kpis?new=kpi",
                         screens: ["/kpis"],
                       },
                       {
@@ -511,7 +520,11 @@ export async function AppShellLayout({
               its last line. */}
           <div className="flex min-h-full flex-col">
             <div className="flex-1">{children}</div>
-            <VersionFooter level={level} />
+            <AppFooter
+              level={level}
+              instanceName={await getInstanceName()}
+              askAvailable={copilot.available}
+            />
           </div>
         </AppShell>
         {/*

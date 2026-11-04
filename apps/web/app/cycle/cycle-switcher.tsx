@@ -77,7 +77,9 @@ export async function CycleSwitcher({
             name="cycle"
             defaultValue={currentId ?? null}
             options={inMode.map((one) => ({ id: one.id, label: one.name }))}
-            className="w-56"
+            // Narrower, and the button says it shows the cycle rather than
+            // opening something (usability review C1).
+            className="w-44"
             inputClassName="text-xs"
           />
           <Button type="submit" size="sm">

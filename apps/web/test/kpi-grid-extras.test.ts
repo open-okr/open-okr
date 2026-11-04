@@ -19,6 +19,7 @@ const at = (path: string) =>
 
 const extras = at("../app/kpis/grid-extras.tsx");
 const page = at("../app/kpis/page.tsx");
+const grid = at("../app/kpis/grid.tsx");
 
 describe("the subtotal", () => {
   test("is a tally of corridor states, not a sum of values", () => {
@@ -27,7 +28,8 @@ describe("the subtotal", () => {
     // across frequencies rather than several KPIs together. Adding a revenue
     // figure to a response time would be a number nobody measured.
     expect(extras).toContain("tally of corridor states, not a sum of values");
-    expect(extras).toContain('states.filter((state) => state === "healthy")');
+    expect(extras).toContain("states.filter((one) => one === state)");
+    expect(extras).toContain('of("healthy")');
     expect(extras).not.toContain("reduce((sum");
   });
 
@@ -63,10 +65,12 @@ describe("the filters", () => {
   test("live in the url, following the explorer's pattern", () => {
     // A combination survives a reload and can be sent to somebody, which local
     // state loses on both counts.
-    expect(extras).toContain("new URLSearchParams(query)");
+    // Since the KPI redesign the options sit in a panel behind Filter, as on
+    // the Goals list, and are still links built from the address.
+    expect(page).toContain("new URLSearchParams(filters)");
     expect(page).toContain("searchParams: Promise<{");
     for (const param of ["frequency", "owner", "category", "state"]) {
-      expect(page, param).toContain(`param="${param}"`);
+      expect(page, param).toContain(`href({ ${param}: null })`);
     }
   });
 
@@ -86,8 +90,8 @@ describe("the page", () => {
 
   test("shows a formula on a calculated row", () => {
     // A chip needs a formula to name, and the grid read returned none until
-    // this row.
-    expect(page).toContain("kpi.isCalculated ?");
-    expect(page).toContain("kpi.formula");
+    // this row. Since the KPI redesign it is on the row itself.
+    expect(grid).toContain("kpi.isCalculated ?");
+    expect(grid).toContain("kpi.formula");
   });
 });

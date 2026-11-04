@@ -178,10 +178,10 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
     feedsStrengthScore: true,
     conditions: [
       {
-        condition: "No named champion",
+        condition: "No named owner",
         status: "fail",
         prompt:
-          "Nobody owns this. Name the champion who reports on it, or it belongs to everyone and therefore to no one.",
+          "Nobody owns this. Name the owner who reports on it, or it belongs to everyone and therefore to no one.",
       },
       {
         condition: "No named reviewer where reviewers are required",
@@ -190,12 +190,12 @@ export const OBJECTIVE_CHECKS: readonly QualityCheck[] = [
           "This workspace asks for a reviewer, who acknowledges the check-ins. Name the person who reads them.",
       },
       {
-        condition: "Champion and reviewer named",
+        condition: "Owner and reviewer named",
         status: "pass",
         prompt: "Owned and reviewed, so the loop closes on somebody.",
       },
       {
-        condition: "Champion named",
+        condition: "Owner named",
         status: "pass",
         prompt:
           "Owned. Nobody is asked to acknowledge its check-ins, which this workspace's practice allows.",
@@ -648,12 +648,12 @@ export function evaluateObjective(
   // OBJ-4
   const obj4 = check("OBJ-4");
   const obj4Verdict = !input.championId
-    ? verdictOf(obj4, "No named champion")
+    ? verdictOf(obj4, "No named owner")
     : input.reviewerId
-      ? verdictOf(obj4, "Champion and reviewer named")
+      ? verdictOf(obj4, "Owner and reviewer named")
       : input.reviewerRequired
         ? verdictOf(obj4, "No named reviewer where reviewers are required")
-        : verdictOf(obj4, "Champion named");
+        : verdictOf(obj4, "Owner named");
 
   // OBJ-5
   const obj5 = check("OBJ-5");

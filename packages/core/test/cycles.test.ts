@@ -643,7 +643,7 @@ describe("changing a threshold", () => {
     await callAction({ pool: wb.appPool, ...context(OWNER) }, "rhythm.update", {
       labels: {
         objective: { singular: "Objective", plural: "Objectives" },
-        champion: { singular: "Owner", plural: "Owners" },
+        champion: { singular: "Champion", plural: "Champions" },
       },
     });
     const wb2 = await workerDb();
@@ -756,7 +756,7 @@ describe("resolving the rhythm from a row", () => {
     // the product works" has to survive a missing row.
     const resolved = resolveRhythm(null);
     expect(resolved.thresholds["cadence.stalenessGraceDays"]).toBe(3);
-    expect(resolved.terminology.champion.singular).toBe("Champion");
+    expect(resolved.terminology.champion.singular).toBe("Owner");
   });
 
   it("reports every problem in a patch at once", () => {

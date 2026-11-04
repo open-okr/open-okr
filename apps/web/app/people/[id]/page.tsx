@@ -16,6 +16,7 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { AppearanceControl } from "../../../lib/appearance.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
@@ -31,6 +32,20 @@ import { LeaveCard } from "./leave-card.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
 import { MemberFieldsForm } from "./member-fields-form.tsx";
 import { ProfileForm } from "./profile-form.tsx";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.person",
+    async (context) =>
+      (await callAction(context, "people.readMember", { memberId: id })).name,
+  );
+}
 
 /**
  * A member's profile (UIUX-PLAN.md SS6 S-33, P6-G09).

@@ -71,6 +71,8 @@ test("sign in", async () => {
 
 test("acceptance: a KPI with no thresholds is told what the ratio does not suit", async () => {
   await goTo(page, "/kpis");
+  // The form opens from its button, as a side panel (KPI redesign).
+  await page.getByRole("link", { name: "New KPI", exact: true }).click();
   const note = addForm().getByTestId("kpi-fallback-note");
   await expect(note).toBeVisible({ timeout: 15_000 });
   await expect(note).toContainText(
@@ -91,7 +93,11 @@ test("adds a range with its band and red boundary, owned by the person adding it
   await form.getByLabel("Green to").fill("100");
   await form.getByLabel("Red below").fill("99.5");
   await expect(form.getByTestId("kpi-fallback-note")).toHaveCount(0);
-  await form.getByRole("button", { name: "Add", exact: true }).click();
+  // The panel's Add sits in its footer, outside the form it submits.
+  await page
+    .getByTestId("kpi-kpi-panel")
+    .getByRole("button", { name: "Add", exact: true })
+    .click();
 
   await expect
     .poll(

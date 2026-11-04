@@ -50,8 +50,13 @@ import { RulePreview } from "../../lib/rule-preview";
  * from somebody else. While the reader is in the field, their draft wins.
  */
 
+/**
+ * Below 768px an editable field is at least 24px tall, WCAG 2.5.8's target
+ * (usability review N3). The 16px Safari needs is the focus rule in
+ * globals.css, under `data-text-first`.
+ */
 const FIELD =
-  "rounded-control border border-transparent bg-transparent px-1.5 py-0.5 text-ink outline-none hover:border-line focus:border-brand focus:bg-surface";
+  "rounded-control border border-transparent bg-transparent px-1.5 py-0.5 text-ink outline-none hover:border-line focus:border-brand focus:bg-surface max-md:min-h-6";
 
 /** Keeps a draft in step with the stored value while the field is not in use. */
 function useDraft<T>(value: T): {
@@ -643,7 +648,7 @@ export function KindControl({
           setPending(next === kind ? null : next);
         }}
         inputClassName={cn(
-          "h-4.5 w-auto rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-brand",
+          "h-4.5 w-auto rounded-full border-0 px-2 text-[11px] font-semibold outline-none focus:ring-0 focus-visible:ring-2 focus-visible:ring-brand max-md:h-6",
           KIND_TONE[shown],
         )}
       >

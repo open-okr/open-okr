@@ -158,7 +158,12 @@ test("the front door shows what provisioning resolved, with nothing configured",
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /^Q[1-4] \d{4}$/ })).toBeVisible();
+  // The cycle is a picker since the usability review's O3, so the generated
+  // cycle is its chosen option rather than a link.
+  await expect(page.getByTestId("work-map-cycle")).toHaveValue(/.+/);
+  await expect(
+    page.getByTestId("work-map-cycle").locator("option:checked"),
+  ).toHaveText(/^Q[1-4] \d{4}$/);
   // And the three ways out of it, which is the front door's other job.
   await expect(
     page.getByRole("link", { name: "Filter and search in the explorer" }),
@@ -951,13 +956,13 @@ test("the review action opens the composer for that goal", async () => {
  */
 test("a KPI recorded below the corridor reaches the recovery board", async () => {
   await page.goto("/kpis");
-  await page.getByLabel("What is being measured").fill("Operating margin");
-  await page.getByLabel("Standing target").fill("100");
-  await page
-    .getByRole("main")
-    .getByRole("button", { name: "Add", exact: true })
-    .first()
-    .click();
+  // The form opens from its button, as a side panel (KPI redesign).
+  await page.getByRole("link", { name: "New KPI", exact: true }).click();
+  const panel = page.getByTestId("kpi-kpi-panel");
+  await panel.getByLabel("What is being measured").fill("Operating margin");
+  await panel.getByLabel("Standing target").fill("100");
+  await panel.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(panel).toHaveCount(0);
 
   // The period the cell belongs to is the workspace's own answer, so the
   // locator matches on the KPI rather than on a date this spec would have to
@@ -1061,6 +1066,9 @@ test("the grid carries its subtotals, sparklines and filters", async () => {
 
   // One value so far, so no line is drawn and the row says why.
   await expect(page.getByTestId("sparkline-too-short").first()).toBeVisible();
+
+  // The filters sit in a panel behind the Filter button (KPI redesign).
+  await page.getByRole("button", { name: "Filter" }).click();
 
   /*
    * The filters are links, so a combination survives a reload and can be sent

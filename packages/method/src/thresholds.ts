@@ -154,7 +154,7 @@ export const THRESHOLDS = {
     section: "11",
     // The sponsor step is conditional, as METHOD §11 and `escalation.ts` say;
     // this sentence named it unconditionally until the OKRGoal UX review.
-    why: "Champion at due, champion again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
+    why: "Owner at due, owner again at one day overdue, reviewer once the grace is exceeded, coordinator at seven days, and the sponsor at fourteen where the workspace adds that step. Widening rather than repeating is what makes an escalation mean something.",
     default: { championRepeat: 1, coordinator: 7, sponsor: 14 },
     schema: z.object({
       championRepeat: wholeDays,
@@ -254,6 +254,22 @@ export const THRESHOLDS = {
     why: "0.7 and above is high: move on to the next key result.",
     default: 0.7,
     schema: unit,
+  }),
+  "scoring.onTrackShareHealthy": param({
+    group: "scoring",
+    label: "On-track share healthy line",
+    section: "3.5",
+    why: "70% or more of the key results under goals on track or achieved reads healthy in a set's summary.",
+    default: 70,
+    schema: z.number().int().min(0).max(100),
+  }),
+  "scoring.onTrackShareWatch": param({
+    group: "scoring",
+    label: "On-track share watch line",
+    section: "3.5",
+    why: "40% to below the healthy line reads watch; below 40% reads at risk. It colours a summary and changes no goal's health.",
+    default: 40,
+    schema: z.number().int().min(0).max(100),
   }),
   "scoring.confidenceLow": param({
     group: "scoring",

@@ -1,18 +1,24 @@
 import {
+  COMPANY_EMAIL_MESSAGE,
+  inviteTokenFromCookies,
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
+  registrationRefusal,
 } from "@openokr/core";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
 import { SignUpForm } from "./sign-up-form";
 
+export const generateMetadata = pageTitle("pageTitle.signUp");
+
 /**
  * Registration (screen S-35), which the plan describes as available "where
- * enabled". An instance is open until somebody claims it and invitation-only
- * afterwards (TECHNICAL-PLAN §4.14).
+ * enabled". The policy is set on Admin → General: invitation only, company
+ * addresses, or anyone (docs/design/registration-policy.md).
  *
  * Showing the form on a closed instance would be a form that cannot succeed,
  * so the page asks first. The endpoint refuses independently: this is the
@@ -52,5 +58,16 @@ export default async function SignUpPage() {
     );
   }
 
-  return <SignUpForm />;
+  // Open to company addresses only: a free address would be refused, so the
+  // form says so up front. Not for an invitee, whom the invitation admits
+  // whatever their address.
+  const companyOnly =
+    inviteTokenFromCookies(cookieHeader) === null &&
+    (await registrationRefusal(
+      getPool(),
+      cookieHeader,
+      "someone@gmail.com",
+    )) === COMPANY_EMAIL_MESSAGE;
+
+  return <SignUpForm companyOnly={companyOnly} />;
 }

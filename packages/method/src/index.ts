@@ -301,6 +301,7 @@ export {
   needsRootCause,
   type OkrKind,
   objectiveScore,
+  onTrackShareBand,
   type PortfolioVerdict,
   type ProgressSignal,
   type ProgressSignalPractice,

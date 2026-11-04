@@ -7,10 +7,13 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { redirect } from "next/navigation";
 import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ConsentForm } from "./consent-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.connectAgent");
 
 /**
  * Screen S-40: connecting an external agent (AI-NATIVE-PLAN.md §8.2, P5-T08c).

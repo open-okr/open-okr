@@ -3,8 +3,11 @@ import { listTimezones } from "@openokr/formats";
 import { redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { requireWorkspace } from "../../lib/workspace";
 import { Wizard } from "./wizard.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.welcome");
 
 /**
  * Onboarding, screen S-34 (P6-G26, GAP-AUDIT G-02).

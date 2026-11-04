@@ -8,6 +8,7 @@
 import {
   activeOnly,
   activities,
+  checkIns,
   cycles,
   goals,
   initiatives,
@@ -34,6 +35,7 @@ import {
   lt,
   lte,
   or,
+  sql,
 } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
@@ -374,6 +376,32 @@ async function subjectTitles(
     idsByType.set(type, held);
   }
   const titles = new Map<string, string>();
+  // A check-in has no title of its own, so its group is named after the
+  // objective it is about: "1 day after publication" under a bare
+  // "Check-in" said nothing about which one (usability review N5).
+  const checkInIds = [
+    ...new Set(
+      rows.flatMap((row) =>
+        row.subjectType === "check_in" && row.subjectId ? [row.subjectId] : [],
+      ),
+    ),
+  ];
+  if (checkInIds.length > 0) {
+    const found = await tx
+      .select({ id: checkIns.id, title: goals.title })
+      .from(checkIns)
+      .innerJoin(goals, eq(goals.id, checkIns.subjectId))
+      .where(
+        activeOnly(
+          checkIns,
+          eq(checkIns.workspaceId, workspaceId),
+          inArray(checkIns.id, checkInIds),
+        ),
+      );
+    for (const one of found) {
+      titles.set(`check_in:${one.id}`, one.title);
+    }
+  }
   for (const [type, ids] of idsByType) {
     const source = TITLE_SOURCES[type];
     const found = await tx
@@ -488,6 +516,71 @@ export const unreadNotificationCount = defineReadAction({
           ),
         );
       return { unread: Number(row?.unread ?? 0) };
+    });
+  },
+});
+
+/**
+ * How many notifications the member has under each filter Activity offers:
+ * every one, the unread ones, and one count per reason (usability review I1).
+ *
+ * Counted over every unsnoozed row, as the badge is, rather than over the
+ * one page of 50 the list returns: counting the page said "50" beside a
+ * badge of 257 (D1). It shares the badge's one overstatement, rows whose
+ * subject the reader has since lost access to.
+ */
+export const notificationReasonCounts = defineReadAction({
+  name: "notifications.reasonCounts",
+  summary:
+    "How many unsnoozed notifications the member has in all, unread, and per reason.",
+  input: z.object({}),
+  output: z.object({
+    total: z.number().int(),
+    unread: z.number().int(),
+    byReason: z.record(z.string(), z.number().int()),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context) {
+    const db = drizzle(context.pool);
+    return withWorkspace(db, context.workspaceId, async (rawTx) => {
+      const tx = rawTx as OperationTx;
+      const memberId = await actingMember(
+        tx,
+        context.workspaceId,
+        context.actor.userId,
+      );
+      if (!memberId) {
+        return { total: 0, unread: 0, byReason: {} };
+      }
+      const now = new Date();
+      const rows = await tx
+        .select({
+          reason: notifications.reason,
+          all: count(),
+          unread: sql<number>`count(*) filter (where ${notifications.readAt} is null)`,
+        })
+        .from(notifications)
+        .where(
+          activeOnly(
+            notifications,
+            eq(notifications.workspaceId, context.workspaceId),
+            eq(notifications.recipientMemberId, memberId),
+            or(
+              isNull(notifications.snoozedUntil),
+              lte(notifications.snoozedUntil, now),
+            ) as never,
+          ),
+        )
+        .groupBy(notifications.reason);
+      const byReason: Record<string, number> = {};
+      let total = 0;
+      let unread = 0;
+      for (const row of rows) {
+        byReason[row.reason] = Number(row.all);
+        total += Number(row.all);
+        unread += Number(row.unread);
+      }
+      return { total, unread, byReason };
     });
   },
 });

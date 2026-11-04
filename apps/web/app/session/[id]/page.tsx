@@ -40,6 +40,11 @@ import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { confidenceDisplay } from "../../../lib/confidence-display.ts";
+import {
+  nameOf,
+  SESSION_KIND_NAME_KEYS,
+} from "../../../lib/identifier-names.ts";
+import { itemTitle } from "../../../lib/page-title.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
@@ -84,6 +89,20 @@ import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
+
+/** The tab reads this item's own name (lib/page-title.ts). */
+export async function generateMetadata({
+  params,
+}: {
+  readonly params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  return itemTitle(
+    "pageTitle.session",
+    async (context) =>
+      (await callAction(context, "sessions.read", { id })).title,
+  );
+}
 
 interface SessionPageProps {
   params: Promise<{ id: string }>;
@@ -729,7 +748,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
             })}
           </p>
         </div>
-        <Chip tone="neutral">{sessionRow.kind}</Chip>
+        <Chip tone="neutral">
+          {nameOf(SESSION_KIND_NAME_KEYS, sessionRow.kind, t)}
+        </Chip>
       </div>
 
       {/* State-specific controls (facilitator only) */}

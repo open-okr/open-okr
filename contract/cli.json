@@ -1661,6 +1661,16 @@
       "pages": false
     },
     {
+      "name": "notifications reasonCounts",
+      "action": "notifications.reasonCounts",
+      "method": "GET",
+      "path": "/notifications/reasonCounts",
+      "scope": "read",
+      "summary": "How many unsnoozed notifications the member has in all, unread, and per reason.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "notifications markRead",
       "action": "notifications.markRead",
       "method": "POST",

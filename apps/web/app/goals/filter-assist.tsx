@@ -6,7 +6,7 @@
  * **What it produces is the explorer's filter state, not a separate result set.**
  * On success it navigates to the same URL a reader would have reached by clicking
  * the filter chips, so what they get is editable with the controls they already
- * know: click "Any" on Health and the assist's answer is gone. That is the row's
+ * know: click "All" on Health and the assist's answer is gone. That is the row's
  * acceptance criterion, and it is why this component navigates rather than
  * rendering a list of its own.
  *

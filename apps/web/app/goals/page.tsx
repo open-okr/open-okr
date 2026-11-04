@@ -23,6 +23,7 @@ import { progressCeiling } from "../../lib/ceilings.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { healthWord } from "../../lib/health-words.ts";
 import { filterGoals, type OkrScope } from "../../lib/okr-tree/cache.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { mapNodesFor } from "../goal-nodes.ts";
@@ -39,6 +40,8 @@ import { NewObjectiveButton } from "./new-objective.tsx";
 import { OkrDiagram } from "./okr-diagram.tsx";
 import { OkrTable } from "./okr-table.tsx";
 import { CYCLE_PLACEHOLDER, FILTER_PLACEHOLDER } from "./placeholders.ts";
+
+export const generateMetadata = pageTitle("pageTitle.goals");
 
 /**
  * The goals explorer (UIUX-PLAN.md §4 S-13, P3-T10).
@@ -747,10 +750,12 @@ function countChip(
   filtered: boolean,
   tree: boolean,
 ): string {
+  // "Objectives", the word the page's own heading uses (usability review G1,
+  // owner decision Q2).
   const goals =
     count === 1
-      ? t("common.count.goalOne", { count })
-      : t("common.count.goalOther", { count });
+      ? t("common.count.objectiveOne", { count })
+      : t("common.count.objectiveOther", { count });
   if (filtered && tree) {
     return t("goals.countFilteredAsATree", { goals });
   }
@@ -949,40 +954,32 @@ async function Filters({
     </fieldset>
   );
 
-  const displays = (
-    <fieldset
-      aria-label={t("goals.editor.displayGroup")}
-      className="inline-flex h-7.5 gap-0.5 rounded-control bg-raised p-0.75"
-    >
-      {(
-        [
-          ["editor", null, t("goals.editor.displayList"), LIST_ICON],
-          [
-            "diagram",
-            "diagram",
-            t("goals.editor.displayDiagram"),
-            DIAGRAM_ICON,
-          ],
-          ["tree", "tree", t("goals.editor.displayTree"), TREE_ICON],
-        ] as const
-      ).map(([key, value, label, icon]) => (
-        <a
-          key={key}
-          href={href({ display: value })}
-          title={label}
-          aria-current={display === key ? "true" : undefined}
-          className={`grid w-7 place-items-center rounded-md ${
-            display === key
-              ? "bg-surface text-brand-text shadow-control"
-              : "text-ink-3 hover:text-ink"
-          }`}
-        >
-          <span className="sr-only">{label}</span>
-          {icon}
-        </a>
-      ))}
-    </fieldset>
-  );
+  // Drawn by the toolbar, a client component, because each icon carries a
+  // tooltip and a server component cannot render one through the kit's
+  // barrel export.
+  const displays = {
+    label: t("goals.editor.displayGroup"),
+    options: [
+      {
+        key: "list" as const,
+        href: href({ display: null }),
+        label: t("goals.editor.displayList"),
+        on: display === "editor",
+      },
+      {
+        key: "diagram" as const,
+        href: href({ display: "diagram" }),
+        label: t("goals.editor.displayDiagram"),
+        on: display === "diagram",
+      },
+      {
+        key: "tree" as const,
+        href: href({ display: "tree" }),
+        label: t("goals.editor.displayTree"),
+        on: display === "tree",
+      },
+    ],
+  };
 
   const panel = (
     <>
@@ -1177,7 +1174,7 @@ function PanelRow({
       <span aria-hidden="true" className={PANEL_LABEL}>
         {label}
       </span>
-      {/* A named group, because "Any" and "All" appear in more than one row
+      {/* A named group, because "All" appears in more than one row
        * and a test that clicks the wrong one passes for the wrong reason;
        * the name is also what a screen reader needs. */}
       <fieldset
@@ -1219,48 +1216,6 @@ function Pill({
 function capital(word: string): string {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
-
-const LIST_ICON = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-    className="size-3.5"
-  >
-    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-  </svg>
-);
-
-const DIAGRAM_ICON = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-    className="size-3.5"
-  >
-    <rect x="9" y="3" width="6" height="5" rx="1" />
-    <rect x="3" y="16" width="6" height="5" rx="1" />
-    <rect x="15" y="16" width="6" height="5" rx="1" />
-    <path d="M12 8v4M6 16v-4h12v4" />
-  </svg>
-);
-
-const TREE_ICON = (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    aria-hidden="true"
-    className="size-3.5"
-  >
-    <path d="M4 5h6M8 12h6M8 19h6M6 5v14M6 12h2M6 19h2" />
-  </svg>
-);
 
 /**
  * Parents before children, and every goal exactly once.

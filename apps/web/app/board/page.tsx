@@ -15,11 +15,14 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { namedOption } from "../../lib/entity-options.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { createTaskAction, moveTaskAction } from "./actions.ts";
 import { Board } from "./board.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.board");
 
 /**
  * The OKR board (UIUX-PLAN.md §6 S-27, P5-T11, completeness review M-02).

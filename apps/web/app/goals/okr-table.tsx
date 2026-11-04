@@ -13,6 +13,7 @@ import {
   Button,
   formatConfidence,
   TextInput,
+  Tooltip,
   useIsMutating,
   useQueryClient,
   useTranslations,
@@ -127,6 +128,12 @@ interface Mover {
   readonly label: string;
   readonly move: (by: -1 | 1) => void;
   readonly onDragStart: () => void;
+  /** The drag ended, dropped anywhere or nowhere: forget it. */
+  readonly onDragEnd: () => void;
+  /** Whether what is being dragged may land here (same set, not itself). */
+  readonly accepts: () => boolean;
+  /** Dragged over this row, in its lower half when `after`: show where. */
+  readonly onHover: (after: boolean) => void;
   /** Dropped on this row, in its lower half when `after`. */
   readonly onDrop: (after: boolean) => void;
 }
@@ -137,27 +144,79 @@ function moverHandlers(mover: Mover | null) {
     return {};
   }
   return {
-    onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => {
+    onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => {
       if (!event.altKey) {
         return;
       }
+      // Stopped where it is handled: the objective's whole card carries a
+      // mover too since the drag fix, and a key result's Alt and arrow
+      // bubbling to it moved the objective as well (s13c).
       if (event.key === "ArrowUp") {
         event.preventDefault();
+        event.stopPropagation();
         mover.move(-1);
       }
       if (event.key === "ArrowDown") {
         event.preventDefault();
+        event.stopPropagation();
         mover.move(1);
       }
     },
-    onDragOver: (event: React.DragEvent<HTMLDivElement>) =>
-      event.preventDefault(),
-    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+    // Only a target that takes the dragged row answers, and then stops the
+    // event: a key result row under a dragged objective lets it pass to the
+    // objective's card, which is the target for objectives. Answering every
+    // drag was why an objective dropped anywhere but on another objective's
+    // head did nothing (Goals drag fix, 2 November 2026).
+    onDragOver: (event: React.DragEvent<HTMLElement>) => {
+      if (!mover.accepts()) {
+        return;
+      }
       event.preventDefault();
+      event.stopPropagation();
+      const box = event.currentTarget.getBoundingClientRect();
+      mover.onHover(event.clientY > box.top + box.height / 2);
+    },
+    onDrop: (event: React.DragEvent<HTMLElement>) => {
+      if (!mover.accepts()) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
       const box = event.currentTarget.getBoundingClientRect();
       mover.onDrop(event.clientY > box.top + box.height / 2);
     },
   };
+}
+
+/**
+ * Where a dragged row will land: a brand line on the side it will take.
+ * Without it a drag had to be dropped on faith, and a miss did nothing.
+ * Between cards the line sits in the gap rather than on the card's border.
+ */
+function DropLine({
+  at,
+  gap = false,
+}: {
+  /** True below, false above, null when nothing is dragged here. */
+  readonly at: boolean | null;
+  readonly gap?: boolean;
+}) {
+  if (at === null) {
+    return null;
+  }
+  const edge = gap
+    ? at
+      ? "-bottom-[7px]"
+      : "-top-[7px]"
+    : at
+      ? "-bottom-px"
+      : "-top-px";
+  return (
+    <span
+      aria-hidden="true"
+      className={`pointer-events-none absolute inset-x-2 z-10 h-0.5 rounded-full bg-brand ${edge}`}
+    />
+  );
 }
 
 /**
@@ -167,35 +226,42 @@ function moverHandlers(mover: Mover | null) {
  * reaches it.
  */
 function Grip({ id, mover }: { readonly id: string; readonly mover: Mover }) {
+  const { t } = useTranslations();
   return (
-    <button
-      type="button"
-      data-grip={id}
-      aria-label={mover.label}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", id);
-        mover.onDragStart();
-      }}
-      className="flex size-5 cursor-grab items-center justify-center rounded-control text-ink-4 opacity-0 hover:bg-raised hover:text-ink-2 focus:opacity-100 group-hover:opacity-100"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        fill="currentColor"
-        aria-hidden="true"
-        className="size-3.5"
+    <Tooltip label={t("okrList.reorderHint")} side="left">
+      <button
+        type="button"
+        data-grip={id}
+        aria-label={mover.label}
+        draggable
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", id);
+          mover.onDragStart();
+        }}
+        onDragEnd={mover.onDragEnd}
+        className="flex size-5 cursor-grab items-center justify-center rounded-control text-ink-4 opacity-0 hover:bg-raised hover:text-ink-2 focus:opacity-100 group-hover:opacity-100"
       >
-        <circle cx="9" cy="6" r="1.5" />
-        <circle cx="15" cy="6" r="1.5" />
-        <circle cx="9" cy="12" r="1.5" />
-        <circle cx="15" cy="12" r="1.5" />
-        <circle cx="9" cy="18" r="1.5" />
-        <circle cx="15" cy="18" r="1.5" />
-      </svg>
-    </button>
+        <svg
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          aria-hidden="true"
+          className="size-3.5"
+        >
+          <circle cx="9" cy="6" r="1.5" />
+          <circle cx="15" cy="6" r="1.5" />
+          <circle cx="9" cy="12" r="1.5" />
+          <circle cx="15" cy="12" r="1.5" />
+          <circle cx="9" cy="18" r="1.5" />
+          <circle cx="15" cy="18" r="1.5" />
+        </svg>
+      </button>
+    </Tooltip>
   );
 }
+
+/** Where "Collapse all" is remembered, per browser (owner decision Q3). */
+const FOLD_KEY = "openokr.goals.fold";
 
 export function OkrTable({
   initialTree,
@@ -321,6 +387,11 @@ function LiveOkrTable({
     readonly parent: string | null;
   } | null>(null);
   const [regrip, setRegrip] = useState<{ id: string; at: number } | null>(null);
+  // Where the dragged row would land: the row it is over, and which side.
+  const [hint, setHint] = useState<{
+    readonly id: string;
+    readonly after: boolean;
+  } | null>(null);
   const tree = useOkrTree({
     cycleId,
     scope,
@@ -391,9 +462,22 @@ function LiveOkrTable({
       onDragStart: () => {
         dragged.current = { id, parent };
       },
+      onDragEnd: () => {
+        dragged.current = null;
+        setHint(null);
+      },
+      accepts: () => {
+        const from = dragged.current;
+        return from !== null && from.parent === parent && from.id !== id;
+      },
+      onHover: (after) =>
+        setHint((now) =>
+          now?.id === id && now.after === after ? now : { id, after },
+        ),
       onDrop: (after) => {
         const from = dragged.current;
         dragged.current = null;
+        setHint(null);
         if (!from || from.parent !== parent || from.id === id) {
           return;
         }
@@ -443,6 +527,34 @@ function LiveOkrTable({
         : [...current, id],
     );
 
+  // Key results are open by default, because they are the proof (METHOD.md
+  // §1, owner decision Q3). "Collapse all" is remembered in this browser, so
+  // somebody who reads objectives only gets that view back.
+  const goalIds = goals.map((goal) => goal.id).join(",");
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(FOLD_KEY) === "collapsed") {
+        setCollapsed(goalIds === "" ? [] : goalIds.split(","));
+      }
+    } catch {
+      // Storage refused: the default, every card open.
+    }
+  }, [goalIds]);
+  const allCollapsed =
+    goals.length > 0 && goals.every((goal) => collapsed.includes(goal.id));
+  const foldAll = (fold: boolean) => {
+    setCollapsed(fold ? goals.map((goal) => goal.id) : []);
+    try {
+      if (fold) {
+        window.localStorage.setItem(FOLD_KEY, "collapsed");
+      } else {
+        window.localStorage.removeItem(FOLD_KEY);
+      }
+    } catch {
+      // Not remembered, which is the only cost.
+    }
+  };
+
   return (
     <div
       className="flex flex-col gap-2"
@@ -485,6 +597,20 @@ function LiveOkrTable({
        * a short bar in a narrow column (Goals audit, 2 November 2026). Every
        * cell is still edited where it is read. */}
       <div className="flex flex-col gap-3">
+        {goals.length > 1 ? (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid="okr-fold-all"
+              aria-pressed={allCollapsed}
+              onClick={() => foldAll(!allCollapsed)}
+            >
+              {allCollapsed ? t("okrList.expandAll") : t("okrList.collapseAll")}
+            </Button>
+          </div>
+        ) : null}
         {tree.goals.length === 0 ? (
           <p
             className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-2"
@@ -500,12 +626,21 @@ function LiveOkrTable({
 
         {goals.map((goal, goalIndex) => {
           const open = !collapsed.includes(goal.id);
+          // The whole card takes a dragged objective, not only its head.
+          const objectiveMover = moverFor(
+            goals,
+            goalIndex,
+            null,
+            t("okrList.moveObjective", { title: goal.title }),
+          );
           return (
             <section
               key={goal.id}
               aria-label={goal.title}
-              className="rounded-xl border border-line bg-surface"
+              className="relative rounded-xl border border-line bg-surface"
+              {...moverHandlers(objectiveMover)}
             >
+              <DropLine at={hint?.id === goal.id ? hint.after : null} gap />
               <ObjectiveRow
                 goal={goal}
                 open={open}
@@ -519,12 +654,7 @@ function LiveOkrTable({
                 coach={coach}
                 spaces={spaces}
                 viewerId={tree.viewerId}
-                mover={moverFor(
-                  goals,
-                  goalIndex,
-                  null,
-                  t("okrList.moveObjective", { title: goal.title }),
-                )}
+                mover={objectiveMover}
                 onDelete={() => okr.mutate({ kind: "deleteGoal", id: goal.id })}
                 onOpen={() => drawer.open(goal.id)}
                 onCheckIn={() => drawer.open(goal.id, { tab: "check-in" })}
@@ -551,6 +681,7 @@ function LiveOkrTable({
                   {goal.keyResults.map((keyResult, keyResultIndex) => (
                     <KeyResultRow
                       key={keyResult.id}
+                      dropAt={hint?.id === keyResult.id ? hint.after : null}
                       mover={moverFor(
                         goal.keyResults,
                         keyResultIndex,
@@ -718,30 +849,16 @@ function ObjectiveRow({
 
   return (
     <>
-      {/* The objective's head, as the prototype draws it: the chevron, the
-          title with its meta line, the health chip and the actions on the
-          right, the rule note, then the progress across the card. The grip
-          sits in the margin and shows on hover. */}
-      <div
-        className="group relative grid grid-cols-[1.5rem_minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-2.5"
-        {...moverHandlers(mover)}
-      >
-        {mover ? (
-          <span className="absolute top-3.5 -left-0.5 hidden md:block">
-            <Grip id={goal.id} mover={mover} />
-          </span>
-        ) : null}
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-label={t("goals.editor.toggleKeyResults", {
-            title: goal.title,
-          })}
-          onClick={onToggle}
-          className="flex size-6 items-center justify-center rounded-md text-ink-4 hover:bg-raised hover:text-ink-2"
-        >
-          <Chevron open={open} />
-        </button>
+      {/* The objective's head: the grip in the same column and at the same
+          place as a key result's, the title with its meta line, the health
+          chip, the actions and the collapse on the right, the rule note,
+          then the progress across the card. The grip sat on the card's own
+          border and the chevron where a key result has its grip, which made
+          the two rows' left edges disagree (Goals, 2 November 2026). */}
+      <div className="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5">
+        <span className="hidden h-6 items-center justify-center md:flex">
+          {mover ? <Grip id={goal.id} mover={mover} /> : null}
+        </span>
 
         <InlineText
           value={goal.title}
@@ -755,7 +872,7 @@ function ObjectiveRow({
           onSave={cells.saveTitle}
         />
 
-        <div className="col-start-3 row-start-1 flex items-center gap-1">
+        <div className="col-start-2 row-start-1 flex items-center gap-1 md:col-start-3">
           <span className="hidden md:inline-flex">
             <HealthChip health={goal.health} reported={goal.reportedStatus} />
           </span>
@@ -781,9 +898,27 @@ function ObjectiveRow({
                 : null
             }
           />
+          {/* Last on the right, where a collapsible card keeps it. */}
+          <Tooltip
+            label={
+              open ? t("okrList.hideKeyResults") : t("okrList.showKeyResults")
+            }
+          >
+            <button
+              type="button"
+              aria-expanded={open}
+              aria-label={t("goals.editor.toggleKeyResults", {
+                title: goal.title,
+              })}
+              onClick={onToggle}
+              className="flex size-6.5 items-center justify-center rounded-md text-ink-3 hover:bg-raised hover:text-ink"
+            >
+              <Chevron open={open} />
+            </button>
+          </Tooltip>
         </div>
 
-        <div data-text-first className={`col-start-2 ${META}`}>
+        <div data-text-first className={`col-start-1 md:col-start-2 ${META}`}>
           {/* On a phone the health chip leads the meta line instead. */}
           <span className="md:hidden" data-phone-only>
             <HealthChip
@@ -874,14 +1009,14 @@ function ObjectiveRow({
         </div>
 
         {cells.verdicts.length > 0 ? (
-          <div className="col-span-2 col-start-2">
+          <div className="col-span-2 col-start-1 md:col-start-2">
             <VerdictChips verdicts={cells.verdicts} />
           </div>
         ) : null}
 
         {/* The objective's progress across the card: the one number the
             card is about. */}
-        <div className="col-span-2 col-start-2 flex items-center gap-2.5">
+        <div className="col-span-2 col-start-1 flex items-center gap-2.5 md:col-start-2">
           <Bar
             value={goal.progressPct}
             max={progressMax}
@@ -899,6 +1034,7 @@ function ObjectiveRow({
 }
 
 function KeyResultRow({
+  dropAt,
   keyResult,
   onOpen,
   okr,
@@ -911,6 +1047,8 @@ function KeyResultRow({
   units,
   cycle,
 }: {
+  /** Where a dragged key result would land: above, below, or not here. */
+  readonly dropAt: boolean | null;
   readonly keyResult: OkrGoal["keyResults"][number];
   readonly onOpen: () => void;
   readonly okr: Okr;
@@ -942,9 +1080,10 @@ function KeyResultRow({
           phone: the title with the menu beside it, the value and the
           confidence under it, then the progress across. */}
       <div
-        className={`group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
+        className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
         {...moverHandlers(mover)}
       >
+        <DropLine at={dropAt} />
         {/* Flex rather than grid: the row is the nearest grid, which is how
             a row is found from its title. */}
         <div className="col-start-1 row-start-1 flex min-w-0 gap-x-2 md:col-start-auto md:row-start-auto">
@@ -1306,72 +1445,78 @@ function RowActions({
   return (
     <div className="flex items-center justify-end gap-0.5 opacity-100 transition-opacity focus-within:opacity-100 group-hover:opacity-100 has-[[data-popup-open]]:opacity-100 md:opacity-0">
       {onCheckIn ? (
-        <button
-          type="button"
-          aria-label={t("okrList.checkInOn")}
-          onClick={onCheckIn}
+        <Tooltip label={t("okrList.checkInOn")}>
+          <button
+            type="button"
+            aria-label={t("okrList.checkInOn")}
+            onClick={onCheckIn}
+            className={`hidden md:flex ${icon}`}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              aria-hidden="true"
+              className="size-3.5"
+            >
+              <path d="m5 12 5 5 9-10" />
+            </svg>
+          </button>
+        </Tooltip>
+      ) : null}
+      <Tooltip label={openLabel}>
+        <a
+          href={href}
+          onClick={(event) => {
+            if (
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) {
+              return;
+            }
+            event.preventDefault();
+            onOpen();
+          }}
           className={`hidden md:flex ${icon}`}
         >
+          {/* The name inside the link rather than on it: an `aria-label` on an
+           * anchor whose only content is a decorative icon leaves the link
+           * empty for anything that reads content rather than labels. */}
+          <span className="sr-only">{openLabel}</span>
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2.2"
+            strokeWidth="2"
             aria-hidden="true"
             className="size-3.5"
           >
-            <path d="m5 12 5 5 9-10" />
+            <path d="M7 17 17 7M8 7h9v9" />
           </svg>
-        </button>
-      ) : null}
-      <a
-        href={href}
-        onClick={(event) => {
-          if (
-            event.button !== 0 ||
-            event.metaKey ||
-            event.ctrlKey ||
-            event.shiftKey ||
-            event.altKey
-          ) {
-            return;
-          }
-          event.preventDefault();
-          onOpen();
-        }}
-        className={`hidden md:flex ${icon}`}
-      >
-        {/* The name inside the link rather than on it: an `aria-label` on an
-         * anchor whose only content is a decorative icon leaves the link
-         * empty for anything that reads content rather than labels. */}
-        <span className="sr-only">{openLabel}</span>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          aria-hidden="true"
-          className="size-3.5"
-        >
-          <path d="M7 17 17 7M8 7h9v9" />
-        </svg>
-      </a>
+        </a>
+      </Tooltip>
       <Menu.Root>
-        <Menu.Trigger
-          aria-label={t("okrList.moreActions", { title })}
-          className={icon}
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            aria-hidden="true"
-            className="size-3.5"
+        <Tooltip label={t("okrList.moreActionsShort")}>
+          <Menu.Trigger
+            aria-label={t("okrList.moreActions", { title })}
+            className={icon}
           >
-            <circle cx="5" cy="12" r="1.8" />
-            <circle cx="12" cy="12" r="1.8" />
-            <circle cx="19" cy="12" r="1.8" />
-          </svg>
-        </Menu.Trigger>
+            <svg
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              aria-hidden="true"
+              className="size-3.5"
+            >
+              <circle cx="5" cy="12" r="1.8" />
+              <circle cx="12" cy="12" r="1.8" />
+              <circle cx="19" cy="12" r="1.8" />
+            </svg>
+          </Menu.Trigger>
+        </Tooltip>
         <Menu.Portal>
           <Menu.Positioner sideOffset={4} align="end">
             <Menu.Popup className="min-w-44 rounded-lg border border-line-2 bg-surface p-1 shadow-(--shadow-popover)">
@@ -1460,7 +1605,9 @@ function AddRow({
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const padding = indented ? "pl-11" : "pl-3.5";
+  // On a phone the key results have no grip column, so the add row
+  // starts where their titles do.
+  const padding = indented ? "pl-3 md:pl-11" : "pl-3.5";
 
   const close = () => {
     setTitle("");

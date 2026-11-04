@@ -449,7 +449,7 @@ describe("the history and the alignment", () => {
     const text = drawer()?.textContent ?? "";
     expect(text).toContain("Activation stalled while the guide was rewritten.");
     expect(text).toContain(
-      "Priya eased the target from 50 % to 45 % on 2027-01-12",
+      "Priya eased the target from 50 % to 45 % on 12 Jan 2027",
     );
     expect(text).toContain("The partner channel closed in week three");
     expect(

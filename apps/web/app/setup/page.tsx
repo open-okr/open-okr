@@ -12,10 +12,13 @@ import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { getInstanceName } from "../../lib/instance-name";
 import { getMailSettings, mailerFrom } from "../../lib/mail";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getKeyRing } from "../../lib/secrets";
 import { getStorage, storageDescription } from "../../lib/storage";
 import { getTranslations } from "../../lib/translations";
 import { CheckList } from "./check-list";
+
+export const generateMetadata = pageTitle("pageTitle.setup");
 
 /**
  * The first-run wizard, step one: what this instance looks like right now

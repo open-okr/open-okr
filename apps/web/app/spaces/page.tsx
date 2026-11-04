@@ -13,10 +13,13 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { memberOption } from "../../lib/entity-options.ts";
 import { searchAnyone } from "../../lib/member-search.ts";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { createSpace } from "./actions.ts";
 import { SpaceForm } from "./space-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.spaces");
 
 /**
  * The space list (TECHNICAL-PLAN §4.2, P3-T01).
@@ -124,7 +127,12 @@ export default async function SpacesPage() {
             </div>
           </CardHeader>
           <CardBody>
-            <SpaceForm action={createSpace} className="flex flex-col gap-2">
+            {/* One row from md up: name, mission, manager and the button
+                (usability review TM1). Stacked on a phone. */}
+            <SpaceForm
+              action={createSpace}
+              className="flex flex-col gap-2 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_15rem_auto] md:items-start md:gap-3"
+            >
               <TextInput
                 // The topbar's + New lands here (lib/new-menu.tsx).
                 id="space-name"
@@ -150,11 +158,11 @@ export default async function SpacesPage() {
                 )}
                 noneLabel={t("spaces.nobodyYet")}
                 search={searchAnyone}
-                className="w-60"
+                className="w-60 md:w-full"
               />
               <button
                 type="submit"
-                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+                className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand md:mt-6"
               >
                 {t("spaces.createTheSpace")}
               </button>

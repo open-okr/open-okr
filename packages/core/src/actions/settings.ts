@@ -18,6 +18,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
+import { isFreeMailDomain } from "@openokr/formats";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -318,6 +319,15 @@ export const updateWorkspaceGeneralSettings = defineWriteAction({
         patch.language = input.language;
       }
       if (input.trustedEmailDomains !== undefined) {
+        // Trusting a free mail provider would offer this workspace to anybody
+        // with an address there (docs/design/registration-policy.md D9).
+        const free = input.trustedEmailDomains.find(isFreeMailDomain);
+        if (free !== undefined) {
+          throw new OperationError(
+            "conflict",
+            `${free} is a free mail provider and cannot be trusted: anybody can have an address there.`,
+          );
+        }
         patch.trustedEmailDomains = input.trustedEmailDomains;
       }
       if (input.requireSecondFactor !== undefined) {

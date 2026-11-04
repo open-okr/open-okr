@@ -98,3 +98,19 @@ version shows.
 - No release notes on screen. The link opens GitHub.
 - No email or nudge about a new version.
 - No check of the container registry.
+
+## 8. The band (revamp, 2 November 2026)
+
+The owner asked for the footer to be separated from the content by a rule and a different background, compared three prototypes (a `raised` band, a white band, a rule only) and chose the white band.
+
+| Part | Rule |
+|---|---|
+| Band | A hairline (`line`) over a `surface` band, the width of the content pane: it takes `main`'s padding back as negative margins |
+| Left, everyone | The instance's name, then "Built on OpenOKR, open source", a link to the source repository |
+| Right, everyone | ⌘K Search, and ⌘J Ask only while the copilot can answer (an AI affordance is hidden when the provider is off). Hidden on a phone, which has no ⌘ key |
+| Right, full access | The running version, and the newer release as a brand chip, as §3 |
+| Position | Sticky to the foot of the content pane, always in view while the page scrolls under it (the owner asked for it to stay put). On a phone it sits on the fixed tab bar |
+| Phone | Two lines, left aligned, above the tab bar |
+
+The footer is therefore shown to every member; only its version part is gated as §3 says. `apps/web/lib/app-footer.tsx` draws the band and `version-footer.tsx` the administrator's part.
+

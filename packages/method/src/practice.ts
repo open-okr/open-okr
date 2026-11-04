@@ -240,11 +240,11 @@ const keyResultKindSettings = Object.fromEntries(
   KEY_RESULT_KINDS.map((kind) => [
     `keyResultKinds.${kind}`,
     setting({
-      label: "Key result kinds",
+      label: "Key result types",
       item: kind,
       group: "model",
       summary:
-        "Which kinds of key result can be written: a metric moved from a baseline to a target, a number maintained inside a band, a milestone done or not, or a baseline still to be measured.",
+        "Which types of key result can be written: a metric moved from a baseline to a target, a number maintained inside a band, a milestone done or not, or a baseline still to be measured.",
       section: "2.10",
       source: "Lamorte; re:Work",
       options: ON_OFF,
@@ -328,10 +328,10 @@ export const PRACTICE = {
 
   // --- The model ---------------------------------------------------------
   "okr.kinds": setting({
-    label: "OKR kinds",
+    label: "OKR types",
     group: "model",
     summary:
-      "Whether objectives can be committed, expected to score 1.0, and aspirational, expected to average around 0.7, or the workspace uses one kind only.",
+      "Whether objectives can be committed, expected to score 1.0, and aspirational, expected to average around 0.7, or the workspace uses one type only.",
     section: "2.8",
     source: "Google's OKR playbook",
     options: ["both", "aspirationalOnly", "committedOnly"],

@@ -140,3 +140,66 @@ export const CHANNEL_NAME_KEYS: Readonly<Record<string, string>> = {
   whatsapp: "channels.whatsapp",
   telegram: "channels.telegram",
 };
+
+/**
+ * Stored values a screen printed as they were stored, lowercase and in English
+ * whatever the reader's language (usability review D3, 3 November 2026). Each
+ * map falls back to the raw value, like the ones above.
+ */
+
+/** A session's ritual kind. */
+export const SESSION_KIND_NAME_KEYS: Readonly<Record<string, string>> = {
+  weekly: "welcome.rhythm.weekly",
+  monthly: "welcome.rhythm.monthly",
+  quarterly: "sessions.kindQuarterly",
+  annual: "sessions.kindAnnual",
+};
+
+/** How often a KPI is measured, METHOD.md §6's frequencies. */
+export const KPI_FREQUENCY_NAME_KEYS: Readonly<Record<string, string>> = {
+  daily: "common.daily",
+  weekly: "common.weekly",
+  monthly: "common.monthly",
+  quarterly: "common.quarterly",
+  yearly: "common.yearly",
+};
+
+/** A KPI's band, METHOD.md §6.4's states. */
+export const KPI_STATE_NAME_KEYS: Readonly<Record<string, string>> = {
+  healthy: "kpis.recovery.stateHealthy",
+  watch: "kpis.recovery.stateWatch",
+  unhealthy: "kpis.recovery.stateUnhealthy",
+  recovering: "kpis.recovery.stateRecovering",
+  no_data: "kpis.recovery.stateNoData",
+};
+
+/** Whether a KPI leads or lags. */
+export const INDICATOR_NAME_KEYS: Readonly<Record<string, string>> = {
+  leading: "kpis.trees.leading",
+  lagging: "kpis.trees.lagging",
+};
+
+/** Where a KPI sits in the chain from effort to result. */
+export const KPI_TIER_NAME_KEYS: Readonly<Record<string, string>> = {
+  input: "kpis.rule.tierInput",
+  output: "kpis.rule.tierOutput",
+  outcome: "kpis.rule.tierOutcome",
+  impact: "kpis.rule.tierImpact",
+};
+
+/** A member's role in a space. */
+export const SPACE_ROLE_NAME_KEYS: Readonly<Record<string, string>> = {
+  member: "spaces.role.member",
+  coordinator: "spaces.role.coordinator",
+  manager: "spaces.role.manager",
+};
+
+/** The value's name, or the value itself when the map has none. */
+export function nameOf(
+  names: Readonly<Record<string, string>>,
+  value: string,
+  t: (key: string) => string,
+): string {
+  const key = names[value];
+  return key === undefined ? value : t(key);
+}

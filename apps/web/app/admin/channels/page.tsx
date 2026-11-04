@@ -16,6 +16,7 @@ import {
   SecretInput,
 } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -28,6 +29,8 @@ import {
 } from "./actions.ts";
 import { ChannelForm } from "./channel-form.tsx";
 import { TemplateMappingForm } from "./template-mapping-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.adminChannels");
 
 /**
  * Notifications and channels (UIUX-PLAN.md §6 S-36, P5-T02c).

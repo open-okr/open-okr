@@ -77,28 +77,35 @@ export function keyResultValueText(
   t: Translate,
   keyResult: KeyResultValues,
 ): string {
-  const { currentValue: current, targetValue: target, unit } = keyResult;
+  const { currentValue: current, targetValue: target } = keyResult;
+  // A percent sign sits on the number it belongs to, "50% of 100%", where a
+  // spaced unit read "50 of 100 %" (usability review O4). Any other unit is
+  // a word and keeps its own place after the figures.
+  const percent = keyResult.unit === "%";
+  const unit = percent ? null : keyResult.unit;
+  const n = (value: number): string | number => (percent ? `${value}%` : value);
   if (target === null) {
-    return t("goalNodes.progressNoTarget", { current });
+    return t("goalNodes.progressNoTarget", { current: n(current) });
   }
   if (keyResult.kind === "maintain" || keyResult.direction === "maintain") {
     const values = {
-      current,
-      low: Math.min(keyResult.baselineValue, target),
-      high: Math.max(keyResult.baselineValue, target),
+      current: n(current),
+      low: n(Math.min(keyResult.baselineValue, target)),
+      high: n(Math.max(keyResult.baselineValue, target)),
     };
     return unit
       ? t("goalNodes.progressBandWithUnit", { ...values, unit })
       : t("goalNodes.progressBand", values);
   }
+  const values = { current: n(current), target: n(target) };
   if (keyResult.direction === "reduce") {
     return unit
-      ? t("goalNodes.progressReduceWithUnit", { current, target, unit })
-      : t("goalNodes.progressReduce", { current, target });
+      ? t("goalNodes.progressReduceWithUnit", { ...values, unit })
+      : t("goalNodes.progressReduce", values);
   }
   return unit
-    ? t("goalNodes.progressWithUnit", { current, target, unit })
-    : t("goalNodes.progress", { current, target });
+    ? t("goalNodes.progressWithUnit", { ...values, unit })
+    : t("goalNodes.progress", values);
 }
 
 /**

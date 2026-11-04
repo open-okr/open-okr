@@ -1,9 +1,12 @@
 import { ACCESS_LEVELS, listSupportSessions } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { GrantDecision } from "./grant-decision";
+
+export const generateMetadata = pageTitle("pageTitle.adminSupport");
 
 /**
  * S-48, the customer's half: who has asked to come in, and who has been

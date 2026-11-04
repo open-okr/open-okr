@@ -126,9 +126,9 @@ test("an administrator opens the setup again from General, and every answer is k
   // The wizard opens on what the workspace holds now, not on blanks or on
   // the defaults, which is what makes reopening it safe.
   await expect(
-    page.getByLabel("What is this workspace called?"),
+    page.getByLabel("Workspace name"),
   ).not.toHaveValue("", { timeout: 15_000 });
-  await expect(page.getByLabel("Which clock does it keep?")).toHaveValue(
+  await expect(page.getByLabel("Time zone")).toHaveValue(
     timezone,
   );
 

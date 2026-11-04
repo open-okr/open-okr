@@ -9,12 +9,15 @@ import {
 } from "@openokr/ui";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { requireWorkspace } from "../../lib/workspace";
 import { ActionForm } from "../cycle/action-form.tsx";
 import { closeCycle } from "../cycle/frame-actions.ts";
+
+export const generateMetadata = pageTitle("pageTitle.scorecard");
 
 /** A result coloured by its own cycle's bands (METHOD.md §3.3, §12). */
 const BAND_TONE = {
@@ -286,8 +289,21 @@ export default async function ScorecardPage() {
                   data-testid="scorecard-moved"
                   aria-label={row.cycleName}
                 >
-                  <h3 className="text-xs font-bold uppercase tracking-wide text-ink-3">
+                  {/* The mid-cycle count as a marker beside the name, not one
+                   * more line in the list (usability review SC1). Kept
+                   * visible, as METHOD.md §12.1's default asks. */}
+                  <h3 className="flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-ink-3">
                     {row.cycleName}
+                    {row.moved.addedMidCycle > 0 ? (
+                      <Chip
+                        tone="neutral"
+                        className="normal-case tracking-normal"
+                      >
+                        {t("scorecard.addedMidCycle", {
+                          count: row.moved.addedMidCycle,
+                        })}
+                      </Chip>
+                    ) : null}
                   </h3>
                   <ul className="flex flex-col gap-1 text-sm text-ink-2">
                     {row.moved.adjusted.map((entry) => (
@@ -322,13 +338,6 @@ export default async function ScorecardPage() {
                             })}
                       </li>
                     ))}
-                    {row.moved.addedMidCycle > 0 ? (
-                      <li>
-                        {t("scorecard.addedMidCycle", {
-                          count: row.moved.addedMidCycle,
-                        })}
-                      </li>
-                    ) : null}
                     {row.moved.kindChanges.map((entry) => (
                       <li key={`k-${entry.goalId}-${entry.at}`}>
                         {entry.reason
@@ -360,61 +369,66 @@ export default async function ScorecardPage() {
        * 7 because the cycle screen shows the current cycle, and the one
        * waiting to close has usually just stopped being current.
        */}
-      {canClose && closable.length > 0 ? (
+      {/* Close and Points side by side on a wide screen: two short cards
+       * stacked read as two more sections to scroll past (usability review
+       * SC1). */}
+      <div className="grid gap-4.5 lg:grid-cols-2">
+        {canClose && closable.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <h2 className="text-sm font-bold text-ink">
+                {t("scorecard.closeACycleOut")}
+              </h2>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-3">
+              <ActionForm
+                action={closeCycle}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <SelectInput
+                  label={t("scorecard.cycleToClose")}
+                  id="cycleId"
+                  name="cycleId"
+                  required
+                  className="flex-row items-center gap-2"
+                  inputClassName="h-6.5 w-auto text-xs"
+                >
+                  {closable.map((cycle) => (
+                    <option key={cycle.id} value={cycle.id}>
+                      {cycle.name}
+                    </option>
+                  ))}
+                </SelectInput>
+                <button
+                  type="submit"
+                  className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
+                >
+                  {t("scorecard.close")}
+                </button>
+              </ActionForm>
+
+              <p className="text-xs text-ink-4">
+                {t("scorecard.closingRecordsAndFeeds")}
+              </p>
+            </CardBody>
+          </Card>
+        ) : null}
+
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">
-              {t("scorecard.closeACycleOut")}
+              {t("scorecard.points")}
             </h2>
           </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            <ActionForm
-              action={closeCycle}
-              className="flex flex-wrap items-center gap-2"
-            >
-              <SelectInput
-                label={t("scorecard.cycleToClose")}
-                id="cycleId"
-                name="cycleId"
-                required
-                className="flex-row items-center gap-2"
-                inputClassName="h-6.5 w-auto text-xs"
-              >
-                {closable.map((cycle) => (
-                  <option key={cycle.id} value={cycle.id}>
-                    {cycle.name}
-                  </option>
-                ))}
-              </SelectInput>
-              <button
-                type="submit"
-                className="rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
-              >
-                {t("scorecard.close")}
-              </button>
-            </ActionForm>
-
-            <p className="text-xs text-ink-4">
-              {t("scorecard.closingRecordsAndFeeds")}
+          <CardBody>
+            <p className="text-sm text-ink-3">
+              {scorecard.pointsEnabled
+                ? t("scorecard.thePointsLayerIsOn")
+                : t("scorecard.thePointsLayerIsOff")}
             </p>
           </CardBody>
         </Card>
-      ) : null}
-
-      <Card>
-        <CardHeader>
-          <h2 className="text-sm font-bold text-ink">
-            {t("scorecard.points")}
-          </h2>
-        </CardHeader>
-        <CardBody>
-          <p className="text-sm text-ink-3">
-            {scorecard.pointsEnabled
-              ? t("scorecard.thePointsLayerIsOn")
-              : t("scorecard.thePointsLayerIsOff")}
-          </p>
-        </CardBody>
-      </Card>
+      </div>
     </div>
   );
 }

@@ -107,6 +107,14 @@ export async function moveTaskAction(
   );
 }
 
+/**
+ * Soft-deletes a card through `tasks.delete`, which nothing in the app called
+ * (usability review D9). `full` on the task, as the action requires.
+ */
+export async function deleteTaskAction(id: string): Promise<WriteState> {
+  return run((context) => callAction(context, "tasks.delete", { id }));
+}
+
 export async function setTaskStatusAction(
   id: string,
   status: string,

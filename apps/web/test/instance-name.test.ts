@@ -69,13 +69,22 @@ const rendered = (name: string, child: ReactNode) =>
   );
 
 describe("the tab title", () => {
+  // Each screen names itself in front since 3 November 2026
+  // (lib/page-title.ts); the layout gives the instance's name as the default
+  // and as what follows every screen's own.
   it("is the instance's name when the deployment sets one", async () => {
-    expect((await generateMetadata()).title).toBe("OKR Goal");
+    expect((await generateMetadata()).title).toEqual({
+      default: "OKR Goal",
+      template: "%s · OKR Goal",
+    });
   });
 
   it("is OpenOKR when nothing names the instance", async () => {
     delete process.env.OPENOKR_INSTANCE_NAME;
-    expect((await generateMetadata()).title).toBe("OpenOKR");
+    expect((await generateMetadata()).title).toEqual({
+      default: "OpenOKR",
+      template: "%s · OpenOKR",
+    });
   });
 });
 

@@ -1,11 +1,14 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { browseAudit } from "./actions";
 import { AuditPanel } from "./audit-panel";
+
+export const generateMetadata = pageTitle("pageTitle.adminAudit");
 
 /**
  * The audit trail, for the person who has to answer for it (screen S-36,

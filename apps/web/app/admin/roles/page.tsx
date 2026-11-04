@@ -1,11 +1,14 @@
 import { callAction } from "@openokr/core";
 import { ROLE_DOMAINS } from "@openokr/db";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { MemberRoles } from "./member-roles.tsx";
 import { RoleMatrix } from "./role-matrix.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.adminRoles");
 
 /**
  * Roles and what each one may do (P8-G13b,

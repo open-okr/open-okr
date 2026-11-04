@@ -134,7 +134,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   const OWNER_NAME = "Check-in overdue";
   /** Each rung by its name, in days, as the card labels it. */
   const RUNGS = {
-    championRepeat: "Champion, again",
+    championRepeat: "Owner, again",
     coordinator: "Then the coordinator",
     sponsor: "Then the sponsor",
   } as const;
@@ -154,7 +154,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   // Out of order first: the top rung fires before the ones below it, which is
   // not a ladder. §11's schema types each rung and says nothing about order,
   // so this refusal is the product's own.
-  await rung(editor, "Champion, again").fill("8");
+  await rung(editor, "Owner, again").fill("8");
   await rung(editor, "Then the coordinator").fill("7");
   await rung(editor, "Then the sponsor").fill("14");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
@@ -164,7 +164,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
   );
 
   // Then one §11 accepts.
-  await rung(editor, "Champion, again").fill("2");
+  await rung(editor, "Owner, again").fill("2");
   await rung(editor, "Then the coordinator").fill("8");
   await rung(editor, "Then the sponsor").fill("12");
   await editor.getByTestId(`save-ladder-${OWNER}`).click();
@@ -179,7 +179,7 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
 
   await goTo(page, "/admin/nudges");
   await expect(
-    rung(page.getByTestId(`ladder-${OWNER}`), "Champion, again"),
+    rung(page.getByTestId(`ladder-${OWNER}`), "Owner, again"),
   ).toHaveValue("2", { timeout: 15_000 });
 
   // And away again. A row kept only to hold a copy of §11's numbers would
@@ -195,6 +195,6 @@ test("a ladder is set, refused when out of order, and returned to the canon", as
 
   await goTo(page, "/admin/nudges");
   await expect(
-    rung(page.getByTestId(`ladder-${OWNER}`), "Champion, again"),
+    rung(page.getByTestId(`ladder-${OWNER}`), "Owner, again"),
   ).toHaveValue("", { timeout: 15_000 });
 });

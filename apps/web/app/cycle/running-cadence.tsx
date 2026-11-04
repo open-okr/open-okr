@@ -4,9 +4,15 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  formatConfidence,
   type MessageValues,
 } from "@openokr/ui";
 import Link from "next/link";
+import { confidenceDisplay } from "../../lib/confidence-display.ts";
+import { dayLabel } from "../../lib/day-label.ts";
+import { groupRows } from "../../lib/group-rows.ts";
+import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
+import { NavSelect } from "../../lib/nav-select.tsx";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -105,13 +111,18 @@ function trend(
 }
 
 export async function RunningCadence({
-  sessions,
-  blockers,
+  team,
+  teamHref,
+  sessions: allSessions,
+  blockers: allBlockers,
   decisions,
   confidence,
   streak,
   calibration,
 }: {
+  /** A space's name to narrow sessions and blockers to (review C6). */
+  readonly team: string | null;
+  readonly teamHref: (team: string | null) => string;
   readonly sessions: readonly SessionRow[];
   readonly blockers: readonly BlockerRow[];
   readonly decisions: readonly DecisionRow[];
@@ -120,8 +131,24 @@ export async function RunningCadence({
   /** One recorded before calibration retired (P9-T13-c-b), or null. */
   readonly calibration: CalibrationRecord | null;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  // The workspace's "Confidence shown as", as the Work Map reads it (D4).
+  const display = await confidenceDisplay();
   const calibratedOn = calibration ? calibration.at.slice(0, 10) : null;
+
+  const teams = [
+    ...new Set([
+      ...allSessions.map((one) => one.spaceName),
+      ...allBlockers.map((one) => one.spaceName),
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
+  const activeTeam = team && teams.includes(team) ? team : null;
+  const sessions = activeTeam
+    ? allSessions.filter((one) => one.spaceName === activeTeam)
+    : allSessions;
+  const blockers = activeTeam
+    ? allBlockers.filter((one) => one.spaceName === activeTeam)
+    : allBlockers;
 
   const held = sessions.filter((one) => one.closed);
   const upcoming = sessions.filter((one) => !one.closed);
@@ -138,7 +165,22 @@ export async function RunningCadence({
               {t("cycle.runningCadence.howTheCycleIs")}
             </p>
           </div>
-          <div className="flex flex-none items-center gap-3.5">
+          <div className="flex flex-none flex-wrap items-center gap-3.5">
+            {teams.length > 1 ? (
+              <NavSelect
+                label={t("workMap.scope.space")}
+                value={activeTeam ?? ""}
+                testId="cadence-team"
+                options={[
+                  { value: "", label: t("goals.all"), href: teamHref(null) },
+                  ...teams.map((name) => ({
+                    value: name,
+                    label: name,
+                    href: teamHref(name),
+                  })),
+                ]}
+              />
+            ) : null}
             <div className="flex flex-col items-end">
               <span className="text-lg font-bold tabular-nums text-ink">
                 {streak}
@@ -167,29 +209,34 @@ export async function RunningCadence({
               {t("cycle.runningCadence.noneScheduledInThis")}
             </p>
           ) : (
-            sessions.map((session) => (
-              <Link
-                key={session.id}
-                href={`/session/${session.id}`}
-                className="flex items-center justify-between gap-2.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink hover:border-ink-4"
-              >
-                <span>
-                  {session.kind}
-                  <span className="ml-1.5 text-xs text-ink-3">
-                    {session.spaceName}
-                  </span>
-                </span>
-                <span className="flex items-center gap-2 text-xs text-ink-3">
-                  {session.scheduledFor
-                    ? session.scheduledFor.slice(0, 10)
-                    : t("cycle.runningCadence.unscheduled")}
-                  <Chip tone={session.closed ? "ok" : "neutral"}>
-                    {session.closed
-                      ? t("cycle.runningCadence.held")
-                      : t("cycle.runningCadence.toCome")}
-                  </Chip>
-                </span>
-              </Link>
+            // Under their space, named once (usability review C6).
+            groupRows(sessions, (session) => session.spaceName).map((group) => (
+              <div key={group.heading} className="flex flex-col gap-1.5">
+                <p className="pt-1.5 text-[11px] font-bold tracking-wide text-ink-4 uppercase first:pt-0">
+                  {group.heading}
+                </p>
+                {group.rows.map((session) => (
+                  <Link
+                    key={session.id}
+                    href={`/session/${session.id}`}
+                    className="flex items-center justify-between gap-2.5 rounded-md border border-line px-2.5 py-1.5 text-sm text-ink hover:border-ink-4"
+                  >
+                    <span>
+                      {nameOf(SESSION_KIND_NAME_KEYS, session.kind, t)}
+                    </span>
+                    <span className="flex items-center gap-2 text-xs text-ink-3">
+                      {session.scheduledFor
+                        ? dayLabel(session.scheduledFor, locale)
+                        : t("cycle.runningCadence.unscheduled")}
+                      <Chip tone={session.closed ? "ok" : "neutral"}>
+                        {session.closed
+                          ? t("cycle.runningCadence.held")
+                          : t("cycle.runningCadence.toCome")}
+                      </Chip>
+                    </span>
+                  </Link>
+                ))}
+              </div>
             ))
           )}
         </CardBody>
@@ -210,28 +257,33 @@ export async function RunningCadence({
               {t("cycle.runningCadence.noKeyResultsWith")}
             </p>
           ) : (
-            confidence.map((row) => {
-              const moved = trend(row, t);
-              return (
-                <div
-                  key={row.id}
-                  className="flex items-center justify-between gap-2.5 border-t border-line pt-1.5 text-sm first:border-0 first:pt-0"
-                >
-                  <span className="min-w-0 text-ink">
-                    {row.title}
-                    <span className="ml-1.5 text-xs text-ink-3">
-                      {row.goalTitle}
-                    </span>
-                  </span>
-                  <span className="flex flex-none items-center gap-2">
-                    <span className="tabular-nums text-ink-2">
-                      {row.confidence === null ? "—" : row.confidence}
-                    </span>
-                    <Chip tone={moved.tone}>{moved.word}</Chip>
-                  </span>
-                </div>
-              );
-            })
+            // Under their objective, named once (usability review C6).
+            groupRows(confidence, (row) => row.goalTitle).map((group) => (
+              <div key={group.heading} className="flex flex-col gap-1.5">
+                <p className="pt-1.5 text-[11px] font-bold tracking-wide text-ink-4 uppercase first:pt-0">
+                  {group.heading}
+                </p>
+                {group.rows.map((row) => {
+                  const moved = trend(row, t);
+                  return (
+                    <div
+                      key={row.id}
+                      className="flex items-center justify-between gap-2.5 border-t border-line pt-1.5 text-sm"
+                    >
+                      <span className="min-w-0 text-ink">{row.title}</span>
+                      <span className="flex flex-none items-center gap-2">
+                        <span className="tabular-nums text-ink-2">
+                          {row.confidence === null
+                            ? "—"
+                            : formatConfidence(row.confidence, display, t)}
+                        </span>
+                        <Chip tone={moved.tone}>{moved.word}</Chip>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           )}
         </CardBody>
       </Card>

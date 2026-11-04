@@ -2,10 +2,13 @@ import { callAction, SEARCH_TEXT_MAX_LENGTH } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip, SearchInput } from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
+import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { Snippet } from "./palette.tsx";
 import { KIND_LABEL } from "./palette-groups.ts";
+
+export const generateMetadata = pageTitle("pageTitle.search");
 
 /**
  * The search page (UIUX-PLAN.md §4 S-32, P5-T13).

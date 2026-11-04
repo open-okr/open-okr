@@ -1260,9 +1260,15 @@ export {
   type WorkspaceUser,
 } from "./workspaces/provisioning.ts";
 export {
+  COMPANY_EMAIL_MESSAGE,
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
+  REGISTRATION_POLICIES,
+  type RegistrationPolicy,
+  readRegistrationPolicy,
   registrationOpenOrInvited,
+  registrationRefusal,
+  setRegistrationPolicy,
 } from "./workspaces/registration.ts";
 export {
   type LiveWorkspace,

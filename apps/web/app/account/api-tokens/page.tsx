@@ -12,12 +12,15 @@ import {
 import { agentSetupLine, agentSetupUrl } from "../../../lib/agent-setup-prompt";
 import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
+import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { createToken, revokeToken } from "./actions.ts";
 import { agentConfiguration } from "./agent-config.ts";
 import { TokenForm } from "./token-form.tsx";
+
+export const generateMetadata = pageTitle("pageTitle.apiTokens");
 
 /**
  * A member's own API tokens (TECHNICAL-PLAN §14, P5-T07a).
