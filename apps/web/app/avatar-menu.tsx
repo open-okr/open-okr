@@ -2,6 +2,7 @@
 
 import { Menu } from "@base-ui-components/react/menu";
 import { Avatar, initialsOf, useTranslations } from "@openokr/ui";
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -14,6 +15,14 @@ import type { ReactNode } from "react";
  * visibly larger than "API tokens" above it. Two rows in one menu need one
  * source of truth for how a row looks, not two.
  */
+/**
+ * Where the software is developed. AGPL-3.0 §13 asks that every person using
+ * the instance over a network is offered its source, so this is for every
+ * member, not for administrators. It sat in the footer as "Built on OpenOKR,
+ * open source" until the owner moved it here (4 November 2026).
+ */
+const SOURCE_URL = "https://github.com/open-okr/open-okr";
+
 export const menuRowClass =
   "block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink-2 data-highlighted:bg-raised hover:bg-raised";
 
@@ -79,6 +88,16 @@ export function AvatarMenu({
              * close the menu on the first click. */}
             {appearance}
             <Menu.Separator className="my-1 h-px bg-line" />
+            <Menu.Item
+              render={<a href={SOURCE_URL} target="_blank" rel="noreferrer" />}
+              className={`${menuRowClass} flex items-center justify-between gap-3`}
+            >
+              {t("avatarMenu.sourceCode")}
+              <ExternalLink
+                aria-hidden="true"
+                className="size-3.5 text-ink-4"
+              />
+            </Menu.Item>
             {/* Not a Menu.Item: signing out is a real form submission (a
              * Server Function), and Base UI's item semantics expect to be
              * the interactive element itself rather than wrap one. The row
