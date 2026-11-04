@@ -21,6 +21,7 @@ import { InstanceNameCard } from "./instance-name-card";
 import { RegistrationCard } from "./registration-card";
 import { SetupCard } from "./setup-card";
 import { UpdateCheckCard } from "./update-check-card";
+import { WorkspaceNameCard } from "./workspace-name-card.tsx";
 import { WorkspaceStateCard } from "./workspace-state-card";
 
 export const generateMetadata = pageTitle("pageTitle.adminGeneral");
@@ -86,6 +87,7 @@ export default async function GeneralSettingsPage() {
         schedulerFailed={schedulerState() === "failed"}
       />
       {mail.transport === "console" ? <ConsoleMailNotice /> : null}
+      <WorkspaceNameCard name={workspace.name} />
       <GeneralSettingsForm settings={read.settings} zones={listTimezones()} />
       {instanceName ? (
         <InstanceNameCard
