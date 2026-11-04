@@ -1,6 +1,13 @@
 "use client";
 
-import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Card,
+  CardBody,
+  initialsOf,
+  TextInput,
+  useTranslations,
+} from "@openokr/ui";
 import {
   type FormEvent,
   startTransition,
@@ -45,6 +52,9 @@ const PART = {
   logo: "admin.branding.mirror.part.logo",
   favicon: "admin.branding.mirror.part.favicon",
 } as const;
+
+/** The schema's own limit for `workspace.rename`. */
+const WORKSPACE_NAME_MAX_LENGTH = 200;
 
 interface Props {
   readonly status: BrandingStatus;
@@ -104,6 +114,14 @@ function StudioBody({
   const [colour, setColour] = useState<string | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
   const [favicon, setFavicon] = useState<string | null>(null);
+  // The name as typed, so the mirror shows it before it is saved. Null until
+  // somebody types, and again after Discard.
+  const [name, setName] = useState<string | null>(null);
+  const shownName = name ?? workspaceName;
+  const nameChanged = name !== null && name.trim() !== workspaceName;
+  const shownInitials = nameChanged
+    ? initialsOf(name.trim() || workspaceName)
+    : initials;
   // Bumped by Discard, so the two picture sections forget their files.
   const [discarded, setDiscarded] = useState(0);
 
@@ -123,14 +141,17 @@ function StudioBody({
     startTransition(() => formAction(data));
   };
 
-  const unsaved = mirror.unsaved.map((part) => t(PART[part]));
+  const unsaved = [
+    ...(nameChanged ? [t("admin.branding.mirror.part.name")] : []),
+    ...mirror.unsaved.map((part) => t(PART[part])),
+  ];
 
   return (
     <div className="flex flex-col gap-4">
       <BrandingMirror
         mirror={mirror}
-        workspaceName={workspaceName}
-        initials={initials}
+        workspaceName={shownName}
+        initials={shownInitials}
       />
       <Card>
         <CardBody>
@@ -139,11 +160,31 @@ function StudioBody({
             onSubmit={submit}
             onReset={() => {
               setColour(null);
+              setName(null);
               setDiscarded((count) => count + 1);
             }}
             aria-busy={pending}
             className="grid gap-5 lg:grid-cols-3 lg:gap-0"
           >
+            {/* The workspace's own name, beside the logo it sits next to in
+             * the sidebar, so the mirror shows both before either is saved.
+             * It moved here from General (owner, 4 November 2026). */}
+            <div className="flex flex-col gap-1 border-b border-line pb-5 lg:col-span-3 lg:mb-5">
+              <input type="hidden" name="storedName" value={workspaceName} />
+              <TextInput
+                key={`name-${discarded}`}
+                label={t("admin.branding.workspaceName.label")}
+                description={t("admin.branding.workspaceName.hint")}
+                name="workspaceName"
+                defaultValue={workspaceName}
+                required
+                maxLength={WORKSPACE_NAME_MAX_LENGTH}
+                autoComplete="organization"
+                disabled={pending}
+                className="max-w-sm"
+                onChange={(event) => setName(event.currentTarget.value)}
+              />
+            </div>
             <div className="lg:pr-5">
               <BrandingSettingsForm
                 status={status}
@@ -224,7 +265,7 @@ function StudioBody({
             form={FORM_ID}
             variant="ghost"
             size="sm"
-            disabled={pending || mirror.unsaved.length === 0}
+            disabled={pending || unsaved.length === 0}
           >
             {t("admin.branding.discard")}
           </Button>
