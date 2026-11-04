@@ -76,6 +76,86 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.4 to 0.5: who may sign up, and a check for new releases
+
+0.5 adds no migration and no data change, so `./openokr upgrade` is the whole
+upgrade. No setting needs choosing. An instance coming from an older release
+still meets the sections below, and the one that can stop an upgrade is 0.3
+to 0.4.
+
+Look at these before you upgrade.
+
+**`OPENOKR_REGISTRATION` now takes effect, and it can open your instance.**
+0.4 documented this variable and never read it. 0.5 reads it when no policy
+has been saved in the application. So an instance with `open` in its
+configuration, which stayed closed only because the variable did nothing,
+starts admitting anybody.
+
+| Where it would be set | How to look |
+|---|---|
+| Helm | `helm get values <release>`, and look for `instance.registration` |
+| Compose | `grep OPENOKR_REGISTRATION deploy/docker/secrets/app.env`. The Compose file does not pass it, so it is only there if somebody added it |
+| Anywhere else | The environment you start the server with |
+
+| What you have | After the upgrade |
+|---|---|
+| Not set, or `auto`, which is the default | No change: invitation only once the instance is claimed |
+| A policy saved in the application, such as closing registration in the setup wizard | No change: a saved policy wins over the variable |
+| `invite_only` | No change on a claimed instance |
+| `open`, with no policy saved | **Anybody can sign up and start a workspace.** If you do not want that, change the value to `auto` before you upgrade |
+
+Afterwards, the Registration card on Admin, General shows the policy and what
+decides it, and it adds a third choice, Company email addresses. Every change
+made there is written to the instance audit chain.
+
+**The server now asks GitHub whether a newer release exists.** An
+administrator sees the running version at the foot of every screen, and a
+link when the instance is behind. To know that, the server asks
+`api.github.com` at most once a day, or once an hour while GitHub does not
+answer, and only when an administrator loads a page. No page waits for it.
+The request carries nothing about the instance, and GitHub sees only the
+server's address. The check is on by default, so an instance on a restricted
+network should turn it off:
+
+| Deployment | How |
+|---|---|
+| Any | Untick it on Admin, General |
+| Compose | Add `OPENOKR_UPDATE_CHECK=off` to `deploy/docker/secrets/app.env`, then run `./openokr up` |
+| Helm | Use Admin, General. The chart has no value for this variable |
+
+A managed cloud never asks.
+
+**A free mail provider can no longer be a trusted email domain.** Trusting
+`gmail.com` offers a workspace to anybody with an address there, so 0.5 refuses
+to save it. A workspace that already trusts one keeps offering itself to those
+addresses, and its General settings will not save until the domain is removed.
+Look at Trusted email domains on Admin, General in each workspace.
+
+**An outbound gateway that reads `X-Api-Key`.** The Anthropic provider moves to
+version 1 of Anthropic's SDK, which sends the key in the `Authorization` header.
+OpenOKR always calls `api.anthropic.com`, so this only matters if a gateway
+inspects that traffic and reads the old header. Change it to read
+`Authorization`.
+
+What an API client or a spreadsheet may meet: no action was removed.
+
+| Where | Change |
+|---|---|
+| `practice.read`, `rhythm.read` | `section` is `4.5`, where it was `§4.5` |
+| `settings.updateWorkspaceGeneral` | Refuses a free mail provider in `trustedEmailDomains` |
+| Goal list exports | The column is headed `Owner`, where it was `Champion` |
+
+What people in an upgraded workspace will notice:
+
+| Area | In 0.5 |
+|---|---|
+| The word for who answers for a goal | Owner by default, where it was Champion. A workspace that renamed the term keeps its own word, and the OKR Champion agent keeps its name |
+| Goals | Each objective is a card with its key results under it, and one Filter button replaces the row of filters |
+| KPIs | Grid, Trees and Recovery board are redesigned and share one card |
+| Work Map | A Company tab, a space picker and a cycle picker |
+| Agents | The OKR Coach and the OKR Champion have faces that show a mood. Every face holds still for anyone who asks for reduced motion |
+| Admin, Practice | The "Scoring" switch is gone. It never did anything, and key results are scored at the close as before |
+
 ## 0.3 to 0.4: session prose is stored as documents only
 
 0.3 wrote each piece of session prose twice: as a document, and as its
