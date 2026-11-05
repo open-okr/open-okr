@@ -105,12 +105,15 @@ export function DraftFromAmbition({
   const [level, setLevel] = useState<Level>("team");
   const [drafted, setDrafted] = useState<Drafted | null>(null);
   const [busy, setBusy] = useState(false);
+  // Which button started the work in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const draft = useCallback(async () => {
     if (ambition.trim() === "" || busy) {
       return;
     }
+    setActing("draft");
     setBusy(true);
     setNotice(null);
     try {
@@ -134,6 +137,7 @@ export function DraftFromAmbition({
     if (!drafted || busy) {
       return;
     }
+    setActing("apply");
     setBusy(true);
     setNotice(null);
     try {
@@ -213,6 +217,7 @@ export function DraftFromAmbition({
           <Button
             variant="ai"
             disabled={busy || ambition.trim() === ""}
+            pending={busy && acting === "draft"}
             onClick={() => void draft()}
           >
             {t("common.draftIt")}
@@ -255,6 +260,7 @@ export function DraftFromAmbition({
               <Button
                 variant="primary"
                 disabled={busy}
+                pending={busy && acting === "apply"}
                 onClick={() => void apply()}
               >
                 {t("common.apply")}
@@ -335,7 +341,7 @@ export function SuggestMeasure({ goalId }: { readonly goalId: string }) {
         placeholder={t("cycle.assists.trialToPaidConversion")}
         inputClassName="text-xs placeholder:text-ink-4"
       />
-      <Button variant="ai" disabled={busy} onClick={() => void run()}>
+      <Button variant="ai" pending={busy} onClick={() => void run()}>
         <Sparkles className="size-3" />
         {t("cycle.assists.suggestNumbers")}
       </Button>
@@ -378,9 +384,12 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
     reason: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
+  // Which button started the work in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const run = useCallback(async () => {
+    setActing("suggest");
     setBusy(true);
     setNotice(null);
     try {
@@ -400,6 +409,7 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
     if (!suggested) {
       return;
     }
+    setActing("align");
     setBusy(true);
     try {
       await alignToParentAction(goalId, suggested.parentGoalId);
@@ -415,7 +425,12 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
 
   return (
     <div className="flex flex-col gap-1">
-      <Button variant="ai" disabled={busy} onClick={() => void run()}>
+      <Button
+        variant="ai"
+        disabled={busy}
+        pending={busy && acting === "suggest"}
+        onClick={() => void run()}
+      >
         <Sparkles className="size-3" />
         {t("cycle.assists.suggestAParent")}
       </Button>
@@ -429,6 +444,7 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
           <Button
             variant="primary"
             disabled={busy}
+            pending={busy && acting === "align"}
             onClick={() => void align()}
           >
             {t("cycle.assists.alignToIt")}

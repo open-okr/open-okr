@@ -1,6 +1,6 @@
 "use client";
 
-import { DateInput, useTranslations } from "@openokr/ui";
+import { DateInput, guardPress, Spinner, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -16,8 +16,15 @@ import type { WriteState } from "../../cycle/write-state.ts";
 function useRun() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const run = (fn: () => Promise<WriteState>, revert?: () => void) => {
+  // Which control started the write in flight, so only that one shows a spinner.
+  const [acting, setActing] = useState<string | null>(null);
+  const run = (
+    name: string,
+    fn: () => Promise<WriteState>,
+    revert?: () => void,
+  ) => {
     setError(null);
+    setActing(name);
     startTransition(async () => {
       const state = await fn();
       if (state.error) {
@@ -26,7 +33,7 @@ function useRun() {
       }
     });
   };
-  return { error, pending, run };
+  return { error, pending, acting, run };
 }
 
 export function ChecklistLine({
@@ -49,7 +56,7 @@ export function ChecklistLine({
 }) {
   const { t } = useTranslations();
   const [ticked, setTicked] = useState(done);
-  const { error, pending, run } = useRun();
+  const { error, pending, acting, run } = useRun();
 
   return (
     <li className="flex flex-col gap-1">
@@ -62,6 +69,7 @@ export function ChecklistLine({
             const next = event.target.checked;
             setTicked(next);
             run(
+              "toggle",
               () => onToggle(next),
               () => setTicked(!next),
             );
@@ -71,15 +79,20 @@ export function ChecklistLine({
         <span className={ticked ? "text-ink-3 line-through" : undefined}>
           {title}
         </span>
+        {pending && acting === "toggle" ? <Spinner /> : null}
         {onRemove && !disabled ? (
+          // Refused with `aria-disabled`, not `disabled`, so the button keeps
+          // keyboard focus while the write is sent; see `guardPress`.
           <button
             type="button"
-            disabled={pending}
+            aria-disabled={pending || undefined}
+            aria-busy={(pending && acting === "remove") || undefined}
             aria-label={`${t("common.remove")} "${title}"`}
-            onClick={() => run(onRemove)}
-            className="ml-auto text-xs text-ink-4 hover:text-bad"
+            onClick={guardPress(pending, () => run("remove", onRemove))}
+            className="ml-auto inline-flex items-center gap-1.5 text-xs text-ink-4 hover:text-bad"
           >
-            {t("common.remove")}
+            {pending && acting === "remove" ? <Spinner /> : null}
+            <span>{t("common.remove")}</span>
           </button>
         ) : null}
       </label>
@@ -104,14 +117,18 @@ export function RailButton({
   const { error, pending, run } = useRun();
   return (
     <span className="flex flex-col items-start gap-1">
+      {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+       * keyboard focus while the write is sent; see `guardPress`. */}
       <button
         type="button"
         aria-label={label}
-        disabled={pending}
-        onClick={() => run(onRun)}
-        className="rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4"
+        aria-disabled={pending || undefined}
+        aria-busy={pending || undefined}
+        onClick={guardPress(pending, () => run("run", onRun))}
+        className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4 aria-disabled:text-ink-4"
       >
-        {text}
+        {pending ? <Spinner /> : null}
+        <span>{text}</span>
       </button>
       {error ? (
         <span role="alert" className="text-xs text-bad">
@@ -138,22 +155,26 @@ export function DueDateField({
 
   return (
     <span className="flex flex-col items-end gap-1">
-      <DateInput
-        label={t("tasks.detail.controls.dueDate")}
-        hideLabel
-        value={value}
-        disabled={disabled || pending}
-        onValueChange={(chosen) => {
-          const next = chosen ?? "";
-          const previous = value;
-          setValue(next);
-          run(
-            () => onSave(next),
-            () => setValue(previous),
-          );
-        }}
-        inputClassName="h-auto py-1"
-      />
+      <span className="flex items-center gap-1.5">
+        {pending ? <Spinner /> : null}
+        <DateInput
+          label={t("tasks.detail.controls.dueDate")}
+          hideLabel
+          value={value}
+          disabled={disabled || pending}
+          onValueChange={(chosen) => {
+            const next = chosen ?? "";
+            const previous = value;
+            setValue(next);
+            run(
+              "due",
+              () => onSave(next),
+              () => setValue(previous),
+            );
+          }}
+          inputClassName="h-auto py-1"
+        />
+      </span>
       {error ? (
         <span role="alert" className="text-xs text-bad">
           {error}

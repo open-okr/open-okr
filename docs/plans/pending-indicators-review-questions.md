@@ -200,3 +200,13 @@ Decision on a shared helper for 3c to 3e: none. Repeat the `acting` state per fi
 Left as is and listed for the owner: separate forms on one screen do not refuse each other (Start and Skip in `session/[id]/page.tsx`, Resolve and Reassign in `blocker-panel`), because each form has its own status. Pre-existing and outside this change: hard-coded English strings such as "That did not save." in `diagnostic`, `digest`, `recognition`, `root-cause` and `process-health.tsx:257`, against the translation rule.
 
 Specs to run: `s22b-digest-channel-post`, `s23-monthly-moves`, `s26-session-entry`, `reviews`.
+
+### 9.6 Opus approver verdict on batch 3c (2026-11-05): APPROVED WITH CHANGES
+
+12 files under board, cycle, documents, initiatives, kpis, spaces and tasks. The other 24 files of the batch need no change: kit buttons inside `ActionForm` or a function-action form already spin on their own (`check-in/*`, most of `cycle/*`, `inbox`, `review/*`, `kpis/trees`, `spaces` forms), `method="get"` search and switcher forms are navigation, and `kpis/grid` cells keep their typed value while they save (Q6, shell bar only).
+
+Applied: the board's delete gets its own `useTransition` and a `deletingId` (the one approved handler change; moves stay optimistic and unchanged); `cycle/assists.tsx` was added to the batch (not on the first list); `kpis/kpi-panel` used `form={formId}` outside its form, which `useFormStatus` cannot see, so it passes `pending` from `useActionState`; `tasks/[id]/controls.tsx` `useRun` takes a name and returns `acting`; raw buttons in `document-editor`, `unlink-button` and `controls` follow pattern R.
+
+Follow-ups, not changed: `search/export-button` and `review/nudge-provenance` raw buttons keep `disabled` and can lose focus (their labels already say "Preparing" and "Snoozing"); inline checkboxes, selects and date inputs still lose focus when disabled; hard-coded English in `cycle/assists.tsx` (lines about 158, 163, 401) and `spaces/[id]/space-membership.tsx:105`.
+
+Specs to run: `s27-board`, `s29-documents`, `s34b-space-holidays`, `s09-drafting-assists`.

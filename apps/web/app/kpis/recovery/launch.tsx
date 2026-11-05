@@ -40,7 +40,7 @@ export function LaunchRecovery({
         type="button"
         variant="primary"
         size={size}
-        disabled={pending}
+        pending={pending}
         onClick={launch}
       >
         {label}

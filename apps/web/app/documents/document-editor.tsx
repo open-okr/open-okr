@@ -2,8 +2,10 @@
 
 import type { RichTextDocument } from "@openokr/core";
 import {
+  guardPress,
   RichTextEditor,
   type RichTextEditorHandle,
+  Spinner,
   useTranslations,
 } from "@openokr/ui";
 import { useRef, useState, useTransition } from "react";
@@ -43,10 +45,17 @@ export function DocumentEditor({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
 
-  const run = (fn: () => Promise<WriteState>, thenSaved: boolean) => {
+  const run = (
+    name: string,
+    fn: () => Promise<WriteState>,
+    thenSaved: boolean,
+  ) => {
     setError(null);
     setSaved(false);
+    setActing(name);
     startTransition(async () => {
       const outcome = await fn();
       if (outcome.error) {
@@ -69,10 +78,13 @@ export function DocumentEditor({
 
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-2">
+          {/* Refused with `aria-disabled`, not `disabled`, so the pressed button
+           * keeps keyboard focus while the write is sent; see `guardPress`. */}
           <button
             type="button"
-            disabled={pending}
-            onClick={() => {
+            aria-disabled={pending || undefined}
+            aria-busy={(pending && acting === "save") || undefined}
+            onClick={guardPress(pending, () => {
               if (editor.current?.hasUploadsInProgress()) {
                 setError(t("documents.documentEditor.fileStillUploading"));
                 return;
@@ -82,21 +94,28 @@ export function DocumentEditor({
               // meet; a wrong shape is refused there, not silently stored.
               const next = (editor.current?.getJSON() ??
                 null) as RichTextDocument | null;
-              run(() => onSave(next), true);
-            }}
-            className="rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-ink-2 hover:border-brand disabled:text-ink-4"
+              run("save", () => onSave(next), true);
+            })}
+            className="inline-flex items-center gap-1.5 rounded-md border border-line px-3 py-1.5 text-sm font-semibold text-ink-2 hover:border-brand disabled:text-ink-4 aria-disabled:text-ink-4"
           >
-            {t("common.save")}
+            {pending && acting === "save" ? <Spinner /> : null}
+            <span>{t("common.save")}</span>
           </button>
           <button
             type="button"
-            disabled={pending}
-            onClick={() => run(onPublish, false)}
-            className="rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand disabled:bg-raised disabled:text-ink-4"
+            aria-disabled={pending || undefined}
+            aria-busy={(pending && acting === "publish") || undefined}
+            onClick={guardPress(pending, () =>
+              run("publish", onPublish, false),
+            )}
+            className="inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 text-sm font-semibold text-on-brand disabled:bg-raised disabled:text-ink-4 aria-disabled:bg-raised aria-disabled:text-ink-4"
           >
-            {state === "draft"
-              ? t("checkIn.composer.publish")
-              : t("documents.documentEditor.publishANewVersion")}
+            {pending && acting === "publish" ? <Spinner /> : null}
+            <span>
+              {state === "draft"
+                ? t("checkIn.composer.publish")
+                : t("documents.documentEditor.publishANewVersion")}
+            </span>
           </button>
           {saved ? (
             <span className="text-xs text-ink-3">

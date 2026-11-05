@@ -131,7 +131,8 @@ export function FormulaBuilder({
         <Button
           type="button"
           variant="primary"
-          disabled={pending || picked.length === 0}
+          disabled={picked.length === 0}
+          pending={pending}
           onClick={() =>
             start(async () => {
               const result = await setFormula(kpiId, operator, picked, today);
