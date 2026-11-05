@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { guardPress, Spinner, useTranslations } from "@openokr/ui";
 import {
   type FormEvent,
   type ReactNode,
@@ -47,12 +47,17 @@ export function MemberFieldsForm({
       className="flex flex-col gap-2"
     >
       {children}
+      {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+       * keyboard focus while the form is sent; see `guardPress`. */}
       <button
         type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60"
+        aria-disabled={pending || undefined}
+        aria-busy={pending || undefined}
+        onClick={guardPress(pending, undefined)}
+        className="inline-flex items-center gap-1.5 self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60 aria-disabled:opacity-60"
       >
-        {t("common.save")}
+        {pending ? <Spinner /> : null}
+        <span>{t("common.save")}</span>
       </button>
       {state && !state.ok ? (
         <p role="alert" className="text-xs text-bad">

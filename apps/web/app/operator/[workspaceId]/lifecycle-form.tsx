@@ -1,6 +1,12 @@
 "use client";
 
-import { SelectInput, TextArea, useTranslations } from "@openokr/ui";
+import {
+  guardPress,
+  SelectInput,
+  Spinner,
+  TextArea,
+  useTranslations,
+} from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import type { OperatorLifecycleState } from "./lifecycle-actions";
 
@@ -110,11 +116,14 @@ export function LifecycleForm({
         {/* The workspace's name is in the button, so the last thing read
          * before the click is who this happens to. */}
         <button
-          className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"
-          disabled={pending}
+          className="inline-flex items-center gap-1.5 self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60 aria-disabled:opacity-60"
+          aria-disabled={pending || undefined}
+          aria-busy={pending || undefined}
+          onClick={guardPress(pending, undefined)}
           type="submit"
         >
-          {t("operator.lifecycle.applyTo", { workspaceName })}
+          {pending ? <Spinner /> : null}
+          <span>{t("operator.lifecycle.applyTo", { workspaceName })}</span>
         </button>
         {state?.error ? (
           <p

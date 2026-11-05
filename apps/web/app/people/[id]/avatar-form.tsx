@@ -94,7 +94,8 @@ export function AvatarForm({
             <Button
               type="button"
               size="sm"
-              disabled={uploading || removing}
+              disabled={uploading}
+              pending={removing}
               onClick={() =>
                 startRemoving(async () => {
                   setRemoval(await removeAvatar());

@@ -1,5 +1,5 @@
 import { requestSupportSession } from "@openokr/core";
-import { TextArea } from "@openokr/ui";
+import { SubmitButton, TextArea } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
@@ -99,12 +99,12 @@ export async function SupportRequest({
           {t("operator.supportRequest.adminDecides")}
         </p>
       </div>
-      <button
+      <SubmitButton
+        bare
         className="self-start rounded-md border border-line px-4 py-2 font-medium text-ink text-sm"
-        type="submit"
       >
         {t("operator.supportRequest.submit")}
-      </button>
+      </SubmitButton>
     </form>
   );
 }
