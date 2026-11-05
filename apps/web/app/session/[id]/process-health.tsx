@@ -269,7 +269,7 @@ export function ProcessHealthPanel({
                         setProblem(
                           error instanceof Error
                             ? error.message
-                            : "That did not save.",
+                            : t("session.detail.thatDidNotSave"),
                         );
                       }
                     });

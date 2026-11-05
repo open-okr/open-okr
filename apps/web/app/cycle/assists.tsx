@@ -162,16 +162,20 @@ export function DraftFromAmbition({
       setNotice(
         refused.length === 0
           ? null
-          : `The objective is there. These measures were refused: ${refused.join("; ")}`,
+          : t("cycle.assists.measuresRefused", {
+              refused: refused.join("; "),
+            }),
       );
     } catch (error) {
       setNotice(
-        error instanceof Error ? error.message : "That could not be applied.",
+        error instanceof Error
+          ? error.message
+          : t("cycle.assists.couldNotApply"),
       );
     } finally {
       setBusy(false);
     }
-  }, [busy, cycleId, drafted, level, memberId]);
+  }, [busy, cycleId, drafted, level, memberId, t]);
 
   return (
     <Card>
@@ -416,12 +420,14 @@ export function SuggestParent({ goalId }: { readonly goalId: string }) {
       setSuggested(null);
     } catch (error) {
       setNotice(
-        error instanceof Error ? error.message : "That could not be aligned.",
+        error instanceof Error
+          ? error.message
+          : t("cycle.assists.couldNotAlign"),
       );
     } finally {
       setBusy(false);
     }
-  }, [goalId, suggested]);
+  }, [goalId, suggested, t]);
 
   return (
     <div className="flex flex-col gap-1">

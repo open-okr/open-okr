@@ -119,12 +119,14 @@ function MissedRow({
           router.refresh();
         } catch (error) {
           onProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [detail, keyResult.keyResultId, onProblem, otherKey, router, sessionId],
+    [detail, keyResult.keyResultId, onProblem, otherKey, router, sessionId, t],
   );
 
   return (

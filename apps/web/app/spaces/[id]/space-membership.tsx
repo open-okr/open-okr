@@ -72,6 +72,13 @@ async function leave(formData: FormData): Promise<void> {
   revalidatePath("/spaces");
 }
 
+/** What a member is told about their own place, by role. */
+const IN_THIS_SPACE_AS = {
+  member: "spaces.detail.spaceMembership.youAreInThisSpaceAsMember",
+  coordinator: "spaces.detail.spaceMembership.youAreInThisSpaceAsCoordinator",
+  manager: "spaces.detail.spaceMembership.youAreInThisSpaceAsManager",
+} as const;
+
 export async function SpaceMembership({
   spaceId,
   ownRole,
@@ -96,15 +103,7 @@ export async function SpaceMembership({
   return (
     <form action={leave} className="flex items-center gap-3">
       <input type="hidden" name="spaceId" value={spaceId} />
-      <p className="text-sm text-ink-3">
-        {t("spaces.detail.spaceMembership.youAreInThisSpace", {
-          ownRole,
-          leave:
-            ownRole === "manager"
-              ? " Appoint another manager before you leave."
-              : "",
-        })}
-      </p>
+      <p className="text-sm text-ink-3">{t(IN_THIS_SPACE_AS[ownRole])}</p>
       <Button type="submit">{t("spaces.detail.spaceMembership.leave")}</Button>
     </form>
   );

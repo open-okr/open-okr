@@ -91,14 +91,14 @@ export function DiagnosticPanel({
       const narrated = await narrateDiagnosticAction(sessionId);
       setNarrative(narrated?.narrative ?? null);
       if (!narrated?.narrative) {
-        setProblem("No specifics this time. The verdict above stands.");
+        setProblem(t("session.detail.diagnostic.noSpecifics"));
       }
     } catch {
-      setProblem("The assist could not run. The verdict above is unaffected.");
+      setProblem(t("session.detail.diagnostic.assistCouldNotRun"));
     } finally {
       setNarrating(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const read = useCallback(() => {
     setProblem(null);
@@ -108,11 +108,13 @@ export function DiagnosticPanel({
         router.refresh();
       } catch (error) {
         setProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [router, sessionId]);
+  }, [router, sessionId, t]);
 
   return (
     <Card role="region" aria-labelledby="diagnostic-heading">

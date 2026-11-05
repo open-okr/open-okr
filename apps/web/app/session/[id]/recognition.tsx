@@ -65,11 +65,11 @@ export function RecognitionPanel({
   const submit = useCallback(() => {
     setProblem(null);
     if (toMemberId === "") {
-      setProblem("Choose who you are naming first.");
+      setProblem(t("session.detail.recognition.chooseWhoFirst"));
       return;
     }
     if (text.trim().length === 0) {
-      setProblem("Say what they did. Specific beats generous.");
+      setProblem(t("session.detail.recognition.sayWhatTheyDid"));
       return;
     }
     startTransition(async () => {
@@ -80,11 +80,13 @@ export function RecognitionPanel({
         router.refresh();
       } catch (error) {
         setProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [router, sessionId, text, toMemberId]);
+  }, [router, sessionId, t, text, toMemberId]);
 
   return (
     // Named landmark, for the reason the narratives panel carries one.

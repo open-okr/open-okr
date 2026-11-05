@@ -156,14 +156,14 @@ export function Digest({
       if (!result) {
         // Either the model declined or it stated a figure the product did not
         // compute. Both end here, and the lines below are unaffected.
-        setNotice("No narration this time. The digest below is the digest.");
+        setNotice(t("session.detail.digest.noNarration"));
       }
     } catch {
-      setNotice("The assist could not run. The digest below is unaffected.");
+      setNotice(t("session.detail.digest.assistCouldNotRun"));
     } finally {
       setBusy(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   if (!digest) {
     return (

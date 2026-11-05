@@ -222,3 +222,18 @@ Carried over and converted in 3e: `search/export-button` plain variant, `review/
 Specs: 3d-1 `s34-onboarding`, `s36g-second-factor-policy`, `first-run-wizard`, `s43-accessibility`; 3d-2 `s33d-member-leave`, `s45-operator-console`, `s33-people`; 3e `s39b-copilot-proposals`, `s29-documents`, `s32b-exports`, `s36c-rhythm`.
 
 Pre-existing hard-coded English, not touched: `account/security/security-settings.tsx` (lines about 109 to 172) and `goals/[id]/coach-strip.tsx` (lines 87 and 93).
+
+### 9.8 Opus approver verdict on the follow-ups (2026-11-05): APPROVED WITH CHANGES
+
+The owner asked Opus to decide which of the recorded follow-ups need fixing.
+
+| Item | Decision | Reason |
+|---|---|---|
+| Hard-coded English strings | Fixed, own commit | They break the translation rule and none was added by this work (the two in `security-settings` were moved by a `try`/`finally`). The coverage gate misses them because it reads JSX text and four attributes, not `setX("...")` |
+| `goals/okr-drawer.tsx` Remove buttons | Fixed, own commit | One `removing` transition spun every Remove and the raw button used `disabled`. A per-row `removingId` and pattern R now |
+| Inline select, checkbox, date input and EntityPicker keep `disabled` | **Left, known limitation** | Plan section 2 already says "disabled while saving, small spinner beside it". A native select and checkbox have no `readOnly`, and `aria-disabled` would let arrow keys start a second save while the first runs. Only EntityPicker and DateInput could keep focus, so one rule would behave two ways |
+| Shared `acting` helper | Left | No defect; handlers come in four shapes and a helper would rewrite about 30 reviewed call sites. Offer as a refactor of its own |
+| Separate forms on one screen (Start and Skip, Resolve and Reassign) | Left | The server guards it: `skipSession` throws unless the session is scheduled, and each form shows its own error |
+| Kit audit (`button.tsx`, `submit-button.tsx`, `spinner.tsx`) | No defect found | Guard cancels implicit submission, a caller's `disabled` returns after the wait, `aria-disabled:` twins exist, no caller overrides `aria-busy`, and every export has a consumer |
+
+Strings moved to `en.json` and `ms.json` (28 keys, inserted in place, nothing re-sorted): account security (5), coach strip (2), filter assist (1), drafting assists (3), capacity (4 plural keys), space membership (3 keys replace one that carried a raw role id and a leading space), operator lifecycle (3), session diagnostic, digest and recognition (6), and `session.detail.someoneNoLongerHere`. One visible wording change is approved: "as manager" became "as a manager", and the role now comes from the catalogue and the terms rather than the raw id. Left out on purpose: the server's own `error.message` pass-through, `acting` keys, `data-testid` and option values, the assists `"; "` joiner, and AI-written reasons.

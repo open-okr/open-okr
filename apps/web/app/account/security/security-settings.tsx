@@ -116,14 +116,14 @@ export function SecuritySettings({
         setNote({
           scope: "passkey",
           tone: "bad",
-          text: "That did not work. Your device may not support passkeys.",
+          text: t("account.security.securitySettings.passkeyNotAdded"),
         });
         return;
       }
       setNote({
         scope: "passkey",
         tone: "ok",
-        text: "Passkey added. You can now sign in with it.",
+        text: t("account.security.securitySettings.passkeyNowAdded"),
       });
       await loadPasskeys();
     } finally {
@@ -146,7 +146,7 @@ export function SecuritySettings({
       setNote({
         scope: "totp",
         tone: "bad",
-        text: "That password was not right.",
+        text: t("account.security.securitySettings.passwordNotRight"),
       });
       return;
     }
@@ -160,7 +160,7 @@ export function SecuritySettings({
       setNote({
         scope: "totp",
         tone: "bad",
-        text: "This instance is not set up for an authenticator app.",
+        text: t("account.security.securitySettings.noAuthenticatorApp"),
       });
       return;
     }
@@ -186,7 +186,7 @@ export function SecuritySettings({
     setNote({
       scope: "totp",
       tone: "ok",
-      text: "One-time codes are on. Keep your backup codes somewhere safe.",
+      text: t("account.security.securitySettings.oneTimeCodesOnKeepBackup"),
     });
     setTotpUri("");
     setCode("");

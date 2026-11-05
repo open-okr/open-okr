@@ -76,25 +76,26 @@ export function CoachStrip({
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const ask = useCallback((keyResultId: string, ruleId: string) => {
-    setActing(`suggest:${keyResultId}:${ruleId}`);
-    setProblem(null);
-    setSuggestion(null);
-    startTransition(async () => {
-      try {
-        const result = await rewriteKeyResultAction(keyResultId, ruleId);
-        if (!result) {
-          setProblem(
-            "No suggestion came back. The provider may be off, or the model had nothing usable to say.",
-          );
-          return;
+  const ask = useCallback(
+    (keyResultId: string, ruleId: string) => {
+      setActing(`suggest:${keyResultId}:${ruleId}`);
+      setProblem(null);
+      setSuggestion(null);
+      startTransition(async () => {
+        try {
+          const result = await rewriteKeyResultAction(keyResultId, ruleId);
+          if (!result) {
+            setProblem(t("goals.detail.coachStrip.noSuggestionCameBack"));
+            return;
+          }
+          setSuggestion({ keyResultId, ruleId, ...result });
+        } catch {
+          setProblem(t("goals.detail.coachStrip.assistNotReached"));
         }
-        setSuggestion({ keyResultId, ruleId, ...result });
-      } catch {
-        setProblem("The assist could not be reached.");
-      }
-    });
-  }, []);
+      });
+    },
+    [t],
+  );
 
   const apply = useCallback(
     (chosen: Suggestion) => {

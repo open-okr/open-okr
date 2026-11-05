@@ -26,15 +26,15 @@ import type { OperatorLifecycleState } from "./lifecycle-actions";
  * plan form is, because React resets a form after its action.
  */
 
-/** What each destination does, in the operator's own words. */
-const OPTIONS: readonly {
-  readonly value: string;
-  readonly label: string;
-}[] = [
-  { value: "active", label: "Active. Everything works." },
-  { value: "suspended", label: "Suspended. Read-only for members." },
-  { value: "closed", label: "Closed. Frozen, and the retention clock starts." },
-];
+/**
+ * What each destination does, in the operator's own words. The label is a
+ * catalogue key; `value` is what the server matches on and is never translated.
+ */
+const OPTIONS = [
+  { value: "active", key: "operator.lifecycle.stateActive" },
+  { value: "suspended", key: "operator.lifecycle.stateSuspended" },
+  { value: "closed", key: "operator.lifecycle.stateClosed" },
+] as const;
 
 export function LifecycleForm({
   action,
@@ -91,7 +91,7 @@ export function LifecycleForm({
           >
             {OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.key)}
               </option>
             ))}
           </SelectInput>
