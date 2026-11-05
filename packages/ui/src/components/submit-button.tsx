@@ -2,9 +2,8 @@
 
 import { LoaderCircle } from "lucide-react";
 import { forwardRef } from "react";
-import { useFormStatus } from "react-dom";
 import { cn } from "../lib/cn.ts";
-import { Button, type ButtonProps } from "./button.tsx";
+import { Button, type ButtonProps, useSubmitPending } from "./button.tsx";
 
 /**
  * A form's submit button that knows the form is being sent (UIUX-PLAN §4,
@@ -12,6 +11,9 @@ import { Button, type ButtonProps } from "./button.tsx";
  * works inside a form a server component drew: the Cycle and Spaces forms
  * pass their markup through a client wrapper, and their Save had no way to
  * say it had been pressed (owner, 4 November 2026).
+ *
+ * `Button` now does this for any `type="submit"`, so this stays for the
+ * `bare` mode and for the call sites that already use it.
  */
 export const SubmitButton = forwardRef<
   HTMLButtonElement,
@@ -23,45 +25,49 @@ export const SubmitButton = forwardRef<
      */
     readonly bare?: boolean;
   }
->(({ bare, className, variant, size, disabled, children, ...props }, ref) => {
-  const { pending } = useFormStatus();
-  if (!bare) {
+>(
+  (
+    { bare, className, variant, size, disabled, children, ...props },
+    forwarded,
+  ) => {
+    const { ref, sending, spinning } = useSubmitPending("submit", forwarded);
+    if (!bare) {
+      return (
+        <Button
+          ref={forwarded}
+          type="submit"
+          variant={variant}
+          size={size}
+          className={className}
+          disabled={disabled}
+          {...props}
+        >
+          {children}
+        </Button>
+      );
+    }
     return (
-      <Button
+      <button
         ref={ref}
         type="submit"
-        pending={pending}
-        variant={variant}
-        size={size}
-        className={className}
-        disabled={disabled}
+        className={cn(
+          "inline-flex items-center justify-center gap-1.5",
+          className,
+        )}
+        disabled={disabled || sending}
+        aria-busy={spinning || undefined}
         {...props}
       >
+        {spinning ? (
+          <LoaderCircle
+            aria-hidden="true"
+            data-testid="button-pending"
+            className="size-3.5 animate-spin motion-reduce:animate-none"
+          />
+        ) : null}
         {children}
-      </Button>
+      </button>
     );
-  }
-  return (
-    <button
-      ref={ref}
-      type="submit"
-      className={cn(
-        "inline-flex items-center justify-center gap-1.5",
-        className,
-      )}
-      disabled={disabled || pending}
-      aria-busy={pending || undefined}
-      {...props}
-    >
-      {pending ? (
-        <LoaderCircle
-          aria-hidden="true"
-          data-testid="button-pending"
-          className="size-3.5 animate-spin motion-reduce:animate-none"
-        />
-      ) : null}
-      {children}
-    </button>
-  );
-});
+  },
+);
 SubmitButton.displayName = "SubmitButton";
