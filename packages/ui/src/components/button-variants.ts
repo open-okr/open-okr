@@ -15,6 +15,9 @@ export const buttonVariants = cva(
     "text-sm font-semibold transition-[border-color,box-shadow,transform] duration-fast ease-out",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-strong",
     "disabled:pointer-events-none disabled:bg-raised disabled:border-line disabled:text-ink-4 disabled:shadow-none",
+    // A button waiting on the server is refused with `aria-disabled`, not
+    // `disabled`, so it keeps keyboard focus; it must still look inert.
+    "aria-disabled:pointer-events-none aria-disabled:bg-raised aria-disabled:border-line aria-disabled:text-ink-4 aria-disabled:shadow-none",
   ],
   {
     variants: {

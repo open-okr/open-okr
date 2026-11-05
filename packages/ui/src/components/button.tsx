@@ -16,6 +16,29 @@ import { cn } from "../lib/cn.ts";
 import { buttonVariants } from "./button-variants.ts";
 
 /**
+ * How long a press may be answered before its spinner appears. The same wait
+ * as `ACTIVITY_DELAY_MS` in `apps/web/lib/activity-indicator.tsx` and as
+ * UIUX-PLAN §4 "Acting": a save that answers faster needs no spinner, and one
+ * that flashes for a frame reads as a glitch. The button refuses a press at once
+ * either way, so a second press is refused from the first moment.
+ */
+const PENDING_SPINNER_DELAY_MS = 200;
+
+/** True once `active` has stayed true for the spinner's wait. */
+export function useDelayedFlag(active: boolean): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!active) {
+      setShown(false);
+      return;
+    }
+    const timer = setTimeout(() => setShown(true), PENDING_SPINNER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [active]);
+  return shown;
+}
+
+/**
  * Whether the form this submit button belongs to is being sent, and whether
  * it was this button that sent it.
  *
@@ -30,6 +53,25 @@ import { buttonVariants } from "./button-variants.ts";
  * A form that handles `onSubmit` itself and calls `preventDefault` never does,
  * and a button there passes `pending` instead.
  */
+/**
+ * A press that is already being answered is refused here, not with `disabled`.
+ * A focused button that becomes `disabled` loses focus to the page, and a
+ * keyboard or screen-reader user who pressed Save is dropped at the top of the
+ * document. `aria-disabled` keeps focus, and the guard stops a second press.
+ */
+export function guardPress(
+  refusing: boolean,
+  onClick: ButtonHTMLAttributes<HTMLButtonElement>["onClick"],
+): ButtonHTMLAttributes<HTMLButtonElement>["onClick"] {
+  return (event) => {
+    if (refusing) {
+      event.preventDefault();
+      return;
+    }
+    onClick?.(event);
+  };
+}
+
 export function useSubmitPending(
   type: ButtonHTMLAttributes<HTMLButtonElement>["type"],
   forwarded: ForwardedRef<HTMLButtonElement>,
@@ -70,9 +112,10 @@ export interface ButtonProps
     VariantProps<typeof buttonVariants> {
   /**
    * The server is working on what this button started (UIUX-PLAN §4,
-   * "Acting"): a spinner before the label, and disabled, so a second press
-   * cannot send it twice. A submit button inside a form with a function
-   * action gets this on its own; pass it for any other write.
+   * "Acting"): refused at once, so a second press cannot send it twice, and
+   * a spinner before the label after 200 milliseconds. A submit button
+   * inside a form with a function action gets this on its own; pass it for
+   * any other write.
    */
   readonly pending?: boolean;
 }
@@ -86,23 +129,31 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       type = "button",
       pending,
       disabled,
+      onClick,
       children,
       ...props
     },
     forwarded,
   ) => {
     const { ref, sending, spinning } = useSubmitPending(type, forwarded);
-    const busy = pending || spinning;
+    const busy = Boolean(pending || spinning);
+    // Refused, not disabled, while the server answers: see `guardPress`. A
+    // caller's own `disabled` is ignored for that time, since it may be
+    // `disabled={pending}` and would take the focus away again.
+    const refusing = Boolean(pending || sending);
+    const showSpinner = useDelayedFlag(busy);
     return (
       <button
         ref={ref}
         type={type}
         className={cn(buttonVariants({ variant, size }), className)}
-        disabled={disabled || pending || sending}
+        disabled={refusing ? undefined : disabled}
+        aria-disabled={refusing || undefined}
         aria-busy={busy || undefined}
+        onClick={guardPress(refusing, onClick)}
         {...props}
       >
-        {busy ? (
+        {showSpinner ? (
           <LoaderCircle
             aria-hidden="true"
             data-testid="button-pending"

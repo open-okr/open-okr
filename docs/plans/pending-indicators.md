@@ -17,6 +17,7 @@ The owner tested and found none on the Goals page and on Admin > General. That i
 | How to split | Three changes, in order. Change 3 runs as five batches (section 7) |
 | A form with several submit buttons | Spinner only on the button that was pressed. The others are disabled |
 | Controls without a button (inline select, switch, toggle, checkbox that saves) | In scope. Disabled while saving, small spinner beside it |
+| UIUX-PLAN §4 allowed only the shell bar | Option A: §4 is amended so the pressed control also spins, after the same 200 ms wait. Do Change 2A (section 6A) before Change 3 |
 
 ## 3. Ground rules for the executor
 
@@ -160,6 +161,63 @@ Inline cells and row menu items call `okr.mutate(...)` and update the row optimi
 ### 6.5 Verify
 
 `pnpm check:fast`, `pnpm test:changed`. In the browser with Slow 3G throttling: check in, record a key result value, add an objective, add a key result, delete a key result, stop an objective, change an inline cell (owner, status) in the list, Admin > General Save and Reset (only the pressed one spins). Changeset: `"@openokr/web": patch`, "The Goals page and Admin > General show a spinner on the control that is saving." Then stop and ask the owner to look.
+
+## 6A. Change 2A: align with UIUX-PLAN §4 before Change 3 (added 2026-11-05)
+
+Why: UIUX-PLAN §4 "Acting" allowed one indicator only, the shell bar (`apps/web/lib/activity-indicator.tsx`, `ACTIVITY_DELAY_MS = 200`). The owner chose on 2026-11-05 to amend §4 so the pressed control also shows a spinner. Review answers: [pending-indicators-review-questions.md](pending-indicators-review-questions.md) §9.
+
+**Already done, uncommitted:** the §4 "Acting" row in `docs/specification/UIUX-PLAN.md` (line 85) is rewritten. Do not edit it again; commit it with this change. Read it, because the code must match it.
+
+### 6A.1 What to build (all in `packages/ui`)
+
+| # | Change | Detail |
+|---|---|---|
+| 1 | Spinner waits 200 ms | In `button.tsx`, add `const PENDING_SPINNER_DELAY_MS = 200;` with a comment that it matches `ACTIVITY_DELAY_MS` in `apps/web/lib/activity-indicator.tsx` and UIUX-PLAN §4. Add a hook `useDelayedFlag(active: boolean): boolean` that turns true only after `active` has stayed true for the delay (`setTimeout` in `useEffect`, cleared on cleanup, reset to false at once when `active` goes false). In `Button`: `disabled` and `aria-busy` still follow the busy state **at once**; only the `LoaderCircle` waits for `useDelayedFlag(busy)` |
+| 2 | Split `SubmitButton` | Today it calls `useSubmitPending` even in the non-bare branch and ignores the result. Make a private `BareSubmitButton` (same file) that calls the hook and `useDelayedFlag`. `SubmitButton` then returns `bare ? <BareSubmitButton .../> : <Button type="submit" .../>` with no hook of its own. Props and `displayName` unchanged |
+| 3 | Export | `useDelayedFlag` is exported from `button.tsx` only because `submit-button.tsx` needs it. If `pnpm dead-code` objects, follow its message rather than suppressing it |
+| 4 | Focus check, then decide | See 6A.3. Only if focus is lost, change `Button` to keep focus (6A.4) |
+
+### 6A.2 Tests (`packages/ui/test/submit-button.test.tsx`)
+
+The existing tests expect the spinner right after the click. With the delay they must wait. Use a helper `const wait = (ms: number) => act(() => new Promise((r) => setTimeout(r, ms)));` and real timers.
+
+| Given | When | Then |
+|---|---|---|
+| A function-action form, one `Button type="submit"` | Pressed | Disabled and `aria-busy="true"` at once; no `button-pending` yet. After `wait(250)`: `button-pending` present |
+| Same | Action resolves before 200 ms (resolve at once, then `wait(250)`) | `button-pending` never appeared, button enabled again |
+| `<Button pending>` | Rendered | Disabled at once; spinner after `wait(250)` |
+| Existing tests | | Update each to `wait(250)` before asserting the spinner. Do not delete any assertion |
+
+### 6A.3 Focus check (browser, keyboard only)
+
+Use the `openokr-lean-dev` skill and the Playwright MCP, POST requests delayed 3 s as in Change 1. On Admin > General, Tab to the instance name Save, press Enter, wait until the button is enabled again, then read `document.activeElement` (tag, text). Repeat on a goal page Edit Save (`ActionForm`).
+
+| Result | Do |
+|---|---|
+| Focus is still on the Save button | Nothing more. Write the result in the report |
+| Focus is on `<body>` or elsewhere | Do 6A.4 |
+
+### 6A.4 Only if focus was lost: keep focus while pending
+
+In `Button` and `BareSubmitButton`, while busy: do **not** set `disabled`. Set `aria-disabled="true"`, and refuse the press: an `onClick` wrapper that calls `event.preventDefault()` and returns when busy, then calls the caller's `onClick` otherwise. Keep the caller's own `disabled` prop working exactly as today. Add a test: a pending submit button pressed again does not call the action a second time. Then rerun 6A.3 and report both results.
+
+### 6A.5 Verify, commit, stop
+
+`pnpm check:fast`, `pnpm test:changed`, the browser check in 6A.3. Changeset `.changeset/pending-spinner-delay.md`, `"@openokr/web": patch`: "A button's spinner waits 200 milliseconds like the bar at the top, so a fast save shows nothing." One signed-off commit with `docs/specification/UIUX-PLAN.md` included. Then stop and report to the owner.
+
+### 6A.6 Corrections for Change 3 from the review
+
+Apply these when building the batch tables in section 7 (details in the review file §9.1):
+
+| Item | Rule |
+|---|---|
+| In-scope rule (replaces the one in 6.1) | Any control whose press makes the person wait on the server, write or read (an AI call, a verify, an export). A visible "Working..." label counts as the indicator |
+| Raw `<button type="submit">` in a function-action form | Replace with `<SubmitButton bare className="<same classes>">`. Do not hand-roll the spinner |
+| Inline controls | Every batch table gets a column for inline controls whose handler writes. For 3a: `roles/member-roles.tsx:69`, `roles/role-matrix.tsx:178`, `nudges/rule-cards.tsx:169, 297, 328` |
+| 3a facts confirmed | `AIForm` and `ChannelForm` use `<form action={formAction}>`: pattern A, nothing to change. `audit/audit-panel.tsx` `check`, `download` and `show` are all in scope |
+| Gap left from Change 2 | `goals/[id]/coach-strip.tsx` "Suggest a fix": `pending={pending && !applying}`. Do it in batch 3e |
+| Spec to run after 3a | `pnpm build && pnpm test:e2e e2e/s36d-nudge-rules.spec.ts` |
+| Batch cadence | Owner decision pending (review Q14). Until the owner says otherwise: send the table and wait for "ok" |
 
 ## 7. Change 3: the rest of the app, in five batches
 
