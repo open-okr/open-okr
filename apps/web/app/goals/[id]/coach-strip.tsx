@@ -70,10 +70,13 @@ export function CoachStrip({
   const { t } = useTranslations();
 
   const [pending, startTransition] = useTransition();
+  // Only applying a wording writes; asking for one is a read of the assist.
+  const [applying, setApplying] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const ask = useCallback((keyResultId: string, ruleId: string) => {
+    setApplying(false);
     setProblem(null);
     setSuggestion(null);
     startTransition(async () => {
@@ -94,6 +97,7 @@ export function CoachStrip({
 
   const apply = useCallback(
     (chosen: Suggestion) => {
+      setApplying(true);
       setProblem(null);
       startTransition(async () => {
         const result = await applyRewrite(
@@ -237,6 +241,7 @@ export function CoachStrip({
                 <Button
                   type="button"
                   disabled={pending}
+                  pending={pending && applying}
                   onClick={() => apply(suggestion)}
                 >
                   {t("goals.detail.coachStrip.useThisWording")}

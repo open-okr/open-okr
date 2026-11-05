@@ -14,6 +14,7 @@ import {
   type ConfidenceDisplay,
   formatConfidence,
   formatMeasure,
+  Spinner,
   useQueryClient,
   useToast,
   useTranslations,
@@ -1155,13 +1156,15 @@ function Alignment({
                   <button
                     type="button"
                     disabled={removing}
+                    aria-busy={removing || undefined}
                     onClick={() => remove(dependency.id)}
                     aria-label={t("goals.studio.studio.removeDependencyOn", {
                       title: dependency.title,
                     })}
-                    className="flex-none rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4"
+                    className="inline-flex flex-none items-center gap-1 rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4"
                   >
-                    {t("goals.studio.studio.removeDependency")}
+                    {removing ? <Spinner /> : null}
+                    <span>{t("goals.studio.studio.removeDependency")}</span>
                   </button>
                 ) : null}
               </li>

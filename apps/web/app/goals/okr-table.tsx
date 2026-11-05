@@ -12,6 +12,7 @@ import {
   Bar,
   Button,
   formatConfidence,
+  Spinner,
   TextInput,
   Tooltip,
   useIsMutating,
@@ -35,6 +36,7 @@ import {
   useOkrLive,
   useOkrMutation,
   useOkrTree,
+  usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { addKeyResult, addObjective } from "./editor-actions.ts";
@@ -410,6 +412,8 @@ function LiveOkrTable({
   // a screen reader hears that a save is under way, and so a test can wait
   // for the server rather than for the row, which moves before it answers.
   const saving = useIsMutating() > 0 || pending;
+  // The rows whose change the server has not answered yet.
+  const savingIds = usePendingOkrIds();
   const goals = filterGoals(tree.goals, filters);
   const units = unitsInUse(tree.goals);
   const problem = okr.problem;
@@ -649,6 +653,7 @@ function LiveOkrTable({
                 canEdit={canEdit}
                 canAdminister={canAdminister}
                 busy={pending}
+                saving={savingIds.has(goal.id)}
                 progressMax={progressMax}
                 members={members}
                 coach={coach}
@@ -697,6 +702,7 @@ function LiveOkrTable({
                       okr={okr}
                       canEdit={canEdit}
                       canAdminister={canAdminister}
+                      saving={savingIds.has(keyResult.id)}
                       progressMax={progressMax}
                       members={members}
                       coach={coach}
@@ -817,6 +823,7 @@ function ObjectiveRow({
   canEdit,
   canAdminister,
   busy,
+  saving,
   progressMax,
   members,
   coach,
@@ -832,6 +839,8 @@ function ObjectiveRow({
   readonly canEdit: boolean;
   readonly canAdminister: boolean;
   readonly busy: boolean;
+  /** A change to this objective is still on its way to the server. */
+  readonly saving: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
@@ -872,7 +881,11 @@ function ObjectiveRow({
           onSave={cells.saveTitle}
         />
 
-        <div className="col-start-2 row-start-1 flex items-center gap-1 md:col-start-3">
+        <div
+          className="col-start-2 row-start-1 flex items-center gap-1 md:col-start-3"
+          aria-busy={saving || undefined}
+        >
+          {saving ? <Spinner /> : null}
           <span className="hidden md:inline-flex">
             <HealthChip health={goal.health} reported={goal.reportedStatus} />
           </span>
@@ -1040,6 +1053,7 @@ function KeyResultRow({
   okr,
   canEdit,
   canAdminister,
+  saving,
   progressMax,
   members,
   coach,
@@ -1054,6 +1068,8 @@ function KeyResultRow({
   readonly okr: Okr;
   readonly canEdit: boolean;
   readonly canAdminister: boolean;
+  /** A change to this key result is still on its way to the server. */
+  readonly saving: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
   readonly coach: Coach;
@@ -1275,7 +1291,11 @@ function KeyResultRow({
               )}
         </span>
 
-        <div className="col-start-2 row-start-1 self-start md:col-start-auto md:row-start-auto md:self-center">
+        <div
+          className="col-start-2 row-start-1 flex items-center gap-1 self-start md:col-start-auto md:row-start-auto md:self-center"
+          aria-busy={saving || undefined}
+        >
+          {saving ? <Spinner /> : null}
           <RowActions
             title={keyResult.title}
             href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
@@ -1694,7 +1714,8 @@ function AddRow({
         <Button
           type="button"
           size="sm"
-          disabled={disabled || saving || title.trim() === "" || needsReason}
+          disabled={disabled || title.trim() === "" || needsReason}
+          pending={saving}
           onClick={() => void commit()}
         >
           {t("common.save")}

@@ -243,7 +243,7 @@ export function CyclePicker({
               <Button
                 type="button"
                 variant="primary"
-                disabled={pending}
+                pending={pending}
                 onClick={create}
               >
                 {t("goals.editor.createCycle")}

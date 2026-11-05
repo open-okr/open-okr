@@ -280,7 +280,8 @@ export function DecomposeKeyResult({
           type="button"
           variant="primary"
           size="sm"
-          disabled={pending || kept.length === 0 || spaceId === "" || overLimit}
+          disabled={kept.length === 0 || spaceId === "" || overLimit}
+          pending={pending}
           onClick={() => {
             setNotice(null);
             start(async () => {

@@ -101,7 +101,8 @@ export function FilterAssist() {
         />
         <Button
           variant="ai"
-          disabled={busy || sentence.trim() === ""}
+          disabled={sentence.trim() === ""}
+          pending={busy}
           onClick={() => void run()}
         >
           {t("goals.filterAssist.filter")}

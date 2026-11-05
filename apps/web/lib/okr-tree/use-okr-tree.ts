@@ -27,6 +27,7 @@
 
 import {
   useMutation,
+  useMutationState,
   useQuery,
   useQueryClient,
   useToast,
@@ -63,6 +64,9 @@ import {
 
 /** The channel tabs of one browser tell each other about a write on. */
 const OKR_CHANNEL = "openokr-okr-tree";
+
+/** Names the one mutation every change to the tree goes through. */
+const OKR_WRITE_KEY = ["okr-tree", "write"] as const;
 
 /** How long a burst of other members' writes is gathered into one re-read. */
 const LIVE_WINDOW_MS = 1_500;
@@ -205,6 +209,7 @@ export function useOkrMutation(input: {
     OkrMutation,
     { readonly previous: OkrTree | undefined }
   >({
+    mutationKey: OKR_WRITE_KEY,
     mutationFn: (change) => runOkrMutation(change),
     onMutate: async (change) => {
       setProblem(null);
@@ -345,6 +350,19 @@ export function useOkrMutation(input: {
     keepMine,
     takeTheirs,
   };
+}
+
+/**
+ * The ids of the goals and key results a write is still on its way for. The
+ * list draws a row's change before the server answers, so this is what lets a
+ * row say it is still being saved.
+ */
+export function usePendingOkrIds(): ReadonlySet<string> {
+  const ids = useMutationState({
+    filters: { mutationKey: OKR_WRITE_KEY, status: "pending" },
+    select: (mutation) => (mutation.state.variables as OkrMutation).id,
+  });
+  return new Set(ids);
 }
 
 /** What every surface that edits the tree is handed: the list, the drawer. */
