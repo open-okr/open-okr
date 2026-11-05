@@ -159,6 +159,7 @@ export function FirstVisitTour() {
               variant="primary"
               size="sm"
               disabled={pending}
+              pending={pending && last}
               data-testid="tour-next"
               onClick={last ? finish : () => setIndex(index + 1)}
             >
@@ -183,6 +184,7 @@ export function FirstVisitTour() {
                 variant="ghost"
                 size="sm"
                 disabled={pending}
+                pending={pending}
                 data-testid="tour-end"
                 onClick={finish}
               >

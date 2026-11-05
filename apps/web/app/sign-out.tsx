@@ -1,3 +1,4 @@
+import { SubmitButton } from "@openokr/ui";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "../lib/auth";
@@ -33,9 +34,11 @@ export async function SignOut() {
       {/* `menuRowClass` rather than a class list of its own: this button sits
        * directly under three menu rows, and an unstyled one inherited the
        * body's 16px next to their 13px. */}
-      <button type="submit" className={menuRowClass}>
+      {/* `justify-start!` because the bare button is a flex row (it holds a
+       * spinner) and the menu rows are left-aligned text. */}
+      <SubmitButton bare className={`${menuRowClass} justify-start!`}>
         {t("signOut.signOut")}
-      </button>
+      </SubmitButton>
     </form>
   );
 }

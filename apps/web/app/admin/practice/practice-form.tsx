@@ -9,8 +9,10 @@ import {
   CardHeader,
   Chip,
   cn,
+  guardPress,
   MethodHint,
   SelectInput,
+  Spinner,
   useFormDirty,
   useKeyboardRegistry,
   useSubmitShortcut,
@@ -317,20 +319,29 @@ function ResetCard({
   const { t } = useTranslations();
   const [pending, start] = useTransition();
   return (
+    // Refused with `aria-disabled` while the reset is sent, not `disabled`, so
+    // the button keeps keyboard focus; see `guardPress`.
     <button
       type="button"
-      disabled={disabled || pending}
-      onClick={() => {
+      disabled={pending ? undefined : disabled}
+      aria-disabled={pending || undefined}
+      aria-busy={pending || undefined}
+      onClick={guardPress(pending, () => {
         if (!window.confirm(t("admin.practice.resetConfirm"))) {
           return;
         }
         start(async () => {
           onOutcome(await resetPractice(keys));
         });
-      }}
-      className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"
+      })}
+      className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60 aria-disabled:opacity-60"
     >
-      {pending ? t("admin.practice.resetting") : t("admin.practice.resetCard")}
+      {pending ? <Spinner /> : null}
+      <span>
+        {pending
+          ? t("admin.practice.resetting")
+          : t("admin.practice.resetCard")}
+      </span>
     </button>
   );
 }

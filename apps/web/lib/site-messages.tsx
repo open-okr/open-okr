@@ -1,4 +1,5 @@
 import { dismissSiteMessage, liveSiteMessagesFor } from "@openokr/core";
+import { SubmitButton } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
 import { requireSession } from "./session";
@@ -66,12 +67,12 @@ export async function SiteMessages({
               {/* "Dismiss" rather than an unlabelled cross: a control whose
                * only label is an icon is one a screen reader announces as
                * "button". */}
-              <button
+              <SubmitButton
+                bare
                 className="whitespace-nowrap font-medium text-sm underline"
-                type="submit"
               >
                 {t("common.dismiss")}
-              </button>
+              </SubmitButton>
             </form>
           ) : null}
         </div>

@@ -8,9 +8,11 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  guardPress,
   MethodHint,
   NumberInput,
   SelectInput,
+  Spinner,
   TextInput,
   TokenInput,
   useFormDirty,
@@ -506,10 +508,14 @@ function ResetCard({
   const [pending, start] = useTransition();
 
   return (
+    // Refused with `aria-disabled` while the reset is sent, not `disabled`, so
+    // the button keeps keyboard focus; see `guardPress`.
     <button
       type="button"
-      disabled={disabled || pending}
-      onClick={() => {
+      disabled={pending ? undefined : disabled}
+      aria-disabled={pending || undefined}
+      aria-busy={pending || undefined}
+      onClick={guardPress(pending, () => {
         if (!window.confirm(t("admin.rhythm.rhythmForm.resetCardConfirm"))) {
           return;
         }
@@ -517,12 +523,15 @@ function ResetCard({
           const outcome = await resetGroup(keys);
           onOutcome(outcome, outcome.error === null);
         });
-      }}
-      className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"
+      })}
+      className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60 aria-disabled:opacity-60"
     >
-      {pending
-        ? t("admin.rhythm.rhythmForm.resetting")
-        : t("common.resetToDefaults")}
+      {pending ? <Spinner /> : null}
+      <span>
+        {pending
+          ? t("admin.rhythm.rhythmForm.resetting")
+          : t("common.resetToDefaults")}
+      </span>
     </button>
   );
 }

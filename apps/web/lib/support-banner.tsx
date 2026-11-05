@@ -1,5 +1,5 @@
 import { endSupportSession, liveSupportSession } from "@openokr/core";
-import type { MessageValues } from "@openokr/ui";
+import { type MessageValues, SubmitButton } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { getPool } from "./pool";
 import { requireSession } from "./session";
@@ -112,12 +112,12 @@ export async function SupportBanner({
         <input name="sessionId" type="hidden" value={live.id} />
         {/* No dismiss. Ending it is the only way to make this go away, which
          * is the point. */}
-        <button
+        <SubmitButton
+          bare
           className="whitespace-nowrap rounded-md border border-bad-dot px-3 py-1.5 font-medium text-sm"
-          type="submit"
         >
           {t("lib.supportBanner.endItNow")}
-        </button>
+        </SubmitButton>
       </form>
     </div>
   );

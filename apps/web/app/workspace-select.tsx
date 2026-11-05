@@ -1,7 +1,8 @@
 "use client";
 
 import type { Membership } from "@openokr/core";
-import { SelectInput } from "@openokr/ui";
+import { SelectInput, Spinner } from "@openokr/ui";
+import { useFormStatus } from "react-dom";
 
 /**
  * The one client-interactive fragment of the workspace switcher: submitting
@@ -21,21 +22,29 @@ export function WorkspaceSelect({
   readonly memberships: readonly Membership[];
   readonly activeWorkspaceId: string;
 }) {
+  // The form is read when it is submitted, so locking the select while the
+  // switch is sent loses nothing.
+  const { pending } = useFormStatus();
   return (
-    <SelectInput
-      id="workspaceId"
-      label={label}
-      hideLabel
-      name="workspaceId"
-      defaultValue={activeWorkspaceId}
-      onChange={(event) => event.currentTarget.form?.requestSubmit()}
-      inputClassName="-ml-0.5 h-auto w-full rounded-md border-none bg-transparent px-0 text-xs text-ink-4 focus:ring-0"
-    >
-      {memberships.map((membership) => (
-        <option key={membership.workspaceId} value={membership.workspaceId}>
-          {membership.name}
-        </option>
-      ))}
-    </SelectInput>
+    <span className="flex items-center gap-1.5">
+      <SelectInput
+        id="workspaceId"
+        label={label}
+        hideLabel
+        name="workspaceId"
+        defaultValue={activeWorkspaceId}
+        disabled={pending}
+        onChange={(event) => event.currentTarget.form?.requestSubmit()}
+        className="min-w-0 flex-1"
+        inputClassName="-ml-0.5 h-auto w-full rounded-md border-none bg-transparent px-0 text-xs text-ink-4 focus:ring-0"
+      >
+        {memberships.map((membership) => (
+          <option key={membership.workspaceId} value={membership.workspaceId}>
+            {membership.name}
+          </option>
+        ))}
+      </SelectInput>
+      {pending ? <Spinner /> : null}
+    </span>
   );
 }

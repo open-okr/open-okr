@@ -70,13 +70,14 @@ export function CoachStrip({
   const { t } = useTranslations();
 
   const [pending, startTransition] = useTransition();
-  // Only applying a wording writes; asking for one is a read of the assist.
-  const [applying, setApplying] = useState(false);
+  // Which button started the call in flight (a suggestion for one rule, or the
+  // apply), so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const ask = useCallback((keyResultId: string, ruleId: string) => {
-    setApplying(false);
+    setActing(`suggest:${keyResultId}:${ruleId}`);
     setProblem(null);
     setSuggestion(null);
     startTransition(async () => {
@@ -97,7 +98,7 @@ export function CoachStrip({
 
   const apply = useCallback(
     (chosen: Suggestion) => {
-      setApplying(true);
+      setActing("apply");
       setProblem(null);
       startTransition(async () => {
         const result = await applyRewrite(
@@ -191,6 +192,7 @@ export function CoachStrip({
                     <Button
                       type="button"
                       disabled={pending}
+                      pending={pending && acting === `suggest:${kr.id}:${rule}`}
                       onClick={() => ask(kr.id, rule)}
                     >
                       {t("goals.detail.coachStrip.suggestAFix")}
@@ -241,7 +243,7 @@ export function CoachStrip({
                 <Button
                   type="button"
                   disabled={pending}
-                  pending={pending && applying}
+                  pending={pending && acting === "apply"}
                   onClick={() => apply(suggestion)}
                 >
                   {t("goals.detail.coachStrip.useThisWording")}
