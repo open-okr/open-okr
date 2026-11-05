@@ -1,5 +1,13 @@
 # @openokr/adapters
 
+## 0.5.0
+
+### Patch Changes
+
+- [#171](https://github.com/open-okr/open-okr/pull/171) [`8f202fc`](https://github.com/open-okr/open-okr/commit/8f202fcdb168a9d05ac4b46812218c1f7e22350e) Thanks [@dependabot](https://github.com/apps/dependabot)! - The Anthropic provider moves to version 1 of Anthropic's SDK, which uses API version 2026-10-21 and sends the API key as a bearer token. That API version refuses a temperature on every model, so requests to Anthropic models no longer carry one, and the sampling a workspace sets for a tier does not apply to them. Nothing set a temperature on a request before this change, so no request behaves differently. A proxy in front of Anthropic that reads the `X-Api-Key` header now has to read `Authorization` instead.
+- Updated dependencies []:
+  - @openokr/config@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @openokr/importer
 
+## 0.5.0
+
+### Patch Changes
+
+- [#166](https://github.com/open-okr/open-okr/pull/166) [`28b8ee0`](https://github.com/open-okr/open-okr/commit/28b8ee02b6c0f6c63ae5a1927115dbc33f932a21) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - No screen, message, API description, command help or import report cites a specification section ("§2.9") any more, and no API description names a screen code ("Drives screen S-27"). Each sentence now says what it means in words. The Grafana dashboard "the §13.1 budgets" is now "Performance budgets". The practice settings screen no longer prints a section and source under each setting, and its "As §4" and "As §8.4" options read "As the method". The KPI trees page no longer lists unbuilt work under "Not here yet". The `section` field that `practice.read` and `rhythm.read` return is now the section number alone, "4.5" rather than "§4.5".
+- Updated dependencies [[`6f01dbb`](https://github.com/open-okr/open-okr/commit/6f01dbb3e9c7029505643777d3d6aadfef6d8cd4), [`8f202fc`](https://github.com/open-okr/open-okr/commit/8f202fcdb168a9d05ac4b46812218c1f7e22350e), [`02e97c4`](https://github.com/open-okr/open-okr/commit/02e97c486934e38c5abd09108d9385aeed732f3e), [`8c20438`](https://github.com/open-okr/open-okr/commit/8c204380b6c21e1984a2a3de321bca7e238b74fd), [`28b8ee0`](https://github.com/open-okr/open-okr/commit/28b8ee02b6c0f6c63ae5a1927115dbc33f932a21), [`e73b7aa`](https://github.com/open-okr/open-okr/commit/e73b7aa0a1d54c84a2619f7337d18121bea3f685), [`0c03fdf`](https://github.com/open-okr/open-okr/commit/0c03fdfd59290e68f1f67349297858ce2ef08357), [`3dbba8c`](https://github.com/open-okr/open-okr/commit/3dbba8cabe4736ebe041dec8eb365a4f5ee0bfc9), [`570a0a2`](https://github.com/open-okr/open-okr/commit/570a0a2f6023efa1b5a613e63b68dbb42b1834b1), [`c426fe2`](https://github.com/open-okr/open-okr/commit/c426fe2115bfdd5ce7eab2edd526fa1b89d0585f), [`f016dd5`](https://github.com/open-okr/open-okr/commit/f016dd5caf2ec0a842d2365fad2a72dc73918660), [`91af1bf`](https://github.com/open-okr/open-okr/commit/91af1bfb6bcc8c82045a752e8e35dcd9cb5f8ab2), [`80354db`](https://github.com/open-okr/open-okr/commit/80354dbe05088a837c1bcef61fff31ac9d067f80), [`8c0fd5b`](https://github.com/open-okr/open-okr/commit/8c0fd5b19d111ce1facb70aa2674aa80b1366be8), [`df256ec`](https://github.com/open-okr/open-okr/commit/df256ec8665a698323d33d5af363e4131ce26905)]:
+  - @openokr/core@0.5.0
+  - @openokr/adapters@0.5.0
+  - @openokr/method@0.5.0
+  - @openokr/config@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes
