@@ -237,3 +237,23 @@ The owner asked Opus to decide which of the recorded follow-ups need fixing.
 | Kit audit (`button.tsx`, `submit-button.tsx`, `spinner.tsx`) | No defect found | Guard cancels implicit submission, a caller's `disabled` returns after the wait, `aria-disabled:` twins exist, no caller overrides `aria-busy`, and every export has a consumer |
 
 Strings moved to `en.json` and `ms.json` (28 keys, inserted in place, nothing re-sorted): account security (5), coach strip (2), filter assist (1), drafting assists (3), capacity (4 plural keys), space membership (3 keys replace one that carried a raw role id and a leading space), operator lifecycle (3), session diagnostic, digest and recognition (6), and `session.detail.someoneNoLongerHere`. One visible wording change is approved: "as manager" became "as a manager", and the role now comes from the catalogue and the terms rather than the raw id. Left out on purpose: the server's own `error.message` pass-through, `acting` keys, `data-testid` and option values, the assists `"; "` joiner, and AI-written reasons.
+
+### 9.9 Opus audit of the finished work (2026-11-05): PASS WITH FINDINGS
+
+An independent Opus audit read the 12 commits and found no blocker. Fixed afterwards (one commit, then the commit messages were reworded because six of them named a model, against the repo's attribution rule):
+
+| # | Finding | Fix |
+|---|---|---|
+| 1 | Six commit messages and the plan header named an AI model | Messages reworded (backup branch `agung-before-reword` keeps the old history); plan header reworded |
+| 2 | The Goals drawer's inline fields and Publish/Approve saved with no indicator | The drawer header shows a spinner and `aria-busy` while a write for the open objective or its key results is pending (`usePendingOkrIds`) |
+| 3 | Sign out: `block` in `menuRowClass` beat `inline-flex`, so the spinner sat on its own line | `flex justify-start` replaces `justify-start!` |
+| 4 | `useDelayedFlag` could paint one stale spinner frame after a send ended | Returns `active && shown` |
+| 6 | SSO: the switch and the confirm button both spun in confirm mode | The switch spins only outside the confirm modes |
+| 7 | Sign in: a rejected provider call left every button disabled | `try`/`finally` around the call |
+| 8 | Key result actions wrapper lost `justify-end` | Restored |
+| 10, 11 | Stacked doc blocks and a wrong claim about a null submitter; a test that did not check `disabled`, no bare-button second-press test | Moved and corrected; assertions and a test added |
+| 13, 14 | Changeset claimed the workspace switcher keeps focus; row spinner sits before the health chip, not after the title (plan 6.4) | Changeset reworded; recorded here as a deviation: the spinner sits with the row's actions, where it does not move the title |
+
+Left for the owner: #5, the extra wording in space membership ("as member" is now "as a member", and "as coordinator" now reads "as the {termCoordinatorLower}"); #9, naming in UIUX-PLAN §4 the cases where an optimistic row shows no spinner (board card moves, KPI grid cells, which only change a legend line); #12, Retry in the drawer and Send in the Copilot show no spinner (the Copilot's face switches to "thinking").
+
+Found while checking the sign-out fix in the browser: `menuRowClass` was exported from a client module (`avatar-menu.tsx`) and imported into the server component `sign-out.tsx`, so the server received a client reference instead of the string. Before this work React dropped it as an invalid `className`, so the Sign out button had no class (the unstyled button the old comment describes). It now lives in `menu-row-class.ts`, a plain module, and both files import it. Visible change: Sign out now looks like the other menu rows.

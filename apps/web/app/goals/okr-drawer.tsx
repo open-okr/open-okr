@@ -34,6 +34,7 @@ import {
 import {
   type OkrHandle,
   useOkrDetail,
+  usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
@@ -185,6 +186,14 @@ export function OkrDrawer({
     address.goalId === null
       ? null
       : (tree.goals.find((entry) => entry.id === address.goalId) ?? null);
+  // A change to this objective or one of its key results is still on its way to
+  // the server. The drawer's fields are saved through the same write as the
+  // list's cells, so the header says so for all of them at once.
+  const savingIds = usePendingOkrIds();
+  const saving =
+    goal !== null &&
+    (savingIds.has(goal.id) ||
+      goal.keyResults.some((keyResult) => savingIds.has(keyResult.id)));
 
   return (
     <Dialog.Root
@@ -209,6 +218,7 @@ export function OkrDrawer({
       <Dialog.Portal>
         <Dialog.Popup
           data-testid="okr-drawer"
+          aria-busy={saving || undefined}
           // Below the toasts (z-50), so an undo stays reachable over it.
           className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none"
         >
@@ -216,6 +226,7 @@ export function OkrDrawer({
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
               {goal?.title ?? t("okrDrawer.missingTitle")}
             </Dialog.Title>
+            {saving ? <Spinner /> : null}
             {goal ? (
               <a
                 href={`/goals/${goal.id}`}

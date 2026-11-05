@@ -35,24 +35,11 @@ export function useDelayedFlag(active: boolean): boolean {
     const timer = setTimeout(() => setShown(true), PENDING_SPINNER_DELAY_MS);
     return () => clearTimeout(timer);
   }, [active]);
-  return shown;
+  // `active &&` so the frame after a send ends never paints a stale spinner:
+  // the reset above runs in an effect, after paint.
+  return active && shown;
 }
 
-/**
- * Whether the form this submit button belongs to is being sent, and whether
- * it was this button that sent it.
- *
- * `useFormStatus` says a form is pending but not who pressed it. The submit
- * event names the pressed button (`submitter`) and fires before React starts
- * the action, so `pressed` is settled by the time the form turns pending.
- * That keeps the spinner on Save and not on Reset beside it. `submitter` is
- * null when Enter was pressed in a field with no default button, which is a
- * send nobody can attribute, so every submit button of the form spins.
- *
- * `useFormStatus` only turns pending for a form whose `action` is a function.
- * A form that handles `onSubmit` itself and calls `preventDefault` never does,
- * and a button there passes `pending` instead.
- */
 /**
  * A press that is already being answered is refused here, not with `disabled`.
  * A focused button that becomes `disabled` loses focus to the page, and a
@@ -72,6 +59,22 @@ export function guardPress(
   };
 }
 
+/**
+ * Whether the form this submit button belongs to is being sent, and whether
+ * it was this button that sent it.
+ *
+ * `useFormStatus` says a form is pending but not who pressed it. The submit
+ * event names the pressed button (`submitter`) and fires before React starts
+ * the action, so `pressed` is settled by the time the form turns pending.
+ * That keeps the spinner on Save and not on Reset beside it. `submitter` is
+ * null only when the form was sent with `requestSubmit()` and no argument,
+ * which is a send nobody can attribute, so every submit button of the form
+ * spins. Enter in a field clicks the form's default button, so it names one.
+ *
+ * `useFormStatus` only turns pending for a form whose `action` is a function.
+ * A form that handles `onSubmit` itself and calls `preventDefault` never does,
+ * and a button there passes `pending` instead.
+ */
 export function useSubmitPending(
   type: ButtonHTMLAttributes<HTMLButtonElement>["type"],
   forwarded: ForwardedRef<HTMLButtonElement>,

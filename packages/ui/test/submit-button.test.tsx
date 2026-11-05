@@ -247,13 +247,56 @@ describe("A button refused while the server answers", () => {
     expect((button as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("still calls onClick and honours disabled when idle", async () => {
+  it("still calls onClick when idle, and a disabled button is really disabled", async () => {
     let clicks = 0;
-    render(<Button onClick={() => (clicks += 1)}>Go</Button>);
+    const { rerender } = render(
+      <Button onClick={() => (clicks += 1)}>Go</Button>,
+    );
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "Go" }));
     });
     expect(clicks).toBe(1);
+
+    rerender(
+      <Button disabled onClick={() => (clicks += 1)}>
+        Go
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Go" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(clicks).toBe(1);
+  });
+
+  it("does not send the form again on a second press of a bare SubmitButton", async () => {
+    let sent = 0;
+    let finish: () => void = () => {};
+    const action = () => {
+      sent += 1;
+      return new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    };
+    render(
+      <form action={action}>
+        <SubmitButton bare>Save</SubmitButton>
+      </form>,
+    );
+    const button = screen.getByRole("button", { name: "Save" });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    expect(sent).toBe(1);
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    await act(async () => {
+      finish();
+    });
+    expect(button.getAttribute("aria-disabled")).toBeNull();
   });
 });
 

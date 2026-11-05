@@ -5,6 +5,7 @@ import { Avatar, initialsOf, useTranslations } from "@openokr/ui";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { menuRowClass } from "./menu-row-class.ts";
 
 /**
  * One row in the avatar menu.
@@ -22,9 +23,6 @@ import type { ReactNode } from "react";
  * open source" until the owner moved it here (4 November 2026).
  */
 const SOURCE_URL = "https://github.com/open-okr/open-okr";
-
-export const menuRowClass =
-  "block w-full rounded-md px-2.5 py-1.5 text-left text-sm text-ink-2 data-highlighted:bg-raised hover:bg-raised";
 
 /**
  * The topbar's avatar menu (UIUX-PLAN.md §3). Base UI's `Menu` supplies the

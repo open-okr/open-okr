@@ -140,7 +140,7 @@ export function ConnectionControls({
           ref={switchRef}
           size="sm"
           disabled={pending}
-          pending={pending && mode !== "confirmRemove"}
+          pending={pending && mode !== "confirmRemove" && mode !== "confirmOff"}
           onClick={() => {
             if (connection.enabled && enforcedDomains !== "") {
               setMode("confirmOff");

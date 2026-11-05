@@ -320,17 +320,28 @@ export default function SignInPage() {
                 // `signIn.sso`, and sending it to `signIn.social` reached a
                 // provider `genericOAuth` had never been given, which failed
                 // with nothing a person could act on.
-                const result =
-                  provider.kind === "saml"
-                    ? await authClient.signIn.sso({
-                        providerId: provider.id,
-                        callbackURL: "/",
-                      })
-                    : await authClient.signIn.social({
-                        provider: provider.id as "github",
-                        callbackURL: "/",
-                      });
-                setActing(null);
+                // Cleared in a `finally`, so a call that rejects never leaves
+                // every sign-in button disabled.
+                let result: Awaited<
+                  ReturnType<
+                    | typeof authClient.signIn.sso
+                    | typeof authClient.signIn.social
+                  >
+                >;
+                try {
+                  result =
+                    provider.kind === "saml"
+                      ? await authClient.signIn.sso({
+                          providerId: provider.id,
+                          callbackURL: "/",
+                        })
+                      : await authClient.signIn.social({
+                          provider: provider.id as "github",
+                          callbackURL: "/",
+                        });
+                } finally {
+                  setActing(null);
+                }
                 if (result?.error) {
                   setError(
                     t("auth.signIn.providerCouldNotBeReached", {

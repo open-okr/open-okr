@@ -1,6 +1,6 @@
 # Plan: a pending indicator on every control that writes
 
-Executor: Claude Sonnet, one change per session. Owner: Agung. Written 2026-11-05 on branch `agung`.
+Executor: a smaller model, one change per session. Owner: Agung. Written 2026-11-05 on branch `agung`.
 
 Read this whole file before touching code. Every path and line number below was checked on commit `12cc5b7b`. If something you find does not match what this file says, **stop and report it**. Do not guess, do not invent an API, do not "fix" the plan silently.
 

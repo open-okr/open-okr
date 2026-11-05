@@ -1292,7 +1292,7 @@ function KeyResultRow({
         </span>
 
         <div
-          className="col-start-2 row-start-1 flex items-center gap-1 self-start md:col-start-auto md:row-start-auto md:self-center"
+          className="col-start-2 row-start-1 flex items-center justify-end gap-1 self-start md:col-start-auto md:row-start-auto md:self-center"
           aria-busy={saving || undefined}
         >
           {saving ? <Spinner /> : null}
