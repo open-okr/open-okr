@@ -52,7 +52,7 @@ export function DataExport() {
         <p className="text-sm text-ink-2">
           {t("account.security.data.explains")}
         </p>
-        <Button disabled={pending} onClick={download} variant="default">
+        <Button pending={pending} onClick={download} variant="default">
           {pending
             ? t("account.security.data.preparing")
             : t("account.security.data.download")}

@@ -38,7 +38,7 @@ export function FinishSetup() {
         type="button"
         variant="primary"
         onClick={finish}
-        disabled={pending}
+        pending={pending}
         className="self-start"
       >
         {pending

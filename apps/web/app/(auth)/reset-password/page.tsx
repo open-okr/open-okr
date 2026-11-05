@@ -64,7 +64,7 @@ function ResetPasswordForm() {
           maxLength={128}
           required
         />
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" pending={pending}>
           {pending
             ? t("auth.resetPassword.saving")
             : t("auth.resetPassword.setPassword")}

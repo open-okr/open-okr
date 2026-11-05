@@ -210,3 +210,15 @@ Applied: the board's delete gets its own `useTransition` and a `deletingId` (the
 Follow-ups, not changed: `search/export-button` and `review/nudge-provenance` raw buttons keep `disabled` and can lose focus (their labels already say "Preparing" and "Snoozing"); inline checkboxes, selects and date inputs still lose focus when disabled; hard-coded English in `cycle/assists.tsx` (lines about 158, 163, 401) and `spaces/[id]/space-membership.tsx:105`.
 
 Specs to run: `s27-board`, `s29-documents`, `s34b-space-holidays`, `s09-drafting-assists`.
+
+### 9.7 Opus approver verdict on batches 3d and 3e (2026-11-05): APPROVED WITH CHANGES
+
+3d is split in two commits and 3e is one: 3d-1 is `(auth)`, `account`, `setup` and `welcome`; 3d-2 is `people` and `operator`; 3e is the shared pieces. Of the 35 files in 3d, 17 change. Kit buttons in function-action forms (all of `join`, most of `account`, `people/[id]/profile-form`, `lifecycle-controls`) already spin and need nothing. `oauth/authorize/consent-form` is a native POST to a route, works without JavaScript and is security-sensitive, so it is left alone and the browser's own loading state covers it. `method="get"` forms (`account/device/code-entry`, `people/page`) are navigation. Error boundaries only redraw in the browser, except `lib/section-boundary` which reads from the server.
+
+Approved handler changes (only these): sign-in passkey and SSO buttons (the key is cleared right after the await, because Back from a provider can restore the page from the browser cache), `security-settings` (three handlers, each wrapped in `try`/`finally`), the welcome wizard `advance(name, work)`, people `leave-card` `save(name, ...)`, copilot `decide(name, id, fn)`, coach-strip `acting` in place of `applying`, comments `setActing`, and `ReactionRow`'s local `pressed` state with two new props. One visible behaviour changes: the comment composer says "Posting..." only for its own post (no new text).
+
+Carried over and converted in 3e: `search/export-button` plain variant, `review/nudge-provenance` Snooze, and the two `ResetCard` buttons. The export menu trigger stays as it is (Base UI owns its disabled state).
+
+Specs: 3d-1 `s34-onboarding`, `s36g-second-factor-policy`, `first-run-wizard`, `s43-accessibility`; 3d-2 `s33d-member-leave`, `s45-operator-console`, `s33-people`; 3e `s39b-copilot-proposals`, `s29-documents`, `s32b-exports`, `s36c-rhythm`.
+
+Pre-existing hard-coded English, not touched: `account/security/security-settings.tsx` (lines about 109 to 172) and `goals/[id]/coach-strip.tsx` (lines 87 and 93).

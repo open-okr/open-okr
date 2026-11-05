@@ -128,7 +128,7 @@ export function SetupAccountForm() {
         its absence, so the offer lands with the content. Recorded on P3-T01.
       */}
 
-      <Button type="submit" variant="primary" disabled={pending}>
+      <Button type="submit" variant="primary" pending={pending}>
         {pending
           ? t("setup.account.setupAccountForm.settingUp")
           : t("setup.account.finishSetup")}
