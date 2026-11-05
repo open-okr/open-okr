@@ -66,6 +66,7 @@ describe("the instructions the agent fetches (§9.2)", () => {
       "### OpenCode",
       "### Windsurf",
       "### Hermes Agent",
+      "### Grok Bot",
       "### ChatGPT",
     ]) {
       expect(markdown).toContain(heading);
@@ -81,6 +82,53 @@ describe("the instructions the agent fetches (§9.2)", () => {
     expect(markdown).toContain("opencode mcp auth openokr");
     expect(markdown).toContain(`"serverUrl": "${endpoint}"`);
     expect(markdown).toContain("auth: oauth");
+  });
+
+  describe("Grok Bot's step", () => {
+    const step = markdown.slice(
+      markdown.indexOf("### Grok Bot"),
+      markdown.indexOf("### ChatGPT"),
+    );
+
+    it("sits between Hermes Agent and ChatGPT", () => {
+      expect(markdown.indexOf("### Hermes Agent")).toBeLessThan(
+        markdown.indexOf("### Grok Bot"),
+      );
+      expect(markdown.indexOf("### Grok Bot")).toBeLessThan(
+        markdown.indexOf("### ChatGPT"),
+      );
+    });
+
+    it("has the Bot add this instance's server in chat", () => {
+      expect(step).toContain("add a custom MCP server named `openokr`");
+      expect(step).toContain(`at \`${endpoint}\` using streamable HTTP`);
+    });
+
+    it("sends a token back to OAuth rather than storing it", () => {
+      expect(step).toContain("use OAuth");
+      expect(step).toContain("Do not store a token");
+      expect(step).not.toContain("Token variant");
+    });
+
+    it("says a token does not make a private address reachable", () => {
+      expect(step).toContain("needs a public HTTPS address");
+      expect(step).toContain("A token does not change that");
+    });
+
+    it("is listed in Resources", () => {
+      expect(markdown).toContain(
+        "- Grok Bot: `https://docs.x.ai/grok-bot/computer-and-apps`",
+      );
+    });
+
+    it("stays out of the fallback that sends the user to create a token", () => {
+      const fallback = markdown.slice(
+        markdown.indexOf("## If you cannot fetch"),
+        markdown.indexOf("## Resources"),
+      );
+      expect(fallback).toContain("/account/api-tokens");
+      expect(fallback).not.toContain("Grok Bot");
+    });
   });
 
   it("explains the token variant without holding a token", () => {
