@@ -14,6 +14,7 @@ import {
   type ConfidenceDisplay,
   formatConfidence,
   formatMeasure,
+  guardPress,
   Spinner,
   useQueryClient,
   useToast,
@@ -1016,6 +1017,9 @@ function Alignment({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [removing, startRemoving] = useTransition();
+  // The dependency whose Remove was pressed, so only that row spins. Saving a
+  // standalone reason shares the transition and sets none.
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Taking a dependency apart (completeness review M-35), here since the
   // studio's details panel became this tab (P9-T09b). Either end may.
@@ -1033,6 +1037,7 @@ function Alignment({
   };
   const remove = (dependencyId: string) => {
     setProblem(null);
+    setRemovingId(dependencyId);
     startRemoving(() => settle(unlinkGoals(dependencyId)));
   };
   // Why an objective with no parent stands alone (METHOD.md §5.2,
@@ -1040,6 +1045,7 @@ function Alignment({
   // reason away.
   const explain = (reason: string) => {
     setProblem(null);
+    setRemovingId(null);
     startRemoving(() => settle(setStandaloneReason(goal.id, reason)));
   };
   const inTree = (id: string) => tree.goals.some((entry) => entry.id === id);
@@ -1153,17 +1159,23 @@ function Alignment({
                   ) : null}
                 </span>
                 {canEdit ? (
+                  // Refused with `aria-disabled`, not `disabled`, so the button
+                  // keeps keyboard focus while the unlink is sent.
                   <button
                     type="button"
-                    disabled={removing}
-                    aria-busy={removing || undefined}
-                    onClick={() => remove(dependency.id)}
+                    aria-disabled={removing || undefined}
+                    aria-busy={
+                      (removing && removingId === dependency.id) || undefined
+                    }
+                    onClick={guardPress(removing, () => remove(dependency.id))}
                     aria-label={t("goals.studio.studio.removeDependencyOn", {
                       title: dependency.title,
                     })}
-                    className="inline-flex flex-none items-center gap-1 rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4"
+                    className="inline-flex flex-none items-center gap-1 rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4 aria-disabled:text-ink-4"
                   >
-                    {removing ? <Spinner /> : null}
+                    {removing && removingId === dependency.id ? (
+                      <Spinner />
+                    ) : null}
                     <span>{t("goals.studio.studio.removeDependency")}</span>
                   </button>
                 ) : null}
