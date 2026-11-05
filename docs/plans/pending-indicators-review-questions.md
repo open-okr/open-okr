@@ -1,6 +1,6 @@
 # Pending indicators: open questions for review
 
-Reviewer: Claude Opus. Author of the work so far: Claude Sonnet. Owner: Agung. Written 2026-11-05 on branch `agung`.
+Reviewer: an independent reviewer. Author of the work so far: the implementer. Owner: Agung. Written 2026-11-05 on branch `agung`.
 
 Plan being executed: [pending-indicators.md](pending-indicators.md). Read it first. This file lists what is done, what deviates from the plan, what is unverified, and every question that needs a decision before Change 3 continues.
 
@@ -38,7 +38,7 @@ Test data left behind: the objective "aaaa" was renamed to "aaaab" and back. The
 
 ## 3. Deviations from the plan
 
-The plan said to change these. Sonnet did not, for the reason given. Confirm or overrule each.
+The plan said to change these. The implementer did not, for the reason given. Confirm or overrule each.
 
 | # | File | Plan said | Done | Reason |
 |---|---|---|---|---|
@@ -83,13 +83,13 @@ Unverified points in this table:
 | Q10 | `ai/page.tsx` and `ai/governance.tsx` wrap forms in `AIForm`. It was not opened. If `AIForm` uses `onSubmit` and not a function action, those files move from A to E. Check `AIForm` first |
 | Q11 | `audit/audit-panel.tsx` has an `onSubmit` form for "show". If it only reads the audit log, it is out of scope. Confirm by reading the handler |
 | Q12 | The table lists buttons only. Inline controls that save on change (a `SelectInput` in `roles/role-matrix` and `nudges/rule-cards`, switches in `agents/agent-switch` and `roles/member-roles`) are in scope by the owner's decision (spinner beside the control, control disabled). The table does not list them. Add a column for them before editing |
-| Q13 | Raw buttons (pattern F) do not get the auto spinner. Should Sonnet migrate them to the kit `Button` instead, which would give the auto behaviour but change their look? The plan says keep the look. The owner's memory note "redesign keeps every input" points the same way |
+| Q13 | Raw buttons (pattern F) do not get the auto spinner. Should the implementer migrate them to the kit `Button` instead, which would give the auto behaviour but change their look? The plan says keep the look. The owner's memory note "redesign keeps every input" points the same way |
 
 ## 6. Process questions
 
 | # | Question |
 |---|---|
-| Q14 | After 3a, should Sonnet continue through 3b to 3e with the same table-then-wait step, or stop after each batch for a fresh approval? The plan says table first, wait for ok, per batch |
+| Q14 | After 3a, should the implementer continue through 3b to 3e with the same table-then-wait step, or stop after each batch for a fresh approval? The plan says table first, wait for ok, per batch |
 | Q15 | Change 2 shipped without new unit tests, only the browser check and the existing gates. The owner's memory note says a small change needs `check:fast` and a browser check, no new unit tests and no e2e. Change 1 did add tests because the plan asked for them. Is that split right, or should Change 2 and 3 add a test per pattern? |
 | Q16 | Several e2e specs may assert that a button is enabled right after a click. Only CI sees it. Should one targeted spec run locally for a form that changed (the repo allows `pnpm test:e2e e2e/<file>.spec.ts` for user-visible changes) before the push? |
 | Q17 | Unverified in the browser: key result Save (`key-result-update.tsx`), the drawer check-in form, the cycle picker Create, the goal-writes move, link and unlink buttons, the add-row Save, the diagram add card, the dependency remove button. Each change is `pending={existingFlag}` and typecheck passes. Is that enough before the push, or does the owner want each shown? |
@@ -108,7 +108,7 @@ Unverified points in this table:
 
 Answers to Q1, Q10 to Q14 unblock batch 3a. The rest can be answered at any time and do not block it.
 
-## 9. Review answers (Opus, 2026-11-05)
+## 9. Review answers (reviewer, 2026-11-05)
 
 ### 9.0 Blocking finding: the work contradicts UIUX-PLAN §4
 
@@ -116,7 +116,7 @@ UIUX-PLAN.md line 85, row "Acting": "The bar waits 200 milliseconds, so a fast a
 
 That indicator exists: `apps/web/lib/activity-indicator.tsx`, mounted in `apps/web/lib/app-shell.tsx:534`, with `ACTIVITY_DELAY_MS = 200`. A spinner per button is a second indicator, which §4 forbids. Commit `4e07b8e8` (4 Nov) already cited §4 for its spinner, so the spec and the code disagree since then, and Change 1 and 2 widen the gap. The section 7 row "no deviation was assumed" is wrong.
 
-UIUX-PLAN is the authority over the code (root `CLAUDE.md`, authority order). Two ways out, and this one is the owner's call, not Sonnet's:
+UIUX-PLAN is the authority over the code (root `CLAUDE.md`, authority order). Two ways out, and this one is the owner's call, not the implementer's:
 
 | Option | Effect |
 |---|---|
@@ -142,7 +142,7 @@ Whichever is chosen, **the button spinner must wait 200 ms like the bar** (one r
 | Q11 | `show` calls `browseAudit` (a read) and `check` calls `verifyChain`, `download` calls `exportAudit`. By the Q1 rule all three are in scope because the person waits on the server. `check` and `download` have flags (`checking`, `exporting`): pattern D. `show` goes through `load`: give its submit button `pending` from the same loading state if one exists, otherwise add one. Read the handler before editing |
 | Q12 | Yes, add the column. Inline controls found in 3a: `roles/member-roles.tsx:69` (`onValueChange`), `roles/role-matrix.tsx:178`, `nudges/rule-cards.tsx:169, 297, 328`. Only those whose handler writes count (the in-scope rule in plan 6.1). `role-matrix.tsx:269` sets a name in local state: out of scope. `agents/agent-switch` is a `Button`, not a switch: pattern B |
 | Q13 | Neither as planned. A raw `<button type="submit">` inside a function-action form (`invitations/invite-form`, `plan/plan-form`, `support/grant-decision`) should become `<SubmitButton bare className="...same classes...">`. That is exactly what `bare` is for: same look, auto behaviour. Check `plan-form` first: it has `onSubmit`, so it needs `pending` as well (pattern E). A raw `onClick` button (`invitations/revoke-button`, `practice-form:320`, `rhythm-form:509`) uses the raw-button pattern |
-| Q14 | Recommendation for the owner: keep the table for every batch, but let Sonnet continue without waiting when the table holds only patterns A to F and no deviation. Stop and wait only for a new pattern, a deviation, or anything that touches text, classes or test ids. Owner decides |
+| Q14 | Recommendation for the owner: keep the table for every batch, but let the implementer continue without waiting when the table holds only patterns A to F and no deviation. Stop and wait only for a new pattern, a deviation, or anything that touches text, classes or test ids. Owner decides |
 | Q15 | The split is right. Change 2 and 3 are prop wiring and the owner's rule is `check:fast` plus a browser check for small changes. The exception is new logic: the 200 ms delay gets a unit test in `packages/ui`. `usePendingOkrIds` is thin enough to leave |
 | Q16 | Not required by the repo rule (it asks for specs you wrote or touched, and none were). Low risk found: 13 specs use `toBeDisabled` / `toBeEnabled`; the ones near changed code are `s13h-mid-cycle.spec.ts:174` (still passes, `pending` also disables) and `s36d-nudge-rules.spec.ts:176, 192`, which waits for `save-ladder-*` to be enabled again and sits in batch 3a (`rule-cards.tsx`). Run `pnpm build && pnpm test:e2e e2e/s36d-nudge-rules.spec.ts` after 3a |
 | Q17 | Enough for a push; CI runs the full e2e suite. Ask the owner to spot-check the two weekly flows: the drawer check-in and the key result value Save |
@@ -162,7 +162,7 @@ Whichever is chosen, **the button spinner must wait 200 ms like the bar** (one r
 2. If A: amend UIUX-PLAN §4, add the 200 ms delay and its test, split `SubmitButton` (Q2), check focus (9.2). One change, one commit.
 3. Batch 3a with the corrected table: Q10 confirmed, Q11 and Q12 rows added, Q13 uses `SubmitButton bare`, D3 noted for 3e.
 
-### 9.4 Opus approver verdict on batch 3a (2026-11-05): APPROVED WITH CHANGES
+### 9.4 Approver verdict on batch 3a (2026-11-05): APPROVED WITH CHANGES
 
 Applied by the implementer. Corrections to the section 5 table, each checked by the approver against the code at `de99bc9e`:
 
@@ -183,13 +183,13 @@ Applied by the implementer. Corrections to the section 5 table, each checked by 
 
 Rules added: a standalone `Spinner` waits 200 ms too (done inside `Spinner`, so every caller gets it). A kit `Button` whose label already changes uses `pending={pending}` in place of `disabled={pending}` (pattern G). Bare and raw buttons get an `aria-disabled:` twin of every `disabled:` class.
 
-Q14 (cadence): the owner delegated approval to the Opus approver on 2026-11-05. Decision: the next batch may start without waiting on its table when every row uses a known pattern (A to G, R) and an Opus review has signed it off. Each batch still ends with the owner looking in the browser, and one commit after "ok". Stop and ask on: a new pattern, a handler or text change, a class or element change beyond the `aria-disabled:` twin and the spinner wrapper, a file that does not match its table, a failing gate nobody understands.
+Q14 (cadence): the owner delegated approval to the approver on 2026-11-05. Decision: the next batch may start without waiting on its table when every row uses a known pattern (A to G, R) and an the reviewer review has signed it off. Each batch still ends with the owner looking in the browser, and one commit after "ok". Stop and ask on: a new pattern, a handler or text change, a class or element change beyond the `aria-disabled:` twin and the spinner wrapper, a file that does not match its table, a failing gate nobody understands.
 
 Specs to run after 3a: `e2e/s36d-nudge-rules.spec.ts` and `e2e/s36l-branding.spec.ts` (`pnpm build && pnpm test:e2e <files>`).
 
 Follow-up list for 3e: the four Change 2 spinners are covered by the `Spinner` change; coach-strip "Suggest a fix"; raw `ResetCard` buttons (`practice-form:320`, `rhythm-form:509`) keep `disabled` and can lose focus.
 
-### 9.5 Opus approver verdict on batch 3b (2026-11-05): APPROVED WITH CHANGES
+### 9.5 Approver verdict on batch 3b (2026-11-05): APPROVED WITH CHANGES
 
 `session/[id]/**` and `sessions/**`, 24 files, 44 controls. Ten files need no change (`page.tsx`, `advance-control`, `blocker-panel`, `commitments`, `coordinator-note`, `next-actions`, `confidence-dial`, `session-live`, `minutes/page`, `sessions/page`): their forms use a function action, so the kit button spins on its own and ignores `disabled={pending}` while sending.
 
@@ -201,7 +201,7 @@ Left as is and listed for the owner: separate forms on one screen do not refuse 
 
 Specs to run: `s22b-digest-channel-post`, `s23-monthly-moves`, `s26-session-entry`, `reviews`.
 
-### 9.6 Opus approver verdict on batch 3c (2026-11-05): APPROVED WITH CHANGES
+### 9.6 Approver verdict on batch 3c (2026-11-05): APPROVED WITH CHANGES
 
 12 files under board, cycle, documents, initiatives, kpis, spaces and tasks. The other 24 files of the batch need no change: kit buttons inside `ActionForm` or a function-action form already spin on their own (`check-in/*`, most of `cycle/*`, `inbox`, `review/*`, `kpis/trees`, `spaces` forms), `method="get"` search and switcher forms are navigation, and `kpis/grid` cells keep their typed value while they save (Q6, shell bar only).
 
@@ -211,7 +211,7 @@ Follow-ups, not changed: `search/export-button` and `review/nudge-provenance` ra
 
 Specs to run: `s27-board`, `s29-documents`, `s34b-space-holidays`, `s09-drafting-assists`.
 
-### 9.7 Opus approver verdict on batches 3d and 3e (2026-11-05): APPROVED WITH CHANGES
+### 9.7 Approver verdict on batches 3d and 3e (2026-11-05): APPROVED WITH CHANGES
 
 3d is split in two commits and 3e is one: 3d-1 is `(auth)`, `account`, `setup` and `welcome`; 3d-2 is `people` and `operator`; 3e is the shared pieces. Of the 35 files in 3d, 17 change. Kit buttons in function-action forms (all of `join`, most of `account`, `people/[id]/profile-form`, `lifecycle-controls`) already spin and need nothing. `oauth/authorize/consent-form` is a native POST to a route, works without JavaScript and is security-sensitive, so it is left alone and the browser's own loading state covers it. `method="get"` forms (`account/device/code-entry`, `people/page`) are navigation. Error boundaries only redraw in the browser, except `lib/section-boundary` which reads from the server.
 
@@ -223,9 +223,9 @@ Specs: 3d-1 `s34-onboarding`, `s36g-second-factor-policy`, `first-run-wizard`, `
 
 Pre-existing hard-coded English, not touched: `account/security/security-settings.tsx` (lines about 109 to 172) and `goals/[id]/coach-strip.tsx` (lines 87 and 93).
 
-### 9.8 Opus approver verdict on the follow-ups (2026-11-05): APPROVED WITH CHANGES
+### 9.8 Approver verdict on the follow-ups (2026-11-05): APPROVED WITH CHANGES
 
-The owner asked Opus to decide which of the recorded follow-ups need fixing.
+The owner asked the reviewer to decide which of the recorded follow-ups need fixing.
 
 | Item | Decision | Reason |
 |---|---|---|
@@ -238,9 +238,9 @@ The owner asked Opus to decide which of the recorded follow-ups need fixing.
 
 Strings moved to `en.json` and `ms.json` (28 keys, inserted in place, nothing re-sorted): account security (5), coach strip (2), filter assist (1), drafting assists (3), capacity (4 plural keys), space membership (3 keys replace one that carried a raw role id and a leading space), operator lifecycle (3), session diagnostic, digest and recognition (6), and `session.detail.someoneNoLongerHere`. One visible wording change is approved: "as manager" became "as a manager", and the role now comes from the catalogue and the terms rather than the raw id. Left out on purpose: the server's own `error.message` pass-through, `acting` keys, `data-testid` and option values, the assists `"; "` joiner, and AI-written reasons.
 
-### 9.9 Opus audit of the finished work (2026-11-05): PASS WITH FINDINGS
+### 9.9 Audit of the finished work (2026-11-05): PASS WITH FINDINGS
 
-An independent Opus audit read the 12 commits and found no blocker. Fixed afterwards (one commit, then the commit messages were reworded because six of them named a model, against the repo's attribution rule):
+An independent audit read the 12 commits and found no blocker. Fixed afterwards (one commit, then the commit messages were reworded because six of them named a model, against the repo's attribution rule):
 
 | # | Finding | Fix |
 |---|---|---|
