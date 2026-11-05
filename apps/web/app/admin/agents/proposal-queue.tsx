@@ -91,6 +91,8 @@ export function ProposalQueue({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the work in flight, so only that one spins.
+  const [acting, setActing] = useState<"apply" | "dismiss" | null>(null);
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
   const [outcome, setOutcome] = useState<string | null>(null);
   const [refusals, setRefusals] = useState<
@@ -110,7 +112,8 @@ export function ProposalQueue({
   }, []);
 
   const run = useCallback(
-    (task: () => Promise<string>) => {
+    (name: "apply" | "dismiss", task: () => Promise<string>) => {
+      setActing(name);
       setOutcome(null);
       setRefusals([]);
       startTransition(async () => {
@@ -198,8 +201,9 @@ export function ProposalQueue({
               <Button
                 variant="primary"
                 disabled={pending || ids.length === 0}
+                pending={pending && acting === "apply"}
                 onClick={() =>
-                  run(async () => {
+                  run("apply", async () => {
                     const result = await applyProposalsAction(ids);
                     setRefusals(result.failed);
                     return t("admin.agents.proposalQueue.appliedOf", {
@@ -215,8 +219,9 @@ export function ProposalQueue({
               </Button>
               <Button
                 disabled={pending || ids.length === 0}
+                pending={pending && acting === "dismiss"}
                 onClick={() =>
-                  run(async () => {
+                  run("dismiss", async () => {
                     const result = await dismissProposalsAction(ids);
                     return t("admin.agents.proposalQueue.dismissedCount", {
                       dismissed: result.dismissed,

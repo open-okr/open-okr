@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Button } from "../src/components/button.tsx";
+import { Spinner } from "../src/components/spinner.tsx";
 import { SubmitButton } from "../src/components/submit-button.tsx";
 
 /**
@@ -253,5 +254,22 @@ describe("A button refused while the server answers", () => {
       fireEvent.click(screen.getByRole("button", { name: "Go" }));
     });
     expect(clicks).toBe(1);
+  });
+});
+
+describe("Spinner", () => {
+  it("waits 200 ms like the bar, so a fast save shows nothing", async () => {
+    const { unmount } = render(<Spinner />);
+    expect(screen.queryByTestId("pending-spinner")).toBeNull();
+    await wait(250);
+    expect(screen.queryByTestId("pending-spinner")).not.toBeNull();
+    unmount();
+  });
+
+  it("never shows when it is removed within the wait", async () => {
+    const { unmount } = render(<Spinner />);
+    unmount();
+    await wait(250);
+    expect(screen.queryByTestId("pending-spinner")).toBeNull();
   });
 });

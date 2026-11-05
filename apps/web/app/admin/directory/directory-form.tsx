@@ -89,7 +89,7 @@ export function DirectoryTokenForm() {
           <Button
             type="button"
             variant="primary"
-            disabled={pending}
+            pending={pending}
             onClick={generate}
           >
             {pending

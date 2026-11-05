@@ -161,3 +161,30 @@ Whichever is chosen, **the button spinner must wait 200 ms like the bar** (one r
 1. Owner chooses option A or B in 9.0.
 2. If A: amend UIUX-PLAN §4, add the 200 ms delay and its test, split `SubmitButton` (Q2), check focus (9.2). One change, one commit.
 3. Batch 3a with the corrected table: Q10 confirmed, Q11 and Q12 rows added, Q13 uses `SubmitButton bare`, D3 noted for 3e.
+
+### 9.4 Opus approver verdict on batch 3a (2026-11-05): APPROVED WITH CHANGES
+
+Applied by the implementer. Corrections to the section 5 table, each checked by the approver against the code at `de99bc9e`:
+
+| File | Correction |
+|---|---|
+| `roles/member-roles.tsx:68-69` | Inline control. Per-member `savingId`; wrap picker and spinner in a `span flex items-center gap-1.5` |
+| `nudges/rule-cards.tsx` | Drop `:169` (local state only). `Rule` has four controls on one `pending` with keys `toggle`, `channel`, `quiet`, `ladder`; `LadderEditor` gets a `saving` prop. `:389` quiet mode is B |
+| `roles/role-matrix.tsx` | Cell `SelectInput` is inline, key `${role.id}:${domain}`. Delete and create are C with keys `delete:${id}` and `create` |
+| `sso/connection-controls.tsx` | Only the switch (`:139`) and confirm (`:193`) write. The other three only open or close |
+| `imports/wizard.tsx` | B on each of Read, Preview, Import (different steps) |
+| `audit/audit-log.tsx:275` | Missing: "Older" reads from the server. `pending={state.busy === "append"}` |
+| `branding/*` | Multi-button: `acting` read from `submitter.value` in `studio.submit`, passed to the settings form |
+| `practice/practice-form.tsx` | Pattern A, not E (`action={submit}`, `onSubmit` never prevents default). ResetCard (raw, label) left unchanged |
+| `plan/plan-form.tsx` | Pattern R (raw button, no label, `preventDefault`): `aria-disabled`, `aria-busy`, `guardPress`, delayed spinner |
+| `invitations/invite-form.tsx` | `SubmitButton bare` with the same classes plus an `aria-disabled:` twin |
+| `invitations/revoke-button.tsx` | `start(async () => { await revokeLinkAction(linkId); })`, so the wait lasts |
+| `support/grant-decision.tsx` | `SubmitButton bare`, same classes, `name`, `value` |
+
+Rules added: a standalone `Spinner` waits 200 ms too (done inside `Spinner`, so every caller gets it). A kit `Button` whose label already changes uses `pending={pending}` in place of `disabled={pending}` (pattern G). Bare and raw buttons get an `aria-disabled:` twin of every `disabled:` class.
+
+Q14 (cadence): the owner delegated approval to the Opus approver on 2026-11-05. Decision: the next batch may start without waiting on its table when every row uses a known pattern (A to G, R) and an Opus review has signed it off. Each batch still ends with the owner looking in the browser, and one commit after "ok". Stop and ask on: a new pattern, a handler or text change, a class or element change beyond the `aria-disabled:` twin and the spinner wrapper, a file that does not match its table, a failing gate nobody understands.
+
+Specs to run after 3a: `e2e/s36d-nudge-rules.spec.ts` and `e2e/s36l-branding.spec.ts` (`pnpm build && pnpm test:e2e <files>`).
+
+Follow-up list for 3e: the four Change 2 spinners are covered by the `Spinner` change; coach-strip "Suggest a fix"; raw `ResetCard` buttons (`practice-form:320`, `rhythm-form:509`) keep `disabled` and can lose focus.

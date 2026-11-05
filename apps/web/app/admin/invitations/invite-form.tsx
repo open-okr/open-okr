@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { SubmitButton, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import type { InviteResult } from "./actions";
 
@@ -44,13 +44,12 @@ export function InviteForm({
       aria-busy={pending}
     >
       {children}
-      <button
-        type="submit"
-        disabled={pending}
-        className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60"
+      <SubmitButton
+        bare
+        className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60 aria-disabled:opacity-60"
       >
         {pending ? t("admin.invitations.inviteForm.working") : submitLabel}
-      </button>
+      </SubmitButton>
 
       {state?.link ? (
         <div className="flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">

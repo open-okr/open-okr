@@ -420,7 +420,7 @@ export function SSOForm({
       )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" pending={pending}>
           {pending
             ? t("admin.sso.ssoForm.saving")
             : editing

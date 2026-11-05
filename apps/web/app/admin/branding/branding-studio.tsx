@@ -124,6 +124,9 @@ function StudioBody({
     : initials;
   // Bumped by Discard, so the two picture sections forget their files.
   const [discarded, setDiscarded] = useState(0);
+  // Which button sent the form (Save or Reset to defaults), so only that one
+  // spins. Read from the submitter: this form handles `onSubmit` itself.
+  const [acting, setActing] = useState<string | null>(null);
 
   const mirror = mirrorOf(
     { stored: status.stored, fill: status.fill, logoUrl, faviconUrl },
@@ -136,6 +139,7 @@ function StudioBody({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    setActing(submitter instanceof HTMLButtonElement ? submitter.value : null);
     const data = new FormData(event.currentTarget, submitter);
     onRemoval(null);
     startTransition(() => formAction(data));
@@ -189,6 +193,7 @@ function StudioBody({
               <BrandingSettingsForm
                 status={status}
                 disabled={pending}
+                resetting={pending && acting === "reset"}
                 onColourChange={setColour}
               />
             </div>
@@ -277,6 +282,7 @@ function StudioBody({
             variant="primary"
             size="sm"
             disabled={pending}
+            pending={pending && acting === "save"}
           >
             {pending
               ? t("admin.branding.images.saving")

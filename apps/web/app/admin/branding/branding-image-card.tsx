@@ -249,7 +249,8 @@ export function BrandingImageCard({
           <Button
             type="button"
             size="sm"
-            disabled={busy}
+            disabled={disabled}
+            pending={removing}
             onClick={() =>
               startRemoving(async () => {
                 onRemoval?.(await removeBrandingImage(slot));

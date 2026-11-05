@@ -8,6 +8,7 @@ import {
   Chip,
   NumberInput,
   SelectInput,
+  Spinner,
   useTranslations,
 } from "@openokr/ui";
 import { useState, useTransition } from "react";
@@ -93,10 +94,13 @@ const RUNG_LABEL: Readonly<Record<string, string>> = {
 function LadderEditor({
   rule,
   pending,
+  saving,
   onSave,
 }: {
   readonly rule: RuleRow;
   readonly pending: boolean;
+  /** The ladder itself is what is being saved, so its button spins. */
+  readonly saving: boolean;
   readonly onSave: (ladder: Record<string, number> | null) => void;
 }) {
   const { t } = useTranslations();
@@ -181,6 +185,7 @@ function LadderEditor({
           type="button"
           size="sm"
           disabled={pending || partial}
+          pending={saving}
           data-testid={`save-ladder-${rule.key}`}
           onClick={() =>
             onSave(
@@ -216,10 +221,17 @@ function Rule({
   const { t } = useTranslations();
 
   const [pending, start] = useTransition();
+  // Which control started the write in flight (toggle, channel, quiet, ladder),
+  // so only that one shows a spinner.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const change = (patch: Parameters<typeof setNudgeRuleAction>[0]) => {
+  const change = (
+    name: string,
+    patch: Parameters<typeof setNudgeRuleAction>[0],
+  ) => {
     setProblem(null);
+    setActing(name);
     start(async () => {
       const result = await setNudgeRuleAction(patch);
       setProblem(result.error);
@@ -277,8 +289,11 @@ function Rule({
           size="sm"
           variant={rule.enabled ? "default" : "primary"}
           disabled={pending}
+          pending={pending && acting === "toggle"}
           data-testid={`toggle-${rule.key}`}
-          onClick={() => change({ ruleKey: rule.key, enabled: !rule.enabled })}
+          onClick={() =>
+            change("toggle", { ruleKey: rule.key, enabled: !rule.enabled })
+          }
         >
           {rule.enabled
             ? t("admin.nudges.ruleCards.turnOff")
@@ -295,7 +310,7 @@ function Rule({
             value={rule.channelOverride ?? ""}
             disabled={pending}
             onChange={(event) =>
-              change({
+              change("channel", {
                 ruleKey: rule.key,
                 channelOverride:
                   event.target.value === ""
@@ -318,6 +333,7 @@ function Rule({
               </option>
             ))}
           </SelectInput>
+          {pending && acting === "channel" ? <Spinner /> : null}
         </span>
 
         <label className="flex items-center gap-1.5 text-xs text-ink-3">
@@ -326,22 +342,24 @@ function Rule({
             checked={rule.quietModeExempt}
             disabled={pending}
             onChange={(event) =>
-              change({
+              change("quiet", {
                 ruleKey: rule.key,
                 quietModeExempt: event.target.checked,
               })
             }
             className="size-3.5"
           />
-          {t("admin.nudges.ruleCards.speaksThroughQuietMode")}
+          <span>{t("admin.nudges.ruleCards.speaksThroughQuietMode")}</span>
+          {pending && acting === "quiet" ? <Spinner /> : null}
         </label>
       </div>
 
       <LadderEditor
         rule={rule}
         pending={pending}
+        saving={pending && acting === "ladder"}
         onSave={(ladder) =>
-          change({ ruleKey: rule.key, escalationLadder: ladder })
+          change("ladder", { ruleKey: rule.key, escalationLadder: ladder })
         }
       />
 
@@ -390,7 +408,7 @@ export function NudgeRuleCards({
             type="button"
             size="sm"
             variant={quietMode ? "primary" : "default"}
-            disabled={pending}
+            pending={pending}
             data-testid="quiet-mode"
             onClick={() => {
               setProblem(null);

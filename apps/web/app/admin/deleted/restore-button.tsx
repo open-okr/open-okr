@@ -47,7 +47,7 @@ export function RestoreButton({
       <Button
         type="button"
         size="sm"
-        disabled={pending}
+        pending={pending}
         aria-label={t("admin.deleted.restoreNamed", { title })}
         data-testid="restore-item"
         onClick={() =>

@@ -39,12 +39,15 @@ export function BrandingSettingsForm({
   status,
   error,
   disabled,
+  resetting,
   onColourChange,
 }: {
   status: BrandingStatus;
   /** Why the last save refused the colour, when it did. */
   error?: string | null;
   disabled?: boolean;
+  /** The reset itself is what is being sent, so its button spins. */
+  resetting?: boolean;
   /** A whole, accepted colour as it is typed or picked, for the mirror. */
   onColourChange?: (hex: string | null) => void;
 }) {
@@ -115,6 +118,7 @@ export function BrandingSettingsForm({
           value="reset"
           size="sm"
           disabled={disabled}
+          pending={resetting}
           // Reset whatever the box holds, a refused colour included.
           formNoValidate
         >

@@ -3,7 +3,7 @@ import {
   endSupportSession,
   grantSupportSession,
 } from "@openokr/core";
-import { SelectInput } from "@openokr/ui";
+import { SelectInput, SubmitButton } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getPool } from "../../../lib/pool";
@@ -130,22 +130,22 @@ export async function GrantDecision({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <button
-          className="rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong"
+        <SubmitButton
+          bare
+          className="rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong aria-disabled:opacity-60"
           name="answer"
-          type="submit"
           value="grant"
         >
-          {t("admin.support.grant.letThemIn")}
-        </button>
-        <button
-          className="rounded-md border border-line px-4 py-2 font-medium text-ink text-sm"
+          <span>{t("admin.support.grant.letThemIn")}</span>
+        </SubmitButton>
+        <SubmitButton
+          bare
+          className="rounded-md border border-line px-4 py-2 font-medium text-ink text-sm aria-disabled:opacity-60"
           name="answer"
-          type="submit"
           value="refuse"
         >
-          {t("admin.support.grant.no")}
-        </button>
+          <span>{t("admin.support.grant.no")}</span>
+        </SubmitButton>
       </div>
     </form>
   );

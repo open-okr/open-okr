@@ -99,7 +99,8 @@ export function ExportCard() {
             <Button
               variant="primary"
               onClick={handleExport}
-              disabled={pending || passphrase.length < 12}
+              disabled={passphrase.length < 12}
+              pending={pending}
             >
               {pending
                 ? t("admin.imports.exportCard.exporting")

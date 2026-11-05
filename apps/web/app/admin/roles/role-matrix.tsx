@@ -1,7 +1,13 @@
 "use client";
 
 import type { RoleDomain } from "@openokr/db";
-import { Button, SelectInput, TextInput, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  SelectInput,
+  Spinner,
+  TextInput,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
@@ -83,9 +89,13 @@ export function RoleMatrix({
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   const [confirming, setConfirming] = useState<string | null>(null);
+  // What started the write in flight (a cell, a delete, the new role), so only
+  // that control shows a spinner.
+  const [acting, setActing] = useState<string | null>(null);
 
-  const run = (work: () => Promise<{ error: string | null }>) => {
+  const run = (name: string, work: () => Promise<{ error: string | null }>) => {
     setProblem(null);
+    setActing(name);
     start(async () => {
       const result = await work();
       if (result.error) {
@@ -170,33 +180,38 @@ export function RoleMatrix({
                   return (
                     <td key={domain} className="px-2 py-2.5">
                       {role.editable ? (
-                        <SelectInput
-                          label={label}
-                          hideLabel
-                          value={level}
-                          disabled={pending}
-                          onChange={(event) =>
-                            run(() =>
-                              setPermissionAction({
-                                roleId: role.id,
-                                domain,
-                                level: Number(event.target.value) as
-                                  | 0
-                                  | 10
-                                  | 40
-                                  | 70
-                                  | 100,
-                              }),
-                            )
-                          }
-                          inputClassName="h-7 px-1.5 text-xs"
-                        >
-                          {LEVELS.map((entry) => (
-                            <option key={entry.value} value={entry.value}>
-                              {t(entry.key)}
-                            </option>
-                          ))}
-                        </SelectInput>
+                        <span className="flex items-center gap-1.5">
+                          <SelectInput
+                            label={label}
+                            hideLabel
+                            value={level}
+                            disabled={pending}
+                            onChange={(event) =>
+                              run(`${role.id}:${domain}`, () =>
+                                setPermissionAction({
+                                  roleId: role.id,
+                                  domain,
+                                  level: Number(event.target.value) as
+                                    | 0
+                                    | 10
+                                    | 40
+                                    | 70
+                                    | 100,
+                                }),
+                              )
+                            }
+                            inputClassName="h-7 px-1.5 text-xs"
+                          >
+                            {LEVELS.map((entry) => (
+                              <option key={entry.value} value={entry.value}>
+                                {t(entry.key)}
+                              </option>
+                            ))}
+                          </SelectInput>
+                          {pending && acting === `${role.id}:${domain}` ? (
+                            <Spinner />
+                          ) : null}
+                        </span>
                       ) : (
                         <span className="text-xs text-ink-3">
                           {t(
@@ -217,8 +232,9 @@ export function RoleMatrix({
                           type="button"
                           size="sm"
                           disabled={pending}
+                          pending={pending && acting === `delete:${role.id}`}
                           onClick={() =>
-                            run(async () => {
+                            run(`delete:${role.id}`, async () => {
                               const result = await deleteRoleAction({
                                 id: role.id,
                               });
@@ -280,9 +296,10 @@ export function RoleMatrix({
           <Button
             type="button"
             variant="primary"
-            disabled={pending || name.trim() === ""}
+            disabled={name.trim() === "" || (pending && acting !== "create")}
+            pending={pending && acting === "create"}
             onClick={() =>
-              run(async () => {
+              run("create", async () => {
                 const result = await createRoleAction({ name: name.trim() });
                 if (!result.error) {
                   setName("");
