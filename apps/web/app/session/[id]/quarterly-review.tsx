@@ -88,6 +88,8 @@ export function QuarterlyReview({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState<unknown>(note);
   const [now, setNow] = useState(() => Date.now());
@@ -117,8 +119,9 @@ export function QuarterlyReview({
   }
 
   const run = useCallback(
-    (work: () => Promise<unknown>) => {
+    (name: string, work: () => Promise<unknown>) => {
       setProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await work();
@@ -194,7 +197,8 @@ export function QuarterlyReview({
                 type="button"
                 size="sm"
                 disabled={pending}
-                onClick={() => run(() => addMinuteAction(sessionId))}
+                pending={pending && acting === "minute"}
+                onClick={() => run("minute", () => addMinuteAction(sessionId))}
               >
                 {t("session.detail.quarterlyReview.1Min")}
               </Button>
@@ -350,8 +354,11 @@ export function QuarterlyReview({
                   <Button
                     type="button"
                     disabled={pending}
+                    pending={pending && acting === "note"}
                     onClick={() =>
-                      run(() => setStageNoteAction(sessionId, noteDraft))
+                      run("note", () =>
+                        setStageNoteAction(sessionId, noteDraft),
+                      )
                     }
                   >
                     {t("common.saveTheNote")}

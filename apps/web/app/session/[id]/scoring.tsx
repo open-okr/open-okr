@@ -284,7 +284,7 @@ function ScoreRow({
             maxLength={500}
           />
           <span>
-            <Button type="button" size="sm" disabled={pending} onClick={save}>
+            <Button type="button" size="sm" pending={pending} onClick={save}>
               {keyResult.score === null
                 ? t("session.detail.scoring.saveTheGrade")
                 : t("session.detail.changeIt")}
@@ -361,7 +361,7 @@ function Reveal({
           : t("session.detail.scoring.scoreStaysHidden")}
       </span>
       {canReveal && objective.scored > 0 ? (
-        <Button type="button" size="sm" disabled={pending} onClick={reveal}>
+        <Button type="button" size="sm" pending={pending} onClick={reveal}>
           {t("session.detail.scoring.revealTheScore")}
         </Button>
       ) : null}

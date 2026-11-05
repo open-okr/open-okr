@@ -174,7 +174,7 @@ function ObjectiveRow({
             maxLength={1000}
           />
           <span>
-            <Button type="button" size="sm" disabled={pending} onClick={save}>
+            <Button type="button" size="sm" pending={pending} onClick={save}>
               {objective.decision === null
                 ? t("session.detail.reset.closeItDeliberately")
                 : t("session.detail.reset.changeTheDecision")}

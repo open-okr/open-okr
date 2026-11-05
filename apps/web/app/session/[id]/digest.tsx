@@ -71,7 +71,7 @@ function PostToChannel({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          disabled={pending}
+          pending={pending}
           data-testid="post-digest"
           onClick={() => {
             setSaid(null);
@@ -187,7 +187,7 @@ export function Digest({
           })}
         </span>
         {assistAvailable ? (
-          <Button variant="ai" disabled={busy} onClick={() => void narrate()}>
+          <Button variant="ai" pending={busy} onClick={() => void narrate()}>
             <Sparkles className="size-3" />
             {t("session.detail.digest.narrateIt")}
           </Button>

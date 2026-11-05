@@ -166,7 +166,7 @@ export function RecognitionPanel({
               <Button
                 type="button"
                 size="sm"
-                disabled={pending}
+                pending={pending}
                 onClick={submit}
               >
                 {t("common.nameIt")}

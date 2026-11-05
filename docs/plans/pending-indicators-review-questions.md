@@ -188,3 +188,15 @@ Q14 (cadence): the owner delegated approval to the Opus approver on 2026-11-05. 
 Specs to run after 3a: `e2e/s36d-nudge-rules.spec.ts` and `e2e/s36l-branding.spec.ts` (`pnpm build && pnpm test:e2e <files>`).
 
 Follow-up list for 3e: the four Change 2 spinners are covered by the `Spinner` change; coach-strip "Suggest a fix"; raw `ResetCard` buttons (`practice-form:320`, `rhythm-form:509`) keep `disabled` and can lose focus.
+
+### 9.5 Opus approver verdict on batch 3b (2026-11-05): APPROVED WITH CHANGES
+
+`session/[id]/**` and `sessions/**`, 24 files, 44 controls. Ten files need no change (`page.tsx`, `advance-control`, `blocker-panel`, `commitments`, `coordinator-note`, `next-actions`, `confidence-dial`, `session-live`, `minutes/page`, `sessions/page`): their forms use a function action, so the kit button spins on its own and ignores `disabled={pending}` while sending.
+
+Applied: pattern C (an `acting` key per button) in `confidence-round`, `forward`, `monthly-review`, `narratives`, `process-health`, `quarterly-review`, `root-cause` and team-retro `NoteRow`, with the local `run(work)` becoming `run(name, work)`; pattern B or G (`pending={pending}`) in `diagnostic`, `digest`, `management-retro`, `minutes-write-up`, `recognition`, `reset`, `room-pulse`, `scoring` and the team-retro add, cluster; pattern F (`SubmitButton bare`) for the two raw buttons in `sessions/schedule.tsx`. `root-cause`'s detail field uses the `TextInput` `trailing` slot for its spinner.
+
+Decision on a shared helper for 3c to 3e: none. Repeat the `acting` state per file (one `useState`, one `setActing`); handlers differ too much, and a wrapper would mean rewriting call sites, against "same handlers". A consolidation is a separate refactor, offered after 3e.
+
+Left as is and listed for the owner: separate forms on one screen do not refuse each other (Start and Skip in `session/[id]/page.tsx`, Resolve and Reassign in `blocker-panel`), because each form has its own status. Pre-existing and outside this change: hard-coded English strings such as "That did not save." in `diagnostic`, `digest`, `recognition`, `root-cause` and `process-health.tsx:257`, against the translation rule.
+
+Specs to run: `s22b-digest-channel-post`, `s23-monthly-moves`, `s26-session-entry`, `reviews`.

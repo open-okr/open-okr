@@ -82,10 +82,13 @@ function NoteRow({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
 
   const run = useCallback(
-    (work: () => Promise<unknown>) => {
+    (name: string, work: () => Promise<unknown>) => {
       onProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await work();
@@ -123,7 +126,10 @@ function NoteRow({
             type="button"
             size="sm"
             disabled={pending || !canSpend}
-            onClick={() => run(() => castRetroVoteAction(sessionId, note.id))}
+            pending={pending && acting === "vote"}
+            onClick={() =>
+              run("vote", () => castRetroVoteAction(sessionId, note.id))
+            }
           >
             {note.mine
               ? t("session.detail.teamRetro.takeMyDotBack")
@@ -135,7 +141,10 @@ function NoteRow({
           size="sm"
           variant="ghost"
           disabled={pending}
-          onClick={() => run(() => removeRetroNoteAction(sessionId, note.id))}
+          pending={pending && acting === "remove"}
+          onClick={() =>
+            run("remove", () => removeRetroNoteAction(sessionId, note.id))
+          }
         >
           {t("common.remove")}
         </Button>
@@ -241,7 +250,7 @@ function Column({
             maxLength={500}
           />
           <span className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" disabled={pending} onClick={add}>
+            <Button type="button" size="sm" pending={pending} onClick={add}>
               {t("session.detail.teamRetro.addIt")}
             </Button>
             <label className="flex items-center gap-1.5 text-xs text-ink-3">
@@ -382,7 +391,7 @@ export function TeamRetroPanel({
             <Button
               type="button"
               variant="ai"
-              disabled={clustering}
+              pending={clustering}
               onClick={() => void cluster()}
             >
               {t("session.detail.teamRetro.findTheThemes")}

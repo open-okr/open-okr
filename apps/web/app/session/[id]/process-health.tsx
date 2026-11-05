@@ -68,6 +68,8 @@ export function ProcessHealthPanel({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [chosen, setChosen] = useState<readonly (number | null)[]>(
     health.statements.map((entry) => entry.mine),
@@ -79,6 +81,7 @@ export function ProcessHealthPanel({
       setProblem(t("session.detail.processHealth.allFiveTogether"));
       return;
     }
+    setActing("submit");
     startTransition(async () => {
       try {
         await submitProcessHealthAction(sessionId, chosen as number[]);
@@ -177,7 +180,13 @@ export function ProcessHealthPanel({
 
         {canAnswer ? (
           <span>
-            <Button type="button" size="sm" disabled={pending} onClick={submit}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={pending}
+              pending={pending && acting === "submit"}
+              onClick={submit}
+            >
               {health.submitted
                 ? t("session.detail.processHealth.changeMyAnswers")
                 : t("session.detail.processHealth.submitAnonymously")}
@@ -236,12 +245,14 @@ export function ProcessHealthPanel({
                   type="button"
                   size="sm"
                   disabled={pending || actionOwner === "" || actionDue === ""}
+                  pending={pending && acting === "action"}
                   onClick={() => {
                     const lowest = health.lowest;
                     if (!lowest) {
                       return;
                     }
                     setProblem(null);
+                    setActing("action");
                     startTransition(async () => {
                       try {
                         await addActionAction(

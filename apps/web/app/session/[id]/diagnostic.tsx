@@ -208,7 +208,7 @@ export function DiagnosticPanel({
                   type="button"
                   size="sm"
                   variant="ai"
-                  disabled={narrating}
+                  pending={narrating}
                   onClick={() => void narrate()}
                 >
                   {t("session.detail.diagnostic.addTheSpecifics")}
@@ -233,7 +233,7 @@ export function DiagnosticPanel({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={pending}
+                  pending={pending}
                   onClick={read}
                 >
                   {t("session.detail.diagnostic.readTheDiagnostic")}
@@ -255,7 +255,7 @@ export function DiagnosticPanel({
 
         {diagnostic.recorded && canRead ? (
           <span>
-            <Button type="button" size="sm" disabled={pending} onClick={read}>
+            <Button type="button" size="sm" pending={pending} onClick={read}>
               {t("session.detail.diagnostic.readItAgain")}
             </Button>
           </span>

@@ -154,7 +154,7 @@ function QuestionRow({
             onUpdate={setBody}
           />
           <span className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" disabled={pending} onClick={save}>
+            <Button type="button" size="sm" pending={pending} onClick={save}>
               {t("session.detail.managementRetro.saveTheAnswer")}
             </Button>
             <Button

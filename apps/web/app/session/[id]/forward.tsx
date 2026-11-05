@@ -96,6 +96,8 @@ export function ForwardPanel({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const [learning, setLearning] = useState("");
@@ -105,8 +107,9 @@ export function ForwardPanel({
   const [dueOn, setDueOn] = useState("");
 
   const run = useCallback(
-    (work: () => Promise<unknown>) => {
+    (name: string, work: () => Promise<unknown>) => {
       setProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await work();
@@ -204,8 +207,9 @@ export function ForwardPanel({
                       type="button"
                       size="sm"
                       disabled={pending}
+                      pending={pending && acting === `promote:${note.noteId}`}
                       onClick={() =>
-                        run(() =>
+                        run(`promote:${note.noteId}`, () =>
                           captureLearningAction(
                             sessionId,
                             t("session.detail.forward.weLearnedThatNote", {
@@ -241,6 +245,7 @@ export function ForwardPanel({
                   type="button"
                   size="sm"
                   disabled={pending}
+                  pending={pending && acting === "capture"}
                   onClick={() => {
                     if (learning.trim().length === 0) {
                       setProblem(
@@ -248,7 +253,7 @@ export function ForwardPanel({
                       );
                       return;
                     }
-                    run(async () => {
+                    run("capture", async () => {
                       await captureLearningAction(
                         sessionId,
                         learning.trim(),
@@ -327,8 +332,9 @@ export function ForwardPanel({
                       size="sm"
                       variant={action.done ? "ghost" : "default"}
                       disabled={pending}
+                      pending={pending && acting === `complete:${action.id}`}
                       onClick={() =>
-                        run(() =>
+                        run(`complete:${action.id}`, () =>
                           completeActionAction(
                             sessionId,
                             action.id,
@@ -392,6 +398,7 @@ export function ForwardPanel({
                   type="button"
                   size="sm"
                   disabled={pending}
+                  pending={pending && acting === "agree"}
                   onClick={() => {
                     if (what.trim().length === 0) {
                       setProblem(t("session.detail.forward.sayWhatHappens"));
@@ -403,7 +410,7 @@ export function ForwardPanel({
                       );
                       return;
                     }
-                    run(async () => {
+                    run("agree", async () => {
                       await addActionAction(
                         sessionId,
                         what.trim(),

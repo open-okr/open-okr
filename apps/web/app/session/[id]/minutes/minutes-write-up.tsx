@@ -60,7 +60,7 @@ export function MinutesWriteUp({
           variant="ai"
           size="sm"
           className="self-start"
-          disabled={pending}
+          pending={pending}
           onClick={() => {
             setNotice(null);
             start(async () => {
@@ -104,7 +104,8 @@ export function MinutesWriteUp({
               type="button"
               variant="primary"
               size="sm"
-              disabled={pending || isBlankDocument(written)}
+              disabled={isBlankDocument(written)}
+              pending={pending}
               onClick={() => {
                 setNotice(null);
                 start(async () => {
