@@ -1,11 +1,11 @@
 "use client";
 
-import { Field } from "@base-ui-components/react/field";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
+import { DateInput } from "./date-input.tsx";
 import { useFormReset } from "./form-reset.ts";
-import { FIELD_CONTROL_CLASS } from "./text-input.tsx";
+import { TimeInput } from "./time-input.tsx";
 
 export interface DateTimeInputProps {
   readonly label: string;
@@ -34,12 +34,21 @@ export interface DateTimeInputProps {
   readonly className?: string;
 }
 
+interface DateTimeParts {
+  readonly date: string;
+  readonly time: string;
+}
+
+const split = (value: string | null | undefined): DateTimeParts => {
+  const [date = "", time = ""] = (value ?? "").split("T");
+  return { date, time };
+};
+const combine = ({ date, time }: DateTimeParts): string =>
+  date && time ? `${date}T${time}` : "";
+
 /**
- * A date and a time (docs/design/guided-inputs.md §4.9): the browser's own
- * `datetime-local` control, which has no zone of its own, with the zone it
- * is read in said beside it. "09:00" means nothing until somebody says
- * where, and a server that guessed read it in its own zone, which is UTC in a
- * container and is nobody's.
+ * The shared date picker plus a time field. The form still posts one local
+ * datetime, without an offset; the zone beside the pair says how to read it.
  */
 export function DateTimeInput({
   label,
@@ -57,10 +66,33 @@ export function DateTimeInput({
   className,
 }: DateTimeInputProps) {
   const { t } = useTranslations();
-  const [own, setOwn] = useState(defaultValue ?? "");
-  const current = value !== undefined ? (value ?? "") : own;
-  const wrapper = useRef<HTMLDivElement>(null);
-  useFormReset(wrapper, () => setOwn(defaultValue ?? ""));
+  const zoneId = useId();
+  const [own, setOwn] = useState(() => split(defaultValue));
+  // A controlled empty value cannot carry a half-completed date/time. Keep
+  // that draft until both parts are available, while complete values remain
+  // controlled by the caller. External nonempty values take precedence.
+  const [partial, setPartial] = useState<DateTimeParts | null>(null);
+  useEffect(() => {
+    if (value) {
+      setPartial(null);
+    }
+  }, [value]);
+  const current =
+    value === undefined ? own : value ? split(value) : (partial ?? split(""));
+  const combined = combine(current);
+  const wrapper = useRef<HTMLFieldSetElement>(null);
+  useFormReset(wrapper, () => {
+    setOwn(split(defaultValue));
+    setPartial(null);
+  });
+  const change = (next: DateTimeParts) => {
+    const nextValue = combine(next);
+    if (value === undefined) {
+      setOwn(next);
+    }
+    setPartial(nextValue === "" ? next : null);
+    onValueChange?.(nextValue === "" ? null : nextValue);
+  };
 
   // Read after mounting: the server rendering this has no browser to ask.
   const [device, setDevice] = useState<string | null>(null);
@@ -70,42 +102,59 @@ export function DateTimeInput({
     }
   }, [timeZone]);
   const zone = timeZone ?? device;
+  const lower = split(min);
+  const upper = split(max);
 
   return (
-    <Field.Root
+    <fieldset
       ref={wrapper}
-      name={name}
       disabled={disabled}
-      className={cn("flex flex-col gap-1", className)}
+      aria-describedby={zone ? zoneId : undefined}
+      className={cn("flex min-w-0 flex-col gap-1", className)}
     >
-      <Field.Label className="text-sm font-medium text-ink-2">
-        {label}
-      </Field.Label>
-      <Field.Control
-        id={id}
-        type="datetime-local"
-        name={name}
-        value={current}
-        min={min}
-        max={max}
-        required={required}
-        onChange={(event) => {
-          const next = event.currentTarget.value;
-          if (value === undefined) {
-            setOwn(next);
+      <legend className="mb-1 text-sm font-medium text-ink-2">{label}</legend>
+      <div className="flex flex-wrap items-start gap-2.5">
+        <DateInput
+          id={id}
+          label={t("fields.dateTime.date", { label })}
+          hideLabel
+          value={current.date}
+          min={lower.date || undefined}
+          max={upper.date || undefined}
+          required={required || current.time !== ""}
+          disabled={disabled}
+          onValueChange={(date) => change({ ...current, date: date ?? "" })}
+        />
+        <TimeInput
+          id={id ? `${id}-time` : undefined}
+          label={t("fields.dateTime.time", { label })}
+          hideLabel
+          value={current.time}
+          min={
+            current.date === lower.date ? lower.time || undefined : undefined
           }
-          onValueChange?.(next === "" ? null : next);
-        }}
-        className={cn(FIELD_CONTROL_CLASS, "w-auto tabular-nums")}
-      />
+          max={
+            current.date === upper.date ? upper.time || undefined : undefined
+          }
+          required={required || current.date !== ""}
+          disabled={disabled}
+          onValueChange={(time) => change({ ...current, time: time ?? "" })}
+        />
+      </div>
+      <input type="hidden" name={name} value={combined} disabled={disabled} />
       {zone ? (
-        <Field.Description className="text-xs text-ink-3">
+        <p id={zoneId} className="text-xs text-ink-3">
           {t("fields.dateTime.inZone", { zone })}
-        </Field.Description>
+        </p>
       ) : null}
       {zoneName ? (
-        <input type="hidden" name={zoneName} value={zone ?? ""} />
+        <input
+          type="hidden"
+          name={zoneName}
+          value={zone ?? ""}
+          disabled={disabled}
+        />
       ) : null}
-    </Field.Root>
+    </fieldset>
   );
 }

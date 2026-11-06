@@ -2014,6 +2014,8 @@
   "fields.counter": "{used} of {max} characters",
   "fields.counterOver": "{used} of {max} characters. Take out {over} to save it.",
   "fields.dateRange.endBeforeStart": "Ends before it starts. Pick a date on or after {start}.",
+  "fields.dateTime.date": "{label}: date",
+  "fields.dateTime.time": "{label}: time",
   "fields.dateTime.inZone": "In {zone} time.",
   "fields.email.invalid": "Check the address. It needs a name, an @ and a domain, like priya@northwind.example.",
   "fields.identifier.oneWord": "An id is one word, with no spaces. Copy it as the other system shows it.",
