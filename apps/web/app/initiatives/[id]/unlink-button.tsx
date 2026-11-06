@@ -1,6 +1,6 @@
 "use client";
 
-import { useTranslations } from "@openokr/ui";
+import { guardPress, Spinner, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../../cycle/write-state.ts";
 
@@ -26,12 +26,15 @@ export function UnlinkButton({
 
   return (
     <span className="flex flex-col items-end gap-1">
+      {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+       * keyboard focus while the unlink is sent; see `guardPress`. */}
       <button
         type="button"
         aria-label={label}
-        disabled={pending}
-        className="rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:border-bad hover:text-bad disabled:text-ink-4"
-        onClick={() => {
+        aria-disabled={pending || undefined}
+        aria-busy={pending || undefined}
+        className="inline-flex items-center gap-1.5 rounded-md border border-line px-2 py-1 text-xs text-ink-2 hover:border-bad hover:text-bad disabled:text-ink-4 aria-disabled:text-ink-4"
+        onClick={guardPress(pending, () => {
           setError(null);
           startTransition(async () => {
             const state = await onUnlink();
@@ -39,9 +42,10 @@ export function UnlinkButton({
               setError(state.error);
             }
           });
-        }}
+        })}
       >
-        {t("common.unlink")}
+        {pending ? <Spinner /> : null}
+        <span>{t("common.unlink")}</span>
       </button>
       {error ? (
         <span role="alert" className="text-xs text-bad">

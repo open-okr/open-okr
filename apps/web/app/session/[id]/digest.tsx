@@ -71,7 +71,7 @@ function PostToChannel({
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          disabled={pending}
+          pending={pending}
           data-testid="post-digest"
           onClick={() => {
             setSaid(null);
@@ -156,14 +156,14 @@ export function Digest({
       if (!result) {
         // Either the model declined or it stated a figure the product did not
         // compute. Both end here, and the lines below are unaffected.
-        setNotice("No narration this time. The digest below is the digest.");
+        setNotice(t("session.detail.digest.noNarration"));
       }
     } catch {
-      setNotice("The assist could not run. The digest below is unaffected.");
+      setNotice(t("session.detail.digest.assistCouldNotRun"));
     } finally {
       setBusy(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   if (!digest) {
     return (
@@ -187,7 +187,7 @@ export function Digest({
           })}
         </span>
         {assistAvailable ? (
-          <Button variant="ai" disabled={busy} onClick={() => void narrate()}>
+          <Button variant="ai" pending={busy} onClick={() => void narrate()}>
             <Sparkles className="size-3" />
             {t("session.detail.digest.narrateIt")}
           </Button>

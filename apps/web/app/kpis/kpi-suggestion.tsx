@@ -120,7 +120,8 @@ export function KpiSuggestion() {
             variant="ai"
             size="sm"
             className="self-start"
-            disabled={pending || sentence.trim() === ""}
+            disabled={sentence.trim() === ""}
+            pending={pending}
             onClick={() => {
               setNotice(null);
               start(async () => {
@@ -266,7 +267,8 @@ export function KpiSuggestion() {
               type="button"
               variant="primary"
               size="sm"
-              disabled={pending || editing.title.trim() === ""}
+              disabled={editing.title.trim() === ""}
+              pending={pending}
               onClick={() => {
                 setNotice(null);
                 start(async () => {

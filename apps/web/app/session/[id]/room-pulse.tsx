@@ -139,7 +139,7 @@ export function RoomPulsePanel({
           />
           {canGive ? (
             <span className="flex flex-wrap items-center gap-2">
-              <Button type="button" disabled={pending} onClick={submit}>
+              <Button type="button" pending={pending} onClick={submit}>
                 {pulse.mine.pulse === null
                   ? t("session.detail.roomPulse.giveMyPulse")
                   : t("session.detail.changeIt")}

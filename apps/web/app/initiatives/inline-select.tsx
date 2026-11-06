@@ -1,6 +1,6 @@
 "use client";
 
-import { SelectInput } from "@openokr/ui";
+import { SelectInput, Spinner } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../cycle/write-state.ts";
 
@@ -40,32 +40,35 @@ export function InlineSelect({
 
   return (
     <span className="inline-flex flex-col gap-1">
-      <SelectInput
-        label={label}
-        hideLabel
-        value={current}
-        disabled={disabled || pending}
-        onChange={(event) => {
-          const next = event.target.value;
-          const previous = current;
-          setCurrent(next);
-          setError(null);
-          startTransition(async () => {
-            const state = await onSave(next);
-            if (state.error) {
-              setCurrent(previous);
-              setError(state.error);
-            }
-          });
-        }}
-        inputClassName="h-6.5 w-auto px-2 text-xs disabled:text-ink-3"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </SelectInput>
+      <span className="inline-flex items-center gap-1.5">
+        <SelectInput
+          label={label}
+          hideLabel
+          value={current}
+          disabled={disabled || pending}
+          onChange={(event) => {
+            const next = event.target.value;
+            const previous = current;
+            setCurrent(next);
+            setError(null);
+            startTransition(async () => {
+              const state = await onSave(next);
+              if (state.error) {
+                setCurrent(previous);
+                setError(state.error);
+              }
+            });
+          }}
+          inputClassName="h-6.5 w-auto px-2 text-xs disabled:text-ink-3"
+        >
+          {options.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </SelectInput>
+        {pending ? <Spinner /> : null}
+      </span>
       {error ? (
         <span role="alert" className="text-xs text-bad">
           {error}

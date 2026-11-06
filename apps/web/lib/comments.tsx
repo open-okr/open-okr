@@ -14,9 +14,11 @@
 import type { RichTextDocument } from "@openokr/core";
 import {
   Button,
+  guardPress,
   isBlankDocument,
   RichTextEditor,
   RichTextView,
+  Spinner,
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
@@ -84,6 +86,9 @@ export function CommentThread({
   const { t } = useTranslations();
 
   const [isPending, startTransition] = useTransition();
+  // Which control started the write in flight (the composer, an edit, a delete
+  // or a reaction), so only that one shows a spinner.
+  const [acting, setActing] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   // A new composer once a comment is posted: the editor shows its text as the
   // page's own, so a posted comment left in it would read as said twice.
@@ -91,6 +96,7 @@ export function CommentThread({
 
   const handleEdit = useCallback(
     (commentId: string, body: RichTextDocument) => {
+      setActing(`edit:${commentId}`);
       startTransition(async () => {
         await onEdit(commentId, body);
         setEditingId(null);
@@ -101,6 +107,7 @@ export function CommentThread({
 
   const handleDelete = useCallback(
     (commentId: string) => {
+      setActing(`delete:${commentId}`);
       startTransition(async () => {
         await onDelete(commentId);
       });
@@ -115,6 +122,7 @@ export function CommentThread({
       emoji: string,
       ownReactionId: string | null,
     ) => {
+      setActing(`react:${targetSubjectId}`);
       startTransition(async () => {
         await onReact(targetSubjectType, targetSubjectId, emoji, ownReactionId);
       });
@@ -158,7 +166,8 @@ export function CommentThread({
                 onSave={(body) => handleEdit(comment.id, body)}
                 searchMembers={searchMembers}
                 onCancel={() => setEditingId(null)}
-                saving={isPending}
+                saving={isPending && acting === `edit:${comment.id}`}
+                busy={isPending}
               />
             </div>
           ) : (
@@ -168,6 +177,8 @@ export function CommentThread({
           <div className="flex flex-wrap items-center gap-2">
             <ReactionRow
               groups={comment.reactions}
+              refusing={isPending}
+              saving={isPending && acting === `react:${comment.id}`}
               onReact={(emoji, ownReactionId) =>
                 handleReact("comment", comment.id, emoji, ownReactionId)
               }
@@ -182,12 +193,24 @@ export function CommentThread({
                   >
                     {t("common.edit")}
                   </button>
+                  {/* Refused with `aria-disabled`, not `disabled`, so the button
+                   * keeps keyboard focus while the delete is sent. */}
                   <button
                     type="button"
-                    className="text-xs text-ink-3 hover:text-bad"
-                    onClick={() => handleDelete(comment.id)}
+                    aria-disabled={isPending || undefined}
+                    aria-busy={
+                      (isPending && acting === `delete:${comment.id}`) ||
+                      undefined
+                    }
+                    className="inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-bad"
+                    onClick={guardPress(isPending, () =>
+                      handleDelete(comment.id),
+                    )}
                   >
-                    {t("common.delete")}
+                    {isPending && acting === `delete:${comment.id}` ? (
+                      <Spinner />
+                    ) : null}
+                    <span>{t("common.delete")}</span>
                   </button>
                 </>
               )}
@@ -200,13 +223,15 @@ export function CommentThread({
         <CommentEditor
           key={composer}
           onSave={(body) => {
+            setActing("post");
             startTransition(async () => {
               if (await onPost(body)) {
                 setComposer((count) => count + 1);
               }
             });
           }}
-          saving={isPending}
+          saving={isPending && acting === "post"}
+          busy={isPending}
           placeholder={t("comments.thread.writeAComment")}
           searchMembers={searchMembers}
         />
@@ -226,36 +251,60 @@ export function CommentThread({
 export function ReactionRow({
   groups,
   onReact,
+  refusing = false,
+  saving = false,
 }: {
   readonly groups: readonly ReactionGroupData[];
   readonly onReact: (emoji: string, ownReactionId: string | null) => void;
+  /** Any write on the thread is on its way: a second press is refused. */
+  readonly refusing?: boolean;
+  /** A reaction on this subject is on its way, so the pressed one spins. */
+  readonly saving?: boolean;
 }) {
+  // Which one was pressed. Needed because +1 and an emoji nobody owns call
+  // `onReact` with the same arguments.
+  const [pressed, setPressed] = useState<string | null>(null);
+  const press = (key: string, emoji: string, ownReactionId: string | null) =>
+    guardPress(refusing, () => {
+      setPressed(key);
+      onReact(emoji, ownReactionId);
+    });
   return (
     <>
       {groups.map((group) => (
         <button
           key={group.emoji}
           type="button"
+          aria-disabled={refusing || undefined}
+          aria-busy={(saving && pressed === group.emoji) || undefined}
           // The reader's own reaction is marked, because a count with no
           // "did I" in it makes somebody click again to find out.
           className={
             group.own
-              ? "rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
-              : "rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
+              ? "inline-flex items-center gap-1 rounded-full bg-brand-weak px-2 py-0.5 text-xs font-semibold text-brand-text"
+              : "inline-flex items-center gap-1 rounded-full border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
           }
-          onClick={() => onReact(group.emoji, group.ownReactionId)}
+          onClick={press(group.emoji, group.emoji, group.ownReactionId)}
         >
-          {group.emoji} {group.count}
+          {saving && pressed === group.emoji ? (
+            <Spinner className="size-3" />
+          ) : null}
+          <span>
+            {group.emoji} {group.count}
+          </span>
         </button>
       ))}
       <button
         type="button"
-        className="text-xs text-ink-3 hover:text-ink-2"
+        aria-disabled={refusing || undefined}
+        aria-busy={(saving && pressed === "+1") || undefined}
+        className="inline-flex items-center gap-1 text-xs text-ink-3 hover:text-ink-2"
         // The thumb always adds. A reader who already gave one sees it in the
         // row beside it and presses that to take it back.
-        onClick={() => onReact("\u{1F44D}", null)}
+        onClick={press("+1", "\u{1F44D}", null)}
       >
-        +1
+        {saving && pressed === "+1" ? <Spinner className="size-3" /> : null}
+        <span>+1</span>
       </button>
     </>
   );
@@ -292,7 +341,10 @@ interface CommentEditorProps {
   readonly initialBody?: unknown;
   readonly onSave: (body: RichTextDocument) => void;
   readonly onCancel?: () => void;
+  /** This editor's own write is on its way, so its button spins. */
   readonly saving?: boolean;
+  /** Any write on the thread is on its way: a second press is refused. */
+  readonly busy?: boolean;
   readonly placeholder?: string;
   readonly searchMembers?: (
     query: string,
@@ -310,6 +362,7 @@ function CommentEditor({
   onSave,
   onCancel,
   saving,
+  busy,
   placeholder,
   searchMembers,
 }: CommentEditorProps) {
@@ -339,7 +392,8 @@ function CommentEditor({
         <Button
           size="sm"
           onClick={() => body && onSave(body)}
-          disabled={saving || !body || isBlankDocument(body)}
+          disabled={busy || !body || isBlankDocument(body)}
+          pending={saving}
         >
           {saving
             ? t("comments.thread.posting")

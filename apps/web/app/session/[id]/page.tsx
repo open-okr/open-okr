@@ -275,7 +275,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
           : null,
         // An owner who has left the room since is reported rather than blanked.
         ownerName:
-          names.get(blocker.ownerId) ?? "Someone no longer in this session",
+          names.get(blocker.ownerId) ?? t("session.detail.someoneNoLongerHere"),
         nextAction: blocker.nextAction,
         dueOn: blocker.dueOn,
         hoursOpen: blocker.hoursOpen,
@@ -294,7 +294,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
               text: score.nextAction.text,
               ownerName:
                 names.get(score.nextAction.ownerId) ??
-                "Someone no longer in this session",
+                t("session.detail.someoneNoLongerHere"),
               dueOn: score.nextAction.dueOn,
             }
           : null,
@@ -365,7 +365,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
     // A commitment's owner can have left the room since it was set, so a name
     // the participant list does not hold is reported rather than blanked.
     const nameOf = (memberId: string) =>
-      memberNames.get(memberId) ?? "Someone no longer in this session";
+      memberNames.get(memberId) ?? t("session.detail.someoneNoLongerHere");
 
     const bounds = (rhythm.thresholds as unknown as ResolvedThresholds)[
       "sessions.weeklyCommitmentBounds"

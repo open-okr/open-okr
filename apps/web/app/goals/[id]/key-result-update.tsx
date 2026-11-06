@@ -134,7 +134,7 @@ export function KeyResultUpdate({
             inputClassName="h-auto px-1.5 py-0.5 text-xs"
           />
         </span>
-        <Button type="submit" size="sm" disabled={saving}>
+        <Button type="submit" size="sm" pending={saving}>
           {t("common.save")}
         </Button>
       </span>
@@ -272,7 +272,8 @@ export function AddKeyResult({
         <Button
           type="button"
           size="sm"
-          disabled={saving || title.trim() === ""}
+          disabled={title.trim() === ""}
+          pending={saving}
           onClick={() => void commit()}
         >
           {t("common.save")}

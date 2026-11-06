@@ -25,6 +25,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  Spinner,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -80,6 +81,9 @@ function MissedRow({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which control started the save in flight (a cause button or the detail), so
+  // only that one shows a spinner.
+  const [acting, setActing] = useState<string | null>(null);
   const [chosen, setChosen] = useState<number | null>(keyResult.causeKey);
   const [second, setSecond] = useState<number | null>(
     keyResult.secondaryCauseKey,
@@ -90,7 +94,7 @@ function MissedRow({
     detail.trim().length === 0;
 
   const save = useCallback(
-    (causeKey: number, secondaryCauseKey: number | null) => {
+    (causeKey: number, secondaryCauseKey: number | null, key: string) => {
       onProblem(null);
       setChosen(causeKey);
       setSecond(secondaryCauseKey);
@@ -102,6 +106,7 @@ function MissedRow({
       ) {
         return;
       }
+      setActing(key);
       startTransition(async () => {
         try {
           await setRootCauseAction(
@@ -114,12 +119,14 @@ function MissedRow({
           router.refresh();
         } catch (error) {
           onProblem(
-            error instanceof Error ? error.message : "That did not save.",
+            error instanceof Error
+              ? error.message
+              : t("session.detail.thatDidNotSave"),
           );
         }
       });
     },
-    [detail, keyResult.keyResultId, onProblem, otherKey, router, sessionId],
+    [detail, keyResult.keyResultId, onProblem, otherKey, router, sessionId, t],
   );
 
   return (
@@ -147,8 +154,13 @@ function MissedRow({
                   size="sm"
                   variant={chosen === causeKey ? "default" : "ghost"}
                   disabled={pending}
+                  pending={pending && acting === `primary:${causeKey}`}
                   onClick={() =>
-                    save(causeKey, second === causeKey ? null : second)
+                    save(
+                      causeKey,
+                      second === causeKey ? null : second,
+                      `primary:${causeKey}`,
+                    )
                   }
                 >
                   {cause}
@@ -175,6 +187,7 @@ function MissedRow({
                       size="sm"
                       variant={second === causeKey ? "default" : "ghost"}
                       disabled={pending}
+                      pending={pending && acting === `second:${causeKey}`}
                       aria-pressed={second === causeKey}
                       // Its own name, so a picker reading two rows of the
                       // same nine never hears one name twice.
@@ -183,7 +196,11 @@ function MissedRow({
                         { cause },
                       )}
                       onClick={() =>
-                        save(chosen, second === causeKey ? null : causeKey)
+                        save(
+                          chosen,
+                          second === causeKey ? null : causeKey,
+                          `second:${causeKey}`,
+                        )
                       }
                     >
                       {cause}
@@ -207,9 +224,14 @@ function MissedRow({
                 chosen !== null &&
                 detail.trim() !== (keyResult.detail ?? "")
               ) {
-                save(chosen, second);
+                save(chosen, second, "detail");
               }
             }}
+            trailing={
+              pending && acting === "detail" ? (
+                <Spinner className="absolute top-1/2 right-2.5 -translate-y-1/2 text-ink-3" />
+              ) : undefined
+            }
             maxLength={1000}
           />
           {needsLine(chosen, second) ? (

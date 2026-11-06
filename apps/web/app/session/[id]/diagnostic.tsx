@@ -91,14 +91,14 @@ export function DiagnosticPanel({
       const narrated = await narrateDiagnosticAction(sessionId);
       setNarrative(narrated?.narrative ?? null);
       if (!narrated?.narrative) {
-        setProblem("No specifics this time. The verdict above stands.");
+        setProblem(t("session.detail.diagnostic.noSpecifics"));
       }
     } catch {
-      setProblem("The assist could not run. The verdict above is unaffected.");
+      setProblem(t("session.detail.diagnostic.assistCouldNotRun"));
     } finally {
       setNarrating(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const read = useCallback(() => {
     setProblem(null);
@@ -108,11 +108,13 @@ export function DiagnosticPanel({
         router.refresh();
       } catch (error) {
         setProblem(
-          error instanceof Error ? error.message : "That did not save.",
+          error instanceof Error
+            ? error.message
+            : t("session.detail.thatDidNotSave"),
         );
       }
     });
-  }, [router, sessionId]);
+  }, [router, sessionId, t]);
 
   return (
     <Card role="region" aria-labelledby="diagnostic-heading">
@@ -208,7 +210,7 @@ export function DiagnosticPanel({
                   type="button"
                   size="sm"
                   variant="ai"
-                  disabled={narrating}
+                  pending={narrating}
                   onClick={() => void narrate()}
                 >
                   {t("session.detail.diagnostic.addTheSpecifics")}
@@ -233,7 +235,7 @@ export function DiagnosticPanel({
                 <Button
                   type="button"
                   size="sm"
-                  disabled={pending}
+                  pending={pending}
                   onClick={read}
                 >
                   {t("session.detail.diagnostic.readTheDiagnostic")}
@@ -255,7 +257,7 @@ export function DiagnosticPanel({
 
         {diagnostic.recorded && canRead ? (
           <span>
-            <Button type="button" size="sm" disabled={pending} onClick={read}>
+            <Button type="button" size="sm" pending={pending} onClick={read}>
               {t("session.detail.diagnostic.readItAgain")}
             </Button>
           </span>

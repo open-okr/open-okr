@@ -66,6 +66,8 @@ export function GoalWrites({
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [target, setTarget] = useState(currentCycleId ?? "");
   const [pickedKeyResult, setPickedKeyResult] = useState(
@@ -82,8 +84,9 @@ export function GoalWrites({
     ? pickedKpi
     : (kpis?.[0]?.id ?? "");
 
-  const run = (work: () => Promise<{ error: string | null }>) => {
+  const run = (name: string, work: () => Promise<{ error: string | null }>) => {
     setProblem(null);
+    setActing(name);
     start(async () => {
       const result = await work();
       if (result.error) {
@@ -130,9 +133,12 @@ export function GoalWrites({
                 type="button"
                 size="sm"
                 disabled={pending || target === "" || target === currentCycleId}
+                pending={pending && acting === "move"}
                 data-testid="move-to-cycle"
                 onClick={() =>
-                  run(() => moveGoalToCycle({ id: goalId, cycleId: target }))
+                  run("move", () =>
+                    moveGoalToCycle({ id: goalId, cycleId: target }),
+                  )
                 }
               >
                 {t("goal.writes.move")}
@@ -193,9 +199,12 @@ export function GoalWrites({
                       type="button"
                       size="sm"
                       disabled={pending || linking === "" || kpiId === ""}
+                      pending={pending && acting === "link"}
                       data-testid="link-kpi"
                       onClick={() =>
-                        run(() => linkKeyResultKpi({ id: linking, kpiId }))
+                        run("link", () =>
+                          linkKeyResultKpi({ id: linking, kpiId }),
+                        )
                       }
                     >
                       {t("goal.writes.link")}
@@ -226,9 +235,12 @@ export function GoalWrites({
                     type="button"
                     size="sm"
                     disabled={pending}
+                    pending={pending && acting === `unlink-${keyResult.id}`}
                     data-testid={`unlink-kpi-${keyResult.id}`}
                     onClick={() =>
-                      run(() => unlinkKeyResultKpi({ id: keyResult.id }))
+                      run(`unlink-${keyResult.id}`, () =>
+                        unlinkKeyResultKpi({ id: keyResult.id }),
+                      )
                     }
                   >
                     {t("common.unlink")}

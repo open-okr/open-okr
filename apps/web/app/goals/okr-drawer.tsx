@@ -14,6 +14,8 @@ import {
   type ConfidenceDisplay,
   formatConfidence,
   formatMeasure,
+  guardPress,
+  Spinner,
   useQueryClient,
   useToast,
   useTranslations,
@@ -32,6 +34,7 @@ import {
 import {
   type OkrHandle,
   useOkrDetail,
+  usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
@@ -183,6 +186,14 @@ export function OkrDrawer({
     address.goalId === null
       ? null
       : (tree.goals.find((entry) => entry.id === address.goalId) ?? null);
+  // A change to this objective or one of its key results is still on its way to
+  // the server. The drawer's fields are saved through the same write as the
+  // list's cells, so the header says so for all of them at once.
+  const savingIds = usePendingOkrIds();
+  const saving =
+    goal !== null &&
+    (savingIds.has(goal.id) ||
+      goal.keyResults.some((keyResult) => savingIds.has(keyResult.id)));
 
   return (
     <Dialog.Root
@@ -207,6 +218,7 @@ export function OkrDrawer({
       <Dialog.Portal>
         <Dialog.Popup
           data-testid="okr-drawer"
+          aria-busy={saving || undefined}
           // Below the toasts (z-50), so an undo stays reachable over it.
           className="fixed inset-y-0 right-0 z-40 flex w-full max-w-lg flex-col border-l border-line bg-surface shadow-lg outline-none"
         >
@@ -214,6 +226,7 @@ export function OkrDrawer({
             <Dialog.Title className="min-w-0 flex-1 truncate text-sm font-bold text-ink">
               {goal?.title ?? t("okrDrawer.missingTitle")}
             </Dialog.Title>
+            {saving ? <Spinner /> : null}
             {goal ? (
               <a
                 href={`/goals/${goal.id}`}
@@ -1015,6 +1028,9 @@ function Alignment({
   const router = useRouter();
   const queryClient = useQueryClient();
   const [removing, startRemoving] = useTransition();
+  // The dependency whose Remove was pressed, so only that row spins. Saving a
+  // standalone reason shares the transition and sets none.
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   // Taking a dependency apart (completeness review M-35), here since the
   // studio's details panel became this tab (P9-T09b). Either end may.
@@ -1032,6 +1048,7 @@ function Alignment({
   };
   const remove = (dependencyId: string) => {
     setProblem(null);
+    setRemovingId(dependencyId);
     startRemoving(() => settle(unlinkGoals(dependencyId)));
   };
   // Why an objective with no parent stands alone (METHOD.md §5.2,
@@ -1039,6 +1056,7 @@ function Alignment({
   // reason away.
   const explain = (reason: string) => {
     setProblem(null);
+    setRemovingId(null);
     startRemoving(() => settle(setStandaloneReason(goal.id, reason)));
   };
   const inTree = (id: string) => tree.goals.some((entry) => entry.id === id);
@@ -1152,16 +1170,24 @@ function Alignment({
                   ) : null}
                 </span>
                 {canEdit ? (
+                  // Refused with `aria-disabled`, not `disabled`, so the button
+                  // keeps keyboard focus while the unlink is sent.
                   <button
                     type="button"
-                    disabled={removing}
-                    onClick={() => remove(dependency.id)}
+                    aria-disabled={removing || undefined}
+                    aria-busy={
+                      (removing && removingId === dependency.id) || undefined
+                    }
+                    onClick={guardPress(removing, () => remove(dependency.id))}
                     aria-label={t("goals.studio.studio.removeDependencyOn", {
                       title: dependency.title,
                     })}
-                    className="flex-none rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4"
+                    className="inline-flex flex-none items-center gap-1 rounded-control px-2 py-0.5 text-xs text-ink-3 hover:bg-bad-bg hover:text-bad disabled:text-ink-4 aria-disabled:text-ink-4"
                   >
-                    {t("goals.studio.studio.removeDependency")}
+                    {removing && removingId === dependency.id ? (
+                      <Spinner />
+                    ) : null}
+                    <span>{t("goals.studio.studio.removeDependency")}</span>
                   </button>
                 ) : null}
               </li>

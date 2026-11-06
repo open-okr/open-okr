@@ -1,6 +1,6 @@
 "use client";
 
-import { Chip, useTranslations } from "@openokr/ui";
+import { Chip, guardPress, Spinner, useTranslations } from "@openokr/ui";
 import { GripVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -130,6 +130,10 @@ export function Board({
   const [announcement, setAnnouncement] = useState("");
   const [present, setPresent] = useState<readonly PresentMember[]>([]);
   const [, startTransition] = useTransition();
+  // Deleting has its own transition: a move is drawn before the server answers,
+  // but a delete waits, so its card says it is being removed.
+  const [deleting, startDelete] = useTransition();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const refocus = useRef<string | null>(null);
   const instructionsId = useId();
@@ -261,7 +265,8 @@ export function Board({
       return;
     }
     setError(null);
-    startTransition(async () => {
+    setDeletingId(card.id);
+    startDelete(async () => {
       const state = await deleteTaskAction(card.id);
       if (state.error) {
         setError(state.error);
@@ -470,6 +475,7 @@ export function Board({
                     }
                   }}
                   onHandle={() => onHandle(card.id)}
+                  deleting={deleting && deletingId === card.id}
                   onDelete={() => remove(card)}
                   onHandleKey={onHandleKey}
                   onShift={(direction) => {
@@ -507,9 +513,12 @@ function Card({
   onHandle,
   onHandleKey,
   onShift,
+  deleting,
   onDelete,
 }: {
   readonly card: BoardCard;
+  /** This card's delete is on its way to the server. */
+  readonly deleting: boolean;
   readonly canEdit: boolean;
   readonly held: boolean;
   readonly instructionsId: string;
@@ -590,10 +599,13 @@ function Card({
               type="button"
               aria-label={t("board.board.delete", { title: card.title })}
               title={t("board.board.delete", { title: card.title })}
-              onClick={onDelete}
+              aria-disabled={deleting || undefined}
+              aria-busy={deleting || undefined}
+              onClick={guardPress(deleting, onDelete)}
               data-testid="board-card-delete"
-              className="rounded border border-line px-1 text-ink-3 hover:border-bad hover:text-bad"
+              className="inline-flex items-center gap-1 rounded border border-line px-1 text-ink-3 hover:border-bad hover:text-bad"
             >
+              {deleting ? <Spinner className="size-3" /> : null}
               <Trash2 aria-hidden="true" className="size-3" />
             </button>
           </span>

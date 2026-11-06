@@ -1,6 +1,6 @@
 "use client";
 
-import { SelectInput, useTranslations } from "@openokr/ui";
+import { guardPress, SelectInput, Spinner, useTranslations } from "@openokr/ui";
 import {
   type FormEvent,
   startTransition,
@@ -74,12 +74,17 @@ export function PlanForm({
             ))}
           </SelectInput>
         </div>
+        {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+         * keyboard focus while the plan change is sent; see `guardPress`. */}
         <button
-          className="rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"
-          disabled={pending}
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60 aria-disabled:opacity-60"
+          aria-disabled={pending || undefined}
+          aria-busy={pending || undefined}
+          onClick={guardPress(pending, undefined)}
           type="submit"
         >
-          {t("admin.plan.changeButton")}
+          {pending ? <Spinner /> : null}
+          <span>{t("admin.plan.changeButton")}</span>
         </button>
       </div>
       <p className="text-ink-3 text-xs">{t("admin.plan.fewerSeats")}</p>

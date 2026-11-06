@@ -276,6 +276,7 @@ export function AuditLog({
             type="button"
             size="sm"
             disabled={state.busy !== null}
+            pending={state.busy === "append"}
             onClick={onOlder}
           >
             {t("admin.audit.log.older")}

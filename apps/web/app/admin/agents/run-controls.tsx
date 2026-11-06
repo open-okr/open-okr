@@ -39,11 +39,14 @@ export function RunControls({ drafting }: { drafting: boolean }) {
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the run in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const run = useCallback(
-    (task: () => Promise<void>) => {
+    (name: string, task: () => Promise<void>) => {
       setProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await task();
@@ -92,7 +95,10 @@ export function RunControls({ drafting }: { drafting: boolean }) {
               type="button"
               variant="default"
               disabled={pending}
-              onClick={() => run(() => runChampionAction(entry.cadence))}
+              pending={pending && acting === entry.cadence}
+              onClick={() =>
+                run(entry.cadence, () => runChampionAction(entry.cadence))
+              }
             >
               {t(entry.labelKey)}
             </Button>
@@ -101,7 +107,8 @@ export function RunControls({ drafting }: { drafting: boolean }) {
             type="button"
             variant="default"
             disabled={pending}
-            onClick={() => run(() => runCoachAction())}
+            pending={pending && acting === "coach"}
+            onClick={() => run("coach", () => runCoachAction())}
           >
             {t("admin.agents.runControls.qualityPass")}
           </Button>

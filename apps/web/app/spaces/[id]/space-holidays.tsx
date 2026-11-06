@@ -48,8 +48,15 @@ export function SpaceHolidaysCard({
   const [label, setLabel] = useState("");
   const [state, setState] = useState<SpaceWriteState>(NO_SPACE_ERROR);
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
 
-  const save = (next: readonly SpaceHoliday[], after?: () => void) =>
+  const save = (
+    name: string,
+    next: readonly SpaceHoliday[],
+    after?: () => void,
+  ) => {
+    setActing(name);
     startTransition(async () => {
       const result = await setSpaceHolidays(spaceId, next);
       setState(result);
@@ -58,6 +65,7 @@ export function SpaceHolidaysCard({
         after?.();
       }
     });
+  };
 
   const backwards = startsOn !== "" && endsOn !== "" && endsOn < startsOn;
 
@@ -95,10 +103,19 @@ export function SpaceHolidaysCard({
                     type="button"
                     size="sm"
                     disabled={pending}
+                    pending={
+                      pending &&
+                      acting === `remove:${span.startsOn}:${span.endsOn}`
+                    }
                     aria-label={t("spaces.detail.holidays.remove", {
                       startsOn: span.startsOn,
                     })}
-                    onClick={() => save(list.filter((one) => one !== span))}
+                    onClick={() =>
+                      save(
+                        `remove:${span.startsOn}:${span.endsOn}`,
+                        list.filter((one) => one !== span),
+                      )
+                    }
                   >
                     {t("common.remove")}
                   </Button>
@@ -132,8 +149,10 @@ export function SpaceHolidaysCard({
               disabled={
                 pending || startsOn === "" || endsOn === "" || backwards
               }
+              pending={pending && acting === "add"}
               onClick={() =>
                 save(
+                  "add",
                   [
                     ...list,
                     {

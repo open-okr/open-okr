@@ -207,7 +207,7 @@ export function ImportWizard({
               {t("admin.imports.wizard.csvOrXlsxNothing")}
             </p>
             <div>
-              <Button type="submit" variant="primary" disabled={pending}>
+              <Button type="submit" variant="primary" pending={pending}>
                 {pending
                   ? t("admin.imports.wizard.reading")
                   : t("admin.imports.wizard.readTheFile")}
@@ -312,7 +312,8 @@ export function ImportWizard({
             <div className="flex gap-2">
               <Button
                 variant="primary"
-                disabled={pending || missing.length > 0}
+                disabled={missing.length > 0}
+                pending={pending}
                 onClick={() => run(false)}
                 data-testid="import-preview"
               >
@@ -352,7 +353,8 @@ export function ImportWizard({
               <div className="flex gap-2">
                 <Button
                   variant="primary"
-                  disabled={pending || report.created + report.updated === 0}
+                  disabled={report.created + report.updated === 0}
+                  pending={pending}
                   onClick={() => run(true)}
                   data-testid="import-confirm"
                 >

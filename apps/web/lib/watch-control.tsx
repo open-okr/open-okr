@@ -70,7 +70,7 @@ export function WatchControl({
           type="button"
           variant={state.watching ? "default" : "ai"}
           size="sm"
-          disabled={pending}
+          pending={pending}
           data-testid="watch-control"
           onClick={() => {
             setProblem(null);

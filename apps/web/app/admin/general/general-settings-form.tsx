@@ -9,7 +9,12 @@ import {
   TokenInput,
   useTranslations,
 } from "@openokr/ui";
-import { type FormEvent, startTransition, useActionState } from "react";
+import {
+  type FormEvent,
+  startTransition,
+  useActionState,
+  useState,
+} from "react";
 import { submitGeneral } from "./actions.ts";
 import { NOTHING_SAVED } from "./general-state.ts";
 
@@ -47,11 +52,16 @@ export function GeneralSettingsForm({
     NOTHING_SAVED,
   );
 
+  // Which button sent the form, so only that one spins. `useFormStatus` cannot
+  // say: this form handles `onSubmit` itself and `preventDefault`s it.
+  const [acting, setActing] = useState<string | null>(null);
+
   // Carries the pressed button's `intent`, which a FormData built from the
   // form alone would leave out.
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter;
+    setActing(submitter instanceof HTMLButtonElement ? submitter.value : null);
     const data = new FormData(event.currentTarget, submitter);
     startTransition(() => formAction(data));
   };
@@ -163,6 +173,7 @@ export function GeneralSettingsForm({
               variant="primary"
               size="sm"
               disabled={pending}
+              pending={pending && acting === "save"}
             >
               {t("common.save")}
             </Button>
@@ -173,6 +184,7 @@ export function GeneralSettingsForm({
               variant="ghost"
               size="sm"
               disabled={pending}
+              pending={pending && acting === "reset"}
             >
               {t("common.resetToDefaults")}
             </Button>

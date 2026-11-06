@@ -73,7 +73,7 @@ export default function ForgotPasswordPage() {
           name="email"
           required
         />
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" pending={pending}>
           {pending
             ? t("auth.forgotPassword.sending")
             : t("auth.forgotPassword.sendResetLink")}

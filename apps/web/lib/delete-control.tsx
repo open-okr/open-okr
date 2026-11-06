@@ -112,7 +112,7 @@ export function DeleteControl({
           // one here would be a design decision taken in a feature. The
           // token colours the label instead.
           className="text-bad"
-          disabled={pending}
+          pending={pending}
           data-testid={`delete-${subject}-button`}
           onClick={() =>
             start(async () => {

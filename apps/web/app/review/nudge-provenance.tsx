@@ -1,6 +1,11 @@
 "use client";
 
-import { type MessageValues, useTranslations } from "@openokr/ui";
+import {
+  guardPress,
+  type MessageValues,
+  Spinner,
+  useTranslations,
+} from "@openokr/ui";
 import { useState } from "react";
 import {
   CHANNEL_NAME_KEYS,
@@ -143,10 +148,13 @@ export function NudgeProvenance({
             >
               {t("review.nudgeProvenance.seeTheRule")}
             </RulePreview>
+            {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+             * keyboard focus while the snooze is sent; see `guardPress`. */}
             <button
               type="button"
-              disabled={busy === nudge.id}
-              onClick={async () => {
+              aria-disabled={busy === nudge.id || undefined}
+              aria-busy={busy === nudge.id || undefined}
+              onClick={guardPress(busy === nudge.id, async () => {
                 setBusy(nudge.id);
                 try {
                   const until = new Date();
@@ -155,12 +163,15 @@ export function NudgeProvenance({
                 } finally {
                   setBusy(null);
                 }
-              }}
-              className="min-h-6 rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
+              })}
+              className="inline-flex min-h-6 items-center gap-1.5 rounded-md border border-line px-2 py-0.5 text-xs text-ink-2 hover:border-brand"
             >
-              {busy === nudge.id
-                ? t("review.nudgeProvenance.snoozing")
-                : t("review.nudgeProvenance.snoozeForAWeek")}
+              {busy === nudge.id ? <Spinner /> : null}
+              <span>
+                {busy === nudge.id
+                  ? t("review.nudgeProvenance.snoozing")
+                  : t("review.nudgeProvenance.snoozeForAWeek")}
+              </span>
             </button>
             <span className="text-xs text-ink-4">
               {t("review.nudgeProvenance.snoozingStopsTheMessages")}

@@ -38,7 +38,7 @@ export function FilterAssist() {
     try {
       const parsed = await parseFilterAction(asked);
       if (!parsed) {
-        setRefusal("The assist could not run. The filters above still work.");
+        setRefusal(t("goals.filterAssist.couldNotRun"));
         return;
       }
       if (parsed.kind === "refused") {
@@ -66,11 +66,11 @@ export function FilterAssist() {
       setSentence("");
       router.push(`/goals?${query.toString()}`);
     } catch {
-      setRefusal("The assist could not run. The filters above still work.");
+      setRefusal(t("goals.filterAssist.couldNotRun"));
     } finally {
       setBusy(false);
     }
-  }, [busy, router, sentence]);
+  }, [busy, router, sentence, t]);
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -101,7 +101,8 @@ export function FilterAssist() {
         />
         <Button
           variant="ai"
-          disabled={busy || sentence.trim() === ""}
+          disabled={sentence.trim() === ""}
+          pending={busy}
           onClick={() => void run()}
         >
           {t("goals.filterAssist.filter")}

@@ -72,12 +72,15 @@ function ObjectiveRow({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [written, setWritten] = useState<unknown>(objective.body);
 
   const run = useCallback(
-    (work: () => Promise<unknown>) => {
+    (name: string, work: () => Promise<unknown>) => {
       onProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await work();
@@ -128,8 +131,9 @@ function ObjectiveRow({
             type="button"
             size="sm"
             disabled={pending}
+            pending={pending && acting === "mic"}
             onClick={() =>
-              run(() => passMicAction(sessionId, objective.goalId))
+              run("mic", () => passMicAction(sessionId, objective.goalId))
             }
           >
             {t("session.detail.narratives.giveThemTheMic")}
@@ -140,7 +144,8 @@ function ObjectiveRow({
             type="button"
             size="sm"
             disabled={pending}
-            onClick={() => run(() => passMicAction(sessionId, null))}
+            pending={pending && acting === "mic"}
+            onClick={() => run("mic", () => passMicAction(sessionId, null))}
           >
             {t("session.detail.narratives.putTheMicDown")}
           </Button>
@@ -183,8 +188,9 @@ function ObjectiveRow({
               type="button"
               size="sm"
               disabled={pending}
+              pending={pending && acting === "save"}
               onClick={() =>
-                run(async () => {
+                run("save", async () => {
                   await setNarrativeAction(
                     sessionId,
                     objective.goalId,

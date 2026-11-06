@@ -55,12 +55,18 @@ export function CycleAdmin({
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [on, setOn] = useState("");
   const [deadline, setDeadline] = useState(publicationDeadline ?? "");
 
-  const run = (work: () => Promise<{ error: string | null; id?: string }>) => {
+  const run = (
+    name: string,
+    work: () => Promise<{ error: string | null; id?: string }>,
+  ) => {
     setProblem(null);
+    setActing(name);
     start(async () => {
       const result = await work();
       if (result.error) {
@@ -103,8 +109,9 @@ export function CycleAdmin({
               type="button"
               size="sm"
               disabled={pending || on === ""}
+              pending={pending && acting === "create"}
               data-testid="create-cycle"
-              onClick={() => run(() => createCycle({ on, mode }))}
+              onClick={() => run("create", () => createCycle({ on, mode }))}
             >
               {t("cycle.admin.create")}
             </Button>
@@ -134,9 +141,10 @@ export function CycleAdmin({
                   type="button"
                   size="sm"
                   disabled={pending}
+                  pending={pending && acting === "deadline"}
                   data-testid="set-publication-deadline"
                   onClick={() =>
-                    run(() =>
+                    run("deadline", () =>
                       updateCycleDates({
                         id: currentCycleId,
                         publicationDeadline: deadline === "" ? null : deadline,
@@ -161,6 +169,7 @@ export function CycleAdmin({
                   type="button"
                   size="sm"
                   disabled={pending}
+                  pending={pending && acting === "archive"}
                   className="text-bad"
                   data-testid="archive-cycle"
                   onClick={() => {
@@ -175,7 +184,7 @@ export function CycleAdmin({
                     ) {
                       return;
                     }
-                    run(() => archiveCycle({ id: currentCycleId }));
+                    run("archive", () => archiveCycle({ id: currentCycleId }));
                   }}
                 >
                   {t("common.archive")}

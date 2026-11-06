@@ -70,30 +70,36 @@ export function CoachStrip({
   const { t } = useTranslations();
 
   const [pending, startTransition] = useTransition();
+  // Which button started the call in flight (a suggestion for one rule, or the
+  // apply), so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const ask = useCallback((keyResultId: string, ruleId: string) => {
-    setProblem(null);
-    setSuggestion(null);
-    startTransition(async () => {
-      try {
-        const result = await rewriteKeyResultAction(keyResultId, ruleId);
-        if (!result) {
-          setProblem(
-            "No suggestion came back. The provider may be off, or the model had nothing usable to say.",
-          );
-          return;
+  const ask = useCallback(
+    (keyResultId: string, ruleId: string) => {
+      setActing(`suggest:${keyResultId}:${ruleId}`);
+      setProblem(null);
+      setSuggestion(null);
+      startTransition(async () => {
+        try {
+          const result = await rewriteKeyResultAction(keyResultId, ruleId);
+          if (!result) {
+            setProblem(t("goals.detail.coachStrip.noSuggestionCameBack"));
+            return;
+          }
+          setSuggestion({ keyResultId, ruleId, ...result });
+        } catch {
+          setProblem(t("goals.detail.coachStrip.assistNotReached"));
         }
-        setSuggestion({ keyResultId, ruleId, ...result });
-      } catch {
-        setProblem("The assist could not be reached.");
-      }
-    });
-  }, []);
+      });
+    },
+    [t],
+  );
 
   const apply = useCallback(
     (chosen: Suggestion) => {
+      setActing("apply");
       setProblem(null);
       startTransition(async () => {
         const result = await applyRewrite(
@@ -187,6 +193,7 @@ export function CoachStrip({
                     <Button
                       type="button"
                       disabled={pending}
+                      pending={pending && acting === `suggest:${kr.id}:${rule}`}
                       onClick={() => ask(kr.id, rule)}
                     >
                       {t("goals.detail.coachStrip.suggestAFix")}
@@ -237,6 +244,7 @@ export function CoachStrip({
                 <Button
                   type="button"
                   disabled={pending}
+                  pending={pending && acting === "apply"}
                   onClick={() => apply(suggestion)}
                 >
                   {t("goals.detail.coachStrip.useThisWording")}

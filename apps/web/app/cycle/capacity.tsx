@@ -81,8 +81,10 @@ export async function Capacity({
               {t("cycle.capacity.gateFiveRefusesThisSet", {
                 capacity:
                   overCommitted.length === 1
-                    ? "One initiative is over capacity."
-                    : `${overCommitted.length} initiatives are over capacity.`,
+                    ? t("cycle.capacity.overCapacityOne")
+                    : t("cycle.capacity.overCapacityOther", {
+                        count: overCommitted.length,
+                      }),
               })}
             </p>
             <ul className="mt-1 flex flex-col gap-0.5">
@@ -105,8 +107,10 @@ export async function Capacity({
             {t("cycle.capacity.55IfTheAnswer", {
               yet:
                 unjudged.length === 1
-                  ? "One initiative has no capacity verdict yet."
-                  : `${unjudged.length} initiatives have no capacity verdict yet.`,
+                  ? t("cycle.capacity.noVerdictOne")
+                  : t("cycle.capacity.noVerdictOther", {
+                      count: unjudged.length,
+                    }),
             })}
           </p>
         ) : null}

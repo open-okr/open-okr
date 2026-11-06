@@ -54,7 +54,7 @@ export function AssistReading({
           variant="ai"
           size="sm"
           className="self-start"
-          disabled={pending}
+          pending={pending}
           onClick={() => {
             setNotice(null);
             start(async () => {

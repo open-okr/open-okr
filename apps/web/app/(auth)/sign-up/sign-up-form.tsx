@@ -82,7 +82,7 @@ export function SignUpForm({
           required
           description={t("auth.signUp.signUpForm.atLeast12Characters")}
         />
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button type="submit" variant="primary" pending={pending}>
           {pending
             ? t("auth.signUp.signUpForm.creating")
             : t("auth.signUp.signUpForm.createAccount")}

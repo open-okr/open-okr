@@ -103,6 +103,8 @@ export function AgentPolicy({
   const choices = kind === "space" ? spaces : kind === "kpi_tree" ? trees : [];
 
   const [pending, start] = useTransition();
+  // The autonomy option that started the write in flight, so only it spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -123,6 +125,7 @@ export function AgentPolicy({
                 size="sm"
                 variant={current ? "primary" : "default"}
                 disabled={pending || current}
+                pending={pending && acting === option}
                 data-testid={`autonomy-${option}`}
                 onClick={() => {
                   if (
@@ -136,6 +139,7 @@ export function AgentPolicy({
                     return;
                   }
                   setProblem(null);
+                  setActing(option);
                   start(async () => {
                     const result = await setAgentAutonomyAction(
                       agentId,
@@ -162,6 +166,7 @@ export function AgentPolicy({
             event.preventDefault();
             const form = new FormData(event.currentTarget);
             setProblem(null);
+            setActing("bind");
             start(async () => {
               const result = await bindAgentScopeAction({
                 agentId,
@@ -210,7 +215,12 @@ export function AgentPolicy({
               </option>
             ))}
           </SelectInput>
-          <Button type="submit" size="sm" disabled={pending}>
+          <Button
+            type="submit"
+            size="sm"
+            disabled={pending}
+            pending={pending && acting === "bind"}
+          >
             {pending
               ? t("admin.agents.agentPolicy.binding")
               : t("admin.agents.agentPolicy.bind")}

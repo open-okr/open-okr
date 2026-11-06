@@ -6,6 +6,7 @@ import {
   DateTimeInput,
   EntityPicker,
   SelectInput,
+  SubmitButton,
   TextInput,
   TimeInput,
 } from "@openokr/ui";
@@ -173,12 +174,12 @@ export async function ScheduleSessions({
                 />
               </div>
               {facilitatorField}
-              <button
-                type="submit"
+              <SubmitButton
+                bare
                 className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
               >
                 {t("sessions.schedule.bookButton")}
-              </button>
+              </SubmitButton>
             </ScheduleForm>
           ) : (
             <p className="text-xs text-ink-3">
@@ -234,12 +235,12 @@ export async function ScheduleSessions({
               timeZone={timezone}
             />
             {facilitatorField}
-            <button
-              type="submit"
+            <SubmitButton
+              bare
               className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand"
             >
               {t("sessions.schedule.scheduleButton")}
-            </button>
+            </SubmitButton>
           </ScheduleForm>
         </section>
       </CardBody>

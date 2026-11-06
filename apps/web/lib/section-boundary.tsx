@@ -77,7 +77,7 @@ export function SectionFailed({
         <Button
           variant="primary"
           size="sm"
-          disabled={pending}
+          pending={pending}
           onClick={() =>
             startTransition(() => {
               // Read the page again from the server, then draw the card again.

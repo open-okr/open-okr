@@ -26,8 +26,10 @@ export function RevokeButton({ linkId }: { readonly linkId: string }) {
         if (!window.confirm(t("admin.invitations.revokeButton.confirm"))) {
           return;
         }
-        start(() => {
-          void revokeLinkAction(linkId);
+        // Awaited, so the transition lasts as long as the revoke and the label
+        // says "Revoking" until the server has answered.
+        start(async () => {
+          await revokeLinkAction(linkId);
         });
       }}
       className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 disabled:opacity-60"

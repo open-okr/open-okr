@@ -155,7 +155,8 @@ export function NewObjectiveButton({
         <Button
           type="button"
           variant="primary"
-          disabled={pending || title.trim() === "" || needsReason}
+          disabled={title.trim() === "" || needsReason}
+          pending={pending}
           onClick={save}
         >
           {t("common.save")}

@@ -62,7 +62,7 @@ describe("the five steps", () => {
     // Skipping advances without writing anything, which is what makes the
     // §4.14 defaults the answer rather than a fallback.
     expect(wizard).toContain(
-      "const skip = () => advance(async () => ({ error: null }));",
+      'const skip = () => advance("skip", async () => ({ error: null }));',
     );
   });
 

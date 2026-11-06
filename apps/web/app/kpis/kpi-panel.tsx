@@ -158,7 +158,7 @@ export function KpiPanel({
               type="submit"
               form={formId}
               variant="primary"
-              disabled={pending}
+              pending={pending}
             >
               {submitLabel}
             </Button>

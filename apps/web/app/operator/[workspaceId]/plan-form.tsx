@@ -1,8 +1,10 @@
 "use client";
 
 import {
+  guardPress,
   NumberInput,
   SelectInput,
+  Spinner,
   TextArea,
   useTranslations,
 } from "@openokr/ui";
@@ -112,11 +114,14 @@ export function OperatorPlanForm({
           />
         </div>
         <button
-          className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"
-          disabled={pending}
+          className="inline-flex items-center gap-1.5 self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60 aria-disabled:opacity-60"
+          aria-disabled={pending || undefined}
+          aria-busy={pending || undefined}
+          onClick={guardPress(pending, undefined)}
           type="submit"
         >
-          {t("operator.plan.apply", { workspaceName })}
+          {pending ? <Spinner /> : null}
+          <span>{t("operator.plan.apply", { workspaceName })}</span>
         </button>
         {state?.error ? (
           <p

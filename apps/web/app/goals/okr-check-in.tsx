@@ -334,7 +334,7 @@ export function CheckInTab({
       ) : null}
 
       <div className="flex items-center gap-2">
-        <Button type="submit" variant="primary" disabled={sending}>
+        <Button type="submit" variant="primary" pending={sending}>
           {t("okrDrawer.publish")}
         </Button>
         <span className="text-xs text-ink-4">

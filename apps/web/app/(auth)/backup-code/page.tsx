@@ -72,7 +72,8 @@ export default function BackupCodePage() {
         <Button
           type="submit"
           variant="primary"
-          disabled={pending || code.length < 10}
+          disabled={code.length < 10}
+          pending={pending}
         >
           {pending
             ? t("auth.backupCode.checking")

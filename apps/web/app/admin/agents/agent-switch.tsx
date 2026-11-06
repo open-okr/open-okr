@@ -35,7 +35,7 @@ export function AgentSwitch({
     <Button
       size="sm"
       variant={enabled ? "default" : "primary"}
-      disabled={pending}
+      pending={pending}
       onClick={() => {
         if (
           enabled &&
@@ -69,7 +69,7 @@ export function CancelRun({ id }: { readonly id: string }) {
   return (
     <Button
       size="sm"
-      disabled={pending}
+      pending={pending}
       onClick={() => {
         start(async () => {
           await cancelRunAction(id);

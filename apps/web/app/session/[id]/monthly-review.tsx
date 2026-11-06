@@ -162,6 +162,8 @@ export function MonthlyReview({
 
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [shiftsDraft, setShiftsDraft] = useState<unknown>(shiftsDocument);
   const [decisionDocument, setDecisionDocument] = useState<unknown>(null);
@@ -174,8 +176,9 @@ export function MonthlyReview({
   );
 
   const run = useCallback(
-    (work: () => Promise<unknown>) => {
+    (name: string, work: () => Promise<unknown>) => {
       setProblem(null);
+      setActing(name);
       startTransition(async () => {
         try {
           await work();
@@ -245,8 +248,12 @@ export function MonthlyReview({
                         entry?.trend === option.value ? "primary" : "default"
                       }
                       disabled={pending || !canEdit}
+                      pending={
+                        pending &&
+                        acting === `trend:${objective.goalId}:${option.value}`
+                      }
                       onClick={() =>
-                        run(() =>
+                        run(`trend:${objective.goalId}:${option.value}`, () =>
                           setTrendAction(
                             sessionId,
                             objective.goalId,
@@ -337,8 +344,9 @@ export function MonthlyReview({
               <Button
                 type="button"
                 disabled={pending}
+                pending={pending && acting === "shifts"}
                 onClick={() =>
-                  run(() => setShiftsAction(sessionId, shiftsDraft))
+                  run("shifts", () => setShiftsAction(sessionId, shiftsDraft))
                 }
               >
                 {t("common.saveTheNote")}
@@ -493,8 +501,9 @@ export function MonthlyReview({
                     stopGoalId === "" ||
                     stopReason.trim().length === 0
                   }
+                  pending={pending && acting === "stop"}
                   onClick={() =>
-                    run(async () => {
+                    run("stop", async () => {
                       await stopObjectiveAction(
                         sessionId,
                         stopGoalId,
@@ -585,9 +594,10 @@ export function MonthlyReview({
                     decisionDocument === null ||
                     isBlankDocument(decisionDocument)
                   }
+                  pending={pending && acting === "decision"}
                   onClick={() => {
                     const [kind, id] = subjectKey.split(":");
-                    run(async () => {
+                    run("decision", async () => {
                       await recordDecisionAction(sessionId, {
                         ...(kind === "keyResult"
                           ? { keyResultId: id }

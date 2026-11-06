@@ -224,7 +224,7 @@ export function AuditPanel({
           type="button"
           variant="primary"
           size="sm"
-          disabled={checking}
+          pending={checking}
           onClick={check}
         >
           {checking ? t("admin.audit.checking") : t("admin.audit.verify")}
@@ -325,13 +325,14 @@ export function AuditPanel({
               variant="primary"
               size="sm"
               disabled={log.busy !== null}
+              pending={log.busy === "replace"}
             >
               {t("admin.audit.show")}
             </Button>
             <Button
               type="button"
               size="sm"
-              disabled={exporting}
+              pending={exporting}
               onClick={(event) => {
                 const form = event.currentTarget.form;
                 if (form) {

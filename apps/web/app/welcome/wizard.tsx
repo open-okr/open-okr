@@ -125,6 +125,8 @@ export function Wizard({
   const router = useRouter();
   const [step, setStep] = useState<Step>("basics");
   const [pending, start] = useTransition();
+  // Continue or Skip started the step in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const [name, setName] = useState(workspaceName);
@@ -138,8 +140,12 @@ export function Wizard({
 
   const index = STEPS.indexOf(step);
 
-  const advance = (work: () => Promise<{ error: string | null }>) => {
+  const advance = (
+    name: string,
+    work: () => Promise<{ error: string | null }>,
+  ) => {
     setProblem(null);
+    setActing(name);
     start(async () => {
       const result = await work();
       if (result.error) {
@@ -163,7 +169,7 @@ export function Wizard({
     });
   };
 
-  const skip = () => advance(async () => ({ error: null }));
+  const skip = () => advance("skip", async () => ({ error: null }));
 
   return (
     <Card>
@@ -345,12 +351,13 @@ export function Wizard({
             type="button"
             variant="primary"
             disabled={pending}
+            pending={pending && acting === "continue"}
             data-testid="welcome-continue"
             onClick={() => {
               if (step === "basics") {
-                advance(() => saveBasics({ name, timezone: zone }));
+                advance("continue", () => saveBasics({ name, timezone: zone }));
               } else if (step === "rhythm") {
-                advance(() =>
+                advance("continue", () =>
                   saveRhythm({ defaultCheckInFrequency: frequency }),
                 );
               } else if (step === "people") {
@@ -362,11 +369,11 @@ export function Wizard({
                   setProblem(t("fields.email.invalid"));
                   return;
                 }
-                advance(() => inviteSomebody({ email: address }));
+                advance("continue", () => inviteSomebody({ email: address }));
               } else if (step === "template") {
-                advance(() => applyStartingTemplate({ template }));
+                advance("continue", () => applyStartingTemplate({ template }));
               } else {
-                advance(buildDemo);
+                advance("continue", buildDemo);
               }
             }}
           >
@@ -381,6 +388,7 @@ export function Wizard({
           <Button
             type="button"
             disabled={pending}
+            pending={pending && acting === "skip"}
             data-testid="welcome-skip"
             onClick={skip}
           >

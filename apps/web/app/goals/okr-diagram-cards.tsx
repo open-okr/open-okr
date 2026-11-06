@@ -1,7 +1,13 @@
 "use client";
 
 import { okrKindsInUse } from "@openokr/method";
-import { Bar, EntityPicker, TextInput, useTranslations } from "@openokr/ui";
+import {
+  Bar,
+  EntityPicker,
+  Spinner,
+  TextInput,
+  useTranslations,
+} from "@openokr/ui";
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
@@ -605,26 +611,29 @@ function DraftField({
   };
   return (
     <span ref={box} className="nodrag flex min-w-0 flex-1 flex-col">
-      <TextInput
-        value={title}
-        label={label}
-        hideLabel
-        maxLength={500}
-        placeholder={placeholder}
-        disabled={saving}
-        onChange={(event) => setTitle(event.target.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            void commit();
-          }
-          if (event.key === "Escape") {
-            onClose();
-          }
-        }}
-        className="min-w-0"
-        inputClassName="h-auto px-1.5 py-0.5 text-[11px]"
-      />
+      <span className="flex min-w-0 items-center gap-1" aria-busy={saving}>
+        <TextInput
+          value={title}
+          label={label}
+          hideLabel
+          maxLength={500}
+          placeholder={placeholder}
+          disabled={saving}
+          onChange={(event) => setTitle(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              void commit();
+            }
+            if (event.key === "Escape") {
+              onClose();
+            }
+          }}
+          className="min-w-0 flex-1"
+          inputClassName="h-auto px-1.5 py-0.5 text-[11px]"
+        />
+        {saving ? <Spinner className="size-3 flex-none" /> : null}
+      </span>
       {problem ? (
         <span role="alert" className="truncate text-[10px] text-bad">
           {problem}

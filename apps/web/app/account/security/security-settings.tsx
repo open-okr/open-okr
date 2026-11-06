@@ -63,6 +63,9 @@ export function SecuritySettings({
   // takes focus back, rather than in the note under the card.
   const [codeError, setCodeError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Which passkey or password button started a call, so only it spins. Cleared
+  // in a `finally`, so a refused call never leaves a button stuck.
+  const [acting, setActing] = useState<string | null>(null);
 
   const loadPasskeys = useCallback(async () => {
     const { data } = await authClient.passkey.listUserPasskeys();
@@ -80,18 +83,23 @@ export function SecuritySettings({
       return;
     }
     setNote(null);
-    const { error: failure } = await authClient.passkey.deletePasskey({
-      id: passkey.id,
-    });
-    if (failure) {
-      setNote({
-        scope: "passkey",
-        tone: "bad",
-        text: t("account.security.securitySettings.passkeyNotRemoved"),
+    setActing(`remove:${passkey.id}`);
+    try {
+      const { error: failure } = await authClient.passkey.deletePasskey({
+        id: passkey.id,
       });
-      return;
+      if (failure) {
+        setNote({
+          scope: "passkey",
+          tone: "bad",
+          text: t("account.security.securitySettings.passkeyNotRemoved"),
+        });
+        return;
+      }
+      await loadPasskeys();
+    } finally {
+      setActing(null);
     }
-    await loadPasskeys();
   };
 
   const added = (when: string | Date) =>
@@ -101,34 +109,44 @@ export function SecuritySettings({
 
   const addPasskey = async () => {
     setNote(null);
-    const result = await authClient.passkey.addPasskey();
-    if (result?.error) {
+    setActing("add-passkey");
+    try {
+      const result = await authClient.passkey.addPasskey();
+      if (result?.error) {
+        setNote({
+          scope: "passkey",
+          tone: "bad",
+          text: t("account.security.securitySettings.passkeyNotAdded"),
+        });
+        return;
+      }
       setNote({
         scope: "passkey",
-        tone: "bad",
-        text: "That did not work. Your device may not support passkeys.",
+        tone: "ok",
+        text: t("account.security.securitySettings.passkeyNowAdded"),
       });
-      return;
+      await loadPasskeys();
+    } finally {
+      setActing(null);
     }
-    setNote({
-      scope: "passkey",
-      tone: "ok",
-      text: "Passkey added. You can now sign in with it.",
-    });
-    await loadPasskeys();
   };
 
   const startTwoFactor = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setNote(null);
-    const { data, error: failure } = await authClient.twoFactor.enable({
-      password,
-    });
+    setActing("enable-totp");
+    let started: Awaited<ReturnType<typeof authClient.twoFactor.enable>>;
+    try {
+      started = await authClient.twoFactor.enable({ password });
+    } finally {
+      setActing(null);
+    }
+    const { data, error: failure } = started;
     if (failure || !data) {
       setNote({
         scope: "totp",
         tone: "bad",
-        text: "That password was not right.",
+        text: t("account.security.securitySettings.passwordNotRight"),
       });
       return;
     }
@@ -142,7 +160,7 @@ export function SecuritySettings({
       setNote({
         scope: "totp",
         tone: "bad",
-        text: "This instance is not set up for an authenticator app.",
+        text: t("account.security.securitySettings.noAuthenticatorApp"),
       });
       return;
     }
@@ -168,7 +186,7 @@ export function SecuritySettings({
     setNote({
       scope: "totp",
       tone: "ok",
-      text: "One-time codes are on. Keep your backup codes somewhere safe.",
+      text: t("account.security.securitySettings.oneTimeCodesOnKeepBackup"),
     });
     setTotpUri("");
     setCode("");
@@ -231,6 +249,8 @@ export function SecuritySettings({
                   <Button
                     type="button"
                     size="sm"
+                    disabled={acting !== null}
+                    pending={acting === `remove:${passkey.id}`}
                     onClick={() => removePasskey(passkey)}
                   >
                     {t("account.security.securitySettings.removePasskey")}
@@ -239,7 +259,13 @@ export function SecuritySettings({
               ))}
             </ul>
           )}
-          <Button type="button" size="sm" onClick={addPasskey}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={acting !== null}
+            pending={acting === "add-passkey"}
+            onClick={addPasskey}
+          >
             {t("account.security.securitySettings.addAPasskey")}
           </Button>
           {noteFor("passkey")}
@@ -309,7 +335,8 @@ export function SecuritySettings({
                   type="submit"
                   variant="primary"
                   size="sm"
-                  disabled={confirming || code.length < 6}
+                  disabled={code.length < 6}
+                  pending={confirming}
                 >
                   {t("account.security.securitySettings.turnOn")}
                 </Button>
@@ -330,7 +357,13 @@ export function SecuritySettings({
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
               />
-              <Button type="submit" variant="primary" size="sm">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                disabled={acting !== null}
+                pending={acting === "enable-totp"}
+              >
                 {t("account.security.securitySettings.setUpOneTime")}
               </Button>
             </form>

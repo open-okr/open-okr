@@ -1,6 +1,6 @@
 "use client";
 
-import { EntityPicker, useTranslations } from "@openokr/ui";
+import { EntityPicker, Spinner, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { assignRoleAction } from "./actions.ts";
@@ -32,10 +32,13 @@ export function MemberRoles({
   const { t } = useTranslations();
   const router = useRouter();
   const [pending, start] = useTransition();
+  // The member whose role is being saved, so only that row shows a spinner.
+  const [savingId, setSavingId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   const assign = (memberId: string, roleId: string | null) => {
     setProblem(null);
+    setSavingId(memberId);
     start(async () => {
       const result = await assignRoleAction({ memberId, roleId });
       if (result.error) {
@@ -61,21 +64,27 @@ export function MemberRoles({
             className="flex flex-wrap items-center justify-between gap-2 py-2"
           >
             <span className="min-w-0 text-sm text-ink">{member.name}</span>
-            <EntityPicker
-              label={t("admin.roles.roleFor", { name: member.name })}
-              hideLabel
-              value={member.roleId}
-              disabled={pending}
-              onValueChange={(next) => {
-                if (next !== member.roleId) {
-                  assign(member.id, next);
-                }
-              }}
-              options={roles.map((role) => ({ id: role.id, label: role.name }))}
-              noneLabel={t("admin.roles.noRole")}
-              className="w-48"
-              inputClassName="h-7 text-xs"
-            />
+            <span className="flex items-center gap-1.5">
+              {pending && savingId === member.id ? <Spinner /> : null}
+              <EntityPicker
+                label={t("admin.roles.roleFor", { name: member.name })}
+                hideLabel
+                value={member.roleId}
+                disabled={pending}
+                onValueChange={(next) => {
+                  if (next !== member.roleId) {
+                    assign(member.id, next);
+                  }
+                }}
+                options={roles.map((role) => ({
+                  id: role.id,
+                  label: role.name,
+                }))}
+                noneLabel={t("admin.roles.noRole")}
+                className="w-48"
+                inputClassName="h-7 text-xs"
+              />
+            </span>
           </li>
         ))}
       </ul>

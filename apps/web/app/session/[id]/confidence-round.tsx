@@ -129,12 +129,15 @@ function KrVoteCard({
 
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
   const [dialValue, setDialValue] = useState(
     kr.confirmedConfidence ?? kr.average ?? kr.myVote ?? 0.5,
   );
   const [note, setNote] = useState(kr.whatChanged ?? "");
 
   const handleVote = useCallback(() => {
+    setActing("vote");
     startTransition(async () => {
       await castVoteAction(sessionId, kr.keyResultId, dialValue);
       router.refresh();
@@ -142,6 +145,7 @@ function KrVoteCard({
   }, [sessionId, kr.keyResultId, dialValue, router]);
 
   const handleReveal = useCallback(() => {
+    setActing("reveal");
     startTransition(async () => {
       await revealVotesAction(sessionId, kr.keyResultId);
       router.refresh();
@@ -150,6 +154,7 @@ function KrVoteCard({
 
   const handleConfirm = useCallback(() => {
     if (note.trim().length === 0) return;
+    setActing("confirm");
     startTransition(async () => {
       await confirmConfidenceAction(sessionId, kr.keyResultId, dialValue, note);
       router.refresh();
@@ -228,6 +233,7 @@ function KrVoteCard({
             variant="primary"
             onClick={handleVote}
             disabled={isPending}
+            pending={isPending && acting === "vote"}
           >
             {t("session.detail.confidenceRound.castVote")}
           </Button>
@@ -258,6 +264,7 @@ function KrVoteCard({
             variant="default"
             onClick={handleReveal}
             disabled={isPending || kr.votesCast === 0}
+            pending={isPending && acting === "reveal"}
           >
             {t("session.detail.confidenceRound.revealVotes")}
           </Button>
@@ -283,6 +290,7 @@ function KrVoteCard({
             variant="primary"
             onClick={handleConfirm}
             disabled={isPending || note.trim().length === 0}
+            pending={isPending && acting === "confirm"}
           >
             {t("session.detail.confidenceRound.confirmConfidence")}
           </Button>

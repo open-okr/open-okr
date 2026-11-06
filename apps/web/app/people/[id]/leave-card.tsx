@@ -54,8 +54,15 @@ export function LeaveCard({
   const [delegateId, setDelegateId] = useState("");
   const [result, setResult] = useState<ProfileResult | null>(null);
   const [pending, startTransition] = useTransition();
+  // Which button started the write in flight, so only that one spins.
+  const [acting, setActing] = useState<string | null>(null);
 
-  const save = (next: readonly LeaveSpan[], after?: () => void) =>
+  const save = (
+    name: string,
+    next: readonly LeaveSpan[],
+    after?: () => void,
+  ) => {
+    setActing(name);
     startTransition(async () => {
       const answer = await setLeaveAction(memberId, isSelf, next);
       setResult(answer);
@@ -64,6 +71,7 @@ export function LeaveCard({
         after?.();
       }
     });
+  };
 
   const backwards = startsOn !== "" && endsOn !== "" && endsOn < startsOn;
 
@@ -99,10 +107,19 @@ export function LeaveCard({
                     type="button"
                     size="sm"
                     disabled={pending}
+                    pending={
+                      pending &&
+                      acting === `remove:${span.startsOn}:${span.endsOn}`
+                    }
                     aria-label={t("people.detail.leave.remove", {
                       startsOn: span.startsOn,
                     })}
-                    onClick={() => save(list.filter((one) => one !== span))}
+                    onClick={() =>
+                      save(
+                        `remove:${span.startsOn}:${span.endsOn}`,
+                        list.filter((one) => one !== span),
+                      )
+                    }
                   >
                     {t("common.remove")}
                   </Button>
@@ -142,8 +159,10 @@ export function LeaveCard({
                 delegateId === "" ||
                 backwards
               }
+              pending={pending && acting === "mark"}
               onClick={() =>
                 save(
+                  "mark",
                   [
                     ...list,
                     {

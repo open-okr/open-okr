@@ -54,7 +54,7 @@ export function SubjectComments({
   readonly currentMemberId: string;
 }) {
   const { t } = useTranslations();
-  const [, start] = useTransition();
+  const [reacting, start] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
   const said = (result: WriteState) => setProblem(result.error);
 
@@ -70,6 +70,8 @@ export function SubjectComments({
       >
         <ReactionRow
           groups={reactions}
+          refusing={reacting}
+          saving={reacting}
           onReact={(emoji, ownReactionId) =>
             start(async () => {
               said(

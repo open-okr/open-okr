@@ -46,6 +46,10 @@ export default function SignInPage() {
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  // The passkey or provider button that started a call, so only it spins. Set
+  // before the call and cleared after it: Back from a provider can restore this
+  // page from the browser cache, and a key left set would show a stuck button.
+  const [acting, setActing] = useState<string | null>(null);
   const [challenge, setChallenge] = useState(false);
   const [code, setCode] = useState("");
   const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
@@ -179,7 +183,9 @@ export default function SignInPage() {
 
   const signInWithPasskey = async () => {
     setError("");
+    setActing("passkey");
     const result = await authClient.signIn.passkey();
+    setActing(null);
     if (result?.error) {
       setError(t("auth.signIn.thatPasskeyDidNotWork"));
       return;
@@ -215,7 +221,8 @@ export default function SignInPage() {
           <Button
             type="submit"
             variant="primary"
-            disabled={pending || code.length < 6}
+            disabled={code.length < 6}
+            pending={pending}
           >
             {pending ? t("auth.signIn.checking") : t("auth.signIn.verify")}
           </Button>
@@ -274,12 +281,23 @@ export default function SignInPage() {
           autoComplete="current-password"
           required
         />
-        <Button type="submit" variant="primary" disabled={pending}>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={acting !== null}
+          pending={pending}
+        >
           {pending ? t("auth.signIn.signingIn") : t("setup.account.signIn")}
         </Button>
       </form>
 
-      <Button type="button" variant="default" onClick={signInWithPasskey}>
+      <Button
+        type="button"
+        variant="default"
+        disabled={acting !== null}
+        pending={acting === "passkey"}
+        onClick={signInWithPasskey}
+      >
         {t("auth.signIn.signInWithA")}
       </Button>
 
@@ -293,22 +311,37 @@ export default function SignInPage() {
               key={provider.id}
               type="button"
               variant="default"
+              disabled={acting !== null}
+              pending={acting === `sso:${provider.id}`}
               onClick={async () => {
                 setError("");
+                setActing(`sso:${provider.id}`);
                 // **Two protocols, two calls** (P8-T07c-b). SAML starts at
                 // `signIn.sso`, and sending it to `signIn.social` reached a
                 // provider `genericOAuth` had never been given, which failed
                 // with nothing a person could act on.
-                const result =
-                  provider.kind === "saml"
-                    ? await authClient.signIn.sso({
-                        providerId: provider.id,
-                        callbackURL: "/",
-                      })
-                    : await authClient.signIn.social({
-                        provider: provider.id as "github",
-                        callbackURL: "/",
-                      });
+                // Cleared in a `finally`, so a call that rejects never leaves
+                // every sign-in button disabled.
+                let result: Awaited<
+                  ReturnType<
+                    | typeof authClient.signIn.sso
+                    | typeof authClient.signIn.social
+                  >
+                >;
+                try {
+                  result =
+                    provider.kind === "saml"
+                      ? await authClient.signIn.sso({
+                          providerId: provider.id,
+                          callbackURL: "/",
+                        })
+                      : await authClient.signIn.social({
+                          provider: provider.id as "github",
+                          callbackURL: "/",
+                        });
+                } finally {
+                  setActing(null);
+                }
                 if (result?.error) {
                   setError(
                     t("auth.signIn.providerCouldNotBeReached", {

@@ -6,6 +6,8 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  guardPress,
+  Spinner,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -120,6 +122,8 @@ export function Attachments({
   // long enough that a button which only greys out looks stuck.
   const [uploading, startUpload] = useTransition();
   const pending = detaching || uploading;
+  // The file whose detach is in flight, so only that row shows a spinner.
+  const [detachingId, setDetachingId] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
@@ -185,11 +189,17 @@ export function Attachments({
                     </Chip>
                   ) : null}
                   {canEdit ? (
+                    // Refused with `aria-disabled`, not `disabled`, so the button
+                    // keeps keyboard focus while the detach is sent.
                     <button
                       type="button"
-                      disabled={pending}
+                      aria-disabled={pending || undefined}
+                      aria-busy={
+                        (detaching && detachingId === file.id) || undefined
+                      }
                       data-testid={`detach-${file.id}`}
-                      onClick={() =>
+                      onClick={guardPress(pending, () => {
+                        setDetachingId(file.id);
                         start(async () => {
                           const result = await detachAttachment({
                             id: file.id,
@@ -198,11 +208,14 @@ export function Attachments({
                           if (!result.error) {
                             router.refresh();
                           }
-                        })
-                      }
-                      className="shrink-0 text-xs text-ink-4 hover:text-bad"
+                        });
+                      })}
+                      className="inline-flex shrink-0 items-center gap-1.5 text-xs text-ink-4 hover:text-bad"
                     >
-                      {t("attachments.detach")}
+                      {detaching && detachingId === file.id ? (
+                        <Spinner />
+                      ) : null}
+                      <span>{t("attachments.detach")}</span>
                     </button>
                   ) : null}
                 </li>
@@ -227,7 +240,8 @@ export function Attachments({
             <Button
               type="button"
               size="sm"
-              disabled={pending}
+              disabled={detaching}
+              pending={uploading}
               data-testid="attachment-upload"
               onClick={() => {
                 const chosen = input.current?.files?.[0];

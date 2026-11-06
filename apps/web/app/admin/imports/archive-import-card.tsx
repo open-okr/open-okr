@@ -271,7 +271,7 @@ export function ArchiveImportCard() {
                 <Button
                   variant="primary"
                   onClick={handleConfirm}
-                  disabled={pending}
+                  pending={pending}
                 >
                   {pending
                     ? t("admin.imports.archiveImportCard.importing")

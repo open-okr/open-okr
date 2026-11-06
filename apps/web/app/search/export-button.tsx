@@ -1,7 +1,7 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { SelectInput, useTranslations } from "@openokr/ui";
+import { guardPress, SelectInput, Spinner, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 
 /**
@@ -170,15 +170,21 @@ export function ExportButton({
             </option>
           ))}
         </SelectInput>
+        {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
+         * keyboard focus while the export is prepared; see `guardPress`. */}
         <button
           type="button"
-          disabled={pending}
-          onClick={() => run(format)}
-          className="rounded-md border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4"
+          aria-disabled={pending || undefined}
+          aria-busy={pending || undefined}
+          onClick={guardPress(pending, () => run(format))}
+          className="inline-flex items-center gap-1.5 rounded-md border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-brand disabled:text-ink-4 aria-disabled:text-ink-4"
         >
-          {pending
-            ? t("search.exportButton.preparing")
-            : (label ?? t("search.exportButton.export"))}
+          {pending ? <Spinner /> : null}
+          <span>
+            {pending
+              ? t("search.exportButton.preparing")
+              : (label ?? t("search.exportButton.export"))}
+          </span>
         </button>
       </span>
       {message ? (

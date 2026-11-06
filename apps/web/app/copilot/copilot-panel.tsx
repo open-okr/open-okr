@@ -239,12 +239,15 @@ const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
 function ProposalCard({
   proposal,
   busy,
+  acting,
   onApply,
   onDismiss,
   onUndo,
 }: {
   readonly proposal: Proposal;
   readonly busy: boolean;
+  /** The button that started the work in flight, so only that one spins. */
+  readonly acting: string | null;
   readonly onApply: () => void;
   readonly onDismiss: () => void;
   readonly onUndo: () => void;
@@ -291,11 +294,21 @@ function ProposalCard({
       <div className="mt-3 flex items-center gap-2">
         {proposal.status === "pending" ? (
           <>
-            <Button variant="primary" disabled={busy} onClick={onApply}>
+            <Button
+              variant="primary"
+              disabled={busy}
+              pending={busy && acting === `apply:${proposal.id}`}
+              onClick={onApply}
+            >
               <Check className="size-4" />
               {t("common.apply")}
             </Button>
-            <Button variant="ghost" disabled={busy} onClick={onDismiss}>
+            <Button
+              variant="ghost"
+              disabled={busy}
+              pending={busy && acting === `dismiss:${proposal.id}`}
+              onClick={onDismiss}
+            >
               {t("common.dismiss")}
             </Button>
           </>
@@ -303,7 +316,12 @@ function ProposalCard({
         {proposal.status === "applied" &&
         !proposal.undone &&
         proposal.reversible ? (
-          <Button variant="ghost" disabled={busy} onClick={onUndo}>
+          <Button
+            variant="ghost"
+            disabled={busy}
+            pending={busy && acting === `undo:${proposal.id}`}
+            onClick={onUndo}
+          >
             <Undo2 className="size-4" />
             {t("copilot.copilotPanel.undo")}
           </Button>
@@ -380,6 +398,9 @@ export function CopilotPanel({
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Which proposal button started the decision in flight. Cleared with `busy`,
+  // because `busy` is also set while a question is sent.
+  const [acting, setActing] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -482,10 +503,12 @@ export function CopilotPanel({
    */
   const decide = useCallback(
     async (
+      name: string,
       id: string,
       decision: (id: string) => Promise<unknown>,
     ): Promise<void> => {
       setBusy(true);
+      setActing(`${name}:${id}`);
       setNotice(null);
       try {
         await decision(id);
@@ -497,6 +520,7 @@ export function CopilotPanel({
         );
       } finally {
         setBusy(false);
+        setActing(null);
         if (threadId) {
           await loadThread(threadId).catch(() => undefined);
         }
@@ -703,14 +727,27 @@ export function CopilotPanel({
                     key={proposal.id}
                     proposal={proposal}
                     busy={busy}
+                    acting={acting}
                     onApply={() =>
-                      void decide(proposal.id, applyCopilotProposalAction)
+                      void decide(
+                        "apply",
+                        proposal.id,
+                        applyCopilotProposalAction,
+                      )
                     }
                     onDismiss={() =>
-                      void decide(proposal.id, dismissCopilotProposalAction)
+                      void decide(
+                        "dismiss",
+                        proposal.id,
+                        dismissCopilotProposalAction,
+                      )
                     }
                     onUndo={() =>
-                      void decide(proposal.id, undoCopilotProposalAction)
+                      void decide(
+                        "undo",
+                        proposal.id,
+                        undoCopilotProposalAction,
+                      )
                     }
                   />
                 ))}

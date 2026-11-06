@@ -1,6 +1,12 @@
 "use client";
 
-import { SelectInput, TextArea, useTranslations } from "@openokr/ui";
+import {
+  guardPress,
+  SelectInput,
+  Spinner,
+  TextArea,
+  useTranslations,
+} from "@openokr/ui";
 import { type FormEvent, startTransition, useActionState } from "react";
 import type { OperatorLifecycleState } from "./lifecycle-actions";
 
@@ -20,15 +26,15 @@ import type { OperatorLifecycleState } from "./lifecycle-actions";
  * plan form is, because React resets a form after its action.
  */
 
-/** What each destination does, in the operator's own words. */
-const OPTIONS: readonly {
-  readonly value: string;
-  readonly label: string;
-}[] = [
-  { value: "active", label: "Active. Everything works." },
-  { value: "suspended", label: "Suspended. Read-only for members." },
-  { value: "closed", label: "Closed. Frozen, and the retention clock starts." },
-];
+/**
+ * What each destination does, in the operator's own words. The label is a
+ * catalogue key; `value` is what the server matches on and is never translated.
+ */
+const OPTIONS = [
+  { value: "active", key: "operator.lifecycle.stateActive" },
+  { value: "suspended", key: "operator.lifecycle.stateSuspended" },
+  { value: "closed", key: "operator.lifecycle.stateClosed" },
+] as const;
 
 export function LifecycleForm({
   action,
@@ -85,7 +91,7 @@ export function LifecycleForm({
           >
             {OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
-                {option.label}
+                {t(option.key)}
               </option>
             ))}
           </SelectInput>
@@ -110,11 +116,14 @@ export function LifecycleForm({
         {/* The workspace's name is in the button, so the last thing read
          * before the click is who this happens to. */}
         <button
-          className="self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60"
-          disabled={pending}
+          className="inline-flex items-center gap-1.5 self-start rounded-md bg-brand px-4 py-2 font-medium text-on-brand text-sm hover:bg-brand-strong disabled:opacity-60 aria-disabled:opacity-60"
+          aria-disabled={pending || undefined}
+          aria-busy={pending || undefined}
+          onClick={guardPress(pending, undefined)}
           type="submit"
         >
-          {t("operator.lifecycle.applyTo", { workspaceName })}
+          {pending ? <Spinner /> : null}
+          <span>{t("operator.lifecycle.applyTo", { workspaceName })}</span>
         </button>
         {state?.error ? (
           <p
