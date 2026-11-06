@@ -184,6 +184,19 @@ export function agentSetupMarkdown({
       `Token variant: replace \`auth: oauth\` with \`headers:\` and \`Authorization: "${bearer}"\` beneath it, then run \`hermes mcp test ${SERVER_NAME}\`.`,
     ],
     [
+      "### Grok Bot",
+      "",
+      `You have no configuration file for this. In this chat, add a custom MCP server named \`${SERVER_NAME}\` at \`${endpoint}\` using streamable HTTP.`,
+      "",
+      "Then ask the user to approve it and sign in from the Connect card. The tools appear after sign-in. If the server shows Needs auth or Disconnected, ask them to choose Authenticate (Authorize on the phone).",
+      "",
+      "If a later task does not have the tools, ask the user to type `@` and attach the server.",
+      "",
+      "This needs a public HTTPS address. If this instance is on `localhost` or an office network, tell the user Grok Bot cannot connect to it. A token does not change that.",
+      "",
+      "A token is not covered here: use OAuth. Do not store a token the user pasted into this chat.",
+    ],
+    [
       "### ChatGPT (developer mode)",
       "",
       `You cannot add this yourself. Tell the user to open Settings, then Apps and Connectors, then Advanced settings, turn on Developer mode, and create a connector named ${instanceName} with the server URL above and OAuth authentication. ChatGPT connectors take OAuth only, so a token does not work there.`,
@@ -217,6 +230,7 @@ export function agentSetupMarkdown({
       "- OpenCode: `https://opencode.ai/docs/mcp-servers/`",
       "- Windsurf: `https://docs.windsurf.com/windsurf/cascade/mcp`",
       "- Hermes Agent: `https://hermes-agent.nousresearch.com`",
+      "- Grok Bot: `https://docs.x.ai/grok-bot/computer-and-apps`",
     ],
     [
       `These instructions are served at \`${agentSetupUrl(base)}\`, so you can fetch them again to check them.`,

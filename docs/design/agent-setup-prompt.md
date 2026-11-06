@@ -208,7 +208,10 @@ Structure, after Cloudflare's file:
 | OpenCode | `opencode.json`, `mcp.openokr` with `"type": "remote"`, `url`, `"enabled": true`, `"oauth": {}`, then `opencode mcp auth openokr` | `headers.Authorization` and `"oauth": false` | opencode.ai/docs/mcp-servers |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json`, `mcpServers.openokr.serverUrl` | Not given: no header syntax was found in the vendor's documents, so the file says to use OAuth | Cloudflare's file |
 | Hermes Agent | `~/.hermes/config.yaml`, `auth: oauth` | `headers.Authorization` | §2 |
+| Grok Bot | In chat, add a custom MCP server named `openokr` at `<endpoint>` using streamable HTTP, then sign in from the Connect card | Not given: sources conflict on secret headers, so the file says to use OAuth, as it does for Windsurf | docs.x.ai/grok-bot/computer-and-apps for adding by URL and for Authenticate; unofficial guides for the wording. Checked 5 November 2026. Not checked against a live client |
 | ChatGPT | Developer mode connector, OAuth; the agent tells the user what to click | Not supported, OAuth only | §2 |
+
+**Grok Bot's step has not been run on a live client,** the same position §8 left Gemini CLI out for. Its line that an office network cannot connect is unconfirmed too: docs.x.ai says adding a server on a private network asks for approval first. Remove this note once somebody has run the step.
 
 4. A check: "Call the `workspace.overview` tool once."
 5. A closing box, as Cloudflare's, with `{instanceName}`, the workspace name and "Restart your agent if the tools do not appear."
