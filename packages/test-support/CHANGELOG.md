@@ -1,5 +1,13 @@
 # @openokr/test-support
 
+## 0.5.0
+
+### Patch Changes
+
+- Updated dependencies [[`6f01dbb`](https://github.com/open-okr/open-okr/commit/6f01dbb3e9c7029505643777d3d6aadfef6d8cd4), [`02e97c4`](https://github.com/open-okr/open-okr/commit/02e97c486934e38c5abd09108d9385aeed732f3e), [`28b8ee0`](https://github.com/open-okr/open-okr/commit/28b8ee02b6c0f6c63ae5a1927115dbc33f932a21), [`0c03fdf`](https://github.com/open-okr/open-okr/commit/0c03fdfd59290e68f1f67349297858ce2ef08357), [`3dbba8c`](https://github.com/open-okr/open-okr/commit/3dbba8cabe4736ebe041dec8eb365a4f5ee0bfc9), [`c426fe2`](https://github.com/open-okr/open-okr/commit/c426fe2115bfdd5ce7eab2edd526fa1b89d0585f), [`8c0fd5b`](https://github.com/open-okr/open-okr/commit/8c0fd5b19d111ce1facb70aa2674aa80b1366be8), [`df256ec`](https://github.com/open-okr/open-okr/commit/df256ec8665a698323d33d5af363e4131ce26905)]:
+  - @openokr/core@0.5.0
+  - @openokr/db@0.5.0
+
 ## 0.4.0
 
 ### Patch Changes
