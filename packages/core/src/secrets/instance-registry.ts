@@ -354,6 +354,40 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "Seconds without a successful scheduler run before /api/status reports it as unavailable. Default 14400 (4 hours).",
   },
   {
+    key: "billing.provider",
+    kind: "string",
+    fallback: "none",
+    environment: "OPENOKR_BILLING_PROVIDER",
+    summary:
+      "Which payment provider takes subscriptions: none or stripe. None means an operator sets each plan by hand, and nothing is loaded or called.",
+  },
+  {
+    key: "billing.stripe.secretKey",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_STRIPE_SECRET_KEY",
+    secret: true,
+    summary:
+      "Stripe's secret key. Envelope-encrypted, never returned to a page.",
+  },
+  {
+    key: "billing.stripe.webhookSecret",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_STRIPE_WEBHOOK_SECRET",
+    secret: true,
+    summary:
+      "The signing secret of the webhook pointed at /api/billing/webhook. Envelope-encrypted, never returned to a page.",
+  },
+  {
+    key: "billing.stripe.automaticTax",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_STRIPE_AUTOMATIC_TAX",
+    summary:
+      "Whether a checkout has Stripe Tax work out the tax. It also has to be set up in the Stripe account.",
+  },
+  {
     key: "ai.allowPrivateEndpoints",
     kind: "boolean",
     fallback: false,

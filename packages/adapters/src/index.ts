@@ -25,6 +25,7 @@ export {
   defaultTierModelsFor,
   type GuardedAIProvider,
 } from "./create-ai-provider.ts";
+export { type BillingConfig, createBilling } from "./create-billing.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
 export {
   createTelemetry,
@@ -180,6 +181,14 @@ export type {
   ToolDefinition,
 } from "./ports/ai.ts";
 export { AIUnavailableError } from "./ports/ai.ts";
+export {
+  type Billing,
+  type BillingEvent,
+  type BillingPrice,
+  BillingSignatureError,
+  BillingUnavailableError,
+  type SubscriptionState,
+} from "./ports/billing.ts";
 export type { Cache, RateLimitResult } from "./ports/cache.ts";
 export type {
   Channel,

@@ -871,6 +871,16 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 ### workspace_imports
 Archive manifest, checksum, status, progress.
 
+### billing_accounts *(cloud only)*
+`workspace_id` to workspaces (**and it is the primary key**), `provider`, `customer_ref`, `subscription_ref?`, `status?`, `current_period_end?`, `cancel_at_period_end`, `suspended_by_billing`, timestamps. Unique on `provider` and `customer_ref`.
+
+Migration 0145. Design: `docs/design/billing.md`. Named for any provider, so another is a new driver and no migration. `suspended_by_billing` is why a billing event never lifts a suspension an operator imposed. Empty until a provider turns billing on. The tenant floor, and a read-only policy for a live operator. `pnpm check:boundaries` refuses a read or an import from a product path, as it does for `tenants`.
+
+### billing_events *(cloud only)*
+`provider` and `event_ref` (**the primary key**), `workspace_id` to workspaces, `received_at`.
+
+Migration 0145. What makes a repeated webhook delivery do nothing. No `deleted_at`, because removing a row would let the event apply twice.
+
 ### tenants *(cloud only)*
 `workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`.
 

@@ -163,6 +163,11 @@ export {
   users,
   verifications,
 } from "./schema/auth.ts";
+export {
+  type BillingAccount,
+  billingAccounts,
+  billingEvents,
+} from "./schema/billing.ts";
 export { type Blob, type BlobStatus, blobs } from "./schema/blobs.ts";
 export {
   BLOCKER_SOURCES,
