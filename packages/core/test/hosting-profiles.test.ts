@@ -7,7 +7,10 @@ import { setPlanAsOperator } from "../src/operator/plans.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import {
+  adoptWorkspaces,
   CLOUD_ENABLED_KEY,
+  guardsAIEndpoints,
+  hasPlanScreen,
   isCloudEnabled,
   readPlans,
   readTenant,
@@ -99,6 +102,8 @@ describe("one organisation with one workspace: every switch at its default", () 
     const workspaceId = await firstWorkspace();
     await expect(readTenant(wb.appPool, workspaceId)).resolves.toBeUndefined();
     await expect(readPlans(wb.appPool)).resolves.toEqual([]);
+    await expect(hasPlanScreen(wb.appPool)).resolves.toBe(false);
+    await expect(guardsAIEndpoints(wb.appPool)).resolves.toBe(false);
   });
 
   it("ignores a default plan, because nothing here is a cloud", async () => {
@@ -159,6 +164,50 @@ describe.each([
     const wb = await workerDb();
     await expect(isRegistrationOpen(wb.appPool)).resolves.toBe(false);
   });
+
+  it("has no plan screen, because there are no plans", async () => {
+    const wb = await workerDb();
+    await expect(hasPlanScreen(wb.appPool)).resolves.toBe(false);
+  });
+
+  it("guards an AI address unless the deployment says it trusts its administrators", async () => {
+    const wb = await workerDb();
+    await expect(guardsAIEndpoints(wb.appPool)).resolves.toBe(true);
+    await applySetup({ "ai.allowPrivateEndpoints": true });
+    await expect(guardsAIEndpoints(wb.appPool)).resolves.toBe(false);
+  });
+});
+
+describe("turning the flag on later", () => {
+  it("gives workspaces from before it a tenant record, once", async () => {
+    const wb = await workerDb();
+    const workspaceId = await firstWorkspace();
+    await expect(adoptWorkspaces(wb.appPool)).resolves.toBe(0);
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toBeUndefined();
+
+    await applySetup({ [CLOUD_ENABLED_KEY]: true });
+    await expect(adoptWorkspaces(wb.appPool)).resolves.toBe(1);
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
+      state: "active",
+      planKey: null,
+      seats: null,
+    });
+    await expect(adoptWorkspaces(wb.appPool)).resolves.toBe(0);
+  });
+
+  it("gives an adopted workspace no plan, even with a default named", async () => {
+    const wb = await workerDb();
+    const workspaceId = await firstWorkspace();
+    await applySetup({
+      [CLOUD_ENABLED_KEY]: true,
+      "cloud.plans": PROVIDER_PLANS,
+      "cloud.defaultPlan": "starter",
+    });
+    await adoptWorkspaces(wb.appPool);
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
+      planKey: null,
+    });
+  });
 });
 
 describe("a cloud run by a provider: the flag on, its own plans", () => {
@@ -175,9 +224,11 @@ describe("a cloud run by a provider: the flag on, its own plans", () => {
     await expect(isRegistrationOpen(wb.appPool)).resolves.toBe(true);
   });
 
-  it("offers the provider's own catalogue", async () => {
+  it("offers the provider's own catalogue, on a plan screen", async () => {
     const wb = await workerDb();
     await expect(readPlans(wb.appPool)).resolves.toEqual(PROVIDER_PLANS);
+    await expect(hasPlanScreen(wb.appPool)).resolves.toBe(true);
+    await expect(guardsAIEndpoints(wb.appPool)).resolves.toBe(true);
   });
 
   it("does not let an administrator take a plan for nothing", async () => {

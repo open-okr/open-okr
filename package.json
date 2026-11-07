@@ -48,6 +48,7 @@
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install --with-deps chromium",
     "cadence:sweep": "pnpm --filter @openokr/core cadence:sweep",
+    "cloud:adopt": "pnpm --filter @openokr/core cloud:adopt",
     "cloud:operator": "pnpm --filter @openokr/core cloud:operator",
     "cloud:sweep": "pnpm --filter @openokr/core cloud:sweep",
     "cloud:usage": "pnpm --filter @openokr/core cloud:usage",

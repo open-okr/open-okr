@@ -15,8 +15,8 @@
  * This uses it: the route names the provider, the credential is that
  * provider's own, and its base URL is the one the workspace configured.
  *
- * **On the managed cloud, an administrator's base URL is checked on every
- * request** (H-07). A workspace administrator there is not the operator, and
+ * **On a cloud, an administrator's base URL is checked on every request** (H-07),
+ * unless whoever runs the deployment has said it trusts them. A workspace administrator there is not the operator, and
  * a base URL pointed at a metadata address or the database host would be a
  * request the server makes for them.
  *
@@ -37,7 +37,7 @@ import {
 import { loadEnv } from "@openokr/config";
 import {
   callRecorder,
-  isCloudEnabled,
+  guardsAIEndpoints,
   type ResolvedAICredential,
   recordAIEgressWithheld,
   resolveAICredential,
@@ -158,7 +158,7 @@ export async function providerForTier(
     return null;
   }
   const config = providerConfigFor(resolved, {
-    guardOutbound: await isCloudEnabled(pool),
+    guardOutbound: await guardsAIEndpoints(pool),
     appUrl: loadEnv().BETTER_AUTH_URL,
     appName: await getInstanceName(),
   });

@@ -1,6 +1,6 @@
 import {
   ACCESS_LEVELS,
-  isCloudEnabled,
+  hasPlanScreen,
   listSeatHolders,
   readOwnPlan,
   readOwnUsage,
@@ -21,7 +21,7 @@ export const generateMetadata = pageTitle("pageTitle.adminPlan");
 /**
  * S-49 Plan and seats: the customer's own side (P8-T05).
  *
- * **With the cloud flag off this screen does not exist.** Not empty, not
+ * **With the cloud flag off or no plans, this screen does not exist.** Not empty, not
  * disabled: absent from the admin navigation and not-found at its route.
  * P8-T05's acceptance criterion says no billing surface appears, and a
  * disabled control is an appearance. A self-hosted university should never
@@ -44,9 +44,9 @@ export const dynamic = "force-dynamic";
 
 export default async function PlanPage() {
   const pool = getPool();
-  // The flag first, before the level: on a self-hosted instance this route
-  // does not exist for anybody, including an administrator.
-  if (!(await isCloudEnabled(pool))) {
+  // Before the level: with the flag off, or with no plans to read, this route does
+  // not exist for anybody, including an administrator.
+  if (!(await hasPlanScreen(pool))) {
     notFound();
   }
 
@@ -85,7 +85,7 @@ export default async function PlanPage() {
           {t("admin.plan.current")}
         </h2>
         <p className="font-semibold text-ink text-xl">{currentName}</p>
-        {own && plans.length > 0 ? (
+        {own ? (
           <p className="text-ink-2 text-sm">
             {supportEmail ? (
               <a
@@ -201,32 +201,24 @@ export default async function PlanPage() {
         <h2 className="font-semibold text-ink text-sm">
           {t("admin.plan.plans")}
         </h2>
-        {plans.length === 0 ? (
-          <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            {t("admin.plan.noPlans")}
-          </p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {plans.map((plan) => (
-              <li
-                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-surface px-4 py-3"
-                key={plan.key}
-              >
-                <span className="font-medium text-ink text-sm">
-                  {plan.name}
-                </span>
-                <span className="text-ink-2 text-sm">
-                  {plan.aiMonthlyUsd === null
-                    ? seatsOf(plan.seats)
-                    : t("admin.plan.seatsWithAiSpend", {
-                        seats: seatsOf(plan.seats),
-                        usd: plan.aiMonthlyUsd,
-                      })}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="flex flex-col gap-2">
+          {plans.map((plan) => (
+            <li
+              className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-surface px-4 py-3"
+              key={plan.key}
+            >
+              <span className="font-medium text-ink text-sm">{plan.name}</span>
+              <span className="text-ink-2 text-sm">
+                {plan.aiMonthlyUsd === null
+                  ? seatsOf(plan.seats)
+                  : t("admin.plan.seatsWithAiSpend", {
+                      seats: seatsOf(plan.seats),
+                      usd: plan.aiMonthlyUsd,
+                    })}
+              </span>
+            </li>
+          ))}
+        </ul>
         {/* The one sentence that matters most on this screen. */}
         <p className="text-ink-3 text-xs">{t("admin.plan.noFeatureGate")}</p>
       </section>

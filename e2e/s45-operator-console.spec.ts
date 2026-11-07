@@ -108,6 +108,13 @@ test.beforeAll(async ({ browser }) => {
      values ('cloud.enabled', 'true'::jsonb, 'admin')
      on conflict (key) do update set value = excluded.value`,
   );
+  // A plan screen needs a plan to read (docs/design/hosting-profiles.md §5).
+  await pool.query(
+    `insert into system_settings (key, value, source)
+     values ('cloud.plans', $1::jsonb, 'admin')
+     on conflict (key) do update set value = excluded.value`,
+    [JSON.stringify([{ key: "team", name: "Team", seats: 20 }])],
+  );
   customer = await browser.newContext();
   // The operator's browser is in São Paulo: UTC-3 all year since Brazil
   // dropped summer time, and the zone of neither the machine running this
@@ -120,7 +127,9 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   // Undone whatever happened above, so no later spec runs against a cloud.
   if (pool) {
-    await pool.query("delete from system_settings where key = 'cloud.enabled'");
+    await pool.query(
+      "delete from system_settings where key in ('cloud.enabled', 'cloud.plans')",
+    );
     await pool.query(
       `update instance_operators set revoked_at = now()
         where user_id = (select id from users where email = $1)
@@ -151,6 +160,27 @@ test("the customer's administrator reads their plan, which only a cloud has", as
   await expect(
     customerPage.getByText("This workspace has no seat limit."),
   ).toBeVisible();
+});
+
+test("an operator creates a workspace for somebody with no account yet", async () => {
+  await arrive(operatorPage, OPERATOR);
+  await pool.query(
+    `insert into instance_operators (user_id, granted_by_user_id, note)
+     values ($1, $2, 'granted by the end-to-end suite')
+     on conflict (user_id) do update set revoked_at = null`,
+    [await userId(OPERATOR.email), await userId(INSTANCE_ACCOUNT.email)],
+  );
+  await goTo(operatorPage, "/operator");
+  const name = `Northwind Malaysia ${Date.now()}`;
+  await operatorPage.getByLabel("Workspace name").fill(name);
+  await operatorPage
+    .getByLabel("First administrator's email")
+    .fill("new.owner@example.net");
+  await operatorPage.getByRole("button", { name: "Create workspace" }).click();
+  await expect(
+    operatorPage.getByText("Created. An invitation went to new.owner@example.net."),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(operatorPage.getByRole("link", { name })).toBeVisible();
 });
 
 test("a member without a grant is told the console does not exist", async ({

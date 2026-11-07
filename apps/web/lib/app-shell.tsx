@@ -2,7 +2,7 @@ import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
   callAction,
-  isCloudEnabled,
+  hasPlanScreen,
   mayCreateOwnWorkspace,
   navigationFor,
   OperationError,
@@ -292,10 +292,10 @@ export async function AppShellLayout({
   // The pages the palette offers (completeness review M-21): the sidebar's,
   // the account's and the administration cards, from the same registry and
   // filtered by the same level, so the palette can open nothing the sidebar
-  // would not. A cloud-only card is left out on a self-hosted instance, as the
-  // admin layout leaves it out.
-  const cloud = adminItems.some((item) => item.cloudOnly)
-    ? await isCloudEnabled(getPool())
+  // would not. The plan card is left out with no plans to read, as the admin layout
+  // leaves it out.
+  const plans = adminItems.some((item) => item.needsPlans)
+    ? await hasPlanScreen(getPool())
     : false;
   const paletteDestinations: PaletteDestination[] = [
     ...sidebarItems.map((item) => ({
@@ -311,7 +311,7 @@ export async function AppShellLayout({
       area: "page" as const,
     })),
     ...adminItems
-      .filter((item) => cloud || !item.cloudOnly)
+      .filter((item) => plans || !item.needsPlans)
       .map((item) => ({
         id: item.id,
         label: item.label,

@@ -44,6 +44,41 @@ test("/workspaces/new does not exist under an invitation-only policy", async ({
   ).toBeVisible({ timeout: 15_000 });
 });
 
+test.describe("a group of companies", () => {
+  test.describe.configure({ mode: "serial" });
+  let pool: pg.Pool;
+
+  test.beforeAll(async () => {
+    pool = new pg.Pool(CONNECTION);
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('cloud.enabled', 'true'::jsonb, 'admin'),
+              ('registration.policy', '"invite_only"'::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+    );
+  });
+
+  // Undone whatever happened above, so no later spec runs against a cloud.
+  test.afterAll(async () => {
+    await pool.query(
+      "delete from system_settings where key in ('cloud.enabled', 'registration.policy')",
+    );
+    await pool.end();
+  });
+
+  test("an administrator sees no plan screen and no way to start a workspace", async ({
+    page,
+  }) => {
+    await signIn(page);
+    for (const route of ["/admin/plan", "/workspaces/new"]) {
+      await goTo(page, route);
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Not found" }),
+      ).toBeVisible({ timeout: 15_000 });
+    }
+  });
+});
+
 test.describe("a cloud run by a provider", () => {
   test.describe.configure({ mode: "serial" });
 

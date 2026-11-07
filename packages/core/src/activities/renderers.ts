@@ -29,6 +29,7 @@ const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
 
 export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
+  "workspace.adopted": () => "Workspace added to the operator console",
   "workspace.renamed": (p) =>
     `Workspace renamed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "workspace.onboarded": () => "Workspace setup finished",

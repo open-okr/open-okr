@@ -29,7 +29,7 @@ vi.mock("@openokr/core", () => ({
     costInPerMillion: 3,
     costOutPerMillion: 15,
   }),
-  isCloudEnabled: async () => false,
+  guardsAIEndpoints: async () => false,
   resolveAICredential: async () => ({
     source: "workspace",
     provider: "anthropic",

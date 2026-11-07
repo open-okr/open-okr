@@ -174,8 +174,8 @@ The current plan, seats used against seats available with the list of who
 holds them, the AI spend against its cap, and who to contact to change the
 plan.
 
-**With the cloud flag off, the screen does not exist.** Not empty, not
-disabled: absent from the admin navigation and not-found at its route.
+**With the cloud flag off, or no plans in the catalogue, the screen does not
+exist.** Not empty, not disabled: absent from the admin navigation and not-found at its route.
 P8-T05's acceptance says "no billing surface appears", and a disabled
 control is an appearance.
 

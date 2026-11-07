@@ -35,6 +35,7 @@ import {
 } from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 import { listMembershipsForUser } from "../workspaces/memberships.ts";
+import { isCloudEnabled } from "./settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
@@ -144,6 +145,17 @@ export async function readPlans(pool: Pool): Promise<readonly Plan[]> {
   const stored = await readSetting(pool, CLOUD_PLANS_KEY);
   const parsed = plansSchema.safeParse(stored ?? plansFromEnvironment());
   return parsed.success ? parsed.data : [];
+}
+
+/**
+ * Whether Plan and seats exists on this instance.
+ *
+ * With the flag off, or with no plans to read, it does not. A group runs with the
+ * flag on and an empty catalogue, and a screen implying a paid version of what it
+ * runs would not be true (`docs/design/hosting-profiles.md` §5).
+ */
+export async function hasPlanScreen(pool: Pool): Promise<boolean> {
+  return (await isCloudEnabled(pool)) && (await readPlans(pool)).length > 0;
 }
 
 /**

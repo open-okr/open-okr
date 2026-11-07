@@ -77,7 +77,8 @@ The install guide says so in those words.
 | Change | Detail |
 |---|---|
 | Plan screen | With an empty catalogue, not-found at the route and absent from the navigation and the palette, the same as flag off |
-| Existing workspaces | The scheduler gives any live workspace without one a tenant row, through `listLiveWorkspaces`. `pnpm cloud:adopt` and `./openokr operator adopt` do it now, for `OPENOKR_SCHEDULER=off`. Idempotent, and only with the flag on |
+| Existing workspaces | The scheduler gives any live workspace without one a tenant row every hour, through `listLiveWorkspaces`. `pnpm cloud:adopt` does it now, for `OPENOKR_SCHEDULER=off`. Idempotent, and only with the flag on. An `./openokr operator adopt` was designed and dropped: it would have needed most of the domain in the image's pruned sources, and the scheduler already does it on that target |
+| Usage figures | The scheduler also refreshes the snapshot the console and the plan screen read, every hour. Not in the first draft of this design: nothing refreshed it unless somebody ran `pnpm cloud:usage`, so a provider's console would have read empty |
 
 ## 6. Not in this design
 
@@ -92,6 +93,7 @@ The install guide says so in those words.
 - **No migration.** `workspace_members` already holds waiting members.
 - **Contract:** `workspace.provision` gains the signed-in person's path. `agentSurface` stays false, so an agent cannot create a workspace.
 - **Settings:** `ai.allowPrivateEndpoints`, `cloud.limits.freeWorkspacesPerPerson`, in TECHNICAL-PLAN §4.14.
+- **Screens:** S-50, in UIUX-PLAN.
 
 ## 8. Acceptance criteria
 

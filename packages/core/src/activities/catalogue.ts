@@ -30,6 +30,9 @@ export const isTestScaffoldKind = (kind: string): boolean =>
  */
 export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.provisioned": z.object({ name: z.string(), slug: z.string() }),
+  // The cloud flag was turned on after this workspace was made. No payload: the
+  // audit row beside it names the region.
+  "workspace.adopted": z.object({}),
   "workspace.renamed": z.object({ from: z.string(), to: z.string() }),
   // P6-G26. No payload: the fact is the event, and who did it is on the
   // audit row beside it.

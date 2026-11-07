@@ -18,10 +18,12 @@ export {
   currentConcurrentActions,
   setDefaultAdmission,
 } from "./admission.ts";
+export { adoptWorkspaces } from "./adopt.ts";
 export { setTenantStateInTx } from "./lifecycle.ts";
 export {
   applyPlanInTx,
   countSeats,
+  hasPlanScreen,
   listSeatHolders,
   planByKey,
   readOwnPlan,
@@ -35,6 +37,7 @@ export {
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,
+  guardsAIEndpoints,
   isCloudEnabled,
   resolveAdmissionLimits,
   resolveCloudTenancy,

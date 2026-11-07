@@ -325,8 +325,8 @@ spend against its cap, and who to contact to change the plan. An administrator
 does not change it here: with no payment behind it, that was a free upgrade to
 anything in the catalogue. A change below the current headcount is refused
 naming both numbers, because the product never picks who loses access. With
-`cloud.enabled` false the section is absent from the navigation and the
-route is not-found: P8-T05 asks that no billing surface appears, and a
+`cloud.enabled` false, or no plans in the catalogue, the section is absent from the
+navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a
 disabled control is an appearance.
 
 **S-50 New workspace.** A signed-in person starting another workspace, reached from

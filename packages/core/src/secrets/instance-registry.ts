@@ -354,6 +354,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "Seconds without a successful scheduler run before /api/status reports it as unavailable. Default 14400 (4 hours).",
   },
   {
+    key: "ai.allowPrivateEndpoints",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_AI_ALLOW_PRIVATE_ENDPOINTS",
+    summary:
+      "With the cloud flag on, whether a workspace administrator's AI base URL may name an address inside the network. Off is right for a public cloud. A group running its own model turns it on, trusting every workspace's administrators.",
+  },
+  {
     key: "ai.deployment.provider",
     kind: "string",
     fallback: "",

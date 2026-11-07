@@ -791,7 +791,6 @@
   "admin.plan.measured": "diukur {replace}",
   "admin.plan.noFeatureGate": "Tiada ciri yang pernah disekat di sebalik pelan. Menukar pelan hanya mengubah berapa ramai orang boleh berada di sini, dan tiada yang lain.",
   "admin.plan.noHolders": "Belum ada sesiapa yang memegang tempat duduk.",
-  "admin.plan.noPlans": "Tiada pelan dikonfigurasikan pada instans ini, jadi tiada apa yang dihadkan.",
   "admin.plan.noSeatLimit": "Ruang kerja ini tiada had tempat duduk.",
   "admin.plan.plans": "Pelan",
   "admin.plan.seatCountOne": "{count} tempat duduk",

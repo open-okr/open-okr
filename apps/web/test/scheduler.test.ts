@@ -95,7 +95,15 @@ describe("the run table", () => {
   // `outbox.purge` since completeness review M-19: it deletes delivery
   // bookkeeping for the whole instance, has no workspace or member to act
   // as, and is nothing an API caller should be able to trigger.
-  const NOT_REGISTRY_ACTIONS = new Set(["audit.chain", "outbox.purge"]);
+  // `tenancy.adopt` and `cloud.measureUsage` since docs/design/hosting-profiles.md
+  // §5: each walks every workspace for the deployment rather than for one of
+  // them, has no member to act as, and a tenant should not be able to start it.
+  const NOT_REGISTRY_ACTIONS = new Set([
+    "audit.chain",
+    "outbox.purge",
+    "tenancy.adopt",
+    "cloud.measureUsage",
+  ]);
 
   test("names a real action for every run", () => {
     // Checked against the registry rather than against a list written here.
@@ -116,12 +124,22 @@ describe("the run table", () => {
     // Guards the exemption. A run added to it silently would be a scheduled
     // job with no contract, no permission check and no place in the one-
     // contract surface, which is the opposite of what the registry is for.
-    expect([...NOT_REGISTRY_ACTIONS]).toEqual(["audit.chain", "outbox.purge"]);
+    expect([...NOT_REGISTRY_ACTIONS]).toEqual([
+      "audit.chain",
+      "outbox.purge",
+      "tenancy.adopt",
+      "cloud.measureUsage",
+    ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
-    expect(off.map((run) => run.job)).toEqual(["audit.chain", "outbox.purge"]);
+    expect(off.map((run) => run.job).sort()).toEqual([
+      "audit.chain",
+      "cloud.measureUsage",
+      "outbox.purge",
+      "tenancy.adopt",
+    ]);
     for (const run of off) {
       expect(run.cron, run.job).toBeTruthy();
     }

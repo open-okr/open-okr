@@ -85,7 +85,7 @@ vi.mock("@openokr/core", async (original) => ({
     costInPerMillion: 3,
     costOutPerMillion: 15,
   }),
-  isCloudEnabled: async () => false,
+  guardsAIEndpoints: async () => false,
   resolveAICredential: (...args: Parameters<typeof resolveAICredential>) =>
     resolveAICredential(...args),
   resolveTierRoute: async () => ({

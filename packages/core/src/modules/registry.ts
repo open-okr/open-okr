@@ -73,7 +73,7 @@ export interface NavigationItem {
    * belongs. `navigationFor` does not read it, because it has no database:
    * the caller that already knows whether this is a cloud passes the answer.
    */
-  readonly cloudOnly?: boolean;
+  readonly needsPlans?: boolean;
   /**
    * For an `inside` item, the sidebar row it lives under, which is lit while
    * it is open: Sessions and Scorecard light Cycle, Check in lights OKRs.
@@ -403,7 +403,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         label: "Plan and seats",
         href: "/admin/plan",
         section: "admin",
-        cloudOnly: true,
+        needsPlans: true,
         minLevel: ACCESS_LEVELS.full,
       },
       {

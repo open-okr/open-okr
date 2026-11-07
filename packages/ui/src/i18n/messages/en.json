@@ -791,7 +791,6 @@
   "admin.plan.measured": "measured {replace}",
   "admin.plan.noFeatureGate": "No feature is ever behind a plan. Changing plan changes how many people can be here, and nothing else.",
   "admin.plan.noHolders": "Nobody holds a seat yet.",
-  "admin.plan.noPlans": "No plans have been configured on this instance, so nothing is limited.",
   "admin.plan.noSeatLimit": "This workspace has no seat limit.",
   "admin.plan.plans": "Plans",
   "admin.plan.seatCountOne": "{count} seat",
