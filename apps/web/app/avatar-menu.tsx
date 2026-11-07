@@ -17,14 +17,6 @@ import { menuRowClass } from "./menu-row-class.ts";
  * source of truth for how a row looks, not two.
  */
 /**
- * Where the software is developed. AGPL-3.0 §13 asks that every person using
- * the instance over a network is offered its source, so this is for every
- * member, not for administrators. It sat in the footer as "Built on OpenOKR,
- * open source" until the owner moved it here (4 November 2026).
- */
-const SOURCE_URL = "https://github.com/open-okr/open-okr";
-
-/**
  * The topbar's avatar menu (UIUX-PLAN.md §3). Base UI's `Menu` supplies the
  * keyboard and focus behaviour (§2: "all accessibility behaviour... comes
  * from Base UI") — arrow-key navigation between items, `Escape` to close,
@@ -35,8 +27,17 @@ export function AvatarMenu({
   items,
   signOut,
   appearance,
+  sourceUrl,
 }: {
   readonly name: string;
+  /**
+   * Where this instance's source is. AGPL-3.0 §13 asks that every person using
+   * the instance over a network is offered it, so this is for every member, not
+   * for administrators, and a provider who changed the code names their own. It
+   * sat in the footer as "Built on OpenOKR, open source" until the owner moved it
+   * here (4 November 2026).
+   */
+  readonly sourceUrl: string;
   /**
    * The account pages, in the order they appear.
    *
@@ -87,7 +88,7 @@ export function AvatarMenu({
             {appearance}
             <Menu.Separator className="my-1 h-px bg-line" />
             <Menu.Item
-              render={<a href={SOURCE_URL} target="_blank" rel="noreferrer" />}
+              render={<a href={sourceUrl} target="_blank" rel="noreferrer" />}
               className={`${menuRowClass} flex items-center justify-between gap-3`}
             >
               {t("avatarMenu.sourceCode")}

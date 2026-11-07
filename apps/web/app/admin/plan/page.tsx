@@ -5,6 +5,7 @@ import {
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  resolveSupportEmail,
   seatState,
 } from "@openokr/core";
 import Link from "next/link";
@@ -64,6 +65,7 @@ export default async function PlanPage() {
     currentKey ??
     t("admin.plan.free");
   const instanceName = await getInstanceName();
+  const supportEmail = await resolveSupportEmail(pool);
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
@@ -85,7 +87,16 @@ export default async function PlanPage() {
         <p className="font-semibold text-ink text-xl">{currentName}</p>
         {own && plans.length > 0 ? (
           <p className="text-ink-2 text-sm">
-            {t("admin.plan.changedByProvider", { name: instanceName })}
+            {supportEmail ? (
+              <a
+                className="text-brand-text hover:underline"
+                href={`mailto:${supportEmail}`}
+              >
+                {t("admin.plan.changedByProvider", { name: instanceName })}
+              </a>
+            ) : (
+              t("admin.plan.changedByProvider", { name: instanceName })
+            )}
           </p>
         ) : null}
       </section>

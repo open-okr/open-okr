@@ -5,6 +5,7 @@ import {
   isCloudEnabled,
   navigationFor,
   OperationError,
+  resolveSourceUrl,
 } from "@openokr/core";
 import {
   AppShell,
@@ -443,6 +444,7 @@ export async function AppShellLayout({
               avatarMenu={
                 <AvatarMenu
                   name={workspace.name}
+                  sourceUrl={await resolveSourceUrl(getPool())}
                   // From the registry rather than a literal list. A literal one
                   // is how /account/channels shipped unlinked at P5-T02c and how
                   // /account/connections was still unlinked four tasks later:

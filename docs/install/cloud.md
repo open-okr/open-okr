@@ -76,6 +76,19 @@ instance audit chain. An operator sets a workspace's plan, or a seat count of
 their own for a contract no plan matches, on the workspace's page in the
 console, with a reason the customer reads in their own audit log.
 
+## Running your own
+
+Anybody may run a cloud from this code under the same licence. If you change the
+code and offer it over a network, you publish your changes. These make the
+instance yours without changing any code:
+
+| Variable | What it does |
+|---|---|
+| `OPENOKR_INSTANCE_NAME` | What the product calls itself, including "{name} support" |
+| `OPENOKR_SOURCE_URL` | Where every member is offered the source. Point it at your own if you changed the code |
+| `OPENOKR_TERMS_URL`, `OPENOKR_PRIVACY_URL` | Named on the sign-up page. Nothing shows until you set them |
+| `OPENOKR_SUPPORT_EMAIL` | Who a customer writes to about their plan |
+
 ## What differs from self-hosting
 
 | Difference | Detail |

@@ -49,6 +49,9 @@ export function instanceNameOr(name: string | undefined | null): string {
     : DEFAULT_INSTANCE_NAME;
 }
 
+/** Where the software is developed, until a provider names their own. */
+export const DEFAULT_SOURCE_URL = "https://github.com/open-okr/open-okr";
+
 export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: SETUP_COMPLETED_AT,
@@ -64,6 +67,38 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_INSTANCE_NAME",
     summary:
       "What this deployment calls itself: the page title, the sign-in and setup headings, every email and chat message, the authenticator entry and the passkey prompt. Changed from the wizard or admin, General.",
+  },
+  {
+    key: "instance.sourceUrl",
+    kind: "string",
+    fallback: DEFAULT_SOURCE_URL,
+    environment: "OPENOKR_SOURCE_URL",
+    summary:
+      "Where every member is offered this instance's source, which AGPL-3.0 section 13 asks for. A provider who changed the code points this at their own.",
+  },
+  {
+    key: "instance.termsUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_TERMS_URL",
+    summary:
+      "The terms a sign-up agrees to, as a web address. Empty means the sign-up page names none.",
+  },
+  {
+    key: "instance.privacyUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_PRIVACY_URL",
+    summary:
+      "The privacy policy a sign-up can read, as a web address. Empty means the sign-up page names none.",
+  },
+  {
+    key: "instance.supportEmail",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_SUPPORT_EMAIL",
+    summary:
+      "Who a customer writes to about their plan. Empty means the plan screen names the instance and no address.",
   },
   {
     key: "instance.language",

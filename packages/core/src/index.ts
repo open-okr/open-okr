@@ -1077,6 +1077,12 @@ export {
   RichTextValidationError,
 } from "./rich-text/validate.ts";
 export {
+  type LegalLinks,
+  resolveLegalLinks,
+  resolveSourceUrl,
+  resolveSupportEmail,
+} from "./secrets/instance-identity.ts";
+export {
   deploymentInstanceName,
   INSTANCE_NAME_MAX_LENGTH,
   InstanceNameError,
