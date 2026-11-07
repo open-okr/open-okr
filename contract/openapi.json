@@ -1011,7 +1011,7 @@
     "/workspace/provision": {
       "post": {
         "operationId": "workspace.provision",
-        "summary": "Create a workspace and its first member for a newly registered person.",
+        "summary": "Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy.",
         "tags": [
           "workspace"
         ],
@@ -1121,10 +1121,7 @@
                   "timezone": {
                     "type": "string"
                   }
-                },
-                "required": [
-                  "user"
-                ]
+                }
               }
             }
           }

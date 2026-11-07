@@ -683,7 +683,7 @@ the machine-readable document.
 | `workspace.finishOnboarding`<br/>Mark the workspace's own setup as finished, so the wizard stops offering itself. | `POST /api/v1/workspace/finishOnboarding` | writes |
 | `workspace.importArchive`<br/>Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import. | `POST /api/v1/workspace/importArchive` | writes |
 | `workspace.overview`<br/>The current workspace and the member reading it. | `GET /api/v1/workspace/overview` | reads |
-| `workspace.provision`<br/>Create a workspace and its first member for a newly registered person. | `POST /api/v1/workspace/provision` | writes |
+| `workspace.provision`<br/>Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy. | `POST /api/v1/workspace/provision` | writes |
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |
 | `workspace.reopenOnboarding`<br/>Offer the workspace's own setup again, keeping every answer it already holds. | `POST /api/v1/workspace/reopenOnboarding` | writes |
 | `workspace.setLifecycle`<br/>Move a cloud workspace between active, suspended and closed. | `POST /api/v1/workspace/setLifecycle` | writes |

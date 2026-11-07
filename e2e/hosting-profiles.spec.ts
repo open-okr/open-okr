@@ -34,6 +34,16 @@ test.describe("one organisation with one workspace", () => {
   }
 });
 
+test("/workspaces/new does not exist under an invitation-only policy", async ({
+  page,
+}) => {
+  await signIn(page);
+  await goTo(page, "/workspaces/new");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Not found" }),
+  ).toBeVisible({ timeout: 15_000 });
+});
+
 test.describe("a cloud run by a provider", () => {
   test.describe.configure({ mode: "serial" });
 
@@ -76,6 +86,16 @@ test.describe("a cloud run by a provider", () => {
       page.getByRole("link", { name: "Privacy policy" }),
     ).toHaveAttribute("href", SETTINGS["instance.privacyUrl"]);
     await visitor.close();
+  });
+
+  test("a member starts another workspace, and lands in its setup", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await goTo(page, "/workspaces/new");
+    await page.getByLabel("Name", { exact: true }).fill(`Second ${Date.now()}`);
+    await page.getByRole("button", { name: "Create workspace" }).click();
+    await expect(page).toHaveURL(/\/welcome/, { timeout: 15_000 });
   });
 
   test("every member is offered the provider's own source", async ({ page }) => {

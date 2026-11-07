@@ -329,6 +329,13 @@ naming both numbers, because the product never picks who loses access. With
 route is not-found: P8-T05 asks that no billing surface appears, and a
 disabled control is an appearance.
 
+**S-50 New workspace.** A signed-in person starting another workspace, reached from
+the avatar menu where sign-up is open to them and not-found anywhere else. A name, and
+a refusal that names the free limit when that is why. The new workspace becomes the
+active one, and its owner goes to S-34. An operator creates one on S-45 instead, naming
+who will own it, and does not become a member. See
+[hosting-profiles.md](../design/hosting-profiles.md) §3.
+
 ### Power-floor stubs
 
 Specified only enough that the v1 data model does not block them: a saved query and view builder, custom fields, configurable statuses and workflows, a Gantt timeline with scheduling, sprint boards, time logging, the operator console and billing.

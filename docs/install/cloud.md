@@ -91,6 +91,13 @@ list such as `[{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]`
 a new workspace has no plan and no seat limit, so to limit a free plan, list it
 in the catalogue and name it here.
 
+**An operator creates a workspace** on the console's first page, naming who will own
+it. With an account they own it straight away, and without one they get an invitation.
+The operator does not become a member. A signed-in person can also start their own,
+from the account menu, wherever sign-up is open to them. On a plan with a free tier,
+`OPENOKR_CLOUD_FREE_WORKSPACES_PER_PERSON` limits how many free ones a person may own.
+It defaults to 1, and zero means unlimited.
+
 Nobody grants the role to themselves. Once one operator exists, only an
 operator can grant another. Every grant and revocation is written to the
 instance audit chain. An operator sets a workspace's plan, or a seat count of

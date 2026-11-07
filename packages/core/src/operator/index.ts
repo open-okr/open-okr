@@ -30,3 +30,4 @@ export {
 } from "./site-messages.ts";
 export { isLiveOperator, listTenantsAsOperator } from "./store.ts";
 export { measureAllWorkspaces, readUsageAsOperator } from "./usage.ts";
+export { createWorkspaceAsOperator } from "./workspaces.ts";

@@ -27,6 +27,7 @@ export {
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  requireFreeWorkspaceRoom,
   resolveDefaultPlan,
   seatState,
 } from "./plans.ts";

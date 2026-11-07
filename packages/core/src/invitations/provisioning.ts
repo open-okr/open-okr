@@ -236,6 +236,9 @@ async function claimWaitingMember<
       userId: input.user.id,
       kind: "human",
       status: "active",
+      // A row an operator made for an address has only the address as a name. An
+      // import's has the person's real one, which stands.
+      name: sql`case when lower(${workspaceMembers.name}) = lower(${user.email}) then ${input.user.name} else ${workspaceMembers.name} end`,
       placeholderEmail: null,
       // The first sign-in of somebody an import left waiting: their browser's
       // zone, unless the import already gave them one.

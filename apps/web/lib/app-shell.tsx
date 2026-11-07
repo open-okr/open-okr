@@ -3,6 +3,7 @@ import {
   ACCESS_LEVELS,
   callAction,
   isCloudEnabled,
+  mayCreateOwnWorkspace,
   navigationFor,
   OperationError,
   resolveSourceUrl,
@@ -333,6 +334,11 @@ export async function AppShellLayout({
     ...accountItems.map((item) => ({ href: item.href, label: item.label })),
     ...(adminItems.length > 0
       ? [{ href: "/admin", label: t("shell.avatar.workspaceAdmin") }]
+      : []),
+    // Only where sign-up is open to this person, because anywhere else the page
+    // it opens is not-found (docs/design/hosting-profiles.md §3).
+    ...((await mayCreateOwnWorkspace(getPool(), session.user.email))
+      ? [{ href: "/workspaces/new", label: t("shell.avatar.newWorkspace") }]
       : []),
   ];
 

@@ -5,6 +5,8 @@ import { requireOperator } from "../../lib/operator";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
+import { NewWorkspaceForm } from "./new-workspace-form";
+import { createWorkspace } from "./workspace-actions";
 
 export const generateMetadata = pageTitle("pageTitle.operator");
 
@@ -76,6 +78,8 @@ export default async function OperatorWorkspacesPage() {
               })}
         </p>
       </header>
+
+      <NewWorkspaceForm action={createWorkspace} />
 
       {tenants.length === 0 ? (
         // An empty state that is a statement rather than an error. A fresh

@@ -27,6 +27,7 @@
  */
 import {
   activeOnly,
+  inviteLinks,
   newId,
   withUser,
   workspaceMembers,
@@ -49,6 +50,7 @@ import {
   ensureCurrentCycleInTx,
   ensureRhythmSettingsInTx,
 } from "../cycles/service.ts";
+import { generateInviteToken, hashInviteToken } from "../invitations/tokens.ts";
 import { runOperation } from "../operations/operation.ts";
 import {
   type ProvisioningContext,
@@ -69,8 +71,7 @@ export interface WorkspaceUser {
   readonly name: string;
 }
 
-export interface CreateWorkspaceInput {
-  readonly user: WorkspaceUser;
+interface CreateWorkspaceOptions {
   /** Defaults to a name built from the person's own. */
   readonly name?: string;
   /** The registering browser's timezone. Validated by the settings registry. */
@@ -78,6 +79,17 @@ export interface CreateWorkspaceInput {
   /** Defaults to the instance's own resolved default language. */
   readonly language?: string;
 }
+
+/**
+ * Who a workspace is for: somebody with an account, or an address an operator
+ * named. The second gets a waiting owner's row and a single-use invitation, and
+ * accepting it claims the row, through the path an import's members use.
+ */
+export type CreateWorkspaceInput = CreateWorkspaceOptions &
+  (
+    | { readonly user: WorkspaceUser }
+    | { readonly waitingOwner: { readonly email: string } }
+  );
 
 export interface ProvisionedWorkspace {
   readonly workspaceId: string;
@@ -184,6 +196,13 @@ export async function createWorkspace(
           ...input,
           language,
         });
+        const invitation =
+          "waitingOwner" in input
+            ? await inviteWaitingOwnerInTx(tx, {
+                workspaceId,
+                email: input.waitingOwner.email,
+              })
+            : null;
         // One statement, in the shape every other module contributes
         // (TECHNICAL-PLAN §4.14). Returns immediately when the cloud is off,
         // so the self-hosted path executes a call and writes nothing.
@@ -206,12 +225,15 @@ export async function createWorkspace(
             // The acting member does not exist yet, so the user this workspace
             // was created for is recorded here instead.
             payload: {
-              userId: input.user.id,
+              ...("user" in input
+                ? { userId: input.user.id }
+                : { waitingOwnerEmail: input.waitingOwner.email }),
               name: provisioned.name,
               slug: provisioned.slug,
               memberId: provisioned.memberId,
             },
           },
+          ...(invitation ? { outbox: [invitation] } : {}),
         };
       },
     },
@@ -226,6 +248,43 @@ export async function createWorkspace(
  * provisioning leaves a real user with no workspace. This is both the hook and
  * the repair for that state, which is why it checks before it creates.
  */
+/**
+ * The one invitation a waiting owner gets, in the transaction that made their
+ * workspace, so neither exists without the other.
+ */
+async function inviteWaitingOwnerInTx(
+  tx: Tx,
+  input: { readonly workspaceId: string; readonly email: string },
+) {
+  const token = generateInviteToken();
+  // openokr:allow-mutation: the provisioning operation's own transaction, which
+  // is what makes the workspace and its invitation commit together.
+  const [link] = await tx
+    .insert(inviteLinks)
+    .values({
+      workspaceId: input.workspaceId,
+      mode: "personal",
+      tokenHash: hashInviteToken(token),
+      email: input.email,
+      maxUses: 1,
+      memberKind: "human",
+    })
+    .returning({ id: inviteLinks.id });
+  const created = link as NonNullable<typeof link>;
+  return {
+    // The raw token travels only this way, and the relay strips it on delivery,
+    // as for every other invitation (`invitations.createPersonalLink`).
+    topic: "invitation.email",
+    payload: {
+      linkId: created.id,
+      workspaceId: input.workspaceId,
+      to: input.email,
+      token,
+    },
+    idempotencyKey: `invitation.email:${created.id}`,
+  };
+}
+
 export async function provisionWorkspaceForUser(
   pool: Pool,
   user: WorkspaceUser,
@@ -306,7 +365,23 @@ async function insertWorkspaceAndMember(
   workspaceId: string,
   input: CreateWorkspaceInput & ProvisioningContext,
 ): Promise<ProvisionedWorkspace> {
-  const name = input.name?.trim() || defaultWorkspaceName(input.user.name);
+  const founder =
+    "user" in input
+      ? {
+          userId: input.user.id,
+          name: input.user.name,
+          kind: "human" as const,
+          placeholderEmail: null,
+        }
+      : {
+          // Nobody has signed in as this row yet. The address stands in as the
+          // name until somebody claims it, because that is all that is known.
+          userId: null,
+          name: input.waitingOwner.email,
+          kind: "placeholder" as const,
+          placeholderEmail: input.waitingOwner.email,
+        };
+  const name = input.name?.trim() || defaultWorkspaceName(founder.name);
   const base = slugify(name);
   // **A newly provisioned workspace owes its owner a setup** (P6-G26). The
   // registry's default for `onboardingDone` is true, because a workspace
@@ -338,12 +413,13 @@ async function insertWorkspaceAndMember(
         await savepoint.insert(workspaceMembers).values({
           id: memberId,
           workspaceId,
-          userId: input.user.id,
-          name: input.user.name,
+          userId: founder.userId,
+          name: founder.name,
+          placeholderEmail: founder.placeholderEmail,
           // The member's own timezone starts as the workspace's. A person in
           // another country changes it in their profile (P2-T03).
           timezone: settings.timezone,
-          kind: "human",
+          kind: founder.kind,
           status: "active",
           primaryChannel:
             memberSettings.primaryChannel as typeof workspaceMembers.$inferInsert.primaryChannel,

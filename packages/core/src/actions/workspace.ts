@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
 import { setTenantStateInTx } from "../tenancy/index.ts";
+import { createOwnWorkspace } from "../workspaces/create-own.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -270,9 +271,12 @@ export const provisionWorkspace = {
   name: "workspace.provision" as const,
   agentSurface: false as const,
   summary:
-    "Create a workspace and its first member for a newly registered person.",
+    "Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy.",
   input: z.object({
-    user: z.object({ id: z.string().min(1), name: z.string().min(1) }),
+    /** Who it is for. A person may only name themselves, so may leave it out. */
+    user: z
+      .object({ id: z.string().min(1), name: z.string().min(1) })
+      .optional(),
     name: z.string().trim().min(1).max(200).optional(),
     timezone: z.string().optional(),
   }),
@@ -283,7 +287,7 @@ export const provisionWorkspace = {
   async handler(
     context: {
       pool: import("pg").Pool;
-      actor: { readonly kind: string };
+      actor: { readonly kind: string; readonly userId?: string };
     },
     rawInput: unknown,
   ): Promise<{
@@ -292,17 +296,40 @@ export const provisionWorkspace = {
     name: string;
     slug: string;
   }> {
-    // Registration and the setup wizard call `createWorkspace` directly, so the
-    // only callers that reach this handler are the surfaces. No member of any
-    // workspace may create another one for somebody, whatever their level.
-    if (context.actor.kind !== "system" && context.actor.kind !== "operator") {
+    const input = provisionWorkspace.input.parse(rawInput);
+    const options = {
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.timezone ? { timezone: input.timezone } : {}),
+    };
+
+    // **A signed-in person may start one where sign-up is open to them**
+    // (docs/design/hosting-profiles.md §3), and only for themselves. No member
+    // of any workspace may create one for somebody else, whatever their level.
+    if (context.actor.kind === "human" && context.actor.userId) {
+      if (input.user && input.user.id !== context.actor.userId) {
+        throw new OperationError(
+          "forbidden",
+          "A workspace cannot be created for somebody else here.",
+        );
+      }
+      return createOwnWorkspace(context.pool, {
+        userId: context.actor.userId,
+        ...options,
+      });
+    }
+
+    // Registration and the setup wizard call `createWorkspace` directly, so
+    // this is the surfaces: nobody else reaches it, and an agent never does.
+    if (
+      (context.actor.kind !== "system" && context.actor.kind !== "operator") ||
+      !input.user
+    ) {
       throw new OperationError(
         "forbidden",
         "A workspace is created when somebody signs up, not through this action.",
       );
     }
-    const input = provisionWorkspace.input.parse(rawInput);
-    return createWorkspace(context.pool, input);
+    return createWorkspace(context.pool, { user: input.user, ...options });
   },
 };
 

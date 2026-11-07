@@ -54,10 +54,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "an agent checks a draft before creating it; the browser's composer runs the same checks as the person types",
   },
-  "workspace.provision": {
-    caller: "packages/core/src/workspaces/provisioning.ts",
-    why: "the pipeline calls it, from registration and the setup wizard",
-  },
   "workspace.changePlan": {
     caller: "packages/core/src/operator/plans.ts",
     why: "an operator's plan change on the console is audited under it; a workspace's own members are refused",

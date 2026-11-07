@@ -988,6 +988,7 @@ export {
 // boundary gate lets only these touch `tenants`.
 export {
   createSiteMessage,
+  createWorkspaceAsOperator,
   deleteSiteMessage,
   dismissSiteMessage,
   endSupportSession,
@@ -1254,6 +1255,10 @@ export {
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
+export {
+  createOwnWorkspace,
+  mayCreateOwnWorkspace,
+} from "./workspaces/create-own.ts";
 export {
   listMembershipsForUser,
   type Membership,

@@ -171,6 +171,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   // unlimited so a self-hosted instance is never limited by a number nobody
   // chose. Design: docs/design/tenant-limits.md §4.
   {
+    key: "cloud.limits.freeWorkspacesPerPerson",
+    kind: "number",
+    fallback: 1,
+    environment: "OPENOKR_CLOUD_FREE_WORKSPACES_PER_PERSON",
+    summary:
+      "How many workspaces on the default plan one person may own. Zero means unlimited. With no default plan it does not apply, so a group is never limited, and an operator is not held to it.",
+  },
+  {
     key: "cloud.limits.actionsPerMinute",
     kind: "number",
     fallback: 0,

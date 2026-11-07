@@ -21,21 +21,25 @@ import {
   tenants,
   withWorkspace,
   workspaceMembers,
+  workspaceRoles,
 } from "@openokr/db";
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
+import { PROTECTED_ROLE_KEY } from "../access/roles.ts";
 import { OperationError } from "../operations/errors.ts";
 import {
   environmentValue,
   getInstanceSetting,
 } from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
+import { listMembershipsForUser } from "../workspaces/memberships.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
 const CLOUD_DEFAULT_PLAN_KEY = "cloud.defaultPlan";
+const FREE_WORKSPACES_KEY = "cloud.limits.freeWorkspacesPerPerson";
 
 /**
  * One plan.
@@ -183,6 +187,70 @@ export async function resolveDefaultPlan(pool: Pool): Promise<Plan | null> {
     return null;
   }
   return (await readPlans(pool)).find((plan) => plan.key === key) ?? null;
+}
+
+/**
+ * How many free workspaces one person may own (docs/design/hosting-profiles.md §3).
+ *
+ * Each one is worth AI credits, so without this a free plan is as much AI as
+ * somebody cares to ask for. It only means anything with a default plan, which
+ * is why a group, which has none, is never limited.
+ */
+export async function requireFreeWorkspaceRoom(
+  pool: Pool,
+  userId: string,
+): Promise<void> {
+  const plan = await resolveDefaultPlan(pool);
+  if (!plan) {
+    return;
+  }
+  const definition = getInstanceSetting(FREE_WORKSPACES_KEY);
+  const stored = await readSetting(pool, FREE_WORKSPACES_KEY);
+  const fromVariable = definition
+    ? environmentValue(definition, process.env)
+    : undefined;
+  const limit = Number(stored ?? fromVariable ?? definition?.fallback ?? 1);
+  if (!(limit > 0)) {
+    return;
+  }
+
+  let owned = 0;
+  for (const { workspaceId, memberId } of await listMembershipsForUser(
+    pool,
+    userId,
+  )) {
+    const [row] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+      tx
+        .select({ id: workspaceRoles.id })
+        .from(workspaceMembers)
+        .innerJoin(
+          workspaceRoles,
+          eq(workspaceRoles.id, workspaceMembers.roleId),
+        )
+        .innerJoin(
+          tenants,
+          eq(tenants.workspaceId, workspaceMembers.workspaceId),
+        )
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, memberId),
+            eq(workspaceRoles.builtinKey, PROTECTED_ROLE_KEY),
+            eq(tenants.planKey, plan.key),
+          ),
+        )
+        .limit(1),
+    );
+    if (row) {
+      owned += 1;
+    }
+  }
+  if (owned >= limit) {
+    throw new OperationError(
+      "forbidden",
+      `You already own ${owned} free workspace${owned === 1 ? "" : "s"}, which is the limit here. Move one to a paid plan to start another.`,
+    );
+  }
 }
 
 /** The usage snapshot, for the customer's own plan screen. */
