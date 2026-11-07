@@ -1,7 +1,8 @@
 # AI credits: an allowance on the provider's own key
 
-Status: approved on 7 November 2026. Authority: AI-NATIVE-PLAN §1 rule 7 and §4,
-`plans-and-seats.md` §9, `billing.md`.
+Status: approved on 7 November 2026. **The expiry of purchased credits in §4, §6, §9,
+§10 and §11 was added on 8 November 2026 and awaits approval.** Authority: AI-NATIVE-PLAN
+§1 rule 7 and §4, `plans-and-seats.md` §9, `billing.md`.
 
 ## 1. What a credit is
 
@@ -68,21 +69,32 @@ One migration, with row-level security in the same file. No legacy source.
 | Change | Notes |
 |---|---|
 | `ai_usage_events.key_source` | `user`, `workspace` or `deployment`. Nullable, because earlier rows do not know and spend nothing |
-| `ai_credit_balances` | One row per workspace: `period_start`, `used_usd`, `agent_used_usd`, `purchased_usd` |
+| `ai_credit_balances` | One row per workspace: `period_start`, `used_usd`, `agent_used_usd` |
+| `ai_credit_packs` | One row per purchase: `workspace_id`, `credits`, `purchased_usd`, `remaining_usd`, `event_ref`, `purchased_at`, `expires_at` |
 
 **A balance row rather than summing the usage table.** The check runs before every AI
 call, and one locked row is both faster and safe under concurrency. The events stay
 as the record, and the row can be rebuilt from them.
+
+**One row per purchase rather than one total**, because two packs bought months apart
+expire on different days, and one number cannot say how much of it lapses when.
 
 Each call on the provider's key updates the balance in the same transaction as its
 usage row. A new month resets `used_usd` and `agent_used_usd`.
 
 ```
 allowance  = plan credits x credit value
+live packs = packs whose expires_at is after now
+available  = (allowance - used) + the remaining_usd of every live pack
 overflow   = what this call took past the allowance
-purchased  = purchased - overflow, never below zero
-available  = (allowance - used) + purchased
 ```
+
+Overflow comes off the live pack that expires soonest, then the next. A charge already
+holds the balance row's lock, so the packs need no lock of their own.
+
+**The balance's `purchased_usd` goes in the migration that adds the packs.** No release
+has shipped that column: migration 0146 exists only on this branch. So the two-release
+rule has nothing to protect, and no purchase needs carrying over.
 
 ## 5. Limits
 
@@ -103,12 +115,15 @@ lower spend further, including on their own key.
 | Item | Detail |
 |---|---|
 | Who | A plan with `aiTopUps: true`. The page says paid plans |
-| Price | A Stripe price the provider chose, in its own currency, named by `billing.creditPack`: `{ "priceId": "price_1Xyz", "credits": 1000 }`. OKRGoal's is US$20 |
+| Price | A Stripe price the provider chose, in its own currency, named by `billing.creditPack`: `{ "priceId": "price_1Xyz", "credits": 1000, "months": 12 }`. OKRGoal's is US$20 |
 | How | **Buy credits** on S-49, through hosted checkout |
-| When it lands | The webhook adds to `purchased_usd`, once per checkout session |
-| Spent | After the month's allowance |
-| Expiry | **None.** They paid for them. Easy to tighten later and hard to loosen |
-| Refunds | None, per your terms |
+| When it lands | The webhook adds one pack row, once per checkout session |
+| Spent | After the month's allowance, soonest to expire first, so nobody loses credits they could have spent |
+| Expiry | **Twelve months after purchase**, which is what Terms §5.2 and the pricing page promise. `months` in `billing.creditPack` sets another length, default 12, so the release does not decide this for another provider |
+| Fixed at purchase | `expires_at` is written when the pack lands. A provider changing `months` later does not touch a pack already sold |
+| The moment it lapses | A pack stops counting as soon as `expires_at` passes, because every read compares the date. **No job runs**, so none can fail or run late, and the row stays as the record of what lapsed |
+| Refunds | None, per Terms §4.8, which names unused AI credits |
+| Moving to a plan with no credits | The pack waits, unusable, because that plan has no provider key (§3). Its clock keeps running |
 
 ## 7. Default models on the provider's key
 
@@ -132,7 +147,7 @@ typical credits on the pricing page.** It costs a few dollars.
 
 | Screen | Change |
 |---|---|
-| S-49 | Credits used of the allowance, purchased credits left, when it resets, **Buy credits**, and a usage log by feature |
+| S-49 | Credits used of the allowance, purchased credits left and when the soonest of them expire ("300 of these expire on 3 March 2027"), when the allowance resets, **Buy credits**, and a usage log by feature |
 | Admin, AI | Says plainly that a key added here spends no credits |
 | Any AI affordance, out of credits | Hidden, as it is with a provider off, and a banner across the product says AI is paused until the 1st or until somebody buys more, and that nothing else stopped. A disabled control on each of some twenty screens would say the same thing twenty times |
 
@@ -152,7 +167,11 @@ needs your decision and a rule key, so it is left out.
 9. **Given** a plan with `aiCredits` absent, **when** a workspace has no key of its own, **then** AI is off, and adding a key turns it on.
 10. **Given** an administrator's own model row at zero cost, **when** a call runs on the provider's key, **then** it is priced from the catalogue.
 11. **Given** a self-hosted instance with `OPENOKR_AI_PROVIDER` set, **when** a member uses AI, **then** it works with no credit check.
-12. **Given** ten concurrent calls near the limit, **then** the balance is exact and the overshoot is at most the calls in flight.
+12. **Given** ten concurrent calls near the limit, **then** the balance is exact across every pack and the overshoot is at most the calls in flight.
+13. **Given** a pack bought on 8 November 2026, **when** S-49 shows it, **then** it says those credits expire on 8 November 2027.
+14. **Given** a pack expiring in March and one in June, and an allowance already spent, **when** a call runs, **then** the March pack pays first and the June pack is untouched until March's is empty.
+15. **Given** a pack whose `expires_at` has just passed and no allowance left, **when** a member asks the copilot, **then** AI on the provider's key is paused, with no job having run.
+16. **Given** a pack already sold, **when** the provider changes `months`, **then** that pack's expiry does not move, and the next pack bought uses the new length.
 
 ## 11. Decisions for you
 
@@ -161,4 +180,5 @@ needs your decision and a rule key, so it is left out.
 | 1 | Which model runs on your key by default? | Haiku 5.5 for every tier on OKRGoal, then decide from `pnpm ai:measure` and reading its output. Credits go twenty times further, and I have not yet compared the quality |
 | 2 | Do you want agents held to half the allowance? | Yes. Change it after real use |
 | 3 | May a provider set its own credit value? | Yes, one setting. You asked that providers set their own pricing |
-| 4 | Do purchased credits never expire? | Yes |
+| 4 | Do purchased credits never expire? | **Closed on 8 November 2026: they expire after twelve months**, matching Terms §5.2 and the pricing page |
+| 5 | Should anybody be warned before a pack lapses? | No for now. S-49 shows the date, and a warning would be a new kind of proactive message, which is your decision |
