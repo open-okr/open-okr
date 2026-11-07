@@ -1,6 +1,6 @@
 # Billing: Stripe behind a port, for any provider
 
-Status: **waiting for approval.** Authority: REQUIREMENTS §5, PLAN §3 and §10 #1,
+Status: approved on 7 November 2026. Authority: REQUIREMENTS §5, PLAN §3 and §10 #1,
 `plans-and-seats.md` §9. Depends on `tenant-lifecycle.md`.
 
 ## 1. What this has to be true of

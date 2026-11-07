@@ -1,6 +1,6 @@
 # Hosting setups: creating workspaces, and the switches behind each setup
 
-Status: **waiting for approval.** Authority: REQUIREMENTS §5, PLAN §5.2.
+Status: approved on 7 November 2026. Authority: REQUIREMENTS §5, PLAN §5.2.
 Depends on `tenant-lifecycle.md`, `operator-console.md`, `plans-and-seats.md`.
 
 ## 1. The problem

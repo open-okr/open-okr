@@ -1,6 +1,6 @@
 # AI credits: an allowance on the provider's own key
 
-Status: **waiting for approval.** Authority: AI-NATIVE-PLAN §1 rule 7 and §4,
+Status: approved on 7 November 2026. Authority: AI-NATIVE-PLAN §1 rule 7 and §4,
 `plans-and-seats.md` §9, `billing.md`.
 
 ## 1. What a credit is
