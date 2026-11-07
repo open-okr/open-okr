@@ -25,6 +25,7 @@ export {
   countSeats,
   hasPlanScreen,
   listSeatHolders,
+  type Plan,
   planByKey,
   readOwnPlan,
   readOwnUsage,
@@ -32,6 +33,7 @@ export {
   requireFreeWorkspaceRoom,
   resolveDefaultPlan,
   seatState,
+  seatsInUseInTx,
 } from "./plans.ts";
 export {
   CLOUD_CLOSURE_RETENTION_KEY,

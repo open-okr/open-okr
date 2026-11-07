@@ -25,6 +25,10 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // is lifting, and a cloud workspace could be suspended and never
   // reactivated.
   "workspace.setLifecycle",
+  // Paying again is how a workspace billing made read-only gets out of it, so the
+  // write that says so has to survive the state it ends.
+  "billing.subscription_changed",
+  "billing.settleEnded",
   // Turning a single sign-on connection off, and on again. A compromised
   // identity provider has to be shut out whatever state the workspace is in,
   // and a freeze is exactly when somebody is dealing with an incident.

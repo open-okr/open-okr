@@ -56,6 +56,17 @@ const planSchema = z.object({
   seats: z.number().int().min(1).nullable().default(null),
   /** Written into the existing `ai_budgets` workspace row. No new mechanism. */
   aiMonthlyUsd: z.number().min(0).nullable().default(null),
+  /**
+   * A payment provider's price identifiers, and no amounts: the provider holds
+   * those, because each provider sets its own prices and currency. A plan with none
+   * cannot be bought, only set by an operator (docs/design/billing.md §3).
+   */
+  prices: z
+    .object({
+      month: z.string().trim().min(1).optional(),
+      year: z.string().trim().min(1).optional(),
+    })
+    .optional(),
 });
 
 export type Plan = z.infer<typeof planSchema>;
@@ -349,6 +360,27 @@ export async function requireSeatInTx(
   }
 }
 
+/** How many seats are in use, from inside an Operation's own transaction. */
+export async function seatsInUseInTx(
+  tx: AnyTx,
+  workspaceId: string,
+): Promise<number> {
+  const [row] = await tx
+    .select({ n: count() })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.kind, "human"),
+          inArray(workspaceMembers.status, [...SEAT_STATUSES]),
+        ),
+      ),
+    );
+  return row?.n ?? 0;
+}
+
 export interface ApplyPlanInput {
   readonly workspaceId: string;
   /** Null is the free tier, which needs no catalogue row. */
@@ -380,20 +412,7 @@ export async function applyPlanInTx(
   const seats =
     input.seats !== undefined ? input.seats : (input.plan?.seats ?? null);
   if (seats !== null) {
-    const [row] = await tx
-      .select({ n: count() })
-      .from(workspaceMembers)
-      .where(
-        activeOnly(
-          workspaceMembers,
-          and(
-            eq(workspaceMembers.workspaceId, input.workspaceId),
-            eq(workspaceMembers.kind, "human"),
-            inArray(workspaceMembers.status, [...SEAT_STATUSES]),
-          ),
-        ),
-      );
-    const used = row?.n ?? 0;
+    const used = await seatsInUseInTx(tx, input.workspaceId);
     if (used > seats) {
       throw new OperationError(
         "forbidden",

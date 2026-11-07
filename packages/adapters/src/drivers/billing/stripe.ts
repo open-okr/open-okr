@@ -51,6 +51,8 @@ export class StripeBilling implements Billing {
     this.#client = new Stripe(options.secretKey, {
       httpClient: Stripe.createFetchHttpClient(options.fetch),
       maxNetworkRetries: 2,
+      // The plan screen waits on this, and must still draw when Stripe does not answer.
+      timeout: 10_000,
     });
   }
 

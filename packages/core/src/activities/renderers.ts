@@ -41,6 +41,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
+  "billing.subscription_changed": (p) =>
+    `The subscription is now ${asString(p.status)}`,
   "workspace.plan_changed": (p) =>
     typeof p.seats === "number"
       ? `Workspace moved to the ${asString(p.plan)} plan, with ${p.seats} seats`

@@ -531,6 +531,15 @@ export {
   trackSSOProviders,
 } from "./auth/sso-refresh.ts";
 export {
+  applyBillingEvent,
+  type BillingGateway,
+  type BillingOutcome,
+  type BillingSettings,
+  resolveBillingSettings,
+  type SubscriptionSnapshot,
+  type VerifiedBillingEvent,
+} from "./billing/index.ts";
+export {
   type ClaimBlobInput,
   type ClaimedBlob,
   claimBlob,
