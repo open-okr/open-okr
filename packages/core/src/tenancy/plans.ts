@@ -258,9 +258,8 @@ export interface ApplyPlanInput {
  * Puts a workspace on a plan (completeness review H-21).
  *
  * Nothing wrote `plan_key` or `seats` after a tenant was created, so no seat
- * limit ever applied to anybody. Both the administrator's change on S-49 and
- * an operator's on S-46 come through here, so the rule cannot differ between
- * them:
+ * limit ever applied to anybody. Everything that changes a plan comes through
+ * here, so the rule cannot differ between them:
  *
  * - **Never below the headcount.** Refused naming both numbers, because the
  *   product never picks who loses access (UIUX-PLAN S-49).

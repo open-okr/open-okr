@@ -10,11 +10,10 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
-import { changePlan } from "./actions";
-import { PlanForm } from "./plan-form";
 
 export const generateMetadata = pageTitle("pageTitle.adminPlan");
 
@@ -33,10 +32,12 @@ export const generateMetadata = pageTitle("pageTitle.adminPlan");
  * PLAN.md §4 says the cloud sells operation rather than features. A plan is a
  * seat count and a spend cap.
  *
- * **The administrator can change plan here, and sees who holds each seat**
- * (completeness review H-21). Until then this screen described plans nobody
- * could move between, and told an administrator to free a seat without
- * saying whose.
+ * **The administrator sees who holds each seat** (completeness review H-21),
+ * because telling somebody to free a seat without saying whose is no help.
+ *
+ * **They read the plan here and do not change it.** Moving plan with no payment
+ * behind it was a free upgrade to anything in the catalogue, so the action refuses
+ * them and this screen names who does change it.
  */
 export const dynamic = "force-dynamic";
 
@@ -62,17 +63,13 @@ export default async function PlanPage() {
     plans.find((plan) => plan.key === currentKey)?.name ??
     currentKey ??
     t("admin.plan.free");
+  const instanceName = await getInstanceName();
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
       : count === 1
         ? t("admin.plan.seatCountOne", { count })
         : t("admin.plan.seatCountOther", { count });
-  const describe = (plan: (typeof plans)[number]): string =>
-    t("admin.plan.planWithSeats", {
-      name: plan.name,
-      seats: seatsOf(plan.seats),
-    });
 
   return (
     <div className="flex flex-col gap-8">
@@ -86,17 +83,10 @@ export default async function PlanPage() {
           {t("admin.plan.current")}
         </h2>
         <p className="font-semibold text-ink text-xl">{currentName}</p>
-        {/* Only with a tenant row and a catalogue: on a cloud with no plans
-         * configured there is nothing to move to. */}
         {own && plans.length > 0 ? (
-          <PlanForm
-            action={changePlan}
-            current={currentKey}
-            plans={plans.map((plan) => ({
-              key: plan.key,
-              label: describe(plan),
-            }))}
-          />
+          <p className="text-ink-2 text-sm">
+            {t("admin.plan.changedByProvider", { name: instanceName })}
+          </p>
         ) : null}
       </section>
 

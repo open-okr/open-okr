@@ -41,7 +41,8 @@ support screen in admin.
 ## Plans and seats
 
 An administrator sees the workspace's plan, its seats and who holds each one
-on **Admin, Plan and seats**, and moves to another plan there.
+on **Admin, Plan and seats**. An operator changes the plan, on the workspace's
+page in the console.
 
 | Rule | Why |
 |---|---|

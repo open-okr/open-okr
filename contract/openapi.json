@@ -683,7 +683,7 @@
     "/workspace/changePlan": {
       "post": {
         "operationId": "workspace.changePlan",
-        "summary": "Move this cloud workspace onto another plan from the catalogue.",
+        "summary": "Refused for a workspace's own members. A plan changes through billing, or through the instance's operator.",
         "tags": [
           "workspace"
         ],

@@ -11,11 +11,7 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
-import {
-  applyPlanInTx,
-  planByKey,
-  setTenantStateInTx,
-} from "../tenancy/index.ts";
+import { setTenantStateInTx } from "../tenancy/index.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -381,16 +377,20 @@ export const setWorkspaceLifecycle = defineWriteAction({
 });
 
 /**
- * A workspace's administrator moves it onto another plan from S-49
- * (completeness review H-21).
+ * Moving a workspace onto another plan, declared so that an operator's change
+ * resolves back to a contract like every other audit row.
  *
- * The seat count comes from the plan, never from the caller: a custom number
- * is an operator's decision and goes through `setPlanAsOperator`. Moving to a
- * plan with fewer seats than are in use is refused naming both numbers.
+ * **An administrator could move their own workspace onto any plan, and nothing
+ * asked them to pay.** REST, the command line and the agent tools all reached it
+ * as well as S-49, so hiding the control would not have closed it, and so the
+ * refusal is here. A plan changes through billing, or through
+ * `setPlanAsOperator`, which is what a contract no card pays for needs.
  */
-export const changeWorkspacePlan = defineWriteAction({
-  name: "workspace.changePlan",
-  summary: "Move this cloud workspace onto another plan from the catalogue.",
+export const changeWorkspacePlan = {
+  name: "workspace.changePlan" as const,
+  agentSurface: false as const,
+  summary:
+    "Refused for a workspace's own members. A plan changes through billing, or through the instance's operator.",
   input: z.object({
     /** A key from the operator's catalogue, or null for the free tier. */
     planKey: z.string().trim().min(1).max(50).nullable(),
@@ -400,42 +400,12 @@ export const changeWorkspacePlan = defineWriteAction({
     seats: z.number().int().nullable(),
   }),
   access: ACCESS_LEVELS.full,
-  operation: (context, input) => ({
-    // Read from the instance setting before the change, outside the
-    // workspace's transaction, because the catalogue belongs to the instance
-    // rather than to any tenant.
-    // The return type is written out: TypeScript 7 does not infer the loaded
-    // shape from a load that takes no arguments, and `execute` then reads
-    // `plan` off `undefined`.
-    async load(): Promise<{
-      plan: Awaited<ReturnType<typeof planByKey>>;
-    }> {
-      return { plan: await planByKey(context.pool, input.planKey) };
-    },
-    async execute({ tx, workspaceId, loaded: { plan } }) {
-      const moved = await applyPlanInTx(tx, { workspaceId, plan });
-      if (!moved) {
-        throw new OperationError(
-          "not_found",
-          "This workspace has no tenant record, so it has no plan to change.",
-        );
-      }
-      const seats = plan?.seats ?? null;
-      return {
-        result: { planKey: plan?.key ?? null, seats },
-        activity: {
-          kind: "workspace.plan_changed",
-          subjectType: "workspace",
-          subjectId: workspaceId,
-          payload: { plan: plan?.name ?? "Free", seats },
-        },
-        audit: {
-          action: "workspace.changePlan",
-          targetType: "workspace",
-          targetId: workspaceId,
-          payload: { planKey: plan?.key ?? null, seats },
-        },
-      };
-    },
-  }),
-});
+  safety: "write" as const,
+  runsThroughPipeline: true,
+  async handler(): Promise<{ planKey: string | null; seats: number | null }> {
+    throw new OperationError(
+      "forbidden",
+      "A workspace's plan changes through billing, or through whoever runs this instance.",
+    );
+  },
+};

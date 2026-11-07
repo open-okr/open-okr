@@ -1,6 +1,7 @@
 import { newId } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { callAction } from "../src/actions/registry.ts";
 import { grantOperator } from "../src/operator/grants.ts";
 import { setPlanAsOperator } from "../src/operator/plans.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
@@ -167,6 +168,25 @@ describe("a cloud run by a provider: the flag on, its own plans", () => {
   it("offers the provider's own catalogue", async () => {
     const wb = await workerDb();
     await expect(readPlans(wb.appPool)).resolves.toEqual(PROVIDER_PLANS);
+  });
+
+  it("does not let an administrator take a plan for nothing", async () => {
+    const wb = await workerDb();
+    const workspaceId = await firstWorkspace();
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", userId: FOUNDER },
+        },
+        "workspace.changePlan",
+        { planKey: "starter" },
+      ),
+    ).rejects.toThrow(/through billing/);
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
+      planKey: null,
+    });
   });
 
   it("applies a plan's seat limit once an operator sets the plan", async () => {

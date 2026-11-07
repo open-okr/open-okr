@@ -677,7 +677,7 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `workspace.changePlan`<br/>Move this cloud workspace onto another plan from the catalogue. | `POST /api/v1/workspace/changePlan` | writes |
+| `workspace.changePlan`<br/>Refused for a workspace's own members. A plan changes through billing, or through the instance's operator. | `POST /api/v1/workspace/changePlan` | writes |
 | `workspace.deletedItems`<br/>The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each. | `GET /api/v1/workspace/deletedItems` | reads |
 | `workspace.exportArchive`<br/>Exports the whole workspace as a versioned, checksummed, encrypted archive. Audited. | `POST /api/v1/workspace/exportArchive` | writes |
 | `workspace.finishOnboarding`<br/>Mark the workspace's own setup as finished, so the wizard stops offering itself. | `POST /api/v1/workspace/finishOnboarding` | writes |

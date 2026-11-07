@@ -58,6 +58,10 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/core/src/workspaces/provisioning.ts",
     why: "the pipeline calls it, from registration and the setup wizard",
   },
+  "workspace.changePlan": {
+    caller: "packages/core/src/operator/plans.ts",
+    why: "an operator's plan change on the console is audited under it; a workspace's own members are refused",
+  },
   "people.importMember": {
     caller: "packages/importer/src/flowyteam/mappers/organisation.ts",
     why: "the FlowyTeam importer brings people across through it",

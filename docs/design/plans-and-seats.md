@@ -152,10 +152,16 @@ ten-seat plan,
 **then** the change is refused, naming eighteen and ten, and the screen
 links to the member list so they can suspend eight people first.
 
-Built at completeness review H-21: `workspace.changePlan` for the
-administrator on S-49 and `setPlanAsOperator` on S-46, both through
+Built at completeness review H-21: `setPlanAsOperator` on S-46, through
 `applyPlanInTx`. Until then nothing wrote `plan_key` or `seats` after a tenant
 was created, so this section described a control that did not exist.
+
+**An administrator's own change on S-49 was removed on 7 November 2026**
+(section 9). It wrote the plan with no payment behind it, so any administrator
+could take any plan for nothing, over REST and the agent tools as well as the
+screen. `workspace.changePlan` stays declared, so an operator's audit row
+resolves to a contract, and refuses everybody who can reach it. Billing brings an
+administrator's own path back, through `applyPlanInTx` like this one.
 
 A downgrade that does fit applies immediately. There is no proration
 model here, because this design charges nobody. Payment belongs to the
@@ -165,8 +171,8 @@ billing design (section 9).
 
 **S-49 Plan and seats.** A workspace admin's screen, not an operator's.
 The current plan, seats used against seats available with the list of who
-holds them, the AI spend against its cap, and the upgrade and downgrade
-controls.
+holds them, the AI spend against its cap, and who to contact to change the
+plan.
 
 **With the cloud flag off, the screen does not exist.** Not empty, not
 disabled: absent from the admin navigation and not-found at its route.

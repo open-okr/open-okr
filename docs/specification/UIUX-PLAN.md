@@ -321,9 +321,10 @@ list.
 **S-49 Plan and seats.** A workspace administrator's screen rather than an
 operator's, reached from the S-36 admin navigation. The current plan,
 seats used against seats available with the list of who holds them, AI
-spend against its cap, and the upgrade and downgrade controls. A downgrade
-below the current headcount is refused naming both numbers and links to
-the member list, because the product never picks who loses access. With
+spend against its cap, and who to contact to change the plan. An administrator
+does not change it here: with no payment behind it, that was a free upgrade to
+anything in the catalogue. A change below the current headcount is refused
+naming both numbers, because the product never picks who loses access. With
 `cloud.enabled` false the section is absent from the navigation and the
 route is not-found: P8-T05 asks that no billing surface appears, and a
 disabled control is an appearance.
