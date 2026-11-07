@@ -22,7 +22,9 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import {
+  addPurchasedCreditsInTx,
   applyPlanInTx,
+  creditValueUsd,
   type Plan,
   readPlans,
   resolveDefaultPlan,
@@ -216,12 +218,77 @@ async function applySubscription(
 
 const workspaceIdSchema = z.uuid();
 
+/**
+ * A paid credit pack (docs/design/ai-credits.md §6).
+ *
+ * In model cost at this instance's credit value, read now rather than at checkout: a
+ * credit is what this instance says it is, and that is what the balance is kept in.
+ */
+async function applyCreditPack(
+  pool: Pool,
+  input: {
+    readonly provider: string;
+    readonly eventRef: string;
+    readonly workspaceId: string;
+    readonly credits: number;
+  },
+): Promise<void> {
+  const value = await creditValueUsd(pool);
+  await runOperation(
+    { pool },
+    {
+      action: "billing.credits_purchased",
+      workspaceId: input.workspaceId,
+      actor: { kind: "system" },
+      bootstrap: true,
+      async execute({ tx, workspaceId }) {
+        // openokr:allow-mutation: this operation's own transaction.
+        const inserted = await tx
+          .insert(billingEvents)
+          .values({
+            provider: input.provider,
+            eventRef: input.eventRef,
+            workspaceId,
+          })
+          .onConflictDoNothing()
+          .returning({ eventRef: billingEvents.eventRef });
+        if (inserted.length === 0) {
+          throw new AlreadyApplied();
+        }
+        await addPurchasedCreditsInTx(tx, {
+          workspaceId,
+          amountUsd: input.credits * value,
+        });
+        return {
+          result: undefined,
+          activity: {
+            kind: "billing.credits_purchased",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: { credits: input.credits },
+          },
+          audit: {
+            action: "billing.credits_purchased",
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: {
+              provider: input.provider,
+              eventRef: input.eventRef,
+              credits: input.credits,
+            },
+          },
+        };
+      },
+    },
+  );
+}
+
 export async function applyBillingEvent(
   pool: Pool,
   gateway: Pick<BillingGateway, "provider" | "readSubscription">,
   event: VerifiedBillingEvent,
 ): Promise<BillingOutcome> {
-  if (event.kind !== "subscription") {
+  if (event.kind === "ignored") {
     return "ignored";
   }
   // A signed event with no workspace of ours on it: somebody else's product on the
@@ -230,8 +297,17 @@ export async function applyBillingEvent(
   if (!workspaceId.success) {
     return "ignored";
   }
-  const subscription = await gateway.readSubscription(event.subscriptionRef);
   try {
+    if (event.kind === "credit_pack") {
+      await applyCreditPack(pool, {
+        provider: gateway.provider,
+        eventRef: event.eventRef,
+        workspaceId: workspaceId.data,
+        credits: event.credits,
+      });
+      return "applied";
+    }
+    const subscription = await gateway.readSubscription(event.subscriptionRef);
     await applySubscription(pool, {
       provider: gateway.provider,
       eventRef: event.eventRef,

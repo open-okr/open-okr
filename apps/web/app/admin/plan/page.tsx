@@ -20,12 +20,13 @@ import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import {
+  buyCreditsAction,
   changePlanAction,
   openPortalAction,
   settleEndedAction,
   startCheckoutAction,
 } from "./actions";
-import { BillingPanel, SettleButton } from "./billing-panel";
+import { BillingPanel, BuyCreditsButton, SettleButton } from "./billing-panel";
 
 export const generateMetadata = pageTitle("pageTitle.adminPlan");
 
@@ -274,6 +275,15 @@ export default async function PlanPage({
               {t("admin.credits.ownKey")}
             </p>
           </div>
+          {summary?.creditPack ? (
+            <BuyCreditsButton
+              action={buyCreditsAction}
+              amountMinor={summary.creditPack.amountMinor}
+              credits={summary.creditPack.credits}
+              currency={summary.creditPack.currency}
+              locale={locale}
+            />
+          ) : null}
           {credits.bySource.length > 0 ? (
             <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
               {credits.bySource.map((row) => (

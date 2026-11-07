@@ -396,6 +396,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       "The signing secret of the webhook pointed at /api/billing/webhook. Envelope-encrypted, never returned to a page.",
   },
   {
+    key: "billing.creditPack",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_BILLING_CREDIT_PACK",
+    summary:
+      'The extra AI credits a plan with top-ups can buy, as JSON: {"priceId":"price_1Xyz","credits":1000}. The price, and its currency, are set in the payment provider. Empty means nothing is on sale.',
+  },
+  {
     key: "billing.stripe.automaticTax",
     kind: "boolean",
     fallback: false,

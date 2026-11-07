@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import {
+  buyCreditPack,
   changeSubscriptionPlan,
   openBillingPortal,
   readBillingSummary,
@@ -55,6 +56,13 @@ export const readBilling = defineReadAction({
     scheduledPlanKey: z.string().nullable(),
     pricesAvailable: z.boolean(),
     defaultPlanKey: z.string().nullable(),
+    creditPack: z
+      .object({
+        credits: z.number(),
+        amountMinor: z.number().nullable(),
+        currency: z.string(),
+      })
+      .nullable(),
     plans: z.array(
       z.object({
         key: z.string(),
@@ -103,6 +111,31 @@ export const startCheckout = {
       workspaceId: context.workspaceId,
       ...(context.actor.userId ? { userId: context.actor.userId } : {}),
       ...input,
+      ...(context.billing ? { gateway: context.billing } : {}),
+      ...(context.baseUrl ? { baseUrl: context.baseUrl } : {}),
+    });
+  },
+};
+
+export const buyCredits = {
+  name: "billing.buyCredits" as const,
+  agentSurface: false as const,
+  summary: "An address to pay at, for the provider's pack of AI credits.",
+  input: z.object({}),
+  output: addressOnly,
+  access: ACCESS_LEVELS.full,
+  safety: "write" as const,
+  // It writes nothing: the credits arrive with the provider's webhook.
+  runsThroughPipeline: false,
+  async handler(context: ActionCallContext) {
+    await requireDeclaredAccess(
+      context,
+      ACCESS_LEVELS.full,
+      "billing.buyCredits",
+    );
+    return buyCreditPack(context.pool, {
+      workspaceId: context.workspaceId,
+      ...(context.actor.userId ? { userId: context.actor.userId } : {}),
       ...(context.billing ? { gateway: context.billing } : {}),
       ...(context.baseUrl ? { baseUrl: context.baseUrl } : {}),
     });

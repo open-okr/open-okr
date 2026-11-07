@@ -20,6 +20,7 @@ export {
 } from "./admission.ts";
 export { adoptWorkspaces } from "./adopt.ts";
 export {
+  addPurchasedCreditsInTx,
   type CreditSummary,
   chargeCreditsInTx,
   creditsPausedReason,

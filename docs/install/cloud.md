@@ -134,6 +134,19 @@ release names one.
 
 Discounts are Stripe coupons, and customers can enter a promotion code at checkout.
 
+**AI credits.** Give a plan `aiCredits` for a monthly allowance on your own key, set with
+`OPENOKR_AI_PROVIDER` and `OPENOKR_AI_API_KEY`. A credit is worth one US cent of model
+cost unless you set `OPENOKR_CLOUD_CREDIT_VALUE_USD`. A workspace that adds its own key
+spends none. To sell more, give the plan `"aiTopUps": true`, create a one-off price in
+Stripe in your own currency, and name it:
+
+```
+OPENOKR_BILLING_CREDIT_PACK={"priceId":"price_1Xyz","credits":1000}
+```
+
+Purchased credits do not expire. `OPENOKR_AI_TIER_MODELS` chooses which model each tier
+uses on your key, and `OPENOKR_AI_PRICES` corrects a model's price without a release.
+
 | What happens | Result |
 |---|---|
 | A payment fails | The plan stays while Stripe retries, and Plan and seats says so |

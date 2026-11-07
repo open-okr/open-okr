@@ -123,6 +123,16 @@
       "pages": false
     },
     {
+      "name": "billing buyCredits",
+      "action": "billing.buyCredits",
+      "method": "POST",
+      "path": "/billing/buyCredits",
+      "scope": "write",
+      "summary": "An address to pay at, for the provider's pack of AI credits.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "billing changePlan",
       "action": "billing.changePlan",
       "method": "POST",

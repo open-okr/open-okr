@@ -9,11 +9,18 @@ import { activeOnly, billingAccounts, users, withWorkspace } from "@openokr/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { z } from "zod";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  environmentValue,
+  getInstanceSetting,
+} from "../secrets/instance-registry.ts";
+import { readSetting } from "../secrets/instance-settings.ts";
 import {
   applyPlanInTx,
   countSeats,
   type Plan,
+  readHostedAccess,
   readOwnPlan,
   readPlans,
   resolveDefaultPlan,
@@ -59,6 +66,29 @@ interface PlanPrice {
   readonly currency: string;
 }
 
+/** The pack a provider has on sale, or none. */
+const creditPackSchema = z.object({
+  priceId: z.string().trim().min(1),
+  credits: z.number().int().positive(),
+});
+
+async function readCreditPack(pool: Pool) {
+  const definition = getInstanceSetting("billing.creditPack");
+  const stored = await readSetting(pool, "billing.creditPack");
+  let raw =
+    stored ??
+    (definition ? environmentValue(definition, process.env) : undefined);
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const parsed = creditPackSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
+}
+
 export interface BillingSummary {
   readonly currentPlanKey: string | null;
   readonly status: string | null;
@@ -71,6 +101,12 @@ export interface BillingSummary {
   /** False when the provider did not answer. The plan and seats still show. */
   readonly pricesAvailable: boolean;
   readonly defaultPlanKey: string | null;
+  /** On sale to this workspace, at the provider's price. Null when it is not. */
+  readonly creditPack: {
+    readonly credits: number;
+    readonly amountMinor: number | null;
+    readonly currency: string;
+  } | null;
   readonly plans: readonly {
     readonly key: string;
     readonly name: string;
@@ -85,12 +121,16 @@ export async function readBillingSummary(
   workspaceId: string,
   gateway: BillingGateway,
 ): Promise<BillingSummary> {
-  const [plans, account, own, defaultPlan] = await Promise.all([
+  const [plans, account, own, defaultPlan, pack, hosted] = await Promise.all([
     readPlans(pool),
     readBillingAccount(pool, workspaceId),
     readOwnPlan(pool, workspaceId),
     resolveDefaultPlan(pool),
+    readCreditPack(pool),
+    readHostedAccess(pool, workspaceId),
   ]);
+  const onSale =
+    pack && hosted.kind === "credits" && hosted.topUps ? pack : null;
 
   const priceIds = plans.flatMap((plan) =>
     [plan.prices?.month, plan.prices?.year].filter(
@@ -100,7 +140,9 @@ export async function readBillingSummary(
   let prices: Awaited<ReturnType<BillingGateway["listPrices"]>> = [];
   let pricesAvailable = true;
   try {
-    prices = await gateway.listPrices(priceIds);
+    prices = await gateway.listPrices(
+      onSale ? [...priceIds, onSale.priceId] : priceIds,
+    );
   } catch {
     pricesAvailable = false;
   }
@@ -138,6 +180,10 @@ export async function readBillingSummary(
     scheduledPlanKey,
     pricesAvailable,
     defaultPlanKey: defaultPlan?.key ?? null,
+    creditPack: (() => {
+      const price = onSale ? priceOf(onSale.priceId) : null;
+      return onSale && price ? { credits: onSale.credits, ...price } : null;
+    })(),
     plans: plans.map((plan) => ({
       key: plan.key,
       name: plan.name,
@@ -221,6 +267,51 @@ export async function startSubscriptionCheckout(
     mode: "subscription",
     priceId,
     workspaceId: input.workspaceId,
+    successUrl: `${baseUrl}/admin/plan?checkout=done`,
+    cancelUrl: `${baseUrl}/admin/plan`,
+    ...(account?.customerRef
+      ? { customerRef: account.customerRef }
+      : user?.email
+        ? { customerEmail: user.email }
+        : {}),
+  });
+}
+
+/** A one-off checkout for the credit pack, on a plan that can buy one. */
+export async function buyCreditPack(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly userId?: string;
+    readonly gateway?: BillingGateway;
+    readonly baseUrl?: string;
+  },
+): Promise<{ readonly url: string }> {
+  const gateway = requireGateway(input.gateway);
+  const baseUrl = requireBaseUrl(input.baseUrl);
+  const [pack, hosted, account] = await Promise.all([
+    readCreditPack(pool),
+    readHostedAccess(pool, input.workspaceId),
+    readBillingAccount(pool, input.workspaceId),
+  ]);
+  if (!pack || hosted.kind !== "credits" || !hosted.topUps) {
+    throw new OperationError(
+      "forbidden",
+      "This workspace's plan cannot buy more credits.",
+    );
+  }
+  const [user] = input.userId
+    ? await drizzle(pool)
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1)
+    : [];
+  return gateway.startCheckout({
+    mode: "payment",
+    priceId: pack.priceId,
+    workspaceId: input.workspaceId,
+    credits: pack.credits,
     successUrl: `${baseUrl}/admin/plan?checkout=done`,
     cancelUrl: `${baseUrl}/admin/plan`,
     ...(account?.customerRef

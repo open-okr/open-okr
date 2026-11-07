@@ -108,6 +108,7 @@ import {
   verifyAudit,
 } from "./audit.ts";
 import {
+  buyCredits,
   changeBillingPlan,
   openPortal,
   readBilling,
@@ -531,6 +532,7 @@ export const ACTION_MAP = {
   "billing.summary": readBilling,
   "billing.startCheckout": startCheckout,
   "billing.openPortal": openPortal,
+  "billing.buyCredits": buyCredits,
   "billing.changePlan": changeBillingPlan,
   "billing.settleEnded": settleEnded,
   "workspace.setLifecycle": setWorkspaceLifecycle,

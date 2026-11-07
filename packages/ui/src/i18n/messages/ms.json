@@ -552,6 +552,8 @@
   "admin.channels.whichTemplateAnswersWhich": "Templat mana menjawab peringatan mana",
   "admin.channels.workspaceId": "ID ruang kerja",
   "admin.channels.yourOwnChannelAnd": "Saluran dan waktu senyap anda sendiri boleh anda ubah, dalam tetapan akaun anda.",
+  "admin.credits.buy": "Beli {count} kredit",
+  "admin.credits.buyFor": "Beli {count} kredit dengan {amount}",
   "admin.credits.ownKey": "Kunci yang anda tambah pada skrin AI tidak menggunakan kredit, dan anda membayar penyedia anda secara terus.",
   "admin.credits.purchased": "{count} kredit yang dibeli masih ada. Ia tidak luput.",
   "admin.credits.resets": "Ditetapkan semula pada {date}.",

@@ -552,6 +552,8 @@
   "admin.channels.whichTemplateAnswersWhich": "Which template answers which reminder",
   "admin.channels.workspaceId": "Workspace id",
   "admin.channels.yourOwnChannelAnd": "Your own channel and quiet hours are yours to change, in your\n              account settings.",
+  "admin.credits.buy": "Buy {count} credits",
+  "admin.credits.buyFor": "Buy {count} credits for {amount}",
   "admin.credits.ownKey": "A key you add on the AI screen spends no credits, and you pay your provider directly.",
   "admin.credits.purchased": "{count} purchased credits left. They do not expire.",
   "admin.credits.resets": "Resets on {date}.",

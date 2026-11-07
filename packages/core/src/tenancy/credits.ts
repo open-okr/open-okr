@@ -281,3 +281,24 @@ export async function chargeCreditsInTx(
     })
     .where(eq(aiCreditBalances.workspaceId, input.workspaceId));
 }
+
+/** Adds purchased credits. They wait until the month's allowance is spent. */
+export async function addPurchasedCreditsInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly amountUsd: number;
+    readonly now?: Date;
+  },
+): Promise<void> {
+  const period = monthStart(input.now ?? new Date());
+  const balance = await lockedBalanceInTx(tx, input.workspaceId, period);
+  // openokr:allow-mutation: the caller's Operation transaction.
+  await tx
+    .update(aiCreditBalances)
+    .set({
+      purchasedUsd: String(balance.purchasedUsd + input.amountUsd),
+      updatedAt: sql`now()`,
+    })
+    .where(eq(aiCreditBalances.workspaceId, input.workspaceId));
+}

@@ -62,6 +62,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // Completeness review H-21. In the feed because a plan change can change
   // what everybody's invitations do.
   "billing.subscription_changed": z.object({ status: z.string() }),
+  "billing.credits_purchased": z.object({ credits: z.number() }),
   "workspace.plan_changed": z.object({
     plan: z.string(),
     seats: z.number().nullable(),

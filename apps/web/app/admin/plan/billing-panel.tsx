@@ -241,6 +241,38 @@ export function BillingPanel({
   );
 }
 
+/** The provider's pack of credits, at the price it states. */
+export function BuyCreditsButton({
+  action,
+  credits,
+  amountMinor,
+  currency,
+  locale,
+}: {
+  readonly action: BillingAction;
+  readonly credits: number;
+  readonly amountMinor: number | null;
+  readonly currency: string;
+  readonly locale: string;
+}) {
+  const { t } = useTranslations();
+  const count = credits.toLocaleString(locale);
+  return (
+    <ActionButton
+      action={action}
+      label={
+        amountMinor === null
+          ? t("admin.credits.buy", { count })
+          : t("admin.credits.buyFor", {
+              count,
+              amount: formatPrice(amountMinor, currency, locale),
+            })
+      }
+      quiet
+    />
+  );
+}
+
 /** Moving to the default plan, once a read-only workspace's people fit it. */
 export function SettleButton({
   action,

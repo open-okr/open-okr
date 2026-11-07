@@ -855,6 +855,36 @@
                             "null"
                           ]
                         },
+                        "creditPack": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "credits": {
+                                  "type": "number"
+                                },
+                                "amountMinor": {
+                                  "type": [
+                                    "number",
+                                    "null"
+                                  ]
+                                },
+                                "currency": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "credits",
+                                "amountMinor",
+                                "currency"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
                         "plans": {
                           "type": "array",
                           "items": {
@@ -947,6 +977,7 @@
                         "scheduledPlanKey",
                         "pricesAvailable",
                         "defaultPlanKey",
+                        "creditPack",
                         "plans"
                       ],
                       "additionalProperties": false
@@ -1088,6 +1119,84 @@
       "post": {
         "operationId": "billing.openPortal",
         "summary": "An address to manage cards and invoices, and to cancel.",
+        "tags": [
+          "billing"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "url"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/billing/buyCredits": {
+      "post": {
+        "operationId": "billing.buyCredits",
+        "summary": "An address to pay at, for the provider's pack of AI credits.",
         "tags": [
           "billing"
         ],

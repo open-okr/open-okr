@@ -83,6 +83,14 @@ export async function changePlanAction(
   }
 }
 
+export async function buyCreditsAction(): Promise<BillingActionState> {
+  try {
+    return await callAction(await context(), "billing.buyCredits", {});
+  } catch (error) {
+    return refused(error);
+  }
+}
+
 export async function openPortalAction(): Promise<BillingActionState> {
   try {
     return await callAction(await context(), "billing.openPortal", {});
