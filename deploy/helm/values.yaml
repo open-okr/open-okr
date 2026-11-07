@@ -63,6 +63,36 @@ instance:
   # auto | open | company_domains | invite_only. A choice saved on Admin >
   # General wins over this.
   registration: "auto"
+  # Where every member is offered the source (AGPL-3.0 section 13). Empty means
+  # upstream. If you changed the code and offer it over a network, name your own.
+  sourceUrl: ""
+  # Named on the sign-up page once set. Web addresses.
+  termsUrl: ""
+  privacyUrl: ""
+  # Who a customer writes to about their plan.
+  supportEmail: ""
+
+# Running this instance for other people, or for several companies of your own
+# (PLAN.md section 5.2). Off is the ordinary self-hosted instance. On brings
+# tenant records and the operator console. Plans and seat limits come only from
+# `plans`, so an empty one limits nobody.
+cloud:
+  enabled: false
+  region: ""
+  # The plan catalogue, as JSON:
+  # [{"key":"team","name":"Team","seats":50,"aiMonthlyUsd":20}]
+  plans: ""
+  # A key from `plans`, for the plan a new workspace starts on.
+  defaultPlan: ""
+
+# Anything else the application reads, including a credential. Prefer
+# extraEnvFrom with a Secret: a value here lands in the release's stored values,
+# which anyone with `helm get values` can read.
+#   extraEnvFrom:
+#     - secretRef:
+#         name: openokr-providers
+extraEnv: []
+extraEnvFrom: []
 
 mail:
   # console writes mail to the log and needs no server, which is why a fresh

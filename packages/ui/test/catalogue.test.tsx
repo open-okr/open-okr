@@ -123,7 +123,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "copilot.copilotPanel.preview.objective",
   "copilot.copilotPanel.preview.space",
   "goals.detail.decompose.refused",
-  "admin.plan.planWithSeats",
   "board.board.movedTo",
   "checkIn.timeline.bylineDate",
   "checkIn.walkerLine",

@@ -188,7 +188,6 @@ packages/config     Shared TypeScript, lint and environment schema
 packages/test-support  Factory building through core services, test harness
 deploy/docker       Dockerfile, compose, reverse proxy, setup wizard
 deploy/helm         Helm chart
-deploy/cloud        Vendor-operated overlay: provisioning, operator console
 deploy/demo         The public demonstration instance
 deploy/staging      A staging instance with test personas
 docs/specification  The specification set and the FlowyTeam reference

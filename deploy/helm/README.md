@@ -61,6 +61,12 @@ and skip generation entirely.
 | `persistence.enabled` | true | A volume for uploaded files. See below |
 | `mail.transport` | console | `console` writes mail to the pod log and needs no server |
 | `instance.registration` | auto | Open until the instance is claimed, then closed |
+| `instance.sourceUrl` | upstream | Where every member is offered the source. Name your own if you changed the code |
+| `instance.termsUrl`, `instance.privacyUrl` | empty | Named on the sign-up page once set |
+| `instance.supportEmail` | empty | Who a customer writes to about their plan |
+| `cloud.enabled` | false | Tenant records and the operator console, for running this for other people or for several companies of your own |
+| `cloud.plans`, `cloud.defaultPlan`, `cloud.region` | empty | The plan catalogue as JSON, the plan a new workspace starts on, and the region recorded on each tenant |
+| `extraEnv`, `extraEnvFrom` | empty | Anything else the application reads. Prefer `extraEnvFrom` with a Secret for a credential |
 
 ## Storage and replicas
 

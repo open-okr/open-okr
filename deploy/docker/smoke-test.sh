@@ -158,6 +158,18 @@ case "$health" in
 esac
 pass "the scheduler is running and the tenant floor is enforced"
 
+# --- the operator command runs inside the image -----------------------------
+# A provider on this target has no checkout, so `pnpm cloud:operator` is not there
+# for them. The image holds a pruned copy of the sources, so a module the command
+# needs and the copy lacks only fails here. Nobody has signed up yet, and being
+# told so is the proof it loaded and reached the database.
+if ./openokr operator --email ops@example.com --granted-by founder@example.com 2>&1 \
+  | grep -q "Nobody has signed up"; then
+  pass "the operator command runs inside the image"
+else
+  fail "the operator command does not run inside the image"
+fi
+
 # --- an unconfigured instance leads to the wizard --------------------------
 location=$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/sign-in")
 case "$location" in

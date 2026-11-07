@@ -58,8 +58,6 @@ packages/
 deploy/
   docker/              Dockerfile, compose, reverse proxy, setup wizard
   helm/                Helm chart
-  cloud/               Vendor-operated overlay: provisioning, operator console,
-                       tenant limits
 docs/
   specification/       This specification set
   design/              Detailed designs, one per engine or subsystem
@@ -126,7 +124,7 @@ Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` a
 |---|---|---|---|
 | Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. A first-run web wizard generates every secret, tests the database, mail, channel and AI connections, seeds the admin and offers demo data | About 30 minutes on any small server |
 | Enterprise | Universities, large organisations | Helm chart on their Kubernetes, external Postgres, single sign-on, their backups | Their platform team, hours not weeks |
-| Managed cloud | Teams that want no operations | The same image under vendor operation, plus the tenant lifecycle overlay | Sign up and start |
+| Managed cloud | Teams that want no operations | The same image under vendor operation, with the cloud flag on | Sign up and start |
 
 All tiers run the same tagged release. Signed images are published on every release. A lifecycle helper ships with the self-hosted tarball for upgrade, status, logs and key rotation, with a documented rollback.
 

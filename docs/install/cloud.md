@@ -53,14 +53,35 @@ page in the console.
 
 ## Operating an instance
 
-For the vendor. The operator console is at `/operator` and is not-found to
-anybody without a grant. **The first operator is granted by the deployment,
-never by a screen**, because a screen that creates the first operator can be
-reached by whoever gets there first. Both people must have signed up.
+For the vendor. Two variables make an ordinary install a cloud, and neither is
+needed for anything else:
+
+| Variable | What it does |
+|---|---|
+| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION` |
+| `OPENOKR_CLOUD_PLANS` | The plan catalogue. Without it nobody has a seat limit |
+
+On [one server](compose.md), add them to `secrets/app.env` and run `./openokr up`.
+On [Kubernetes](kubernetes.md), set `cloud.enabled` and `cloud.plans` in the chart's
+values, and pass credentials with `extraEnvFrom`.
+
+The operator console is at `/operator` and is not-found to anybody without a
+grant. **The first operator is granted by the deployment, never by a screen**,
+because a screen that creates the first operator can be reached by whoever gets
+there first. Both people must have signed up.
 
 ```
+# One server
+./openokr operator --email ops@example.com --granted-by founder@example.com
+./openokr operator --email ops@example.com --revoke --by founder@example.com
+
+# Kubernetes
+kubectl exec deploy/openokr -- node --experimental-strip-types --no-warnings \
+  /app/migrator/packages/core/src/bin/cloud-operator.ts \
+  --email ops@example.com --granted-by founder@example.com
+
+# From a checkout
 pnpm cloud:operator --email ops@example.com --granted-by founder@example.com
-pnpm cloud:operator --email ops@example.com --revoke --by founder@example.com
 ```
 
 The plans an operator can choose from come from `OPENOKR_CLOUD_PLANS`, a JSON

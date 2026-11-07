@@ -6,6 +6,7 @@
 #   ./openokr logs            follow the application log
 #   ./openokr upgrade         pull, restart, re-run migrations, report
 #   ./openokr rotate-key      re-wrap stored secrets under a new root key
+#   ./openokr operator ...    grant or revoke the cloud operator role
 #   ./openokr backup          encrypted database dump + blob copy, with checksum
 #   ./openokr restore F       restore from a backup directory created by backup
 #   ./openokr verify-backup F prove a backup would restore, without touching the live database
@@ -461,6 +462,15 @@ somewhere else."
     compose up -d
     wait_for_health
     log "upgraded. Migrations ran on boot; './openokr logs' shows what applied."
+    ;;
+
+  operator)
+    # The deployment's door to the first operator (docs/install/cloud.md). It
+    # runs in the container, so it needs no checkout and no published database
+    # port, and it reads the instance's own DATABASE_URL.
+    shift
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/core/src/bin/cloud-operator.ts "$@"
     ;;
 
   rotate-key)
