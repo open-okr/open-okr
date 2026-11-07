@@ -14543,6 +14543,7 @@
                             "enum": [
                               "policy",
                               "seeded-default",
+                              "deployment",
                               "unresolved"
                             ]
                           }
@@ -14672,6 +14673,7 @@
                           "enum": [
                             "policy",
                             "seeded-default",
+                            "deployment",
                             "unresolved"
                           ]
                         }

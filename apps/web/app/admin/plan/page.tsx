@@ -3,6 +3,7 @@ import {
   callAction,
   hasPlanScreen,
   listSeatHolders,
+  readCreditSummary,
   readOwnPlan,
   readOwnUsage,
   readPlans,
@@ -81,6 +82,7 @@ export default async function PlanPage({
     t("admin.plan.free");
   const instanceName = await getInstanceName();
   const supportEmail = await resolveSupportEmail(pool);
+  const credits = await readCreditSummary(pool, access.workspaceId);
   const billing = await getBilling();
   const summary = billing
     ? await callAction(
@@ -241,6 +243,57 @@ export default async function PlanPage({
         )}
       </section>
 
+      {credits ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.credits.title")}
+          </h2>
+          <div className="rounded-lg border border-line bg-surface px-4 py-3">
+            <p className="font-semibold text-ink text-xl tabular-nums">
+              {t("admin.credits.usedOf", {
+                used: credits.used.toLocaleString(locale),
+                allowance: credits.allowance.toLocaleString(locale),
+              })}
+            </p>
+            <p className="mt-1 text-ink-2 text-sm">
+              {t("admin.credits.resets", {
+                date: new Intl.DateTimeFormat(locale, {
+                  dateStyle: "long",
+                  timeZone: "UTC",
+                }).format(new Date(credits.resetsAt)),
+              })}
+            </p>
+            {credits.purchased > 0 ? (
+              <p className="mt-1 text-ink-2 text-sm">
+                {t("admin.credits.purchased", {
+                  count: credits.purchased.toLocaleString(locale),
+                })}
+              </p>
+            ) : null}
+            <p className="mt-2 text-ink-3 text-xs">
+              {t("admin.credits.ownKey")}
+            </p>
+          </div>
+          {credits.bySource.length > 0 ? (
+            <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+              {credits.bySource.map((row) => (
+                <li
+                  className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
+                  key={row.source}
+                >
+                  <span className="text-ink">
+                    {t(`admin.credits.source.${row.source}`)}
+                  </span>
+                  <span className="text-ink-2 tabular-nums">
+                    {row.credits.toLocaleString(locale)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       {usage ? (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -302,12 +355,12 @@ export default async function PlanPage({
                   {plan.name}
                 </span>
                 <span className="text-ink-2 text-sm">
-                  {plan.aiMonthlyUsd === null
-                    ? seatsOf(plan.seats)
-                    : t("admin.plan.seatsWithAiSpend", {
+                  {plan.aiCredits
+                    ? t("admin.plan.seatsWithCredits", {
                         seats: seatsOf(plan.seats),
-                        usd: plan.aiMonthlyUsd,
-                      })}
+                        credits: plan.aiCredits.toLocaleString(locale),
+                      })
+                    : seatsOf(plan.seats)}
                 </span>
               </li>
             ))}

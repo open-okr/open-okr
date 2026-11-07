@@ -118,7 +118,9 @@ turns adding a plan into a migration.
 | `key` | What `tenants.plan_key` holds. Null means no plan and no seat limit, which is what every self-hosted instance and every group has. A provider's free plan is an ordinary row, and `cloud.defaultPlan` names it |
 | `name` | What a customer reads |
 | `seats` | The number written to `tenants.seats` at provisioning and at every change. Null means unlimited |
-| `aiMonthlyUsd` | Written into the existing `ai_budgets` workspace row. No new mechanism |
+| `aiCredits` | AI credits a month on the provider's own key. Absent means the workspace brings its own ([ai-credits.md](ai-credits.md)) |
+| `aiTopUps` | Whether this plan can buy more credits |
+| `prices` | A payment provider's price identifiers, and no amounts ([billing.md](billing.md)) |
 | `limits` | The `cloud.limits.*` values from `tenant-limits.md`, if a plan ever varies them. Absent means the instance default |
 
 **Where the catalogue lives is an instance setting, not a table.** It is

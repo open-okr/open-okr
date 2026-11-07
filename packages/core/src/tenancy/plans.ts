@@ -7,8 +7,8 @@
  * one.** REQUIREMENTS §5 says self-host is never feature-gated and PLAN.md §4
  * says the managed cloud sells operation rather than features. A plan that
  * can turn a feature off is how that stops being true, and the way it arrives
- * is an empty list somebody adds "for later". A plan is a seat count and a
- * spend cap, and that is the whole of it.
+ * is an empty list somebody adds "for later". A plan is a seat count, an AI
+ * allowance and its prices, and that is the whole of it.
  *
  * **The catalogue is an instance setting, not a table.** It is operator
  * configuration for one deployment, it changes rarely, and it has no
@@ -16,14 +16,13 @@
  */
 import {
   activeOnly,
-  aiBudgets,
   operatorWorkspaceUsage,
   tenants,
   withWorkspace,
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { and, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
@@ -54,8 +53,13 @@ const planSchema = z.object({
   name: z.string().trim().min(1).max(100),
   /** Null is unlimited. */
   seats: z.number().int().min(1).nullable().default(null),
-  /** Written into the existing `ai_budgets` workspace row. No new mechanism. */
-  aiMonthlyUsd: z.number().min(0).nullable().default(null),
+  /**
+   * AI credits a month on the provider's own key. Absent or zero means the workspace
+   * brings its own (docs/design/ai-credits.md §3).
+   */
+  aiCredits: z.number().int().min(0).optional(),
+  /** Whether this plan can buy more credits. */
+  aiTopUps: z.boolean().optional(),
   /**
    * A payment provider's price identifiers, and no amounts: the provider holds
    * those, because each provider sets its own prices and currency. A plan with none
@@ -398,9 +402,6 @@ export interface ApplyPlanInput {
  *
  * - **Never below the headcount.** Refused naming both numbers, because the
  *   product never picks who loses access (UIUX-PLAN S-49).
- * - **The plan's AI allowance becomes the workspace's monthly cost budget**,
- *   in the existing `ai_budgets` row rather than a mechanism of its own. A
- *   plan with none leaves whatever budget the workspace set alone.
  *
  * Returns false when the workspace has no tenant row, which is every
  * self-hosted instance.
@@ -430,42 +431,6 @@ export async function applyPlanInTx(
     return false;
   }
 
-  if (input.plan?.aiMonthlyUsd != null) {
-    const [existing] = await tx
-      .select({ id: aiBudgets.id })
-      .from(aiBudgets)
-      .where(
-        activeOnly(
-          aiBudgets,
-          eq(aiBudgets.workspaceId, input.workspaceId),
-          eq(aiBudgets.scope, "workspace"),
-          isNull(aiBudgets.scopeRef),
-          eq(aiBudgets.metric, "cost"),
-        ),
-      )
-      .limit(1);
-    const values = {
-      period: "month" as const,
-      limitValue: String(input.plan.aiMonthlyUsd),
-      updatedAt: new Date(),
-    };
-    if (existing) {
-      // openokr:allow-mutation: the caller's Operation transaction.
-      await tx
-        .update(aiBudgets)
-        .set(values)
-        .where(activeOnly(aiBudgets, eq(aiBudgets.id, existing.id)));
-    } else {
-      // openokr:allow-mutation: the caller's Operation transaction.
-      await tx.insert(aiBudgets).values({
-        workspaceId: input.workspaceId,
-        scope: "workspace",
-        scopeRef: null,
-        metric: "cost",
-        ...values,
-      });
-    }
-  }
   return true;
 }
 

@@ -21,6 +21,7 @@
  * shared thread would show one of them the other's. Every action here refuses a
  * thread that is not the caller's, with not-found rather than forbidden.
  */
+
 import {
   type AiCitation,
   activeOnly,
@@ -37,6 +38,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { readableCitations } from "../copilot/citations.ts";
 import { isEmbeddableType } from "../embeddings/subjects.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { creditsPausedReason } from "../tenancy/index.ts";
 import {
   type ActionCallContext,
   defineReadAction,
@@ -858,6 +860,19 @@ export const readAvailability = defineReadAction({
     const providerConfigured =
       Boolean(context.drafter?.answerGrounded) || streaming;
     if (!providerConfigured) {
+      const paused = await creditsPausedReason(
+        context.pool,
+        context.workspaceId,
+      );
+      if (paused) {
+        return {
+          available: false,
+          providerConfigured: true,
+          reason: paused,
+          searchAvailable: true,
+          streaming: false,
+        };
+      }
       return {
         available: false,
         providerConfigured: false,

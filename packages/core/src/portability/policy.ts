@@ -114,7 +114,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
   },
   // ── The cloud's own records, added at Phase 8 ────────────────────────
   //
-  // Eight tables, one reason with eight shapes: an archive is a workspace's
+  // Nine tables, one reason with nine shapes: an archive is a workspace's
   // data, and these are the vendor's side of the relationship rather than
   // anything the workspace produced. A receiving instance is usually
   // somebody's own server, where none of them means anything: there is no
@@ -125,6 +125,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "exclude",
     reason:
       "The cloud's record of a workspace as a customer: plan, state, region, trial and closure dates. The commercial relationship, not the work. A self-hosted instance receiving this archive has no such relationship.",
+  },
+  {
+    table: "ai_credit_balances",
+    decision: "exclude",
+    reason:
+      "What is left of an allowance on this instance's own AI key. Another instance has no such key, and the credits were sold here.",
   },
   {
     table: "billing_accounts",

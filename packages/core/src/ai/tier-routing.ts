@@ -20,11 +20,31 @@ import {
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { z } from "zod";
+import {
+  environmentValue,
+  getInstanceSetting,
+} from "../secrets/instance-registry.ts";
+import { readSetting } from "../secrets/instance-settings.ts";
 import {
   findSeededModel,
   type ModelRates,
   seededModelsForProvider,
 } from "./model-catalog.ts";
+
+const pricesSchema = z.object({
+  costInPerMillion: z.number().min(0),
+  costOutPerMillion: z.number().min(0),
+  costCachedInPerMillion: z.number().min(0).optional(),
+});
+
+const stripAbsent = (rates: z.infer<typeof pricesSchema>): ModelRates => ({
+  costInPerMillion: rates.costInPerMillion,
+  costOutPerMillion: rates.costOutPerMillion,
+  ...(rates.costCachedInPerMillion === undefined
+    ? {}
+    : { costCachedInPerMillion: rates.costCachedInPerMillion }),
+});
 
 export interface ResolvedTierRoute {
   readonly tier: ModelTier;
@@ -32,10 +52,80 @@ export interface ResolvedTierRoute {
   readonly modelId: string;
   readonly temperature: number | null;
   readonly maxTokens: number | null;
-  readonly source: "policy" | "seeded-default";
+  readonly source: "policy" | "seeded-default" | "deployment";
+}
+
+/** A JSON instance setting, or nothing when it is absent or does not parse. */
+async function jsonSetting(pool: Pool, key: string): Promise<unknown> {
+  const definition = getInstanceSetting(key);
+  const stored = await readSetting(pool, key);
+  const raw =
+    stored ??
+    (definition ? environmentValue(definition, process.env) : undefined);
+  if (typeof raw !== "string") {
+    return raw;
+  }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * The provider's own key, for a workspace with no provider of its own
+ * (docs/design/ai-credits.md §3).
+ *
+ * The credential resolver has always fallen back to the deployment's key, and nothing
+ * routed to it, so it did nothing unless a workspace had enabled a provider of its
+ * own. A deployment that names a provider now serves every workspace that has none.
+ */
+async function deploymentRoute(
+  pool: Pool,
+  tier: ModelTier,
+): Promise<ResolvedTierRoute | undefined> {
+  const definition = getInstanceSetting("ai.deployment.provider");
+  const stored = await readSetting(pool, "ai.deployment.provider");
+  const provider = (stored ??
+    (definition ? environmentValue(definition, process.env) : undefined)) as
+    | AIProviderKind
+    | ""
+    | undefined;
+  if (!provider) {
+    return undefined;
+  }
+  const chosen = await jsonSetting(pool, "ai.deployment.tierModels");
+  const named =
+    chosen && typeof chosen === "object"
+      ? (chosen as Record<string, unknown>)[tier]
+      : undefined;
+  const modelId =
+    typeof named === "string" && findSeededModel(provider, named)
+      ? named
+      : seededModelsForProvider(provider).find((model) =>
+          model.tiers.includes(tier),
+        )?.modelId;
+  return modelId
+    ? {
+        tier,
+        provider,
+        modelId,
+        temperature: null,
+        maxTokens: null,
+        source: "deployment",
+      }
+    : undefined;
 }
 
 export async function resolveTierRoute(
+  pool: Pool,
+  input: { readonly workspaceId: string; readonly tier: ModelTier },
+): Promise<ResolvedTierRoute | undefined> {
+  const own = await workspaceRoute(pool, input);
+  return own ?? deploymentRoute(pool, input.tier);
+}
+
+async function workspaceRoute(
   pool: Pool,
   input: { readonly workspaceId: string; readonly tier: ModelTier },
 ): Promise<ResolvedTierRoute | undefined> {
@@ -138,6 +228,29 @@ export async function resolveModelRates(
     };
   }
   return findSeededModel(input.provider, input.modelId);
+}
+
+/**
+ * What a model costs on the provider's own key.
+ *
+ * **From the catalogue, never from a workspace's own row**, which an administrator
+ * writes: they could otherwise price the provider's model at nothing. A deployment can
+ * correct a price without a release, because prices move.
+ */
+export async function resolveDeploymentRates(
+  pool: Pool,
+  provider: AIProviderKind,
+  modelId: string,
+): Promise<ModelRates | undefined> {
+  const corrected = await jsonSetting(pool, "ai.deployment.prices");
+  const entry =
+    corrected && typeof corrected === "object"
+      ? (corrected as Record<string, unknown>)[modelId]
+      : undefined;
+  const parsed = pricesSchema.safeParse(entry);
+  return parsed.success
+    ? stripAbsent(parsed.data)
+    : findSeededModel(provider, modelId);
 }
 
 export interface ResolvedFeatureTier {

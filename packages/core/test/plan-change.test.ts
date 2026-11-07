@@ -44,9 +44,9 @@ const seedUser = async (id: string) => {
 };
 
 const PLANS = [
-  { key: "team", name: "Team", seats: 3, aiMonthlyUsd: 20 },
-  { key: "solo", name: "Solo", seats: 1, aiMonthlyUsd: null },
-  { key: "org", name: "Organisation", seats: null, aiMonthlyUsd: 200 },
+  { key: "team", name: "Team", seats: 3 },
+  { key: "solo", name: "Solo", seats: 1 },
+  { key: "org", name: "Organisation", seats: null },
 ];
 
 const asOwner = () =>
@@ -150,13 +150,11 @@ describe("an operator changes plan", () => {
     });
   });
 
-  it("writes the plan's AI allowance as the workspace's monthly budget", async () => {
+  it("leaves the workspace's own AI budget alone", async () => {
+    // A plan's allowance is credits, kept apart, because an administrator can edit a
+    // budget (docs/design/ai-credits.md).
     await asOperator("team");
-    expect(await workspaceBudget()).toEqual([{ period: "month", limit: 20 }]);
-
-    // Moving again updates the same row rather than adding a second.
-    await asOperator("org");
-    expect(await workspaceBudget()).toEqual([{ period: "month", limit: 200 }]);
+    expect(await workspaceBudget()).toEqual([]);
   });
 
   it("refuses a plan with fewer seats than are in use, naming both numbers", async () => {

@@ -20,6 +20,7 @@
  * `streamAnswer` yields the words as they arrive, which is what the panel wants,
  * and records what arrived even when the reader stops it halfway.
  */
+
 import type { Pool } from "pg";
 import {
   askingMemberId,
@@ -35,6 +36,7 @@ import type {
 } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
+import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
 
 /**
@@ -199,6 +201,10 @@ export async function groundQuestion(
 
   const drafter = context.drafter;
   if (!drafter || !wants(drafter)) {
+    const paused = await creditsPausedReason(pool, input.workspaceId);
+    if (paused) {
+      return nothing(paused);
+    }
     return nothing(
       "No AI provider is configured, so these are the passages that match your question.",
     );

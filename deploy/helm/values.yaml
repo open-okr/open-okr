@@ -80,7 +80,7 @@ cloud:
   enabled: false
   region: ""
   # The plan catalogue, as JSON:
-  # [{"key":"team","name":"Team","seats":50,"aiMonthlyUsd":20}]
+  # [{"key":"team","name":"Team","seats":50,"aiCredits":2000}]
   plans: ""
   # A key from `plans`, for the plan a new workspace starts on.
   defaultPlan: ""

@@ -85,8 +85,12 @@ export async function drafterFor(
     model: routed.modelId,
     // §4.14's `agentRunCostCapUsd`, read from the workspace rather than from a
     // constant, so a workspace that lowered it stops the drafter mid-run
-    // rather than only being refused at the door.
-    costCapUsd,
+    // rather than only being refused at the door. Never past what is left of a
+    // workspace's credits, so one run cannot empty a free plan.
+    costCapUsd:
+      routed.spendCeilingUsd === undefined
+        ? costCapUsd
+        : Math.min(costCapUsd, routed.spendCeilingUsd),
     costInPerMillion: routed.costInPerMillion,
     costOutPerMillion: routed.costOutPerMillion,
     ...(routed.costCachedInPerMillion === undefined

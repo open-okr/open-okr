@@ -38,9 +38,7 @@ const FOUNDER = "profile-founder";
 const OPERATOR = "profile-operator";
 
 /** Another provider's own catalogue. Nothing in the product names these. */
-const PROVIDER_PLANS = [
-  { key: "starter", name: "Starter", seats: 2, aiMonthlyUsd: null },
-];
+const PROVIDER_PLANS = [{ key: "starter", name: "Starter", seats: 2 }];
 
 const seedUser = async (id: string) => {
   const wb = await workerDb();

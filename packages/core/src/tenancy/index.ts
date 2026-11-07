@@ -19,6 +19,15 @@ export {
   setDefaultAdmission,
 } from "./admission.ts";
 export { adoptWorkspaces } from "./adopt.ts";
+export {
+  type CreditSummary,
+  chargeCreditsInTx,
+  creditsPausedReason,
+  creditValueUsd,
+  type HostedAccess,
+  readCreditSummary,
+  readHostedAccess,
+} from "./credits.ts";
 export { setTenantStateInTx } from "./lifecycle.ts";
 export {
   applyPlanInTx,

@@ -871,6 +871,11 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 ### workspace_imports
 Archive manifest, checksum, status, progress.
 
+### ai_credit_balances *(cloud only)*
+`workspace_id` to workspaces (**and it is the primary key**), `period_start`, `used_usd`, `agent_used_usd`, `purchased_usd`, timestamps.
+
+Migration 0146. Design: `docs/design/ai-credits.md`. One row per workspace rather than a sum over `ai_usage_events`, because the check runs before every AI call and one locked row is both faster and exact under concurrency. The usage events stay as the record. Migration 0146 also adds `ai_usage_events.key_source`, because a credit is spent only on the provider's own key.
+
 ### billing_accounts *(cloud only)*
 `workspace_id` to workspaces (**and it is the primary key**), `provider`, `customer_ref`, `subscription_ref?`, `status?`, `current_period_end?`, `cancel_at_period_end`, `suspended_by_billing`, timestamps. Unique on `provider` and `customer_ref`.
 

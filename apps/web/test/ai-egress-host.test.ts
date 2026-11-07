@@ -29,6 +29,11 @@ vi.mock("@openokr/core", () => ({
     costInPerMillion: 3,
     costOutPerMillion: 15,
   }),
+  resolveDeploymentRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
+  readHostedAccess: async () => ({ kind: "unmetered" }),
   guardsAIEndpoints: async () => false,
   resolveAICredential: async () => ({
     source: "workspace",
@@ -97,6 +102,7 @@ describe("what a call used", () => {
       workspaceId: "workspace-1",
       provider: "anthropic",
       rates: RATES,
+      keySource: "workspace",
     });
     const [, egress] = createAIProvider.mock.calls[0] as [
       unknown,

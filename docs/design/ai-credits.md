@@ -46,9 +46,9 @@ as Notion does, and by showing a usage log.
 
 | The workspace's plan | The provider's key |
 |---|---|
-| No plan, or the catalogue is empty (self-hosted, group) | Available with no credit check, as the deployer's own choice |
+| An empty catalogue (self-hosted, group) | Available with no credit check, as the deployer's own choice |
 | A plan with `aiCredits` above zero | Available, spending credits |
-| A plan with `aiCredits` at zero or absent | Not available. The workspace brings its own key |
+| A plan with `aiCredits` at zero or absent, or no plan when there is a catalogue | Not available. The workspace brings its own key. A workspace adopted from before the flag has no plan, and must not spend a provider's key without limit |
 
 **Routing changes for everybody:** a workspace with no provider of its own routes to
 the deployment's provider, with the catalogue's default model for each tier. This
@@ -134,7 +134,7 @@ typical credits on the pricing page.** It costs a few dollars.
 |---|---|
 | S-49 | Credits used of the allowance, purchased credits left, when it resets, **Buy credits**, and a usage log by feature |
 | Admin, AI | Says plainly that a key added here spends no credits |
-| Any AI affordance, out of credits | Disabled, saying AI is paused until the 1st or until somebody buys more, and that nothing else stopped. A provider off stays hidden, as it is today |
+| Any AI affordance, out of credits | Hidden, as it is with a provider off, and a banner across the product says AI is paused until the 1st or until somebody buys more, and that nothing else stopped. A disabled control on each of some twenty screens would say the same thing twenty times |
 
 **No new proactive message.** A warning at 80% would be a new kind of nudge, which
 needs your decision and a rule key, so it is left out.

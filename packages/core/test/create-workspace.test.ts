@@ -26,8 +26,8 @@ const FOUNDER = "create-founder";
 const OPERATOR = "create-operator";
 const OTHER = "create-other";
 const FREE_PLANS = [
-  { key: "free", name: "Free", seats: 10, aiMonthlyUsd: null },
-  { key: "team", name: "Team", seats: 50, aiMonthlyUsd: null },
+  { key: "free", name: "Free", seats: 10 },
+  { key: "team", name: "Team", seats: 50 },
 ];
 
 const seedUser = async (id: string, email = `${id}@company.example`) => {

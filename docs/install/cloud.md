@@ -49,7 +49,7 @@ page in the console.
 | A seat is a person who is here or has been invited | An invitation holds a seat, so a full workspace is refused at the invitation rather than when somebody clicks the link |
 | Guests and the two agents never hold a seat | Sharing is never a decision about money |
 | A plan with fewer seats than are in use is refused, and the refusal names both numbers | The product never chooses who loses access. Suspend somebody first |
-| The plan's AI allowance becomes the workspace's monthly AI cost budget | The same budget an administrator sets by hand on the AI screen |
+| The plan's AI credits are spent only on your key | A workspace that adds its own key spends none, and an administrator's budget can only lower what is spent |
 
 ## Operating an instance
 
@@ -85,7 +85,7 @@ pnpm cloud:operator --email ops@example.com --granted-by founder@example.com
 ```
 
 The plans an operator can choose from come from `OPENOKR_CLOUD_PLANS`, a JSON
-list such as `[{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]`
+list such as `[{"key":"team","name":"Team","seats":20,"aiCredits":2000}]`
 (`seats` null is unlimited). Without it the only plan is Free, with no seat limit.
 `OPENOKR_CLOUD_DEFAULT_PLAN` names the plan a new workspace starts on. Without it
 a new workspace has no plan and no seat limit, so to limit a free plan, list it

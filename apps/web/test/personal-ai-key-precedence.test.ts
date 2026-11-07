@@ -85,6 +85,11 @@ vi.mock("@openokr/core", async (original) => ({
     costInPerMillion: 3,
     costOutPerMillion: 15,
   }),
+  resolveDeploymentRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
+  readHostedAccess: async () => ({ kind: "unmetered" }),
   guardsAIEndpoints: async () => false,
   resolveAICredential: (...args: Parameters<typeof resolveAICredential>) =>
     resolveAICredential(...args),

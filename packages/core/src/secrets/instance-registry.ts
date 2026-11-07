@@ -140,7 +140,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "[]",
     environment: "OPENOKR_CLOUD_PLANS",
     summary:
-      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]. Seats null is unlimited. Without it the only plan is Free.',
+      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiCredits":2000}]. Seats null is unlimited. Without it the only plan is Free.',
   },
   {
     key: "cloud.defaultPlan",
@@ -149,6 +149,22 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_CLOUD_DEFAULT_PLAN",
     summary:
       "The plan a new workspace starts on, as a key from the catalogue. Empty means a new workspace has no plan and no seat limit. A key the catalogue does not hold reads as empty, so a typo cannot refuse a sign-up.",
+  },
+  {
+    key: "cloud.creditValueUsd",
+    kind: "number",
+    fallback: 0.01,
+    environment: "OPENOKR_CLOUD_CREDIT_VALUE_USD",
+    summary:
+      "What one AI credit is worth in model cost, in US dollars, because the model price list is. A provider sells credits in whatever currency it likes.",
+  },
+  {
+    key: "cloud.agentCreditShare",
+    kind: "number",
+    fallback: 0.5,
+    environment: "OPENOKR_CLOUD_AGENT_CREDIT_SHARE",
+    summary:
+      "How much of a month's AI allowance the Coach and the Champion may spend, so background work cannot pause the copilot. From 0 to 1.",
   },
   {
     key: "cloud.closureRetentionDays",
@@ -394,6 +410,22 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_AI_ALLOW_PRIVATE_ENDPOINTS",
     summary:
       "With the cloud flag on, whether a workspace administrator's AI base URL may name an address inside the network. Off is right for a public cloud. A group running its own model turns it on, trusting every workspace's administrators.",
+  },
+  {
+    key: "ai.deployment.tierModels",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_AI_TIER_MODELS",
+    summary:
+      'Which model each tier uses on the deployment key, as JSON, such as {"balanced":"claude-haiku-5-5"}. A model the catalogue cannot price is ignored. Empty means the catalogue\'s default for each tier.',
+  },
+  {
+    key: "ai.deployment.prices",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_AI_PRICES",
+    summary:
+      'Corrects a model\'s price on the deployment key without a release, because prices move, as JSON: {"model":{"costInPerMillion":1,"costOutPerMillion":5,"costCachedInPerMillion":0.1}}.',
   },
   {
     key: "ai.deployment.provider",

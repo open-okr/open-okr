@@ -39,9 +39,11 @@ import {
   callRecorder,
   guardsAIEndpoints,
   type ResolvedAICredential,
+  readHostedAccess,
   recordAIEgressWithheld,
   resolveAICredential,
   resolveAIPrivacySettings,
+  resolveDeploymentRates,
   resolveModelRates,
   resolveTierRoute,
 } from "@openokr/core";
@@ -58,6 +60,8 @@ export interface RoutedProvider {
    */
   readonly provider: GuardedAIProvider;
   readonly modelId: string;
+  /** What is left on the provider's own key, when this call would spend credits. */
+  readonly spendCeilingUsd?: number;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
   readonly costCachedInPerMillion?: number;
@@ -141,20 +145,43 @@ export async function providerForTier(
   if (!route) {
     return null;
   }
-  const priced = await resolveModelRates(pool, {
-    workspaceId,
-    provider: route.provider,
-    modelId: route.modelId,
-  });
-  if (!priced) {
-    return null;
-  }
   const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
     workspaceId,
     provider: route.provider,
     ...(forUser ? { userId: forUser } : {}),
   });
   if (resolved.source === "off") {
+    return null;
+  }
+
+  // **The provider's own key has limits a workspace's does not**
+  // (docs/design/ai-credits.md). Whether it may be used, how much is left, and at
+  // whose price: the catalogue's, because an administrator writes their own rows.
+  const onProvidersKey = resolved.source === "deployment";
+  const hosted = onProvidersKey
+    ? await readHostedAccess(pool, workspaceId)
+    : null;
+  if (hosted?.kind === "none") {
+    return null;
+  }
+  const isAgent = !forUser;
+  const left =
+    hosted?.kind === "credits"
+      ? isAgent
+        ? hosted.agentAvailableUsd
+        : hosted.availableUsd
+      : null;
+  if (left !== null && left <= 0) {
+    return null;
+  }
+  const priced = onProvidersKey
+    ? await resolveDeploymentRates(pool, route.provider, route.modelId)
+    : await resolveModelRates(pool, {
+        workspaceId,
+        provider: route.provider,
+        modelId: route.modelId,
+      });
+  if (!priced) {
     return null;
   }
   const config = providerConfigFor(resolved, {
@@ -175,11 +202,13 @@ export async function providerForTier(
         workspaceId,
         provider: route.provider,
         rates: priced,
+        keySource: resolved.source,
         ...(forUser ? { forUser } : {}),
         ...attribution,
       }),
     }),
     modelId: route.modelId,
+    ...(left === null ? {} : { spendCeilingUsd: left }),
     costInPerMillion: priced.costInPerMillion,
     costOutPerMillion: priced.costOutPerMillion,
     ...(priced.costCachedInPerMillion === undefined

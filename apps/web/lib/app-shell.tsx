@@ -42,6 +42,7 @@ import { AppFooter } from "./app-footer.tsx";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
 import { brandingImageUrl } from "./branding-image.ts";
+import { CreditsBanner } from "./credits-banner.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
@@ -507,6 +508,7 @@ export async function AppShellLayout({
            * one that is about who is looking over the reader's shoulder, and
            * the only one that cannot be dismissed. */}
           <SupportBanner workspaceId={workspace.workspaceId} />
+          <CreditsBanner workspaceId={workspace.workspaceId} />
           {/* What the vendor is saying, above the workspace's own state
            * banner (P8-T03c). A site message is news from outside the
            * organisation and the state banner is a fact about the workspace,
