@@ -40,6 +40,7 @@ const SELF_SERVICE = new Set([
   "tokens.approveDevice",
   "tokens.create",
   "tokens.revoke",
+  "workspace.provision",
 ]);
 
 /**

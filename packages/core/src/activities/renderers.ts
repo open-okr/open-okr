@@ -41,6 +41,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
+  "billing.requested": () => "Somebody used the billing screen",
   "billing.credits_purchased": (p) =>
     `${String(p.credits)} AI credits were bought`,
   "billing.subscription_changed": (p) =>

@@ -10,7 +10,12 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  type ActorInput,
+  OperationError,
+  type OperationTx,
+  runOperation,
+} from "../operations/operation.ts";
 import {
   environmentValue,
   getInstanceSetting,
@@ -31,6 +36,52 @@ import type { BillingGateway } from "./gateway.ts";
 import { LIVE_STATUSES, planForPrice } from "./webhook.ts";
 
 export type BillingInterval = "month" | "year";
+
+/**
+ * Records that somebody asked the provider to do something, in the customer's own
+ * audit log.
+ *
+ * **The provider call itself has no place in a transaction**, because holding a
+ * connection open across somebody else's network is how one slow answer stalls a
+ * pool. So the call goes first and this follows it. Money moved by an action nobody
+ * can trace is what the pipeline exists to prevent, and what the webhook records is
+ * what happened, never who asked.
+ */
+export async function recordBillingRequest(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly actor: ActorInput;
+    readonly action: string;
+    readonly payload: Record<string, unknown>;
+  },
+): Promise<void> {
+  await runOperation(
+    { pool },
+    {
+      action: input.action,
+      workspaceId: input.workspaceId,
+      actor: input.actor,
+      async execute({ workspaceId }) {
+        return {
+          result: undefined,
+          activity: {
+            kind: "billing.requested",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: { action: input.action },
+          },
+          audit: {
+            action: input.action,
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: input.payload,
+          },
+        };
+      },
+    },
+  );
+}
 
 const NOT_SET_UP = "Billing is not set up on this instance.";
 

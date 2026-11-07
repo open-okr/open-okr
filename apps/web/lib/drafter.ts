@@ -15,7 +15,11 @@
  * product: every trigger, ladder, gate and corridor works without it.
  */
 import { createProviderDrafter } from "@openokr/agents";
-import { type AgentDrafter, resolveAgentRunCostCap } from "@openokr/core";
+import {
+  type AgentDrafter,
+  builtInAgentId,
+  resolveAgentRunCostCap,
+} from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
 import { providerForTier, type UsageAttribution } from "./ai-provider";
 import { getPool } from "./auth";
@@ -96,5 +100,22 @@ export async function drafterFor(
     ...(routed.costCachedInPerMillion === undefined
       ? {}
       : { costCachedInPerMillion: routed.costCachedInPerMillion }),
+  });
+}
+
+/**
+ * The drafter for the Coach or the Champion, on the workspace's key.
+ *
+ * Named so its calls count against that agent, which is how a bill is read by agent
+ * and what an agent's own budget counts. No reader is passed, because these are the
+ * agent's requests rather than a person's.
+ */
+export async function drafterForAgent(
+  workspaceId: string,
+  kind: "coach" | "champion",
+): Promise<AgentDrafter | null> {
+  const agentId = await builtInAgentId(getPool(), workspaceId, kind);
+  return drafterFor(workspaceId, "balanced", undefined, {
+    ...(agentId ? { agentId } : {}),
   });
 }

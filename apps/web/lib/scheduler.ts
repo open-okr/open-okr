@@ -52,7 +52,7 @@ import {
   measureAllWorkspaces,
   outboxRetentionDays,
 } from "@openokr/core";
-import { drafterFor } from "./drafter";
+import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -464,7 +464,10 @@ async function runOne(
   workspace: SchedulableWorkspace,
   run: ScheduledRun,
 ): Promise<void> {
-  const drafter = await drafterFor(workspace.id);
+  const drafter = await drafterForAgent(
+    workspace.id,
+    run.action === "agents.runCoach" ? "coach" : "champion",
+  );
   const context = {
     pool: getPool(),
     workspaceId: workspace.id,

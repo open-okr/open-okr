@@ -213,11 +213,9 @@ describe("the agent paths", () => {
   ])(
     "pass no reader from %s, so the Coach and the Champion stay on the workspace's key",
     (_name, path) => {
-      const calls = source(path).match(/drafterFor\([^)]*\)/g) ?? [];
-      expect(calls.length).toBeGreaterThan(0);
-      for (const call of calls) {
-        expect(call, `${path}: ${call}`).not.toMatch(/,/);
-      }
+      // Through the helper that takes no reader at all, so there is nowhere to pass one.
+      expect(source(path)).toContain("drafterForAgent(");
+      expect(source(path)).not.toMatch(/drafterFor\(/);
     },
   );
 

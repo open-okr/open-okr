@@ -438,6 +438,8 @@ export interface EgressGuardOptions {
 /** What one provider call used, for whoever is keeping count. */
 export interface AIUsageRecord {
   readonly model: string;
+  /** Which feature asked, when the caller said. */
+  readonly feature?: string;
   readonly usage: TokenUsage;
   /** True when the provider gave no total and this is counted from the text. */
   readonly estimated: boolean;
@@ -483,7 +485,7 @@ export class EgressGuardedProvider implements AIProvider {
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
     const response = await this.#inner.chat(await this.#admitChat(request));
-    await this.#record(request.model, response.usage);
+    await this.#record(request, response.usage);
     return response;
   }
 
@@ -513,7 +515,7 @@ export class EgressGuardedProvider implements AIProvider {
         0,
       );
       await this.#record(
-        request.model,
+        request,
         counted ?? {
           inputTokens: estimateTokens(sent),
           outputTokens: estimateTokens(written),
@@ -529,13 +531,13 @@ export class EgressGuardedProvider implements AIProvider {
     const response = await this.#inner.chatWithTools(
       await this.#admitChat(request),
     );
-    await this.#record(request.model, response.usage);
+    await this.#record(request, response.usage);
     return response;
   }
 
   async extract(request: ExtractRequest): Promise<ChatResponse> {
     const response = await this.#inner.extract(await this.#admitChat(request));
-    await this.#record(request.model, response.usage);
+    await this.#record(request, response.usage);
     return response;
   }
 
@@ -543,7 +545,7 @@ export class EgressGuardedProvider implements AIProvider {
   async embed(request: EmbedRequest): Promise<EmbedResponse> {
     const input = await this.#admit("retrieval", request.input);
     const response = await this.#inner.embed({ ...request, input });
-    await this.#record(request.model, response.usage);
+    await this.#record(request, response.usage);
     return response;
   }
 
@@ -611,12 +613,17 @@ export class EgressGuardedProvider implements AIProvider {
   }
 
   async #record(
-    model: string,
+    request: { readonly model: string; readonly feature?: string },
     usage: TokenUsage,
     estimated = false,
   ): Promise<void> {
     try {
-      await this.#options.onUsage?.({ model, usage, estimated });
+      await this.#options.onUsage?.({
+        model: request.model,
+        ...(request.feature ? { feature: request.feature } : {}),
+        usage,
+        estimated,
+      });
     } catch {
       // The provider has answered and been paid. Losing the answer as well
       // over a row that could not be written would help nobody.

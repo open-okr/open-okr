@@ -29,7 +29,7 @@ export function NewOwnWorkspaceForm({
       aria-busy={pending}
       className="flex flex-col gap-4 rounded-lg border border-line bg-surface p-4"
     >
-      <div className="flex flex-col gap-1.5">
+      <div className="flex max-w-sm flex-col gap-1.5">
         <TextInput
           label={t("workspaces.new.name")}
           id="own-workspace-name"

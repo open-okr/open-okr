@@ -210,6 +210,7 @@ export {
   resolveTierRoute,
 } from "./ai/tier-routing.ts";
 export {
+  builtInAgentId,
   callRecorder,
   type RecordUsageEventInput,
   recordUsageEvent,

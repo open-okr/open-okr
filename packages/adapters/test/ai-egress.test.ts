@@ -409,6 +409,30 @@ describe("what a call used", () => {
     ]);
   });
 
+  it("says which feature asked, and sends that to nobody", async () => {
+    const mock = new MockAIProvider({ streamChunks: ["x"] });
+    const records: AIUsageRecord[] = [];
+    const provider = new EgressGuardedProvider(mock, {
+      provider: "openai",
+      target: REMOTE,
+      policy: OPEN,
+      onUsage: (record) => {
+        records.push(record);
+      },
+    });
+    await provider.chat({ ...REQUEST, feature: "draftCheckIn" });
+    for await (const _piece of provider.stream({
+      ...REQUEST,
+      feature: "streamGrounded",
+    })) {
+      // Read to the end.
+    }
+    expect(records.map((record) => record.feature)).toEqual([
+      "draftCheckIn",
+      "streamGrounded",
+    ]);
+  });
+
   it("records a finished stream once, with what the provider counted", async () => {
     const { provider, records } = metered();
     const seen: string[] = [];

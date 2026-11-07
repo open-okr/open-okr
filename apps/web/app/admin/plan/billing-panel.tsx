@@ -26,7 +26,7 @@ type BillingAction = (formData: FormData) => Promise<BillingActionState>;
 const BUTTON =
   "inline-flex items-center gap-1.5 rounded-md bg-brand px-3 py-1.5 font-medium text-on-brand text-sm hover:bg-brand-strong";
 const QUIET_BUTTON =
-  "inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-ink text-sm hover:bg-surface-2";
+  "inline-flex items-center gap-1.5 rounded-md border border-line bg-surface px-3 py-1.5 font-medium text-ink text-sm hover:bg-line";
 
 /** Runs a billing action, and goes to the address it answers, if it answers one. */
 function useBillingAction(action: BillingAction) {

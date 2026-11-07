@@ -50,6 +50,8 @@ export interface ChatRequest {
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly purpose?: AIPurpose;
+  /** Which feature asked, for the usage row. Never sent to the provider. */
+  readonly feature?: string;
 }
 
 export interface TokenUsage {
@@ -69,6 +71,8 @@ export interface ChatResponse {
 export interface EmbedRequest {
   readonly model: string;
   readonly input: readonly string[];
+  /** Which feature asked, for the usage row. Never sent to the provider. */
+  readonly feature?: string;
 }
 
 export interface EmbedResponse {

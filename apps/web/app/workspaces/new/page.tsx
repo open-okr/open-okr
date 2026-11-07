@@ -25,7 +25,7 @@ export default async function NewWorkspacePage() {
   }
   const { t } = await getTranslations();
   return (
-    <div className="mx-auto flex max-w-xl flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="font-bold text-ink text-lg">
           {t("workspaces.new.title")}

@@ -294,6 +294,54 @@ describe("changing plan", () => {
   });
 });
 
+describe("the audit trail", () => {
+  it("records who asked, with what they chose, on each provider call", async () => {
+    const wb = await workerDb();
+    await callAction(await context(), "billing.startCheckout", {
+      planKey: "team",
+      interval: "year",
+    });
+    await subscribe();
+    await callAction(await context(), "billing.changePlan", {
+      planKey: "biz",
+      interval: "month",
+    });
+    await callAction(await context(), "billing.openPortal", {});
+    const { rows } = await wb.admin.query(
+      `select action, payload, actor_kind from audit_events
+        where workspace_id = $1 and action in ('billing.startCheckout', 'billing.changePlan', 'billing.openPortal')`,
+      [workspaceId],
+    );
+    expect(rows.map((row) => row.action).sort()).toEqual([
+      "billing.changePlan",
+      "billing.openPortal",
+      "billing.startCheckout",
+    ]);
+    expect(
+      rows.find((row) => row.action === "billing.changePlan")?.payload,
+    ).toEqual({
+      planKey: "biz",
+      interval: "month",
+      when: "now",
+    });
+    expect(rows.every((row) => row.actor_kind === "human")).toBe(true);
+  });
+
+  it("works on a workspace billing made read-only, which has to be able to pay", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update workspaces set state = 'read_only' where id = $1",
+      [workspaceId],
+    );
+    await expect(
+      callAction(await context(), "billing.startCheckout", {
+        planKey: "team",
+        interval: "month",
+      }),
+    ).resolves.toEqual({ url: "https://pay.test/checkout" });
+  });
+});
+
 describe("the portal", () => {
   it("opens for a workspace with an account, and returns to the plan screen", async () => {
     await subscribe();

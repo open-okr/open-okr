@@ -331,6 +331,20 @@ describe("a recorded provider call", () => {
     ]);
   });
 
+  it("names the feature that asked, so a bill can be read by feature", async () => {
+    const wb = await workerDb();
+    await callRecorder(wb.appPool, {
+      workspaceId,
+      provider: "anthropic",
+      rates: RATES,
+    })({ ...CALL, feature: "draftCheckIn" });
+    const { rows } = await wb.admin.query(
+      "select feature_key from ai_usage_events where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ feature_key: "draftCheckIn" }]);
+  });
+
   it("counts as an agent's when nobody asked", async () => {
     const wb = await workerDb();
     await callRecorder(wb.appPool, {

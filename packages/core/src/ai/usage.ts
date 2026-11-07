@@ -21,6 +21,8 @@
  */
 import {
   type AIProviderKind,
+  activeOnly,
+  agents,
   aiUsageEvents,
   type UsageSource,
   withWorkspace,
@@ -231,6 +233,7 @@ export interface CallRecorderInput {
 export function callRecorder(pool: Pool, input: CallRecorderInput) {
   return async (record: {
     readonly model: string;
+    readonly feature?: string;
     readonly usage: {
       readonly inputTokens: number;
       readonly outputTokens: number;
@@ -253,6 +256,7 @@ export function callRecorder(pool: Pool, input: CallRecorderInput) {
         : {}),
       ...(memberId ? { memberId } : {}),
       ...(input.agentId ? { agentId: input.agentId } : {}),
+      ...(record.feature ? { featureKey: record.feature } : {}),
       source: input.source ?? (input.forUser ? "assist" : "agent"),
       provider: input.provider,
       modelId: record.model,
@@ -261,6 +265,28 @@ export function callRecorder(pool: Pool, input: CallRecorderInput) {
       cost: costOfUsage(input.rates, record.usage),
     });
   };
+}
+
+/** A workspace's Coach or Champion, so its calls count against its own budget. */
+export async function builtInAgentId(
+  pool: Pool,
+  workspaceId: string,
+  kind: "coach" | "champion",
+): Promise<string | undefined> {
+  const [agent] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    tx
+      .select({ id: agents.id })
+      .from(agents)
+      .where(
+        activeOnly(
+          agents,
+          eq(agents.workspaceId, workspaceId),
+          eq(agents.kind, kind),
+        ),
+      )
+      .limit(1),
+  );
+  return agent?.id;
 }
 
 export interface UsageSummaryRow {

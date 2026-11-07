@@ -281,7 +281,9 @@ export const provisionWorkspace = {
     timezone: z.string().optional(),
   }),
   output: workspaceSummary.extend({ memberId: z.uuid() }),
-  access: ACCESS_LEVELS.full,
+  // Every member's level, because a person's own level in this workspace says nothing
+  // about starting another: the handler's rules are the whole of what authorises it.
+  access: ACCESS_LEVELS.edit,
   safety: "write" as const,
   runsThroughPipeline: true,
   async handler(

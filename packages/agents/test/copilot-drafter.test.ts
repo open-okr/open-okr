@@ -166,6 +166,16 @@ const collect = async (chunks: AsyncIterable<GroundedChunk>) => {
   return { text, joined: text.join(""), done };
 };
 
+describe("which feature asked", () => {
+  it("is said on every call, for the usage row", async () => {
+    const { drafter, provider } = drafterOver(["An answer."]);
+    await collect(streamOf(drafter, question));
+    expect(provider.requests.map((request) => request.feature)).toEqual([
+      "streamGrounded",
+    ]);
+  });
+});
+
 describe("the drafter's spend cap", () => {
   it("counts a streamed answer, so the next one is refused past the cap", async () => {
     // 400 in and 60 out at these rates is $0.00052, well past a $0.0001 cap.

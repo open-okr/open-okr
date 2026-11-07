@@ -54,6 +54,16 @@ export const generateMetadata = pageTitle("pageTitle.adminPlan");
  */
 export const dynamic = "force-dynamic";
 
+/** Where credits went, in words. A source the schema adds later shows as itself. */
+const SOURCE_WORDS: Readonly<Record<string, string>> = {
+  agent: "admin.credits.source.agent",
+  assist: "admin.credits.source.assist",
+  channel: "admin.credits.source.channel",
+  copilot: "admin.credits.source.copilot",
+  mcp: "admin.credits.source.mcp",
+  rest: "admin.credits.source.rest",
+};
+
 export default async function PlanPage({
   searchParams,
 }: {
@@ -292,7 +302,9 @@ export default async function PlanPage({
                   key={row.source}
                 >
                   <span className="text-ink">
-                    {t(`admin.credits.source.${row.source}`)}
+                    {SOURCE_WORDS[row.source]
+                      ? t(SOURCE_WORDS[row.source] as string)
+                      : row.source}
                   </span>
                   <span className="text-ink-2 tabular-nums">
                     {row.credits.toLocaleString(locale)}
