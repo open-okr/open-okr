@@ -12,6 +12,7 @@ import {
   activeOnly,
   aiFeatureSettings,
   aiModelPolicies,
+  aiModels,
   aiProviders,
   type ModelTier,
   withWorkspace,
@@ -19,7 +20,11 @@ import {
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import { seededModelsForProvider } from "./model-catalog.ts";
+import {
+  findSeededModel,
+  type ModelRates,
+  seededModelsForProvider,
+} from "./model-catalog.ts";
 
 export interface ResolvedTierRoute {
   readonly tier: ModelTier;
@@ -89,6 +94,50 @@ export async function resolveTierRoute(
 
     return undefined;
   });
+}
+
+/**
+ * What this model costs this workspace, or nothing when nobody has priced it.
+ *
+ * **An administrator's own row comes first**, then the seeded catalogue: the
+ * "registry plus database overrides" the catalogue describes. Reading only the
+ * seed left every model an administrator added unpriced, and an unpriced model
+ * is refused, so no OpenAI-compatible endpoint could ever answer and Ollama
+ * answered only for the seeded names.
+ */
+export async function resolveModelRates(
+  pool: Pool,
+  input: {
+    readonly workspaceId: string;
+    readonly provider: AIProviderKind;
+    readonly modelId: string;
+  },
+): Promise<ModelRates | undefined> {
+  const db = drizzle(pool);
+  const [own] = await withWorkspace(db, input.workspaceId, (tx) =>
+    tx
+      .select({
+        costInPerMillion: aiModels.costInPerMillion,
+        costOutPerMillion: aiModels.costOutPerMillion,
+      })
+      .from(aiModels)
+      .where(
+        activeOnly(
+          aiModels,
+          eq(aiModels.workspaceId, input.workspaceId),
+          eq(aiModels.provider, input.provider),
+          eq(aiModels.modelId, input.modelId),
+        ),
+      )
+      .limit(1),
+  );
+  if (own) {
+    return {
+      costInPerMillion: Number(own.costInPerMillion),
+      costOutPerMillion: Number(own.costOutPerMillion),
+    };
+  }
+  return findSeededModel(input.provider, input.modelId);
 }
 
 export interface ResolvedFeatureTier {

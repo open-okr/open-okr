@@ -70,6 +70,15 @@ function toTool(tool: ToolDefinition): OpenAI.Chat.ChatCompletionTool {
   };
 }
 
+const usageOf = (usage: OpenAI.CompletionUsage | undefined): TokenUsage => {
+  const cached = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  return {
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    ...(cached > 0 ? { cachedInputTokens: cached } : {}),
+  };
+};
+
 function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
   const message = completion.choices[0]?.message;
   const usage = completion.usage;
@@ -90,10 +99,7 @@ function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
 
   return {
     content: message?.content ?? "",
-    usage: {
-      inputTokens: usage?.prompt_tokens ?? 0,
-      outputTokens: usage?.completion_tokens ?? 0,
-    },
+    usage: usageOf(usage),
     ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
   };
 }
@@ -141,10 +147,7 @@ export class OpenAiCompatibleProvider implements AIProvider {
     });
     for await (const chunk of stream) {
       if (chunk.usage) {
-        onUsage?.({
-          inputTokens: chunk.usage.prompt_tokens,
-          outputTokens: chunk.usage.completion_tokens,
-        });
+        onUsage?.(usageOf(chunk.usage));
       }
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {

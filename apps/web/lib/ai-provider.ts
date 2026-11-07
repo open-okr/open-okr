@@ -37,12 +37,12 @@ import {
 import { loadEnv } from "@openokr/config";
 import {
   callRecorder,
-  findSeededModel,
   isCloudEnabled,
   type ResolvedAICredential,
   recordAIEgressWithheld,
   resolveAICredential,
   resolveAIPrivacySettings,
+  resolveModelRates,
   resolveTierRoute,
 } from "@openokr/core";
 import type { ModelTier, UsageSource } from "@openokr/db";
@@ -60,6 +60,7 @@ export interface RoutedProvider {
   readonly modelId: string;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
+  readonly costCachedInPerMillion?: number;
 }
 
 /** Who a usage row is charged to, beyond the person a request is for. */
@@ -140,7 +141,11 @@ export async function providerForTier(
   if (!route) {
     return null;
   }
-  const priced = findSeededModel(route.provider, route.modelId);
+  const priced = await resolveModelRates(pool, {
+    workspaceId,
+    provider: route.provider,
+    modelId: route.modelId,
+  });
   if (!priced) {
     return null;
   }
@@ -177,5 +182,8 @@ export async function providerForTier(
     modelId: route.modelId,
     costInPerMillion: priced.costInPerMillion,
     costOutPerMillion: priced.costOutPerMillion,
+    ...(priced.costCachedInPerMillion === undefined
+      ? {}
+      : { costCachedInPerMillion: priced.costCachedInPerMillion }),
   };
 }

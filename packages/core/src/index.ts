@@ -205,6 +205,7 @@ export {
   type ResolvedFeatureTier,
   type ResolvedTierRoute,
   resolveFeatureTier,
+  resolveModelRates,
   resolveTierRoute,
 } from "./ai/tier-routing.ts";
 export {

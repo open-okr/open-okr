@@ -36,8 +36,8 @@ import type { TierModelMap } from "./tier-map.ts";
 /** A seed, not a catalogue: refined per model once P2-T15's catalogue exists. */
 export const GOOGLE_DEFAULT_TIER_MODELS: TierModelMap = {
   fast: "gemini-2.5-flash-lite",
-  balanced: "gemini-2.5-flash",
-  deep: "gemini-2.5-pro",
+  balanced: "gemini-3.5-flash-lite",
+  deep: "gemini-3.8-flash",
   embed: "gemini-embedding-001",
 };
 
@@ -50,8 +50,18 @@ interface GenerateContentResult {
   readonly usageMetadata?: {
     readonly promptTokenCount?: number;
     readonly candidatesTokenCount?: number;
+    readonly cachedContentTokenCount?: number;
   };
 }
+
+const usageOf = (usage: GenerateContentResult["usageMetadata"]): TokenUsage => {
+  const cached = usage?.cachedContentTokenCount ?? 0;
+  return {
+    inputTokens: usage?.promptTokenCount ?? 0,
+    outputTokens: usage?.candidatesTokenCount ?? 0,
+    ...(cached > 0 ? { cachedInputTokens: cached } : {}),
+  };
+};
 
 type GenerateContentStreamResult = AsyncIterable<GenerateContentResult>;
 
@@ -130,10 +140,7 @@ function fromResult(result: GenerateContentResult): ChatResponse {
 
   return {
     content: result.text ?? "",
-    usage: {
-      inputTokens: result.usageMetadata?.promptTokenCount ?? 0,
-      outputTokens: result.usageMetadata?.candidatesTokenCount ?? 0,
-    },
+    usage: usageOf(result.usageMetadata),
     ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
   };
 }
@@ -183,10 +190,7 @@ export class GoogleProvider implements AIProvider {
     let usage: TokenUsage | undefined;
     for await (const chunk of stream) {
       if (chunk.usageMetadata) {
-        usage = {
-          inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
-          outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
-        };
+        usage = usageOf(chunk.usageMetadata);
       }
       if (chunk.text) {
         yield chunk.text;

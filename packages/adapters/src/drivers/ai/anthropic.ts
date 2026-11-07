@@ -33,9 +33,26 @@ import type { TierModelMap } from "./tier-map.ts";
 
 /** A seed, not a catalogue: refined per model once P2-T15's catalogue exists. */
 export const ANTHROPIC_DEFAULT_TIER_MODELS: TierModelMap = {
-  fast: "claude-haiku-4-5",
-  balanced: "claude-sonnet-5",
-  deep: "claude-opus-5",
+  fast: "claude-haiku-5-5",
+  balanced: "claude-sonnet-5-5",
+  deep: "claude-opus-5-5",
+};
+
+/**
+ * The port's usage from Anthropic's.
+ *
+ * Anthropic counts cache reads and writes apart from `input_tokens`, where the
+ * port's `inputTokens` is every input token, as the other providers report it.
+ * A cache write is counted at the input rate: this driver sends no `cache_control`.
+ */
+const usageOf = (usage: Anthropic.Usage): TokenUsage => {
+  const cached = usage.cache_read_input_tokens ?? 0;
+  return {
+    inputTokens:
+      usage.input_tokens + cached + (usage.cache_creation_input_tokens ?? 0),
+    outputTokens: usage.output_tokens,
+    ...(cached > 0 ? { cachedInputTokens: cached } : {}),
+  };
 };
 
 /** The Messages API requires `max_tokens`; there is no server-side default. */
@@ -100,10 +117,7 @@ function fromMessage(message: Anthropic.Message): ChatResponse {
 
   return {
     content: textBlocks.map((block) => block.text).join(""),
-    usage: {
-      inputTokens: message.usage.input_tokens,
-      outputTokens: message.usage.output_tokens,
-    },
+    usage: usageOf(message.usage),
     ...(toolBlocks.length > 0
       ? {
           toolCalls: toolBlocks.map((block) => ({
@@ -168,11 +182,11 @@ export class AnthropicProvider implements AIProvider {
       messages: toMessages(rest),
       stream: true,
     });
-    let inputTokens = 0;
+    let started: Anthropic.Usage | undefined;
     let outputTokens = 0;
     for await (const event of stream) {
       if (event.type === "message_start") {
-        inputTokens = event.message.usage.input_tokens;
+        started = event.message.usage;
       } else if (event.type === "message_delta") {
         outputTokens = event.usage.output_tokens;
       } else if (
@@ -182,7 +196,9 @@ export class AnthropicProvider implements AIProvider {
         yield event.delta.text;
       }
     }
-    onUsage?.({ inputTokens, outputTokens });
+    if (started) {
+      onUsage?.({ ...usageOf(started), outputTokens });
+    }
   }
 
   async chatWithTools(
@@ -231,10 +247,7 @@ export class AnthropicProvider implements AIProvider {
     );
     return {
       content: toolUse ? JSON.stringify(toolUse.input) : "",
-      usage: {
-        inputTokens: message.usage.input_tokens,
-        outputTokens: message.usage.output_tokens,
-      },
+      usage: usageOf(message.usage),
     };
   }
 

@@ -234,6 +234,36 @@ describe("stream", () => {
   });
 });
 
+describe("usage", () => {
+  it("counts every input token, and says which came from the cache", async () => {
+    const client = provider(
+      fakeFetch({
+        id: "msg_9",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-5-5",
+        content: [{ type: "text", text: "Hi", citations: null }],
+        stop_reason: "end_turn",
+        usage: {
+          input_tokens: 100,
+          cache_read_input_tokens: 900,
+          cache_creation_input_tokens: 50,
+          output_tokens: 6,
+        },
+      }),
+    );
+    const response = await client.chat({
+      model: "claude-sonnet-5-5",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 1050,
+      cachedInputTokens: 900,
+      outputTokens: 6,
+    });
+  });
+});
+
 describe("capabilities and stop", () => {
   it("reports jsonMode as false: extract() works through a forced tool call instead", () => {
     const client = provider(fakeFetch({}));

@@ -10,7 +10,9 @@
  *
  * Cost and context-window figures here are a working seed an admin is
  * expected to confirm or refresh (§3.4: "ships seeded and is refreshable
- * from the provider"), not a pricing guarantee this codebase makes. Every
+ * from the provider"), not a pricing guarantee this codebase makes. The
+ * Anthropic, OpenAI and Google prices were read from each vendor's own pricing
+ * page on 7 November 2026. Every
  * driver from P2-T13 is represented except `off` (nothing to seed) and
  * `openai-compatible` (fully generic — nobody but its own operator can name
  * a model for it, the same reason `defaultTierModelsFor` seeds it empty).
@@ -24,6 +26,8 @@ export interface SeededModel {
   readonly contextWindow: number;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
+  /** What a token served from the provider's cache costs. Absent: the input rate. */
+  readonly costCachedInPerMillion?: number;
   readonly supportsTools: boolean;
   readonly supportsVision: boolean;
   readonly supportsJsonMode: boolean;
@@ -32,15 +36,22 @@ export interface SeededModel {
   readonly tiers: readonly ModelTier[];
 }
 
+/** What it takes to price a call. */
+export type ModelRates = Pick<
+  SeededModel,
+  "costInPerMillion" | "costOutPerMillion" | "costCachedInPerMillion"
+>;
+
 export const SEEDED_MODELS: readonly SeededModel[] = [
   // Anthropic — no embedding model, per tier-map.ts's own note.
   {
     provider: "anthropic",
-    modelId: "claude-haiku-4-5",
-    displayName: "Claude Haiku 4.5",
+    modelId: "claude-haiku-5-5",
+    displayName: "Claude Haiku 5.5",
     contextWindow: 200_000,
-    costInPerMillion: 0.8,
-    costOutPerMillion: 4,
+    costInPerMillion: 0.1,
+    costOutPerMillion: 0.5,
+    costCachedInPerMillion: 0.01,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
@@ -49,11 +60,12 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
   },
   {
     provider: "anthropic",
-    modelId: "claude-sonnet-5",
-    displayName: "Claude Sonnet 5",
+    modelId: "claude-sonnet-5-5",
+    displayName: "Claude Sonnet 5.5",
     contextWindow: 200_000,
-    costInPerMillion: 3,
-    costOutPerMillion: 15,
+    costInPerMillion: 2,
+    costOutPerMillion: 10,
+    costCachedInPerMillion: 0.1,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
@@ -62,25 +74,72 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
   },
   {
     provider: "anthropic",
-    modelId: "claude-opus-5",
-    displayName: "Claude Opus 5",
+    modelId: "claude-opus-5-5",
+    displayName: "Claude Opus 5.5",
     contextWindow: 200_000,
-    costInPerMillion: 15,
-    costOutPerMillion: 75,
+    costInPerMillion: 4,
+    costOutPerMillion: 20,
+    costCachedInPerMillion: 0.2,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
     supportsStreaming: true,
     tiers: ["deep"],
   },
+  // Earlier models carry no tier, so nothing new routes to them, and stay priced
+  // because a workspace's own tier policy may still name one: an unpriced model
+  // is refused, and that would switch its AI off on upgrade.
+  {
+    provider: "anthropic",
+    modelId: "claude-haiku-4-5",
+    displayName: "Claude Haiku 4.5",
+    contextWindow: 200_000,
+    costInPerMillion: 1,
+    costOutPerMillion: 5,
+    costCachedInPerMillion: 0.1,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
+  },
+  {
+    provider: "anthropic",
+    modelId: "claude-sonnet-5",
+    displayName: "Claude Sonnet 5",
+    contextWindow: 200_000,
+    costInPerMillion: 2,
+    costOutPerMillion: 10,
+    costCachedInPerMillion: 0.2,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
+  },
+  {
+    provider: "anthropic",
+    modelId: "claude-opus-5",
+    displayName: "Claude Opus 5",
+    contextWindow: 200_000,
+    costInPerMillion: 5,
+    costOutPerMillion: 25,
+    costCachedInPerMillion: 0.5,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
+  },
   // OpenAI
   {
     provider: "openai",
-    modelId: "gpt-5-mini",
-    displayName: "GPT-5 Mini",
+    modelId: "gpt-6-luna",
+    displayName: "GPT-6 Luna",
     contextWindow: 128_000,
-    costInPerMillion: 0.15,
-    costOutPerMillion: 0.6,
+    costInPerMillion: 0.1,
+    costOutPerMillion: 0.5,
+    costCachedInPerMillion: 0.01,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
@@ -89,16 +148,59 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
   },
   {
     provider: "openai",
-    modelId: "gpt-5",
-    displayName: "GPT-5",
+    modelId: "gpt-6.1-terra",
+    displayName: "GPT-6.1 Terra",
     contextWindow: 128_000,
-    costInPerMillion: 2.5,
-    costOutPerMillion: 10,
+    costInPerMillion: 1,
+    costOutPerMillion: 5,
+    costCachedInPerMillion: 0.05,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
     supportsStreaming: true,
-    tiers: ["balanced", "deep"],
+    tiers: ["balanced"],
+  },
+  {
+    provider: "openai",
+    modelId: "gpt-6.1-sol",
+    displayName: "GPT-6.1 Sol",
+    contextWindow: 128_000,
+    costInPerMillion: 2,
+    costOutPerMillion: 10,
+    costCachedInPerMillion: 0.1,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: ["deep"],
+  },
+  {
+    provider: "openai",
+    modelId: "gpt-5-mini",
+    displayName: "GPT-5 Mini",
+    contextWindow: 128_000,
+    costInPerMillion: 0.25,
+    costOutPerMillion: 2,
+    costCachedInPerMillion: 0.025,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
+  },
+  {
+    provider: "openai",
+    modelId: "gpt-5",
+    displayName: "GPT-5",
+    contextWindow: 128_000,
+    costInPerMillion: 1.25,
+    costOutPerMillion: 10,
+    costCachedInPerMillion: 0.125,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
   },
   {
     provider: "openai",
@@ -114,7 +216,8 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     embeddingDimensions: 1536,
     tiers: ["embed"],
   },
-  // Google
+  // Google. Gemini 2.5 Flash and 2.5 Pro stop being served as themselves on
+  // 1 December 2026, so neither is a default any more.
   {
     provider: "google",
     modelId: "gemini-2.5-flash-lite",
@@ -122,6 +225,7 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     contextWindow: 1_000_000,
     costInPerMillion: 0.1,
     costOutPerMillion: 0.4,
+    costCachedInPerMillion: 0.01,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
@@ -130,16 +234,47 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
   },
   {
     provider: "google",
-    modelId: "gemini-2.5-flash",
-    displayName: "Gemini 2.5 Flash",
+    modelId: "gemini-3.5-flash-lite",
+    displayName: "Gemini 3.5 Flash Lite",
     contextWindow: 1_000_000,
     costInPerMillion: 0.3,
-    costOutPerMillion: 1.2,
+    costOutPerMillion: 2.5,
+    costCachedInPerMillion: 0.03,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
     supportsStreaming: true,
     tiers: ["balanced"],
+  },
+  // Google's price from 1 January 2027, which it has already published. Half that
+  // until then, and metering low would have a workspace spend more than it sees.
+  {
+    provider: "google",
+    modelId: "gemini-3.8-flash",
+    displayName: "Gemini 3.8 Flash",
+    contextWindow: 1_000_000,
+    costInPerMillion: 1.5,
+    costOutPerMillion: 7.5,
+    costCachedInPerMillion: 0.15,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: ["deep"],
+  },
+  {
+    provider: "google",
+    modelId: "gemini-2.5-flash",
+    displayName: "Gemini 2.5 Flash",
+    contextWindow: 1_000_000,
+    costInPerMillion: 0.3,
+    costOutPerMillion: 2.5,
+    costCachedInPerMillion: 0.03,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: [],
   },
   {
     provider: "google",
@@ -147,12 +282,13 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     displayName: "Gemini 2.5 Pro",
     contextWindow: 1_000_000,
     costInPerMillion: 1.25,
-    costOutPerMillion: 5,
+    costOutPerMillion: 10,
+    costCachedInPerMillion: 0.125,
     supportsTools: true,
     supportsVision: true,
     supportsJsonMode: true,
     supportsStreaming: true,
-    tiers: ["deep"],
+    tiers: [],
   },
   {
     provider: "google",
@@ -254,11 +390,17 @@ export function seededModelsForProvider(
  * of the same call.
  */
 export function costOfUsage(
-  rates: Pick<SeededModel, "costInPerMillion" | "costOutPerMillion">,
-  usage: { readonly inputTokens: number; readonly outputTokens: number },
+  rates: ModelRates,
+  usage: {
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly cachedInputTokens?: number;
+  },
 ): number {
+  const cached = usage.cachedInputTokens ?? 0;
   return (
-    (usage.inputTokens * rates.costInPerMillion +
+    ((usage.inputTokens - cached) * rates.costInPerMillion +
+      cached * (rates.costCachedInPerMillion ?? rates.costInPerMillion) +
       usage.outputTokens * rates.costOutPerMillion) /
     1_000_000
   );

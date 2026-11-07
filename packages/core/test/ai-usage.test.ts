@@ -269,6 +269,28 @@ describe("costOfUsage", () => {
       ),
     ).toBeCloseTo(0.0045);
   });
+
+  it("charges a cached token at the cached rate", () => {
+    expect(
+      costOfUsage(
+        {
+          costInPerMillion: 2,
+          costCachedInPerMillion: 0.1,
+          costOutPerMillion: 10,
+        },
+        { inputTokens: 12_000, cachedInputTokens: 10_000, outputTokens: 700 },
+      ),
+    ).toBeCloseTo(0.012);
+  });
+
+  it("charges a cached token at the input rate when no cached rate is known", () => {
+    expect(
+      costOfUsage(
+        { costInPerMillion: 2, costOutPerMillion: 10 },
+        { inputTokens: 1000, cachedInputTokens: 1000, outputTokens: 0 },
+      ),
+    ).toBeCloseTo(0.002);
+  });
 });
 
 /**

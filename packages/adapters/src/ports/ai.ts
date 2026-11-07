@@ -53,8 +53,11 @@ export interface ChatRequest {
 }
 
 export interface TokenUsage {
+  /** Every input token, including any the provider served from its cache. */
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /** How many of `inputTokens` came from the cache, at the cheaper rate. */
+  readonly cachedInputTokens?: number;
 }
 
 export interface ChatResponse {

@@ -943,6 +943,7 @@ export interface ProviderDrafterOptions {
   /** Dollars per million tokens, for turning usage into spend. */
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
+  readonly costCachedInPerMillion?: number;
 }
 
 /** Editor JSON from one paragraph of plain text, which is all a model returns. */
@@ -974,10 +975,12 @@ export function createProviderDrafter(
   const charge = (usage?: {
     inputTokens?: number;
     outputTokens?: number;
+    cachedInputTokens?: number;
   }): void => {
     spent += costOfUsage(options, {
       inputTokens: usage?.inputTokens ?? 0,
       outputTokens: usage?.outputTokens ?? 0,
+      cachedInputTokens: usage?.cachedInputTokens ?? 0,
     });
   };
 

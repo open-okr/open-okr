@@ -30,7 +30,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
-import { costOfUsage, type SeededModel } from "./model-catalog.ts";
+import { costOfUsage, type ModelRates } from "./model-catalog.ts";
 import { activePersonFor } from "./resolve.ts";
 
 export interface RecordUsageEventInput {
@@ -194,7 +194,7 @@ export async function recordUsageEvent(
 export interface CallRecorderInput {
   readonly workspaceId: string;
   readonly provider: AIProviderKind;
-  readonly rates: Pick<SeededModel, "costInPerMillion" | "costOutPerMillion">;
+  readonly rates: ModelRates;
   /** The signed-in person a request is for. Nobody, for an agent or the scheduler. */
   readonly forUser?: string;
   /** Defaults to an assist when a person asked, and an agent when nobody did. */
@@ -217,6 +217,7 @@ export function callRecorder(pool: Pool, input: CallRecorderInput) {
     readonly usage: {
       readonly inputTokens: number;
       readonly outputTokens: number;
+      readonly cachedInputTokens?: number;
     };
   }): Promise<void> => {
     const memberId = input.forUser

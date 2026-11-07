@@ -81,7 +81,10 @@ vi.mock("@openokr/config", async (original) => ({
 }));
 vi.mock("@openokr/core", async (original) => ({
   ...(await original<typeof import("@openokr/core")>()),
-  findSeededModel: () => ({ costInPerMillion: 3, costOutPerMillion: 15 }),
+  resolveModelRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
   isCloudEnabled: async () => false,
   resolveAICredential: (...args: Parameters<typeof resolveAICredential>) =>
     resolveAICredential(...args),

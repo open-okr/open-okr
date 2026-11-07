@@ -3,9 +3,9 @@ import type { TierModelMap } from "./tier-map.ts";
 
 /** A seed, not a catalogue: refined per model once P2-T15's catalogue exists. */
 export const OPENAI_DEFAULT_TIER_MODELS: TierModelMap = {
-  fast: "gpt-4.1-mini",
-  balanced: "gpt-4.1",
-  deep: "o3",
+  fast: "gpt-6-luna",
+  balanced: "gpt-6.1-terra",
+  deep: "gpt-6.1-sol",
   embed: "text-embedding-3-large",
 };
 

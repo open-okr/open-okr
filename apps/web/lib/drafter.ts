@@ -89,5 +89,8 @@ export async function drafterFor(
     costCapUsd,
     costInPerMillion: routed.costInPerMillion,
     costOutPerMillion: routed.costOutPerMillion,
+    ...(routed.costCachedInPerMillion === undefined
+      ? {}
+      : { costCachedInPerMillion: routed.costCachedInPerMillion }),
   });
 }

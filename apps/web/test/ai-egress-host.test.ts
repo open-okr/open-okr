@@ -25,7 +25,10 @@ vi.mock("@openokr/config", () => ({
   loadEnv: () => ({ BETTER_AUTH_URL: "https://okr.example.com" }),
 }));
 vi.mock("@openokr/core", () => ({
-  findSeededModel: () => ({ costInPerMillion: 3, costOutPerMillion: 15 }),
+  resolveModelRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
   isCloudEnabled: async () => false,
   resolveAICredential: async () => ({
     source: "workspace",

@@ -255,6 +255,38 @@ describe("stream", () => {
   });
 });
 
+describe("usage", () => {
+  it("says how many input tokens came from the cache", async () => {
+    const client = provider(
+      fakeFetch({
+        id: "c1",
+        object: "chat.completion",
+        choices: [
+          {
+            index: 0,
+            message: { role: "assistant", content: "Hi" },
+            finish_reason: "stop",
+          },
+        ],
+        usage: {
+          prompt_tokens: 1000,
+          completion_tokens: 6,
+          prompt_tokens_details: { cached_tokens: 900 },
+        },
+      }),
+    );
+    const response = await client.chat({
+      model: "gpt-6-luna",
+      messages: [{ role: "user", content: "hi" }],
+    });
+    expect(response.usage).toEqual({
+      inputTokens: 1000,
+      cachedInputTokens: 900,
+      outputTokens: 6,
+    });
+  });
+});
+
 describe("capabilities and stop", () => {
   it("reports a reasonable default capability set with no live catalogue", () => {
     const client = provider(fakeFetch({}));
