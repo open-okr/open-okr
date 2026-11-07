@@ -35,6 +35,7 @@ import { readSetting } from "../secrets/instance-settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
+const CLOUD_DEFAULT_PLAN_KEY = "cloud.defaultPlan";
 
 /**
  * One plan.
@@ -160,6 +161,28 @@ function plansFromEnvironment(): unknown {
   } catch {
     return [];
   }
+}
+
+/**
+ * The plan a new workspace starts on, or none.
+ *
+ * **Empty is the default, and it changes nothing**: a new workspace has no plan
+ * and no seat limit, which is what every group and every single organisation
+ * needs. A provider names its free plan here, which is what makes "Free" mean
+ * ten people rather than unlimited.
+ *
+ * A key the catalogue does not hold reads as none. The alternative is refusing
+ * every sign-up over a typo in a setting.
+ */
+export async function resolveDefaultPlan(pool: Pool): Promise<Plan | null> {
+  const definition = getInstanceSetting(CLOUD_DEFAULT_PLAN_KEY);
+  const stored = await readSetting(pool, CLOUD_DEFAULT_PLAN_KEY);
+  const key =
+    stored ?? (definition && environmentValue(definition, process.env));
+  if (typeof key !== "string" || key.trim() === "") {
+    return null;
+  }
+  return (await readPlans(pool)).find((plan) => plan.key === key) ?? null;
 }
 
 /** The usage snapshot, for the customer's own plan screen. */

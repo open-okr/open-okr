@@ -57,7 +57,12 @@ import {
 } from "../settings/registry.ts";
 import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 import { createSpaceInTx } from "../spaces/service.ts";
-import { resolveCloudTenancy, seedTenantInTx } from "../tenancy/index.ts";
+import {
+  applyPlanInTx,
+  resolveCloudTenancy,
+  resolveDefaultPlan,
+  seedTenantInTx,
+} from "../tenancy/index.ts";
 
 export interface WorkspaceUser {
   readonly id: string;
@@ -156,6 +161,7 @@ export async function createWorkspace(
   // a self-hosted instance this resolves to off and the seed below writes
   // nothing (P8-T02a).
   const cloud = await resolveCloudTenancy(pool);
+  const defaultPlan = cloud.enabled ? await resolveDefaultPlan(pool) : null;
 
   // A bootstrap operation: it creates the workspace it runs in, so there is no
   // member to authorise against and no workspace to load. Everything else is
@@ -182,6 +188,9 @@ export async function createWorkspace(
         // (TECHNICAL-PLAN §4.14). Returns immediately when the cloud is off,
         // so the self-hosted path executes a call and writes nothing.
         await seedTenantInTx(tx, { workspaceId, cloud });
+        if (defaultPlan) {
+          await applyPlanInTx(tx, { workspaceId, plan: defaultPlan });
+        }
         return {
           result: provisioned,
           activity: {

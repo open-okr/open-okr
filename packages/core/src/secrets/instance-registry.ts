@@ -108,6 +108,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
       'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]. Seats null is unlimited. Without it the only plan is Free.',
   },
   {
+    key: "cloud.defaultPlan",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_CLOUD_DEFAULT_PLAN",
+    summary:
+      "The plan a new workspace starts on, as a key from the catalogue. Empty means a new workspace has no plan and no seat limit. A key the catalogue does not hold reads as empty, so a typo cannot refuse a sign-up.",
+  },
+  {
     key: "cloud.closureRetentionDays",
     kind: "number",
     fallback: 0,

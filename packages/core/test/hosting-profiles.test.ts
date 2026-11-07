@@ -101,6 +101,16 @@ describe("one organisation with one workspace: every switch at its default", () 
     await expect(readPlans(wb.appPool)).resolves.toEqual([]);
   });
 
+  it("ignores a default plan, because nothing here is a cloud", async () => {
+    const wb = await workerDb();
+    await applySetup({
+      "cloud.plans": PROVIDER_PLANS,
+      "cloud.defaultPlan": "starter",
+    });
+    const workspaceId = await firstWorkspace();
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toBeUndefined();
+  });
+
   it("never limits seats", async () => {
     const wb = await workerDb();
     const workspaceId = await firstWorkspace();
@@ -186,6 +196,30 @@ describe("a cloud run by a provider: the flag on, its own plans", () => {
     ).rejects.toThrow(/through billing/);
     await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
       planKey: null,
+    });
+  });
+
+  it("starts a new workspace on the plan the provider names", async () => {
+    const wb = await workerDb();
+    await applySetup({ "cloud.defaultPlan": "starter" });
+    const workspaceId = await firstWorkspace();
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
+      planKey: "starter",
+      seats: 2,
+    });
+    await expect(seatState(wb.appPool, workspaceId)).resolves.toMatchObject({
+      limit: 2,
+      used: 1,
+    });
+  });
+
+  it("does not refuse a sign-up over a default plan the catalogue lacks", async () => {
+    const wb = await workerDb();
+    await applySetup({ "cloud.defaultPlan": "strater" });
+    const workspaceId = await firstWorkspace();
+    await expect(readTenant(wb.appPool, workspaceId)).resolves.toMatchObject({
+      planKey: null,
+      seats: null,
     });
   });
 

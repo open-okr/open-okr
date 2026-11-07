@@ -115,7 +115,7 @@ turns adding a plan into a migration.
 
 | Field | Notes |
 |---|---|
-| `key` | What `tenants.plan_key` holds. Null means the free tier, so the free tier needs no row |
+| `key` | What `tenants.plan_key` holds. Null means no plan and no seat limit, which is what every self-hosted instance and every group has. A provider's free plan is an ordinary row, and `cloud.defaultPlan` names it |
 | `name` | What a customer reads |
 | `seats` | The number written to `tenants.seats` at provisioning and at every change. Null means unlimited |
 | `aiMonthlyUsd` | Written into the existing `ai_budgets` workspace row. No new mechanism |
@@ -220,7 +220,7 @@ Written as the test plan P8-T05 inherits.
 |---|---|---|
 | 1 | The pricing model. PLAN.md §10 #1 | **Closed on 7 November 2026: per workspace.** Section 9. The design holds seats and the AI cap as data, so each provider's catalogue in `cloud.plans` carries the numbers |
 | 2 | Whether any feature is ever gated. PLAN.md §10 #2 | A human's call, and this design makes the answer no harder to keep: there is no field to gate a feature with |
-| 3 | The free tier's shape | Null `plan_key` and null `seats` means the free tier is unlimited today. **Decided on 7 November 2026: Free becomes a catalogue row with its own seat limit, and a new workspace starts on whichever plan the provider names.** With no plan named, nothing changes, so a self-hosted instance is untouched. Not built yet |
+| 3 | The free tier's shape | Null `plan_key` and null `seats` means the free tier is unlimited today. **Decided on 7 November 2026: Free becomes a catalogue row with its own seat limit, and a new workspace starts on whichever plan the provider names.** With no plan named, nothing changes, so a self-hosted instance is untouched. `cloud.defaultPlan` holds the name |
 | 4 | Billing, payment and invoicing | **Decided on 7 November 2026: Stripe behind a billing port, off until a provider turns it on.** Nothing here talks to a payment provider yet, and `tenants` holds no customer or subscription identifier. The billing design owns both |
 | 5 | Whether an over-limit workspace can ever exist | Section 5 refuses it at the downgrade. It can still arise if an operator lowers `tenants.seats` directly from the console. The design tolerates the state, refuses new joins in it, and shows the admin the number. Whether the console should refuse the lowering too is a small open question. **Answered at completeness review H-21: yes, it refuses.** The operator's plan control and the administrator's both go through `applyPlanInTx`, which holds the headcount rule, so neither can lower seats below the people in use |
 

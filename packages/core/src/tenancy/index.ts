@@ -27,6 +27,7 @@ export {
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  resolveDefaultPlan,
   seatState,
 } from "./plans.ts";
 export {
