@@ -123,7 +123,8 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
      */
     continueAgentRun: (job) =>
       continueAgentRun(getPool(), job, {
-        modelFor: (id, tier) => providerForTier(id, tier),
+        modelFor: (id, tier, agentId) =>
+          providerForTier(id, tier, undefined, { agentId }),
       }),
     async publish(channel, event, data) {
       await getRealtime().publish(channel, { name: event, data });

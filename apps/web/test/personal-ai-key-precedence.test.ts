@@ -215,7 +215,7 @@ describe("the agent paths", () => {
 
   it("builds an agent step's model with no reader", () => {
     expect(source("../lib/relay.ts")).toContain(
-      "modelFor: (id, tier) => providerForTier(id, tier)",
+      "modelFor: (id, tier, agentId) =>\n          providerForTier(id, tier, undefined, { agentId }),",
     );
   });
 });

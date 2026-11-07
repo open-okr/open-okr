@@ -30,6 +30,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
+import { costOfUsage, type SeededModel } from "./model-catalog.ts";
+import { activePersonFor } from "./resolve.ts";
 
 export interface RecordUsageEventInput {
   readonly workspaceId: string;
@@ -187,6 +189,51 @@ export async function recordUsageEvent(
       },
     },
   );
+}
+
+export interface CallRecorderInput {
+  readonly workspaceId: string;
+  readonly provider: AIProviderKind;
+  readonly rates: Pick<SeededModel, "costInPerMillion" | "costOutPerMillion">;
+  /** The signed-in person a request is for. Nobody, for an agent or the scheduler. */
+  readonly forUser?: string;
+  /** Defaults to an assist when a person asked, and an agent when nobody did. */
+  readonly source?: UsageSource;
+  /** The agent whose run this step belongs to, for its own budget. */
+  readonly agentId?: string;
+}
+
+/**
+ * What a provider tells about each call, turned into a usage row.
+ *
+ * **Without this nothing wrote one**, so every budget read zero and no cap ever
+ * tripped (AI-NATIVE-PLAN §1 rule 7: "every call records tokens and cost"). The
+ * host builds one per provider, because the host is what knows the workspace,
+ * the person and the model's price.
+ */
+export function callRecorder(pool: Pool, input: CallRecorderInput) {
+  return async (record: {
+    readonly model: string;
+    readonly usage: {
+      readonly inputTokens: number;
+      readonly outputTokens: number;
+    };
+  }): Promise<void> => {
+    const memberId = input.forUser
+      ? await activePersonFor(pool, input.workspaceId, input.forUser)
+      : undefined;
+    await recordUsageEvent(pool, {
+      workspaceId: input.workspaceId,
+      ...(memberId ? { memberId } : {}),
+      ...(input.agentId ? { agentId: input.agentId } : {}),
+      source: input.source ?? (input.forUser ? "assist" : "agent"),
+      provider: input.provider,
+      modelId: record.model,
+      inputTokens: record.usage.inputTokens,
+      outputTokens: record.usage.outputTokens,
+      cost: costOfUsage(input.rates, record.usage),
+    });
+  };
 }
 
 export interface UsageSummaryRow {

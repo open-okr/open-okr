@@ -19,6 +19,7 @@ import type {
   EmbedResponse,
   ExtractRequest,
   ModelCapabilities,
+  TokenUsage,
   ToolDefinition,
 } from "../../ports/ai.ts";
 
@@ -124,7 +125,10 @@ export class OpenAiCompatibleProvider implements AIProvider {
     return fromCompletion(completion);
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
     const stream = await this.#client.chat.completions.create({
       ...this.#extraBody,
       model: request.model,
@@ -132,8 +136,16 @@ export class OpenAiCompatibleProvider implements AIProvider {
       temperature: request.temperature,
       max_completion_tokens: request.maxTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       stream: true,
+      // Without this the API sends no token counts on a stream at all.
+      stream_options: { include_usage: true },
     });
     for await (const chunk of stream) {
+      if (chunk.usage) {
+        onUsage?.({
+          inputTokens: chunk.usage.prompt_tokens,
+          outputTokens: chunk.usage.completion_tokens,
+        });
+      }
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {
         yield delta;

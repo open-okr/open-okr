@@ -9,6 +9,7 @@ import {
   type AIEgressPolicy,
   AIEgressRefusedError,
   type AIEgressTarget,
+  type AIUsageRecord,
   aiEgressRefusal,
   EgressGuardedProvider,
   isLocalAIHost,
@@ -356,6 +357,123 @@ describe("a record that cannot be written", () => {
       messages: [{ role: "user", content: PERSONAL }],
     });
     expect(JSON.stringify(mock.calls)).not.toContain("jane.doe@example.com");
+  });
+});
+
+describe("what a call used", () => {
+  const REQUEST = {
+    model: "m",
+    purpose: "assist" as const,
+    messages: [{ role: "user" as const, content: "hello" }],
+  };
+
+  function metered(onUsage?: (record: AIUsageRecord) => void) {
+    const records: AIUsageRecord[] = [];
+    const provider = new EgressGuardedProvider(
+      new MockAIProvider({ streamChunks: ["one ", "two"] }),
+      {
+        provider: "openai",
+        target: REMOTE,
+        policy: OPEN,
+        onUsage:
+          onUsage ??
+          ((record) => {
+            records.push(record);
+          }),
+      },
+    );
+    return { provider, records };
+  }
+
+  it("records a chat, with what the provider counted", async () => {
+    const { provider, records } = metered();
+    await provider.chat(REQUEST);
+    expect(records).toEqual([
+      {
+        model: "m",
+        usage: { inputTokens: 10, outputTokens: 10 },
+        estimated: false,
+      },
+    ]);
+  });
+
+  it("records every other kind of call, once each", async () => {
+    const { provider, records } = metered();
+    await provider.chatWithTools({ ...REQUEST, tools: [] });
+    await provider.extract({ ...REQUEST, schema: {} });
+    await provider.embed({ model: "embedder", input: ["a"] });
+    expect(records.map((record) => record.model)).toEqual([
+      "m",
+      "m",
+      "embedder",
+    ]);
+  });
+
+  it("records a finished stream once, with what the provider counted", async () => {
+    const { provider, records } = metered();
+    const seen: string[] = [];
+    for await (const piece of provider.stream(REQUEST)) {
+      seen.push(piece);
+    }
+    expect(seen.join("")).toBe("one two");
+    expect(records).toEqual([
+      {
+        model: "m",
+        usage: { inputTokens: 10, outputTokens: 10 },
+        estimated: false,
+      },
+    ]);
+  });
+
+  it("still tells the caller of a stream what it used", async () => {
+    const { provider } = metered();
+    const told: unknown[] = [];
+    for await (const _piece of provider.stream(REQUEST, (usage) => {
+      told.push(usage);
+    })) {
+      // Read to the end.
+    }
+    expect(told).toEqual([{ inputTokens: 10, outputTokens: 10 }]);
+  });
+
+  it("counts from the text when a reader stops an answer early", async () => {
+    // Stopping must not be a way to spend for free: the provider billed what
+    // it generated, and a stream cut short never reports a total.
+    const { provider, records } = metered();
+    for await (const _piece of provider.stream(REQUEST)) {
+      break;
+    }
+    expect(records).toEqual([
+      {
+        model: "m",
+        // "hello" and "one ", at four characters to a token, rounded up.
+        usage: { inputTokens: 2, outputTokens: 1 },
+        estimated: true,
+      },
+    ]);
+  });
+
+  it("records nothing for a call the controls refused", async () => {
+    const records: AIUsageRecord[] = [];
+    const provider = new EgressGuardedProvider(new MockAIProvider(), {
+      provider: "openai",
+      target: REMOTE,
+      policy: { ...OPEN, contextEgress: "none" },
+      onUsage: (record) => {
+        records.push(record);
+      },
+    });
+    await expect(provider.chat(REQUEST)).rejects.toThrow(AIEgressRefusedError);
+    expect(records).toEqual([]);
+  });
+
+  it("keeps the answer when the record cannot be written", async () => {
+    const { provider } = metered(() => {
+      throw new Error("the database is down");
+    });
+    await expect(provider.chat(REQUEST)).resolves.toMatchObject({
+      content: "This is a mock response.",
+    });
   });
 });
 

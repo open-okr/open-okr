@@ -247,6 +247,23 @@ export function seededModelsForProvider(
   return SEEDED_MODELS.filter((model) => model.provider === provider);
 }
 
+/**
+ * What a call cost, at a model's list price.
+ *
+ * One function, so the budget and the run cap cannot disagree about the price
+ * of the same call.
+ */
+export function costOfUsage(
+  rates: Pick<SeededModel, "costInPerMillion" | "costOutPerMillion">,
+  usage: { readonly inputTokens: number; readonly outputTokens: number },
+): number {
+  return (
+    (usage.inputTokens * rates.costInPerMillion +
+      usage.outputTokens * rates.costOutPerMillion) /
+    1_000_000
+  );
+}
+
 export function findSeededModel(
   provider: AIProviderKind,
   modelId: string,

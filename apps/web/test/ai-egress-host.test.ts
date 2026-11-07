@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createAIProvider = vi.fn();
 const resolveAIPrivacySettings = vi.fn();
 const recordAIEgressWithheld = vi.fn();
+const RECORDER = async () => undefined;
+const callRecorder = vi.fn(() => RECORDER);
 
 vi.mock("@openokr/adapters", () => ({
   createAIProvider: (...args: unknown[]) => createAIProvider(...args),
@@ -40,6 +42,7 @@ vi.mock("@openokr/core", () => ({
   recordAIEgressWithheld: (...args: unknown[]) =>
     recordAIEgressWithheld(...args),
   resolveAgentRunCostCap: async () => 2,
+  callRecorder: (...args: unknown[]) => callRecorder(...(args as [])),
 }));
 vi.mock("@openokr/agents", () => ({
   createProviderDrafter: () => ({ drafted: true }),
@@ -71,7 +74,63 @@ beforeEach(() => {
   createAIProvider.mockReset();
   resolveAIPrivacySettings.mockReset();
   recordAIEgressWithheld.mockReset();
+  callRecorder.mockClear();
   resolveAIPrivacySettings.mockResolvedValue(POLICY);
+});
+
+/**
+ * The host is where the price, the workspace and the person are known, so it is
+ * what builds the recorder a provider reports each call to. `callRecorder`
+ * itself is proved against a real database in `packages/core/test/ai-usage.test.ts`.
+ */
+describe("what a call used", () => {
+  const RATES = { costInPerMillion: 3, costOutPerMillion: 15 };
+
+  it("is recorded against the workspace, at this model's price", async () => {
+    createAIProvider.mockReturnValue(guarded(["assist"]));
+    await providerForTier("workspace-1", "balanced");
+
+    expect(callRecorder).toHaveBeenCalledWith("the pool", {
+      workspaceId: "workspace-1",
+      provider: "anthropic",
+      rates: RATES,
+    });
+    const [, egress] = createAIProvider.mock.calls[0] as [
+      unknown,
+      { onUsage: unknown },
+    ];
+    expect(egress.onUsage).toBe(RECORDER);
+  });
+
+  it("names the person, the surface and the agent when told them", async () => {
+    createAIProvider.mockReturnValue(guarded(["assist"]));
+    await providerForTier("workspace-1", "balanced", "user-1", {
+      source: "copilot",
+    });
+    expect(callRecorder).toHaveBeenLastCalledWith(
+      "the pool",
+      expect.objectContaining({ forUser: "user-1", source: "copilot" }),
+    );
+
+    await providerForTier("workspace-1", "balanced", undefined, {
+      agentId: "agent-1",
+    });
+    expect(callRecorder).toHaveBeenLastCalledWith(
+      "the pool",
+      expect.objectContaining({ agentId: "agent-1" }),
+    );
+  });
+
+  it("reaches the provider through drafterFor, with the surface named", async () => {
+    createAIProvider.mockReturnValue(guarded(["assist"]));
+    await drafterFor("workspace-1", "balanced", "user-1", {
+      source: "copilot",
+    });
+    expect(callRecorder).toHaveBeenLastCalledWith(
+      "the pool",
+      expect.objectContaining({ source: "copilot" }),
+    );
+  });
 });
 
 describe("providerForTier", () => {

@@ -6,7 +6,12 @@ import {
   checkFeatureAvailability,
   isOverHardCap,
 } from "../src/ai/budgets.ts";
-import { recordUsageEvent, summariseUsage } from "../src/ai/usage.ts";
+import { costOfUsage } from "../src/ai/model-catalog.ts";
+import {
+  callRecorder,
+  recordUsageEvent,
+  summariseUsage,
+} from "../src/ai/usage.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -252,5 +257,93 @@ describe("budget admin actions", () => {
       {},
     );
     expect(afterRemoval).toHaveLength(0);
+  });
+});
+
+describe("costOfUsage", () => {
+  it("prices a call at the model's list rates", () => {
+    expect(
+      costOfUsage(
+        { costInPerMillion: 3, costOutPerMillion: 15 },
+        { inputTokens: 1000, outputTokens: 100 },
+      ),
+    ).toBeCloseTo(0.0045);
+  });
+});
+
+/**
+ * The whole chain, because each link was tested and the chain was missing: a
+ * budget could be set and checked, and no production code ever wrote the row it
+ * counts, so no cap tripped on any instance.
+ */
+describe("a recorded provider call", () => {
+  const RATES = { costInPerMillion: 3, costOutPerMillion: 15 };
+  const CALL = {
+    model: "claude-sonnet-5",
+    usage: { inputTokens: 1000, outputTokens: 100 },
+  };
+
+  it("writes the tokens and the price, and names the person", async () => {
+    const wb = await workerDb();
+    await callRecorder(wb.appPool, {
+      workspaceId,
+      provider: "anthropic",
+      rates: RATES,
+      forUser: OWNER,
+    })(CALL);
+
+    const { rows } = await wb.admin.query(
+      "select source, member_id, agent_id, model_id, input_tokens, output_tokens, cost::float as cost from ai_usage_events where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(rows).toEqual([
+      {
+        source: "assist",
+        member_id: expect.any(String),
+        agent_id: null,
+        model_id: "claude-sonnet-5",
+        input_tokens: 1000,
+        output_tokens: 100,
+        cost: 0.0045,
+      },
+    ]);
+  });
+
+  it("counts as an agent's when nobody asked", async () => {
+    const wb = await workerDb();
+    await callRecorder(wb.appPool, {
+      workspaceId,
+      provider: "anthropic",
+      rates: RATES,
+    })(CALL);
+    const { rows } = await wb.admin.query(
+      "select source, member_id from ai_usage_events where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ source: "agent", member_id: null }]);
+  });
+
+  it("trips the workspace's hard cap", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "ai.setBudget", {
+      scope: "workspace",
+      scopeRef: null,
+      metric: "cost",
+      period: "month",
+      limitValue: 0.004,
+    });
+    await expect(
+      isOverHardCap(wb.appPool, { workspaceId }),
+    ).resolves.toMatchObject({ over: false });
+
+    await callRecorder(wb.appPool, {
+      workspaceId,
+      provider: "anthropic",
+      rates: RATES,
+    })(CALL);
+
+    await expect(
+      isOverHardCap(wb.appPool, { workspaceId }),
+    ).resolves.toMatchObject({ over: true });
   });
 });

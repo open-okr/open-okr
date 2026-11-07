@@ -217,14 +217,20 @@ describe("stream", () => {
     const client = provider(fakeFetch(sse, { sse: true }));
 
     const chunks: string[] = [];
-    for await (const chunk of client.stream({
-      model: "claude-sonnet-5",
-      messages: [{ role: "user", content: "hi" }],
-    })) {
+    const usage: unknown[] = [];
+    for await (const chunk of client.stream(
+      {
+        model: "claude-sonnet-5",
+        messages: [{ role: "user", content: "hi" }],
+      },
+      (counted) => usage.push(counted),
+    )) {
       chunks.push(chunk);
     }
 
     expect(chunks.join("")).toBe("Hello");
+    // Input arrives on the first event and output on the last.
+    expect(usage).toEqual([{ inputTokens: 5, outputTokens: 2 }]);
   });
 });
 

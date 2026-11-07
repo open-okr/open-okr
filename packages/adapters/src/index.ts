@@ -141,6 +141,7 @@ export {
   type AIEgressRefusal,
   AIEgressRefusedError,
   type AIEgressTarget,
+  type AIUsageRecord,
 } from "./outbound/ai-egress.ts";
 export {
   type CheckedUrl,

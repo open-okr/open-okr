@@ -206,6 +206,53 @@ describe("stream", () => {
 
     expect(chunks.join("")).toBe("Hello");
   });
+
+  it("asks for the usage total, and reports it from the last chunk", async () => {
+    const events = [
+      {
+        choices: [{ index: 0, delta: { content: "Hi" }, finish_reason: null }],
+      },
+      { choices: [{ index: 0, delta: {}, finish_reason: "stop" }] },
+      { choices: [], usage: { prompt_tokens: 7, completion_tokens: 2 } },
+    ];
+    const sse = `${events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")}data: [DONE]\n\n`;
+    let body: Record<string, unknown> = {};
+    const client = provider(async (_url, init) => {
+      body = JSON.parse(String(init?.body));
+      return new Response(sse, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    });
+
+    const usage: unknown[] = [];
+    for await (const _chunk of client.stream(
+      { model: "gpt-4.1-mini", messages: [{ role: "user", content: "hi" }] },
+      (counted) => usage.push(counted),
+    )) {
+      // Read to the end.
+    }
+
+    expect(body.stream_options).toEqual({ include_usage: true });
+    expect(usage).toEqual([{ inputTokens: 7, outputTokens: 2 }]);
+  });
+
+  it("reports nothing when an endpoint sends no total", async () => {
+    const sse = `data: ${JSON.stringify({
+      choices: [{ index: 0, delta: { content: "Hi" }, finish_reason: "stop" }],
+    })}\n\ndata: [DONE]\n\n`;
+    const client = provider(fakeFetch(sse, { sse: true }));
+
+    const usage: unknown[] = [];
+    for await (const _chunk of client.stream(
+      { model: "local", messages: [{ role: "user", content: "hi" }] },
+      (counted) => usage.push(counted),
+    )) {
+      // Read to the end.
+    }
+
+    expect(usage).toEqual([]);
+  });
 });
 
 describe("capabilities and stop", () => {

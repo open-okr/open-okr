@@ -28,6 +28,7 @@ import type {
   EmbedResponse,
   ExtractRequest,
   ModelCapabilities,
+  TokenUsage,
   ToolDefinition,
 } from "../../ports/ai.ts";
 import type { TierModelMap } from "./tier-map.ts";
@@ -165,7 +166,10 @@ export class GoogleProvider implements AIProvider {
     return fromResult(result);
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
     const stream = await this.#client.models.generateContentStream({
       model: request.model,
       contents: toContents(request.messages),
@@ -175,10 +179,21 @@ export class GoogleProvider implements AIProvider {
         maxOutputTokens: request.maxTokens,
       },
     });
+    // Each chunk carries the running total, so the last one seen is the answer.
+    let usage: TokenUsage | undefined;
     for await (const chunk of stream) {
+      if (chunk.usageMetadata) {
+        usage = {
+          inputTokens: chunk.usageMetadata.promptTokenCount ?? 0,
+          outputTokens: chunk.usageMetadata.candidatesTokenCount ?? 0,
+        };
+      }
       if (chunk.text) {
         yield chunk.text;
       }
+    }
+    if (usage) {
+      onUsage?.(usage);
     }
   }
 

@@ -24,6 +24,10 @@
  * read here, per build, and handed to `createAIProvider`, which will not build
  * a provider without them. What a control withholds or replaces is written to
  * the audit trail as counts and a host, never as text.
+ *
+ * **Every call becomes a usage row here**, through `callRecorder`. This is the
+ * one place that knows the workspace and the model's price, and every provider
+ * passes through it.
  */
 import {
   type AIProviderConfig,
@@ -32,6 +36,7 @@ import {
 } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
+  callRecorder,
   findSeededModel,
   isCloudEnabled,
   type ResolvedAICredential,
@@ -40,7 +45,7 @@ import {
   resolveAIPrivacySettings,
   resolveTierRoute,
 } from "@openokr/core";
-import type { ModelTier } from "@openokr/db";
+import type { ModelTier, UsageSource } from "@openokr/db";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -55,6 +60,14 @@ export interface RoutedProvider {
   readonly modelId: string;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
+}
+
+/** Who a usage row is charged to, beyond the person a request is for. */
+export interface UsageAttribution {
+  /** Defaults to an assist when a person asked, and an agent when nobody did. */
+  readonly source?: UsageSource;
+  /** The agent whose run this step belongs to, for its own budget. */
+  readonly agentId?: string;
 }
 
 type Resolved = Exclude<ResolvedAICredential, { source: "off" }>;
@@ -120,6 +133,7 @@ export async function providerForTier(
   workspaceId: string,
   tier: ModelTier,
   forUser?: string,
+  attribution: UsageAttribution = {},
 ): Promise<RoutedProvider | null> {
   const pool = getPool();
   const route = await resolveTierRoute(pool, { workspaceId, tier });
@@ -152,6 +166,13 @@ export async function providerForTier(
       policy,
       onWithheld: (event) =>
         recordAIEgressWithheld(pool, { workspaceId, ...event }),
+      onUsage: callRecorder(pool, {
+        workspaceId,
+        provider: route.provider,
+        rates: priced,
+        ...(forUser ? { forUser } : {}),
+        ...attribution,
+      }),
     }),
     modelId: route.modelId,
     costInPerMillion: priced.costInPerMillion,

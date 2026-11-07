@@ -17,7 +17,7 @@
 import { createProviderDrafter } from "@openokr/agents";
 import { type AgentDrafter, resolveAgentRunCostCap } from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
-import { providerForTier } from "./ai-provider";
+import { providerForTier, type UsageAttribution } from "./ai-provider";
 import { getPool } from "./auth";
 
 /**
@@ -58,6 +58,7 @@ export async function drafterFor(
   workspaceId: string,
   tier: ModelTier = "balanced",
   forUser?: string,
+  attribution?: UsageAttribution,
 ): Promise<AgentDrafter | null> {
   const pool = getPool();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
@@ -66,7 +67,7 @@ export async function drafterFor(
   // under their own name is worth a better model than the cheapest one, and
   // the run cap bounds what that can cost. Whichever provider the workspace
   // routes that tier to, not OpenRouter always (completeness review H-27).
-  const routed = await providerForTier(workspaceId, tier, forUser);
+  const routed = await providerForTier(workspaceId, tier, forUser, attribution);
   if (!routed) {
     return null;
   }

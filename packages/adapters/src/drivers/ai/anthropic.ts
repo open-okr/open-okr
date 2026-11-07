@@ -26,6 +26,7 @@ import {
   type EmbedResponse,
   type ExtractRequest,
   type ModelCapabilities,
+  type TokenUsage,
   type ToolDefinition,
 } from "../../ports/ai.ts";
 import type { TierModelMap } from "./tier-map.ts";
@@ -155,7 +156,10 @@ export class AnthropicProvider implements AIProvider {
     return fromMessage(message);
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
     const { system, rest } = splitSystem(request.messages);
     const stream = await this.#client.messages.create({
       model: request.model,
@@ -164,14 +168,21 @@ export class AnthropicProvider implements AIProvider {
       messages: toMessages(rest),
       stream: true,
     });
+    let inputTokens = 0;
+    let outputTokens = 0;
     for await (const event of stream) {
-      if (
+      if (event.type === "message_start") {
+        inputTokens = event.message.usage.input_tokens;
+      } else if (event.type === "message_delta") {
+        outputTokens = event.usage.output_tokens;
+      } else if (
         event.type === "content_block_delta" &&
         event.delta.type === "text_delta"
       ) {
         yield event.delta.text;
       }
     }
+    onUsage?.({ inputTokens, outputTokens });
   }
 
   async chatWithTools(

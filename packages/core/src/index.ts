@@ -181,6 +181,7 @@ export {
   resolveAIPrivacySettings,
 } from "./ai/egress.ts";
 export {
+  costOfUsage,
   findSeededModel,
   SEEDED_MODELS,
   type SeededModel,
@@ -207,6 +208,7 @@ export {
   resolveTierRoute,
 } from "./ai/tier-routing.ts";
 export {
+  callRecorder,
   type RecordUsageEventInput,
   recordUsageEvent,
   summariseUsage,

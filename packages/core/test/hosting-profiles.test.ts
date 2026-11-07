@@ -68,7 +68,9 @@ const addPeople = async (workspaceId: string, count: number) => {
 const firstWorkspace = async () => {
   const wb = await workerDb();
   return (
-    await createWorkspace(wb.appPool, { user: { id: FOUNDER, name: "Founder" } })
+    await createWorkspace(wb.appPool, {
+      user: { id: FOUNDER, name: "Founder" },
+    })
   ).workspaceId;
 };
 

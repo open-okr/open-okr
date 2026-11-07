@@ -51,6 +51,7 @@ import {
   type AIEgressEvent,
   type AIEgressPolicy,
   type AIEgressTarget,
+  type AIUsageRecord,
   aiEgressTargetFromUrl,
   EgressGuardedProvider,
 } from "./outbound/ai-egress.ts";
@@ -87,6 +88,8 @@ export interface AIEgressOptions {
   readonly policy: AIEgressPolicy;
   /** Told what a control withheld or replaced. Never given the text. */
   readonly onWithheld?: (event: AIEgressEvent) => void | Promise<void>;
+  /** Told what each call used, so a budget has something to count. */
+  readonly onUsage?: (record: AIUsageRecord) => void | Promise<void>;
 }
 
 /** A provider as `createAIProvider` returns it: guarded, and able to say so. */
@@ -182,6 +185,7 @@ export function createAIProvider(
     target,
     policy: egress.policy,
     ...(egress.onWithheld ? { onWithheld: egress.onWithheld } : {}),
+    ...(egress.onUsage ? { onUsage: egress.onUsage } : {}),
   });
 }
 

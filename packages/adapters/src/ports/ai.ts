@@ -91,7 +91,15 @@ export interface ModelCapabilities {
 
 export interface AIProvider {
   chat(request: ChatRequest): Promise<ChatResponse>;
-  stream(request: ChatRequest): AsyncIterable<string>;
+  /**
+   * `onUsage` is told what the provider counted, once the stream has ended. It
+   * may never be told: a stream cut off early has no total, and some
+   * OpenAI-compatible endpoints do not send one.
+   */
+  stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string>;
   chatWithTools(
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ): Promise<ChatResponse>;

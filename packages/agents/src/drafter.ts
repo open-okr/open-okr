@@ -52,6 +52,7 @@ import type {
   ThreadSummary,
   TrendContext,
 } from "@openokr/core";
+import { costOfUsage } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
 
@@ -974,11 +975,10 @@ export function createProviderDrafter(
     inputTokens?: number;
     outputTokens?: number;
   }): void => {
-    const input = usage?.inputTokens ?? 0;
-    const output = usage?.outputTokens ?? 0;
-    spent +=
-      (input * options.costInPerMillion + output * options.costOutPerMillion) /
-      1_000_000;
+    spent += costOfUsage(options, {
+      inputTokens: usage?.inputTokens ?? 0,
+      outputTokens: usage?.outputTokens ?? 0,
+    });
   };
 
   return {
@@ -1130,12 +1130,15 @@ export function createProviderDrafter(
         return { kind: "text", text };
       };
       try {
-        for await (const piece of options.provider.stream({
-          model: options.model,
-          purpose: "retrieval",
-          messages: copilotMessages(context),
-          maxTokens: COPILOT_MAX_TOKENS,
-        })) {
+        for await (const piece of options.provider.stream(
+          {
+            model: options.model,
+            purpose: "retrieval",
+            messages: copilotMessages(context),
+            maxTokens: COPILOT_MAX_TOKENS,
+          },
+          charge,
+        )) {
           if (signal?.aborted) {
             // Return rather than throw: what arrived is a real partial answer
             // and the caller records it.
