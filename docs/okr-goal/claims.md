@@ -119,10 +119,10 @@ The company behind OKRGoal and OpenOKR. The figures are OKR Institute's claims a
 
 | Claim | Safe wording | Source |
 |---|---|---|
-| Pricing model | "Priced per person, with a free tier" | PLAN.md §10 #1 |
+| Pricing model | "Priced per workspace, with a limit on people for each plan and a free plan" | PLAN.md §10 #1 |
 | Plans differ only by numbers | "A plan is a number of seats, an AI allowance and a level of support. Never a feature list" | plans-and-seats.md §1, §4 |
 | Who is a seat | "Active and invited people count. Guests, agents and people who have left do not" | plans-and-seats.md §2 |
-| Leavers | "A leaver stops costing money the day they leave" | plans-and-seats.md §2 |
+| Leavers | "A leaver frees their seat the day they leave" | plans-and-seats.md §2 |
 | Downgrades | "We never suspend people to fit a smaller plan. You choose who goes" | plans-and-seats.md §5 |
 
 ## The demo

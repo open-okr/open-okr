@@ -125,8 +125,8 @@ Detailed designs live in `docs/design/`, one per engine or subsystem. Keep them 
 
 - TypeScript strict everywhere. No loose types without a comment justifying it.
 - Postgres is the only required service. Access it only through Drizzle using `DATABASE_URL`.
-- Never import a vendor SDK (a cloud provider, a queue, a mail service, a chat provider, an LLM client) outside `packages/adapters`.
-- Every runtime-sensitive capability goes through a port in `packages/adapters`: jobs, realtime, storage, mail, cache, search, ai, channels.
+- Never import a vendor SDK (a cloud provider, a queue, a mail service, a chat provider, an LLM client, a payment provider) outside `packages/adapters`.
+- Every runtime-sensitive capability goes through a port in `packages/adapters`: jobs, realtime, storage, mail, cache, search, ai, channels, billing.
 - **Every write is one transaction through the Operation pipeline:** the domain change, access bindings, the activity row, the audit row and the outbox row commit together. Authorise *before* the transaction against freshly loaded, access-scoped rows. Side effects are enqueued **only** by inserting an outbox row in that transaction. A direct driver call on a write path is a build failure.
 - **Every setting has a working default and nothing must be configured before the product works.** New settings are declared in the TECHNICAL-PLAN.md §4.14 map with a default, and thresholds belong to the METHOD.md §11 registry. Never hardcode a value that belongs in either. Never ship a screen that blocks until a setting is chosen.
 - Every business table gets `workspace_id` and a **row-level security policy in the same migration**. The tenant setting is applied with `SET LOCAL` per transaction. Row-level security is the tenant floor; it does not replace object authorisation.

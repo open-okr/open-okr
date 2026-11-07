@@ -5,12 +5,12 @@ PLAN.md §4 and §13 rows 1 and 2, TECHNICAL-PLAN.md §4.1, §4.14.
 Implemented at P8-T05. Depends on `tenant-lifecycle.md`, which
 defines `tenants.plan_key`, `tenants.seats` and the cloud flag.
 
-**PLAN.md §10 #1 (the pricing model) and #2 (whether any feature is ever
-gated) are open decisions and neither is taken here.** Agung's instruction
-on 14 September 2026 was to design on their recorded current position: per
-seat with a free tier, nothing gated. The design holds the numbers as data
-so that closing either row changes a catalogue entry rather than this
-document.
+**PLAN.md §10 #1 (the pricing model) closed on 7 November 2026: per
+workspace, a flat price with a seat limit and a free plan, with each provider
+setting its own prices and currency. PLAN.md §10 #2 stands: nothing is
+gated.** A plan is still a seat count and an AI allowance held as data, so
+the decision did not change the shape of this design. Section 9 records what
+was decided.
 
 ## 0. What already exists
 
@@ -67,7 +67,7 @@ seat resolver returned null.
 |---|---|---|---|
 | `human` | `active` | Yes | The person using the product |
 | `human` | `invited` | **Yes** | Section 3 |
-| `human` | `suspended` | No | A leaver stops costing money on the day they leave, not at the next billing cycle. Their rows stay for authorship |
+| `human` | `suspended` | No | A leaver frees their seat on the day they leave, not at the next billing cycle. Their rows stay for authorship |
 | `guest` | any | No | A guest sees one space. Charging for a guest would make sharing a decision about money |
 | `agent` | any | No | The Coach and the Champion ship with every workspace. Charging for them would gate the product's whole premise behind a plan |
 | `placeholder` | any | No | Nobody has claimed it |
@@ -158,8 +158,8 @@ administrator on S-49 and `setPlanAsOperator` on S-46, both through
 was created, so this section described a control that did not exist.
 
 A downgrade that does fit applies immediately. There is no proration
-model here, because there is no billing provider here: money is outside
-this design and outside the repository.
+model here, because this design charges nobody. Payment belongs to the
+billing design (section 9).
 
 ## 6. The billing surface, and its absence
 
@@ -212,8 +212,25 @@ Written as the test plan P8-T05 inherits.
 
 | # | Question | Why it is not answered here |
 |---|---|---|
-| 1 | The pricing model. PLAN.md §10 #1 | A human's call. The design holds seats and the AI cap as data, so closing the row edits `cloud.plans` |
+| 1 | The pricing model. PLAN.md §10 #1 | **Closed on 7 November 2026: per workspace.** Section 9. The design holds seats and the AI cap as data, so each provider's catalogue in `cloud.plans` carries the numbers |
 | 2 | Whether any feature is ever gated. PLAN.md §10 #2 | A human's call, and this design makes the answer no harder to keep: there is no field to gate a feature with |
-| 3 | The free tier's shape | Null `plan_key` and null `seats` means the free tier is currently unlimited, which is almost certainly not what a real free tier does. Named here rather than guessed, because it is a pricing decision |
-| 4 | Billing, payment and invoicing | Entirely outside this design and outside the repository. Nothing here talks to a payment provider, and `tenants` holds no customer or subscription identifier. Adding one is its own task with its own decision about a dependency |
+| 3 | The free tier's shape | Null `plan_key` and null `seats` means the free tier is unlimited today. **Decided on 7 November 2026: Free becomes a catalogue row with its own seat limit, and a new workspace starts on whichever plan the provider names.** With no plan named, nothing changes, so a self-hosted instance is untouched. Not built yet |
+| 4 | Billing, payment and invoicing | **Decided on 7 November 2026: Stripe behind a billing port, off until a provider turns it on.** Nothing here talks to a payment provider yet, and `tenants` holds no customer or subscription identifier. The billing design owns both |
 | 5 | Whether an over-limit workspace can ever exist | Section 5 refuses it at the downgrade. It can still arise if an operator lowers `tenants.seats` directly from the console. The design tolerates the state, refuses new joins in it, and shows the admin the number. Whether the console should refuse the lowering too is a small open question. **Answered at completeness review H-21: yes, it refuses.** The operator's plan control and the administrator's both go through `applyPlanInTx`, which holds the headcount rule, so neither can lower seats below the people in use |
+
+## 9. Decided on 7 November 2026
+
+By the project owner. The later designs build on these, and none of them is
+built yet. One provider's own commercial terms are not here: OKRGoal's are in
+`docs/okr-goal/pages/pricing.md`.
+
+| Decision | Detail |
+|---|---|
+| Pricing | Per workspace: a flat price with a seat limit, and a free plan |
+| Prices and currency | Each provider's own, set in its billing account and its plan catalogue. The release names no price and no currency |
+| Billing provider | Stripe behind a billing port, with a `none` driver. The `stripe` package is approved and lives only in `packages/adapters` |
+| Changing plan | An administrator changes plan through billing, never directly. An operator can still set a plan by hand, for a customer who pays by invoice |
+| A subscription that ends | The workspace moves to Free if its people fit. If not, it goes read-only until seats are freed or payment resumes. The product never removes anybody |
+| Free workspaces | One per person. AI credits only after the address is verified |
+| AI credits | A credit is a unit of AI model cost. The product measures model cost in US dollars, as its model price list does, whatever currency a provider sells in. Whether a provider may set its own credit value is for the credits design |
+| Reporting across workspaces | Not in v1. REQUIREMENTS §9 |

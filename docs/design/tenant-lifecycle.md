@@ -289,7 +289,7 @@ Written as the test plan P8-T02 inherits.
 
 | # | Question | Why it is not answered here |
 |---|---|---|
-| 1 | The cloud pricing model. PLAN.md §10 #1, current position per seat with a free tier | CLAUDE.md puts every §13 row in a human's hands. This design holds `plan_key` and `seats` nullable so the decision changes a catalogue row rather than the schema. §13 is untouched |
+| 1 | The cloud pricing model. PLAN.md §10 #1 | **Closed on 7 November 2026: per workspace, with a seat limit.** This design holds `plan_key` and `seats` nullable, so the decision changed a catalogue row rather than the schema. See plans-and-seats.md §9 |
 | 2 | Whether any feature is ever gated. PLAN.md §10 #2, current position nothing gated | Same. The design assumes nothing gated, which is also what REQUIREMENTS §5 states outright, and the two would have to be reconciled before anything could be gated |
 | 3 | The closure retention number a real cloud would run | The default is 0 and that is safe. The number is a business and legal decision, not a design one |
 | 4 | Whether a closed workspace's members keep read access, or only its admins | Written here as all members. An argument exists for admins only, and it is a policy question |

@@ -162,10 +162,12 @@ One codebase, one tagged release, two ways to run it.
 
 | Way | Who | What it takes |
 |---|---|---|
-| **Self-hosted** | Any organisation that wants its data on its own servers. Universities, regulated sectors, privacy-minded teams | Docker Compose on one server with a first-run web setup wizard (target: under 30 minutes), or the Helm chart on their own Kubernetes |
-| **Managed cloud** | Teams that do not want to run anything | Sign up, pick a workspace name, start. Operated by us, on the same release |
+| **Self-hosted** | Any organisation that wants its data on its own servers, on one workspace or several. A group of companies, with one workspace per company. Universities, regulated sectors, privacy-minded teams | Docker Compose on one server with a first-run web setup wizard (target: under 30 minutes), or the Helm chart on their own Kubernetes |
+| **Managed cloud** | Teams that do not want to run anything | Sign up, pick a workspace name, start. Run by a provider on the same release: OKR Institute runs OKRGoal, and any other provider may run its own on its own servers |
 
-The cloud is the same container release under vendor operation, plus a tenant lifecycle surface: signup and provisioning, plans and seat limits behind a flag, an operator console, per-tenant limits, and time-boxed support access that is visible to the customer. It is not a different product and not a different runtime.
+The cloud is the same container release under vendor operation, plus a tenant lifecycle surface: signup and provisioning, plans and seat limits behind a flag, billing, an operator console, per-tenant limits, and time-boxed support access that is visible to the customer. It is not a different product and not a different runtime.
+
+A cloud is priced per workspace: a flat price with a seat limit, and a free plan. Plans differ only in people, AI allowance and support. Each provider sets its own plans, prices and currency, so the release names none of them, and billing stays off until a provider turns it on.
 
 Self-host is never seat-limited and never feature-gated.
 
@@ -216,8 +218,8 @@ Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md §16
 8. Real-time co-editing of documents.
 9. Native mobile applications. The responsive web app and the chat channels cover mobile in v1.
 10. An importer for any source beyond FlowyTeam and CSV.
+11. OKRs and reports across the workspaces of a group. Each company's workspace stands alone in v1.
 
 ## 10. Open questions
 
-- Cloud pricing model. Nothing is gated; the cloud sells operation, not features.
 - Sector-specific compliance beyond PDPA and GDPR.
