@@ -1,6 +1,7 @@
 import {
   listSupportSessions,
   listTenantsAsOperator,
+  readBillingAsOperator,
   readPlans,
   readUsageAsOperator,
 } from "@openokr/core";
@@ -188,6 +189,11 @@ export default async function OperatorWorkspacePage({
   }
 
   const [usage] = await readUsageAsOperator(pool, operator.userId, workspaceId);
+  const billing = await readBillingAsOperator(
+    pool,
+    operator.userId,
+    workspaceId,
+  );
   // Whether this operator is already waiting on an answer. Read under their
   // own policy, so it shows their own request and not somebody else's.
   const sessions = await listSupportSessions(pool, workspaceId);
@@ -361,6 +367,23 @@ export default async function OperatorWorkspacePage({
           refused={refused}
         />
       </section>
+
+      {/* The status and the customer reference, and never a card. A workspace with
+       * no row here has its plan set by hand. */}
+      {billing ? (
+        <section className="flex flex-col gap-1">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("operator.billing.title")}
+          </h2>
+          <p className="text-ink-2 text-sm">
+            {t("operator.billing.summary", {
+              provider: billing.provider,
+              status: billing.status ?? "",
+              customer: billing.customerRef,
+            })}
+          </p>
+        </section>
+      ) : null}
 
       {/* Completeness review H-21: nothing wrote a plan or seats after a
        * tenant was created, so no seat limit ever applied. */}

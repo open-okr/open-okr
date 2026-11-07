@@ -38,6 +38,7 @@
     "@types/react-dom": "19.3.0",
     "jsdom": "catalog:",
     "postcss": "catalog:",
+    "stripe": "23.1.0",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "typescript5": "catalog:",

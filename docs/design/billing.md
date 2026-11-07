@@ -144,7 +144,8 @@ and never a card.
 |---|---|
 | Unit | The `none` driver and a fake driver. The Stripe driver against `fetch` stubs, including real signatures from Stripe's own test helper |
 | Integration | Every row of §6 against a real database, including a repeated event and events out of order |
-| Browser | `e2e/hosting-profiles.spec.ts`, with the fake driver |
+| Route | `apps/web/test/billing-webhook-route.test.ts`, with the real driver and real signatures |
+| Browser | `e2e/hosting-profiles.spec.ts`: the route is absent with billing off, and the plan screen draws with no keys. Not a fake driver in the release: shipping one so a test can reach it would be a way to take a plan for nothing, so checkout itself is proved by hand in Stripe test mode |
 | By hand, before go-live | Stripe test mode: needs test keys from you |
 
 CI never reaches Stripe.

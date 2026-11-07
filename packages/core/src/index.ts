@@ -1012,6 +1012,7 @@ export {
   liveSupportSession,
   measureAllWorkspaces,
   OperatorGrantError,
+  readBillingAsOperator,
   readInstanceFlags,
   readUsageAsOperator,
   requestSupportSession,

@@ -12,6 +12,7 @@
  */
 import {
   activeOnly,
+  billingAccounts,
   instanceOperators,
   tenants,
   withInstanceAdmin,
@@ -94,4 +95,31 @@ export async function listTenantsAsOperator(
       .orderBy(workspaces.name),
   );
   return rows;
+}
+
+/** The billing status and customer reference S-46 shows, and never a card. */
+export async function readBillingAsOperator(
+  pool: Pool,
+  operatorUserId: string,
+  workspaceId: string,
+) {
+  const db = drizzle(pool);
+  const [row] = await withOperator(db, operatorUserId, (tx) =>
+    tx
+      .select({
+        provider: billingAccounts.provider,
+        customerRef: billingAccounts.customerRef,
+        status: billingAccounts.status,
+        currentPeriodEnd: billingAccounts.currentPeriodEnd,
+      })
+      .from(billingAccounts)
+      .where(
+        activeOnly(
+          billingAccounts,
+          eq(billingAccounts.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1),
+  );
+  return row;
 }

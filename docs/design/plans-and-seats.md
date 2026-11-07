@@ -160,8 +160,9 @@ was created, so this section described a control that did not exist.
 (section 9). It wrote the plan with no payment behind it, so any administrator
 could take any plan for nothing, over REST and the agent tools as well as the
 screen. `workspace.changePlan` stays declared, so an operator's audit row
-resolves to a contract, and refuses everybody who can reach it. Billing brings an
-administrator's own path back, through `applyPlanInTx` like this one.
+resolves to a contract, and refuses everybody who can reach it. `billing.md` is an
+administrator's own path, with a payment behind it, through `applyPlanInTx` like this
+one.
 
 A downgrade that does fit applies immediately. There is no proration
 model here, because this design charges nobody. Payment belongs to the

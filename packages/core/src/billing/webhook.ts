@@ -36,7 +36,10 @@ import type {
 } from "./gateway.ts";
 
 /** Paying, or about to be. */
-const LIVE_STATUSES: ReadonlySet<string> = new Set(["active", "trialing"]);
+export const LIVE_STATUSES: ReadonlySet<string> = new Set([
+  "active",
+  "trialing",
+]);
 /** Over. Anything else, `past_due` for one, keeps what it has while Stripe retries. */
 const ENDED_STATUSES: ReadonlySet<string> = new Set([
   "canceled",
@@ -50,7 +53,7 @@ export type BillingOutcome = "applied" | "duplicate" | "ignored";
 class AlreadyApplied extends Error {}
 
 /** Which catalogue row a provider's price belongs to. */
-const planForPrice = (
+export const planForPrice = (
   plans: readonly Plan[],
   priceId: string | null,
 ): Plan | undefined =>

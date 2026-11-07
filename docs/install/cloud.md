@@ -104,6 +104,44 @@ instance audit chain. An operator sets a workspace's plan, or a seat count of
 their own for a contract no plan matches, on the workspace's page in the
 console, with a reason the customer reads in their own audit log.
 
+## Taking payment
+
+Billing is off until you turn it on. With it off, an operator sets each plan by hand.
+Prices and currency are yours and live in your Stripe account, so nothing in the
+release names one.
+
+1. In Stripe, create a price for each plan, monthly, yearly or both, in whatever currency you sell in.
+2. Name those prices in the catalogue:
+
+   ```json
+   [
+     { "key": "free", "name": "Free", "seats": 10 },
+     { "key": "team", "name": "Team", "seats": 50,
+       "prices": { "month": "price_1Abc", "year": "price_1Def" } }
+   ]
+   ```
+
+   A plan with no `prices` cannot be bought, only set by an operator, which is what a contract or an invoice customer uses.
+3. In Stripe, add a webhook pointed at `https://<your instance>/api/billing/webhook`, sending `checkout.session.completed`, `checkout.session.async_payment_succeeded` and every `customer.subscription.*` event.
+4. Set these, as a Secret on Kubernetes:
+
+| Variable | Value |
+|---|---|
+| `OPENOKR_BILLING_PROVIDER` | `stripe` |
+| `OPENOKR_STRIPE_SECRET_KEY` | Your secret key |
+| `OPENOKR_STRIPE_WEBHOOK_SECRET` | The webhook's signing secret |
+| `OPENOKR_STRIPE_AUTOMATIC_TAX` | `true`, once Stripe Tax is set up in your account |
+
+Discounts are Stripe coupons, and customers can enter a promotion code at checkout.
+
+| What happens | Result |
+|---|---|
+| A payment fails | The plan stays while Stripe retries, and Plan and seats says so |
+| A subscription ends, and the people fit the default plan | It moves there |
+| It ends and they do not | It goes read-only until seats are freed or payment resumes. Nobody is removed |
+| A plan with fewer seats is chosen | It takes effect at the period's end, with no partial refund. Refused below the headcount |
+| A plan with more seats is chosen | It starts now, and Stripe charges the difference |
+
 ## Running your own
 
 Anybody may run a cloud from this code under the same licence. If you change the

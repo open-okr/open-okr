@@ -76,6 +76,90 @@
       "pages": false
     },
     {
+      "name": "billing summary",
+      "action": "billing.summary",
+      "method": "GET",
+      "path": "/billing/summary",
+      "scope": "read",
+      "summary": "The plan, its status, and every plan's price as the payment provider states it.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "billing startCheckout",
+      "action": "billing.startCheckout",
+      "method": "POST",
+      "path": "/billing/startCheckout",
+      "scope": "write",
+      "summary": "An address to pay at, to start a subscription on this plan.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "interval",
+          "field": "interval",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "month",
+            "year"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "billing openPortal",
+      "action": "billing.openPortal",
+      "method": "POST",
+      "path": "/billing/openPortal",
+      "scope": "write",
+      "summary": "An address to manage cards and invoices, and to cancel.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "billing changePlan",
+      "action": "billing.changePlan",
+      "method": "POST",
+      "path": "/billing/changePlan",
+      "scope": "write",
+      "summary": "Moves a subscription to another plan: now for more seats, at the period's end for fewer. Refused below the headcount.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "interval",
+          "field": "interval",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "month",
+            "year"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "billing settleEnded",
+      "action": "billing.settleEnded",
+      "method": "POST",
+      "path": "/billing/settleEnded",
+      "scope": "write",
+      "summary": "Moves a workspace billing made read-only to the default plan, once its people fit.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace setLifecycle",
       "action": "workspace.setLifecycle",
       "method": "POST",

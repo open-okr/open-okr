@@ -1,5 +1,6 @@
 import {
   ACCESS_LEVELS,
+  callAction,
   hasPlanScreen,
   listSeatHolders,
   readOwnPlan,
@@ -11,10 +12,19 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { getBilling } from "../../../lib/billing";
 import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
+import { requireWorkspace } from "../../../lib/workspace";
+import {
+  changePlanAction,
+  openPortalAction,
+  settleEndedAction,
+  startCheckoutAction,
+} from "./actions";
+import { BillingPanel, SettleButton } from "./billing-panel";
 
 export const generateMetadata = pageTitle("pageTitle.adminPlan");
 
@@ -42,7 +52,11 @@ export const generateMetadata = pageTitle("pageTitle.adminPlan");
  */
 export const dynamic = "force-dynamic";
 
-export default async function PlanPage() {
+export default async function PlanPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly checkout?: string }>;
+}) {
   const pool = getPool();
   // Before the level: with the flag off, or with no plans to read, this route does
   // not exist for anybody, including an administrator.
@@ -51,7 +65,8 @@ export default async function PlanPage() {
   }
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const { session } = await requireWorkspace();
   const [seats, plans, usage, own, holders] = await Promise.all([
     seatState(pool, access.workspaceId),
     readPlans(pool),
@@ -66,6 +81,27 @@ export default async function PlanPage() {
     t("admin.plan.free");
   const instanceName = await getInstanceName();
   const supportEmail = await resolveSupportEmail(pool);
+  const billing = await getBilling();
+  const summary = billing
+    ? await callAction(
+        {
+          pool,
+          workspaceId: access.workspaceId,
+          actor: { kind: "human", userId: session.user.id },
+          billing,
+        },
+        "billing.summary",
+        {},
+      )
+    : null;
+  const { checkout } = await searchParams;
+  const planName = (key: string | null): string =>
+    plans.find((plan) => plan.key === key)?.name ?? t("admin.plan.free");
+  const periodEnd = summary?.currentPeriodEnd
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+        new Date(summary.currentPeriodEnd),
+      )
+    : "";
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
@@ -85,7 +121,49 @@ export default async function PlanPage() {
           {t("admin.plan.current")}
         </h2>
         <p className="font-semibold text-ink text-xl">{currentName}</p>
-        {own ? (
+        {summary && checkout === "done" ? (
+          <p className="text-ok text-sm" role="status">
+            {t("admin.billing.checkoutDone")}
+          </p>
+        ) : null}
+        {summary?.status === "past_due" ? (
+          <p
+            className="rounded-md bg-bad-bg px-2.5 py-1.5 text-bad text-sm"
+            role="alert"
+          >
+            {t("admin.billing.paymentFailed")}
+          </p>
+        ) : null}
+        {summary?.suspendedByBilling ? (
+          <div className="flex flex-col gap-2 rounded-md bg-warn-bg px-2.5 py-2 text-sm text-warn">
+            <p role="alert">
+              {t("admin.billing.readOnly", {
+                plan: planName(summary.defaultPlanKey),
+              })}
+            </p>
+            <SettleButton
+              action={settleEndedAction}
+              label={t("admin.billing.settle", {
+                plan: planName(summary.defaultPlanKey),
+              })}
+            />
+          </div>
+        ) : null}
+        {summary?.cancelAtPeriodEnd ? (
+          <p className="text-ink-2 text-sm">
+            {t("admin.billing.endsOn", { date: periodEnd })}
+          </p>
+        ) : null}
+        {summary?.scheduledPlanKey ? (
+          <p className="text-ink-2 text-sm">
+            {t("admin.billing.movesOn", {
+              plan: planName(summary.scheduledPlanKey),
+              date: periodEnd,
+            })}
+          </p>
+        ) : null}
+        {/* With billing on, the plans below are how it changes. */}
+        {own && !summary ? (
           <p className="text-ink-2 text-sm">
             {supportEmail ? (
               <a
@@ -201,24 +279,40 @@ export default async function PlanPage() {
         <h2 className="font-semibold text-ink text-sm">
           {t("admin.plan.plans")}
         </h2>
-        <ul className="flex flex-col gap-2">
-          {plans.map((plan) => (
-            <li
-              className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-surface px-4 py-3"
-              key={plan.key}
-            >
-              <span className="font-medium text-ink text-sm">{plan.name}</span>
-              <span className="text-ink-2 text-sm">
-                {plan.aiMonthlyUsd === null
-                  ? seatsOf(plan.seats)
-                  : t("admin.plan.seatsWithAiSpend", {
-                      seats: seatsOf(plan.seats),
-                      usd: plan.aiMonthlyUsd,
-                    })}
-              </span>
-            </li>
-          ))}
-        </ul>
+        {summary ? (
+          <BillingPanel
+            changePlan={changePlanAction}
+            currentPlanKey={summary.currentPlanKey}
+            hasAccount={summary.hasAccount}
+            hasLiveSubscription={summary.hasLiveSubscription}
+            locale={locale}
+            openPortal={openPortalAction}
+            plans={summary.plans}
+            pricesAvailable={summary.pricesAvailable}
+            startCheckout={startCheckoutAction}
+          />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {plans.map((plan) => (
+              <li
+                className="flex flex-wrap items-baseline justify-between gap-2 rounded-lg border border-line bg-surface px-4 py-3"
+                key={plan.key}
+              >
+                <span className="font-medium text-ink text-sm">
+                  {plan.name}
+                </span>
+                <span className="text-ink-2 text-sm">
+                  {plan.aiMonthlyUsd === null
+                    ? seatsOf(plan.seats)
+                    : t("admin.plan.seatsWithAiSpend", {
+                        seats: seatsOf(plan.seats),
+                        usd: plan.aiMonthlyUsd,
+                      })}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         {/* The one sentence that matters most on this screen. */}
         <p className="text-ink-3 text-xs">{t("admin.plan.noFeatureGate")}</p>
       </section>

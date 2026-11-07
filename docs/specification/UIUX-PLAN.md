@@ -320,10 +320,15 @@ list.
 
 **S-49 Plan and seats.** A workspace administrator's screen rather than an
 operator's, reached from the S-36 admin navigation. The current plan,
-seats used against seats available with the list of who holds them, AI
-spend against its cap, and who to contact to change the plan. An administrator
-does not change it here: with no payment behind it, that was a free upgrade to
-anything in the catalogue. A change below the current headcount is refused
+seats used against seats available with the list of who holds them, and AI
+spend against its cap. With billing off it names who to contact to change the plan,
+because a change with no payment behind it was a free upgrade to anything in the
+catalogue. With billing on it shows every plan at the price the provider states, in
+the provider's currency, with **Upgrade**, a monthly or yearly choice and **Manage
+billing**, and says when a payment failed, when a subscription ends, and when a
+downgrade takes effect. If the subscription ended and the people do not fit the
+default plan, it says the workspace is read-only, that nobody was removed, and how to
+get out. See [billing.md](../design/billing.md) §9. A change below the current headcount is refused
 naming both numbers, because the product never picks who loses access. With
 `cloud.enabled` false, or no plans in the catalogue, the section is absent from the
 navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a

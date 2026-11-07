@@ -18,6 +18,7 @@ import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import {
   type ActorInput,
@@ -179,6 +180,13 @@ export interface ActionCallContext {
    * thing and costs two comparisons: `admit` returns before any round trip.
    */
   readonly admission?: Admission;
+  /**
+   * The payment provider, when this instance has one (docs/design/billing.md).
+   *
+   * Structural, like `storage` and `metrics` above and for the same reason. Absent is
+   * every self-hosted instance, and each billing action refuses in words.
+   */
+  readonly billing?: BillingGateway;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

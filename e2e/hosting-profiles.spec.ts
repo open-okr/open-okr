@@ -44,6 +44,13 @@ test("/workspaces/new does not exist under an invitation-only policy", async ({
   ).toBeVisible({ timeout: 15_000 });
 });
 
+test("/api/billing/webhook does not exist with billing off", async ({
+  request,
+}) => {
+  const answer = await request.post("/api/billing/webhook", { data: "{}" });
+  expect(answer.status()).toBe(404);
+});
+
 test.describe("a group of companies", () => {
   test.describe.configure({ mode: "serial" });
   let pool: pg.Pool;
@@ -108,6 +115,42 @@ test.describe("a cloud run by a provider", () => {
       Object.keys(SETTINGS),
     ]);
     await pool.end();
+  });
+
+  test("Stripe chosen with no keys reads as off: no checkout, and no error page", async ({
+    page,
+    request,
+  }) => {
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('billing.provider', '"stripe"'::jsonb, 'admin'),
+              ('cloud.plans', $1::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+      [
+        JSON.stringify([
+          {
+            key: "team",
+            name: "Team",
+            seats: 50,
+            prices: { month: "price_does_not_exist" },
+          },
+        ]),
+      ],
+    );
+    try {
+      await signIn(page);
+      await goTo(page, "/admin/plan");
+      await expect(
+        page.getByRole("heading", { level: 1, name: "Plan and seats" }),
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("button", { name: "Upgrade" })).toHaveCount(0);
+      const answer = await request.post("/api/billing/webhook", { data: "{}" });
+      expect(answer.status()).toBe(404);
+    } finally {
+      await pool.query(
+        "delete from system_settings where key in ('billing.provider', 'cloud.plans')",
+      );
+    }
   });
 
   test("a sign-up names the provider's own legal pages", async ({ browser }) => {
