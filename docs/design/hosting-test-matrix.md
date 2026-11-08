@@ -51,7 +51,7 @@ cannot be stepped down.
 | **U** | Proved by a unit or integration test against a real Postgres (section 5 names it) |
 | **L** | Proved by the Stripe test-mode run against the real Stripe API, by hand on 8 November 2026, 15 of 15 |
 | **n/a** | Does not exist in this setup, and the cell says what happens instead |
-| **Defect** | The product does not do what its design says. Section 6 |
+| **Defect** | The product does not do what its design says. Section 6 lists any found, open or fixed |
 
 ## 4. The matrix
 
@@ -85,7 +85,7 @@ cannot be stepped down.
 | C-8 | Starts a second workspace | Refused, naming the free limit: B | Refused the same way: U | Offered, with no free limit: B, U | Not found: only the operator creates workspaces: B |
 | C-9 | Moves between the company's workspaces in the switcher | U (once the first is paid) | U | U | B |
 | C-10 | Invites people within the seat limit, and the next is refused naming both numbers | B | Seats counted, 3 of 5: B | No limit: U | No limit: U |
-| C-11 | A pending invitation holds a seat | **Defect** (test marked `fixme`) | **Defect** | n/a | n/a |
+| C-11 | A pending invitation holds a seat, and is named on the plan screen | B | U | n/a | n/a |
 | C-12 | Makes a member an administrator | B | B | B | B |
 | C-13 | Meets none of the instance's own settings: its name, registration, update check | B | B | B | B |
 | C-14 | Sees the plan's AI credits, and a credit pack paid at Stripe with when it expires | B | n/a: no credits in this catalogue (U for a catalogue with them) | n/a: no catalogue, never limited (U) | n/a: as setup 3 |
@@ -152,7 +152,7 @@ cannot be stepped down.
 | C-8 | `hosting-okrgoal`: "a second free workspace is refused"; `hosting-group`: "a company address is offered a workspace"; `hosting-one-company`: "no plan, no seat limit, no way to start a workspace" | `create-workspace.test.ts`: "may own one free workspace, and is told the limit past it", "is refused under an invitation-only policy, by any surface", "is limited by the setting, and zero means unlimited" |
 | C-9 | `hosting-one-company`: "moves between the company's workspaces" | `create-workspace.test.ts`: "does not count a workspace on a paid plan, or one they only belong to" |
 | C-10 | `hosting-okrgoal`: "two people join …", "the next invitation is refused, naming the seats" | `seats.test.ts`: "refuses the invitation, naming both numbers"; `hosting-profiles.test.ts`: "never limits seats, because self-hosting never does" |
-| C-11 | `hosting-okrgoal`: the `fixme` test | `seats.test.ts`: "counts an invited human" writes that member by hand, which is why it passes. Section 6 |
+| C-11 | `hosting-okrgoal`: "a pending invitation holds a seat, and is named on the plan screen" | `seats.test.ts`: the block "a pending invitation holds a seat" |
 | C-12, A-1 | every journey: "appoints …" or "makes one of them an administrator" | `administrator-handover.test.ts`: "makes a member an administrator, and lets the founder then step down" |
 | C-13 | every journey: "meets none of the instance's own settings" or "no instance settings" | |
 | C-14 | `hosting-okrgoal`: "sees Team, its seats and its credits", "a credit pack paid at Stripe …"; `hosting-profiles`: "the plan screen says when purchased credits expire" | `ai-credits.test.ts`, `ai-credit-packs.test.ts`, `billing-webhook-route.test.ts` (apps/web) |
@@ -166,18 +166,18 @@ cannot be stepped down.
 
 ## 6. Findings and gaps
 
-### Defect D-1: a pending invitation holds no seat
+### Defect D-1, fixed: a pending invitation held no seat
 
 | | |
 |---|---|
 | What the design says | `plans-and-seats.md` §2: an invited person counts as a seat, "the load-bearing choice", so a full workspace refuses the administrator rather than the person clicking the link |
 | What the screen says | S-49: "Somebody invited holds a seat before they accept" |
-| What happens | A personal invitation writes no member row until it is accepted, and seats count member rows. With two of three seats free, an administrator can invite any number of people. Each one past the limit is refused at the link, the outcome the design set out to avoid |
-| Why no test caught it | `seats.test.ts` proves the counter counts a member with status `invited`, but inserts that member by hand. No product path writes that status |
+| What happened | A personal invitation writes no member row until it is accepted, and seats counted member rows. With two of three seats free, an administrator could invite any number of people. Each one past the limit was refused at the link, the outcome the design set out to avoid |
+| Why no test caught it | `seats.test.ts` proved the counter counts a member with status `invited`, but inserted that member by hand. No product path writes that status |
 | Found by | `hosting-okrgoal.spec.ts`, inviting a fourth person to a three-seat plan |
-| Marker | `test.fixme` at the end of `hosting-okrgoal.spec.ts`. It turns green when the defect is fixed |
 | Affects | Setups 1 and 2, any provider with seat limits |
-| Status | Open. Fixing it changes seat counting, so it is a change of its own, for a human to approve |
+| Fix | The pending invitation itself holds the seat, once per address, until it is accepted, revoked or expires. A move to a smaller plan is still judged by the people. `plans-and-seats.md` §2 has the rule |
+| Status | Fixed on 8 November 2026, approved by Akmal. The browser test that found it is now an ordinary test |
 
 ### What a browser cannot prove here, and what does
 
@@ -216,4 +216,3 @@ Continuous integration runs all four with the rest of the suite.
 
 - A new switch, setting or screen that differs by setup adds a row here and a step to the journeys it changes.
 - A row marked U or n/a that becomes reachable in a browser moves to B in the same change.
-- Fixing D-1 removes the `fixme` and moves C-11 to B.

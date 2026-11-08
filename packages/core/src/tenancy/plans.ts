@@ -16,13 +16,27 @@
  */
 import {
   activeOnly,
+  inviteLinks,
   operatorWorkspaceUsage,
   tenants,
+  users,
   withWorkspace,
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { and, count, eq, inArray } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  or,
+  type SQL,
+  sql,
+} from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
@@ -93,12 +107,72 @@ const plansSchema = z.array(planSchema);
 const SEAT_STATUSES = ["active", "invited"] as const;
 
 /**
- * How many seats a workspace is using.
+ * The personal invitations still waiting for somebody, each of which holds a
+ * seat (plans-and-seats.md §2).
+ *
+ * **A personal invitation writes a link and no member until it is accepted**,
+ * so the `invited` status above was never written by anything, and with seats
+ * free any number of invitations succeeded. The link is what holds the seat,
+ * from the moment it is sent until it is accepted, revoked or expires.
+ *
+ * - A guest's invitation is not a seat, as a guest is not.
+ * - One seat per address, however many times that person was asked.
+ * - None for an address somebody here already has: accepting changes nothing.
+ *   A placeholder, an import's waiting row or the owner an operator's new
+ *   workspace waits for, is not a seat itself, so its invitation is the seat.
+ * - None for `arriving`, the address being admitted now: the seat its
+ *   invitation holds is the one that person is about to take.
+ */
+function pendingInvitations(workspaceId: string, arriving?: string): SQL {
+  return and(
+    eq(inviteLinks.workspaceId, workspaceId),
+    eq(inviteLinks.mode, "personal"),
+    eq(inviteLinks.memberKind, "human"),
+    isNotNull(inviteLinks.email),
+    isNull(inviteLinks.memberId),
+    isNull(inviteLinks.revokedAt),
+    or(isNull(inviteLinks.expiresAt), gt(inviteLinks.expiresAt, sql`now()`)),
+    or(
+      isNull(inviteLinks.maxUses),
+      lt(inviteLinks.useCount, inviteLinks.maxUses),
+    ),
+    arriving === undefined
+      ? undefined
+      : sql`lower(${inviteLinks.email}) <> lower(${arriving})`,
+    sql`not exists (
+      select 1 from ${workspaceMembers}
+        left join ${users} on ${users.id} = ${workspaceMembers.userId}
+       where ${workspaceMembers.workspaceId} = ${inviteLinks.workspaceId}
+         and ${workspaceMembers.deletedAt} is null
+         and ${workspaceMembers.kind} <> 'placeholder'
+         and (lower(${users.email}) = lower(${inviteLinks.email})
+              or lower(${workspaceMembers.placeholderEmail}) = lower(${inviteLinks.email})))`,
+  ) as SQL;
+}
+
+async function pendingInvitationCountInTx(
+  tx: AnyTx,
+  workspaceId: string,
+  arriving?: string,
+): Promise<number> {
+  const [row] = await tx
+    .select({
+      n: sql<number>`count(distinct lower(${inviteLinks.email}))::int`,
+    })
+    .from(inviteLinks)
+    .where(activeOnly(inviteLinks, pendingInvitations(workspaceId, arriving)));
+  return row?.n ?? 0;
+}
+
+/**
+ * How many people a workspace has: the headcount a smaller plan is judged by.
  *
  * Humans only. A guest is not a seat, so sharing is never a decision about
  * money and a support session costs the customer nothing. An agent is not a
  * seat, so the Coach and the Champion are not billed for. A placeholder is
- * nobody.
+ * nobody. **Pending invitations are not counted here**: a plan that fits the
+ * people takes nobody's access away, and whoever arrives without a seat is
+ * refused at the funnel. `seatState` adds them, for the seats that are held.
  */
 export async function countSeats(
   pool: Pool,
@@ -144,7 +218,10 @@ export async function seatState(
 ): Promise<SeatState> {
   const tenant = await readTenant(pool, workspaceId);
   const limit = tenant?.seats ?? null;
-  const used = await countSeats(pool, workspaceId);
+  const pending = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    pendingInvitationCountInTx(tx, workspaceId),
+  );
+  const used = (await countSeats(pool, workspaceId)) + pending;
   return { limit, used, full: limit !== null && used >= limit };
 }
 
@@ -315,6 +392,7 @@ interface SeatCheck {
 async function seatCheckInTx(
   tx: AnyTx,
   workspaceId: string,
+  arriving?: string,
 ): Promise<SeatCheck> {
   const [tenant] = await tx
     .select({ seats: tenants.seats })
@@ -342,7 +420,8 @@ async function seatCheckInTx(
       ),
     );
 
-  return { limit: tenant.seats, used: row?.n ?? 0 };
+  const pending = await pendingInvitationCountInTx(tx, workspaceId, arriving);
+  return { limit: tenant.seats, used: (row?.n ?? 0) + pending };
 }
 
 /**
@@ -352,19 +431,30 @@ async function seatCheckInTx(
  * comparisons is two answers that can disagree, and the disagreement would
  * show up as an invitation that says it worked and a join that says it did
  * not.
+ *
+ * `arriving` is the address being invited or admitted, whose own pending
+ * invitation is the seat they would take rather than one in the way.
  */
 export async function requireSeatInTx(
   tx: AnyTx,
   workspaceId: string,
   message: (used: number, limit: number) => string,
+  options: { readonly arriving?: string } = {},
 ): Promise<void> {
-  const { limit, used } = await seatCheckInTx(tx, workspaceId);
+  const { limit, used } = await seatCheckInTx(
+    tx,
+    workspaceId,
+    options.arriving,
+  );
   if (limit !== null && used >= limit) {
     throw new OperationError("forbidden", message(used, limit));
   }
 }
 
-/** How many seats are in use, from inside an Operation's own transaction. */
+/**
+ * How many people a workspace has, from inside an Operation's own transaction:
+ * the headcount `countSeats` gives, with no pending invitation in it.
+ */
 export async function seatsInUseInTx(
   tx: AnyTx,
   workspaceId: string,
@@ -465,25 +555,28 @@ export async function readOwnPlan(
 }
 
 export interface SeatHolder {
-  readonly memberId: string;
+  /** The member's id, or the invitation's for somebody not here yet. */
+  readonly id: string;
+  /** The member's name, or the invited address. */
   readonly name: string;
   readonly status: (typeof SEAT_STATUSES)[number];
 }
 
 /**
- * Who holds the seats `countSeats` counts, by the same rule, so the list and
+ * Who holds the seats `seatState` counts, by the same rule, so the list and
  * the number beside it cannot disagree (completeness review H-21). An
- * administrator told to free a seat needs to see whose it is.
+ * administrator told to free a seat needs to see whose it is, including an
+ * invitation they can revoke.
  */
 export async function listSeatHolders(
   pool: Pool,
   workspaceId: string,
 ): Promise<readonly SeatHolder[]> {
   const db = drizzle(pool);
-  return withWorkspace(db, workspaceId, (tx) =>
-    tx
+  return withWorkspace(db, workspaceId, async (tx) => {
+    const members = (await tx
       .select({
-        memberId: workspaceMembers.id,
+        id: workspaceMembers.id,
         name: workspaceMembers.name,
         status: workspaceMembers.status,
       })
@@ -497,7 +590,26 @@ export async function listSeatHolders(
             inArray(workspaceMembers.status, [...SEAT_STATUSES]),
           ),
         ),
-      )
-      .orderBy(workspaceMembers.name),
-  ) as Promise<readonly SeatHolder[]>;
+      )) as SeatHolder[];
+    const invitations = await tx
+      .select({ id: inviteLinks.id, email: inviteLinks.email })
+      .from(inviteLinks)
+      .where(activeOnly(inviteLinks, pendingInvitations(workspaceId)))
+      .orderBy(inviteLinks.createdAt);
+    // One holder per address, as the count has one seat per address.
+    const byAddress = new Map<string, SeatHolder>();
+    for (const invitation of invitations) {
+      const email = invitation.email ?? "";
+      if (!byAddress.has(email.toLowerCase())) {
+        byAddress.set(email.toLowerCase(), {
+          id: invitation.id,
+          name: email,
+          status: "invited",
+        });
+      }
+    }
+    return [...members, ...byAddress.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  });
 }
