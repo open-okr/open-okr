@@ -1,5 +1,13 @@
 # @openokr/ui
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @openokr/formats@0.6.0
+  - @openokr/method@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
