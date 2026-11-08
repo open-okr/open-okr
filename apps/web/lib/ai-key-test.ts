@@ -1,7 +1,7 @@
 import { createAIProvider } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
-  isCloudEnabled,
+  guardsAIEndpoints,
   resolveAICredential,
   resolveAIPrivacySettings,
   SEEDED_MODELS,
@@ -59,7 +59,7 @@ export async function testWorkspaceKey(
     return "unreachable";
   }
   const config = providerConfigFor(resolved, {
-    guardOutbound: await isCloudEnabled(pool),
+    guardOutbound: await guardsAIEndpoints(pool),
     appUrl: loadEnv().BETTER_AUTH_URL,
     appName: await getInstanceName(),
   });

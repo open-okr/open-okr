@@ -50,6 +50,7 @@ export async function embedFor(
     const result = await routed.provider.embed({
       model: routed.modelId,
       input: [...inputs],
+      feature: "embedding",
     });
     return {
       vectors: result.vectors,

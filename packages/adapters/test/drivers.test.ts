@@ -71,6 +71,29 @@ describe("LocalDiskStorage", () => {
     );
   });
 
+  it("deletes one workspace's whole prefix and nobody else's, twice without complaint", async () => {
+    await storage.put("w1/a.txt", Buffer.from("x"));
+    await storage.put("w1/exports/run/a.okr", Buffer.from("x"));
+    await storage.put("w2/a.txt", Buffer.from("y"));
+    await storage.deletePrefix("w1/");
+    await expect(storage.deletePrefix("w1/")).resolves.toBeUndefined();
+    await expect(storage.get("w1/a.txt")).rejects.toBeInstanceOf(
+      ObjectNotFoundError,
+    );
+    await expect(storage.get("w1/exports/run/a.okr")).rejects.toBeInstanceOf(
+      ObjectNotFoundError,
+    );
+    expect((await storage.get("w2/a.txt")).toString()).toBe("y");
+  });
+
+  it("refuses a prefix wider than one directory", async () => {
+    for (const prefix of ["", "/", "../", "w1/a/", "*"]) {
+      await expect(storage.deletePrefix(prefix)).rejects.toThrow(
+        /single directory/,
+      );
+    }
+  });
+
   it("refuses a key that escapes the storage root", async () => {
     await expect(storage.put("../escape", Buffer.from("x"))).rejects.toThrow(
       /key/i,

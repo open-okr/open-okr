@@ -174,6 +174,67 @@ describe("stream", () => {
 
     expect(received.join("")).toBe("Hello");
   });
+
+  it("reports the usage the stream's chunks carry", async () => {
+    async function* chunks() {
+      yield { text: "Hi" };
+      yield {
+        text: "",
+        usageMetadata: { promptTokenCount: 9, candidatesTokenCount: 3 },
+      };
+    }
+    const provider = new GoogleProvider({
+      client: fakeClient({
+        generateContentStream: vi.fn().mockResolvedValue(chunks()),
+      }),
+    });
+
+    const usage: unknown[] = [];
+    for await (const _chunk of provider.stream(
+      {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: "hi" }],
+      },
+      (counted) => usage.push(counted),
+    )) {
+      // Read to the end.
+    }
+
+    expect(usage).toEqual([{ inputTokens: 9, outputTokens: 3 }]);
+  });
+
+  it("says how many input tokens came from the cache", async () => {
+    async function* chunks() {
+      yield {
+        text: "Hi",
+        usageMetadata: {
+          promptTokenCount: 9,
+          candidatesTokenCount: 3,
+          cachedContentTokenCount: 5,
+        },
+      };
+    }
+    const provider = new GoogleProvider({
+      client: fakeClient({
+        generateContentStream: vi.fn().mockResolvedValue(chunks()),
+      }),
+    });
+
+    const usage: unknown[] = [];
+    for await (const _chunk of provider.stream(
+      {
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: "hi" }],
+      },
+      (counted) => usage.push(counted),
+    )) {
+      // Read to the end.
+    }
+
+    expect(usage).toEqual([
+      { inputTokens: 9, outputTokens: 3, cachedInputTokens: 5 },
+    ]);
+  });
 });
 
 describe("capabilities and stop", () => {

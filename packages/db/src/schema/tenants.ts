@@ -1,4 +1,11 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { workspaces } from "./workspaces.ts";
 
 /**
@@ -35,6 +42,21 @@ export const tenants = pgTable("tenants", {
   /** Recorded, never routed on. */
   region: text("region").notNull(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
+  /**
+   * True only when the owner closed it while it was active, so reopening it is
+   * theirs too (docs/design/workspace-erasure.md §3). Migration 0148.
+   */
+  ownerMayReopen: boolean("owner_may_reopen").notNull().default(false),
+  /**
+   * When erasure claimed it (docs/design/workspace-erasure.md §4). Once set,
+   * nothing reopens it, and its audit rows may be deleted. Migration 0149.
+   */
+  erasingAt: timestamp("erasing_at", { withTimezone: true }),
+  /**
+   * When the owners and administrators were told it is deleted in seven days.
+   * Cleared on every lifecycle move. Migration 0150.
+   */
+  erasureRemindedAt: timestamp("erasure_reminded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

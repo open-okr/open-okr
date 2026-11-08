@@ -15,9 +15,13 @@
  * product: every trigger, ladder, gate and corridor works without it.
  */
 import { createProviderDrafter } from "@openokr/agents";
-import { type AgentDrafter, resolveAgentRunCostCap } from "@openokr/core";
+import {
+  type AgentDrafter,
+  builtInAgentId,
+  resolveAgentRunCostCap,
+} from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
-import { providerForTier } from "./ai-provider";
+import { providerForTier, type UsageAttribution } from "./ai-provider";
 import { getPool } from "./auth";
 
 /**
@@ -58,6 +62,7 @@ export async function drafterFor(
   workspaceId: string,
   tier: ModelTier = "balanced",
   forUser?: string,
+  attribution?: UsageAttribution,
 ): Promise<AgentDrafter | null> {
   const pool = getPool();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
@@ -66,7 +71,7 @@ export async function drafterFor(
   // under their own name is worth a better model than the cheapest one, and
   // the run cap bounds what that can cost. Whichever provider the workspace
   // routes that tier to, not OpenRouter always (completeness review H-27).
-  const routed = await providerForTier(workspaceId, tier, forUser);
+  const routed = await providerForTier(workspaceId, tier, forUser, attribution);
   if (!routed) {
     return null;
   }
@@ -84,9 +89,33 @@ export async function drafterFor(
     model: routed.modelId,
     // §4.14's `agentRunCostCapUsd`, read from the workspace rather than from a
     // constant, so a workspace that lowered it stops the drafter mid-run
-    // rather than only being refused at the door.
-    costCapUsd,
+    // rather than only being refused at the door. Never past what is left of a
+    // workspace's credits, so one run cannot empty a free plan.
+    costCapUsd:
+      routed.spendCeilingUsd === undefined
+        ? costCapUsd
+        : Math.min(costCapUsd, routed.spendCeilingUsd),
     costInPerMillion: routed.costInPerMillion,
     costOutPerMillion: routed.costOutPerMillion,
+    ...(routed.costCachedInPerMillion === undefined
+      ? {}
+      : { costCachedInPerMillion: routed.costCachedInPerMillion }),
+  });
+}
+
+/**
+ * The drafter for the Coach or the Champion, on the workspace's key.
+ *
+ * Named so its calls count against that agent, which is how a bill is read by agent
+ * and what an agent's own budget counts. No reader is passed, because these are the
+ * agent's requests rather than a person's.
+ */
+export async function drafterForAgent(
+  workspaceId: string,
+  kind: "coach" | "champion",
+): Promise<AgentDrafter | null> {
+  const agentId = await builtInAgentId(getPool(), workspaceId, kind);
+  return drafterFor(workspaceId, "balanced", undefined, {
+    ...(agentId ? { agentId } : {}),
   });
 }

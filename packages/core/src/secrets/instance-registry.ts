@@ -49,6 +49,9 @@ export function instanceNameOr(name: string | undefined | null): string {
     : DEFAULT_INSTANCE_NAME;
 }
 
+/** Where the software is developed, until a provider names their own. */
+export const DEFAULT_SOURCE_URL = "https://github.com/open-okr/open-okr";
+
 export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   {
     key: SETUP_COMPLETED_AT,
@@ -64,6 +67,38 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_INSTANCE_NAME",
     summary:
       "What this deployment calls itself: the page title, the sign-in and setup headings, every email and chat message, the authenticator entry and the passkey prompt. Changed from the wizard or admin, General.",
+  },
+  {
+    key: "instance.sourceUrl",
+    kind: "string",
+    fallback: DEFAULT_SOURCE_URL,
+    environment: "OPENOKR_SOURCE_URL",
+    summary:
+      "Where every member is offered this instance's source, which AGPL-3.0 section 13 asks for. A provider who changed the code points this at their own.",
+  },
+  {
+    key: "instance.termsUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_TERMS_URL",
+    summary:
+      "The terms a sign-up agrees to, as a web address. Empty means the sign-up page names none.",
+  },
+  {
+    key: "instance.privacyUrl",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_PRIVACY_URL",
+    summary:
+      "The privacy policy a sign-up can read, as a web address. Empty means the sign-up page names none.",
+  },
+  {
+    key: "instance.supportEmail",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_SUPPORT_EMAIL",
+    summary:
+      "Who a customer writes to about their plan. Empty means the plan screen names the instance and no address.",
   },
   {
     key: "instance.language",
@@ -105,7 +140,31 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "[]",
     environment: "OPENOKR_CLOUD_PLANS",
     summary:
-      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiMonthlyUsd":50}]. Seats null is unlimited. Without it the only plan is Free.',
+      'The plans an operator can put a workspace on, as a JSON list: [{"key":"team","name":"Team","seats":20,"aiCredits":2000}]. Seats null is unlimited. Without it the only plan is Free.',
+  },
+  {
+    key: "cloud.defaultPlan",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_CLOUD_DEFAULT_PLAN",
+    summary:
+      "The plan a new workspace starts on, as a key from the catalogue. Empty means a new workspace has no plan and no seat limit. A key the catalogue does not hold reads as empty, so a typo cannot refuse a sign-up.",
+  },
+  {
+    key: "cloud.creditValueUsd",
+    kind: "number",
+    fallback: 0.01,
+    environment: "OPENOKR_CLOUD_CREDIT_VALUE_USD",
+    summary:
+      "What one AI credit is worth in model cost, in US dollars, because the model price list is. A provider sells credits in whatever currency it likes.",
+  },
+  {
+    key: "cloud.agentCreditShare",
+    kind: "number",
+    fallback: 0.5,
+    environment: "OPENOKR_CLOUD_AGENT_CREDIT_SHARE",
+    summary:
+      "How much of a month's AI allowance the Coach and the Champion may spend, so background work cannot pause the copilot. From 0 to 1.",
   },
   {
     key: "cloud.closureRetentionDays",
@@ -127,6 +186,14 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
   // describe the deployment rather than any customer, and both default to
   // unlimited so a self-hosted instance is never limited by a number nobody
   // chose. Design: docs/design/tenant-limits.md §4.
+  {
+    key: "cloud.limits.freeWorkspacesPerPerson",
+    kind: "number",
+    fallback: 1,
+    environment: "OPENOKR_CLOUD_FREE_WORKSPACES_PER_PERSON",
+    summary:
+      "How many workspaces on the default plan one person may own. Zero means unlimited. With no default plan it does not apply, so a group is never limited, and an operator is not held to it.",
+  },
   {
     key: "cloud.limits.actionsPerMinute",
     kind: "number",
@@ -301,6 +368,72 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_STATUS_SCHEDULER_UNAVAILABLE_SECONDS",
     summary:
       "Seconds without a successful scheduler run before /api/status reports it as unavailable. Default 14400 (4 hours).",
+  },
+  {
+    key: "billing.provider",
+    kind: "string",
+    fallback: "none",
+    environment: "OPENOKR_BILLING_PROVIDER",
+    summary:
+      "Which payment provider takes subscriptions: none or stripe. None means an operator sets each plan by hand, and nothing is loaded or called.",
+  },
+  {
+    key: "billing.stripe.secretKey",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_STRIPE_SECRET_KEY",
+    secret: true,
+    summary:
+      "Stripe's secret key. Envelope-encrypted, never returned to a page.",
+  },
+  {
+    key: "billing.stripe.webhookSecret",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_STRIPE_WEBHOOK_SECRET",
+    secret: true,
+    summary:
+      "The signing secret of the webhook pointed at /api/billing/webhook. Envelope-encrypted, never returned to a page.",
+  },
+  {
+    key: "billing.creditPack",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_BILLING_CREDIT_PACK",
+    summary:
+      'The extra AI credits a plan with top-ups can buy, as JSON: {"priceId":"price_1Xyz","credits":1000,"months":12}. The price, and its currency, are set in the payment provider. A pack lasts `months` from the day it is bought, twelve when left out. Empty means nothing is on sale.',
+  },
+  {
+    key: "billing.stripe.automaticTax",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_STRIPE_AUTOMATIC_TAX",
+    summary:
+      "Whether a checkout has Stripe Tax work out the tax. It also has to be set up in the Stripe account.",
+  },
+  {
+    key: "ai.allowPrivateEndpoints",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_AI_ALLOW_PRIVATE_ENDPOINTS",
+    summary:
+      "With the cloud flag on, whether a workspace administrator's AI base URL may name an address inside the network. Off is right for a public cloud. A group running its own model turns it on, trusting every workspace's administrators.",
+  },
+  {
+    key: "ai.deployment.tierModels",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_AI_TIER_MODELS",
+    summary:
+      'Which model each tier uses on the deployment key, as JSON, such as {"balanced":"claude-haiku-5-5"}. A model the catalogue cannot price is ignored. Empty means the catalogue\'s default for each tier.',
+  },
+  {
+    key: "ai.deployment.prices",
+    kind: "string",
+    fallback: "{}",
+    environment: "OPENOKR_AI_PRICES",
+    summary:
+      'Corrects a model\'s price on the deployment key without a release, because prices move, as JSON: {"model":{"costInPerMillion":1,"costOutPerMillion":5,"costCachedInPerMillion":0.1}}.',
   },
   {
     key: "ai.deployment.provider",

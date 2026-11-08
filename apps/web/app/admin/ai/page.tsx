@@ -1,4 +1,9 @@
-import { ACCESS_LEVELS, callAction, knownPromptKeys } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  knownPromptKeys,
+  readHostedAccess,
+} from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
 import {
   Button,
@@ -156,6 +161,7 @@ export default async function AdminAIPage() {
     actor: { kind: "human" as const, userId: session.user.id },
     ring: getKeyRing(),
   };
+  const hosted = await readHostedAccess(getPool(), workspace.workspaceId);
 
   const since = new Date(
     Date.now() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
@@ -206,6 +212,9 @@ export default async function AdminAIPage() {
         <CardHeader className="justify-between">
           <div className="flex min-w-0 flex-col">
             <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
+            {hosted.kind === "credits" ? (
+              <p className="text-ink-2 text-sm">{t("admin.credits.ownKey")}</p>
+            ) : null}
             <p className="text-xs text-ink-3">
               {t("admin.ai.everyRuleScoreGate")}
             </p>
@@ -538,7 +547,9 @@ export default async function AdminAIPage() {
                     ? t("admin.ai.setHere")
                     : route.source === "seeded-default"
                       ? t("admin.ai.seededDefault")
-                      : t("admin.ai.nothingAnswersThisYet")}
+                      : route.source === "deployment"
+                        ? t("admin.ai.deploymentDefault")
+                        : t("admin.ai.nothingAnswersThisYet")}
                 </Chip>
                 {route.modelId ? (
                   <code className="font-mono text-xs text-ink-3">

@@ -181,6 +181,7 @@ export {
   resolveAIPrivacySettings,
 } from "./ai/egress.ts";
 export {
+  costOfUsage,
   findSeededModel,
   SEEDED_MODELS,
   type SeededModel,
@@ -203,10 +204,14 @@ export {
 export {
   type ResolvedFeatureTier,
   type ResolvedTierRoute,
+  resolveDeploymentRates,
   resolveFeatureTier,
+  resolveModelRates,
   resolveTierRoute,
 } from "./ai/tier-routing.ts";
 export {
+  builtInAgentId,
+  callRecorder,
   type RecordUsageEventInput,
   recordUsageEvent,
   summariseUsage,
@@ -527,6 +532,15 @@ export {
   type SSOProviderTracker,
   trackSSOProviders,
 } from "./auth/sso-refresh.ts";
+export {
+  applyBillingEvent,
+  type BillingGateway,
+  type BillingOutcome,
+  type BillingSettings,
+  resolveBillingSettings,
+  type SubscriptionSnapshot,
+  type VerifiedBillingEvent,
+} from "./billing/index.ts";
 export {
   type ClaimBlobInput,
   type ClaimedBlob,
@@ -985,6 +999,7 @@ export {
 // boundary gate lets only these touch `tenants`.
 export {
   createSiteMessage,
+  createWorkspaceAsOperator,
   deleteSiteMessage,
   dismissSiteMessage,
   endSupportSession,
@@ -999,6 +1014,7 @@ export {
   liveSupportSession,
   measureAllWorkspaces,
   OperatorGrantError,
+  readBillingAsOperator,
   readInstanceFlags,
   readUsageAsOperator,
   requestSupportSession,
@@ -1073,6 +1089,12 @@ export {
   parseRichText,
   RichTextValidationError,
 } from "./rich-text/validate.ts";
+export {
+  type LegalLinks,
+  resolveLegalLinks,
+  resolveSourceUrl,
+  resolveSupportEmail,
+} from "./secrets/instance-identity.ts";
 export {
   deploymentInstanceName,
   INSTANCE_NAME_MAX_LENGTH,
@@ -1232,19 +1254,38 @@ export {
   AdmissionError,
   type AdmissionLimits,
   AdmissionSettingError,
+  adoptWorkspaces,
+  type ClosureSchedule,
+  type CreditSummary,
   countSeats,
+  creditsPausedReason,
+  creditValueUsd,
   currentConcurrentActions,
+  erasureDateFor,
+  guardsAIEndpoints,
+  type HostedAccess,
+  hasPlanScreen,
   isCloudEnabled,
   listSeatHolders,
+  readClosureSchedule,
+  readCreditSummary,
+  readHostedAccess,
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  readWorkspaceLifecycle,
+  remindBeforeErasure,
   resolveAdmissionLimits,
   seatState,
   setDefaultAdmission,
+  type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
+export {
+  createOwnWorkspace,
+  mayCreateOwnWorkspace,
+} from "./workspaces/create-own.ts";
 export {
   listMembershipsForUser,
   type Membership,

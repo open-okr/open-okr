@@ -15,8 +15,8 @@
  * This uses it: the route names the provider, the credential is that
  * provider's own, and its base URL is the one the workspace configured.
  *
- * **On the managed cloud, an administrator's base URL is checked on every
- * request** (H-07). A workspace administrator there is not the operator, and
+ * **On a cloud, an administrator's base URL is checked on every request** (H-07),
+ * unless whoever runs the deployment has said it trusts them. A workspace administrator there is not the operator, and
  * a base URL pointed at a metadata address or the database host would be a
  * request the server makes for them.
  *
@@ -24,6 +24,10 @@
  * read here, per build, and handed to `createAIProvider`, which will not build
  * a provider without them. What a control withholds or replaces is written to
  * the audit trail as counts and a host, never as text.
+ *
+ * **Every call becomes a usage row here**, through `callRecorder`. This is the
+ * one place that knows the workspace and the model's price, and every provider
+ * passes through it.
  */
 import {
   type AIProviderConfig,
@@ -32,15 +36,18 @@ import {
 } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
-  findSeededModel,
-  isCloudEnabled,
+  callRecorder,
+  guardsAIEndpoints,
   type ResolvedAICredential,
+  readHostedAccess,
   recordAIEgressWithheld,
   resolveAICredential,
   resolveAIPrivacySettings,
+  resolveDeploymentRates,
+  resolveModelRates,
   resolveTierRoute,
 } from "@openokr/core";
-import type { ModelTier } from "@openokr/db";
+import type { ModelTier, UsageSource } from "@openokr/db";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -53,8 +60,19 @@ export interface RoutedProvider {
    */
   readonly provider: GuardedAIProvider;
   readonly modelId: string;
+  /** What is left on the provider's own key, when this call would spend credits. */
+  readonly spendCeilingUsd?: number;
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
+  readonly costCachedInPerMillion?: number;
+}
+
+/** Who a usage row is charged to, beyond the person a request is for. */
+export interface UsageAttribution {
+  /** Defaults to an assist when a person asked, and an agent when nobody did. */
+  readonly source?: UsageSource;
+  /** The agent whose run this step belongs to, for its own budget. */
+  readonly agentId?: string;
 }
 
 type Resolved = Exclude<ResolvedAICredential, { source: "off" }>;
@@ -120,14 +138,11 @@ export async function providerForTier(
   workspaceId: string,
   tier: ModelTier,
   forUser?: string,
+  attribution: UsageAttribution = {},
 ): Promise<RoutedProvider | null> {
   const pool = getPool();
   const route = await resolveTierRoute(pool, { workspaceId, tier });
   if (!route) {
-    return null;
-  }
-  const priced = findSeededModel(route.provider, route.modelId);
-  if (!priced) {
     return null;
   }
   const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
@@ -138,8 +153,39 @@ export async function providerForTier(
   if (resolved.source === "off") {
     return null;
   }
+
+  // **The provider's own key has limits a workspace's does not**
+  // (docs/design/ai-credits.md). Whether it may be used, how much is left, and at
+  // whose price: the catalogue's, because an administrator writes their own rows.
+  const onProvidersKey = resolved.source === "deployment";
+  const hosted = onProvidersKey
+    ? await readHostedAccess(pool, workspaceId)
+    : null;
+  if (hosted?.kind === "none") {
+    return null;
+  }
+  const isAgent = !forUser;
+  const left =
+    hosted?.kind === "credits"
+      ? isAgent
+        ? hosted.agentAvailableUsd
+        : hosted.availableUsd
+      : null;
+  if (left !== null && left <= 0) {
+    return null;
+  }
+  const priced = onProvidersKey
+    ? await resolveDeploymentRates(pool, route.provider, route.modelId)
+    : await resolveModelRates(pool, {
+        workspaceId,
+        provider: route.provider,
+        modelId: route.modelId,
+      });
+  if (!priced) {
+    return null;
+  }
   const config = providerConfigFor(resolved, {
-    guardOutbound: await isCloudEnabled(pool),
+    guardOutbound: await guardsAIEndpoints(pool),
     appUrl: loadEnv().BETTER_AUTH_URL,
     appName: await getInstanceName(),
   });
@@ -152,9 +198,21 @@ export async function providerForTier(
       policy,
       onWithheld: (event) =>
         recordAIEgressWithheld(pool, { workspaceId, ...event }),
+      onUsage: callRecorder(pool, {
+        workspaceId,
+        provider: route.provider,
+        rates: priced,
+        keySource: resolved.source,
+        ...(forUser ? { forUser } : {}),
+        ...attribution,
+      }),
     }),
     modelId: route.modelId,
+    ...(left === null ? {} : { spendCeilingUsd: left }),
     costInPerMillion: priced.costInPerMillion,
     costOutPerMillion: priced.costOutPerMillion,
+    ...(priced.costCachedInPerMillion === undefined
+      ? {}
+      : { costCachedInPerMillion: priced.costCachedInPerMillion }),
   };
 }

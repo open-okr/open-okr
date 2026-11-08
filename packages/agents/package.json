@@ -8,6 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
+    "ai:measure": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/measure-credits.ts",
     "typecheck": "tsc --noEmit --singleThreaded"
   },
   "dependencies": {

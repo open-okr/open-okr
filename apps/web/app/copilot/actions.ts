@@ -54,6 +54,7 @@ export async function copilotAvailabilityAction() {
     base.workspaceId,
     "balanced",
     base.actor.userId,
+    { source: "copilot" },
   );
   return callAction(
     drafter ? { ...base, drafter } : base,
@@ -78,6 +79,7 @@ export async function proposeFromCopilotAction(
     base.workspaceId,
     "balanced",
     base.actor.userId,
+    { source: "copilot" },
   );
   if (!drafter) {
     return null;

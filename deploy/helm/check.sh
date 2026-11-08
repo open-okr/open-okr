@@ -398,6 +398,59 @@ else
   pass "no clamd host means no scan"
 fi
 
+# --- the setups in PLAN.md section 5.2 -------------------------------------
+if render_one deployment.yaml | grep -q "OPENOKR_CLOUD"; then
+  fail "an ordinary install is told it is a cloud"
+else
+  pass "an ordinary install is not a cloud"
+fi
+
+cloud=$(render_one deployment.yaml --set cloud.enabled=true \
+  --set cloud.defaultPlan=free --set instance.termsUrl=https://example.com/terms)
+if echo "$cloud" | grep -q "OPENOKR_CLOUD$" \
+  && echo "$cloud" | grep -q "OPENOKR_CLOUD_DEFAULT_PLAN" \
+  && echo "$cloud" | grep -q "OPENOKR_TERMS_URL"; then
+  pass "a cloud install names its flag, its default plan and its terms"
+else
+  fail "a cloud install lost a setting on the way to the pod"
+fi
+
+if render_one deployment.yaml --set cloud.defaultPlan=free \
+  | grep -q "OPENOKR_CLOUD_DEFAULT_PLAN"; then
+  fail "a default plan reached a pod with the cloud off"
+else
+  pass "plans mean nothing with the cloud off"
+fi
+
+extra=$(render_one deployment.yaml \
+  --set-json 'extraEnvFrom=[{"secretRef":{"name":"providers"}}]' \
+  --set-json 'extraEnv=[{"name":"OPENOKR_AI_PROVIDER","value":"anthropic"}]')
+if echo "$extra" | grep -q "name: providers" \
+  && echo "$extra" | grep -q "OPENOKR_AI_PROVIDER"; then
+  pass "extra variables reach the pod, by value or from a Secret"
+else
+  fail "extra variables did not reach the pod"
+fi
+
+# --- erasure CronJob (docs/design/workspace-erasure.md §7) -----------------
+if echo "$defaults" | grep -q "component: erasure"; then
+  fail "the erasure CronJob renders with no schedule"
+else
+  pass "the erasure CronJob is off until a schedule is set"
+fi
+
+erase_job=$(render_one erasure-cronjob.yaml \
+  --set cloud.erasure.schedule="30 3 * * *" \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr 2>&1)
+if echo "$erase_job" | grep -q "cloud-erase.ts" \
+  && echo "$erase_job" | grep -q -- "- --write" \
+  && echo "$erase_job" | grep -q "name: DATABASE_ADMIN_URL" \
+  && ! echo "$erase_job" | grep -q "secret@db"; then
+  pass "the erasure CronJob runs with the owner role, from a Secret"
+else
+  fail "the erasure CronJob does not run with the owner role from a Secret"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2

@@ -57,7 +57,7 @@ The copy is final around these. Each one is a human decision, and several are al
 | # | Decision | Affects | Recorded as open in |
 |---|---|---|---|
 | 1 | **Settled on 1 November 2026.** OKR Institute is the company, OKRGoal the cloud product, OpenOKR the open source product | Every page | [messaging.md §1](messaging.md) |
-| 2 | **Cloud prices:** per-person price, free plan limit, AI allowance per plan, yearly discount, trial | Pricing, Cloud, Home FAQ | [PLAN.md §10 #1](../specification/PLAN.md), [plans-and-seats.md §8](../design/plans-and-seats.md) |
+| 2 | **Decided on 7 November 2026.** Cloud prices are per workspace and the live page holds them. OKRGoal's terms are in [pages/pricing.md](pages/pricing.md) | Pricing, Cloud, Home FAQ | [PLAN.md §10 #1](../specification/PLAN.md), [plans-and-seats.md §9](../design/plans-and-seats.md) |
 | 3 | **The cloud's addresses:** sign-up (`app.okrgoal.com` is a placeholder) and the agent endpoint | Every "Start free" button, Integrations, Home | |
 | 4 | **Cloud operation:** region, backup schedule, uptime commitment, status page | Cloud, Security, Enterprise | [tenant-lifecycle.md §5](../design/tenant-lifecycle.md) |
 | 5 | **What OKR Institute sells with OKRGoal:** coaching, certification, a named contact, migration, security review, self-hosted support, the response times for each, and whether existing programmes such as the 90-Day OKR Program apply to OKRGoal | Enterprise, Pricing, Self-host | |
@@ -70,7 +70,7 @@ The copy is final around these. Each one is a human decision, and several are al
 | 12 | **Whether to say the demo has AI on**, within a daily cap | Demo | |
 | 13 | **Where the documentation lives:** `okrgoal.com/docs` or a subdomain | Sitemap, Resources | |
 | 14 | **A Bahasa Melayu version of the site** | Footer, every page | |
-| 15 | **Discounts and billing:** education and non-profit, currency, invoices, proration | Pricing | |
+| 15 | **Decided on 7 November 2026.** Discounts, currency, invoices and proration are on the live page. Cancelling, refunds and tax are in [pages/pricing.md](pages/pricing.md) | Pricing | |
 | 16 | **okri.io and OKRGoal side by side:** OKR Institute now offers two OKR platforms. What the site tells an okri.io customer, and whether okri.io is named beyond the "built on its lessons" line | About, FAQ | |
 | 17 | **OKR Institute's figures:** the copy quotes 2017, 12,000+ courses, 70,000+ participants, 1,000+ organisations and 50+ countries from okrinstitute.org. The same site also says "900+ organizations" and "certified 70,000+ professionals". Confirm one set and keep it current | Home, About, Enterprise | [claims.md](claims.md) |
 

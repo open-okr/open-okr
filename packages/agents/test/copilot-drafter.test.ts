@@ -47,11 +47,15 @@ class ScriptedProvider implements AIProvider {
     };
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: { inputTokens: number; outputTokens: number }) => void,
+  ): AsyncIterable<string> {
     this.requests.push(request);
     for (const piece of this.#pieces) {
       yield piece;
     }
+    onUsage?.({ inputTokens: 400, outputTokens: 60 });
   }
 
   chatWithTools(): Promise<ChatResponse> {
@@ -161,6 +165,30 @@ const collect = async (chunks: AsyncIterable<GroundedChunk>) => {
   }
   return { text, joined: text.join(""), done };
 };
+
+describe("which feature asked", () => {
+  it("is said on every call, for the usage row", async () => {
+    const { drafter, provider } = drafterOver(["An answer."]);
+    await collect(streamOf(drafter, question));
+    expect(provider.requests.map((request) => request.feature)).toEqual([
+      "streamGrounded",
+    ]);
+  });
+});
+
+describe("the drafter's spend cap", () => {
+  it("counts a streamed answer, so the next one is refused past the cap", async () => {
+    // 400 in and 60 out at these rates is $0.00052, well past a $0.0001 cap.
+    const { drafter, provider } = drafterOver(["An answer."], 0.0001);
+
+    const first = await collect(streamOf(drafter, question));
+    expect(first.joined).toContain("An answer.");
+
+    const second = await collect(streamOf(drafter, question));
+    expect(second.joined).toBe("");
+    expect(provider.requests).toHaveLength(1);
+  });
+});
 
 describe("the sentinel line", () => {
   it("is never sent to the reader, even split across pieces", async () => {

@@ -50,11 +50,16 @@ export async function seedTenantInTx(
   // arrangement `seedCoachInTx` and `createSpaceInTx` use, and for the same
   // reason: the audit, activity and outbox rows belong to the whole
   // provisioning, not to each module's statement inside it.
-  await tx.insert(tenants).values({
-    workspaceId: input.workspaceId,
-    state: "active",
-    region: input.cloud.region,
-  });
+  // Nothing on a conflict: `adoptWorkspaces` and a second scheduler replica can both
+  // reach a workspace, and one record is all either of them wants.
+  await tx
+    .insert(tenants)
+    .values({
+      workspaceId: input.workspaceId,
+      state: "active",
+      region: input.cloud.region,
+    })
+    .onConflictDoNothing();
 }
 
 export interface ReadTenantOptions {

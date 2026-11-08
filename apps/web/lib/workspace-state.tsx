@@ -1,5 +1,6 @@
 import { Card, CardBody, Chip } from "@openokr/ui";
 import Link from "next/link";
+import type { Hold } from "./held-by.ts";
 import { getTranslations } from "./translations";
 
 /**
@@ -28,16 +29,57 @@ import { getTranslations } from "./translations";
 export async function WorkspaceStateBanner({
   state,
   canRecover,
+  hold = null,
 }: {
   readonly state: "active" | "read_only" | "frozen";
   /** Whether this member can reach the control that lifts it. */
   readonly canRecover: boolean;
+  /**
+   * The provider holds it, so no administrator here can lift it and the banner
+   * does not send one to a switch that would refuse. A closed workspace says when
+   * it will be deleted (docs/design/workspace-erasure.md §8).
+   */
+  readonly hold?: Hold | null;
 }) {
   if (state === "active") {
     return null;
   }
 
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  if (hold?.kind === "closed") {
+    const day = (date: Date) =>
+      new Intl.DateTimeFormat(locale, {
+        dateStyle: "long",
+        timeZone: "UTC",
+      }).format(date);
+    return (
+      <Card data-testid="workspace-state-banner">
+        <CardBody className="flex flex-wrap items-baseline gap-2.5">
+          <Chip tone="bad">{t("workspaceState.closed")}</Chip>
+          <span className="min-w-0 flex-1 text-sm text-ink-2">
+            {hold.eraseOn
+              ? t("workspaceState.closedUntil", {
+                  closed: day(hold.closedAt),
+                  erase: day(hold.eraseOn),
+                })
+              : t("workspaceState.closedKept", { closed: day(hold.closedAt) })}
+          </span>
+          {canRecover && hold.ownerMayReopen ? (
+            <Link
+              href="/admin/general"
+              className="text-xs font-semibold text-brand-text hover:underline"
+            >
+              {t("workspaceState.reopenInAdmin")}
+            </Link>
+          ) : (
+            <span className="text-xs text-ink-4">
+              {t("workspaceState.onlyTheProviderReopens")}
+            </span>
+          )}
+        </CardBody>
+      </Card>
+    );
+  }
   const frozen = state === "frozen";
 
   return (
@@ -53,7 +95,11 @@ export async function WorkspaceStateBanner({
             ? t("workspaceState.frozenExplained")
             : t("workspaceState.readOnlyExplained")}
         </span>
-        {canRecover ? (
+        {hold ? (
+          <span className="text-xs text-ink-4">
+            {t("workspaceState.onlyTheProvider")}
+          </span>
+        ) : canRecover ? (
           <Link
             href="/admin/general"
             className="text-xs font-semibold text-brand-text hover:underline"

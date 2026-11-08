@@ -123,7 +123,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "copilot.copilotPanel.preview.objective",
   "copilot.copilotPanel.preview.space",
   "goals.detail.decompose.refused",
-  "admin.plan.planWithSeats",
   "board.board.movedTo",
   "checkIn.timeline.bylineDate",
   "checkIn.walkerLine",
@@ -263,24 +262,13 @@ function comparableHoles(message: string): readonly string[] {
  * acting, so an instance its operator had named still said "OpenOKR" on every
  * one of them. Those strings take `{instanceName}` now.
  *
- * The word may stay only where it names the software or the company that runs
- * the managed cloud rather than this instance: the support session, which is
- * the cloud operator entering a customer's workspace, and a line describing
- * what the software speaks. This list is exactly the catalogue half of the
- * finding's "should keep OpenOKR" table, and adding to it is a decision about
- * whose name a screen shows.
+ * The word may stay only where it names the software rather than this instance,
+ * and adding to this list is a decision about whose name a screen shows. It is
+ * empty since any provider may run a cloud (PLAN.md §5.2): the support session
+ * used to say "OpenOKR", which is only true of one provider, and the avatar menu
+ * links to wherever this instance's source is, which may be a provider's own.
  */
-const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set([
-  // The operator of the managed cloud, not the customer's instance.
-  "admin.support.intro",
-  "admin.support.nobodyHasBeen",
-  "lib.supportBanner.supportIsHere",
-  // What the software speaks, whatever the instance is called.
-  "admin.sso.connectAnIdentityProvider",
-  // The avatar menu's link to the software's source, offered to every
-  // member because the licence is AGPL-3.0 (§13).
-  "avatarMenu.sourceCode",
-]);
+const NAMES_THE_SOFTWARE: ReadonlySet<string> = new Set<string>();
 
 describe("the instance's name is not written into the catalogue (M-33)", () => {
   test("no entry says OpenOKR unless it names the software", () => {

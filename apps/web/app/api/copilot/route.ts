@@ -114,7 +114,9 @@ export async function POST(request: NextRequest) {
   // Null means the provider is off, which the panel renders as its own state
   // rather than as a failure. `streamAnswer` still records the question and
   // still returns the passages retrieval found.
-  const drafter = await drafterFor(workspaceId, "balanced", userId);
+  const drafter = await drafterFor(workspaceId, "balanced", userId, {
+    source: "copilot",
+  });
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

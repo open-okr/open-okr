@@ -1,27 +1,39 @@
 import {
   ACCESS_LEVELS,
-  isCloudEnabled,
+  callAction,
+  hasPlanScreen,
   listSeatHolders,
+  readCreditSummary,
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  resolveSupportEmail,
   seatState,
 } from "@openokr/core";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { getBilling } from "../../../lib/billing";
+import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
-import { changePlan } from "./actions";
-import { PlanForm } from "./plan-form";
+import { requireWorkspace } from "../../../lib/workspace";
+import {
+  buyCreditsAction,
+  changePlanAction,
+  openPortalAction,
+  settleEndedAction,
+  startCheckoutAction,
+} from "./actions";
+import { BillingPanel, BuyCreditsButton, SettleButton } from "./billing-panel";
 
 export const generateMetadata = pageTitle("pageTitle.adminPlan");
 
 /**
  * S-49 Plan and seats: the customer's own side (P8-T05).
  *
- * **With the cloud flag off this screen does not exist.** Not empty, not
+ * **With the cloud flag off or no plans, this screen does not exist.** Not empty, not
  * disabled: absent from the admin navigation and not-found at its route.
  * P8-T05's acceptance criterion says no billing surface appears, and a
  * disabled control is an appearance. A self-hosted university should never
@@ -33,23 +45,40 @@ export const generateMetadata = pageTitle("pageTitle.adminPlan");
  * PLAN.md §4 says the cloud sells operation rather than features. A plan is a
  * seat count and a spend cap.
  *
- * **The administrator can change plan here, and sees who holds each seat**
- * (completeness review H-21). Until then this screen described plans nobody
- * could move between, and told an administrator to free a seat without
- * saying whose.
+ * **The administrator sees who holds each seat** (completeness review H-21),
+ * because telling somebody to free a seat without saying whose is no help.
+ *
+ * **They read the plan here and do not change it.** Moving plan with no payment
+ * behind it was a free upgrade to anything in the catalogue, so the action refuses
+ * them and this screen names who does change it.
  */
 export const dynamic = "force-dynamic";
 
-export default async function PlanPage() {
+/** Where credits went, in words. A source the schema adds later shows as itself. */
+const SOURCE_WORDS: Readonly<Record<string, string>> = {
+  agent: "admin.credits.source.agent",
+  assist: "admin.credits.source.assist",
+  channel: "admin.credits.source.channel",
+  copilot: "admin.credits.source.copilot",
+  mcp: "admin.credits.source.mcp",
+  rest: "admin.credits.source.rest",
+};
+
+export default async function PlanPage({
+  searchParams,
+}: {
+  readonly searchParams: Promise<{ readonly checkout?: string }>;
+}) {
   const pool = getPool();
-  // The flag first, before the level: on a self-hosted instance this route
-  // does not exist for anybody, including an administrator.
-  if (!(await isCloudEnabled(pool))) {
+  // Before the level: with the flag off, or with no plans to read, this route does
+  // not exist for anybody, including an administrator.
+  if (!(await hasPlanScreen(pool))) {
     notFound();
   }
 
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
+  const { session } = await requireWorkspace();
   const [seats, plans, usage, own, holders] = await Promise.all([
     seatState(pool, access.workspaceId),
     readPlans(pool),
@@ -62,17 +91,36 @@ export default async function PlanPage() {
     plans.find((plan) => plan.key === currentKey)?.name ??
     currentKey ??
     t("admin.plan.free");
+  const instanceName = await getInstanceName();
+  const supportEmail = await resolveSupportEmail(pool);
+  const credits = await readCreditSummary(pool, access.workspaceId);
+  const billing = await getBilling();
+  const summary = billing
+    ? await callAction(
+        {
+          pool,
+          workspaceId: access.workspaceId,
+          actor: { kind: "human", userId: session.user.id },
+          billing,
+        },
+        "billing.summary",
+        {},
+      )
+    : null;
+  const { checkout } = await searchParams;
+  const planName = (key: string | null): string =>
+    plans.find((plan) => plan.key === key)?.name ?? t("admin.plan.free");
+  const periodEnd = summary?.currentPeriodEnd
+    ? new Intl.DateTimeFormat(locale, { dateStyle: "long" }).format(
+        new Date(summary.currentPeriodEnd),
+      )
+    : "";
   const seatsOf = (count: number | null): string =>
     count === null
       ? t("admin.plan.unlimitedSeats")
       : count === 1
         ? t("admin.plan.seatCountOne", { count })
         : t("admin.plan.seatCountOther", { count });
-  const describe = (plan: (typeof plans)[number]): string =>
-    t("admin.plan.planWithSeats", {
-      name: plan.name,
-      seats: seatsOf(plan.seats),
-    });
 
   return (
     <div className="flex flex-col gap-8">
@@ -86,17 +134,61 @@ export default async function PlanPage() {
           {t("admin.plan.current")}
         </h2>
         <p className="font-semibold text-ink text-xl">{currentName}</p>
-        {/* Only with a tenant row and a catalogue: on a cloud with no plans
-         * configured there is nothing to move to. */}
-        {own && plans.length > 0 ? (
-          <PlanForm
-            action={changePlan}
-            current={currentKey}
-            plans={plans.map((plan) => ({
-              key: plan.key,
-              label: describe(plan),
-            }))}
-          />
+        {summary && checkout === "done" ? (
+          <p className="text-ok text-sm" role="status">
+            {t("admin.billing.checkoutDone")}
+          </p>
+        ) : null}
+        {summary?.status === "past_due" ? (
+          <p
+            className="rounded-md bg-bad-bg px-2.5 py-1.5 text-bad text-sm"
+            role="alert"
+          >
+            {t("admin.billing.paymentFailed")}
+          </p>
+        ) : null}
+        {summary?.suspendedByBilling ? (
+          <div className="flex flex-col gap-2 rounded-md bg-warn-bg px-2.5 py-2 text-sm text-warn">
+            <p role="alert">
+              {t("admin.billing.readOnly", {
+                plan: planName(summary.defaultPlanKey),
+              })}
+            </p>
+            <SettleButton
+              action={settleEndedAction}
+              label={t("admin.billing.settle", {
+                plan: planName(summary.defaultPlanKey),
+              })}
+            />
+          </div>
+        ) : null}
+        {summary?.cancelAtPeriodEnd ? (
+          <p className="text-ink-2 text-sm">
+            {t("admin.billing.endsOn", { date: periodEnd })}
+          </p>
+        ) : null}
+        {summary?.scheduledPlanKey ? (
+          <p className="text-ink-2 text-sm">
+            {t("admin.billing.movesOn", {
+              plan: planName(summary.scheduledPlanKey),
+              date: periodEnd,
+            })}
+          </p>
+        ) : null}
+        {/* With billing on, the plans below are how it changes. */}
+        {own && !summary ? (
+          <p className="text-ink-2 text-sm">
+            {supportEmail ? (
+              <a
+                className="text-brand-text hover:underline"
+                href={`mailto:${supportEmail}`}
+              >
+                {t("admin.plan.changedByProvider", { name: instanceName })}
+              </a>
+            ) : (
+              t("admin.plan.changedByProvider", { name: instanceName })
+            )}
+          </p>
         ) : null}
       </section>
 
@@ -162,6 +254,77 @@ export default async function PlanPage() {
         )}
       </section>
 
+      {credits ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="font-semibold text-ink text-sm">
+            {t("admin.credits.title")}
+          </h2>
+          <div className="rounded-lg border border-line bg-surface px-4 py-3">
+            <p className="font-semibold text-ink text-xl tabular-nums">
+              {t("admin.credits.usedOf", {
+                used: credits.used.toLocaleString(locale),
+                allowance: credits.allowance.toLocaleString(locale),
+              })}
+            </p>
+            <p className="mt-1 text-ink-2 text-sm">
+              {t("admin.credits.resets", {
+                date: new Intl.DateTimeFormat(locale, {
+                  dateStyle: "long",
+                  timeZone: "UTC",
+                }).format(new Date(credits.resetsAt)),
+              })}
+            </p>
+            {credits.purchased > 0 ? (
+              <p className="mt-1 text-ink-2 text-sm">
+                {credits.expiring
+                  ? t("admin.credits.purchasedExpiring", {
+                      count: credits.purchased.toLocaleString(locale),
+                      expiring: credits.expiring.credits.toLocaleString(locale),
+                      date: new Intl.DateTimeFormat(locale, {
+                        dateStyle: "long",
+                        timeZone: "UTC",
+                      }).format(new Date(credits.expiring.at)),
+                    })
+                  : t("admin.credits.purchased", {
+                      count: credits.purchased.toLocaleString(locale),
+                    })}
+              </p>
+            ) : null}
+            <p className="mt-2 text-ink-3 text-xs">
+              {t("admin.credits.ownKey")}
+            </p>
+          </div>
+          {summary?.creditPack ? (
+            <BuyCreditsButton
+              action={buyCreditsAction}
+              amountMinor={summary.creditPack.amountMinor}
+              credits={summary.creditPack.credits}
+              currency={summary.creditPack.currency}
+              locale={locale}
+            />
+          ) : null}
+          {credits.bySource.length > 0 ? (
+            <ul className="divide-y divide-line rounded-lg border border-line bg-surface">
+              {credits.bySource.map((row) => (
+                <li
+                  className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
+                  key={row.source}
+                >
+                  <span className="text-ink">
+                    {SOURCE_WORDS[row.source]
+                      ? t(SOURCE_WORDS[row.source] as string)
+                      : row.source}
+                  </span>
+                  <span className="text-ink-2 tabular-nums">
+                    {row.credits.toLocaleString(locale)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       {usage ? (
         <section className="flex flex-col gap-3">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4">
@@ -200,10 +363,18 @@ export default async function PlanPage() {
         <h2 className="font-semibold text-ink text-sm">
           {t("admin.plan.plans")}
         </h2>
-        {plans.length === 0 ? (
-          <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            {t("admin.plan.noPlans")}
-          </p>
+        {summary ? (
+          <BillingPanel
+            changePlan={changePlanAction}
+            currentPlanKey={summary.currentPlanKey}
+            hasAccount={summary.hasAccount}
+            hasLiveSubscription={summary.hasLiveSubscription}
+            locale={locale}
+            openPortal={openPortalAction}
+            plans={summary.plans}
+            pricesAvailable={summary.pricesAvailable}
+            startCheckout={startCheckoutAction}
+          />
         ) : (
           <ul className="flex flex-col gap-2">
             {plans.map((plan) => (
@@ -215,12 +386,12 @@ export default async function PlanPage() {
                   {plan.name}
                 </span>
                 <span className="text-ink-2 text-sm">
-                  {plan.aiMonthlyUsd === null
-                    ? seatsOf(plan.seats)
-                    : t("admin.plan.seatsWithAiSpend", {
+                  {plan.aiCredits
+                    ? t("admin.plan.seatsWithCredits", {
                         seats: seatsOf(plan.seats),
-                        usd: plan.aiMonthlyUsd,
-                      })}
+                        credits: plan.aiCredits.toLocaleString(locale),
+                      })
+                    : seatsOf(plan.seats)}
                 </span>
               </li>
             ))}

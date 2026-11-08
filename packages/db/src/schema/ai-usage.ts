@@ -36,6 +36,8 @@ export const aiUsageEvents = pgTable("ai_usage_events", {
   agentId: uuid("agent_id"),
   featureKey: text("feature_key"),
   source: text("source", { enum: USAGE_SOURCES }).notNull(),
+  /** Whose key paid. Null on rows from before credits, which spend nothing. */
+  keySource: text("key_source", { enum: ["user", "workspace", "deployment"] }),
   provider: text("provider", { enum: AI_PROVIDER_KINDS }).notNull(),
   modelId: text("model_id").notNull(),
   inputTokens: integer("input_tokens").notNull().default(0),

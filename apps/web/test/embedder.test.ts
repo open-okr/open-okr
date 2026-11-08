@@ -65,6 +65,7 @@ describe("the embedding function", () => {
     expect(allowed.provider.embed).toHaveBeenCalledWith({
       model: "text-embedding-test",
       input: ["retention for returning customers"],
+      feature: "embedding",
     });
     expect(result).toEqual({
       vectors: [[0.1, 0.2]],

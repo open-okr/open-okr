@@ -1,6 +1,7 @@
 import { endSupportSession, liveSupportSession } from "@openokr/core";
 import { type MessageValues, SubmitButton } from "@openokr/ui";
 import { revalidatePath } from "next/cache";
+import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { requireSession } from "./session";
 import { getTranslations } from "./translations";
@@ -95,6 +96,7 @@ export async function SupportBanner({
       <div className="flex-1">
         <p className="font-semibold text-sm">
           {t("lib.supportBanner.supportIsHere", {
+            name: await getInstanceName(),
             remaining: remaining(t, live.expiresAt),
           })}
         </p>

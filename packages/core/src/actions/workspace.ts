@@ -12,10 +12,13 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
-  applyPlanInTx,
-  planByKey,
+  closingOutbox,
+  readLifecycleInTx,
+  refuseOwnLifecycleMove,
+  refuseOwnStateChange,
   setTenantStateInTx,
 } from "../tenancy/index.ts";
+import { createOwnWorkspace } from "../workspaces/create-own.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
 
@@ -206,8 +209,13 @@ export const setWorkspaceState = defineWriteAction({
   operation: (_context, input) => ({
     // On the freeze overlay's own recovery list (packages/core/src/
     // operations/freeze.ts): the one write that must survive a freeze is
-    // the one that lifts it, so this action itself never refuses on the
-    // workspace's own state, only on the caller's access level.
+    // the one that lifts it, so this action never refuses on a state the
+    // workspace's own administrator chose.
+    //
+    // **It does refuse while the provider holds the workspace.** This writes
+    // the same column a suspension or a closure does, so before this check an
+    // administrator could lift an operator's suspension, unpaid read-only
+    // mode, or a closure, from Admin, General (workspace-erasure.md §2).
     async load({ tx, workspaceId }) {
       const [current] = await tx
         .select({
@@ -220,6 +228,12 @@ export const setWorkspaceState = defineWriteAction({
         .limit(1);
       if (!current) {
         throw new OperationError("not_found", "No such workspace.");
+      }
+      const refusal = refuseOwnStateChange(
+        await readLifecycleInTx(tx, workspaceId),
+      );
+      if (refusal) {
+        throw new OperationError("forbidden", refusal);
       }
       return current;
     },
@@ -274,20 +288,25 @@ export const provisionWorkspace = {
   name: "workspace.provision" as const,
   agentSurface: false as const,
   summary:
-    "Create a workspace and its first member for a newly registered person.",
+    "Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy.",
   input: z.object({
-    user: z.object({ id: z.string().min(1), name: z.string().min(1) }),
+    /** Who it is for. A person may only name themselves, so may leave it out. */
+    user: z
+      .object({ id: z.string().min(1), name: z.string().min(1) })
+      .optional(),
     name: z.string().trim().min(1).max(200).optional(),
     timezone: z.string().optional(),
   }),
   output: workspaceSummary.extend({ memberId: z.uuid() }),
-  access: ACCESS_LEVELS.full,
+  // Every member's level, because a person's own level in this workspace says nothing
+  // about starting another: the handler's rules are the whole of what authorises it.
+  access: ACCESS_LEVELS.edit,
   safety: "write" as const,
   runsThroughPipeline: true,
   async handler(
     context: {
       pool: import("pg").Pool;
-      actor: { readonly kind: string };
+      actor: { readonly kind: string; readonly userId?: string };
     },
     rawInput: unknown,
   ): Promise<{
@@ -296,35 +315,74 @@ export const provisionWorkspace = {
     name: string;
     slug: string;
   }> {
-    // Registration and the setup wizard call `createWorkspace` directly, so the
-    // only callers that reach this handler are the surfaces. No member of any
-    // workspace may create another one for somebody, whatever their level.
-    if (context.actor.kind !== "system" && context.actor.kind !== "operator") {
+    const input = provisionWorkspace.input.parse(rawInput);
+    const options = {
+      ...(input.name ? { name: input.name } : {}),
+      ...(input.timezone ? { timezone: input.timezone } : {}),
+    };
+
+    // **A signed-in person may start one where sign-up is open to them**
+    // (docs/design/hosting-profiles.md §3), and only for themselves. No member
+    // of any workspace may create one for somebody else, whatever their level.
+    if (context.actor.kind === "human" && context.actor.userId) {
+      if (input.user && input.user.id !== context.actor.userId) {
+        throw new OperationError(
+          "forbidden",
+          "A workspace cannot be created for somebody else here.",
+        );
+      }
+      return createOwnWorkspace(context.pool, {
+        userId: context.actor.userId,
+        ...options,
+      });
+    }
+
+    // Registration and the setup wizard call `createWorkspace` directly, so
+    // this is the surfaces: nobody else reaches it, and an agent never does.
+    if (
+      (context.actor.kind !== "system" && context.actor.kind !== "operator") ||
+      !input.user
+    ) {
       throw new OperationError(
         "forbidden",
         "A workspace is created when somebody signs up, not through this action.",
       );
     }
-    const input = provisionWorkspace.input.parse(rawInput);
-    return createWorkspace(context.pool, input);
+    return createWorkspace(context.pool, { user: input.user, ...options });
   },
 };
 
+/**
+ * A cloud workspace's own administrator closing it (workspace-erasure.md §3).
+ *
+ * **This is the customer's door, and the provider's is `setLifecycleAsOperator`.**
+ * Suspending and lifting a suspension are the provider's, because one may be a legal
+ * hold and the other the price of not paying. A closed workspace is erased once its
+ * window passes, so closing asks for the workspace's address, checked here rather
+ * than only on the screen, because REST and the command line reach this too.
+ *
+ * Off the agent's tools, and a token needs the destructive scope: an agent has no
+ * business closing the workspace it works in.
+ */
 export const setWorkspaceLifecycle = defineWriteAction({
   name: "workspace.setLifecycle",
-  summary: "Move a cloud workspace between active, suspended and closed.",
+  summary:
+    "Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's.",
   input: z.object({
     state: z.enum(["active", "suspended", "closed"]),
+    /** The workspace's address, typed by whoever closes it. */
+    confirmSlug: z.string().trim().max(200).optional(),
   }),
   output: workspaceSummary.extend({
     state: z.enum(["active", "suspended", "closed"]),
   }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
+  agentSurface: false,
   operation: (_context, input) => ({
     // On the freeze overlay's recovery list by prefix, like
-    // `workspace.setState`: the write that lifts a suspension has to survive
-    // the suspension. Closing is on the same list, and that is deliberate,
-    // because a closed workspace being reopened is the same kind of write.
+    // `workspace.setState`: closing has to work on a workspace billing made
+    // read-only, because that is how somebody who stopped paying leaves.
     async load({ tx, workspaceId }) {
       const [current] = await tx
         .select({ name: workspaces.name, slug: workspaces.slug })
@@ -334,22 +392,44 @@ export const setWorkspaceLifecycle = defineWriteAction({
       if (!current) {
         throw new OperationError("not_found", "No such workspace.");
       }
-      return current;
+      const lifecycle = await readLifecycleInTx(tx, workspaceId);
+      if (!lifecycle) {
+        // No tenant row, which is every self-hosted instance. Refused rather
+        // than silently doing half the work: on a self-hosted instance
+        // `workspace.setState` is the whole of what freezing means, and a
+        // caller who reached here wanted something this deployment does not
+        // have.
+        throw new OperationError(
+          "not_found",
+          "This workspace has no tenant record, so it has no lifecycle to move.",
+        );
+      }
+      const refusal = refuseOwnLifecycleMove(lifecycle, input.state);
+      if (refusal) {
+        throw new OperationError("forbidden", refusal);
+      }
+      if (input.state === "closed" && input.confirmSlug !== current.slug) {
+        throw new OperationError(
+          "forbidden",
+          "The address typed does not match this workspace's, so nothing changed.",
+        );
+      }
+      return { ...current, from: lifecycle.state };
     },
-    async execute({ tx, workspaceId, loaded }) {
+    async execute({ tx, workspaceId, loaded, actor }) {
+      const now = new Date();
       // The tenancy module owns every read and write of `tenants`, and
       // `pnpm check:boundaries` is what keeps it that way. This action never
       // sees the table.
       const moved = await setTenantStateInTx(tx, {
         workspaceId,
         state: input.state,
+        // Closing an active workspace is undoable by whoever did it. Closing one
+        // billing made read-only is not, or it would be the way out of paying.
+        ownerMayReopen: loaded.from === "active",
+        now,
       });
       if (!moved) {
-        // No tenant row, which is every self-hosted instance. Refused rather
-        // than silently doing half the work: on a self-hosted instance
-        // `workspace.setState` is the whole of what freezing means, and a
-        // caller who reached here wanted something this deployment does not
-        // have.
         throw new OperationError(
           "not_found",
           "This workspace has no tenant record, so it has no lifecycle to move.",
@@ -373,24 +453,40 @@ export const setWorkspaceLifecycle = defineWriteAction({
           action: "workspace.setLifecycle",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { state: input.state },
+          payload: { state: input.state, from: loaded.from },
         },
+        // The subscription stops renewing and the owners and administrators are
+        // told the date. Reopening does neither: the subscription stays set to
+        // end, because nobody has just confirmed a new charge.
+        ...(input.state === "closed"
+          ? {
+              outbox: closingOutbox({
+                workspaceId,
+                closedAt: now,
+                byMemberId: actor.memberId,
+              }),
+            }
+          : {}),
       };
     },
   }),
 });
 
 /**
- * A workspace's administrator moves it onto another plan from S-49
- * (completeness review H-21).
+ * Moving a workspace onto another plan, declared so that an operator's change
+ * resolves back to a contract like every other audit row.
  *
- * The seat count comes from the plan, never from the caller: a custom number
- * is an operator's decision and goes through `setPlanAsOperator`. Moving to a
- * plan with fewer seats than are in use is refused naming both numbers.
+ * **An administrator could move their own workspace onto any plan, and nothing
+ * asked them to pay.** REST, the command line and the agent tools all reached it
+ * as well as S-49, so hiding the control would not have closed it, and so the
+ * refusal is here. A plan changes through billing, or through
+ * `setPlanAsOperator`, which is what a contract no card pays for needs.
  */
-export const changeWorkspacePlan = defineWriteAction({
-  name: "workspace.changePlan",
-  summary: "Move this cloud workspace onto another plan from the catalogue.",
+export const changeWorkspacePlan = {
+  name: "workspace.changePlan" as const,
+  agentSurface: false as const,
+  summary:
+    "Refused for a workspace's own members. A plan changes through billing, or through the instance's operator.",
   input: z.object({
     /** A key from the operator's catalogue, or null for the free tier. */
     planKey: z.string().trim().min(1).max(50).nullable(),
@@ -400,42 +496,12 @@ export const changeWorkspacePlan = defineWriteAction({
     seats: z.number().int().nullable(),
   }),
   access: ACCESS_LEVELS.full,
-  operation: (context, input) => ({
-    // Read from the instance setting before the change, outside the
-    // workspace's transaction, because the catalogue belongs to the instance
-    // rather than to any tenant.
-    // The return type is written out: TypeScript 7 does not infer the loaded
-    // shape from a load that takes no arguments, and `execute` then reads
-    // `plan` off `undefined`.
-    async load(): Promise<{
-      plan: Awaited<ReturnType<typeof planByKey>>;
-    }> {
-      return { plan: await planByKey(context.pool, input.planKey) };
-    },
-    async execute({ tx, workspaceId, loaded: { plan } }) {
-      const moved = await applyPlanInTx(tx, { workspaceId, plan });
-      if (!moved) {
-        throw new OperationError(
-          "not_found",
-          "This workspace has no tenant record, so it has no plan to change.",
-        );
-      }
-      const seats = plan?.seats ?? null;
-      return {
-        result: { planKey: plan?.key ?? null, seats },
-        activity: {
-          kind: "workspace.plan_changed",
-          subjectType: "workspace",
-          subjectId: workspaceId,
-          payload: { plan: plan?.name ?? "Free", seats },
-        },
-        audit: {
-          action: "workspace.changePlan",
-          targetType: "workspace",
-          targetId: workspaceId,
-          payload: { planKey: plan?.key ?? null, seats },
-        },
-      };
-    },
-  }),
-});
+  safety: "write" as const,
+  runsThroughPipeline: true,
+  async handler(): Promise<{ planKey: string | null; seats: number | null }> {
+    throw new OperationError(
+      "forbidden",
+      "A workspace's plan changes through billing, or through whoever runs this instance.",
+    );
+  },
+};

@@ -30,6 +30,9 @@ export const isTestScaffoldKind = (kind: string): boolean =>
  */
 export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "workspace.provisioned": z.object({ name: z.string(), slug: z.string() }),
+  // The cloud flag was turned on after this workspace was made. No payload: the
+  // audit row beside it names the region.
+  "workspace.adopted": z.object({}),
   "workspace.renamed": z.object({ from: z.string(), to: z.string() }),
   // P6-G26. No payload: the fact is the event, and who did it is on the
   // audit row beside it.
@@ -53,11 +56,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     level: z.number(),
   }),
   "support.ended": z.object({ reason: z.string() }),
+  "workspace.erasure_reminded": z.object({ eraseOn: z.string() }),
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),
   // Completeness review H-21. In the feed because a plan change can change
   // what everybody's invitations do.
+  "billing.subscription_changed": z.object({ status: z.string() }),
+  "billing.credits_purchased": z.object({ credits: z.number() }),
+  // Private, in the list below: opening the billing portal is nobody's news.
+  "billing.requested": z.object({ action: z.string() }),
   "workspace.plan_changed": z.object({
     plan: z.string(),
     seats: z.number().nullable(),
@@ -742,6 +750,7 @@ export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
  * applied to one surface and forgotten on the next.
  */
 export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
+  "billing.requested",
   "copilot.asked",
   "copilot.answered",
   // A proposal is a suggestion in one member's conversation. What it *does* when

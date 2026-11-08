@@ -81,8 +81,16 @@ vi.mock("@openokr/config", async (original) => ({
 }));
 vi.mock("@openokr/core", async (original) => ({
   ...(await original<typeof import("@openokr/core")>()),
-  findSeededModel: () => ({ costInPerMillion: 3, costOutPerMillion: 15 }),
-  isCloudEnabled: async () => false,
+  resolveModelRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
+  resolveDeploymentRates: async () => ({
+    costInPerMillion: 3,
+    costOutPerMillion: 15,
+  }),
+  readHostedAccess: async () => ({ kind: "unmetered" }),
+  guardsAIEndpoints: async () => false,
   resolveAICredential: (...args: Parameters<typeof resolveAICredential>) =>
     resolveAICredential(...args),
   resolveTierRoute: async () => ({
@@ -205,17 +213,15 @@ describe("the agent paths", () => {
   ])(
     "pass no reader from %s, so the Coach and the Champion stay on the workspace's key",
     (_name, path) => {
-      const calls = source(path).match(/drafterFor\([^)]*\)/g) ?? [];
-      expect(calls.length).toBeGreaterThan(0);
-      for (const call of calls) {
-        expect(call, `${path}: ${call}`).not.toMatch(/,/);
-      }
+      // Through the helper that takes no reader at all, so there is nowhere to pass one.
+      expect(source(path)).toContain("drafterForAgent(");
+      expect(source(path)).not.toMatch(/drafterFor\(/);
     },
   );
 
   it("builds an agent step's model with no reader", () => {
     expect(source("../lib/relay.ts")).toContain(
-      "modelFor: (id, tier) => providerForTier(id, tier)",
+      "modelFor: (id, tier, agentId) =>\n          providerForTier(id, tier, undefined, { agentId }),",
     );
   });
 });

@@ -121,7 +121,7 @@ The workspace `language` default now resolves through the instance's own `instan
 
 **The job queue's schema (migration 0099).** Not a table of ours: `pgboss` is created by whoever runs migrations, and `grantAppPrivileges` gives the application role USAGE and CREATE on it and hands over anything an earlier install left there under another role. pg-boss then installs and owns its own tables as the application role. This is what lets the scheduler start without CREATE on the database, which Postgres checks before it checks whether a schema already exists.
 
-**`state` (§4.1, §8.2, P2-T09) is now enforced, not just stored.** `runOperation` (`packages/core/src/operations/operation.ts`) loads it ahead of everything else in every write, and refuses with `forbidden` when it is not `active` unless the action is on the freeze overlay's recovery list (`packages/core/src/operations/freeze.ts`: every `people.*` and `settings.*` action, plus `workspace.setState` itself so the freeze can be lifted). `read_only` and `frozen` are treated identically, matching TECHNICAL-PLAN §4.1's own wording ("not active" collapses to view-only). `workspace.setState` (`actions/workspace.ts`) is the one writer, gated at `full` like `workspace.rename`. Reads are unaffected by construction: a read action never opens a transaction through `runOperation`.
+**`state` (§4.1, §8.2, P2-T09) is now enforced, not just stored.** `runOperation` (`packages/core/src/operations/operation.ts`) loads it ahead of everything else in every write, and refuses with `forbidden` when it is not `active` unless the action is on the freeze overlay's recovery list (`packages/core/src/operations/freeze.ts`: every `people.*` and `settings.*` action, plus `workspace.setState` itself so the freeze can be lifted). `read_only` and `frozen` are treated identically, matching TECHNICAL-PLAN §4.1's own wording ("not active" collapses to view-only). `workspace.setState` (`actions/workspace.ts`) is the one writer, gated at `full` like `workspace.rename`, and it refuses while the workspace's tenant is suspended or closed, so a customer cannot lift what the provider set (`docs/design/workspace-erasure.md` §2). Reads are unaffected by construction: a read action never opens a transaction through `runOperation`.
 
 ### users *(global, no workspace_id)*
 `email` unique, authentication linkage. Credentials, sessions, passkeys and second factors are owned by the authentication library.
@@ -172,6 +172,8 @@ Unique on `token_hash` alone for live rows since migration 0075 (P6-G06b), and t
 `seq`, `actor_member_id?`, `actor_kind` (`human` / `agent` / `system` / `operator`), `action`, `target_type`, `target_id?`, `payload jsonb`, `at`, `prev_hash`, `row_hash`. Unique on `(workspace_id, seq)`.
 
 `seq` is the position in this workspace's chain, from 1. Ordering by `at` would be ambiguous under concurrency, and a chain needs exactly one order to be verifiable. `action` is the registry action name, so a row resolves back to one contract.
+
+**Migration 0149 makes one exception to append-only** (`docs/design/workspace-erasure.md` §5): the trigger lets a row be deleted when its workspace's tenant has `erasing_at` set, which only `pnpm cloud:erase` sets, running as the owner role. The application role still has no DELETE grant, so it is refused before the trigger is reached. The erasure's receipt on `instance_audit_events` records the chain's last `seq` and `row_hash`.
 
 **Migration 0105 adds `audit_events_recent_idx` on `(workspace_id, at desc, id desc)`** (completeness review L-19). The admin screen's list, `audit.list`, reads the trail newest first with the last row's `(at, id)` as the cursor for the next page, and a date range narrows the same index. The chain index answers `seq`, which is null for a row still waiting for its position, so it could not serve a list that has to show those rows too.
 
@@ -871,10 +873,30 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 ### workspace_imports
 Archive manifest, checksum, status, progress.
 
-### tenants *(cloud only)*
-`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`.
+### ai_credit_balances *(cloud only)*
+`workspace_id` to workspaces (**and it is the primary key**), `period_start`, `used_usd`, `agent_used_usd`, timestamps.
 
-Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`.
+Migration 0146. Design: `docs/design/ai-credits.md`. One row per workspace rather than a sum over `ai_usage_events`, because the check runs before every AI call and one locked row is both faster and exact under concurrency. The usage events stay as the record. Migration 0146 also adds `ai_usage_events.key_source`, because a credit is spent only on the provider's own key. Migration 0147 drops the `purchased_usd` it had, which no release shipped, in favour of one row per pack.
+
+### ai_credit_packs *(cloud only)*
+`id`, `workspace_id` to workspaces, `credits`, `purchased_usd`, `remaining_usd`, `purchase_ref`, `purchased_at`, `expires_at`, timestamps. Unique on `workspace_id` and `purchase_ref`.
+
+Migration 0147. Design: `docs/design/ai-credits.md` §6. One row per purchase rather than one total, because two packs bought months apart expire on different days. `purchase_ref` is Stripe's checkout session, so one checkout is one pack whichever of its events arrives. A pack counts while `expires_at` is ahead of now and nothing runs when it lapses; the row stays as the record. A charge holds the balance row's lock before it spends a pack, so the packs need none of their own. No `deleted_at`: spent and lapsed packs keep their rows, and they go with the workspace.
+
+### billing_accounts *(cloud only)*
+`workspace_id` to workspaces (**and it is the primary key**), `provider`, `customer_ref`, `subscription_ref?`, `status?`, `current_period_end?`, `cancel_at_period_end`, `suspended_by_billing`, timestamps. Unique on `provider` and `customer_ref`.
+
+Migration 0145. Design: `docs/design/billing.md`. Named for any provider, so another is a new driver and no migration. `suspended_by_billing` is why a billing event never lifts a suspension an operator imposed. Empty until a provider turns billing on. The tenant floor, and a read-only policy for a live operator. `pnpm check:boundaries` refuses a read or an import from a product path, as it does for `tenants`.
+
+### billing_events *(cloud only)*
+`provider` and `event_ref` (**the primary key**), `workspace_id` to workspaces, `received_at`.
+
+Migration 0145. What makes a repeated webhook delivery do nothing. No `deleted_at`, because removing a row would let the event apply twice.
+
+### tenants *(cloud only)*
+`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`, `owner_may_reopen`, `erasing_at?`, `erasure_reminded_at?`.
+
+Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`. Migration 0148 adds `owner_may_reopen`, default false: true only when the workspace's owner closed it while it was active, so reopening it is theirs too. A closure the provider made, or one of a workspace billing made read-only, leaves it false, so closing cannot become the way out of paying (`docs/design/workspace-erasure.md` §3). Migration 0149 adds `erasing_at`, set when `pnpm cloud:erase` claims a closed workspace: from then on nothing moves the tenant, and it is the one condition under which `audit_events_append_only()` lets a row of that workspace be deleted. The trigger reads the tenant under the row-level floor, and the server's role has no DELETE grant on `audit_events` at all, so only the owner role, through that command, ever uses it. Migration 0150 adds `erasure_reminded_at`: when the owners and administrators were told the workspace is deleted in seven days, set by the hourly `cloud.remindErasure` job and cleared on every lifecycle move, so each closure is reminded once.
 
 The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
 

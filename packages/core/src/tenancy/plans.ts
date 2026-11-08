@@ -7,8 +7,8 @@
  * one.** REQUIREMENTS §5 says self-host is never feature-gated and PLAN.md §4
  * says the managed cloud sells operation rather than features. A plan that
  * can turn a feature off is how that stops being true, and the way it arrives
- * is an empty list somebody adds "for later". A plan is a seat count and a
- * spend cap, and that is the whole of it.
+ * is an empty list somebody adds "for later". A plan is a seat count, an AI
+ * allowance and its prices, and that is the whole of it.
  *
  * **The catalogue is an instance setting, not a table.** It is operator
  * configuration for one deployment, it changes rarely, and it has no
@@ -16,25 +16,30 @@
  */
 import {
   activeOnly,
-  aiBudgets,
   operatorWorkspaceUsage,
   tenants,
   withWorkspace,
   workspaceMembers,
+  workspaceRoles,
 } from "@openokr/db";
-import { and, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
+import { PROTECTED_ROLE_KEY } from "../access/roles.ts";
 import { OperationError } from "../operations/errors.ts";
 import {
   environmentValue,
   getInstanceSetting,
 } from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
+import { listMembershipsForUser } from "../workspaces/memberships.ts";
+import { isCloudEnabled } from "./settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
+const CLOUD_DEFAULT_PLAN_KEY = "cloud.defaultPlan";
+const FREE_WORKSPACES_KEY = "cloud.limits.freeWorkspacesPerPerson";
 
 /**
  * One plan.
@@ -48,8 +53,24 @@ const planSchema = z.object({
   name: z.string().trim().min(1).max(100),
   /** Null is unlimited. */
   seats: z.number().int().min(1).nullable().default(null),
-  /** Written into the existing `ai_budgets` workspace row. No new mechanism. */
-  aiMonthlyUsd: z.number().min(0).nullable().default(null),
+  /**
+   * AI credits a month on the provider's own key. Absent or zero means the workspace
+   * brings its own (docs/design/ai-credits.md §3).
+   */
+  aiCredits: z.number().int().min(0).optional(),
+  /** Whether this plan can buy more credits. */
+  aiTopUps: z.boolean().optional(),
+  /**
+   * A payment provider's price identifiers, and no amounts: the provider holds
+   * those, because each provider sets its own prices and currency. A plan with none
+   * cannot be bought, only set by an operator (docs/design/billing.md §3).
+   */
+  prices: z
+    .object({
+      month: z.string().trim().min(1).optional(),
+      year: z.string().trim().min(1).optional(),
+    })
+    .optional(),
 });
 
 export type Plan = z.infer<typeof planSchema>;
@@ -142,6 +163,17 @@ export async function readPlans(pool: Pool): Promise<readonly Plan[]> {
 }
 
 /**
+ * Whether Plan and seats exists on this instance.
+ *
+ * With the flag off, or with no plans to read, it does not. A group runs with the
+ * flag on and an empty catalogue, and a screen implying a paid version of what it
+ * runs would not be true (`docs/design/hosting-profiles.md` §5).
+ */
+export async function hasPlanScreen(pool: Pool): Promise<boolean> {
+  return (await isCloudEnabled(pool)) && (await readPlans(pool)).length > 0;
+}
+
+/**
  * \`OPENOKR_CLOUD_PLANS\`, the bootstrap for a deployment that has no stored
  * catalogue (UAT BUG-022). Nothing wrote \`cloud.plans\` and nothing documented
  * it, so an operator could offer no plan but Free. A stored catalogue still
@@ -159,6 +191,92 @@ function plansFromEnvironment(): unknown {
     return JSON.parse(raw);
   } catch {
     return [];
+  }
+}
+
+/**
+ * The plan a new workspace starts on, or none.
+ *
+ * **Empty is the default, and it changes nothing**: a new workspace has no plan
+ * and no seat limit, which is what every group and every single organisation
+ * needs. A provider names its free plan here, which is what makes "Free" mean
+ * ten people rather than unlimited.
+ *
+ * A key the catalogue does not hold reads as none. The alternative is refusing
+ * every sign-up over a typo in a setting.
+ */
+export async function resolveDefaultPlan(pool: Pool): Promise<Plan | null> {
+  const definition = getInstanceSetting(CLOUD_DEFAULT_PLAN_KEY);
+  const stored = await readSetting(pool, CLOUD_DEFAULT_PLAN_KEY);
+  const key =
+    stored ?? (definition && environmentValue(definition, process.env));
+  if (typeof key !== "string" || key.trim() === "") {
+    return null;
+  }
+  return (await readPlans(pool)).find((plan) => plan.key === key) ?? null;
+}
+
+/**
+ * How many free workspaces one person may own (docs/design/hosting-profiles.md §3).
+ *
+ * Each one is worth AI credits, so without this a free plan is as much AI as
+ * somebody cares to ask for. It only means anything with a default plan, which
+ * is why a group, which has none, is never limited.
+ */
+export async function requireFreeWorkspaceRoom(
+  pool: Pool,
+  userId: string,
+): Promise<void> {
+  const plan = await resolveDefaultPlan(pool);
+  if (!plan) {
+    return;
+  }
+  const definition = getInstanceSetting(FREE_WORKSPACES_KEY);
+  const stored = await readSetting(pool, FREE_WORKSPACES_KEY);
+  const fromVariable = definition
+    ? environmentValue(definition, process.env)
+    : undefined;
+  const limit = Number(stored ?? fromVariable ?? definition?.fallback ?? 1);
+  if (!(limit > 0)) {
+    return;
+  }
+
+  let owned = 0;
+  for (const { workspaceId, memberId } of await listMembershipsForUser(
+    pool,
+    userId,
+  )) {
+    const [row] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+      tx
+        .select({ id: workspaceRoles.id })
+        .from(workspaceMembers)
+        .innerJoin(
+          workspaceRoles,
+          eq(workspaceRoles.id, workspaceMembers.roleId),
+        )
+        .innerJoin(
+          tenants,
+          eq(tenants.workspaceId, workspaceMembers.workspaceId),
+        )
+        .where(
+          activeOnly(
+            workspaceMembers,
+            eq(workspaceMembers.id, memberId),
+            eq(workspaceRoles.builtinKey, PROTECTED_ROLE_KEY),
+            eq(tenants.planKey, plan.key),
+          ),
+        )
+        .limit(1),
+    );
+    if (row) {
+      owned += 1;
+    }
+  }
+  if (owned >= limit) {
+    throw new OperationError(
+      "forbidden",
+      `You already own ${owned} free workspace${owned === 1 ? "" : "s"}, which is the limit here. Move one to a paid plan to start another.`,
+    );
   }
 }
 
@@ -246,6 +364,27 @@ export async function requireSeatInTx(
   }
 }
 
+/** How many seats are in use, from inside an Operation's own transaction. */
+export async function seatsInUseInTx(
+  tx: AnyTx,
+  workspaceId: string,
+): Promise<number> {
+  const [row] = await tx
+    .select({ n: count() })
+    .from(workspaceMembers)
+    .where(
+      activeOnly(
+        workspaceMembers,
+        and(
+          eq(workspaceMembers.workspaceId, workspaceId),
+          eq(workspaceMembers.kind, "human"),
+          inArray(workspaceMembers.status, [...SEAT_STATUSES]),
+        ),
+      ),
+    );
+  return row?.n ?? 0;
+}
+
 export interface ApplyPlanInput {
   readonly workspaceId: string;
   /** Null is the free tier, which needs no catalogue row. */
@@ -258,15 +397,11 @@ export interface ApplyPlanInput {
  * Puts a workspace on a plan (completeness review H-21).
  *
  * Nothing wrote `plan_key` or `seats` after a tenant was created, so no seat
- * limit ever applied to anybody. Both the administrator's change on S-49 and
- * an operator's on S-46 come through here, so the rule cannot differ between
- * them:
+ * limit ever applied to anybody. Everything that changes a plan comes through
+ * here, so the rule cannot differ between them:
  *
  * - **Never below the headcount.** Refused naming both numbers, because the
  *   product never picks who loses access (UIUX-PLAN S-49).
- * - **The plan's AI allowance becomes the workspace's monthly cost budget**,
- *   in the existing `ai_budgets` row rather than a mechanism of its own. A
- *   plan with none leaves whatever budget the workspace set alone.
  *
  * Returns false when the workspace has no tenant row, which is every
  * self-hosted instance.
@@ -278,20 +413,7 @@ export async function applyPlanInTx(
   const seats =
     input.seats !== undefined ? input.seats : (input.plan?.seats ?? null);
   if (seats !== null) {
-    const [row] = await tx
-      .select({ n: count() })
-      .from(workspaceMembers)
-      .where(
-        activeOnly(
-          workspaceMembers,
-          and(
-            eq(workspaceMembers.workspaceId, input.workspaceId),
-            eq(workspaceMembers.kind, "human"),
-            inArray(workspaceMembers.status, [...SEAT_STATUSES]),
-          ),
-        ),
-      );
-    const used = row?.n ?? 0;
+    const used = await seatsInUseInTx(tx, input.workspaceId);
     if (used > seats) {
       throw new OperationError(
         "forbidden",
@@ -309,42 +431,6 @@ export async function applyPlanInTx(
     return false;
   }
 
-  if (input.plan?.aiMonthlyUsd != null) {
-    const [existing] = await tx
-      .select({ id: aiBudgets.id })
-      .from(aiBudgets)
-      .where(
-        activeOnly(
-          aiBudgets,
-          eq(aiBudgets.workspaceId, input.workspaceId),
-          eq(aiBudgets.scope, "workspace"),
-          isNull(aiBudgets.scopeRef),
-          eq(aiBudgets.metric, "cost"),
-        ),
-      )
-      .limit(1);
-    const values = {
-      period: "month" as const,
-      limitValue: String(input.plan.aiMonthlyUsd),
-      updatedAt: new Date(),
-    };
-    if (existing) {
-      // openokr:allow-mutation: the caller's Operation transaction.
-      await tx
-        .update(aiBudgets)
-        .set(values)
-        .where(activeOnly(aiBudgets, eq(aiBudgets.id, existing.id)));
-    } else {
-      // openokr:allow-mutation: the caller's Operation transaction.
-      await tx.insert(aiBudgets).values({
-        workspaceId: input.workspaceId,
-        scope: "workspace",
-        scopeRef: null,
-        metric: "cost",
-        ...values,
-      });
-    }
-  }
   return true;
 }
 

@@ -22,6 +22,13 @@ export interface FileStorage {
   /** A time-limited URL. `expiresInSeconds` defaults to the driver's own default. */
   signedUrl(key: string, expiresInSeconds?: number): Promise<string>;
   delete(key: string): Promise<void>;
+  /**
+   * Deletes every object whose key starts with `prefix`, which must name one
+   * directory, such as `<workspaceId>/`. What is already gone is fine. Erasing a
+   * workspace's files, thumbnails and export archives is what it is for
+   * (docs/design/workspace-erasure.md §4).
+   */
+  deletePrefix(prefix: string): Promise<void>;
   /** Releases whatever this driver holds open. Local disk owns nothing; an
    * S3-compatible driver holding its own HTTP client is not exempt. */
   stop(): Promise<void>;

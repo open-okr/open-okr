@@ -28,6 +28,7 @@
     "pg": "catalog:",
     "pg-boss": "catalog:",
     "sharp": "catalog:",
+    "stripe": "23.1.0",
     "ws": "catalog:"
   },
   "devDependencies": {

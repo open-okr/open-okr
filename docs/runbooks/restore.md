@@ -191,3 +191,19 @@ backup:
 The CronJob runs `pg_dump`, encrypts with the instance key, and applies
 retention. Point `existingClaim` at a PVC backed by durable storage (NFS,
 EBS, etc.). Without it the job uses an `emptyDir` that is lost on restart.
+
+## After restoring a cloud instance
+
+A restore brings back what the backup held, including a workspace that has been
+erased since (docs/design/workspace-erasure.md §9). The erasure cron's own log,
+which lives outside the database, names every workspace it erased, and
+`pnpm cloud:sweep --erased` lists the receipts still in the restored database.
+
+| Came back as | Do |
+|---|---|
+| Closed | Nothing. The next `./openokr erase --write` erases it again, once its window has passed |
+| Active or suspended | Close it on S-46, the operator's workspace page, then `pnpm cloud:erase --id <id> --now --write` (`./openokr erase --id <id> --now --write` in Compose) |
+
+Do this before anybody signs in, so nobody meets a workspace the provider has
+already promised them is gone.
+

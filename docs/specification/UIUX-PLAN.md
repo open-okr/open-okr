@@ -320,13 +320,26 @@ list.
 
 **S-49 Plan and seats.** A workspace administrator's screen rather than an
 operator's, reached from the S-36 admin navigation. The current plan,
-seats used against seats available with the list of who holds them, AI
-spend against its cap, and the upgrade and downgrade controls. A downgrade
-below the current headcount is refused naming both numbers and links to
-the member list, because the product never picks who loses access. With
-`cloud.enabled` false the section is absent from the navigation and the
-route is not-found: P8-T05 asks that no billing surface appears, and a
+seats used against seats available with the list of who holds them, and AI
+spend against its cap. With billing off it names who to contact to change the plan,
+because a change with no payment behind it was a free upgrade to anything in the
+catalogue. With billing on it shows every plan at the price the provider states, in
+the provider's currency, with **Upgrade**, a monthly or yearly choice and **Manage
+billing**, and says when a payment failed, when a subscription ends, and when a
+downgrade takes effect. If the subscription ended and the people do not fit the
+default plan, it says the workspace is read-only, that nobody was removed, and how to
+get out. See [billing.md](../design/billing.md) §9. A change below the current headcount is refused
+naming both numbers, because the product never picks who loses access. With
+`cloud.enabled` false, or no plans in the catalogue, the section is absent from the
+navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a
 disabled control is an appearance.
+
+**S-50 New workspace.** A signed-in person starting another workspace, reached from
+the avatar menu where sign-up is open to them and not-found anywhere else. A name, and
+a refusal that names the free limit when that is why. The new workspace becomes the
+active one, and its owner goes to S-34. An operator creates one on S-45 instead, naming
+who will own it, and does not become a member. See
+[hosting-profiles.md](../design/hosting-profiles.md) §3.
 
 ### Power-floor stubs
 

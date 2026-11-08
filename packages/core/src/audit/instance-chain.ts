@@ -120,36 +120,47 @@ export async function recordInstanceAuditEvent(
   pool: Pool,
   input: RecordInstanceAuditEventInput,
 ): Promise<void> {
-  const db = drizzle(pool);
-  await withInstanceAdmin(db, async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(${INSTANCE_AUDIT_LOCK_KEY})`,
-    );
+  await withInstanceAdmin(drizzle(pool), (tx) =>
+    appendInstanceAuditInTx(tx, input),
+  );
+}
 
-    const [head] = await tx
-      .select({
-        seq: instanceAuditEvents.seq,
-        rowHash: instanceAuditEvents.rowHash,
-      })
-      .from(instanceAuditEvents)
-      .orderBy(desc(instanceAuditEvents.seq))
-      .limit(1);
+/**
+ * The same, on a transaction the caller holds with the instance-admin flag set,
+ * so the row commits or rolls back with the caller's own change. Erasure's claim
+ * and its receipt use it (docs/design/workspace-erasure.md §4).
+ */
+export async function appendInstanceAuditInTx(
+  tx: Pick<ReturnType<typeof drizzle>, "execute" | "select" | "insert">,
+  input: RecordInstanceAuditEventInput,
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${INSTANCE_AUDIT_LOCK_KEY})`,
+  );
 
-    const row: InstanceAuditRow = {
-      seq: head ? Number(head.seq) + 1 : 1,
-      action: input.action,
-      payload: input.payload ?? {},
-      at: new Date(),
-      prevHash: head ? head.rowHash : GENESIS_HASH,
-    };
+  const [head] = await tx
+    .select({
+      seq: instanceAuditEvents.seq,
+      rowHash: instanceAuditEvents.rowHash,
+    })
+    .from(instanceAuditEvents)
+    .orderBy(desc(instanceAuditEvents.seq))
+    .limit(1);
 
-    // openokr:allow-mutation: instance audit is not workspace data, the same
-    // reasoning `writeSettings` already documents. There is no workspace and
-    // no acting member for the Operation pipeline's own rows to attach to.
-    await tx.insert(instanceAuditEvents).values({
-      id: newId(),
-      ...row,
-      rowHash: instanceAuditRowHash(row),
-    });
+  const row: InstanceAuditRow = {
+    seq: head ? Number(head.seq) + 1 : 1,
+    action: input.action,
+    payload: input.payload ?? {},
+    at: new Date(),
+    prevHash: head ? head.rowHash : GENESIS_HASH,
+  };
+
+  // openokr:allow-mutation: instance audit is not workspace data, the same
+  // reasoning `writeSettings` already documents. There is no workspace and
+  // no acting member for the Operation pipeline's own rows to attach to.
+  await tx.insert(instanceAuditEvents).values({
+    id: newId(),
+    ...row,
+    rowHash: instanceAuditRowHash(row),
   });
 }

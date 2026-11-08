@@ -12,13 +12,14 @@
  */
 import {
   activeOnly,
+  billingAccounts,
   instanceOperators,
   tenants,
   withInstanceAdmin,
   withOperator,
   workspaces,
 } from "@openokr/db";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 
@@ -32,6 +33,8 @@ export interface OperatorWorkspaceRow {
   readonly seats: number | null;
   readonly region: string;
   readonly closedAt: Date | null;
+  /** Set once erasure has claimed it (docs/design/workspace-erasure.md §8). */
+  readonly erasingAt: Date | null;
 }
 
 /** Whether this person holds a live grant. */
@@ -84,14 +87,49 @@ export async function listTenantsAsOperator(
         seats: tenants.seats,
         region: tenants.region,
         closedAt: tenants.closedAt,
+        erasingAt: tenants.erasingAt,
       })
       .from(tenants)
       .innerJoin(workspaces, eq(workspaces.id, tenants.workspaceId))
       // `activeOnly` scopes the tenant row, and the joined workspace gets
       // its own predicate: the helper takes one table and this reads two,
-      // each carrying its own `deleted_at`.
-      .where(activeOnly(tenants, isNull(workspaces.deletedAt)))
+      // each carrying its own `deleted_at`. A workspace erasure has claimed is
+      // deleted to its members and still listed here until it is gone, so an
+      // operator can see it going.
+      .where(
+        activeOnly(
+          tenants,
+          or(isNull(workspaces.deletedAt), isNotNull(tenants.erasingAt)),
+        ),
+      )
       .orderBy(workspaces.name),
   );
   return rows;
+}
+
+/** The billing status and customer reference S-46 shows, and never a card. */
+export async function readBillingAsOperator(
+  pool: Pool,
+  operatorUserId: string,
+  workspaceId: string,
+) {
+  const db = drizzle(pool);
+  const [row] = await withOperator(db, operatorUserId, (tx) =>
+    tx
+      .select({
+        provider: billingAccounts.provider,
+        customerRef: billingAccounts.customerRef,
+        status: billingAccounts.status,
+        currentPeriodEnd: billingAccounts.currentPeriodEnd,
+      })
+      .from(billingAccounts)
+      .where(
+        activeOnly(
+          billingAccounts,
+          eq(billingAccounts.workspaceId, workspaceId),
+        ),
+      )
+      .limit(1),
+  );
+  return row;
 }

@@ -209,6 +209,32 @@ const CHECKS: readonly Check[] = [
     },
   },
   {
+    id: "billing-off-by-default",
+    async run() {
+      const failures: string[] = [];
+      const registry = await readFile(
+        join(ROOT, "packages/core/src/secrets/instance-registry.ts"),
+        "utf8",
+      );
+      if (!/key: "billing\.provider",[\s\S]{0,60}?fallback: "none"/.test(registry)) {
+        failures.push("billing.provider no longer defaults to none");
+      }
+      // Imported in the driver and nowhere else, and the driver only ever
+      // dynamically, so an instance with billing off never loads the SDK.
+      const seam = await readFile(
+        join(ROOT, "packages/adapters/src/create-billing.ts"),
+        "utf8",
+      );
+      if (/^import [^;]*stripe/im.test(seam)) {
+        failures.push("create-billing.ts imports the Stripe driver statically");
+      }
+      if (!/await import\("\.\/drivers\/billing\/stripe\.ts"\)/.test(seam)) {
+        failures.push("create-billing.ts no longer loads the Stripe driver on demand");
+      }
+      return failures;
+    },
+  },
+  {
     id: "outbound-goes-through-the-port",
     async run() {
       const failures: string[] = [];

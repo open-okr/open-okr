@@ -11,7 +11,7 @@ This file is the architecture authority. Product scope lives in REQUIREMENTS.md.
 One codebase that ships as one product and runs two ways from day one:
 
 1. **Self-hosted.** A single Docker Compose file on a modest server, guided by a first-run web setup wizard. Target: under 30 minutes. Or the Helm chart on the customer's own Kubernetes, with their Postgres, their single sign-on and their backups.
-2. **Managed cloud.** The same release, operated by us, with a tenant lifecycle surface on top: signup, provisioning, plans and seats behind a flag, an operator console and support access that the customer can see.
+2. **Managed cloud.** The same release, operated by a provider, with a tenant lifecycle surface on top: signup, provisioning, plans and seats behind a flag, billing behind a port, an operator console and support access that the customer can see. OKR Institute runs OKRGoal this way, and any other provider may run its own on its own servers.
 
 Same repository, same tagged release, same behaviour. The cloud is a way of operating the product, not a second product.
 
@@ -22,7 +22,7 @@ Same repository, same tagged release, same behaviour. The cloud is a way of oper
 3. **Agent-native to the core.** Every read and every write is defined once in one contract. The browser, the public API, the command line, the MCP server and the built-in agents are projections of it. There is no capability a human has that an agent cannot be granted, and no path an agent takes that skips a permission check.
 4. **AI-native, never AI-dependent.** Every AI feature accelerates a complete manual path. The Draft Coach's rules, the alignment score, the health corridors and the diagnostics are deterministic and work with AI switched off. AI adds rewriting, semantic judgement and natural language. Continuous integration proves the product is whole with the provider set to off.
 5. **Postgres is the only hard dependency.** Everything else is optional or swappable.
-6. **No vendor SDK outside the adapter package.** Jobs, realtime, storage, mail, cache, search, AI and channels all sit behind ports.
+6. **No vendor SDK outside the adapter package.** Jobs, realtime, storage, mail, cache, search, AI, channels and billing all sit behind ports.
 7. **Two layers of security by construction.** Row-level security in Postgres is the tenant floor: a forgotten filter cannot cross workspaces. A relationship-based access model behind a single `can()` is the authorisation model. Neither replaces the other.
 8. **Every write is one transaction.** Domain change, access bindings, activity, audit row and outbox row commit together. Side effects run from the outbox after commit, never as fire-and-forget calls on the write path.
 9. **Opinion first, configuration later.** The rhythm, the roles, the gates and the map work with zero setup. Every setting has a working default, so registering is the whole of setup and configuration is how an organisation adapts the product later, never how it starts. Custom fields, custom workflows and query builders are deferred (REQUIREMENTS.md §9) and are never the lead.
@@ -48,7 +48,7 @@ packages/
   db/                  Drizzle schema, migrations, row-level security policies,
                        seed, data-change runner
   adapters/            Ports and drivers (jobs, realtime, storage, mail, cache,
-                       search, ai, channels) and the outbox relay
+                       search, ai, channels, billing) and the outbox relay
   agents/              The Coach and Champion runtimes, the trigger scheduler,
                        run state machines, proposal envelopes
   importer/            CSV/XLSX and FlowyTeam importers (command line)
@@ -58,8 +58,6 @@ packages/
 deploy/
   docker/              Dockerfile, compose, reverse proxy, setup wizard
   helm/                Helm chart
-  cloud/               Vendor-operated overlay: provisioning, operator console,
-                       tenant limits
 docs/
   specification/       This specification set
   design/              Detailed designs, one per engine or subsystem
@@ -86,13 +84,14 @@ One runtime: the container profile. It runs on a customer's server, on their Kub
 | Search | Postgres full-text search, with pgvector for semantic search |
 | AIProvider | Anthropic, OpenAI, Google, OpenRouter, Ollama, any OpenAI-compatible endpoint, or off |
 | Channel | Slack, Microsoft Teams, WhatsApp Business, Telegram, email, or none |
+| Billing | Stripe, or none |
 
 Rules that make this real:
 
 - Vendor SDKs are imported only inside `packages/adapters`.
 - Feature code calls `jobs.enqueue(...)`, `channels.send(...)`, `realtime.publish(...)`. It never knows which driver is running.
 - **Transactional enqueue is the only enqueue.** `enqueue` writes an outbox row inside the caller's transaction. A relay drains committed rows to the driver after commit, at least once, with idempotency keys. A direct network call on a write path fails the build.
-- The AI provider and every channel are selected by stored configuration, not by the runtime variable. No configuration means that capability reports unavailable and the product degrades cleanly.
+- The AI provider, every channel and billing are selected by stored configuration, not by the runtime variable. No configuration means that capability reports unavailable and the product degrades cleanly.
 
 ### Multi-tenancy
 
@@ -115,6 +114,8 @@ Why a contributor licence agreement: it keeps the right to dual-license or run a
 
 Nothing is feature-gated. The managed cloud sells operation, not features. Self-host gets every capability, with no seat limit.
 
+Any provider may run its own cloud from this code, with its own name, plans, prices and currency, under the same licence: whoever changes the code and offers it over a network publishes the changes.
+
 Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` and `GOVERNANCE.md` stating that the project owner has the final say while the project is young. Continuous integration enforces a licence-compatibility gate on dependencies and a sign-off check on commits.
 
 ## 5. Deployment tiers
@@ -123,7 +124,7 @@ Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` a
 |---|---|---|---|
 | Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. A first-run web wizard generates every secret, tests the database, mail, channel and AI connections, seeds the admin and offers demo data | About 30 minutes on any small server |
 | Enterprise | Universities, large organisations | Helm chart on their Kubernetes, external Postgres, single sign-on, their backups | Their platform team, hours not weeks |
-| Managed cloud | Teams that want no operations | The same image under vendor operation, plus the tenant lifecycle overlay | Sign up and start |
+| Managed cloud | Teams that want no operations | The same image under vendor operation, with the cloud flag on | Sign up and start |
 
 All tiers run the same tagged release. Signed images are published on every release. A lifecycle helper ships with the self-hosted tarball for upgrade, status, logs and key rotation, with a documented rollback.
 
@@ -138,6 +139,20 @@ Every instance upgrades itself. There is no auto-update and no version check tha
 - **Backfills never block a boot.** Schema migrations run on start. Data changes run separately through the data-change runner, on the administrator's schedule, and `status` reports what is pending. An upgrade is never held open by a long backfill.
 
 How a release is produced is §9: changesets for the version, changelog and release notes, a signed image and a software bill of materials per release, and customers pin versions.
+
+### 5.2 The setups one release has to keep working
+
+| Setup | Cloud flag | Plan catalogue | Billing | Registration |
+|---|---|---|---|---|
+| OKRGoal, run by OKR Institute | On | OKRGoal's | Stripe | Open |
+| A cloud run by another provider on its own servers | On | Its own | Stripe, or none | Its choice |
+| A group of companies on its own servers, one workspace per company | On | Empty | None | Invitation or company email |
+| One organisation with several workspaces | On | Empty | None | Invitation |
+| One organisation with one workspace | Off | Empty | None | The default: closed after the first account |
+
+The switches are independent. The cloud flag brings tenant records, the operator console and the lifecycle. The catalogue brings plans and seat limits, so an empty one means no limit and no plan screen. The billing provider brings payment. The release names no price and no currency: those are each provider's own configuration.
+
+A change that breaks any row is a defect, and `packages/core/test/hosting-profiles.test.ts` and `e2e/hosting-profiles.spec.ts` hold a section per setup to catch it.
 
 ## 6. Security model
 
@@ -192,7 +207,7 @@ Decisions that shape the product as a whole. Changing any of them is a maintaine
 
 | # | Decision | Options | Position |
 |---|---|---|---|
-| 1 | Cloud pricing model | Per seat, per workspace, usage-based, free tier shape | Per seat with a free tier; no feature gating |
+| 1 | Cloud pricing model | Per seat, per workspace, usage-based, free tier shape | Per workspace: a flat price with a seat limit, and a free plan. No feature gating. Each provider sets its own prices and currency |
 | 2 | Whether any feature is ever gated | Nothing gated / an enterprise layer | Nothing gated |
 | 3 | Default agent autonomy | Propose and approve / scoped direct writes | Propose and approve; direct writes are opt-in per agent |
 | 4 | Coach strictness default | Advisory / warn / strict | Only structural defects block publishing by default, and every quality check and publish gate has its own level, block, warn or off (METHOD.md §4, §4.5, §12) |

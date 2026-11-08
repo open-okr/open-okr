@@ -6,6 +6,8 @@
 #   ./openokr logs            follow the application log
 #   ./openokr upgrade         pull, restart, re-run migrations, report
 #   ./openokr rotate-key      re-wrap stored secrets under a new root key
+#   ./openokr operator ...    grant or revoke the cloud operator role
+#   ./openokr erase ...       erase closed workspaces past their window (--write)
 #   ./openokr backup          encrypted database dump + blob copy, with checksum
 #   ./openokr restore F       restore from a backup directory created by backup
 #   ./openokr verify-backup F prove a backup would restore, without touching the live database
@@ -463,6 +465,27 @@ somewhere else."
     log "upgraded. Migrations ran on boot; './openokr logs' shows what applied."
     ;;
 
+  operator)
+    # The deployment's door to the first operator (docs/install/cloud.md). It
+    # runs in the container, so it needs no checkout and no published database
+    # port, and it reads the instance's own DATABASE_URL.
+    shift
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/core/src/bin/cloud-operator.ts "$@"
+    ;;
+
+  erase)
+    # Erases the closed workspaces whose retention window has passed
+    # (docs/design/workspace-erasure.md). A dry run unless --write is given, so
+    # the line for the host's cron, beside the backup's, is
+    # `./openokr erase --write`. Runs as DATABASE_ADMIN_URL from app.env,
+    # because only the owner role may delete a workspace's audit rows, and the
+    # server, which deletes the files and the payment customer, must be up.
+    shift
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/core/src/bin/cloud-erase.ts "$@"
+    ;;
+
   rotate-key)
     [ -f "$APP_ENV" ] || fail "no $APP_ENV. This instance has not been started yet."
     log "rotating the root key. Stored secrets are re-wrapped; none is decrypted to disk."
@@ -746,6 +769,6 @@ MANIFEST
     ;;
 
   *)
-    sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
     ;;
 esac

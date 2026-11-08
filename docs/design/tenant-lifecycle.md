@@ -117,6 +117,13 @@ member and still fix their billing email. That is the right list for a
 suspension, and it is the list that already exists, so no new one is
 written.
 
+**Being on the list does not let the customer lift what the provider set.**
+Corrected on 8 November 2026 (`workspace-erasure.md` §2): `workspace.setState`
+writes the same column, and until then an administrator could lift an
+operator's suspension, unpaid read-only mode or a closure with it. It now
+refuses while the tenant is suspended or closed, and `workspace.setLifecycle`
+lets a workspace's own administrator do one thing only, close it.
+
 **`read_only` and `frozen` are treated identically by the overlay today**,
 and `freeze.ts` says so in its own comment, leaving the difference "to
 whichever task actually needs that difference." This is that task, and the
@@ -229,8 +236,9 @@ delivery log did not.
 cloud operator who wants a 90-day window sets 90 and the sweep starts
 working. A cloud operator who never thinks about it destroys nothing.
 
-**Erasure runs through the data-change runner**, not through a migration
-and not inside the sweep. CLAUDE.md puts anything touching stored user
+**Who may close, reopen and erase, and how erasure works, is now
+`workspace-erasure.md`.** The rule below still holds. **Erasure runs through the
+data-change runner**, not through a migration and not inside the sweep. CLAUDE.md puts anything touching stored user
 data in a human's hands, and a backfill runner is resumable, batched and
 idempotent-by-ledger, which a cron job deleting rows is not.
 
@@ -289,8 +297,8 @@ Written as the test plan P8-T02 inherits.
 
 | # | Question | Why it is not answered here |
 |---|---|---|
-| 1 | The cloud pricing model. PLAN.md §10 #1, current position per seat with a free tier | CLAUDE.md puts every §13 row in a human's hands. This design holds `plan_key` and `seats` nullable so the decision changes a catalogue row rather than the schema. §13 is untouched |
+| 1 | The cloud pricing model. PLAN.md §10 #1 | **Closed on 7 November 2026: per workspace, with a seat limit.** This design holds `plan_key` and `seats` nullable, so the decision changed a catalogue row rather than the schema. See plans-and-seats.md §9 |
 | 2 | Whether any feature is ever gated. PLAN.md §10 #2, current position nothing gated | Same. The design assumes nothing gated, which is also what REQUIREMENTS §5 states outright, and the two would have to be reconciled before anything could be gated |
-| 3 | The closure retention number a real cloud would run | The default is 0 and that is safe. The number is a business and legal decision, not a design one |
+| 3 | The closure retention number a real cloud would run | The default is 0 and that is safe. The number is a business and legal decision: OKRGoal's is 30, because Terms §12.3 says so. Any other provider chooses its own |
 | 4 | Whether a closed workspace's members keep read access, or only its admins | Written here as all members. An argument exists for admins only, and it is a policy question |
 | 5 | The region list | Written here as a free string resolved from an instance setting. An enum would mean a migration every time the cloud opens a region |

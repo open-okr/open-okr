@@ -8,9 +8,9 @@
 | Primary CTA | Start free |
 | Secondary CTA | Talk to us |
 | Page title | Pricing: every feature on every plan · OKRGoal |
-| Meta description | OpenOKR is free to self-host with every feature and no seat limit. OKRGoal has a free plan and per-person plans that differ only in seats, AI allowance and support. Never in features. |
+| Meta description | OpenOKR is free to self-host with every feature and no seat limit. OKRGoal has a free plan and per-workspace plans that differ only in people, AI allowance and support. Never in features. |
 
-> **The numbers on this page are not decided.** PLAN.md §10 #1 records the position "per seat with a free tier, no feature gating" and leaves the prices to a maintainer decision. Every `[bracket]` below is a decision, listed in full at the end of this file. The copy around the brackets is final.
+> **This draft predates the live page.** okrgoal.com/pricing holds the plans and prices, and the model is per workspace (PLAN.md §10 #1, decided on 7 November 2026). The per-person wording and the `[brackets]` below are out of date until this draft is brought into line with the site. What is decided is listed at the end of this file.
 
 ## Section structure
 
@@ -185,16 +185,28 @@ On Enterprise, yes. [Decision needed for Team.]
 
 ---
 
-## Decisions this page is waiting for
+## What is decided
 
 | # | Decision | Recorded position | Where it is held |
 |---|---|---|---|
-| 1 | Per-person price for Team, monthly and yearly | Per seat with a free tier | PLAN.md §10 #1 |
-| 2 | The free plan's limit on people | Open. Today a free tenant is unlimited, which "is almost certainly not what a real free tier does" | [plans-and-seats.md §8 #3](../../design/plans-and-seats.md) |
-| 3 | The AI allowance per plan, in US dollars a month | A plan writes its cap into the workspace AI budget | plans-and-seats.md §4 |
-| 4 | Whether there is a trial of Team, and how long | The tenant model holds a trial end date | [tenant-lifecycle.md](../../design/tenant-lifecycle.md) |
-| 5 | Support response times per plan | Not recorded | |
-| 6 | Self-hosted support pricing | Not recorded | |
-| 7 | Discounts for education and non-profits | Not recorded | |
-| 8 | Billing currency, invoicing, proration | Billing is outside the repository today | plans-and-seats.md §8 #4 |
-| 9 | The yearly discount | Not recorded | |
+| 1 | Prices for Team and Business, monthly and yearly | Per workspace. The live page holds the numbers | PLAN.md §10 #1 |
+| 2 | The free plan's limit on people | 10 people. Not enforced until a new workspace can start on Free | [plans-and-seats.md §8 #3](../../design/plans-and-seats.md) |
+| 3 | The AI allowance per plan | Credits, on the live page. Not enforced until usage is metered | plans-and-seats.md §9 |
+| 4 | Whether there is a trial of Team, and how long | The live page states none. The tenant model holds a trial end date that nothing reads | [tenant-lifecycle.md](../../design/tenant-lifecycle.md) |
+| 5 | Support response times per plan | On the live page | |
+| 6 | Self-hosted support pricing | Talk to us, priced per year | |
+| 7 | Discounts for education and non-profits | 30% off Team and Business, on the live page | |
+| 8 | Billing currency, invoicing, proration | On the live page. Every provider chooses its own prices and currency | plans-and-seats.md §9 |
+| 9 | The yearly discount | 17%, on the live page | |
+
+## OKRGoal's terms, decided on 7 November 2026
+
+| Term | Decision |
+|---|---|
+| Extra AI credits | US$20 per 1,000, replacing the US$12 on the live page |
+| What one credit is | One US cent of AI model cost, at the provider's price |
+| Cancelling | Takes effect at the end of the paid period |
+| Refunds | No partial refunds |
+| Tax | Stripe Tax |
+
+The live page still says US$12 and says nothing about cancelling, refunds or tax. All of them go in the next site change, before paid plans open.
