@@ -121,12 +121,15 @@ describe("checkout", () => {
       cancelUrl: "https://okr.example.com/no",
       customerRef: "cus_1",
       credits: 1000,
+      months: 12,
     });
     const body = calls[0]?.body;
     expect(body?.get("automatic_tax[enabled]")).toBe("true");
     expect(body?.get("customer")).toBe("cus_1");
     expect(body?.get("customer_update[address]")).toBe("auto");
     expect(body?.get("metadata[credits]")).toBe("1000");
+    // Carried to the webhook, so a pack keeps the length it was sold with.
+    expect(body?.get("metadata[credit_months]")).toBe("12");
     expect(body?.has("subscription_data[metadata][workspace_id]")).toBe(false);
   });
 });
@@ -316,7 +319,7 @@ describe("the webhook", () => {
       object: "checkout.session",
       mode: "payment",
       customer: "cus_1",
-      metadata: { workspace_id: "w1", credits: "1000" },
+      metadata: { workspace_id: "w1", credits: "1000", credit_months: "12" },
     };
     await expect(
       parse(
@@ -340,7 +343,23 @@ describe("the webhook", () => {
       customerRef: "cus_1",
       sessionRef: "cs_2",
       credits: 1000,
+      months: 12,
     });
+  });
+
+  it("leaves a pack's length to the instance when a checkout did not name one", async () => {
+    await expect(
+      parse(
+        event("checkout.session.completed", {
+          id: "cs_3",
+          object: "checkout.session",
+          mode: "payment",
+          customer: "cus_1",
+          payment_status: "paid",
+          metadata: { workspace_id: "w1", credits: "1000" },
+        }),
+      ),
+    ).resolves.toMatchObject({ kind: "credit_pack", months: null });
   });
 
   it("ignores what it has no use for", async () => {

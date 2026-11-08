@@ -6,6 +6,7 @@
  * contact, which is a true sentence.
  */
 import type { Pool } from "pg";
+import { z } from "zod";
 import {
   environmentValue,
   getInstanceSetting,
@@ -86,4 +87,38 @@ export async function resolveBillingSettings(
     automaticTax:
       (await plain(pool, "billing.stripe.automaticTax", environment)) === true,
   };
+}
+
+/** Twelve months, which is what OKRGoal's Terms §5.2 promise. */
+export const DEFAULT_CREDIT_PACK_MONTHS = 12;
+
+/**
+ * The pack a provider has on sale, or none (docs/design/ai-credits.md §6).
+ *
+ * `months` is how long a pack lasts once bought, so the release does not decide that
+ * for another provider. Ten years is the ceiling: a longer one is a typo, and a pack
+ * that never lapses is not something to fall into by one.
+ */
+const creditPackSchema = z.object({
+  priceId: z.string().trim().min(1),
+  credits: z.number().int().positive(),
+  months: z.number().int().min(1).max(120).default(DEFAULT_CREDIT_PACK_MONTHS),
+});
+
+export type CreditPack = z.infer<typeof creditPackSchema>;
+
+export async function readCreditPack(
+  pool: Pool,
+  environment: Environment = process.env,
+): Promise<CreditPack | null> {
+  let raw = await plain(pool, "billing.creditPack", environment);
+  if (typeof raw === "string") {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  const parsed = creditPackSchema.safeParse(raw);
+  return parsed.success ? parsed.data : null;
 }

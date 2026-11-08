@@ -141,10 +141,13 @@ spends none. To sell more, give the plan `"aiTopUps": true`, create a one-off pr
 Stripe in your own currency, and name it:
 
 ```
-OPENOKR_BILLING_CREDIT_PACK={"priceId":"price_1Xyz","credits":1000}
+OPENOKR_BILLING_CREDIT_PACK={"priceId":"price_1Xyz","credits":1000,"months":12}
 ```
 
-Purchased credits do not expire. `OPENOKR_AI_TIER_MODELS` chooses which model each tier
+A pack lasts `months` from the day it is bought, twelve if you leave it out, and the
+one that expires first is spent first. Changing `months` moves only the packs sold
+afterwards. Nothing runs when a pack expires: it stops counting at that moment.
+`OPENOKR_AI_TIER_MODELS` chooses which model each tier
 uses on your key, and `OPENOKR_AI_PRICES` corrects a model's price without a release.
 
 | What happens | Result |

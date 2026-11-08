@@ -401,7 +401,7 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "{}",
     environment: "OPENOKR_BILLING_CREDIT_PACK",
     summary:
-      'The extra AI credits a plan with top-ups can buy, as JSON: {"priceId":"price_1Xyz","credits":1000}. The price, and its currency, are set in the payment provider. Empty means nothing is on sale.',
+      'The extra AI credits a plan with top-ups can buy, as JSON: {"priceId":"price_1Xyz","credits":1000,"months":12}. The price, and its currency, are set in the payment provider. A pack lasts `months` from the day it is bought, twelve when left out. Empty means nothing is on sale.',
   },
   {
     key: "billing.stripe.automaticTax",

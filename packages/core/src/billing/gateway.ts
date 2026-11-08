@@ -36,6 +36,7 @@ export interface BillingGateway {
     readonly customerRef?: string;
     readonly customerEmail?: string;
     readonly credits?: number;
+    readonly months?: number;
   }): Promise<{ readonly url: string }>;
   openPortal(input: {
     readonly customerRef: string;
@@ -64,5 +65,7 @@ export type VerifiedBillingEvent =
       readonly customerRef: string | null;
       readonly sessionRef: string;
       readonly credits: number;
+      /** Null when the checkout named no length: the instance's own applies. */
+      readonly months: number | null;
     }
   | { readonly kind: "ignored"; readonly eventRef: string };

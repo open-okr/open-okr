@@ -872,9 +872,14 @@ One row per asked-for file (P5-T15). The blob is nullable until the worker has o
 Archive manifest, checksum, status, progress.
 
 ### ai_credit_balances *(cloud only)*
-`workspace_id` to workspaces (**and it is the primary key**), `period_start`, `used_usd`, `agent_used_usd`, `purchased_usd`, timestamps.
+`workspace_id` to workspaces (**and it is the primary key**), `period_start`, `used_usd`, `agent_used_usd`, timestamps.
 
-Migration 0146. Design: `docs/design/ai-credits.md`. One row per workspace rather than a sum over `ai_usage_events`, because the check runs before every AI call and one locked row is both faster and exact under concurrency. The usage events stay as the record. Migration 0146 also adds `ai_usage_events.key_source`, because a credit is spent only on the provider's own key.
+Migration 0146. Design: `docs/design/ai-credits.md`. One row per workspace rather than a sum over `ai_usage_events`, because the check runs before every AI call and one locked row is both faster and exact under concurrency. The usage events stay as the record. Migration 0146 also adds `ai_usage_events.key_source`, because a credit is spent only on the provider's own key. Migration 0147 drops the `purchased_usd` it had, which no release shipped, in favour of one row per pack.
+
+### ai_credit_packs *(cloud only)*
+`id`, `workspace_id` to workspaces, `credits`, `purchased_usd`, `remaining_usd`, `purchase_ref`, `purchased_at`, `expires_at`, timestamps. Unique on `workspace_id` and `purchase_ref`.
+
+Migration 0147. Design: `docs/design/ai-credits.md` §6. One row per purchase rather than one total, because two packs bought months apart expire on different days. `purchase_ref` is Stripe's checkout session, so one checkout is one pack whichever of its events arrives. A pack counts while `expires_at` is ahead of now and nothing runs when it lapses; the row stays as the record. A charge holds the balance row's lock before it spends a pack, so the packs need none of their own. No `deleted_at`: spent and lapsed packs keep their rows, and they go with the workspace.
 
 ### billing_accounts *(cloud only)*
 `workspace_id` to workspaces (**and it is the primary key**), `provider`, `customer_ref`, `subscription_ref?`, `status?`, `current_period_end?`, `cancel_at_period_end`, `suspended_by_billing`, timestamps. Unique on `provider` and `customer_ref`.

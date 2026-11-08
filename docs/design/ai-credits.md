@@ -1,7 +1,8 @@
 # AI credits: an allowance on the provider's own key
 
-Status: approved on 7 November 2026. **The expiry of purchased credits in §4, §6, §9,
-§10 and §11 was added on 8 November 2026 and awaits approval.** Authority: AI-NATIVE-PLAN
+Status: approved on 7 November 2026. The expiry of purchased credits in §4, §6, §9,
+§10 and §11 was added and approved on 8 November 2026, and built in migration 0147.
+Authority: AI-NATIVE-PLAN
 §1 rule 7 and §4, `plans-and-seats.md` §9, `billing.md`.
 
 ## 1. What a credit is
@@ -70,7 +71,7 @@ One migration, with row-level security in the same file. No legacy source.
 |---|---|
 | `ai_usage_events.key_source` | `user`, `workspace` or `deployment`. Nullable, because earlier rows do not know and spend nothing |
 | `ai_credit_balances` | One row per workspace: `period_start`, `used_usd`, `agent_used_usd` |
-| `ai_credit_packs` | One row per purchase: `workspace_id`, `credits`, `purchased_usd`, `remaining_usd`, `event_ref`, `purchased_at`, `expires_at` |
+| `ai_credit_packs` | One row per purchase: `workspace_id`, `credits`, `purchased_usd`, `remaining_usd`, `purchase_ref`, `purchased_at`, `expires_at`. `purchase_ref` is the checkout session, unique per workspace, so one checkout is one pack whichever of its events arrives |
 
 **A balance row rather than summing the usage table.** The check runs before every AI
 call, and one locked row is both faster and safe under concurrency. The events stay
@@ -117,7 +118,7 @@ lower spend further, including on their own key.
 | Who | A plan with `aiTopUps: true`. The page says paid plans |
 | Price | A Stripe price the provider chose, in its own currency, named by `billing.creditPack`: `{ "priceId": "price_1Xyz", "credits": 1000, "months": 12 }`. OKRGoal's is US$20 |
 | How | **Buy credits** on S-49, through hosted checkout |
-| When it lands | The webhook adds one pack row, once per checkout session |
+| When it lands | The webhook adds one pack row, once per checkout session. The checkout carries `months`, so a pack keeps the length it was sold with even if the setting changes before the payment clears |
 | Spent | After the month's allowance, soonest to expire first, so nobody loses credits they could have spent |
 | Expiry | **Twelve months after purchase**, which is what Terms §5.2 and the pricing page promise. `months` in `billing.creditPack` sets another length, default 12, so the release does not decide this for another provider |
 | Fixed at purchase | `expires_at` is written when the pack lands. A provider changing `months` later does not touch a pack already sold |
@@ -181,4 +182,4 @@ needs your decision and a rule key, so it is left out.
 | 2 | Do you want agents held to half the allowance? | Yes. Change it after real use |
 | 3 | May a provider set its own credit value? | Yes, one setting. You asked that providers set their own pricing |
 | 4 | Do purchased credits never expire? | **Closed on 8 November 2026: they expire after twelve months**, matching Terms §5.2 and the pricing page |
-| 5 | Should anybody be warned before a pack lapses? | No for now. S-49 shows the date, and a warning would be a new kind of proactive message, which is your decision |
+| 5 | Should anybody be warned before a pack lapses? | **Closed on 8 November 2026: no for now.** S-49 shows the date. A warning would be a new kind of proactive message, so it waits for its own decision |

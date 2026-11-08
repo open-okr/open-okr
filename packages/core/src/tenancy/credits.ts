@@ -15,11 +15,12 @@ import {
   activeOnly,
   aiCredentials,
   aiCreditBalances,
+  aiCreditPacks,
   aiUsageEvents,
   tenants,
   withWorkspace,
 } from "@openokr/db";
-import { and, eq, gte, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import type { OperationTx } from "../operations/operation.ts";
@@ -37,6 +38,37 @@ const monthStart = (now: Date): string =>
 
 const nextMonthStart = (now: Date): Date =>
   new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+/**
+ * The same instant `months` later, in UTC, and on the month's last day when the day
+ * does not exist there: 31 January plus one month is 28 or 29 February, not 3 March.
+ * Worked out here rather than by Postgres, whose month arithmetic follows the session
+ * time zone and so could move a pack's expiry by an hour across a clock change.
+ */
+export function addMonths(from: Date, months: number): Date {
+  const year = from.getUTCFullYear();
+  const month = from.getUTCMonth() + months;
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(
+    Date.UTC(
+      year,
+      month,
+      Math.min(from.getUTCDate(), lastDay),
+      from.getUTCHours(),
+      from.getUTCMinutes(),
+      from.getUTCSeconds(),
+      from.getUTCMilliseconds(),
+    ),
+  );
+}
+
+/** Packs that still count: something left, and not yet lapsed. */
+const livePacks = (workspaceId: string, now: Date) =>
+  and(
+    eq(aiCreditPacks.workspaceId, workspaceId),
+    gt(aiCreditPacks.expiresAt, now),
+    gt(aiCreditPacks.remainingUsd, "0"),
+  );
 
 async function numberSetting(pool: Pool, key: string): Promise<number> {
   const definition = getInstanceSetting(key);
@@ -62,7 +94,13 @@ export type HostedAccess =
       readonly allowanceUsd: number;
       readonly usedUsd: number;
       readonly agentUsedUsd: number;
+      /** What is left of the packs that have not lapsed. */
       readonly purchasedUsd: number;
+      /** The pack that lapses first, and what is left of it. Null with none live. */
+      readonly soonestExpiry: {
+        readonly usd: number;
+        readonly at: Date;
+      } | null;
       /** What is left, allowance and purchased together. Never below zero. */
       readonly availableUsd: number;
       /** What the agents may still spend, within their share of the allowance. */
@@ -100,7 +138,16 @@ export async function readHostedAccess(
       .from(aiCreditBalances)
       .where(eq(aiCreditBalances.workspaceId, workspaceId))
       .limit(1);
-    return [{ planKey: tenant?.planKey ?? null, balance }];
+    // Compared with the time on every read, which is the whole of expiry: no job.
+    const packs = await tx
+      .select({
+        remainingUsd: aiCreditPacks.remainingUsd,
+        expiresAt: aiCreditPacks.expiresAt,
+      })
+      .from(aiCreditPacks)
+      .where(livePacks(workspaceId, now))
+      .orderBy(asc(aiCreditPacks.expiresAt));
+    return [{ planKey: tenant?.planKey ?? null, balance, packs }];
   });
   const plan = plans.find((entry) => entry.key === row?.planKey);
   if (!plan?.aiCredits) {
@@ -115,7 +162,12 @@ export async function readHostedAccess(
   const current = balance?.periodStart === monthStart(now);
   const usedUsd = current ? Number(balance?.usedUsd ?? 0) : 0;
   const agentUsedUsd = current ? Number(balance?.agentUsedUsd ?? 0) : 0;
-  const purchasedUsd = Number(balance?.purchasedUsd ?? 0);
+  const packs = row?.packs ?? [];
+  const purchasedUsd = packs.reduce(
+    (sum, pack) => sum + Number(pack.remainingUsd),
+    0,
+  );
+  const soonest = packs[0];
   const availableUsd = Math.max(0, allowanceUsd - usedUsd) + purchasedUsd;
   return {
     kind: "credits",
@@ -123,6 +175,9 @@ export async function readHostedAccess(
     usedUsd,
     agentUsedUsd,
     purchasedUsd,
+    soonestExpiry: soonest
+      ? { usd: Number(soonest.remainingUsd), at: soonest.expiresAt }
+      : null,
     availableUsd,
     agentAvailableUsd: Math.min(
       availableUsd,
@@ -165,6 +220,8 @@ export interface CreditSummary {
   readonly allowance: number;
   readonly used: number;
   readonly purchased: number;
+  /** The purchased credits that lapse first, and when. Null with none. */
+  readonly expiring: { readonly credits: number; readonly at: string } | null;
   readonly resetsAt: string;
   readonly topUps: boolean;
   /** This month, by where it was spent: copilot, assist, agent. */
@@ -190,6 +247,10 @@ export async function readCreditSummary(
     return null;
   }
   const credits = (usd: number) => Math.ceil(usd / hosted.creditValueUsd);
+  // Rounded down, the other way, because these are credits a person still holds,
+  // and a screen promising one more than there is would be the wrong mistake.
+  // The tolerance stops 10 / 0.01 reading as 999.
+  const held = (usd: number) => Math.floor(usd / hosted.creditValueUsd + 1e-9);
   const rows = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
     tx
       .select({
@@ -209,7 +270,13 @@ export async function readCreditSummary(
   return {
     allowance: Math.round(hosted.allowanceUsd / hosted.creditValueUsd),
     used: credits(hosted.usedUsd),
-    purchased: Math.floor(hosted.purchasedUsd / hosted.creditValueUsd),
+    purchased: held(hosted.purchasedUsd),
+    expiring: hosted.soonestExpiry
+      ? {
+          credits: held(hosted.soonestExpiry.usd),
+          at: hosted.soonestExpiry.at.toISOString(),
+        }
+      : null,
     resetsAt: hosted.resetsAt.toISOString(),
     topUps: hosted.topUps,
     bySource: rows.map((row) => ({
@@ -240,7 +307,6 @@ async function lockedBalanceInTx(
   return {
     usedUsd: current ? Number(row?.usedUsd ?? 0) : 0,
     agentUsedUsd: current ? Number(row?.agentUsedUsd ?? 0) : 0,
-    purchasedUsd: Number(row?.purchasedUsd ?? 0),
   };
 }
 
@@ -248,7 +314,9 @@ async function lockedBalanceInTx(
  * Charges one call to the balance, in the transaction that records its usage.
  *
  * The month's allowance goes first and purchased credits after it, because those last
- * until they are used and an allowance does not.
+ * longer and an allowance does not. Among the packs, the one that lapses soonest pays
+ * first, so nobody loses credits they could have spent. The balance row's lock is
+ * already held, which is what keeps two calls from spending the same pack.
  */
 export async function chargeCreditsInTx(
   tx: OperationTx,
@@ -276,29 +344,71 @@ export async function chargeCreditsInTx(
       agentUsedUsd: String(
         balance.agentUsedUsd + (input.agent ? input.costUsd : 0),
       ),
-      purchasedUsd: String(Math.max(0, balance.purchasedUsd - overflow)),
       updatedAt: sql`now()`,
     })
     .where(eq(aiCreditBalances.workspaceId, input.workspaceId));
+  if (overflow <= 0) {
+    return;
+  }
+
+  const packs = await tx
+    .select({ id: aiCreditPacks.id, remainingUsd: aiCreditPacks.remainingUsd })
+    .from(aiCreditPacks)
+    .where(livePacks(input.workspaceId, now))
+    .orderBy(asc(aiCreditPacks.expiresAt), asc(aiCreditPacks.purchasedAt));
+  let owed = overflow;
+  for (const pack of packs) {
+    if (owed <= 0) {
+      break;
+    }
+    const take = Math.min(Number(pack.remainingUsd), owed);
+    owed -= take;
+    // openokr:allow-mutation: the caller's Operation transaction. Subtracted in the
+    // database, so the stored amount never takes on a float's rounding.
+    await tx
+      .update(aiCreditPacks)
+      .set({
+        remainingUsd: sql`greatest(0, ${aiCreditPacks.remainingUsd} - ${String(take)}::numeric)`,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(aiCreditPacks.id, pack.id));
+  }
+  // What is still owed past every pack is the overshoot of calls already in flight,
+  // which the design accepts (§5) rather than refusing an answer already given.
 }
 
-/** Adds purchased credits. They wait until the month's allowance is spent. */
-export async function addPurchasedCreditsInTx(
+/**
+ * Adds one purchased pack. It waits until the month's allowance is spent, and lapses
+ * `months` after it lands.
+ *
+ * False when this purchase already has its pack: a checkout can arrive as two
+ * events, and one purchase is one pack.
+ */
+export async function addCreditPackInTx(
   tx: OperationTx,
   input: {
     readonly workspaceId: string;
+    readonly credits: number;
     readonly amountUsd: number;
+    readonly purchaseRef: string;
+    readonly months: number;
     readonly now?: Date;
   },
-): Promise<void> {
-  const period = monthStart(input.now ?? new Date());
-  const balance = await lockedBalanceInTx(tx, input.workspaceId, period);
+): Promise<boolean> {
+  const now = input.now ?? new Date();
   // openokr:allow-mutation: the caller's Operation transaction.
-  await tx
-    .update(aiCreditBalances)
-    .set({
-      purchasedUsd: String(balance.purchasedUsd + input.amountUsd),
-      updatedAt: sql`now()`,
+  const inserted = await tx
+    .insert(aiCreditPacks)
+    .values({
+      workspaceId: input.workspaceId,
+      credits: input.credits,
+      purchasedUsd: String(input.amountUsd),
+      remainingUsd: String(input.amountUsd),
+      purchaseRef: input.purchaseRef,
+      purchasedAt: now,
+      expiresAt: addMonths(now, input.months),
     })
-    .where(eq(aiCreditBalances.workspaceId, input.workspaceId));
+    .onConflictDoNothing()
+    .returning({ id: aiCreditPacks.id });
+  return inserted.length > 0;
 }

@@ -9,7 +9,7 @@
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
 
 // The superuser: `system_settings` sits above the tenant floor, and writing it is
 // instance administration, as it is in s45-operator-console.spec.ts.
@@ -164,6 +164,69 @@ test.describe("a cloud run by a provider", () => {
       page.getByRole("link", { name: "Privacy policy" }),
     ).toHaveAttribute("href", SETTINGS["instance.privacyUrl"]);
     await visitor.close();
+  });
+
+  test("the plan screen says when purchased credits expire", async ({
+    page,
+  }) => {
+    // Every workspace the person is in, so whichever the session opens on has one.
+    const { rows } = await pool.query<{ id: string }>(
+      `select m.workspace_id as id
+         from workspace_members m join users u on u.id = m.user_id
+        where u.email = $1 and m.deleted_at is null`,
+      [INSTANCE_ACCOUNT.email],
+    );
+    const workspaces = rows.map((row) => row.id);
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('cloud.plans', $1::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+      [
+        JSON.stringify([
+          {
+            key: "team",
+            name: "Team",
+            seats: 50,
+            aiCredits: 2000,
+            aiTopUps: true,
+          },
+        ]),
+      ],
+    );
+    const { rows: made } = await pool.query<{ id: string }>(
+      `insert into tenants (workspace_id, plan_key, region)
+       select id, 'team', 'local' from unnest($1::uuid[]) as id
+       on conflict (workspace_id) do nothing
+       returning workspace_id as id`,
+      [workspaces],
+    );
+    await pool.query(
+      `insert into ai_credit_packs
+         (id, workspace_id, credits, purchased_usd, remaining_usd, purchase_ref,
+          purchased_at, expires_at)
+       select gen_random_uuid(), id, 1000, 10, 10, 'cs_e2e_' || id, now(),
+              now() + interval '1 year'
+         from unnest($1::uuid[]) as id`,
+      [workspaces],
+    );
+    try {
+      await signIn(page);
+      await goTo(page, "/admin/plan");
+      await expect(
+        page.getByText(
+          /1,000 purchased credits left\. 1,000 of these expire on \w+ \d{1,2}, \d{4}\./,
+        ),
+      ).toBeVisible({ timeout: 15_000 });
+    } finally {
+      await pool.query(
+        "delete from ai_credit_packs where purchase_ref like 'cs_e2e_%'",
+      );
+      await pool.query(
+        "delete from tenants where workspace_id = any($1::uuid[])",
+        [made.map((row) => row.id)],
+      );
+      await pool.query("delete from system_settings where key = 'cloud.plans'");
+    }
   });
 
   test("a member starts another workspace, and lands in its setup", async ({

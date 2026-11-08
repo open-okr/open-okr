@@ -9,18 +9,12 @@ import { activeOnly, billingAccounts, users, withWorkspace } from "@openokr/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import { z } from "zod";
 import {
   type ActorInput,
   OperationError,
   type OperationTx,
   runOperation,
 } from "../operations/operation.ts";
-import {
-  environmentValue,
-  getInstanceSetting,
-} from "../secrets/instance-registry.ts";
-import { readSetting } from "../secrets/instance-settings.ts";
 import {
   applyPlanInTx,
   countSeats,
@@ -33,6 +27,7 @@ import {
   setTenantStateInTx,
 } from "../tenancy/index.ts";
 import type { BillingGateway } from "./gateway.ts";
+import { readCreditPack } from "./settings.ts";
 import { LIVE_STATUSES, planForPrice } from "./webhook.ts";
 
 export type BillingInterval = "month" | "year";
@@ -115,29 +110,6 @@ async function readBillingAccount(pool: Pool, workspaceId: string) {
 interface PlanPrice {
   readonly amountMinor: number | null;
   readonly currency: string;
-}
-
-/** The pack a provider has on sale, or none. */
-const creditPackSchema = z.object({
-  priceId: z.string().trim().min(1),
-  credits: z.number().int().positive(),
-});
-
-async function readCreditPack(pool: Pool) {
-  const definition = getInstanceSetting("billing.creditPack");
-  const stored = await readSetting(pool, "billing.creditPack");
-  let raw =
-    stored ??
-    (definition ? environmentValue(definition, process.env) : undefined);
-  if (typeof raw === "string") {
-    try {
-      raw = JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  const parsed = creditPackSchema.safeParse(raw);
-  return parsed.success ? parsed.data : null;
 }
 
 export interface BillingSummary {
@@ -363,6 +335,7 @@ export async function buyCreditPack(
     priceId: pack.priceId,
     workspaceId: input.workspaceId,
     credits: pack.credits,
+    months: pack.months,
     successUrl: `${baseUrl}/admin/plan?checkout=done`,
     cancelUrl: `${baseUrl}/admin/plan`,
     ...(account?.customerRef

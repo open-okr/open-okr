@@ -84,7 +84,7 @@ export {
   aiCredentials,
   aiProviders,
 } from "./schema/ai.ts";
-export { aiCreditBalances } from "./schema/ai-credits.ts";
+export { aiCreditBalances, aiCreditPacks } from "./schema/ai-credits.ts";
 export {
   type AIFeatureSetting,
   type AIModel,

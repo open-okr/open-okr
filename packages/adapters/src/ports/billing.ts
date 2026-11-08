@@ -38,6 +38,8 @@ export interface StartCheckoutInput {
   readonly customerEmail?: string;
   /** A credit pack's size, so the webhook knows what was bought. */
   readonly credits?: number;
+  /** How many months the pack lasts, so it keeps the length it was sold with. */
+  readonly months?: number;
 }
 
 export interface ChangeSubscriptionInput {
@@ -62,6 +64,8 @@ export type BillingEvent =
       readonly customerRef: string | null;
       readonly sessionRef: string;
       readonly credits: number;
+      /** Null for a checkout that named no length: the instance's own applies. */
+      readonly months: number | null;
     }
   | { readonly kind: "ignored"; readonly eventRef: string };
 

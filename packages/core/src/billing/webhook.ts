@@ -22,7 +22,7 @@ import type { Pool } from "pg";
 import { z } from "zod";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import {
-  addPurchasedCreditsInTx,
+  addCreditPackInTx,
   applyPlanInTx,
   creditValueUsd,
   type Plan,
@@ -36,6 +36,7 @@ import type {
   SubscriptionSnapshot,
   VerifiedBillingEvent,
 } from "./gateway.ts";
+import { DEFAULT_CREDIT_PACK_MONTHS, readCreditPack } from "./settings.ts";
 
 /** Paying, or about to be. */
 export const LIVE_STATUSES: ReadonlySet<string> = new Set([
@@ -230,10 +231,18 @@ async function applyCreditPack(
     readonly provider: string;
     readonly eventRef: string;
     readonly workspaceId: string;
+    readonly sessionRef: string;
     readonly credits: number;
+    readonly months: number | null;
   },
 ): Promise<void> {
   const value = await creditValueUsd(pool);
+  // The length the checkout was sold with. One that named none is from before a
+  // checkout carried it, and takes what the instance says now.
+  const months =
+    input.months ??
+    (await readCreditPack(pool))?.months ??
+    DEFAULT_CREDIT_PACK_MONTHS;
   await runOperation(
     { pool },
     {
@@ -255,10 +264,17 @@ async function applyCreditPack(
         if (inserted.length === 0) {
           throw new AlreadyApplied();
         }
-        await addPurchasedCreditsInTx(tx, {
+        const added = await addCreditPackInTx(tx, {
           workspaceId,
+          credits: input.credits,
           amountUsd: input.credits * value,
+          purchaseRef: input.sessionRef,
+          months,
         });
+        if (!added) {
+          // The same checkout under another event: one purchase is one pack.
+          throw new AlreadyApplied();
+        }
         return {
           result: undefined,
           activity: {
@@ -275,6 +291,7 @@ async function applyCreditPack(
               provider: input.provider,
               eventRef: input.eventRef,
               credits: input.credits,
+              months,
             },
           },
         };
@@ -303,7 +320,9 @@ export async function applyBillingEvent(
         provider: gateway.provider,
         eventRef: event.eventRef,
         workspaceId: workspaceId.data,
+        sessionRef: event.sessionRef,
         credits: event.credits,
+        months: event.months,
       });
       return "applied";
     }

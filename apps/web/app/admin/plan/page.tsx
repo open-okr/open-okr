@@ -276,9 +276,18 @@ export default async function PlanPage({
             </p>
             {credits.purchased > 0 ? (
               <p className="mt-1 text-ink-2 text-sm">
-                {t("admin.credits.purchased", {
-                  count: credits.purchased.toLocaleString(locale),
-                })}
+                {credits.expiring
+                  ? t("admin.credits.purchasedExpiring", {
+                      count: credits.purchased.toLocaleString(locale),
+                      expiring: credits.expiring.credits.toLocaleString(locale),
+                      date: new Intl.DateTimeFormat(locale, {
+                        dateStyle: "long",
+                        timeZone: "UTC",
+                      }).format(new Date(credits.expiring.at)),
+                    })
+                  : t("admin.credits.purchased", {
+                      count: credits.purchased.toLocaleString(locale),
+                    })}
               </p>
             ) : null}
             <p className="mt-2 text-ink-3 text-xs">

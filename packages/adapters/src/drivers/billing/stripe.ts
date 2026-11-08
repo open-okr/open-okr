@@ -33,6 +33,7 @@ const PRICE_CACHE_MS = 60_000;
 
 const WORKSPACE_KEY = "workspace_id";
 const CREDITS_KEY = "credits";
+const MONTHS_KEY = "credit_months";
 const PORTAL_MARKER = "openokr";
 
 /** Stripe answers an id, or the object when it was asked to expand one. */
@@ -86,6 +87,9 @@ export class StripeBilling implements Billing {
       ...(input.credits === undefined
         ? {}
         : { [CREDITS_KEY]: String(input.credits) }),
+      ...(input.months === undefined
+        ? {}
+        : { [MONTHS_KEY]: String(input.months) }),
     };
     const session = await this.#client.checkout.sessions.create({
       mode: input.mode,
@@ -285,6 +289,7 @@ export class StripeBilling implements Billing {
     // A pack paid by a method that clears later arrives a second time, as
     // `async_payment_succeeded`, and only then is it paid.
     const credits = Number(session.metadata?.[CREDITS_KEY] ?? 0);
+    const months = Number(session.metadata?.[MONTHS_KEY] ?? 0);
     if (
       session.mode === "payment" &&
       session.payment_status === "paid" &&
@@ -297,6 +302,7 @@ export class StripeBilling implements Billing {
         customerRef: idOf(session.customer),
         sessionRef: session.id,
         credits,
+        months: Number.isInteger(months) && months > 0 ? months : null,
       };
     }
     return { kind: "ignored", eventRef };
