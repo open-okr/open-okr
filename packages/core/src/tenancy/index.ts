@@ -29,7 +29,14 @@ export {
   readCreditSummary,
   readHostedAccess,
 } from "./credits.ts";
-export { setTenantStateInTx } from "./lifecycle.ts";
+export {
+  readLifecycleInTx,
+  readWorkspaceLifecycle,
+  refuseOwnLifecycleMove,
+  refuseOwnStateChange,
+  setTenantStateInTx,
+  type TenantLifecycle,
+} from "./lifecycle.ts";
 export {
   applyPlanInTx,
   countSeats,

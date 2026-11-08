@@ -1270,9 +1270,11 @@ export {
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  readWorkspaceLifecycle,
   resolveAdmissionLimits,
   seatState,
   setDefaultAdmission,
+  type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";

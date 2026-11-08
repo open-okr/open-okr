@@ -8,6 +8,7 @@ import {
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { getPool } from "../../../lib/auth";
+import { heldBy } from "../../../lib/held-by";
 import { getMailSettings } from "../../../lib/mail";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { schedulerState } from "../../../lib/scheduler";
@@ -111,7 +112,10 @@ export default async function GeneralSettingsPage() {
        * and no screen ever called it, so P6-T07's rehearsal runbook asked an
        * operator to press something that did not exist.
        */}
-      <WorkspaceStateCard state={workspace.state} />
+      <WorkspaceStateCard
+        state={workspace.state}
+        heldBy={await heldBy(workspace.workspaceId)}
+      />
     </div>
   );
 }

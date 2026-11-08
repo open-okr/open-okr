@@ -11,7 +11,12 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
-import { setTenantStateInTx } from "../tenancy/index.ts";
+import {
+  readLifecycleInTx,
+  refuseOwnLifecycleMove,
+  refuseOwnStateChange,
+  setTenantStateInTx,
+} from "../tenancy/index.ts";
 import { createOwnWorkspace } from "../workspaces/create-own.ts";
 import { createWorkspace } from "../workspaces/provisioning.ts";
 import { defineWriteAction } from "./define.ts";
@@ -203,8 +208,13 @@ export const setWorkspaceState = defineWriteAction({
   operation: (_context, input) => ({
     // On the freeze overlay's own recovery list (packages/core/src/
     // operations/freeze.ts): the one write that must survive a freeze is
-    // the one that lifts it, so this action itself never refuses on the
-    // workspace's own state, only on the caller's access level.
+    // the one that lifts it, so this action never refuses on a state the
+    // workspace's own administrator chose.
+    //
+    // **It does refuse while the provider holds the workspace.** This writes
+    // the same column a suspension or a closure does, so before this check an
+    // administrator could lift an operator's suspension, unpaid read-only
+    // mode, or a closure, from Admin, General (workspace-erasure.md §2).
     async load({ tx, workspaceId }) {
       const [current] = await tx
         .select({
@@ -217,6 +227,12 @@ export const setWorkspaceState = defineWriteAction({
         .limit(1);
       if (!current) {
         throw new OperationError("not_found", "No such workspace.");
+      }
+      const refusal = refuseOwnStateChange(
+        await readLifecycleInTx(tx, workspaceId),
+      );
+      if (refusal) {
+        throw new OperationError("forbidden", refusal);
       }
       return current;
     },
@@ -335,21 +351,37 @@ export const provisionWorkspace = {
   },
 };
 
+/**
+ * A cloud workspace's own administrator closing it (workspace-erasure.md §3).
+ *
+ * **This is the customer's door, and the provider's is `setLifecycleAsOperator`.**
+ * Suspending and lifting a suspension are the provider's, because one may be a legal
+ * hold and the other the price of not paying. A closed workspace is erased once its
+ * window passes, so closing asks for the workspace's address, checked here rather
+ * than only on the screen, because REST and the command line reach this too.
+ *
+ * Off the agent's tools, and a token needs the destructive scope: an agent has no
+ * business closing the workspace it works in.
+ */
 export const setWorkspaceLifecycle = defineWriteAction({
   name: "workspace.setLifecycle",
-  summary: "Move a cloud workspace between active, suspended and closed.",
+  summary:
+    "Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's.",
   input: z.object({
     state: z.enum(["active", "suspended", "closed"]),
+    /** The workspace's address, typed by whoever closes it. */
+    confirmSlug: z.string().trim().max(200).optional(),
   }),
   output: workspaceSummary.extend({
     state: z.enum(["active", "suspended", "closed"]),
   }),
   access: ACCESS_LEVELS.full,
+  safety: "destructive",
+  agentSurface: false,
   operation: (_context, input) => ({
     // On the freeze overlay's recovery list by prefix, like
-    // `workspace.setState`: the write that lifts a suspension has to survive
-    // the suspension. Closing is on the same list, and that is deliberate,
-    // because a closed workspace being reopened is the same kind of write.
+    // `workspace.setState`: closing has to work on a workspace billing made
+    // read-only, because that is how somebody who stopped paying leaves.
     async load({ tx, workspaceId }) {
       const [current] = await tx
         .select({ name: workspaces.name, slug: workspaces.slug })
@@ -358,6 +390,28 @@ export const setWorkspaceLifecycle = defineWriteAction({
         .limit(1);
       if (!current) {
         throw new OperationError("not_found", "No such workspace.");
+      }
+      const lifecycle = await readLifecycleInTx(tx, workspaceId);
+      if (!lifecycle) {
+        // No tenant row, which is every self-hosted instance. Refused rather
+        // than silently doing half the work: on a self-hosted instance
+        // `workspace.setState` is the whole of what freezing means, and a
+        // caller who reached here wanted something this deployment does not
+        // have.
+        throw new OperationError(
+          "not_found",
+          "This workspace has no tenant record, so it has no lifecycle to move.",
+        );
+      }
+      const refusal = refuseOwnLifecycleMove(lifecycle, input.state);
+      if (refusal) {
+        throw new OperationError("forbidden", refusal);
+      }
+      if (input.state === "closed" && input.confirmSlug !== current.slug) {
+        throw new OperationError(
+          "forbidden",
+          "The address typed does not match this workspace's, so nothing changed.",
+        );
       }
       return current;
     },
@@ -370,11 +424,6 @@ export const setWorkspaceLifecycle = defineWriteAction({
         state: input.state,
       });
       if (!moved) {
-        // No tenant row, which is every self-hosted instance. Refused rather
-        // than silently doing half the work: on a self-hosted instance
-        // `workspace.setState` is the whole of what freezing means, and a
-        // caller who reached here wanted something this deployment does not
-        // have.
         throw new OperationError(
           "not_found",
           "This workspace has no tenant record, so it has no lifecycle to move.",

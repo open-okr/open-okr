@@ -698,5 +698,5 @@ the machine-readable document.
 | `workspace.provision`<br/>Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy. | `POST /api/v1/workspace/provision` | writes |
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |
 | `workspace.reopenOnboarding`<br/>Offer the workspace's own setup again, keeping every answer it already holds. | `POST /api/v1/workspace/reopenOnboarding` | writes |
-| `workspace.setLifecycle`<br/>Move a cloud workspace between active, suspended and closed. | `POST /api/v1/workspace/setLifecycle` | writes |
+| `workspace.setLifecycle`<br/>Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's. | `POST /api/v1/workspace/setLifecycle` | destroys |
 | `workspace.setState`<br/>Set the workspace to active, read-only or frozen. | `POST /api/v1/workspace/setState` | writes |

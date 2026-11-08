@@ -291,7 +291,6 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "workspace.rename",
     "workspace.finishOnboarding",
     "workspace.reopenOnboarding",
-    "workspace.setLifecycle",
     "workspace.setState",
     "people.updateOwnProfile",
     "people.readOwnTour",

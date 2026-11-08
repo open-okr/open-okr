@@ -174,8 +174,8 @@
       "action": "workspace.setLifecycle",
       "method": "POST",
       "path": "/workspace/setLifecycle",
-      "scope": "write",
-      "summary": "Move a cloud workspace between active, suspended and closed.",
+      "scope": "destructive",
+      "summary": "Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's.",
       "flags": [
         {
           "name": "state",
@@ -187,6 +187,12 @@
             "suspended",
             "closed"
           ]
+        },
+        {
+          "name": "confirm-slug",
+          "field": "confirmSlug",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

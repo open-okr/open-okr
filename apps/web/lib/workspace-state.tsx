@@ -28,10 +28,16 @@ import { getTranslations } from "./translations";
 export async function WorkspaceStateBanner({
   state,
   canRecover,
+  heldByProvider = false,
 }: {
   readonly state: "active" | "read_only" | "frozen";
   /** Whether this member can reach the control that lifts it. */
   readonly canRecover: boolean;
+  /**
+   * The provider suspended or closed it, so no administrator here can lift it and
+   * the banner does not send one to a switch that would refuse.
+   */
+  readonly heldByProvider?: boolean;
 }) {
   if (state === "active") {
     return null;
@@ -53,7 +59,11 @@ export async function WorkspaceStateBanner({
             ? t("workspaceState.frozenExplained")
             : t("workspaceState.readOnlyExplained")}
         </span>
-        {canRecover ? (
+        {heldByProvider ? (
+          <span className="text-xs text-ink-4">
+            {t("workspaceState.onlyTheProvider")}
+          </span>
+        ) : canRecover ? (
           <Link
             href="/admin/general"
             className="text-xs font-semibold text-brand-text hover:underline"

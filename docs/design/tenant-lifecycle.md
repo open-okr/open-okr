@@ -117,6 +117,13 @@ member and still fix their billing email. That is the right list for a
 suspension, and it is the list that already exists, so no new one is
 written.
 
+**Being on the list does not let the customer lift what the provider set.**
+Corrected on 8 November 2026 (`workspace-erasure.md` §2): `workspace.setState`
+writes the same column, and until then an administrator could lift an
+operator's suspension, unpaid read-only mode or a closure with it. It now
+refuses while the tenant is suspended or closed, and `workspace.setLifecycle`
+lets a workspace's own administrator do one thing only, close it.
+
 **`read_only` and `frozen` are treated identically by the overlay today**,
 and `freeze.ts` says so in its own comment, leaving the difference "to
 whichever task actually needs that difference." This is that task, and the

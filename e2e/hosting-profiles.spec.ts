@@ -229,6 +229,52 @@ test.describe("a cloud run by a provider", () => {
     }
   });
 
+  test("a suspension the provider set offers the administrator nothing to lift", async ({
+    page,
+  }) => {
+    const { rows } = await pool.query<{ id: string }>(
+      `select m.workspace_id as id
+         from workspace_members m join users u on u.id = m.user_id
+        where u.email = $1 and m.deleted_at is null`,
+      [INSTANCE_ACCOUNT.email],
+    );
+    const workspaces = rows.map((row) => row.id);
+    const { rows: made } = await pool.query<{ id: string }>(
+      `insert into tenants (workspace_id, state, region)
+       select id, 'suspended', 'local' from unnest($1::uuid[]) as id
+       on conflict (workspace_id) do nothing
+       returning workspace_id as id`,
+      [workspaces],
+    );
+    const suspended = made.map((row) => row.id);
+    await pool.query(
+      "update workspaces set state = 'read_only' where id = any($1::uuid[])",
+      [suspended],
+    );
+    try {
+      await signIn(page);
+      await goTo(page, "/admin/general");
+      await expect(page.getByTestId("workspace-state-current")).toContainText(
+        "Suspended by the provider",
+        { timeout: 15_000 },
+      );
+      await expect(page.getByTestId("set-state-active")).toHaveCount(0);
+      await expect(page.getByTestId("workspace-state-banner")).toContainText(
+        "Only the provider can lift it.",
+      );
+    } finally {
+      // Every later spec on this shard needs the workspace taking writes.
+      await pool.query(
+        "update workspaces set state = 'active' where id = any($1::uuid[])",
+        [suspended],
+      );
+      await pool.query(
+        "delete from tenants where workspace_id = any($1::uuid[])",
+        [suspended],
+      );
+    }
+  });
+
   test("a member starts another workspace, and lands in its setup", async ({
     page,
   }) => {

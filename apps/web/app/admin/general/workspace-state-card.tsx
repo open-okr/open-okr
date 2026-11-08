@@ -78,10 +78,26 @@ async function setState(formData: FormData): Promise<void> {
   revalidatePath("/", "layout");
 }
 
+/**
+ * Who holds the workspace when it is not the workspace itself. The switch writes
+ * the same column a suspension or a closure does, so while the provider holds it the
+ * card says so and offers nothing the server would refuse
+ * (docs/design/workspace-erasure.md §2).
+ */
+export type HeldBy = "provider" | "unpaid" | "closed" | null;
+
+const HELD = {
+  provider: "admin.state.heldByProvider",
+  unpaid: "admin.state.heldUnpaid",
+  closed: "admin.state.heldClosed",
+} as const;
+
 export async function WorkspaceStateCard({
   state,
+  heldBy = null,
 }: {
   readonly state: "active" | "read_only" | "frozen";
+  readonly heldBy?: HeldBy;
 }) {
   const current = STATES.find((one) => one.value === state);
   // The catalogue, from a server component (P6-G25). P6-G22b's gate had no
@@ -100,23 +116,25 @@ export async function WorkspaceStateCard({
       </CardHeader>
       <CardBody className="flex flex-col gap-3">
         <p className="text-sm text-ink-2" data-testid="workspace-state-current">
-          {current ? t(current.says) : state}
+          {heldBy ? t(HELD[heldBy]) : current ? t(current.says) : state}
         </p>
-        <div className="flex flex-wrap gap-2.5">
-          {STATES.filter((one) => one.value !== state).map((one) => (
-            <form key={one.value} action={setState}>
-              <input type="hidden" name="state" value={one.value} />
-              <Button
-                type="submit"
-                size="sm"
-                variant={one.value === "active" ? "primary" : "default"}
-                data-testid={`set-state-${one.value}`}
-              >
-                {t(one.moveTo)}
-              </Button>
-            </form>
-          ))}
-        </div>
+        {heldBy ? null : (
+          <div className="flex flex-wrap gap-2.5">
+            {STATES.filter((one) => one.value !== state).map((one) => (
+              <form key={one.value} action={setState}>
+                <input type="hidden" name="state" value={one.value} />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant={one.value === "active" ? "primary" : "default"}
+                  data-testid={`set-state-${one.value}`}
+                >
+                  {t(one.moveTo)}
+                </Button>
+              </form>
+            ))}
+          </div>
+        )}
       </CardBody>
     </Card>
   );

@@ -19,11 +19,14 @@
 import type { TenantState } from "@openokr/db";
 import {
   activeOnly,
+  billingAccounts,
   tenants,
-  type withWorkspace,
+  withWorkspace,
   workspaces,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import type { Pool } from "pg";
 
 /** The drizzle transaction handed to a `withWorkspace` callback. */
 type AnyTx = Parameters<Parameters<typeof withWorkspace>[2]>[0];
@@ -96,4 +99,105 @@ export async function setTenantStateInTx(
     .where(activeOnly(workspaces, eq(workspaces.id, input.workspaceId)));
 
   return true;
+}
+
+export interface TenantLifecycle {
+  readonly state: TenantState;
+  readonly closedAt: Date | null;
+  /** True when billing, not an operator, made it read-only. */
+  readonly suspendedByBilling: boolean;
+}
+
+/**
+ * Where a workspace stands with its provider, or null with no tenant record, which
+ * is every self-hosted instance.
+ *
+ * Read by the workspace's own actions, which may not see `tenants` themselves.
+ */
+export async function readLifecycleInTx(
+  tx: AnyTx,
+  workspaceId: string,
+): Promise<TenantLifecycle | null> {
+  const [tenant] = await tx
+    .select({ state: tenants.state, closedAt: tenants.closedAt })
+    .from(tenants)
+    .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
+    .limit(1);
+  if (!tenant) {
+    return null;
+  }
+  const [account] = await tx
+    .select({ suspendedByBilling: billingAccounts.suspendedByBilling })
+    .from(billingAccounts)
+    .where(
+      activeOnly(billingAccounts, eq(billingAccounts.workspaceId, workspaceId)),
+    )
+    .limit(1);
+  return {
+    state: tenant.state,
+    closedAt: tenant.closedAt,
+    suspendedByBilling: account?.suspendedByBilling ?? false,
+  };
+}
+
+/** The same, for a screen: Admin, General and the banner on every page. */
+export function readWorkspaceLifecycle(
+  pool: Pool,
+  workspaceId: string,
+): Promise<TenantLifecycle | null> {
+  return withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    readLifecycleInTx(tx, workspaceId),
+  );
+}
+
+/**
+ * Why a workspace's own administrator may not make this move, or null when they
+ * may (docs/design/workspace-erasure.md §3).
+ *
+ * **Suspending, and lifting a suspension, are the provider's.** An operator's
+ * suspension may be a legal hold, and billing's is the price of not paying, so a
+ * customer who could lift either could lift both. Closing is theirs, from active or
+ * from billing's read-only mode, because that is how somebody leaves. Closing a
+ * workspace an operator suspended is not, because a closed workspace is erased.
+ */
+export function refuseOwnLifecycleMove(
+  from: TenantLifecycle,
+  to: TenantState,
+): string | null {
+  if (from.state === to) {
+    return `This workspace is already ${to}.`;
+  }
+  if (to === "suspended") {
+    return "Only the provider can suspend a workspace.";
+  }
+  if (to === "active") {
+    return from.state === "closed"
+      ? "Only the provider can reopen this workspace."
+      : "Only the provider can lift a suspension.";
+  }
+  if (from.state === "suspended" && !from.suspendedByBilling) {
+    return "The provider suspended this workspace, so only the provider can close it.";
+  }
+  return null;
+}
+
+/**
+ * Why the workspace's own read-only or frozen switch may not move now, or null.
+ *
+ * That switch is the customer's own, and it sits on the same column the lifecycle
+ * writes. So while the provider holds the workspace, the customer's switch waits,
+ * or it would undo the provider's decision from Admin, General.
+ */
+export function refuseOwnStateChange(
+  lifecycle: TenantLifecycle | null,
+): string | null {
+  if (!lifecycle || lifecycle.state === "active") {
+    return null;
+  }
+  if (lifecycle.state === "closed") {
+    return "This workspace is closed, so its state cannot change here.";
+  }
+  return lifecycle.suspendedByBilling
+    ? "This workspace is suspended until its subscription is paid or its people fit its plan, so its state cannot change here."
+    : "This workspace is suspended by its provider, so only the provider can make it active again.";
 }

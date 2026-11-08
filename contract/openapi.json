@@ -1454,12 +1454,12 @@
     "/workspace/setLifecycle": {
       "post": {
         "operationId": "workspace.setLifecycle",
-        "summary": "Move a cloud workspace between active, suspended and closed.",
+        "summary": "Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's.",
         "tags": [
           "workspace"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -1549,6 +1549,10 @@
                       "suspended",
                       "closed"
                     ]
+                  },
+                  "confirmSlug": {
+                    "type": "string",
+                    "maxLength": 200
                   }
                 },
                 "required": [

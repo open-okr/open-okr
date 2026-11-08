@@ -1,8 +1,8 @@
 # Closing and erasing a workspace
 
-Status: awaiting approval. Authority: `tenant-lifecycle.md` §6, `billing.md`, and what
-OKRGoal's published Terms promise. A change to security and to stored data, so nothing
-here is built until it is approved.
+Status: approved on 8 November 2026, every decision in §12 as recommended, including the
+reminder seven days before deletion. One rule in §3 was narrowed while building. Authority:
+`tenant-lifecycle.md` §6, `billing.md`, and what OKRGoal's published Terms promise.
 
 ## 1. What this has to be true of
 
@@ -43,7 +43,8 @@ here is built until it is approved.
 | Move | Owner or admin | Operator | Billing webhook |
 |---|---|---|---|
 | Active to closed | Yes, typing the workspace's slug | Yes, with a reason | No |
-| Suspended to closed | Yes, typing the slug | Yes, with a reason | No |
+| Suspended by billing to closed | Yes, typing the slug | Yes, with a reason | No |
+| Suspended by an operator to closed | No: it may be a legal hold | Yes, with a reason | No |
 | Closed to active, before erasure starts | Only if they closed it while it was active | Yes | No |
 | Active to suspended | No | Yes | Yes |
 | Suspended to active | No | Yes | Only its own suspension |
@@ -63,6 +64,9 @@ non-payment and then reopening it must not become the way out of paying. So
 
 **A legal hold needs nothing new.** "Unless the law requires us to keep it": an operator
 moves the workspace to suspended, which is audited, stays readable and is never due.
+**Changed while building, on 8 November 2026:** this design first let an owner close any
+suspended workspace, which would have let a customer close one under a legal hold and so
+start its erasure. An owner may close a suspended workspace only when billing suspended it.
 
 ## 4. Erasing
 
@@ -190,13 +194,15 @@ Self-hosted with the flag off shows none of this.
 17. **Given** workspaces past their window and no cron, **when** an operator opens S-45, **then** it says how many.
 18. **Given** a group or single-company setup, **when** anything here runs, **then** nothing is deleted and Stripe is not called.
 
-## 12. Decisions for you
+## 12. Decisions, answered on 8 November 2026
 
-| # | Question | My recommendation |
+Every one as recommended. Number 3 was left open and the answer is yes.
+
+| # | Question | Answer |
 |---|---|---|
 | 1 | Where does erasure run (§5)? | A: a command on the deployment's schedule, so the server never holds the power to delete audit rows |
 | 2 | Email owners and admins at closing? It is a new kind of message, so it needs your yes | Yes, one, with the date |
-| 3 | Also remind them seven days before deletion? | Your call. It is the last chance to save something irreversible, and it costs one more column and one job. I lean yes, but the Terms do not promise it |
+| 3 | Also remind them seven days before deletion? | **Yes.** It is the last chance to save something irreversible, and it costs one more column and one job. The Terms do not promise it |
 | 4 | May an owner reopen their own closure (§3)? | Yes, when it was active. An operator otherwise |
 | 5 | Delete the Stripe customer at erasure? | Yes. Invoices stay, and the card and address go |
 | 6 | Delete the accounts of people with no other workspace? | Yes. The privacy notice says so |
