@@ -152,7 +152,7 @@ How a release is produced is §9: changesets for the version, changelog and rele
 
 The switches are independent. The cloud flag brings tenant records, the operator console and the lifecycle. The catalogue brings plans and seat limits, so an empty one means no limit and no plan screen. The billing provider brings payment. The release names no price and no currency: those are each provider's own configuration.
 
-A change that breaks any row is a defect, and `packages/core/test/hosting-profiles.test.ts` and `e2e/hosting-profiles.spec.ts` hold a section per setup to catch it.
+A change that breaks any row is a defect, and `packages/core/test/hosting-profiles.test.ts` and `e2e/hosting-profiles.spec.ts` hold a section per setup to catch it. Each hosted row also has a browser journey, `e2e/hosting-okrgoal.spec.ts`, `hosting-provider`, `hosting-group` and `hosting-one-company`, walked as its operator, a company administrator, a workspace administrator and a member, and `docs/design/hosting-test-matrix.md` maps every scenario to the test that proves it.
 
 ## 6. Security model
 
