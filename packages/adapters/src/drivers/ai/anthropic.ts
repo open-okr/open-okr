@@ -146,6 +146,71 @@ export interface AnthropicProviderOptions {
   readonly defaultContextWindow?: number;
 }
 
+/**
+ * The older models with no structured output, which still take a forced tool
+ * call. Every current model has structured output, and Claude Sonnet 5.5, Opus 5.5
+ * and Fable 5.1 refuse a forced tool with a 400, so structured output is the
+ * default and this list only shrinks. From Anthropic's own model table, October
+ * 2026: Opus 4.0, 4.6 and 4.7, Sonnet 4.0, 4.5 and 4.6, and every Claude 3 model.
+ */
+const FORCED_TOOL_ONLY =
+  /^claude-(3|opus-4-(0|6|7)(?!\d)|opus-4-20|sonnet-4-(0|5|6)(?!\d)|sonnet-4-20)/;
+
+const forcedToolOnly = (model: string): boolean => FORCED_TOOL_ONLY.test(model);
+
+/** What structured output refuses in a schema. Zod checks them on the answer. */
+const UNSUPPORTED_KEYWORDS = new Set([
+  "minimum",
+  "maximum",
+  "exclusiveMinimum",
+  "exclusiveMaximum",
+  "multipleOf",
+  "minLength",
+  "maxLength",
+  "pattern",
+  "minItems",
+  "maxItems",
+  "uniqueItems",
+  "minProperties",
+  "maxProperties",
+]);
+
+/**
+ * The schema as structured output takes it: every object closed with
+ * `additionalProperties: false`, and the limits it cannot enforce left out. The
+ * caller validates the answer against its own schema anyway, so nothing that was
+ * checked before goes unchecked now.
+ */
+function structuredSchema(schema: unknown): Record<string, unknown> {
+  /** A map whose keys are names the schema chose, such as `properties`. */
+  const NAMED = new Set(["properties", "$defs", "definitions"]);
+  const walk = (node: unknown): unknown => {
+    if (Array.isArray(node)) {
+      return node.map(walk);
+    }
+    if (node === null || typeof node !== "object") {
+      return node;
+    }
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(node)) {
+      if (UNSUPPORTED_KEYWORDS.has(key)) {
+        continue;
+      }
+      out[key] =
+        NAMED.has(key) && value !== null && typeof value === "object"
+          ? Object.fromEntries(
+              Object.entries(value).map(([name, child]) => [name, walk(child)]),
+            )
+          : walk(value);
+    }
+    if (out.type === "object" || "properties" in out) {
+      out.additionalProperties = false;
+    }
+    return out;
+  };
+  return walk(schema) as Record<string, unknown>;
+}
+
 export class AnthropicProvider implements AIProvider {
   readonly #client: Anthropic;
   readonly #defaultContextWindow: number;
@@ -227,41 +292,62 @@ export class AnthropicProvider implements AIProvider {
 
   async extract(request: ExtractRequest): Promise<ChatResponse> {
     const { system, rest } = splitSystem(request.messages);
+    if (forcedToolOnly(request.model)) {
+      const message = await this.#client.messages.create({
+        model: request.model,
+        max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
+        system,
+        messages: toMessages(rest),
+        tools: [
+          {
+            name: "extract",
+            description:
+              "Extract the requested structure from the conversation above.",
+            input_schema: request.schema as AnthropicInputSchema,
+          },
+        ],
+        tool_choice: { type: "tool", name: "extract" },
+      });
+      const toolUse = message.content.find(
+        (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
+      );
+      return {
+        content: toolUse ? JSON.stringify(toolUse.input) : "",
+        usage: usageOf(message.usage),
+      };
+    }
+    // Structured output: the answer itself is the JSON. A refusal or a reply cut
+    // off at max_tokens may not match, which the caller's own validation catches.
     const message = await this.#client.messages.create({
       model: request.model,
       max_tokens: request.maxTokens ?? DEFAULT_MAX_TOKENS,
       system,
       messages: toMessages(rest),
-      tools: [
-        {
-          name: "extract",
-          description:
-            "Extract the requested structure from the conversation above.",
-          input_schema: request.schema as AnthropicInputSchema,
+      output_config: {
+        format: {
+          type: "json_schema",
+          schema: structuredSchema(request.schema),
         },
-      ],
-      tool_choice: { type: "tool", name: "extract" },
+      },
     });
-    const toolUse = message.content.find(
-      (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-    );
     return {
-      content: toolUse ? JSON.stringify(toolUse.input) : "",
+      content: message.content
+        .filter((block): block is Anthropic.TextBlock => block.type === "text")
+        .map((block) => block.text)
+        .join(""),
       usage: usageOf(message.usage),
     };
   }
 
-  capabilities(_model: string): ModelCapabilities {
+  capabilities(model: string): ModelCapabilities {
     // No live model catalogue yet (P2-T15); a reasonable default every
-    // current Claude model satisfies. `jsonMode` is false because there is
-    // no response_format switch — `extract()` reaches the same result
-    // through a forced tool call instead, which every model with `tools`
-    // already supports.
+    // current Claude model satisfies. `jsonMode` is structured output, which
+    // `extract()` uses wherever the model has it.
     return {
       available: true,
       tools: true,
       vision: true,
-      jsonMode: false,
+      jsonMode: !forcedToolOnly(model),
       streaming: true,
       contextWindow: this.#defaultContextWindow,
     };

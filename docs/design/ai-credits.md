@@ -144,6 +144,28 @@ models you choose, reporting tokens and credits per action. The benchmark's toke
 counts are assumptions. **This needs an AI key from you, and it is what fills in the
 typical credits on the pricing page.** It costs a few dollars.
 
+**Measured on 8 November 2026**, one run each, at list prices and one US cent a credit:
+
+| Action | Haiku 5.5 | Sonnet 5.5 |
+|---|---|---|
+| Rewrite a key result the Coach flagged | 0.01 | 0.52 |
+| Draft an objective from a sentence | 0.05 | 1.69 |
+| Word a check-in the Champion is chasing | 0.01 | 0.23 |
+| Summarise a comment thread | 0.01 | 0.23 |
+| Answer a copilot question | 0.03 | 0.30 |
+
+Haiku 5.5 is thirty to fifty times cheaper per action, which is more than the
+benchmark's twenty, because Sonnet 5.5 thinks before it answers by default. Both runs'
+answers read as usable; Sonnet's drafts are a little fuller. The measured figures are
+what the pricing page's typical credits come from.
+
+**The measurement found a defect.** Sonnet 5.5, Opus 5.5 and Fable 5.1 refuse a forced
+tool call with a 400, and the Anthropic driver forced one for every structured answer.
+So on those models every rewrite, draft, check-in and summary failed, and the drafters,
+which treat a model error as no draft, said nothing. The driver now asks for structured
+output, which every current model has, and keeps the forced tool only for the older
+models without it.
+
 ## 9. Screens
 
 | Screen | Change |

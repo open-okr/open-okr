@@ -138,39 +138,153 @@ describe("chatWithTools", () => {
 });
 
 describe("extract", () => {
-  it("reads the forced tool call's input as the structured result", async () => {
-    const client = provider(
-      fakeFetch({
-        id: "msg_3",
-        type: "message",
-        role: "assistant",
-        model: "claude-sonnet-5",
-        content: [
-          {
-            type: "tool_use",
-            id: "toolu_2",
-            name: "extract",
-            input: { city: "Paris", country: "France" },
-          },
-        ],
-        stop_reason: "tool_use",
-        usage: { input_tokens: 15, output_tokens: 10 },
-      }),
-    );
+  /** Captures the request body the driver sent, and answers with `body`. */
+  function capturing(body: unknown) {
+    const sent: Record<string, unknown>[] = [];
+    const fetchImpl: typeof fetch = async (_input, init) => {
+      sent.push(JSON.parse(String(init?.body ?? "{}")));
+      return new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    return { sent, client: provider(fetchImpl) };
+  }
 
+  /** The schema the first request asked for, or undefined if it asked for none. */
+  const sentSchema = (sent: Record<string, unknown>[]) =>
+    (sent[0]?.output_config as { format?: { schema?: unknown } } | undefined)
+      ?.format?.schema;
+
+  const answer = (model: string, content: unknown[]) => ({
+    id: "msg_3",
+    type: "message",
+    role: "assistant",
+    model,
+    content,
+    stop_reason: "end_turn",
+    usage: { input_tokens: 15, output_tokens: 10 },
+  });
+
+  it("asks a current model for structured output, never a forced tool, which Claude Sonnet 5.5 refuses", async () => {
+    const { sent, client } = capturing(
+      answer("claude-sonnet-5-5", [
+        { type: "text", text: '{"city":"Paris","country":"France"}' },
+      ]),
+    );
     const response = await client.extract({
-      model: "claude-sonnet-5",
+      model: "claude-sonnet-5-5",
       messages: [{ role: "user", content: "extract the city" }],
       schema: {
         type: "object",
         properties: { city: { type: "string" }, country: { type: "string" } },
       },
     });
-
     expect(JSON.parse(response.content)).toEqual({
       city: "Paris",
       country: "France",
     });
+    const body = sent[0] ?? {};
+    expect(body.tool_choice).toBeUndefined();
+    expect(body.tools).toBeUndefined();
+    expect(body.output_config).toMatchObject({
+      format: {
+        type: "json_schema",
+        schema: { type: "object", additionalProperties: false },
+      },
+    });
+  });
+
+  it("closes every object and drops the limits the API cannot enforce, which the caller still validates", async () => {
+    const { sent, client } = capturing(
+      answer("claude-haiku-5-5", [{ type: "text", text: "{}" }]),
+    );
+    await client.extract({
+      model: "claude-haiku-5-5",
+      messages: [{ role: "user", content: "x" }],
+      schema: {
+        type: "object",
+        properties: {
+          title: { type: "string", minLength: 1, maxLength: 120 },
+          confidence: { type: "number", minimum: 0, maximum: 1 },
+          keyResults: {
+            type: "array",
+            minItems: 1,
+            maxItems: 5,
+            items: {
+              type: "object",
+              properties: { target: { type: "number", multipleOf: 1 } },
+            },
+          },
+        },
+      },
+    });
+    const schema = sentSchema(sent);
+    expect(schema).toEqual({
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        title: { type: "string" },
+        confidence: { type: "number" },
+        keyResults: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            properties: { target: { type: "number" } },
+          },
+        },
+      },
+    });
+  });
+
+  it("keeps a field whose name is also a schema keyword", async () => {
+    const { sent, client } = capturing(
+      answer("claude-haiku-5-5", [{ type: "text", text: "{}" }]),
+    );
+    await client.extract({
+      model: "claude-haiku-5-5",
+      messages: [{ role: "user", content: "x" }],
+      schema: {
+        type: "object",
+        properties: {
+          pattern: { type: "string" },
+          minimum: { type: "number" },
+        },
+      },
+    });
+    expect(sentSchema(sent)).toEqual({
+      type: "object",
+      additionalProperties: false,
+      properties: { pattern: { type: "string" }, minimum: { type: "number" } },
+    });
+  });
+
+  it("keeps the forced tool for an older model that has no structured output", async () => {
+    const { sent, client } = capturing(
+      answer("claude-sonnet-4-6", [
+        {
+          type: "tool_use",
+          id: "toolu_2",
+          name: "extract",
+          input: { city: "Paris", country: "France" },
+        },
+      ]),
+    );
+    const response = await client.extract({
+      model: "claude-sonnet-4-6",
+      messages: [{ role: "user", content: "extract the city" }],
+      schema: {
+        type: "object",
+        properties: { city: { type: "string" }, country: { type: "string" } },
+      },
+    });
+    expect(JSON.parse(response.content)).toEqual({
+      city: "Paris",
+      country: "France",
+    });
+    expect(sent[0]?.tool_choice).toEqual({ type: "tool", name: "extract" });
+    expect(sent[0]?.output_config).toBeUndefined();
   });
 });
 
@@ -265,13 +379,16 @@ describe("usage", () => {
 });
 
 describe("capabilities and stop", () => {
-  it("reports jsonMode as false: extract() works through a forced tool call instead", () => {
+  it("reports structured output where the model has it, and not on an older one", () => {
     const client = provider(fakeFetch({}));
-    expect(client.capabilities("claude-sonnet-5")).toMatchObject({
+    expect(client.capabilities("claude-sonnet-5-5")).toMatchObject({
       available: true,
       tools: true,
-      jsonMode: false,
+      jsonMode: true,
       streaming: true,
+    });
+    expect(client.capabilities("claude-opus-4-7")).toMatchObject({
+      jsonMode: false,
     });
   });
 
