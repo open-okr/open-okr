@@ -76,9 +76,10 @@ gives it batches, a resumable cursor and a ledger. One workspace at a time, olde
 | # | Phase | Commits | What happens |
 |---|---|---|---|
 | 0 | Check | | Refuses unless the connection can delete audit rows (§5), the flag is on, retention is above zero, the tenant is closed, and the window has passed. **The first test runs before anything changes**, so a wrong role cannot strand a half-erased workspace |
-| 1 | Claim | One | `tenants.erasing_at` and `workspaces.deleted_at` are set. Every member and every job loses it at once through the existing soft-delete scope, and reopening is refused from here on. Instance audit: `workspace.erasure_started` |
-| 2 | Provider | | The billing port's new `deleteCustomer` removes the Stripe customer and any subscription still running. An already-gone customer counts as done. **Stripe keeps the invoices**, as tax law requires |
-| 3 | Files | | The storage port's new `deletePrefix("<id>/")` removes files, thumbnails and export archives. Deleting what is already gone is fine |
+| 1 | Claim | One | `tenants.erasing_at` and `workspaces.deleted_at` are set. Every member and every job loses it at once through the existing soft-delete scope, and reopening is refused from here on. Instance audit: `workspace.erasure_started`. Two outbox rows ask the server for phases 2 and 3 |
+| 2 | Provider | | The server's relay calls the billing port's new `deleteCustomer`, which removes the Stripe customer and any subscription still running. An already-gone customer counts as done. **Stripe keeps the invoices**, as tax law requires |
+| 3 | Files | | The server's relay calls the storage port's new `deletePrefix("<id>/")`, which removes files, thumbnails and export archives. Deleting what is already gone is fine |
+| 3a | Wait | One per check | The command waits until both rows are delivered, up to five minutes a run. A row that dead-lettered is asked again, and still failing stops the run with the reason |
 | 4 | Accounts | One per person | Each member with no membership anywhere else and no operator grant loses their account, which takes their sessions and sign-in methods with it. Other people keep theirs. The workspace's `sso_providers` go too |
 | 5 | Rows | One per 1,000 rows | Every table with `workspace_id`, children first. **The list comes from the schema at run time, so a table added next year is erased without anybody remembering.** Each batch sets the tenant setting, so the row-level floor stops a bug reaching another workspace. `outbox` has no floor, so its query names the workspace |
 | 6 | Last | One | Records the audit chain's head, deletes `audit_events`, deletes the `workspaces` row and lets the cascade take what remains. **Then counts every table, and rolls back if any row is left** |
@@ -99,6 +100,13 @@ accounts went, and the audit chain's last position and hash.
 
 A failed step stops that workspace and keeps its progress. The next run resumes it from
 the ledger, even after its tenant row is gone, and exits 1 so the failure reaches the log.
+
+**Changed while building, on 8 November 2026: the server does phases 2 and 3.** The
+image's maintenance layer, where the command runs, holds core and no vendor SDK, and
+core may not import the Stripe or S3 drivers. So the claim enqueues them, the server's
+relay runs them with the drivers it already has, and the command waits. The property §5
+chose is unchanged: the server still cannot delete an audit row. The relay never skips
+either row, only fails it, so a receipt can never claim files gone that are still there.
 
 ## 5. Where it runs, and the change to the audit trail
 
@@ -121,7 +129,9 @@ refused for every role, and an instance with no tenant rows can never delete one
 
 ## 6. Schema
 
-One forward-only migration, with no legacy source (TECHNICAL-PLAN §7.2). No new table.
+Forward-only, with no legacy source (TECHNICAL-PLAN §7.2). No new table. Built as two
+migrations, one per change: 0148 adds `owner_may_reopen` with closing, and 0149 adds
+`erasing_at` and the trigger with erasure. The reminder's column is its own, below.
 
 | Change | Notes |
 |---|---|
@@ -139,7 +149,7 @@ No new setting. `cloud.closureRetentionDays` is the only switch.
 | `pnpm cloud:erase --write` | Erases what is due, and resumes anything unfinished |
 | `pnpm cloud:erase --id <id> --now --write` | Erases one closed workspace before its window ends, for a customer asking for that or after a restore (§9). Refused unless the tenant is closed. The receipt says the window was skipped |
 | `pnpm cloud:sweep --erased` | Lists the receipts, which is what a written confirmation is written from |
-| `./openokr erase` | `pnpm cloud:erase --write` in the container, for a host cron beside the backup's |
+| `./openokr erase --write` | `pnpm cloud:erase --write` in the container, for a host cron beside the backup's. Without `--write` it is the dry run, like the command |
 | Helm `cloud.erasure.schedule` | A CronJob with the same owner secret as the migration job. Empty by default |
 
 ## 8. Screens

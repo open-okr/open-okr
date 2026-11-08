@@ -226,6 +226,8 @@ describe("what an operator does see", () => {
     expect(Object.keys(row ?? {}).sort()).toEqual(
       [
         "closedAt",
+        // When erasure claimed it: a date, like `closedAt`, and no content.
+        "erasingAt",
         "name",
         "planKey",
         "region",

@@ -150,6 +150,11 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
     // (docs/design/workspace-erasure.md §3). Per delivery, like everything
     // here, because billing is a stored setting.
     billingFor: getBilling,
+    // Erasure's files (docs/design/workspace-erasure.md §4): everything under
+    // one workspace's prefix, uploads, thumbnails and export archives alike.
+    async deleteFiles(prefix) {
+      await getStorage().deletePrefix(prefix);
+    },
     // Resolved only when a scan is delivered, so no other topic pays for
     // reading the setting. Null means no scanner, and the handler keeps the
     // file held rather than releasing it unscanned.

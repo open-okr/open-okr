@@ -78,6 +78,7 @@ import {
   readClosureNotice,
   WORKSPACE_CLOSED_TOPIC,
 } from "../tenancy/closing.ts";
+import { ERASE_CUSTOMER_TOPIC, ERASE_FILES_TOPIC } from "../tenancy/erasure.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
@@ -212,6 +213,12 @@ export interface OutboxHandlerDeps {
    * is a stored setting. Absent, or answering null, means no provider.
    */
   readonly billingFor?: () => Promise<SubscriptionEnder | null>;
+  /**
+   * Deletes every stored object under one workspace's prefix, for erasure
+   * (docs/design/workspace-erasure.md §4). A function rather than the port, for
+   * the reason `putFile` is one. Absent means no storage, and erasure waits.
+   */
+  readonly deleteFiles?: (prefix: string) => Promise<void>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -916,6 +923,45 @@ const sendClosureNotice: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Erasure's half that needs the server's drivers: the files, and the customer at
+ * the payment provider (docs/design/workspace-erasure.md §4). The erasure command
+ * waits for both to be delivered before it deletes any rows.
+ *
+ * **Never skipped, only failed.** A skip marks the row delivered, and erasure
+ * would then report files gone that are still there. With nothing to do it with,
+ * the row dead-letters, the command says why, and asks again on its next run.
+ */
+const eraseFiles: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  if (!workspaceId) {
+    throw new PermanentDispatchError("Erasing files needs a workspace.");
+  }
+  if (!deps.deleteFiles) {
+    throw new PermanentDispatchError(
+      "This server has no storage to delete the workspace's files from.",
+    );
+  }
+  await deps.deleteFiles(`${workspaceId}/`);
+};
+
+const deleteCustomer: OutboxHandler = async (delivery, deps) => {
+  const provider = asString(delivery.payload.provider);
+  const customerRef = asString(delivery.payload.customerRef);
+  if (!provider || !customerRef) {
+    throw new PermanentDispatchError(
+      "Deleting a customer needs the provider and the customer.",
+    );
+  }
+  const billing = (await deps.billingFor?.()) ?? null;
+  if (!billing || billing.provider !== provider) {
+    throw new PermanentDispatchError(
+      `No ${provider} billing is configured on this server to delete the customer.`,
+    );
+  }
+  await billing.deleteCustomer(customerRef);
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -968,6 +1014,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // tell its owners and administrators when it will be deleted.
   [END_SUBSCRIPTION_TOPIC]: endSubscription,
   [WORKSPACE_CLOSED_TOPIC]: sendClosureNotice,
+  // Erasure's half that only the server can do (workspace-erasure.md §4).
+  [ERASE_FILES_TOPIC]: eraseFiles,
+  [ERASE_CUSTOMER_TOPIC]: deleteCustomer,
 };
 
 /**
@@ -985,6 +1034,8 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   Record<string, readonly string[]>
 > = {
   "invitation.email": ["to", "token"],
+  // Of a customer the provider no longer has. Nothing needs it once it is gone.
+  [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };
 
 /** Runs one delivery, or refuses it permanently when nothing handles it. */

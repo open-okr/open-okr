@@ -225,15 +225,28 @@ export default async function OperatorWorkspacePage({
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="font-bold text-ink text-xl">{tenant.name}</h1>
           <Chip tone={STATE_TONE[tenant.tenantState] ?? "neutral"}>
-            {tenant.tenantState}
+            {tenant.erasingAt
+              ? t("operator.workspace.beingErased")
+              : tenant.tenantState}
           </Chip>
         </div>
         <p className="text-ink-3 text-sm">{tenant.slug}</p>
       </header>
 
-      {/* Only when there is something to say. An active workspace gets no
-       * band, because "this workspace is fine" is not news. */}
-      {band ? (
+      {/* Once erasure has claimed it there is one thing to say, and nothing to
+       * press: no reopening, no plan, no way in (workspace-erasure.md §8). */}
+      {tenant.erasingAt ? (
+        <div className="rounded-lg border-y border-r border-l-4 border-bad-dot bg-bad-bg px-4 py-3 text-bad">
+          <p className="font-semibold text-sm">
+            {t("operator.workspace.erasingSince", {
+              date: day(tenant.erasingAt),
+            })}
+          </p>
+          <p className="mt-1 text-sm opacity-90">
+            {t("operator.workspace.consequenceErasing")}
+          </p>
+        </div>
+      ) : band ? (
         <div
           className={`rounded-lg border-l-4 border-y border-r px-4 py-3 ${
             BAND_STYLE[tenant.tenantState] ?? "border-line bg-raised text-ink-2"
@@ -367,67 +380,73 @@ export default async function OperatorWorkspacePage({
         </dl>
       </section>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="font-semibold text-ink text-sm">
-          {t("operator.workspace.goingInside")}
-        </h2>
-        {/* Asking is all this does. There is no path in this product that
-         * lets an operator into a workspace on their own, and the form says
-         * so rather than leaving somebody to find out. */}
-        <SupportRequest
-          pending={pending}
-          workspaceId={workspaceId}
-          refused={refused}
-        />
-      </section>
+      {tenant.erasingAt ? null : (
+        <>
+          <section className="flex flex-col gap-3">
+            <h2 className="font-semibold text-ink text-sm">
+              {t("operator.workspace.goingInside")}
+            </h2>
+            {/* Asking is all this does. There is no path in this product that
+             * lets an operator into a workspace on their own, and the form says
+             * so rather than leaving somebody to find out. */}
+            <SupportRequest
+              pending={pending}
+              workspaceId={workspaceId}
+              refused={refused}
+            />
+          </section>
 
-      {/* The status and the customer reference, and never a card. A workspace with
-       * no row here has its plan set by hand. */}
-      {billing ? (
-        <section className="flex flex-col gap-1">
-          <h2 className="font-semibold text-ink text-sm">
-            {t("operator.billing.title")}
-          </h2>
-          <p className="text-ink-2 text-sm">
-            {t("operator.billing.summary", {
-              provider: billing.provider,
-              status: billing.status ?? "",
-              customer: billing.customerRef,
-            })}
-          </p>
-        </section>
-      ) : null}
+          {/* The status and the customer reference, and never a card. A workspace with
+           * no row here has its plan set by hand. */}
+          {billing ? (
+            <section className="flex flex-col gap-1">
+              <h2 className="font-semibold text-ink text-sm">
+                {t("operator.billing.title")}
+              </h2>
+              <p className="text-ink-2 text-sm">
+                {t("operator.billing.summary", {
+                  provider: billing.provider,
+                  status: billing.status ?? "",
+                  customer: billing.customerRef,
+                })}
+              </p>
+            </section>
+          ) : null}
 
-      {/* Completeness review H-21: nothing wrote a plan or seats after a
-       * tenant was created, so no seat limit ever applied. */}
-      <OperatorPlanForm
-        action={setPlan}
-        current={tenant.planKey}
-        plans={plans.map((plan) => ({
-          key: plan.key,
-          label:
-            plan.seats === null
-              ? t("operator.workspace.planUnlimitedSeats", { name: plan.name })
-              : plan.seats === 1
-                ? t("operator.workspace.planSeatsOne", {
-                    name: plan.name,
-                    count: plan.seats,
-                  })
-                : t("operator.workspace.planSeatsOther", {
-                    name: plan.name,
-                    count: plan.seats,
-                  }),
-        }))}
-        workspaceId={tenant.workspaceId}
-        workspaceName={tenant.name}
-      />
+          {/* Completeness review H-21: nothing wrote a plan or seats after a
+           * tenant was created, so no seat limit ever applied. */}
+          <OperatorPlanForm
+            action={setPlan}
+            current={tenant.planKey}
+            plans={plans.map((plan) => ({
+              key: plan.key,
+              label:
+                plan.seats === null
+                  ? t("operator.workspace.planUnlimitedSeats", {
+                      name: plan.name,
+                    })
+                  : plan.seats === 1
+                    ? t("operator.workspace.planSeatsOne", {
+                        name: plan.name,
+                        count: plan.seats,
+                      })
+                    : t("operator.workspace.planSeatsOther", {
+                        name: plan.name,
+                        count: plan.seats,
+                      }),
+            }))}
+            workspaceId={tenant.workspaceId}
+            workspaceName={tenant.name}
+          />
 
-      <LifecycleForm
-        action={moveLifecycle}
-        currentState={tenant.tenantState}
-        workspaceName={tenant.name}
-        workspaceId={tenant.workspaceId}
-      />
+          <LifecycleForm
+            action={moveLifecycle}
+            currentState={tenant.tenantState}
+            workspaceName={tenant.name}
+            workspaceId={tenant.workspaceId}
+          />
+        </>
+      )}
     </div>
   );
 }

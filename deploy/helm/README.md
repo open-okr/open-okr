@@ -66,6 +66,7 @@ and skip generation entirely.
 | `instance.supportEmail` | empty | Who a customer writes to about their plan |
 | `cloud.enabled` | false | Tenant records and the operator console, for running this for other people or for several companies of your own |
 | `cloud.plans`, `cloud.defaultPlan`, `cloud.region` | empty | The plan catalogue as JSON, the plan a new workspace starts on, and the region recorded on each tenant |
+| `cloud.erasure.schedule` | empty | A cron schedule for `pnpm cloud:erase --write`, which erases closed workspaces past their retention window. Runs with `database.adminUrl`, the owner role. Nothing is erased while `OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS` is 0, its default |
 | `extraEnv`, `extraEnvFrom` | empty | Anything else the application reads. Prefer `extraEnvFrom` with a Secret for a credential |
 
 ## Storage and replicas

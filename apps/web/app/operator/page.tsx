@@ -1,4 +1,8 @@
-import { listTenantsAsOperator, readUsageAsOperator } from "@openokr/core";
+import {
+  erasureDateFor,
+  listTenantsAsOperator,
+  readUsageAsOperator,
+} from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
 import { requireOperator } from "../../lib/operator";
@@ -61,6 +65,18 @@ export default async function OperatorWorkspacesPage() {
   ]);
   const byWorkspace = new Map(usage.map((row) => [row.workspaceId, row]));
   const { t } = await getTranslations();
+  // Closed and past the window, and not yet claimed: what a schedule that never
+  // ran leaves behind (docs/design/workspace-erasure.md §8).
+  const now = Date.now();
+  const overdue = (
+    await Promise.all(
+      tenants
+        .filter((one) => one.tenantState === "closed" && !one.erasingAt)
+        .map((one) =>
+          one.closedAt ? erasureDateFor(pool, one.closedAt) : null,
+        ),
+    )
+  ).filter((date) => date !== null && date.getTime() <= now).length;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6 p-6">
@@ -78,6 +94,17 @@ export default async function OperatorWorkspacesPage() {
               })}
         </p>
       </header>
+
+      {overdue > 0 ? (
+        <p
+          className="rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
+          role="status"
+        >
+          {overdue === 1
+            ? t("operator.workspaces.overdueOne")
+            : t("operator.workspaces.overdueOther", { count: overdue })}
+        </p>
+      ) : null}
 
       <NewWorkspaceForm action={createWorkspace} />
 
@@ -142,7 +169,9 @@ export default async function OperatorWorkspacesPage() {
                        * too, which is the §2 rule the Chip primitive's own
                        * comment states. */}
                       <Chip tone={STATE_TONE[tenant.tenantState] ?? "neutral"}>
-                        {tenant.tenantState}
+                        {tenant.erasingAt
+                          ? t("operator.workspace.beingErased")
+                          : tenant.tenantState}
                       </Chip>
                     </td>
                     <td className="p-3 text-ink-2">

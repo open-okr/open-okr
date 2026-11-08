@@ -16,10 +16,14 @@ import {
   billingAccounts,
   billingEvents,
   tenants,
+  withWorkspace,
+  workspaces,
 } from "@openokr/db";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { z } from "zod";
+import { OperationError } from "../operations/errors.ts";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import {
   addCreditPackInTx,
@@ -300,6 +304,28 @@ async function applyCreditPack(
   );
 }
 
+/**
+ * Whether the workspace an event names is still here. One erased, or being erased,
+ * is acknowledged with nothing written, because there is nothing left to write to
+ * and refusing would have Stripe retry for days (workspace-erasure.md §2).
+ */
+async function workspaceIsHere(
+  pool: Pool,
+  workspaceId: string,
+): Promise<boolean> {
+  const [row] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    tx
+      .select({ id: workspaces.id })
+      // openokr:allow-raw-read: the system asking whether the workspace an event
+      // names still exists. Nobody reads on anybody's behalf, and only the id
+      // comes back.
+      .from(workspaces)
+      .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+      .limit(1),
+  );
+  return Boolean(row);
+}
+
 export async function applyBillingEvent(
   pool: Pool,
   gateway: Pick<BillingGateway, "provider" | "readSubscription">,
@@ -316,6 +342,9 @@ export async function applyBillingEvent(
   }
   try {
     if (event.kind === "credit_pack") {
+      if (!(await workspaceIsHere(pool, workspaceId.data))) {
+        return "ignored";
+      }
       await applyCreditPack(pool, {
         provider: gateway.provider,
         eventRef: event.eventRef,
@@ -325,6 +354,9 @@ export async function applyBillingEvent(
         months: event.months,
       });
       return "applied";
+    }
+    if (!(await workspaceIsHere(pool, workspaceId.data))) {
+      return "ignored";
     }
     const subscription = await gateway.readSubscription(event.subscriptionRef);
     await applySubscription(pool, {
@@ -337,6 +369,12 @@ export async function applyBillingEvent(
   } catch (error) {
     if (error instanceof AlreadyApplied) {
       return "duplicate";
+    }
+    // The workspace has been erased, or is being. Acknowledged with nothing
+    // written, because there is nothing left to write to, and refusing would
+    // have Stripe retry for days (docs/design/workspace-erasure.md §2).
+    if (error instanceof OperationError && error.code === "not_found") {
+      return "ignored";
     }
     throw error;
   }

@@ -1,0 +1,78 @@
+{{- if .Values.cloud.erasure.schedule }}
+{{- include "openokr.validate" . -}}
+# Erasing closed workspaces once their retention window has passed
+# (docs/design/workspace-erasure.md §7).
+#
+# Off until a schedule is set, and even then nothing is erased while
+# cloud.closureRetentionDays (OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS) is 0. It runs
+# with the same owner role as the migration job, because only the owner role may
+# delete a workspace's audit rows; the application's pods never hold it. The
+# application must be running: it deletes the files and the payment customer when
+# the erasure asks, because only it holds those drivers.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "openokr.fullname" . }}-erase
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: erasure
+spec:
+  schedule: {{ .Values.cloud.erasure.schedule | quote }}
+  # Two runs at once would wait on each other's advisory lock, and the second
+  # would find nothing to do. Forbid says so in the schedule instead.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # No retry: a failed workspace keeps its progress, the next scheduled run
+      # resumes it, and the failed Job's log says why in the meantime.
+      backoffLimit: 0
+      ttlSecondsAfterFinished: 172800
+      template:
+        metadata:
+          labels:
+            {{- include "openokr.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: erasure
+        spec:
+          restartPolicy: Never
+          {{- with .Values.image.pullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          # Talks to Postgres and to nothing else, like the migration job.
+          automountServiceAccountToken: false
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+            - name: erase
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                {{- toYaml .Values.securityContext | nindent 16 }}
+              command:
+                - node
+                - --experimental-strip-types
+                - --no-warnings
+                - ./migrator/packages/core/src/bin/cloud-erase.ts
+                - --write
+              workingDir: /app
+              env:
+                {{- include "openokr.commonEnv" . | nindent 16 }}
+              resources:
+                {{- toYaml .Values.migrationResources | nindent 16 }}
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

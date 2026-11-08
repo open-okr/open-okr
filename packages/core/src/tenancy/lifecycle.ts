@@ -27,6 +27,7 @@ import {
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { OperationError } from "../operations/errors.ts";
 
 /** The drizzle transaction handed to a `withWorkspace` callback. */
 type AnyTx = Parameters<Parameters<typeof withWorkspace>[2]>[0];
@@ -74,6 +75,16 @@ export async function setTenantStateInTx(
   input: SetTenantStateInput,
 ): Promise<boolean> {
   const now = input.now ?? new Date();
+
+  // Once erasure has claimed it, nothing moves it: not an operator, not billing.
+  const [claimed] = await tx
+    .select({ erasingAt: tenants.erasingAt })
+    .from(tenants)
+    .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
+    .limit(1);
+  if (claimed?.erasingAt) {
+    throw new OperationError("not_found", "No such workspace.");
+  }
 
   // openokr:allow-mutation: this helper writes on the transaction its caller
   // already opened, which is the closing action's own Operation. The same

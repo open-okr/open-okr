@@ -10,10 +10,12 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 
-/** The one call this needs, satisfied by the adapters' Billing port. */
+/** The calls closing and erasing need, satisfied by the adapters' Billing port. */
 export interface SubscriptionEnder {
   readonly provider: string;
   endSubscription(ref: string): Promise<void>;
+  /** Erasure's: removes the customer, their cards and address. */
+  deleteCustomer(ref: string): Promise<void>;
 }
 
 /** Over already, so there is nothing to stop. */
@@ -26,7 +28,7 @@ const ENDED = new Set(["canceled", "unpaid", "incomplete_expired"]);
 export async function endSubscriptionOnClosing(
   pool: Pool,
   workspaceId: string,
-  billing: SubscriptionEnder | null,
+  billing: Pick<SubscriptionEnder, "provider" | "endSubscription"> | null,
 ): Promise<"ended" | string> {
   const [account] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
     tx

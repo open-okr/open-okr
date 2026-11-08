@@ -243,6 +243,21 @@ export class StripeBilling implements Billing {
     }
   }
 
+  async deleteCustomer(ref: string): Promise<void> {
+    try {
+      await this.#client.customers.del(ref);
+    } catch (error) {
+      // Gone already, by an earlier run or by hand in the dashboard.
+      if (
+        error instanceof Stripe.errors.StripeInvalidRequestError &&
+        error.code === "resource_missing"
+      ) {
+        return;
+      }
+      throw error;
+    }
+  }
+
   async readSubscription(ref: string): Promise<SubscriptionState> {
     const subscription = await this.#client.subscriptions.retrieve(ref, {
       expand: ["schedule"],

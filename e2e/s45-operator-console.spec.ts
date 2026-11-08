@@ -348,3 +348,58 @@ test("a site message that ends before it starts is refused in words, and keeps w
   );
   expect(rows).toHaveLength(0);
 });
+
+test("an operator is told what is overdue for erasure, and sees one being erased", async () => {
+  // The workspace this file's operator created above, so no other spec meets it.
+  const { rows } = await pool.query<{ id: string; name: string }>(
+    `select t.workspace_id as id, w.name from tenants t
+       join workspaces w on w.id = t.workspace_id
+      where w.name like 'Northwind Malaysia %' order by t.created_at desc limit 1`,
+  );
+  const target = rows[0];
+  expect(target).toBeDefined();
+  const id = (target as { id: string }).id;
+  await pool.query(
+    `insert into system_settings (key, value, source)
+     values ('cloud.closureRetentionDays', '30'::jsonb, 'admin')
+     on conflict (key) do update set value = excluded.value`,
+  );
+  await pool.query(
+    `update tenants set state = 'closed', closed_at = now() - interval '40 days'
+      where workspace_id = $1`,
+    [id],
+  );
+  await pool.query("update workspaces set state = 'frozen' where id = $1", [
+    id,
+  ]);
+  try {
+    await goTo(operatorPage, "/operator");
+    await expect(
+      operatorPage.getByText(
+        /past (its|their) retention window and (has|have) not been erased/,
+      ),
+    ).toBeVisible({ timeout: 15_000 });
+
+    await pool.query(
+      "update tenants set erasing_at = now() where workspace_id = $1",
+      [id],
+    );
+    await goTo(operatorPage, `/operator/${id}`);
+    await expect(operatorPage.getByText(/^Being erased since /)).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(operatorPage.locator("#lifecycle-state")).toHaveCount(0);
+  } finally {
+    await pool.query(
+      `update tenants set state = 'active', closed_at = null, erasing_at = null
+        where workspace_id = $1`,
+      [id],
+    );
+    await pool.query("update workspaces set state = 'active' where id = $1", [
+      id,
+    ]);
+    await pool.query(
+      "delete from system_settings where key = 'cloud.closureRetentionDays'",
+    );
+  }
+});

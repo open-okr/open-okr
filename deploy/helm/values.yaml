@@ -84,6 +84,12 @@ cloud:
   plans: ""
   # A key from `plans`, for the plan a new workspace starts on.
   defaultPlan: ""
+  erasure:
+    # A cron schedule for erasing closed workspaces past their retention window,
+    # such as "30 3 * * *". Empty runs nothing. Nothing is erased either while
+    # OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS is 0, its default, so set both.
+    # Needs database.adminUrl: only the owner role may delete audit rows.
+    schedule: ""
 
 # Anything else the application reads, including a credential. Prefer
 # extraEnvFrom with a Secret: a value here lands in the release's stored values,

@@ -165,6 +165,25 @@ which is 0, meaning never, until you set it. An owner who closed an active works
 reopen it until then. Only you can reopen one you closed, or one billing made read-only,
 and only you can close one you suspended, so a suspension can serve as a legal hold.
 
+**Erasing.** When the window has passed, `pnpm cloud:erase --write` deletes the
+workspace: its rows in every table, its audit trail, its files and export
+archives, its Stripe customer (Stripe keeps the invoices), and the accounts of
+people who belong to no other workspace. It writes a receipt with nothing personal
+in it, which `pnpm cloud:sweep --erased` lists. It is a dry run without `--write`.
+It runs as the owner role, `DATABASE_ADMIN_URL`, because the application's own role
+can never delete an audit row, and the application must be running, because it is
+what deletes the files and the customer. Schedule it beside the backup:
+
+```cron
+30 3 * * * cd /opt/openokr && ./openokr erase --write >> /var/log/openokr-erase.log 2>&1
+```
+
+On Kubernetes, set `cloud.erasure.schedule`. Keep the log: after a restore it is
+what names the workspaces to erase again ([restore](../runbooks/restore.md)). The
+operator console counts closed workspaces past their window, so a schedule that
+never runs shows. Backups hold erased data until they expire, so make them expire
+within your promise: `OPENOKR_BACKUP_RETENTION` counts backups, not days.
+
 ## Running your own
 
 Anybody may run a cloud from this code under the same licence. If you change the

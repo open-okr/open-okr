@@ -84,6 +84,13 @@ export interface Billing {
    * repeat, and a subscription that has already ended is left as it is.
    */
   endSubscription(ref: string): Promise<void>;
+  /**
+   * Deletes a customer, which ends any subscription still running and removes
+   * their saved cards and address. The provider keeps the invoices, as tax law
+   * requires. A customer already gone counts as done
+   * (docs/design/workspace-erasure.md §4).
+   */
+  deleteCustomer(ref: string): Promise<void>;
   readSubscription(ref: string): Promise<SubscriptionState>;
   /** Verifies the signature first. A bad one throws, and nothing else runs. */
   parseWebhook(body: string, signature: string): Promise<BillingEvent>;

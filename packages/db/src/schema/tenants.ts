@@ -47,6 +47,11 @@ export const tenants = pgTable("tenants", {
    * theirs too (docs/design/workspace-erasure.md §3). Migration 0148.
    */
   ownerMayReopen: boolean("owner_may_reopen").notNull().default(false),
+  /**
+   * When erasure claimed it (docs/design/workspace-erasure.md §4). Once set,
+   * nothing reopens it, and its audit rows may be deleted. Migration 0149.
+   */
+  erasingAt: timestamp("erasing_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

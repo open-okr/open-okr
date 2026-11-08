@@ -432,6 +432,25 @@ else
   fail "extra variables did not reach the pod"
 fi
 
+# --- erasure CronJob (docs/design/workspace-erasure.md §7) -----------------
+if echo "$defaults" | grep -q "component: erasure"; then
+  fail "the erasure CronJob renders with no schedule"
+else
+  pass "the erasure CronJob is off until a schedule is set"
+fi
+
+erase_job=$(render_one erasure-cronjob.yaml \
+  --set cloud.erasure.schedule="30 3 * * *" \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr 2>&1)
+if echo "$erase_job" | grep -q "cloud-erase.ts" \
+  && echo "$erase_job" | grep -q -- "- --write" \
+  && echo "$erase_job" | grep -q "name: DATABASE_ADMIN_URL" \
+  && ! echo "$erase_job" | grep -q "secret@db"; then
+  pass "the erasure CronJob runs with the owner role, from a Secret"
+else
+  fail "the erasure CronJob does not run with the owner role from a Secret"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2

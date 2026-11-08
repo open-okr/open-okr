@@ -173,6 +173,8 @@ Unique on `token_hash` alone for live rows since migration 0075 (P6-G06b), and t
 
 `seq` is the position in this workspace's chain, from 1. Ordering by `at` would be ambiguous under concurrency, and a chain needs exactly one order to be verifiable. `action` is the registry action name, so a row resolves back to one contract.
 
+**Migration 0149 makes one exception to append-only** (`docs/design/workspace-erasure.md` §5): the trigger lets a row be deleted when its workspace's tenant has `erasing_at` set, which only `pnpm cloud:erase` sets, running as the owner role. The application role still has no DELETE grant, so it is refused before the trigger is reached. The erasure's receipt on `instance_audit_events` records the chain's last `seq` and `row_hash`.
+
 **Migration 0105 adds `audit_events_recent_idx` on `(workspace_id, at desc, id desc)`** (completeness review L-19). The admin screen's list, `audit.list`, reads the trail newest first with the last row's `(at, id)` as the cursor for the next page, and a date range narrows the same index. The chain index answers `seq`, which is null for a row still waiting for its position, so it could not serve a list that has to show those rows too.
 
 `at` is written by the application rather than defaulted to `now()`, because it is part of the hash and has to be the value the hash was computed over.
@@ -892,9 +894,9 @@ Migration 0145. Design: `docs/design/billing.md`. Named for any provider, so ano
 Migration 0145. What makes a repeated webhook delivery do nothing. No `deleted_at`, because removing a row would let the event apply twice.
 
 ### tenants *(cloud only)*
-`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`, `owner_may_reopen`.
+`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`, `owner_may_reopen`, `erasing_at?`.
 
-Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`. Migration 0148 adds `owner_may_reopen`, default false: true only when the workspace's owner closed it while it was active, so reopening it is theirs too. A closure the provider made, or one of a workspace billing made read-only, leaves it false, so closing cannot become the way out of paying (`docs/design/workspace-erasure.md` §3).
+Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`. Migration 0148 adds `owner_may_reopen`, default false: true only when the workspace's owner closed it while it was active, so reopening it is theirs too. A closure the provider made, or one of a workspace billing made read-only, leaves it false, so closing cannot become the way out of paying (`docs/design/workspace-erasure.md` §3). Migration 0149 adds `erasing_at`, set when `pnpm cloud:erase` claims a closed workspace: from then on nothing moves the tenant, and it is the one condition under which `audit_events_append_only()` lets a row of that workspace be deleted. The trigger reads the tenant under the row-level floor, and the server's role has no DELETE grant on `audit_events` at all, so only the owner role, through that command, ever uses it.
 
 The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
 

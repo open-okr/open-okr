@@ -278,6 +278,42 @@ describe("ending a subscription when a workspace closes", () => {
   });
 });
 
+describe("deleting a customer when a workspace is erased", () => {
+  it("deletes it, which ends anything still running", async () => {
+    const { calls, billing } = stubbed(() => ({
+      id: "cus_1",
+      object: "customer",
+      deleted: true,
+    }));
+    await (await billing).deleteCustomer("cus_1");
+    expect(calls.map((call) => `${call.method} ${call.path}`)).toEqual([
+      "DELETE /v1/customers/cus_1",
+    ]);
+  });
+
+  it("counts a customer already gone as done", async () => {
+    const fakeFetch: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            type: "invalid_request_error",
+            code: "resource_missing",
+            message: "No such customer: 'cus_gone'",
+          },
+        }),
+        { status: 404, headers: { "content-type": "application/json" } },
+      );
+    const driver = await createBilling({
+      provider: "stripe",
+      secretKey: "sk_test_x",
+      webhookSecret: SECRET,
+      automaticTax: false,
+      fetch: fakeFetch,
+    });
+    await expect(driver.deleteCustomer("cus_gone")).resolves.toBeUndefined();
+  });
+});
+
 describe("reading a subscription", () => {
   it("takes the period from the item, and names a scheduled move", async () => {
     const { billing } = stubbed(() => ({

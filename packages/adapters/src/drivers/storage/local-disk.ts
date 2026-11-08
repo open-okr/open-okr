@@ -25,6 +25,19 @@ export interface LocalDiskStorageOptions {
 
 const DEFAULT_EXPIRY_SECONDS = 300;
 
+/**
+ * A prefix naming exactly one directory below the root, without its slash.
+ * Anything wider, an empty prefix above all, would delete more than one
+ * workspace's files, so it is refused rather than trimmed.
+ */
+export function directoryPrefix(prefix: string): string {
+  const name = prefix.endsWith("/") ? prefix.slice(0, -1) : prefix;
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) {
+    throw new Error(`Not a single directory to delete: ${prefix}`);
+  }
+  return name;
+}
+
 export class LocalDiskStorage implements FileStorage {
   readonly #root: string;
   readonly #secret: string;
@@ -85,6 +98,13 @@ export class LocalDiskStorage implements FileStorage {
     // `force` makes deleting an absent object a no-op, which keeps retries
     // and cleanup jobs simple.
     await rm(this.#resolve(key), { force: true });
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    await rm(this.#resolve(directoryPrefix(prefix)), {
+      recursive: true,
+      force: true,
+    });
   }
 
   async signedUrl(key: string, expiresInSeconds?: number): Promise<string> {
