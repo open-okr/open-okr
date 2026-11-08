@@ -1,5 +1,6 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
 import { canonThresholds, onTrackShareBand } from "@openokr/method";
+import Link from "next/link";
 import { workspaceReaderLevel } from "../lib/access";
 import { getPool } from "../lib/auth";
 import { getTranslations } from "../lib/translations";
@@ -232,33 +233,36 @@ export async function WorkMapScreen({
       />
 
       <p className="flex flex-wrap items-center gap-x-3.5 gap-y-1.5 text-xs text-ink-3">
-        <a className="text-brand-text underline" href="/goals">
+        <Link className="text-brand-text underline" href="/goals">
           {t("home.filterAndSearchIn")}
-        </a>
-        <a className="text-brand-text underline" href="/goals?display=diagram">
+        </Link>
+        <Link
+          className="text-brand-text underline"
+          href="/goals?display=diagram"
+        >
           {t("home.seeTheCascade")}
-        </a>
-        <a className="text-brand-text underline" href="/review">
+        </Link>
+        <Link className="text-brand-text underline" href="/review">
           {t("common.whatYouOwe")}
-        </a>
+        </Link>
         {/* P5-T01c. The task asks for a door from the front door itself,
             two clicks from the session, and since P9-T07a-b this is the
             only one outside the Cycle module's own tabs: Sessions left the
             sidebar for a tab inside Cycle (okr-entry-points.md §3.1). */}
-        <a className="text-brand-text underline" href="/sessions">
+        <Link className="text-brand-text underline" href="/sessions">
           {t("common.sessions")}
-        </a>
+        </Link>
         {/* P6-G11a. S-31 has a screen in §6 and no slot in §3's sidebar, so
             this is how it is reached. The engine has written a row on every
             operation since P2-T07 and nothing has ever shown one. */}
-        <a className="text-brand-text underline" href="/activity">
+        <Link className="text-brand-text underline" href="/activity">
           {t("home.whatHasHappenedHere")}
-        </a>
+        </Link>
         {/* P6-G09. S-33 has a screen in §6 and no slot in §3's sidebar,
             same pattern as Activity above. */}
-        <a className="text-brand-text underline" href="/people">
+        <Link className="text-brand-text underline" href="/people">
           {t("home.whoIsHere")}
-        </a>
+        </Link>
       </p>
     </>
   );

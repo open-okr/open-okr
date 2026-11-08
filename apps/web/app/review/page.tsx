@@ -372,12 +372,12 @@ function Row({
             // renders a `<button>` and only a `<button>`, and wrapping a link in
             // one would take the middle-click, the open-in-new-tab and the
             // status bar away from a row whose whole job is to be followed.
-            <a
+            <Link
               href={obligation.href}
               className={buttonVariants({ variant: "primary" })}
             >
               {obligation.actionLabel}
-            </a>
+            </Link>
           )}
         </span>
       </CardBody>

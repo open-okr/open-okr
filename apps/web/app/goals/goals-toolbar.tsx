@@ -1,6 +1,7 @@
 "use client";
 
 import { Tooltip, useTranslations } from "@openokr/ui";
+import Link from "next/link";
 import { type ReactNode, useState } from "react";
 
 /**
@@ -103,7 +104,7 @@ export function GoalsToolbar({
               >
                 {display.options.map((option) => (
                   <Tooltip key={option.key} label={option.label}>
-                    <a
+                    <Link
                       href={option.href}
                       aria-current={option.on ? "true" : undefined}
                       className={`grid w-7 place-items-center rounded-md ${
@@ -114,7 +115,7 @@ export function GoalsToolbar({
                     >
                       <span className="sr-only">{option.label}</span>
                       {DISPLAY_ICON[option.key]}
-                    </a>
+                    </Link>
                   </Tooltip>
                 ))}
               </fieldset>

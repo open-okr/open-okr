@@ -8,6 +8,7 @@ import {
   TextInput,
   UnitInput,
 } from "@openokr/ui";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { workspaceReaderLevel } from "../../lib/access";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
@@ -311,7 +312,7 @@ export default async function KpisPage({
     active.length === 0
       ? null
       : active.map((one) => (
-          <a
+          <Link
             key={one.key}
             href={href({ [one.key]: null })}
             aria-label={t("goals.filter.removeOne", { filter: one.label })}
@@ -326,7 +327,7 @@ export default async function KpisPage({
                 strokeLinecap="round"
               />
             </svg>
-          </a>
+          </Link>
         ));
 
   const recoveryCount = grid.kpis.filter(
@@ -362,18 +363,18 @@ export default async function KpisPage({
             </div>
             {canEdit ? (
               <div className="ml-auto flex items-center gap-2 max-md:ml-0 max-md:w-full">
-                <a
+                <Link
                   href={opening("category")}
                   className={buttonVariants({ size: "sm" })}
                 >
                   {t("kpis.newCategory")}
-                </a>
-                <a
+                </Link>
+                <Link
                   href={opening("kpi")}
                   className={`${buttonVariants({ variant: "primary", size: "sm" })} max-md:flex-1 max-md:justify-center`}
                 >
                   {t("kpis.addAKpi")}
-                </a>
+                </Link>
               </div>
             ) : null}
           </div>
@@ -393,12 +394,12 @@ export default async function KpisPage({
             chips={chips}
             clearAll={
               active.length === 0 ? null : (
-                <a
+                <Link
                   href="/kpis"
                   className="px-1.5 text-[12.5px] font-semibold text-brand-text hover:underline"
                 >
                   {t("goals.filter.clearAll")}
-                </a>
+                </Link>
               )
             }
             activeCount={active.length}
@@ -589,7 +590,7 @@ function Pill({
   readonly children: ReactNode;
 }) {
   return (
-    <a
+    <Link
       href={href}
       aria-current={on ? "true" : undefined}
       data-testid={testId}
@@ -600,6 +601,6 @@ function Pill({
       }`}
     >
       {children}
-    </a>
+    </Link>
   );
 }

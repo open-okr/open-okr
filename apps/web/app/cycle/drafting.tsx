@@ -22,6 +22,7 @@ import {
   UnitInput,
 } from "@openokr/ui";
 import { ChevronDown } from "lucide-react";
+import Link from "next/link";
 import {
   type MemberLike,
   memberOption,
@@ -278,12 +279,12 @@ export async function Drafting({
               {assistsAvailable && canEdit ? (
                 <SuggestParent goalId={goal.id} />
               ) : null}
-              <a
+              <Link
                 className="inline-flex min-h-6 items-center text-xs text-brand-text underline"
                 href={`/goals/${goal.id}`}
               >
                 {t("cycle.drafting.open")}
-              </a>
+              </Link>
             </span>
           </CardHeader>
           {/* Each objective folds, so a long draft set can be read as a
@@ -621,9 +622,9 @@ export async function Drafting({
                   ) : kpis.length === 0 ? (
                     <p className="text-xs text-ink-4">
                       {t("cycle.drafting.noKpisYet")}{" "}
-                      <a className="underline" href="/kpis">
+                      <Link className="underline" href="/kpis">
                         {t("cycle.drafting.addAKpi")}
-                      </a>
+                      </Link>
                     </p>
                   ) : (
                     <p className="text-xs text-ink-4">

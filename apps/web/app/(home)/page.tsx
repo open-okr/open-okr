@@ -1,4 +1,5 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
 import { agentSetupUrl } from "../../lib/agent-setup-prompt.ts";
@@ -135,9 +136,9 @@ export default async function HomePage({
         </>
       ) : (
         <p className="text-xs">
-          <a className="text-brand-text underline" href="/map">
+          <Link className="text-brand-text underline" href="/map">
             {t("home.map.link")}
-          </a>
+          </Link>
         </p>
       )}
     </div>

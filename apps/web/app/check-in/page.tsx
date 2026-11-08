@@ -8,6 +8,7 @@ import {
   Chip,
   dueDayLabel,
 } from "@openokr/ui";
+import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { progressCeiling } from "../../lib/ceilings.ts";
@@ -154,7 +155,7 @@ export default async function CheckInPage({
             {due.map((goal) => {
               const active = goal.id === requested;
               return (
-                <a
+                <Link
                   key={goal.id}
                   href={`/check-in?goal=${goal.id}`}
                   aria-current={active ? "step" : undefined}
@@ -222,7 +223,7 @@ export default async function CheckInPage({
                       </span>
                     </span>
                   </span>
-                </a>
+                </Link>
               );
             })}
           </CardBody>
@@ -240,7 +241,7 @@ export default async function CheckInPage({
                 {t("checkIn.updateAnyTime")}
               </h2>
               {later.map((goal) => (
-                <a
+                <Link
                   key={goal.id}
                   href={`/check-in?goal=${goal.id}`}
                   aria-current={goal.id === requested ? "step" : undefined}
@@ -254,7 +255,7 @@ export default async function CheckInPage({
                   <span className="text-xs text-ink-3">
                     {t("checkIn.dueOn", { date: dueOn(goal, locale) })}
                   </span>
-                </a>
+                </Link>
               ))}
             </section>
           </CardBody>
@@ -404,19 +405,22 @@ async function CheckInForGoal({
             </p>
             {updatable && canEdit && !dueHere ? (
               <p>
-                <a
+                <Link
                   className="inline-flex rounded-md border border-brand-line px-2.5 py-1 text-xs font-semibold text-brand-text hover:bg-brand-weak"
                   href={`/check-in?goal=${goal.id}&update=1`}
                 >
                   {t("checkIn.postAnUpdate")}
-                </a>
+                </Link>
               </p>
             ) : null}
             {nextGoalId ? (
               <p className="text-xs text-ink-3">
-                <a className="underline" href={`/check-in?goal=${nextGoalId}`}>
+                <Link
+                  className="underline"
+                  href={`/check-in?goal=${nextGoalId}`}
+                >
                   {t("checkIn.continueToYourNext")}
-                </a>
+                </Link>
               </p>
             ) : null}
           </CardBody>

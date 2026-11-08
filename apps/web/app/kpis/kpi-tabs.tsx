@@ -1,4 +1,5 @@
 import { callAction } from "@openokr/core";
+import Link from "next/link";
 import type { getPool } from "../../lib/auth";
 import { KPI_TABS } from "../../lib/section-tabs.tsx";
 
@@ -32,7 +33,7 @@ export function KpiTabs({
         const open = tab.href === active;
         const count = counts[tab.href];
         return (
-          <a
+          <Link
             key={tab.href}
             href={tab.href}
             aria-current={open ? "page" : undefined}
@@ -52,7 +53,7 @@ export function KpiTabs({
                 {count}
               </span>
             )}
-          </a>
+          </Link>
         );
       })}
     </nav>

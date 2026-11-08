@@ -21,6 +21,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { X } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
@@ -228,12 +229,12 @@ export function OkrDrawer({
             </Dialog.Title>
             {saving ? <Spinner /> : null}
             {goal ? (
-              <a
+              <Link
                 href={`/goals/${goal.id}`}
                 className="flex-none text-xs font-semibold text-brand-text hover:underline"
               >
                 {t("okrDrawer.fullPage")}
-              </a>
+              </Link>
             ) : null}
             <Dialog.Close
               aria-label={t("okrDrawer.close")}
@@ -1078,12 +1079,12 @@ function Alignment({
         {title}
       </button>
     ) : (
-      <a
+      <Link
         href={`/goals/${id}`}
         className="text-xs font-semibold text-brand-text hover:underline"
       >
         {title}
-      </a>
+      </Link>
     );
 
   return (

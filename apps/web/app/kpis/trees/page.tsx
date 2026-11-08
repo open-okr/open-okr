@@ -101,12 +101,12 @@ export default async function KpiTreesPage({
               </p>
             </div>
             {canEdit ? (
-              <a
+              <Link
                 href={`/kpis/trees?tree=${current}&new=tree`}
                 className={`${buttonVariants({ variant: "primary", size: "sm" })} ml-auto max-md:ml-0 max-md:w-full max-md:justify-center`}
               >
                 {t("kpis.trees.newTree")}
-              </a>
+              </Link>
             ) : null}
           </div>
           <GoalsToolbar

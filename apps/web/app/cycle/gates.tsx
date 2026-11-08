@@ -7,6 +7,7 @@ import {
   TextArea,
   VerdictDot,
 } from "@openokr/ui";
+import Link from "next/link";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { publishCycle } from "./actions.ts";
@@ -183,7 +184,7 @@ export async function Gates({
                 )}
                 {gate.level === "off" ||
                 (gate.evaluable && gate.passed) ? null : (
-                  <a
+                  <Link
                     href={keepCycle(
                       FIX[gate.gateKey]?.href ?? "/cycle?phase=4",
                       pinnedCycleId,
@@ -194,7 +195,7 @@ export async function Gates({
                       FIX[gate.gateKey]?.label ??
                         "cycle.gates.goToTheDraftingScreen",
                     )}
-                  </a>
+                  </Link>
                 )}
               </span>
             </li>
