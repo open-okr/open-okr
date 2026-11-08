@@ -58,6 +58,23 @@ const en = {
   "invite.footer":
     "Not expecting this? Ignore it. Nothing happens until you accept.",
 
+  "closed.subject": "{workspace} has been closed",
+  "closed.preheader": "It will be deleted on {date}. Export it before then.",
+  "closed.preheaderKept": "Export anything you want to keep.",
+  "closed.eyebrow": "Workspace closed",
+  "closed.heading": "{workspace} is closed",
+  "closed.by": " closed it on {date}.",
+  "closed.byProvider": "The provider closed it on {date}.",
+  "closed.deletedOn":
+    "Everything in it stays readable until {date}. Then it is deleted for good, and cannot be brought back.",
+  "closed.kept":
+    "Everything in it stays readable, and nothing is deleted until the provider decides to.",
+  "closed.action": "Export the workspace",
+  "closed.mayReopen":
+    "Closed by mistake? An owner can reopen it from Admin, General until it is deleted.",
+  "closed.providerReopens": "Only the provider can reopen it.",
+  "closed.footer": "Sent to the owners and administrators of {workspace}.",
+
   "digest.subjectOne": "{workspace}: 1 update",
   "digest.subjectMany": "{workspace}: {count} updates",
   "digest.headingOne": "1 update",
@@ -134,6 +151,23 @@ const ms: Readonly<Record<MailWordKey, string>> = {
     "Jemputan ini untuk alamat ini sahaja dan tamat tempoh pada {date}.",
   "invite.footer":
     "Tidak menjangkakan ini? Abaikan sahaja. Tiada apa berlaku sehingga anda menerimanya.",
+
+  "closed.subject": "{workspace} telah ditutup",
+  "closed.preheader": "Ia akan dipadam pada {date}. Eksport sebelum itu.",
+  "closed.preheaderKept": "Eksport apa-apa yang anda mahu simpan.",
+  "closed.eyebrow": "Ruang kerja ditutup",
+  "closed.heading": "{workspace} telah ditutup",
+  "closed.by": " menutupnya pada {date}.",
+  "closed.byProvider": "Penyedia menutupnya pada {date}.",
+  "closed.deletedOn":
+    "Semua kandungannya kekal boleh dibaca sehingga {date}. Selepas itu ia dipadam terus dan tidak boleh dikembalikan.",
+  "closed.kept":
+    "Semua kandungannya kekal boleh dibaca, dan tiada apa-apa dipadam sehingga penyedia memutuskannya.",
+  "closed.action": "Eksport ruang kerja",
+  "closed.mayReopen":
+    "Ditutup secara tidak sengaja? Pemilik boleh membukanya semula dari Pentadbiran, Umum sebelum ia dipadam.",
+  "closed.providerReopens": "Hanya penyedia boleh membukanya semula.",
+  "closed.footer": "Dihantar kepada pemilik dan pentadbir {workspace}.",
 
   "digest.subjectOne": "{workspace}: 1 kemas kini",
   "digest.subjectMany": "{workspace}: {count} kemas kini",

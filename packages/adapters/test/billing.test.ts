@@ -235,6 +235,49 @@ describe("changing plan", () => {
   });
 });
 
+describe("ending a subscription when a workspace closes", () => {
+  const live = {
+    id: "sub_1",
+    object: "subscription",
+    status: "active",
+    cancel_at_period_end: false,
+    schedule: null,
+  };
+
+  it("stops it renewing at the period's end, and refunds nothing", async () => {
+    const { calls, billing } = stubbed(() => live);
+    await (await billing).endSubscription("sub_1");
+    const posts = calls.filter((call) => call.method === "POST");
+    expect(posts.map((call) => call.path)).toEqual(["/v1/subscriptions/sub_1"]);
+    expect(posts[0]?.body.get("cancel_at_period_end")).toBe("true");
+  });
+
+  it("releases a downgrade waiting for that day first, so it starts no new charge", async () => {
+    const { calls, billing } = stubbed(() => ({
+      ...live,
+      schedule: "sub_sched_1",
+    }));
+    await (await billing).endSubscription("sub_1");
+    expect(
+      calls.filter((call) => call.method === "POST").map((call) => call.path),
+    ).toEqual([
+      "/v1/subscription_schedules/sub_sched_1/release",
+      "/v1/subscriptions/sub_1",
+    ]);
+  });
+
+  it("changes nothing that has already ended or is already set to end", async () => {
+    for (const state of [
+      { status: "canceled" },
+      { cancel_at_period_end: true },
+    ]) {
+      const { calls, billing } = stubbed(() => ({ ...live, ...state }));
+      await (await billing).endSubscription("sub_1");
+      expect(calls.filter((call) => call.method === "POST")).toEqual([]);
+    }
+  });
+});
+
 describe("reading a subscription", () => {
   it("takes the period from the item, and names a scheduled move", async () => {
     const { billing } = stubbed(() => ({

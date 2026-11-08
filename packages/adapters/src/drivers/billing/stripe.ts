@@ -222,6 +222,27 @@ export class StripeBilling implements Billing {
     });
   }
 
+  async endSubscription(ref: string): Promise<void> {
+    const subscription = await this.#client.subscriptions.retrieve(ref);
+    if (
+      subscription.status === "canceled" ||
+      subscription.status === "incomplete_expired"
+    ) {
+      return;
+    }
+    // A downgrade waiting for the period's end would otherwise start a new
+    // phase, and so a new charge, on the day the subscription was meant to end.
+    const scheduleId = idOf(subscription.schedule);
+    if (scheduleId) {
+      await this.#client.subscriptionSchedules.release(scheduleId);
+    }
+    if (!subscription.cancel_at_period_end) {
+      await this.#client.subscriptions.update(ref, {
+        cancel_at_period_end: true,
+      });
+    }
+  }
+
   async readSubscription(ref: string): Promise<SubscriptionState> {
     const subscription = await this.#client.subscriptions.retrieve(ref, {
       expand: ["schedule"],

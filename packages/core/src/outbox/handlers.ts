@@ -40,13 +40,16 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  endSubscriptionOnClosing,
+  type SubscriptionEnder,
+} from "../billing/closing.ts";
+import {
   BLOB_SCAN_TOPIC,
   parseScanJob,
   runScanJob,
   type ScanFile,
 } from "../blobs/scan.ts";
 import { parseCopilotRunJob, runCopilotAnswer } from "../copilot/background.ts";
-
 import type { EmbedFunction } from "../embeddings/service.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import { parseEmbedJob, runEmbedJob } from "../embeddings/worker.ts";
@@ -57,6 +60,7 @@ import {
   runExportJob,
 } from "../exports/worker.ts";
 import {
+  closureMail,
   invitationMail,
   notificationDigestMail,
   renderStoredEmail,
@@ -69,6 +73,11 @@ import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
+import {
+  END_SUBSCRIPTION_TOPIC,
+  readClosureNotice,
+  WORKSPACE_CLOSED_TOPIC,
+} from "../tenancy/closing.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
@@ -197,6 +206,12 @@ export interface OutboxHandlerDeps {
   readonly continueAgentRun?: (
     job: AgentRunStepJob,
   ) => Promise<AgentRunStepOutcome>;
+  /**
+   * The payment provider, for the one call a closure makes of it
+   * (docs/design/workspace-erasure.md §3). Resolved per delivery, because billing
+   * is a stored setting. Absent, or answering null, means no provider.
+   */
+  readonly billingFor?: () => Promise<SubscriptionEnder | null>;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -833,6 +848,74 @@ const continueAgentRun: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Stops the subscription of a workspace that closed (workspace-erasure.md §3).
+ *
+ * **Safe to run twice**: the provider is asked to end at the period's end, and
+ * asking again changes nothing. A provider that fails throws, and the relay asks
+ * again, which is what "retries until it answers" means.
+ */
+const endSubscription: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  if (!workspaceId) {
+    throw new PermanentDispatchError(
+      "Stopping a subscription needs a workspace, and this row names none.",
+    );
+  }
+  const outcome = await endSubscriptionOnClosing(
+    deps.pool,
+    workspaceId,
+    (await deps.billingFor?.()) ?? null,
+  );
+  if (outcome !== "ended") {
+    deps.onSkipped?.(delivery, outcome);
+  }
+};
+
+/**
+ * Tells a closed workspace's owners and administrators the date it will be
+ * deleted (workspace-erasure.md §3).
+ *
+ * **Safe to run twice in the only sense mail can be**, like the digest: a relay
+ * that dies after sending sends again. A workspace reopened before this ran is
+ * not told it closed.
+ */
+const sendClosureNotice: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const closedAt = asString(delivery.payload.closedAt);
+  if (!workspaceId || !closedAt) {
+    throw new PermanentDispatchError(
+      "A closure notice needs a workspace and the instant it closed.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readClosureNotice(deps.pool, {
+    workspaceId,
+    byMemberId: asString(delivery.payload.byMemberId),
+  });
+  if (notice.schedule?.closedAt.toISOString() !== closedAt) {
+    deps.onSkipped?.(delivery, "the workspace was reopened since");
+    return;
+  }
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...closureMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        closedByName: notice.closedByName,
+        closedAt: notice.schedule.closedAt,
+        eraseOn: notice.schedule.eraseOn,
+        ownerMayReopen: notice.schedule.ownerMayReopen,
+      }),
+    });
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -881,6 +964,10 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // scanner is configured, so an instance without one never sees this topic.
   [BLOB_SCAN_TOPIC]: scanBlob,
   "workspace.renamed": acknowledge,
+  // A workspace closed (docs/design/workspace-erasure.md §3): stop the bill, and
+  // tell its owners and administrators when it will be deleted.
+  [END_SUBSCRIPTION_TOPIC]: endSubscription,
+  [WORKSPACE_CLOSED_TOPIC]: sendClosureNotice,
 };
 
 /**

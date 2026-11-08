@@ -1,8 +1,10 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction, getAction } from "../src/actions/registry.ts";
+import { endSubscriptionOnClosing } from "../src/billing/closing.ts";
 import { grantOperator } from "../src/operator/grants.ts";
 import { setLifecycleAsOperator } from "../src/operator/lifecycle.ts";
+import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import {
@@ -199,6 +201,18 @@ describe("what a workspace's own administrator may move (workspace-erasure.md §
     expect(tenant?.state).toBe("suspended");
   });
 
+  it("reopens what it closed while it was active (AC 6)", async () => {
+    await close();
+    await expect(asAdmin("active")).resolves.toMatchObject({ state: "active" });
+    expect(await workspaceState()).toBe("active");
+  });
+
+  it("cannot reopen what the provider closed", async () => {
+    await asOperator("closed");
+    await expect(asAdmin("active")).rejects.toThrow(/provider/);
+    expect(await workspaceState()).toBe("frozen");
+  });
+
   it("cannot suspend it: that is the provider's", async () => {
     await expect(asAdmin("suspended")).rejects.toThrow(/provider/);
     expect(await workspaceState()).toBe("active");
@@ -280,5 +294,142 @@ describe("the closure retention sweep", () => {
     await asOperator("suspended");
     const result = await sweepClosedTenants(wb.appPool, { now: longAfter() });
     expect(result.due).toEqual([]);
+  });
+});
+
+describe("what closing sets going (workspace-erasure.md §3)", () => {
+  const rows = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      `select topic, payload, idempotency_key from outbox
+        where payload->>'workspaceId' = $1
+          and topic in ('billing.endSubscription', 'workspace.closed')
+        order by topic`,
+      [workspaceId],
+    );
+    return rows as {
+      topic: string;
+      payload: Record<string, unknown>;
+      idempotency_key: string;
+    }[];
+  };
+
+  const deliver = async (
+    row: { topic: string; payload: Record<string, unknown> },
+    sent: { to: string; subject: string; text: string }[],
+  ) => {
+    const wb = await workerDb();
+    await dispatchOutbox(
+      {
+        topic: row.topic,
+        payload: row.payload,
+        idempotencyKey: "test",
+        attempts: 0,
+      },
+      {
+        pool: wb.appPool,
+        baseUrl: "https://okr.example.com",
+        async sendMail(message) {
+          sent.push(message);
+        },
+      },
+    );
+  };
+
+  it("asks the provider to stop the bill, and tells the owners, from either door", async () => {
+    await close();
+    expect((await rows()).map((row) => row.topic)).toEqual([
+      "billing.endSubscription",
+      "workspace.closed",
+    ]);
+    await asOperator("active");
+    await asOperator("closed");
+    // A second closure is a second notice: the key carries the instant.
+    expect((await rows()).map((row) => row.topic)).toEqual([
+      "billing.endSubscription",
+      "billing.endSubscription",
+      "workspace.closed",
+      "workspace.closed",
+    ]);
+  });
+
+  it("enqueues nothing on the way back", async () => {
+    await close();
+    await asAdmin("active");
+    expect(await rows()).toHaveLength(2);
+  });
+
+  it("tells every owner the date it will be deleted, who closed it, and how to undo it", async () => {
+    await setSetting(CLOUD_CLOSURE_RETENTION_KEY, 30);
+    await close();
+    const notice = (await rows()).find(
+      (row) => row.topic === "workspace.closed",
+    );
+    const sent: { to: string; subject: string; text: string }[] = [];
+    await deliver(notice as NonNullable<typeof notice>, sent);
+    expect(sent.map((mail) => mail.to)).toEqual(["lifecycle@example.com"]);
+    const eraseOn = new Date(
+      Date.parse(String(notice?.payload.closedAt)) + 30 * 24 * 60 * 60 * 1000,
+    ).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    expect(sent[0]?.subject).toMatch(/has been closed$/);
+    expect(sent[0]?.text).toContain(`stays readable until ${eraseOn}`);
+    expect(sent[0]?.text).toContain("The Owner closed it on");
+    expect(sent[0]?.text).toContain("An owner can reopen it");
+    expect(sent[0]?.text).toContain("https://okr.example.com/admin/imports");
+  });
+
+  it("says nothing will be deleted while retention is off, and that only the provider reopens what it closed", async () => {
+    await asOperator("closed");
+    const notice = (await rows()).find(
+      (row) => row.topic === "workspace.closed",
+    );
+    const sent: { to: string; subject: string; text: string }[] = [];
+    await deliver(notice as NonNullable<typeof notice>, sent);
+    expect(sent[0]?.text).toContain("The provider closed it on");
+    expect(sent[0]?.text).toContain("nothing is deleted until the provider");
+    expect(sent[0]?.text).toContain("Only the provider can reopen it.");
+  });
+
+  it("is not sent once the workspace has been reopened", async () => {
+    await close();
+    await asAdmin("active");
+    const notice = (await rows()).find(
+      (row) => row.topic === "workspace.closed",
+    );
+    const sent: { to: string; subject: string; text: string }[] = [];
+    await deliver(notice as NonNullable<typeof notice>, sent);
+    expect(sent).toEqual([]);
+  });
+
+  it("stops the subscription the workspace pays with, and nothing else", async () => {
+    const wb = await workerDb();
+    const ended: string[] = [];
+    const stripe = {
+      provider: "stripe",
+      async endSubscription(ref: string) {
+        ended.push(ref);
+      },
+    };
+    await expect(
+      endSubscriptionOnClosing(wb.appPool, workspaceId, stripe),
+    ).resolves.toMatch(/no subscription/);
+    await wb.admin.query(
+      `insert into billing_accounts
+         (workspace_id, provider, customer_ref, subscription_ref, status)
+       values ($1, 'stripe', 'cus_closing', 'sub_closing', 'active')`,
+      [workspaceId],
+    );
+    await expect(
+      endSubscriptionOnClosing(wb.appPool, workspaceId, null),
+    ).resolves.toMatch(/no stripe billing/);
+    await expect(
+      endSubscriptionOnClosing(wb.appPool, workspaceId, stripe),
+    ).resolves.toBe("ended");
+    expect(ended).toEqual(["sub_closing"]);
   });
 });

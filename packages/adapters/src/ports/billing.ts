@@ -78,6 +78,12 @@ export interface Billing {
     readonly returnUrl: string;
   }): Promise<{ readonly url: string }>;
   changeSubscription(input: ChangeSubscriptionInput): Promise<void>;
+  /**
+   * Stops a subscription renewing, at the end of the period already paid for, and
+   * releases any change that was scheduled for then. Nothing is refunded. Safe to
+   * repeat, and a subscription that has already ended is left as it is.
+   */
+  endSubscription(ref: string): Promise<void>;
   readSubscription(ref: string): Promise<SubscriptionState>;
   /** Verifies the signature first. A bad one throws, and nothing else runs. */
   parseWebhook(body: string, signature: string): Promise<BillingEvent>;

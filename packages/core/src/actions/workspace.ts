@@ -12,6 +12,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
 import {
+  closingOutbox,
   readLifecycleInTx,
   refuseOwnLifecycleMove,
   refuseOwnStateChange,
@@ -413,15 +414,20 @@ export const setWorkspaceLifecycle = defineWriteAction({
           "The address typed does not match this workspace's, so nothing changed.",
         );
       }
-      return current;
+      return { ...current, from: lifecycle.state };
     },
-    async execute({ tx, workspaceId, loaded }) {
+    async execute({ tx, workspaceId, loaded, actor }) {
+      const now = new Date();
       // The tenancy module owns every read and write of `tenants`, and
       // `pnpm check:boundaries` is what keeps it that way. This action never
       // sees the table.
       const moved = await setTenantStateInTx(tx, {
         workspaceId,
         state: input.state,
+        // Closing an active workspace is undoable by whoever did it. Closing one
+        // billing made read-only is not, or it would be the way out of paying.
+        ownerMayReopen: loaded.from === "active",
+        now,
       });
       if (!moved) {
         throw new OperationError(
@@ -447,8 +453,20 @@ export const setWorkspaceLifecycle = defineWriteAction({
           action: "workspace.setLifecycle",
           targetType: "workspace",
           targetId: workspaceId,
-          payload: { state: input.state },
+          payload: { state: input.state, from: loaded.from },
         },
+        // The subscription stops renewing and the owners and administrators are
+        // told the date. Reopening does neither: the subscription stays set to
+        // end, because nobody has just confirmed a new charge.
+        ...(input.state === "closed"
+          ? {
+              outbox: closingOutbox({
+                workspaceId,
+                closedAt: now,
+                byMemberId: actor.memberId,
+              }),
+            }
+          : {}),
       };
     },
   }),

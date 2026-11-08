@@ -1,4 +1,11 @@
-import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { workspaces } from "./workspaces.ts";
 
 /**
@@ -35,6 +42,11 @@ export const tenants = pgTable("tenants", {
   /** Recorded, never routed on. */
   region: text("region").notNull(),
   closedAt: timestamp("closed_at", { withTimezone: true }),
+  /**
+   * True only when the owner closed it while it was active, so reopening it is
+   * theirs too (docs/design/workspace-erasure.md §3). Migration 0148.
+   */
+  ownerMayReopen: boolean("owner_may_reopen").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

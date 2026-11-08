@@ -20,6 +20,12 @@ export {
 } from "./admission.ts";
 export { adoptWorkspaces } from "./adopt.ts";
 export {
+  type ClosureSchedule,
+  closingOutbox,
+  erasureDateFor,
+  readClosureSchedule,
+} from "./closing.ts";
+export {
   addCreditPackInTx,
   type CreditSummary,
   chargeCreditsInTx,

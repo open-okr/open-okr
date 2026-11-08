@@ -1,20 +1,25 @@
 import {
+  ACCESS_LEVELS,
   callAction,
   deploymentInstanceName,
+  erasureDateFor,
   isCloudEnabled,
   readInstanceName,
   readRegistrationPolicy,
   readUpdateCheck,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
+import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
-import { heldBy } from "../../../lib/held-by";
+import { getBilling } from "../../../lib/billing";
+import { holdOf, readLifecycle } from "../../../lib/held-by";
 import { getMailSettings } from "../../../lib/mail";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { schedulerState } from "../../../lib/scheduler";
 import { tenantFloor } from "../../../lib/tenant-floor";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { CloseWorkspaceCard } from "./close-workspace-card";
 import { ConsoleMailNotice } from "./console-mail-notice";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
@@ -27,7 +32,7 @@ import { WorkspaceStateCard } from "./workspace-state-card";
 export const generateMetadata = pageTitle("pageTitle.adminGeneral");
 
 export default async function GeneralSettingsPage() {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const { session, workspace } = await requireWorkspace();
   const read = await callAction(
@@ -67,6 +72,41 @@ export default async function GeneralSettingsPage() {
   const updateCheck = cloud
     ? null
     : await readUpdateCheck(getPool()).catch(() => null);
+
+  // Where the workspace stands with its provider (docs/design/workspace-erasure.md
+  // §8). Null on every self-hosted instance, which shows neither card's cloud half.
+  const lifecycle = await readLifecycle(workspace.workspaceId);
+  const hold = await holdOf(workspace.workspaceId, lifecycle);
+  const day = (date: Date) =>
+    new Intl.DateTimeFormat(locale, {
+      dateStyle: "long",
+      timeZone: "UTC",
+    }).format(date);
+  // Closing is the owner's, as the server says: `full` on the workspace.
+  const owns =
+    lifecycle !== null &&
+    (await resolveAccessLevelFor(workspace.workspaceId, workspace.memberId)) >=
+      ACCESS_LEVELS.full;
+  const closeCard = !owns ? null : hold?.kind === "closed" ? (
+    <CloseWorkspaceCard
+      mode="closed"
+      closedOn={day(hold.closedAt)}
+      eraseOn={hold.eraseOn ? day(hold.eraseOn) : null}
+      mayReopen={hold.ownerMayReopen}
+    />
+  ) : hold?.kind === "provider" ? null : (
+    <CloseWorkspaceCard
+      mode="open"
+      slug={workspace.slug}
+      eraseIfClosedToday={
+        await erasureDateFor(getPool(), new Date()).then((date) =>
+          date ? day(date) : null,
+        )
+      }
+      mayReopenAfter={hold === null}
+      billingOn={(await getBilling().catch(() => null)) !== null}
+    />
+  );
 
   return (
     <div className="flex flex-col gap-4.5">
@@ -112,10 +152,8 @@ export default async function GeneralSettingsPage() {
        * and no screen ever called it, so P6-T07's rehearsal runbook asked an
        * operator to press something that did not exist.
        */}
-      <WorkspaceStateCard
-        state={workspace.state}
-        heldBy={await heldBy(workspace.workspaceId)}
-      />
+      <WorkspaceStateCard state={workspace.state} heldBy={hold?.kind ?? null} />
+      {closeCard}
     </div>
   );
 }

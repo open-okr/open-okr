@@ -16,7 +16,7 @@ import type { TenantState } from "@openokr/db";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { OperationError, runOperation } from "../operations/operation.ts";
-import { setTenantStateInTx } from "../tenancy/index.ts";
+import { closingOutbox, setTenantStateInTx } from "../tenancy/index.ts";
 import { isLiveOperator } from "./store.ts";
 
 /**
@@ -80,9 +80,13 @@ export async function setLifecycleAsOperator(
       // nothing.
       actor: { kind: "operator", userId: input.operatorUserId },
       async execute({ tx, workspaceId }) {
+        const now = new Date();
+        // Never reopenable by the owner: a closure the provider made is the
+        // provider's to undo (docs/design/workspace-erasure.md §3).
         const moved = await setTenantStateInTx(tx, {
           workspaceId,
           state: input.state,
+          now,
         });
         if (!moved) {
           throw new OperationError(
@@ -108,6 +112,16 @@ export async function setLifecycleAsOperator(
             // months later why they were suspended reads it here.
             payload: { state: input.state, reason, by: "operator" },
           },
+          // The same two side effects the owner's own closing sets going.
+          ...(input.state === "closed"
+            ? {
+                outbox: closingOutbox({
+                  workspaceId,
+                  closedAt: now,
+                  byMemberId: null,
+                }),
+              }
+            : {}),
         };
       },
     },

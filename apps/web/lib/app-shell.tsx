@@ -46,7 +46,7 @@ import { CreditsBanner } from "./credits-banner.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
-import { heldBy } from "./held-by.ts";
+import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { getInstanceName } from "./instance-name";
 import { navBlocks, navLabel } from "./nav-groups.ts";
@@ -523,7 +523,7 @@ export async function AppShellLayout({
               <WorkspaceStateBanner
                 state={workspace.state}
                 canRecover={level >= ACCESS_LEVELS.full}
-                heldByProvider={(await heldBy(workspace.workspaceId)) !== null}
+                hold={await readHold(workspace.workspaceId)}
               />
             </div>
           )}

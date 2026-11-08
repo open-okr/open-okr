@@ -19,6 +19,9 @@ export class NoBilling implements Billing {
   async changeSubscription(): Promise<never> {
     throw new BillingUnavailableError();
   }
+  async endSubscription(): Promise<never> {
+    throw new BillingUnavailableError();
+  }
   async readSubscription(): Promise<never> {
     throw new BillingUnavailableError();
   }

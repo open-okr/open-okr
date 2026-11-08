@@ -119,13 +119,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     caller: "packages/core/src/demo/builder.ts",
     why: "the demo builder records a closed cycle's result through it; a person records it by closing the cycle with `cycles.close`",
   },
-  // The operator console presses it through the typed
-  // `setLifecycleAsOperator` rather than by naming the action, so the scan of
-  // the browser code walks past a caller that is real.
-  "workspace.setLifecycle": {
-    caller: "packages/core/src/operator/lifecycle.ts",
-    why: "the operator console suspends, closes and reopens a workspace through the typed `setLifecycleAsOperator`, which runs this",
-  },
 
   "goals.reviewDecision": {
     answeredBy: "decisions.forGoal",

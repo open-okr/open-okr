@@ -892,9 +892,9 @@ Migration 0145. Design: `docs/design/billing.md`. Named for any provider, so ano
 Migration 0145. What makes a repeated webhook delivery do nothing. No `deleted_at`, because removing a row would let the event apply twice.
 
 ### tenants *(cloud only)*
-`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`.
+`workspace_id` to workspaces (**and it is the primary key**), `state` (`active` / `suspended` / `closed`), `plan_key?`, `seats?`, `trial_ends_at?`, `region`, `closed_at?`, `owner_may_reopen`.
 
-Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`.
+Built at P8-T02a, migration 0082. Design: `docs/design/tenant-lifecycle.md`. Migration 0148 adds `owner_may_reopen`, default false: true only when the workspace's owner closed it while it was active, so reopening it is theirs too. A closure the provider made, or one of a workspace billing made read-only, leaves it false, so closing cannot become the way out of paying (`docs/design/workspace-erasure.md` §3).
 
 The workspace id is the primary key rather than a column beside one, because one tenant per workspace is the rule and a key enforces it without a second unique index. `plan_key` is nullable text and not an enum: null is the free tier, so the free tier needs no catalogue row, and an enum would turn adding a plan into a migration. `seats` null means unlimited. A check constraint ties `closed_at` to the closed state in both directions, so a closed workspace always has a closure instant for the retention sweep to read and an open one never does.
 

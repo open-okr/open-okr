@@ -275,6 +275,67 @@ test.describe("a cloud run by a provider", () => {
     }
   });
 
+  test("an owner closes the workspace by typing its address, sees the date, and reopens it", async ({
+    page,
+  }) => {
+    const { rows } = await pool.query<{ id: string }>(
+      `select m.workspace_id as id
+         from workspace_members m join users u on u.id = m.user_id
+        where u.email = $1 and m.deleted_at is null`,
+      [INSTANCE_ACCOUNT.email],
+    );
+    const { rows: made } = await pool.query<{ id: string }>(
+      `insert into tenants (workspace_id, region)
+       select id, 'local' from unnest($1::uuid[]) as id
+       on conflict (workspace_id) do nothing
+       returning workspace_id as id`,
+      [rows.map((row) => row.id)],
+    );
+    const ours = made.map((row) => row.id);
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('cloud.closureRetentionDays', '30'::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+    );
+    try {
+      await signIn(page);
+      await goTo(page, "/admin/general");
+      const card = page.getByTestId("close-workspace-card");
+      await expect(card).toContainText("it is deleted for good on", {
+        timeout: 15_000,
+      });
+      const label = await card.getByText(/^Type .+ to confirm$/).innerText();
+      const slug = label.replace(/^Type /, "").replace(/ to confirm$/, "");
+      const submit = page.getByTestId("close-workspace-submit");
+      await page.getByTestId("close-workspace-slug").fill(`${slug}-not`);
+      await expect(submit).toBeDisabled();
+      await page.getByTestId("close-workspace-slug").fill(slug);
+      await submit.click();
+
+      await expect(page.getByTestId("workspace-state-banner")).toContainText(
+        /was closed on .+ and will be deleted on .+\. Export it before then\./,
+        { timeout: 15_000 },
+      );
+      await page.getByTestId("reopen-workspace").click();
+      await expect(page.getByTestId("workspace-state-banner")).toHaveCount(0, {
+        timeout: 15_000,
+      });
+    } finally {
+      // Every later spec on this shard needs the workspace taking writes.
+      await pool.query(
+        "update workspaces set state = 'active' where id = any($1::uuid[])",
+        [ours],
+      );
+      await pool.query(
+        "delete from tenants where workspace_id = any($1::uuid[])",
+        [ours],
+      );
+      await pool.query(
+        "delete from system_settings where key = 'cloud.closureRetentionDays'",
+      );
+    }
+  });
+
   test("a member starts another workspace, and lands in its setup", async ({
     page,
   }) => {

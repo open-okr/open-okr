@@ -1,4 +1,5 @@
 import {
+  erasureDateFor,
   listSupportSessions,
   listTenantsAsOperator,
   readBillingAsOperator,
@@ -349,6 +350,18 @@ export default async function OperatorWorkspacePage({
             <Fact
               label={t("operator.workspace.factClosed")}
               value={day(tenant.closedAt)}
+            />
+          ) : null}
+          {/* When erasure will take it (docs/design/workspace-erasure.md §8),
+           * under the retention the instance has now. */}
+          {tenant.tenantState === "closed" && tenant.closedAt ? (
+            <Fact
+              label={t("operator.workspace.factErased")}
+              value={
+                await erasureDateFor(getPool(), tenant.closedAt).then((date) =>
+                  date ? day(date) : t("operator.workspace.erasedNever"),
+                )
+              }
             />
           ) : null}
         </dl>

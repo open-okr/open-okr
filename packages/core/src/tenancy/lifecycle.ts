@@ -47,6 +47,11 @@ const WORKSPACE_STATE: Record<TenantState, "active" | "read_only" | "frozen"> =
 export interface SetTenantStateInput {
   readonly workspaceId: string;
   readonly state: TenantState;
+  /**
+   * The owner closed it while it was active, so may reopen it. Ignored for any
+   * other move, which always clears it (docs/design/workspace-erasure.md §3).
+   */
+  readonly ownerMayReopen?: boolean;
   /** Injected so a test can close a workspace in the past. */
   readonly now?: Date;
 }
@@ -82,6 +87,7 @@ export async function setTenantStateInTx(
       // retention sweep to read and an open one never does. Setting it here
       // rather than in a trigger keeps the rule visible to a reader.
       closedAt: input.state === "closed" ? now : null,
+      ownerMayReopen: input.state === "closed" && input.ownerMayReopen === true,
       updatedAt: now,
     })
     .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
@@ -104,6 +110,8 @@ export async function setTenantStateInTx(
 export interface TenantLifecycle {
   readonly state: TenantState;
   readonly closedAt: Date | null;
+  /** The owner closed it while it was active, so may reopen it. */
+  readonly ownerMayReopen: boolean;
   /** True when billing, not an operator, made it read-only. */
   readonly suspendedByBilling: boolean;
 }
@@ -119,7 +127,11 @@ export async function readLifecycleInTx(
   workspaceId: string,
 ): Promise<TenantLifecycle | null> {
   const [tenant] = await tx
-    .select({ state: tenants.state, closedAt: tenants.closedAt })
+    .select({
+      state: tenants.state,
+      closedAt: tenants.closedAt,
+      ownerMayReopen: tenants.ownerMayReopen,
+    })
     .from(tenants)
     .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
     .limit(1);
@@ -136,6 +148,7 @@ export async function readLifecycleInTx(
   return {
     state: tenant.state,
     closedAt: tenant.closedAt,
+    ownerMayReopen: tenant.ownerMayReopen,
     suspendedByBilling: account?.suspendedByBilling ?? false,
   };
 }
@@ -159,6 +172,7 @@ export function readWorkspaceLifecycle(
  * customer who could lift either could lift both. Closing is theirs, from active or
  * from billing's read-only mode, because that is how somebody leaves. Closing a
  * workspace an operator suspended is not, because a closed workspace is erased.
+ * Reopening is theirs only when they closed it while it was active.
  */
 export function refuseOwnLifecycleMove(
   from: TenantLifecycle,
@@ -171,6 +185,9 @@ export function refuseOwnLifecycleMove(
     return "Only the provider can suspend a workspace.";
   }
   if (to === "active") {
+    if (from.state === "closed" && from.ownerMayReopen) {
+      return null;
+    }
     return from.state === "closed"
       ? "Only the provider can reopen this workspace."
       : "Only the provider can lift a suspension.";
