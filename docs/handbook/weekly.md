@@ -22,8 +22,8 @@ and a linked key result: the few moves that shift a key result, not a to-do
 list. Then name the week's wins.
 
 **4. Digest.** The product assembles it, with the open blockers and their next
-actions, the commitments and the wins, and any of the space's goals that have
-gone stale. Once the session closes, the coordinator adds a note for leadership
+actions, the commitment count and the wins, and any of the space's goals that
+have gone stale. Once the session closes, the coordinator adds a note for leadership
 and posts it to the team's Slack or Teams channel, when the space has linked
 one in its settings.
 
@@ -48,17 +48,18 @@ champion again the day you are back.
 
 | Score | What it means in the session |
 |---|---|
-| Above 0.7 | On track. Move on |
-| 0.4 to 0.7 | Watch. The champion says what changed |
-| Below 0.4 | The session's business. It needs discussion |
-| Below 0.3 | It needs a decision, not a discussion |
+| 0.7 and above | High. Move on |
+| 0.4 to below 0.7 | Medium. When it has dropped since last week, the champion says what changes this week |
+| Below 0.4 | Low. The session's business: a next action due by the next check-in, with an owner, and a blocker where something is actually blocked |
+| 0.3 and below | Critical. The sponsor hears the same day, only where your workspace turns critical escalation on |
 
 Confidence that never moves is the failure this step exists to catch. A key
 result at 0.8 for nine weeks and then 0.2 in week ten was never at 0.8.
 
 ## Blockers
 
-A low score becomes a typed blocker. Five types, and the type is the point:
+Something actually blocked becomes a typed blocker. Seven types, and the type
+is the point:
 naming it is what makes it somebody's to fix rather than everybody's to worry
 about.
 

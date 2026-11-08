@@ -58,7 +58,7 @@ readonly subject?: {
 
 Most write actions already know it from their own input before `execute`:
 `goals.update` has `input.id`, `spaces.update` has `input.id`,
-`tasks.setStatus` has `input.id`. The action passes it beside `action` and
+`tasks.update` has `input.id`. The action passes it beside `action` and
 `workspaceId`.
 
 **The floor takes the higher of the two, and falls back.**
@@ -97,9 +97,9 @@ the row, and the maximum collapses the first into the second, so the owner of
 an initiative could delete it while holding nothing else. That test has said
 since P5-T10a that owning a thing does not make somebody able to delete things.
 So `goals.delete`, `initiatives.delete` and `tasks.delete` keep the workspace
-floor, and the five that declare a subject are all `edit`.
+floor, and the twelve that declare a subject are all `edit`.
 
-The fallback matters: forty-odd write actions do not name a subject before
+The fallback matters: about 245 write actions do not name a subject before
 executing, and this design does not require them to. Nothing about them
 changes. What changes is that an action which *does* declare one is measured
 against the thing it is about.

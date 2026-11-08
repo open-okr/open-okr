@@ -33,7 +33,7 @@ console.
 | Who | When | How |
 |---|---|---|
 | **An operator** | Always, in any setup with the flag on | "New workspace" on S-45: a name and the first administrator's address |
-| **A signed-in person** | Only where sign-up is open to them: policy `open`, or `company_domains` with a company address | "New workspace" in the workspace switcher |
+| **A signed-in person** | Only where sign-up is open to them: policy `open`, or `company_domains` with a company address | "New workspace" in the avatar menu, at `/workspaces/new` |
 | **Anybody else** | Never | Refused in the action, not just hidden. The same rule on REST, the command line and agents |
 
 The two paths share `createWorkspace`, so a new workspace gets the same tenant row,

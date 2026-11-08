@@ -27,8 +27,12 @@ is a commit message.
 
 ## When a change needs none
 
-Documentation, tests, internal refactoring and anything a customer cannot
-observe. Say so explicitly:
+A branch that only touches documentation (`docs/`, `README.md`, `CLAUDE.md`,
+`CONTRIBUTING.md`), tests, `e2e/`, `.github/`, `.vscode/`, the licence or this
+directory needs nothing: `pnpm check:changeset` passes it by path.
+
+Internal refactoring and anything else a customer cannot observe still needs a
+changeset. Say so explicitly:
 
 ```
 pnpm changeset --empty
@@ -36,8 +40,8 @@ pnpm changeset --empty
 
 An empty changeset is a written claim that this change is invisible from
 outside, which is the thing a reviewer can disagree with. **Silence is not
-that claim**, which is why `pnpm check:changeset` fails a branch carrying
-neither.
+that claim**, which is why `pnpm check:changeset` fails a branch that touches
+anything else and carries neither.
 
 ## Versioning
 

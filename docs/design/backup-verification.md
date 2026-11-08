@@ -108,12 +108,14 @@ script and the application image would be needed for it, but the four
 queries above are what this task delivers and they run in `psql`.
 
 Mounts the backup PVC **read-only**. Creates a temporary database with
-a name that includes `$RANDOM` to avoid collision with other Jobs. Finds
+a name that includes the shell's process id and the time in seconds, to
+avoid collision with other Jobs. Finds
 the newest backup directory (lexicographic sort of timestamp-named
 directories), decrypts, restores, checks, drops.
 
-The Job's `DATABASE_URL` is the same secret the application uses, so the
-temporary database is created on the same Postgres instance. This is
+The Job connects with `DATABASE_ADMIN_URL` when the chart has one, and
+otherwise with the `DATABASE_URL` the application uses, so the temporary
+database is created on the same Postgres instance. This is
 deliberate: the verification proves the dump restores on the same server
 the application runs on, not on a hypothetical other one.
 

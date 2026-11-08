@@ -62,7 +62,7 @@ matching `v*.*.*`.
 
 | Job | What it proves |
 |---|---|
-| Verify the tagged commit | The tag matches the commit's version. Then every gate a pull request faces, plus the chart checks and a full Compose boot from an empty machine. A tag is not trusted to mean the code is good |
+| Verify the tagged commit | The tag matches the commit's version. Then the type check, lint, dead code, migration, boundary, licence and sign-off gates and the unit and integration tests, plus the chart checks and a full Compose boot from an empty machine. The browser suite and the documentation, air-gap, method and contract gates are not run again here; they gated the pull request. A tag is not trusted to mean the code is good |
 | Build / Image (amd64), Image (arm64) | Each architecture built on a runner of that architecture, with provenance and a bill of materials attached, and pushed by digest with no tag. Nothing a customer pulls points at it yet |
 | Join, publish and sign | Both digests joined into one image under the exact version tag, signed keyless through Sigstore, with the build provenance attested |
 | Verify the published signature | The signature is checked from outside the job that made it, the way a customer would. A published signature nobody checks is decoration |

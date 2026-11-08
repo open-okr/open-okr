@@ -46,7 +46,7 @@ The phases guide. By default they never stop anybody writing an objective or a k
 
 ### 3.2 Quality at the point of writing
 
-Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. Every check and each of the six publish gates in METHOD.md §4.5 has an enforcement level the workspace sets: block, warn or off (METHOD.md §12). By default only structural defects block publishing: an objective with no key result, a key result with no target or date, and a goal with no owner. Every other check warns and coaches.
+Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. Every check and each of the six publish gates in METHOD.md §4.5 has an enforcement level the workspace sets: block, warn or off (METHOD.md §12). By default only structural defects block publishing: an objective with no key result or no timeframe, a key result with no target, date, owner or derivable direction, a goal with no owner, and a goal aligned under two parents. Every other check warns and coaches.
 
 *Acceptance:* Given an objective beginning "Launch the new mobile app", when the champion types it, then the outcome-not-output check warns inline with the coaching prompt, the strength score drops, and the set can still be published. Given a workspace that has set that check to block, then publishing is refused until it passes or the workspace overrides with a recorded reason.
 
@@ -154,7 +154,7 @@ One channel port with one driver per provider. Every inbound message resolves to
 - **Activity feed (P0).** Typed, human-readable, permission-filtered, live, at workspace, space, goal and profile scope. Separate from the compliance audit log.
 - **Search and command palette (P0).** ⌘K for entity jump, actions and full-text search across everything the member may see. Semantic search arrives with the AI layer.
 - **Admin (P0).** Workspace settings, members and access, practice settings and profiles, cycle and rhythm defaults, thresholds, terminology labels, notification and channel defaults, security, branding, the audit log with chain verification, a read-only freeze switch, backups, import and export.
-- **Portability (P0).** Signed, encrypted, checksummed workspace export and dry-run import between any two OpenOKR instances, self-host and cloud in both directions.
+- **Portability (P0).** Encrypted, checksummed workspace export and dry-run import between any two OpenOKR instances, self-host and cloud in both directions.
 
 ## 5. Deployment (P0)
 

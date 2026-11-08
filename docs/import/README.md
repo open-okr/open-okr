@@ -234,7 +234,7 @@ stay in FlowyTeam, and the report says so every time.
 | Source table | What it holds | Where it could land |
 |---|---|---|
 | `employee_teams` | A second, older list of who belongs to which team. It has no company column, so it is counted through the team | Space membership, beside `other_departments`, if it names anybody that one does not |
-| `performance_settings` | The company's OKR settings: cycle type, which objective levels are allowed, caps on objectives and key results, colour thresholds, terminology labels, and who may edit what | The labels could become this workspace's terminology labels. The caps and thresholds are the method's to set, so a person decides whether any carries across. The edit matrix has no home: access here is granted per goal, space or KPI rather than by role |
+| `performance_settings` | The company's OKR settings: cycle type, which objective levels are allowed, caps on objectives and key results, colour thresholds, terminology labels, and who may edit what | The labels could become this workspace's terminology labels. The caps and thresholds are the method's to set, so a person decides whether any carries across. The edit matrix has no direct home: access here is a workspace role with a level per domain, plus grants on a goal, space or KPI, so a person decides whether and how it maps |
 | `objective_accesses` | Who else may see or update each objective | Access on the imported goal |
 | `objective_discussions` | Comment threads on objectives | Comments on the goal, with replies kept |
 | `keyresult_discussions` | Comment threads on key results | Comments on the key result, with replies kept |

@@ -7,28 +7,30 @@ What each screen is for. The method behind them is in
 
 | Screen | What it answers |
 |---|---|
-| **Overview** | The Work Map: one tree of goals, key results, initiatives and KPIs. Where everything is, and what is outdated |
-| **Inbox** | What arrived for you |
-| **Review** | What you owe, computed on the server, overdue first |
-| **Cycle** | Which phase the cycle is in, what is missing, and who owes it |
-| **Goals** | The objectives and their key results |
-| **KPIs** | The driver trees, the corridors, and anything recovering |
-| **Initiatives** | The work that moves a key result |
-| **Board** | That work as a board, linked to the key result it serves |
-| **Check in** | The one screen for reporting progress |
-| **Sessions** | The weekly and quarterly sessions, run by the product |
-| **Scorecard** | How the cycle is going, by the numbers |
+| **Home** | My week: the goals you own and the check-in each one needs. For the people who run the cycle it also shows the rhythm by team and the Work Map |
+| **Updates**, tab **To do** | What you owe, computed on the server, overdue first |
+| **Updates**, tab **Activity** | What arrived for you |
+| **Goals**, tab **OKRs** | The objectives and their key results |
+| **Goals**, tab **KPIs** | The driver trees, the corridors, and anything recovering |
+| **Goals**, tab **Map** | The Work Map: one tree of goals, key results, initiatives and KPIs. Where everything is, and what is outdated |
+| **Work**, tab **Initiatives** | The work that moves a key result |
+| **Work**, tab **Board** | That work as a board, linked to the key result it serves |
+| **Check in** | The one screen for reporting progress, opened from a button on OKRs, on a goal and on Updates |
 | **Spaces** | Teams, and what each one owns |
+| **Cycle** | Which phase the cycle is in, what is missing, and who owes it. In the sidebar only for administrators and for a space's coordinators and managers |
+| **Cycle**, tab **Sessions** | The weekly and quarterly sessions, run by the product |
+| **Cycle**, tab **Scorecard** | How the cycle is going, by the numbers |
 
 ## Checking in
 
 The one thing to do every week. The check-in walker lists **only what is
-actually due**, so an empty list means you are done rather than that something
-is hidden.
+due, or due within two days**, so an empty list means you are done rather than
+that something is hidden.
 
-A check-in takes a value, a confidence and a sentence about what changed. The
-sentence matters more than it looks: it is what the weekly session reads, and
-"on track" with no sentence is the thing staleness exists to catch.
+A check-in takes a value for each key result, a confidence, a status and a few
+sentences about what moved, what is in the way and what happens next. The
+sentences matter more than they look: they are what the weekly session reads,
+and "on track" with no sentence is the thing staleness exists to catch.
 
 Every check-in takes an immutable snapshot. Editing what you said later does
 not rewrite what the cycle looked like at the time.
@@ -57,9 +59,10 @@ runs through the same permission checks as a click.
 
 | State | Means |
 |---|---|
-| On track | Reported healthy, and checked in recently |
-| At risk | Reported at risk, or confidence below the line |
-| Off track | Reported off track |
+| No check-in yet | Nobody has checked in yet, and the grace period has not passed |
+| On track | Reported on track at the last check-in |
+| At risk | Reported at risk at the last check-in |
+| Off track | Reported off track at the last check-in |
 | **Outdated** | Nobody has checked in within the grace period. **This overrides whatever health was last reported**, which is shown beside it, such as "Outdated, last on track" |
 | Achieved, missed or abandoned | Closed, deliberately, with a retrospective. Abandoned is a stop with its reason, not a miss |
 
@@ -68,8 +71,9 @@ cannot claim their way out of it.
 
 ## Writing and changing OKRs
 
-**Anybody can write an objective or a key result at any time.** The planning
-phases show what is still missing beside the form; they do not stop you. The
+**Anybody allowed to edit objectives can write an objective or a key result
+at any time.** The planning phases show what is still missing beside the form;
+by default they do not stop you. The
 coach warns beside the work rather than refusing it, and only a structural
 defect, such as an objective with no key result, holds a set back from
 publishing.
@@ -95,7 +99,8 @@ A KPI is a number you watch continuously, not a goal you set for a quarter.
 Each sits in a health corridor, in its own units. When one turns unhealthy its
 owner chooses one of three responses: fix it now, add a key result to an
 objective that already exists, or launch the **recovery objective** the
-product drafts, one key result per leading child driver, capped at four. The
+product drafts: the KPI itself as the first key result, then one per leading
+driver that is below its target, four in all at most. The
 KPI keeps reading the band its value is in, with the recovery shown beside it,
 so a recovery never makes a red number look green.
 
@@ -118,9 +123,9 @@ configured the panel says so instead of failing.
 
 ## Your own settings
 
-**Account, then Where to reach you.** Your primary channel, quiet hours, how
-notifications are batched, whether a mention interrupts, and a daily summary if
-you want one. These are yours; no administrator overrides them.
+**The avatar menu, then Where to reach you.** Your primary channel, quiet
+hours, how notifications are batched, whether a mention interrupts, and the
+daily summary, which is on until you turn it off. These are yours; no administrator overrides them.
 
 Quiet hours are respected by every proactive message.
 

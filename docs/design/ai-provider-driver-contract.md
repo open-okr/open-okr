@@ -13,7 +13,7 @@ The `AIProvider` interface, seven methods:
 | `chatWithTools(request)` | Same as `chat`, plus `tools`. `toolCalls` is present whenever the model called one |
 | `embed(request)` | Vectors for the given input strings. Throw `AIUnavailableError` if the provider has no embedding endpoint at all — never fabricate a vector |
 | `extract(request)` | A completion whose `content` is a JSON string matching `request.schema`. The **caller** re-validates with Zod; a driver's job is to get the provider to emit that shape, by whatever mechanism the provider actually offers (a JSON-schema response format, a forced tool call, or a plain instruction to the model — pick whichever is real for that provider, never fake conformance) |
-| `capabilities(model)` | A model's capability flags. With no live model catalogue yet (P2-T15), every driver returns one reasonable default for every model it's asked about; a driver is free to hard-code this rather than guess emptily |
+| `capabilities(model)` | A model's capability flags. With no live model catalogue yet (P2-T15), every driver returns one reasonable default for every model it's asked about (Anthropic varies only `jsonMode`, false for the models without structured output); a driver is free to hard-code this rather than guess emptily |
 | `stop()` | Releases anything the driver holds open. Every current driver's underlying client makes one HTTP call per request and holds nothing between them, so every `stop()` today is a documented no-op — but it must exist, and a driver whose client *does* hold something open (a persistent connection, a background poller) must actually release it here. `Adapters.close()` calls this on every port; a driver that leaks past its own `stop()` leaks past that too |
 
 ## The three roles every message needs translating for
@@ -35,7 +35,7 @@ Anthropic has no embeddings endpoint. Its `embed()` throws `AIUnavailableError` 
 Not every provider's `extract()` uses the same mechanism:
 
 - **OpenAI-shaped**: `response_format: { type: "json_schema", json_schema: { name, schema, strict } }`.
-- **Anthropic**: no such option exists. Force exactly one tool call whose `input_schema` is the caller's schema (`tool_choice: { type: "tool", name: "extract" }`); a forced tool call's only legal output is that tool's arguments, which is the structured result.
+- **Anthropic**: structured output, `output_config: { format: { type: "json_schema", schema } }`, with the schema keywords structured output refuses (`minimum`, `maxLength`, `pattern` and the like) stripped and left to the caller's Zod check. Only the older models without structured output (`FORCED_TOOL_ONLY` in `anthropic.ts`: every Claude 3, and Opus and Sonnet 4.0 to 4.7) still force exactly one tool call whose `input_schema` is the caller's schema (`tool_choice: { type: "tool", name: "extract" }`); current models refuse a forced tool.
 - **Google**: `responseMimeType: "application/json"` plus `responseJsonSchema` — deliberately not `responseSchema`, which is Google's own OpenAPI-3.0-subset `Schema` type (its own `Type` enum, no `additionalProperties`) rather than plain JSON Schema. Translating this port's schemas into that type would be a second schema language for every caller to think about; `responseJsonSchema` accepts the plain shape directly, at the cost of a smaller documented feature subset.
 
 ## The tier map every driver seeds
@@ -46,7 +46,7 @@ These are seeds, not a catalogue — free-text, easily wrong the day a vendor re
 
 ## Contract tests
 
-Every real driver has its own test file (`packages/adapters/test/ai-<driver>.test.ts`) proving it parses that vendor's actual documented response shape correctly — a fixture, not a live call, since this repository never holds a real key. Two injection seams, because the vendors' SDKs don't agree on offering one:
+Every driver implementation has its own test file (`packages/adapters/test/ai-anthropic.test.ts`, `ai-google.test.ts`, and `ai-openai-compatible.test.ts` for the one implementation behind the four OpenAI-shaped drivers) proving it parses that vendor's actual documented response shape correctly — a fixture, not a live call, since this repository never holds a real key. Two injection seams, because the vendors' SDKs don't agree on offering one:
 
 - **OpenAI-shaped and Anthropic**: both SDK constructors accept a `fetch` option. Inject a fake `typeof fetch` returning a hand-built `Response` (JSON for a plain call, `text/event-stream`-formatted text for a streamed one) and the driver runs exactly the parsing code a real call would.
 - **Google**: the SDK has no `fetch` option at all — only `httpOptions.baseUrl`, which redirects the whole client rather than one call. `GoogleProviderOptions.client` exists for exactly this: a pre-built object matching the minimal `GoogleGenAIClient` interface (just the three methods this driver calls), constructed directly in the test with `vi.fn()`.

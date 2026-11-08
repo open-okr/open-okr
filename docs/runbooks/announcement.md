@@ -53,9 +53,9 @@ release page.
 <!-- Replace with the demo instance's address, or delete this section. -->
 
 There is a public demonstration instance at `DEMO_URL`. Sign in as anybody the
-sign-in page names. It holds a quarter in flight and a quarter that is
-finished, both agents run in sandbox so nothing they propose is ever committed,
-and the whole workspace is rebuilt every night.
+sign-in page names. It holds a year of one company's OKRs, placed on the real
+calendar up to today, both agents run in sandbox so nothing they propose is
+ever committed, and the whole workspace is rebuilt every night.
 
 ### What is in this release
 

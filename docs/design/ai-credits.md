@@ -33,7 +33,7 @@ rather than measured (§8).
 The weakness is answered by publishing typical credits per action once measured (§8),
 as Notion does, and by showing a usage log.
 
-## 2. What is wrong today
+## 2. What was wrong before this change
 
 | Finding | Effect |
 |---|---|
@@ -65,7 +65,7 @@ workspace's own row.
 
 ## 4. Schema
 
-One migration, with row-level security in the same file. No legacy source.
+Two migrations, 0146 and 0147, each with row-level security in the same file. No legacy source.
 
 | Change | Notes |
 |---|---|
@@ -94,7 +94,7 @@ Overflow comes off the live pack that expires soonest, then the next. A charge a
 holds the balance row's lock, so the packs need no lock of their own.
 
 **The balance's `purchased_usd` goes in the migration that adds the packs.** No release
-has shipped that column: migration 0146 exists only on this branch. So the two-release
+has shipped that column: migration 0146 is in no release yet. So the two-release
 rule has nothing to protect, and no purchase needs carrying over.
 
 ## 5. Limits
@@ -117,7 +117,7 @@ lower spend further, including on their own key.
 |---|---|
 | Who | A plan with `aiTopUps: true`. The page says paid plans |
 | Price | A Stripe price the provider chose, in its own currency, named by `billing.creditPack`: `{ "priceId": "price_1Xyz", "credits": 1000, "months": 12 }`. OKRGoal's is US$20 |
-| How | **Buy credits** on S-49, through hosted checkout |
+| How | **Buy {count} credits** on S-49, through hosted checkout |
 | When it lands | The webhook adds one pack row, once per checkout session. The checkout carries `months`, so a pack keeps the length it was sold with even if the setting changes before the payment clears |
 | Spent | After the month's allowance, soonest to expire first, so nobody loses credits they could have spent |
 | Expiry | **Twelve months after purchase**, which is what Terms §5.2 and the pricing page promise. `months` in `billing.creditPack` sets another length, default 12, so the release does not decide this for another provider |
@@ -139,7 +139,7 @@ Sonnet 5.5, which is 87% of Team.
 
 ## 8. Measure before go-live
 
-`pnpm ai:measure`: real calls for each AI feature over the Northwind drafts, on the
+`pnpm ai:measure`: real calls for the five AI features people use most, over the Northwind drafts, on the
 models you choose, reporting tokens and credits per action. The benchmark's token
 counts are assumptions. **This needs an AI key from you, and it is what fills in the
 typical credits on the pricing page.** It costs a few dollars.
@@ -170,7 +170,7 @@ models without it.
 
 | Screen | Change |
 |---|---|
-| S-49 | Credits used of the allowance, purchased credits left and when the soonest of them expire ("300 of these expire on 3 March 2027"), when the allowance resets, **Buy credits**, and a usage log by feature |
+| S-49 | Credits used of the allowance, purchased credits left and when the soonest of them expire ("300 of these expire on 3 March 2027"), when the allowance resets, **Buy {count} credits**, and credits used by where they went (the copilot, assists, the Coach and the Champion, chat channels, the API, your own agent) |
 | Admin, AI | Says plainly that a key added here spends no credits |
 | Any AI affordance, out of credits | Hidden, as it is with a provider off, and a banner across the product says AI is paused until the 1st or until somebody buys more, and that nothing else stopped. A disabled control on each of some twenty screens would say the same thing twenty times |
 

@@ -49,19 +49,23 @@ packages/
                        seed, data-change runner
   adapters/            Ports and drivers (jobs, realtime, storage, mail, cache,
                        search, ai, channels, billing) and the outbox relay
-  agents/              The Coach and Champion runtimes, the trigger scheduler,
-                       run state machines, proposal envelopes
+  agents/              Run state machines, the schedule the agent runs are
+                       registered under, structured extraction. The Coach's and
+                       Champion's seeding, scope and triggers live in core
   importer/            CSV/XLSX and FlowyTeam importers (command line)
+  cli/                 The `okr` command line, generated from the registry
   ui/                  Shared components
   config/              Shared TypeScript, lint and environment schema
   test-support/        Factory that builds through core services, test harness
 deploy/
   docker/              Dockerfile, compose, reverse proxy, setup wizard
   helm/                Helm chart
+  demo/, staging/      The public demonstration and staging instances
+  teams/, whatsapp/    Channel setup notes and the Teams app manifest
 docs/
   specification/       This specification set
   design/              Detailed designs, one per engine or subsystem
-  mockups/             Reference mockups of eleven screens
+  mockups/             Reference mockups of key screens
 ```
 
 `packages/method` is deliberately separate from `packages/core`. It has no database access and no framework. It is a pure library of the OKR canon, which means every rule is unit-testable in isolation, the agents and the browser share one implementation, and a change to practice is a change to one package.
@@ -77,7 +81,7 @@ One runtime: the container profile. It runs on a customer's server, on their Kub
 | Port | Driver |
 |---|---|
 | JobQueue | pg-boss, inside Postgres |
-| Realtime | WebSocket server with Postgres listen and notify. Compact typed events carrying an id and a version, an 8 KB payload guard, self-echo suppression |
+| Realtime | Postgres listen and notify, streamed to the browser as server-sent events. Compact typed events carrying an id and a version, an 8,000-byte payload guard, self-echo suppression |
 | FileStorage | Local disk, MinIO or any S3-compatible service |
 | Mailer | SMTP, with settings stored encrypted in the database and editable by an admin |
 | Cache and rate limit | In-process plus Postgres |
@@ -89,8 +93,8 @@ One runtime: the container profile. It runs on a customer's server, on their Kub
 Rules that make this real:
 
 - Vendor SDKs are imported only inside `packages/adapters`.
-- Feature code calls `jobs.enqueue(...)`, `channels.send(...)`, `realtime.publish(...)`. It never knows which driver is running.
-- **Transactional enqueue is the only enqueue.** `enqueue` writes an outbox row inside the caller's transaction. A relay drains committed rows to the driver after commit, at least once, with idempotency keys. A direct network call on a write path fails the build.
+- Feature code calls ports such as `channels.send(...)` and `realtime.publish(...)`. It never knows which driver is running.
+- **Transactional enqueue is the only enqueue.** A write path never calls `jobs.enqueue` itself: `enqueueOutbox` writes an outbox row inside the caller's transaction. A relay drains committed rows to the driver after commit, at least once, with idempotency keys. A direct network call on a write path fails the build.
 - The AI provider, every channel and billing are selected by stored configuration, not by the runtime variable. No configuration means that capability reports unavailable and the product degrades cleanly.
 
 ### Multi-tenancy
@@ -122,7 +126,7 @@ Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` a
 
 | Tier | Who | Stack | Setup effort |
 |---|---|---|---|
-| Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. A first-run web wizard generates every secret, tests the database, mail, channel and AI connections, seeds the admin and offers demo data | About 30 minutes on any small server |
+| Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. The lifecycle helper generates every secret on first run. A first-run web wizard tests the database, mail, storage, channel and AI connections and seeds the admin, and the onboarding wizard offers demo data | About 30 minutes on any small server |
 | Enterprise | Universities, large organisations | Helm chart on their Kubernetes, external Postgres, single sign-on, their backups | Their platform team, hours not weeks |
 | Managed cloud | Teams that want no operations | The same image under vendor operation, with the cloud flag on | Sign up and start |
 
@@ -130,7 +134,7 @@ All tiers run the same tagged release. Signed images are published on every rele
 
 ### 5.1 Upgrade policy
 
-Every instance upgrades itself. There is no auto-update and no version check that leaves the instance. An administrator chooses when, and the product never chooses for them.
+Every instance upgrades itself. There is no auto-update. A version check asks GitHub once a day for the newest release, sends nothing about the instance, and is turned off with `OPENOKR_UPDATE_CHECK=off`. An administrator chooses when, and the product never chooses for them.
 
 - **Versioning is semantic.** A major release carries a change an administrator must act on, and the release notes name the action. A minor release carries features and migrations that need nothing from them. A patch carries fixes.
 - **Supported range.** Any release upgrades directly to any later release in the same major, with no stops. Crossing a major means stopping at the last release of the current major first. Downgrading is not supported once migrations have applied. The direct jump within a major is what lets old migrations retire at a major boundary; without it, every migration ever written stays runnable forever.
@@ -159,7 +163,7 @@ A change that breaks any row is a defect, and `packages/core/test/hosting-profil
 The authority is TECHNICAL-PLAN.md §8. The summary:
 
 - **Authentication.** Better Auth. Email and password, passkeys and time-based one-time passwords from the first phase. Single sign-on through OIDC and SAML in the open core, because institutions will not adopt without it. Directory sync and provisioning in the enterprise phase. Session tokens are hashed at rest.
-- **Authorisation.** Relationship-based: access contexts, graded bindings (view, comment, edit, full, with champion and reviewer tags) and access groups (per person, workspace standard, space standard, anonymous). Effective access is the maximum over every reachable binding. Suspended members yield no access. One `can(member, level, resource)` in `packages/core` is the single enforcement point for the browser, REST, MCP, the command line, the channels and the agents. Every read of a protected aggregate goes through one access-aware getter that returns not-found on forbidden.
+- **Authorisation.** Relationship-based: access contexts, graded bindings (view, comment, edit, full, with champion, reviewer, sponsor, facilitator and coordinator tags) and access groups (per person, workspace standard, space standard, anonymous). Effective access is the maximum over every reachable binding. Suspended members yield no access. One `can(member, level, resource)` in `packages/core` is the single enforcement point for the browser, REST, MCP, the command line, the channels and the agents. Every read of a protected aggregate goes through one access-aware getter that returns not-found on forbidden.
 - **Audit.** An append-only audit table from day one, with database grants that forbid update and delete, written inside the mutating transaction, with a per-workspace hash chain for tamper evidence. The social activity feed is a separate, typed system.
 - **Agent safety.** Built-in agents run under their own member principal with least-privilege bindings scoped to named spaces and goals. Never a workspace-wide grant. Sandbox mode produces a full dry run. The default write policy is proposal plus human approval. Hard cost caps halt a run mid-flight. Retrieved content is data, never instruction.
 - **Channel safety.** Every inbound message is verified against the provider's signature, resolved to a member, rate-limited, and run through `can()`. An unrecognised sender gets nothing, not an error that confirms the workspace exists.
@@ -173,7 +177,7 @@ The authority is TECHNICAL-PLAN.md §8. The summary:
 
 Ship now: presence, live lists and feeds, a live notification and review badge, live session state (everyone in a weekly session sees the same stage and the same votes revealing), live agent run streams.
 
-Everything goes through the Realtime port with channel semantics such as `workspace:{id}:goal:{id}`, publishing compact typed events defined in a shared event registry so payloads are type-checked end to end. Clients refetch through the normal read path, which keeps row-level security and `can()` in the loop.
+Everything goes through the Realtime port with channel semantics such as `workspace:{id}:session:{id}`, publishing compact typed events defined in a shared event registry so payloads are type-checked end to end. Clients refetch through the normal read path, which keeps row-level security and `can()` in the loop.
 
 Design rules that keep collaborative editing a later addition rather than a rewrite:
 
@@ -186,15 +190,15 @@ Design rules that keep collaborative editing a later addition rather than a rewr
 
 - Forward-only migrations, committed with the feature that needs them. A separate data-change runner handles reshaping after launch, so schema changes and backfills never mix.
 - Soft delete is a repository-wide default scope, injected by the query helper with an explicit opt-in to see deleted rows.
-- A seed script and an in-product demo workspace builder create a realistic organisation in one transaction with notifications suppressed. This powers the public demo, onboarding and local development.
+- A seed script and an in-product demo workspace builder create a realistic organisation through the action registry, each write its own transaction. This powers the public demo, onboarding and local development.
 - Rich text is editor JSON. One shared core module owns parsing, validation, sanitised rendering, excerpting and mention extraction, used identically by the app, email, exports, search indexing and the importers.
-- Derived values (progress, health, next check-in, alignment score, KPI achievement, streaks, next step) are recomputed by jobs driven from the outbox and stored in columns. Never computed per row at render.
+- Derived values (progress, health, next check-in, alignment score, KPI achievement, streaks, next step) are recomputed inside the writing transaction and stored in columns. Never computed per row at render.
 
 ## 9. Quality, CI and releases
 
 - Vitest for unit and integration tests. Playwright for end-to-end. A test-support factory that builds through core domain services rather than raw inserts, so every test's setup exercises row-level security and the access layer.
-- End-to-end database isolation is designed, not hoped: a migrated template database cloned per worker, with the workspace identifier set per test.
-- Continuous integration runs the affected graph with a remote cache, shards the test suites, cancels superseded runs, tracks flaky tests with automatic quarantine, gates dead code and dependency licences, and checks commit sign-off.
+- Test database isolation is designed, not hoped: a migrated template database cloned per Vitest worker, with the workspace identifier set per test.
+- Continuous integration runs the affected graph with a remote cache, shards the test suites, cancels superseded runs, tracks flaky tests and lists quarantine candidates for a committed quarantine list, gates dead code and dependency licences, and checks commit sign-off.
 - **Contract drift checks.** The generated OpenAPI document, the MCP tool catalogue and the generated command line are re-derived in CI and compared against committed artifacts. The single contract registry cannot silently drift.
 - **Method conformance checks.** `packages/method` carries a golden-master suite for every rule, band, corridor and diagnostic in METHOD.md, and CI fails when the implementation and the document disagree.
 - **AI-off leg.** CI boots with the provider set to off and asserts every P0 flow passes and every AI affordance is hidden or disabled.

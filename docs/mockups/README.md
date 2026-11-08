@@ -25,9 +25,9 @@ Never cite a mockup as the reason for a behaviour. Cite the specification.
 | [03b-rule-card](png/03b-rule-card.png) | S-09 detail | One verdict opened: prompt, reason, weak-versus-strong pair, rewrite and dismiss |
 | [04-gates-capacity](png/04-gates-capacity.png) | S-10 | The six gates as a checklist with two unmet, the disabled publish control stating its reason, the capacity table and the mandatory cut, the dependency register |
 | [05-alignment-studio](png/05-alignment-studio.png) | S-16 | The OKRs screen's diagram, which the studio became: key results inside each objective's card, an objective hanging from the key result it aligns to, the annual objective in the band above, a dependency dashed, a collapsed card, and the alignment panel's health with each gap opening its objective |
-| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | The driver tree with corridor bars and tier labels, a live recovery objective with one key result per leading driver at the edge of the unhealthy branch, effective health, the cross-tree recovery board with §6.5's three responses on a KPI nobody has answered and the answer on one somebody has |
+| [06-kpi-recovery](png/06-kpi-recovery.png) | S-18, S-19 | The driver tree with corridor bars and tier labels, a live recovery objective with the KPI itself as its first key result and one per leading driver at the edge of the unhealthy branch, the real band with the recovery's progress beside it, the cross-tree recovery board with §6.5's three responses on a KPI nobody has answered and the answer on one somebody has |
 | [07-weekly-session](png/07-weekly-session.png) | S-22 | The four-step rail, the confidence dial with its bands, private votes revealed together, step 2 as what dropped, a low score with a next action and no blocker beside one that is actually blocked, due by the next check-in, the streak |
-| [08-quarterly-review](png/08-quarterly-review.png) | S-24 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the eight root causes, the five process-health statements |
+| [08-quarterly-review](png/08-quarterly-review.png) | S-24 | The lap bar proportional to stage minutes, the stage rail grouped by act, the diagnostic card, the nine root causes, the five process-health statements |
 | [09-channels](png/09-channels.png) | AI-NATIVE-PLAN §5 | The same nudge in four channels, a conversational check-in capturing a typed blocker, and nudge provenance on every message |
 | [10-review-inbox](png/10-review-inbox.png) | S-02 | Overdue-first grouping, agent proposals in the queue, the five-step escalation ladder, the provenance panel with snooze and change-channel |
 | [12-email-templates](src/12-email-templates.html) | AI-NATIVE-PLAN §5, [email-templates.md](../design/email-templates.md) | The six mails in one layout, light and dark: account mail, invitation, notification digest, agent nudges with their rule keys, the weekly digest |
@@ -54,8 +54,8 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 | Alignment as a share of goals below company level aligned or standing alone: healthy at 90%, watch from 80% (P9-T16a) | METHOD.md §5.2 |
 | Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
 | KPI corridors and tiers, and a recovery shown beside the real band  | METHOD.md §6.2, §6.4, §6.5 |
-| The five blocker types and the 24-hour clock | METHOD.md §7.3 |
-| The eleven quarterly stages and their minutes, the eight root causes, the five process statements | METHOD.md §8.1, §8.4, §8.5 |
+| The seven blocker types, and a next action due by the next check-in. 09-channels and 10-review-inbox still draw the older five types and a 24-hour clock | METHOD.md §7.3 |
+| The eleven quarterly stages and their minutes, the nine root causes, the five process statements | METHOD.md §8.1, §8.4, §8.5 |
 | `checkin.overdue`, `kpi.recovery_proposed`, `quality.conflict` and the other trigger keys | AI-NATIVE-PLAN.md §6.4 |
 | The escalation ladder steps and the blocker ladder | AI-NATIVE-PLAN.md §6.3 |
 | Colour, spacing, chips, badges and density | UIUX-PLAN.md §2, §4 |
@@ -69,7 +69,7 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 ./render.sh          # src/*.html -> png/*.png at 1440 wide, 2x, palette-optimised
 ```
 
-Needs a Chromium headless shell. It looks in the Playwright browser cache, falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. Each file declares its own size in a `window-width` / `window-height` comment.
+Needs a Chromium headless shell. It looks in the Playwright browser cache, falls back to Google Chrome, and `CHROME=/path/to/binary` overrides both. A file may declare its own size in a `window-width` / `window-height` comment; without one it renders at 1440 by 900.
 
 `src/style.css` carries the shared tokens, and they are deliberately the same values as UIUX-PLAN.md §2 describes: one brand hue, a neutral grey ramp, semantic tokens for success, warning, danger and info, and health or confidence colour never used without a label beside it.
 
@@ -79,4 +79,4 @@ The rendered PNGs are also the screenshots in the repository's README.
 
 ## A note on 06-kpi-recovery
 
-`06-kpi-recovery` shows the recovery objective on **expansion revenue**, a KPI whose immediate children are leading. Per METHOD.md §6.5 the drafter walks the unhealthy KPI's subtree breadth-first for the leading drivers at the edge of the unhealthy branch, so for this KPI the key results are exactly its leading children, which is what the mockup draws.
+`06-kpi-recovery` shows the recovery objective on **expansion revenue**, a KPI whose immediate children are leading. Per METHOD.md §6.5 the drafter walks the unhealthy KPI's subtree breadth-first for the leading drivers at the edge of the unhealthy branch, so for this KPI the key results are the KPI itself and then its leading children, which is what the mockup draws.

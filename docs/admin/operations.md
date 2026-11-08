@@ -9,7 +9,7 @@ Running the instance, rather than running the practice.
 | Is it up | `./openokr status`, or the container's own health check |
 | What is it doing | `./openokr logs`, and `./openokr logs proxy` for the proxy |
 | Is it healthy from outside | The public status endpoint, which answers without a session |
-| How much is it carrying | The capacity view, which reads a snapshot rather than counting live |
+| How much is it carrying | The Capacity and limits dashboard in the observability profile. With the cloud flag on, the operator console's per-workspace usage reads a snapshot taken hourly rather than counting live |
 
 More in the [observability runbook](../runbooks/observability.md).
 
@@ -89,6 +89,7 @@ An instance runs these on a clock, all on by default:
 | Audit chain | Every minute | Gives each audit row its position in the hash chain |
 | Orphaned uploads | 03:20 UTC | Removes uploads that were prepared and never attached |
 | Message log retention | 03:40 UTC | Deletes channel message records older than the workspace's setting, when it has one |
+| Cloud housekeeping | Hourly, at :10, :40 and :50 | With the cloud flag on: adopts workspaces into the operator console, refreshes the usage snapshot and sends erasure reminders. Nothing without the flag |
 | Outbox purge | 04:00 UTC | Deletes delivered and given-up outbox rows older than `outbox.retentionDays`, 30 by default, 0 to keep them. A delivered invitation loses its token and address the moment it is sent |
 
 `OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,

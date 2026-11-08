@@ -263,7 +263,7 @@ identity or every run would either duplicate them or resurrect dismissals.
 
 | Rule | Detail |
 |---|---|
-| Identity | `(scope, scope_id, cycle_id, rule_key, subject_goal_id, target_goal_id)` |
+| Identity | `(rule_key, subject_goal_id, target_goal_id, subject_key_result_id)` within one `(scope, scope_id, cycle_id, source, kind)` slice (`reconcileFindingsInTx`) |
 | Recompute | Upsert by identity. A row already `dismissed` stays dismissed |
 | Condition cleared | The row is soft-deleted, not flipped to a closed state |
 | Condition returns | A fresh row, in `open`. A dismissal does not survive the condition being fixed and broken again |
@@ -276,7 +276,8 @@ weight.
 
 ## 7. Recomputation triggers
 
-Driven from the outbox on structural change only. Progress and check-ins never
+Driven by structural change only, inside the writing transaction until a relay
+host drains the outbox (see the note at the top). Progress and check-ins never
 move the alignment score.
 
 | Write | Recomputes |
@@ -301,7 +302,8 @@ and the eight unaligned goals are listed, each opening its goal (P9-T16a).
 
 **Given** a tree with one unaligned goal among four below company level and one
 siloed department, **when** the score is computed, **then** it reads 75, a gap,
-and lists exactly two findings, each opening the goal responsible.
+and the engine raises exactly two findings, each opening the goal responsible.
+With AL-6 at its default, off, only the unaligned goal's finding is said.
 
 **Given** an unaligned goal, **when** its owner records why it stands alone,
 **then** it counts on the next recompute and its finding is gone.

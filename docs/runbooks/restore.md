@@ -41,34 +41,25 @@ helm test openokr    # runs against the newest backup on the PVC
 
 Exit 0 means every workspace passed. Exit 1 means a data issue was found
 (the report names which workspaces). Exit 2 means the backup could not
-be loaded at all.
+be loaded at all. Exit 3 is a usage error, such as a directory with no
+checksum, dump or manifest.
 
 ## Docker Compose
 
-### 1. Stop the instance
-
-```sh
-./openokr down
-```
-
-### 2. Restore
+### 1. Restore
 
 ```sh
 ./openokr restore /path/to/backup/20260908T020000Z
 ```
 
-This verifies the checksum, decrypts the dump (trying the current key first,
-then previous keys), drops and recreates the database, runs `pg_restore`, and
-restores blob storage if the backup includes it. Migrations run automatically
-on the next `./openokr up`.
+Leave the stack running: the restore needs the database container, and stops
+and starts the application itself. It verifies the checksum, decrypts the dump
+(trying the current key first, then previous keys), stops the application,
+drops and recreates the database, runs `pg_restore`, restores blob storage if
+the backup includes it, starts the application, waits for it to be healthy,
+and runs the migrations again so the application role's grants come back.
 
-### 3. Start
-
-```sh
-./openokr up
-```
-
-### 4. Verify
+### 2. Verify
 
 ```sh
 ./openokr status
@@ -88,7 +79,7 @@ kubectl scale deployment openokr --replicas=0
 
 ```sh
 openssl enc -d -aes-256-cbc -pbkdf2 \
-  -pass "pass:$(kubectl get secret openokr -o jsonpath='{.data.encryption-key}' | base64 -d)" \
+  -pass "pass:$(kubectl get secret openokr-secrets -o jsonpath='{.data.encryption-key}' | base64 -d)" \
   -in /backups/20260908T020000Z/db.dump.enc \
   -out /tmp/db.dump
 ```
@@ -147,11 +138,11 @@ After a restore, run the audit chain verifier:
 ```sh
 # Docker Compose
 docker compose exec app node --experimental-strip-types --no-warnings \
-  packages/core/src/bin/verify-audit.ts
+  /app/migrator/packages/core/src/bin/verify-audit.ts
 
 # Kubernetes
 kubectl exec deploy/openokr -- node --experimental-strip-types --no-warnings \
-  packages/core/src/bin/verify-audit.ts
+  /app/migrator/packages/core/src/bin/verify-audit.ts
 ```
 
 A failure means the restored audit events do not form a valid chain. Possible
@@ -188,7 +179,8 @@ backup:
   existingClaim: my-backup-pvc
 ```
 
-The CronJob runs `pg_dump`, encrypts with the instance key, and applies
+The CronJob runs `pg_dump`, encrypts with the instance key, archives the
+uploaded files when they live on the chart's own volume, and applies
 retention. Point `existingClaim` at a PVC backed by durable storage (NFS,
 EBS, etc.). Without it the job uses an `emptyDir` that is lost on restart.
 

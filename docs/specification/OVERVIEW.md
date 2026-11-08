@@ -1,6 +1,6 @@
 # OpenOKR: product overview
 
-*Stop storing OKRs. Start running them. Open source, AI-native, self-hosted or in our cloud.*
+*Stop storing OKRs. Start running them. Open source, AI-native, self-hosted or in a managed cloud.*
 
 This document is for the people who will use OpenOKR: team members, champions and reviewers, coordinators and facilitators, executives, and the admins who run it. It explains what OpenOKR is, who it is for, and what every part of it does. For the engineering plan behind it, see the other documents in this folder.
 
@@ -18,10 +18,10 @@ None of that lives in most software. It lives in a consultant's slide deck, and 
 
 **OpenOKR puts the method in the product, and makes the product active.**
 
-- **The method is built in.** A guided eight-phase cycle. Twenty-six quality checks that judge every draft as you type. An alignment score that names its gaps. KPI health corridors that trigger recovery objectives. Two timed session formats. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
-- **The product is active.** Two AI teammates work on your OKRs alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI drops out of its corridor.
+- **The method is built in.** A guided eight-phase cycle. Twenty-six quality checks that judge every draft as you type. An alignment score that names its gaps. KPI health corridors that lead to recovery objectives. Timed weekly, monthly and quarterly sessions. A diagnostic at the close that tells you whether a missed quarter was a cadence problem or a strategy problem.
+- **The product is active.** Two AI teammates work on your OKRs alongside you. The **OKR Coach** guards quality. The **OKR Champion** guards the rhythm. They initiate. They nudge the champion whose check-in is due, escalate the blocker that aged past its clock, tell leadership their not-doing list is empty, and draft the recovery objective when a KPI stays unhealthy.
 - **They reach you where you work.** In the browser, in Slack, Microsoft Teams, WhatsApp or Telegram, by email, and through your own AI agent.
-- **You own it.** Open source. Self-host it on your servers in about half an hour, or run it in our cloud. Same release, same behaviour. Export your whole workspace whenever you want.
+- **You own it.** Open source. Self-host it on your servers in about half an hour, or run it in a managed cloud. Same release, same behaviour. Export your whole workspace whenever you want.
 
 ### In one paragraph
 
@@ -52,14 +52,14 @@ OpenOKR runs your organisation's OKRs, from the annual frame to the quarterly cl
 
 ### 3.1 The guided cycle
 
-Eight phases, from the annual frame to the close. The product knows which one you are in, what is missing, and how many weeks remain before your publication deadline.
+Eight phases, from the annual frame to the close. Phase 0 runs only in an annual cycle, so a quarterly cycle runs seven. The product knows which one you are in, what is missing, and how many weeks remain before your publication deadline. By default the phases guide and refuse nothing; a workspace can make them binding, or hide them.
 
 | Phase | What happens |
 |---|---|
 | 0. Annual strategy | Set the frame once a year: mission, vision, mid-term strategy, two to five annual strategies, up to five annual objectives, and the year's not-doing list |
-| 1. Prepare | Name a sponsor and a facilitator, book every session, and gather the seven-item input pack. Drafting is blocked until it is complete, because a planning session without inputs produces objectives written from opinion |
-| 2. Diagnose | Score the previous cycle, read the KPI baselines, and rank five to ten strategic issues by impact |
-| 3. Set direction | Three to five priorities, each with a statement of what will be measurably different in twelve months. Then write the not-doing list. The product will not let you skip it |
+| 1. Prepare | Name a sponsor and a facilitator, book every session, and gather the seven-item input pack. Where the phases are binding, drafting waits until it is complete, because a planning session without inputs produces objectives written from opinion |
+| 2. Diagnose | Score the previous cycle, read the KPI baselines, and rank at least three strategic issues by impact |
+| 3. Set direction | In an annual cycle, three to five priorities, each with a statement of what will be measurably different in twelve months, then the not-doing list. The Coach speaks up if it is empty. A quarterly cycle revalidates the frame and chooses its focus areas |
 | 4. Draft OKRs | Write the objectives and key results, with the quality rules checking every line as you type |
 | 5. Align and commit | Map contribution, register dependencies, check capacity, and clear six publish gates |
 | 6. Run the cadence | Weekly check-ins, monthly reviews, a decision log, and one optional mid-cycle calibration |
@@ -79,7 +79,7 @@ Some of what it catches:
 - Average confidence above ninety percent at drafting. That is sandbagging, not a stretch.
 - An objective aligned to nothing. Name the priority it moves forward, or rethink it.
 
-Six gates are hard. A set that fails one cannot be published: every objective owned and reviewed, every key result passing, alignment stated, dependencies confirmed or risk-owned, capacity checked with nothing over, and a publication date before day one.
+Six gates run when a set is published: every objective owned, and reviewed where reviewers are required; every key result passing the checks set to block; alignment stated; dependencies confirmed or risk-owned; capacity checked with nothing over; and a publication date before day one. Each gate blocks, warns or is off. By default the first two block, gates 3 to 5 warn and the publication-date gate is off, and an admin may publish past a blocking gate by recording a reason.
 
 ### 3.3 Alignment that means something
 
@@ -93,13 +93,13 @@ KPIs describe the health of your business. OKRs describe what you are changing a
 
 Build KPI driver trees: revenue is driven by new customers and order value, which are driven by conversion and basket size, and so on down to the leading indicators a team can move this week. Every KPI has a health corridor. Above ninety percent of target is healthy. Seventy to ninety is watch. Below seventy is unhealthy.
 
-When a KPI turns unhealthy, OpenOKR drafts a **recovery objective**: committed, named for what the metric protects, with the metric itself as the first key result, from where it is to where it is healthy, and then up to three leading drivers that are short of their own targets, each owned by the person who owns that driver. The KPI is then marked "recovering" beside its real health, never instead of it, and the recovery's own progress is shown next to the reading, so you can see the fix working without anyone mistaking it for the number having recovered. A recovery board shows every unhealthy KPI across the company in one list.
+When a KPI turns unhealthy, its owner is offered three responses: fix it now as day-to-day work, add a key result for it to an existing objective, or launch a recovery objective. If it stays unhealthy for two periods, the Champion drafts a **recovery objective**: committed, named for what the metric protects, with the metric itself as the first key result, from where it is to where it is healthy, and then up to three leading drivers that are short of their own targets, each owned by the person who owns that driver. The KPI is then marked "recovering" beside its real health, never instead of it, and the recovery's own progress is shown next to the reading, so you can see the fix working without anyone mistaking it for the number having recovered. A recovery board shows every unhealthy KPI across the company in one list.
 
 ### 3.5 The weekly rhythm
 
 Fifteen to thirty minutes, four steps, run by the product.
 
-1. **Confidence round.** Every key result gets a score from 0.0 to 1.0. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
+1. **Confidence round.** Every key result gets a confidence, shown by default as x in 10. Where the team votes, everyone submits privately and the votes reveal together, so nobody anchors on the champion. The champion writes one or two lines: what changed this week. Facts, not feelings.
 2. **Discuss what dropped.** Any key result whose confidence fell gets a short discussion. Every low score gets a next action due by the next check-in, with an owner, and a blocker with its type only where something is actually blocked. A key result whose confidence falls into the low band is raised with the coordinator the same day.
 3. **Commitments and wins.** Close last week's, delivered or not, with a line on why where it helps. Set this week's: three or four moves that will actually shift a key result. Name the week's wins.
 4. **Digest.** Generated for you, with open blockers and their next actions, the commitments and the wins, edited by the coordinator, posted to your channel.
@@ -112,7 +112,7 @@ Ninety minutes, four acts, eleven timed stages, about two weeks before the cycle
 
 **Review** asks whether you achieved the results. A room pulse first, because steady rooms round their numbers up. Then score every key result against evidence, with the objective score hidden until the team reveals it together. Then the story behind each number, owner by owner. Then recognition.
 
-**Retro** asks how you worked. What worked and what did not, written silently then dot-voted. The four questions leadership owes the team. One honest cause for every key result under 0.7. And an anonymous five-statement survey of the practice itself, where the lowest statement becomes next quarter's process objective.
+**Retro** asks how you worked. What worked and what did not, written silently then dot-voted. The four questions leadership owes the team. One honest cause for every key result that missed: under 0.6 for an aspirational one, under 1.0 for a committed one. And an anonymous five-statement survey of the practice itself, where the lowest statement becomes a priority for next quarter.
 
 Then the **diagnostic**, which is the most valuable output of the whole session:
 
@@ -122,9 +122,9 @@ Then the **diagnostic**, which is the most valuable output of the whole session:
 | You missed, but the rhythm was strong | A strategy or quality problem. The team ran the rhythm and still missed. Fix the key results, not the people |
 | You missed, and the rhythm was weak | A cadence problem, not an ambition problem. Restore the weekly check-in before you rewrite a single objective |
 
-**Reset** decides the next cycle. Every objective is closed deliberately as keep, modify or abandon, with a reason. Nothing carries over by default. Learnings are captured, next-quarter drafts sketched while the evidence is warm, and every action gets a name and a date.
+**Reset** decides the next cycle. Every objective is closed deliberately as done, keep, modify, defer or abandon, with a reason. Nothing carries over without that decision, though by default the close proposes Keep for an aspirational objective that was not achieved. Learnings are captured, next-quarter drafts sketched while the evidence is warm, and every action gets a name and a date.
 
-Then the product feeds it all forward: your scores become the next cycle's Phase 2 scoring list, your carry-forward items become ranked issues that must survive prioritisation on their merits, your learnings join the input pack, and the lowest process-health statement becomes a priority.
+Then the product feeds it all forward: your scores become the next cycle's Phase 2 scoring list, kept and modified objectives arrive as pre-filled drafts, deferred items and carry-forward learnings become ranked issues that must survive prioritisation on their merits, your learnings join the input pack, and the lowest process-health statement becomes a Phase 3 priority.
 
 ---
 
@@ -157,12 +157,12 @@ It reminds the champion before the check-in is due, on the day, and daily after.
 | Surface | What you can do |
 |---|---|
 | **Browser** | Everything |
-| **Email** | Nudges, digests, your daily summary, one-click check-in links |
+| **Email** | Nudges, digests, your daily summary, links straight to the check-in |
 | **Slack** | Get nudged, check in from a dialog, log a blocker, acknowledge, read a goal, ask the coach |
 | **Microsoft Teams** | The same, in cards |
 | **WhatsApp** | Get nudged, then check in conversationally by replying |
 | **Telegram** | The same, with inline buttons |
-| **Your own AI agent** | Connect Claude, ChatGPT, Cursor or a custom agent through a proper consent screen. It works as you, within your permissions, fully audited. Local desktop agents connect with zero network exposure |
+| **Your own AI agent** | Connect Claude, ChatGPT, Cursor or a custom agent through a proper consent screen. It works as you, within your permissions, fully audited |
 
 A workspace with no chat provider connected still works completely. Email and the browser cover everything.
 
@@ -174,7 +174,7 @@ Deliberately OKR-shaped. Enough to answer "what is actually moving this key resu
 
 - **Initiatives.** The work that moves a key result: an owner, dates, a status, a confidence and a capacity verdict. The capacity check at commit time reads from these, which is why "nothing was cut" is a gate failure.
 - **Tasks and the board.** A kanban with four columns where every card can link to a key result. The sidebar shows your objectives and key results with progress derived from linked completed tasks, including the tasks of every initiative that serves the key result, shown beside the measured number rather than instead of it. When all the linked work is done but the number has not moved, that is exactly the divergence the coach reports.
-- **Documents.** Rich documents attached to a goal, a key result, an initiative, a cycle or a session. Drafts, publishing, version history with a visual difference, comments and reactions.
+- **Documents.** Rich documents attached to a space, a goal, a key result, an initiative, a cycle or a session. Drafts, publishing, version history with a visual difference, comments and reactions.
 
 ---
 
@@ -188,7 +188,7 @@ Deliberately OKR-shaped. Enough to answer "what is actually moving this key resu
 - **Notifications** that respect you: instant for direct mentions, otherwise batched on your schedule, plus a daily summary in your timezone.
 - **People and org**: profiles, a manager chain and org chart, a directory, guests, invitation links with domain rules.
 - **Search and ⌘K** across everything you can see.
-- **Admin**: members and access, the rhythm's defaults and thresholds, coaching strictness, branding, backups, a read-only freeze switch for maintenance, and a tamper-evident audit log with one-click verification.
+- **Admin**: members and access, the rhythm's defaults and thresholds, coaching strictness, branding, a read-only freeze switch for maintenance, and a tamper-evident audit log with one-click verification.
 - **Portability**: export your whole workspace to an encrypted, checksummed archive and import it into any other OpenOKR instance after a dry-run preview.
 
 ---
@@ -196,7 +196,7 @@ Deliberately OKR-shaped. Enough to answer "what is actually moving this key resu
 ## 8. Bringing your data
 
 - **Spreadsheets.** Upload a CSV or XLSX of goals, key results, KPIs, KPI records, initiatives or tasks. AI proposes the column mapping, you confirm it, you see a dry run, then you import.
-- **FlowyTeam.** A dedicated read-only importer for one company at a time, covering teams, cycles, objectives, key results, check-ins, KPIs with their formulas, and tasks. Re-running it changes nothing. Every derived value is recomputed rather than trusted, and anything that cannot map cleanly appears in the report rather than being quietly dropped.
+- **FlowyTeam.** A dedicated read-only importer for one company at a time, covering people, teams, cycles, objectives, key results, check-ins, KPIs with their formulas, initiatives, tasks, comments and files. Re-running it changes nothing. Every derived value is recomputed rather than trusted, and anything that cannot map cleanly appears in the report rather than being quietly dropped.
 
 ---
 
@@ -204,17 +204,17 @@ Deliberately OKR-shaped. Enough to answer "what is actually moving this key resu
 
 | How | Who it suits | What it takes |
 |---|---|---|
-| **Self-hosted, one server** | Any organisation that wants its data on its own machines | One Docker Compose file and a first-run web wizard that generates every secret and tests your connections. About 30 minutes |
+| **Self-hosted, one server** | Any organisation that wants its data on its own machines | One Docker Compose file, a helper script that generates every secret, and a first-run web wizard that tests your connections. About 30 minutes |
 | **Self-hosted, Kubernetes** | Universities and large organisations | A Helm chart, your Postgres, your single sign-on, your backups |
-| **Our cloud** | Teams that want no operations | Sign up and start |
+| **A managed cloud** | Teams that want no operations | Sign up and start. OKRGoal is the one OKR Institute runs |
 
-Both are the same release. Self-host is never seat-limited and never feature-gated. The cloud sells operation, not features.
+All three are the same release. Self-host is never seat-limited and never feature-gated. The cloud sells operation, not features.
 
 **Your data, your rules.**
 
 - **Open source** under AGPL. Free, auditable, never locked in.
 - **Self-hosted means data residency.** Your country, your servers.
-- **Air-gap capable.** Fully offline: a local AI model or none, self-hosted assets, no telemetry unless you opt in.
+- **Air-gap capable.** Fully offline: a local AI model or none, self-hosted assets, no telemetry unless you opt in, and the update check turned off.
 - **Secure by construction.** Tenant isolation enforced inside the database, passkeys and second factors from day one, an append-only audit log with cryptographic tamper evidence, scoped expiring tokens.
 - **Provably portable.** Encrypted export and import, backups whose restores are tested automatically, and, in the cloud, support access that is time-boxed and visible to you.
 
@@ -223,11 +223,11 @@ Both are the same release. Self-host is never seat-limited and never feature-gat
 ## 10. Getting started
 
 1. **Deploy or sign up.** Run the compose file and open the wizard, or create a cloud workspace.
-2. **Set up, or don't.** Every setting starts on a sensible default, so you can skip straight past this. If you like, name the workspace, pick your check-in day, connect a chat provider. Or click "explore with demo data" to poke around a realistic company first.
+2. **Set up, or don't.** Every setting starts on a sensible default, so you can skip straight past this. If you like, name the workspace, pick your check-in day, connect a chat provider. Or add sample data from the welcome wizard to poke around a realistic company first.
 3. **Bring your data,** or start clean.
-4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing and refuse to let you draft on a thin input pack.
-5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate.
-6. **Friday comes.** Everyone's review inbox fills. The Champion nudges the people who forgot. The session runs in twenty minutes. The digest goes out. The streak ticks up.
+4. **Open a cycle.** The product walks you through the eight phases. It will tell you what is missing, and where the phases are binding it will refuse to let you draft on a thin input pack.
+5. **Draft your OKRs.** The coach checks every line as you write it, and will not let you publish a set that fails a gate set to block.
+6. **Check-in day comes.** Everyone's review inbox fills. The Champion nudges the people who forgot. The session runs in twenty minutes. The digest goes out. The streak ticks up.
 7. **The quarter ends.** Ninety minutes, four acts, honest scores, a real diagnosis, and the next cycle already half-populated with what you learned.
 
 That is the product.
@@ -238,7 +238,7 @@ That is the product.
 
 | Area | What you get |
 |---|---|
-| **The method** | A guided eight-phase cycle, twenty-six live quality checks, six hard publish gates, an alignment score, KPI health corridors, two timed session formats, and a closing diagnostic |
+| **The method** | A guided eight-phase cycle, twenty-six live quality checks, six publish gates, an alignment score, KPI health corridors, timed weekly, monthly and quarterly sessions, and a closing diagnostic |
 | **The coach** | Two AI teammates that guard quality and rhythm, initiate, escalate, cite their rules, and are scoped, capped and auditable |
 | **Reach** | Browser, email, Slack, Teams, WhatsApp, Telegram, and your own AI agent |
 | **OKRs** | Weighted, direction-aware key results with value history, confidence, trend forecasting, KPI-backed measurement, and full alignment with dependencies |
@@ -246,5 +246,5 @@ That is the product.
 | **Rhythm** | Cadence with visible staleness, champion and reviewer accountability, blockers due by the next check-in, commitments, streaks and digests |
 | **The work** | Initiatives, a key-result-linked board, and documents |
 | **Platform** | Spaces, the Work Map, the review inbox, a live feed, notifications that respect you, search, admin and a tamper-evident audit log |
-| **Ownership** | Open source, self-hosted in 30 minutes or in our cloud, air-gap capable, database-level isolation, full export |
+| **Ownership** | Open source, self-hosted in 30 minutes or in a managed cloud, air-gap capable, database-level isolation, full export |
 | **Later** | Custom fields, custom workflows, saved views, Gantt, time tracking and sprints. Added after launch, never required |

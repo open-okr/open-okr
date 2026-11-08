@@ -103,7 +103,7 @@ Every verdict opens into the rule itself. Coaching is arguable by design.
 <summary><b>Publish gates</b>: a set is checked before it goes live</summary>
 <br/>
 
-Six gates run when a cycle's OKRs are published: champions and reviewers named, key results that pass their blocking checks, alignment mapped, dependencies confirmed or risk-owned, capacity checked with the cuts recorded, and a publication date. Each gate blocks, warns or is off. By default the two structural gates block and the rest warn, and an admin may override a blocking gate with a recorded reason. The company set publishes before the cycle starts, the team sets in its first weeks.
+Six gates run when a cycle's OKRs are published: an owner for every objective, and a reviewer where reviewers are required; key results that pass their blocking checks; alignment mapped; dependencies confirmed or risk-owned; capacity checked, with nothing left exceeding it; and a publication date. Each gate blocks, warns or is off. By default the two structural gates block, gates 3 to 5 warn and the publication-date gate is off, and an admin may override a blocking gate with a recorded reason. The company set publishes before the cycle starts, the team sets in its first weeks.
 
 <img src="docs/mockups/png/04-gates-capacity.png" alt="Align and commit. Capacity is read from the initiatives actually planned, and the gates are listed with the reason each one is unmet." width="90%"/>
 
@@ -145,7 +145,7 @@ Vertical alignment is contribution. Horizontal alignment is a dependency both te
 <summary><b>KPIs and recovery OKRs</b>: the fix is visible before the number catches up</summary>
 <br/>
 
-Every KPI sits in a health band in its own units: above a threshold, below one, or inside a range. When one turns unhealthy, OpenOKR offers three responses: fix it now as day-to-day work, add a key result to an existing objective, or launch a recovery OKR, drafted with one key result per leading driver. The KPI then shows its real band and the recovery's progress side by side.
+Every KPI sits in a health band in its own units: above a threshold, below one, or inside a range. When one turns unhealthy, OpenOKR offers three responses: fix it now as day-to-day work, add a key result to an existing objective, or launch a recovery OKR, drafted with a key result for the KPI itself and one for each leading driver that is behind its target. The KPI then shows its real band and the recovery's progress side by side.
 
 <img src="docs/mockups/png/06-kpi-recovery.png" alt="A KPI driver tree with a live recovery objective and the cross-tree recovery board." width="90%"/>
 
@@ -155,7 +155,7 @@ Every KPI sits in a health band in its own units: above a threshold, below one, 
 <summary><b>The weekly, monthly and quarterly rhythm</b>: run by the product, not remembered by a person</summary>
 <br/>
 
-The weekly check-in is fifteen to thirty minutes in four steps: a private confidence round revealed together, what dropped, with a next action due by the next check-in for every low score and a typed blocker where something is actually stuck, commitments and wins, and a generated digest. A space may check in weekly, every two weeks or monthly. Holidays pause the rhythm without breaking the streak, and a member on leave names a delegate.
+The weekly check-in is fifteen to thirty minutes in four steps: a private confidence round revealed together, what dropped, with a next action due by the next check-in for every low score and a typed blocker where something is actually stuck, commitments and wins, and a generated digest. A space may check in daily, weekly, every two weeks or monthly. Holidays pause the rhythm without breaking the streak, and a member on leave names a delegate.
 
 <img src="docs/mockups/png/07-weekly-session.png" alt="The weekly session mid-flight. Team votes reveal together. A low score has a next action and an owner." width="90%"/>
 
@@ -191,7 +191,7 @@ Nothing is gated behind a paid tier. The [product overview](docs/specification/O
 | **The work** | Initiatives that move a key result, a key-result-linked kanban board, rich documents with versions, and files. Deliberately OKR-shaped, not a project management suite |
 | **Coaching and AI** | The twenty-six-check engine, both agents, propose-by-default governance with hard cost caps, a grounded copilot, and bring-your-own AI: Anthropic, OpenAI, Google, OpenRouter, Ollama or any compatible endpoint, including fully local |
 | **Channels and reach** | Browser, email, Slack, Microsoft Teams, WhatsApp, Telegram, and an external agent surface with a consent screen and a full audited tool catalogue |
-| **Platform** | Spaces, people and org chart, relationship-based access control with workspace roles, single sign-on and directory sync, comments and notifications with quiet hours, a live activity feed, search, admin, a tamper-evident audit log, signed workspace export, spreadsheet and FlowyTeam importers, WCAG 2.1 AA target, English and Bahasa Melayu |
+| **Platform** | Spaces, people and org chart, relationship-based access control with workspace roles, single sign-on and directory sync, comments and notifications with quiet hours, a live activity feed, search, admin, a tamper-evident audit log, encrypted workspace export, spreadsheet and FlowyTeam importers, WCAG 2.1 AA target, English and Bahasa Melayu |
 
 ## 🏢 Four ways to run it
 
@@ -218,7 +218,7 @@ PostgreSQL is the only service OpenOKR requires. No mail server, no AI provider,
 | **Kubernetes with Helm** | Universities, government and large enterprises | A chart, your PostgreSQL, your ingress, your backups |
 | **A local checkout** | Contributors, and anyone evaluating the code | Node 22 and pnpm |
 
-**Self-host is never seat-limited and never feature-gated.** Air-gapped installation is supported: a local AI model or none at all, self-hosted assets, and telemetry only if you opt in.
+**Self-host is never seat-limited and never feature-gated.** Air-gapped installation is supported: a local AI model or none at all, self-hosted assets, telemetry only if you opt in, and the daily update check, which is on by default, turned off with `OPENOKR_UPDATE_CHECK=off`.
 
 Every release publishes a multi-architecture image to `ghcr.io/open-okr/open-okr`, signed with cosign and with a software bill of materials, and the Helm chart to `oci://ghcr.io/open-okr/charts/openokr`. [Releases](https://github.com/open-okr/open-okr/releases) lists them with their notes.
 
@@ -258,9 +258,9 @@ On the first run this generates every secret it needs into `./secrets/` with mod
 
 **3. Finish setup in the browser.**
 
-Open the address it printed. The wizard asks for one thing: the account that owns the instance. Name, address, and a password of at least twelve characters.
+Open the address it printed. The wizard's first page tests the database, mail, file storage, chat channels and AI provider, and only a failing database stops you. The second asks for the account that owns the instance: your name, address, and a password of at least twelve characters, with a name for the instance already filled in.
 
-Registration closes the moment that account exists. Everybody after you joins by invitation, which is the point: an instance on the open internet with open registration is a mailing list.
+Registration closes the moment that account exists. By default everybody after you joins by invitation, or through single sign-on or directory sync once you set them up, which is the point: an instance on the open internet with open registration is a mailing list. An administrator can open registration to company addresses, or to anyone, later.
 
 That is the install. You are signed in, you have a workspace, and both agents are already members of it.
 
@@ -303,7 +303,7 @@ helm install openokr oci://ghcr.io/open-okr/charts/openokr \
   --set ingress.hosts[0].paths[0].pathType=Prefix
 ```
 
-Keep the connection string in a Secret rather than on the command line: a URL passed with `--set database.url` lands in the release's stored values, which anyone with `helm get values` can read. The PostgreSQL needs the `pgvector` extension available, and the role must not be a superuser or have `BYPASSRLS`, because row-level security is what keeps one workspace out of another's rows.
+Keep the connection string in a Secret rather than on the command line: a URL passed with `--set database.url` lands in the release's stored values, which anyone with `helm get values` can read. The `pgvector` extension is optional: with it, search adds semantic results, and without it search uses full text. The role must not be a superuser or have `BYPASSRLS`, because row-level security is what keeps one workspace out of another's rows.
 
 Then open the host, and the first-run wizard takes over exactly as it does on a single server. Migrations run as a hook from the same image before the application rolls, so an upgrade is `helm upgrade` and nothing else.
 
@@ -334,7 +334,7 @@ pnpm dev
 
 Open `http://localhost:3000`. A database with no account in it redirects to `/setup`, the same first-run wizard the Compose target serves. Everything else has a working default, so nothing above needs editing to boot.
 
-To see the product with a year of data in it, run `pnpm db:seed` after the wizard: it fills the workspace with [a year of OKRs at Northwind](docs/scenarios/northwind-year/README.md), placed on the real calendar as of today.
+To see the product with a year of data in it, run `DATABASE_URL=postgres://postgres:postgres@localhost:55432/openokr pnpm db:seed` after the wizard: it fills the workspace with [a year of OKRs at Northwind](docs/scenarios/northwind-year/README.md), placed on the real calendar as of today.
 
 Details, and the full command list, are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
@@ -361,12 +361,13 @@ TypeScript in strict mode everywhere. Next.js App Router and React. PostgreSQL t
 | **One write path** | Every write is one transaction: the change, its audit row and its outbox row commit together |
 | **Tenant isolation in the database** | Row-level security shipped in the same migration as every table. Application code cannot leak across tenants even if it is wrong |
 | **One authorisation checkpoint** | Every read of a protected object goes through a single access-aware getter. No per-endpoint checks |
-| **One contract, many surfaces** | The API, OpenAPI, the CLI, the agent tool catalogue and the chat commands are generated projections of one action registry, checked for drift in CI |
+| **One contract, many surfaces** | The API, OpenAPI, the CLI and the agent tool catalogue are generated from one action registry and checked for drift in CI. Every chat command calls one action in it |
 | **Vendor code is quarantined** | No vendor SDK outside one adapters package. That is what makes air-gapped operation real rather than aspirational |
 
 ```
 apps/web            Next.js app: interface, internal API, public REST, agent endpoint, channel webhooks
 packages/method     The METHOD.md canon as data and pure functions. No I/O
+packages/formats    Format rules the browser and the server share: email, domain, date, colour, timezone
 packages/core       Domain logic, the Operation pipeline, the action registry, access, the engines
 packages/db         Drizzle schema, migrations, row-level security, the data-change runner
 packages/adapters   Ports and drivers, the only place vendor SDKs live, and the outbox relay
@@ -374,7 +375,9 @@ packages/agents     Agent runs, their schedule, structured extraction and the AI
 packages/importer   The import command line and the FlowyTeam connector
 packages/cli        The `okr` command line, generated from the contract
 packages/ui         Shared components
-deploy/             Docker Compose, the Helm chart, and the cloud overlay
+packages/config     Shared TypeScript, lint and environment schema
+packages/test-support  Test factories, the database harness and the flakiness report
+deploy/             Docker Compose, the Helm chart, the demo and staging overlays, and Teams and WhatsApp setup
 ```
 
 ## 📚 Documentation
@@ -407,7 +410,7 @@ Found a bug? [Open an issue](https://github.com/open-okr/open-okr/issues/new/cho
 
 ## ⚖️ Licence
 
-**AGPL-3.0** with a lightweight contributor licence agreement. The full text is in [LICENSE](LICENSE), the reasoning in [PLAN.md §4](docs/specification/PLAN.md), and the agreement in [CONTRIBUTING.md](CONTRIBUTING.md).
+**AGPL-3.0** with a lightweight contributor licence agreement. The full text is in [LICENSE](LICENSE), the reasoning in [PLAN.md §4](docs/specification/PLAN.md), and how the agreement works in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 - AGPL stops a third party from selling a closed hosted version. Anyone who modifies it and offers it over a network must publish their changes.
 - An organisation that self-hosts for its own staff takes on no obligations at all.

@@ -2,27 +2,32 @@
 
 For the person who owns an OpenOKR instance or a workspace inside one.
 
-Everything an administrator can change lives under **Admin** in the left
-navigation. Every screen there needs full access, which is what the owner
-account has and what an administrator can grant to somebody else.
+Everything an administrator can change lives under **Workspace admin** in the
+avatar menu. Every screen there needs full access to the workspace, which is
+what the owner account has and what an administrator can grant to somebody
+else: **Make administrator** on their profile, or a role that grants it on
+**Roles and permissions**. The built-in Admin role holds edit on the
+workspace rather than full, so on its own it does not reach these screens.
 
 ## The screens, and what each one owns
 
 | Screen | What you decide there |
 |---|---|
-| **General** | Timezone, language, trusted email domains, the second-factor policy, the workspace state, and whether to open the first-day setup again. Reopening it keeps every answer, and every administrator is sent to it from the Work Map until somebody finishes it |
+| **General** | Timezone, language, trusted email domains, the second-factor policy, the workspace state, and whether to open the first-day setup again. Reopening it keeps every answer, and every administrator is sent to it from Home until somebody finishes it. On a self-hosted instance it also holds the instance name, who may register and the update check; on a managed cloud, closing the workspace |
 | **Plan and seats** | The plan and how many seats it carries. Cloud only; a self-hosted instance is never seat-limited |
-| **Support access** | Whether the vendor may look, for how long, and with what reason. Cloud only |
+| **Roles and permissions** | What each role may do in each domain (objectives, KPIs, initiatives, tasks, comments, spaces, the workspace), and who holds which role. Owner, Admin, Member and Viewer are built in; every role but Owner can be changed, and roles can be added |
+| **Support access** | Whether the vendor may come in when they ask, at what level and for how long. Only a managed cloud's operator can ask, so on a self-hosted instance nobody does |
 | **Single sign-on** | An OIDC or SAML 2.0 provider, which email domains it claims, and whether it is enforced. Each connection can be changed, turned off and removed there too. See [Security](security.md#single-sign-on) |
 | **Directory sync** | The SCIM endpoint and its bearer token, so an identity provider provisions people |
 | **Audit trail** | Verify the hash chain, browse the trail newest first, and export it, with one filter for both |
-| **Branding** | The workspace's own colour, which every screen of the workspace is drawn in. See [Settings](settings.md) |
+| **Branding** | The workspace's name, logo and favicon, and its own colour, which every screen of the workspace is drawn in. See [Settings](settings.md) |
+| **Practice** | The practice profile and its settings: who may write, and how hard each check and gate is. See [Settings](settings.md#workspace) |
 | **Rhythm and thresholds** | The cadence, the staleness grace, the numbers the coaching rules fire on, and the workspace's own words for the method's terms. See [Terminology](settings.md#terminology) |
-| **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and the templates each one uses |
+| **Channels** | Slack, Microsoft Teams, WhatsApp and Telegram, and which approved WhatsApp template each reminder uses |
 | **Nudge volume** | Which proactive messages are on, and how loudly they escalate |
-| **Invitations** | Links that let somebody join, and what they are worth |
-| **Deleted items** | Bringing back a goal, initiative, task or document somebody deleted. See [below](#bringing-something-back) |
-| **Import** | Bringing a quarter of history in from a spreadsheet or from FlowyTeam, starting from a downloadable template. See [Importing](../import/README.md#templates) |
+| **Invitations** | Links that let somebody join: one person once, a reusable link with a use count, an expiry and allowed domains, or a guest of one space |
+| **Deleted items** | Bringing back a goal, key result, initiative, task or document somebody deleted. See [below](#bringing-something-back) |
+| **Import** | Bringing history in from a spreadsheet, starting from a downloadable template, and exporting this workspace as an encrypted archive or importing one from another instance. FlowyTeam is imported from the command line. See [Importing](../import/README.md#templates) |
 | **AI** | Whether AI is on at all, whose key, which models, the cost caps, and what may leave for a provider off your network: how much context, whether addresses and phone numbers are replaced first, a no-training request, and which hosts may be reached |
 | **Agents and runs** | What the Coach and the Champion may do, and what they have done |
 
@@ -59,7 +64,7 @@ What comes back with it:
 
 | Deleted | Comes back with |
 |---|---|
-| A goal | Its key results, except any removed before the goal was deleted |
+| A goal | Its key results, except any removed before the goal was deleted. Those are on the list on their own |
 | An initiative | Its links to key results. Publish gate five counts it again |
 | A task | Its assignees and its checklist |
 | A document | Its versions, which the delete never touched |
@@ -67,8 +72,9 @@ What comes back with it:
 Two limits, both deliberate:
 
 - **You see what you could have deleted.** Restoring asks the same access the
-  delete asked: full access to the workspace and to the item itself. A goal
-  you are not the champion of is not on your list.
+  delete asked: full access to the workspace and to the item itself, or the
+  document's own write rule for a document. A goal you do not hold full
+  access on, as its champion or through your role, is not on your list.
 - **A parent comes back first.** A task on a deleted initiative, or a document
   on a deleted goal or initiative, is refused until that parent is restored,
   and the refusal names it.

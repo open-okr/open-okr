@@ -162,4 +162,4 @@ kind load docker-image openokr:ci
 OPENOKR_IMAGE_TAG=ci sh deploy/helm/cluster-test.sh
 ```
 
-Both run in CI on every pull request.
+Both run in CI on every pull request that is not documentation only.

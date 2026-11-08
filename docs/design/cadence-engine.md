@@ -10,10 +10,11 @@ reading and writing beside it in `service.ts`.
 it widens to is §11 practice, and practice lives in the method package. The date
 arithmetic stayed in core, where the local-date primitives already were.
 
-**The sweep in §5 is a command, not a job.** No scheduler host runs in the
-application yet, so `pnpm cadence:sweep` is how it runs, the same shape
-`pnpm audit:verify` already has. It goes through the Operation pipeline per
-workspace, so a health flip nobody triggered is still audited.
+**The sweep in §5 runs in the Champion's daily cadence**, on the scheduler
+host, and `pnpm cadence:sweep` runs the same function for an operator who wants
+it now or for an instance with `OPENOKR_SCHEDULER=off`. It goes through the
+Operation pipeline per workspace, so a health flip nobody triggered is still
+audited.
 
 This is the engine that makes health honest. If the next due date is wrong,
 staleness is wrong, and a neglected goal quietly stays green. That is the one
@@ -22,13 +23,15 @@ thing METHOD.md §1 principle 8 forbids.
 ## 1. Contract and shape decisions
 
 ```
-firstDue(from, frequency, anchor, tz)                        -> LocalDate
+firstDue(from, frequency, anchor)                            -> LocalDate
 advance(due, frequency, anchor)                              -> LocalDate
 nextAfterPublication(due, publishedOn, frequency, anchor, tolerance)
                                                              -> { next: LocalDate, missedPeriod: boolean }
+clearOfHolidays(due, frequency, anchor, holidays)            -> LocalDate
 dueInstant(due, tz)                                          -> Instant
 isOutdated(due, today, graceDays)                            -> boolean
-escalation(daysPastDue, graceDays, ladder)                   -> { step: number, targets: Role[] }
+escalation(daysPastDue, graceDays, thresholds, sponsorInLadders, peerStep)
+                                                             -> { step: number | null, targets: Role[] }
 ```
 
 | Decision | Choice | Why |
@@ -138,8 +141,9 @@ boundary is exclusive: at exactly the grace limit the goal is not yet outdated.
 This matches the health matrix in
 [the scoring document](scoring-and-health-engine.md#4-health).
 
-The staleness sweep is a job. It writes health only, for the goals whose grace
-boundary has passed since the last sweep, and it is idempotent.
+The staleness sweep runs daily in the Champion's cadence. It writes health only,
+for the goals whose grace boundary has passed since the last sweep, and it is
+idempotent.
 
 <!-- golden: cadence.staleness -->
 
@@ -311,7 +315,7 @@ it has passed.
 | Frequency or anchor changed | `firstDue` from the later of the last publication date and today. A change never makes a goal instantly overdue |
 | Goal closed | Cleared. A closed goal is never due |
 | Goal reopened | `firstDue(reopened_on, ...)` |
-| Goal moved to another cycle | Unchanged. The rhythm belongs to the goal |
+| Goal moved to another cycle | Unchanged. The rhythm belongs to the goal. The exception is a goal that arrives mid-cycle as a draft, which is cleared because a draft owes no check-in until it goes live (§2.9) |
 | Workspace default frequency changed | Nothing. Goals hold their own frequency, seeded from the default at creation |
 | A space's frequency changed | The open goals following it, with no frequency of their own or the space's previous one, take the new one and `firstDue` from today; a goal set apart keeps its own (P9-T19a-d-a) |
 

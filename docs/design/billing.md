@@ -22,8 +22,10 @@ Another payment provider is a new driver and needs no change anywhere else.
 |---|---|
 | `listPrices(priceIds)` | Amount, currency and interval for the plan screen, cached for a minute |
 | `startCheckout(input)` | The address of a hosted checkout page, for a new subscription or a credit pack |
-| `openPortal(customerRef, returnUrl)` | The address of the hosted page for cards, invoices and cancelling |
+| `openPortal({ customerRef, returnUrl })` | The address of the hosted page for cards, invoices and cancelling |
 | `changeSubscription(input)` | Upgrade now and charge the difference, or schedule a downgrade for the period's end |
+| `endSubscription(ref)` | Stops renewal at the end of the period already paid for. Nothing is refunded |
+| `deleteCustomer(ref)` | Deletes the customer and their saved cards, for erasure (`workspace-erasure.md` §4) |
 | `readSubscription(ref)` | The subscription as it is now |
 | `parseWebhook(body, signature)` | Verifies the signature first, then returns the event. A bad signature throws |
 
@@ -121,6 +123,7 @@ so while it waits.
 |---|---|---|
 | `billing.summary` | `full` | Plan, prices, status, period end. Absent with billing off |
 | `billing.startCheckout` | `full` | Answers an address. Writes nothing |
+| `billing.buyCredits` | `full` | A credit pack's checkout address (`ai-credits.md` §6). Writes nothing |
 | `billing.openPortal` | `full` | Answers an address. Writes nothing |
 | `billing.changePlan` | `full` | Checks the headcount, then tells Stripe. Writes nothing itself |
 | `billing.settleEnded` | `full` | Moves a read-only workspace to the default plan once its people fit |

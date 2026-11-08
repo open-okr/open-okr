@@ -2,7 +2,7 @@
 
 Status: design approved on 12 October 2026, with one condition: every button and link in a mail opens a page that works. Built: the renderer, the account mails, the invitation, the notification digest and every agent nudge by email.
 
-Every mail the product sends is plain text today. The one exception is the notification digest, which carries a bare `<ul>`. AI-NATIVE-PLAN §5 asks for email as "HTML and plain text, one-click action links". This design gives every mail one shared layout, in both parts.
+Before this design every mail the product sent was plain text. The one exception was the notification digest, which carried a bare `<ul>`. AI-NATIVE-PLAN §5 asks for email as "HTML and plain text, one-click action links". This design gives every mail one shared layout, in both parts.
 
 The reference drawing is [12-email-templates](../mockups/src/12-email-templates.html), with all six mails in light and dark.
 
@@ -11,7 +11,7 @@ The reference drawing is [12-email-templates](../mockups/src/12-email-templates.
 | Goal | What it means here |
 |---|---|
 | One layout | A single renderer builds every mail. A mail supplies blocks, never markup |
-| Both parts from one source | The HTML part and the text part come from the same blocks, so they cannot say different things. Today the digest's "and N more" line is in the text part only |
+| Both parts from one source | The HTML part and the text part come from the same blocks, so they cannot say different things. Before, the digest's "and N more" line was in the text part only |
 | Compact | One card, 560px wide at most, 14px body, 24px padding, one primary action |
 | Works everywhere | Gmail, Outlook (Windows and web), Apple Mail and iOS Mail render it the same |
 | Air-gap safe | No web font and no remote image. The mark is text, and the instance serves nothing to a mail client |
@@ -44,11 +44,13 @@ A mail is a list of blocks. The renderer turns each block into table markup with
 |---|---|---|
 | `eyebrow` | 11px uppercase label | omitted |
 | `heading` | h1, 18px | the line, then a blank line |
+| `muted` | a 13px grey line under the heading | the line |
 | `paragraph` | p, 14px. Bold spans only | the line |
 | `action` | a bulletproof button (a table cell with `bgcolor`), then the raw link | `Label: url` |
 | `notice` | a soft grey box, 13px | the line |
-| `items` | rows split by a hairline: chip, time, line, link to the subject | `- line (url)` |
-| `nudge` | a card with a severity edge, the rule key and the escalation step | `- title: line (rule key, step n)`, then the url |
+| `agent` | the agent's initials, name, badge and role | `Name (badge)` |
+| `items` | rows split by a hairline: chip, time, line, link to the subject | `- [chip] line`, then `  Label: url` |
+| `nudges` | a card per nudge with a severity edge and the rule key with the escalation step | `- title (rule)`, the line, then `  Label: url` |
 | `stats` | up to three tiles: on track, at risk, off track | `5 on track, 2 at risk, 1 off track` |
 | `list` | a titled bullet list | the title, then `- item` |
 | `richText` | `renderRichTextToHtml`, the sanitising allow-list renderer | the shared plain-text excerpt |
@@ -67,7 +69,7 @@ These are the UI's own values from `packages/ui/src/styles/tokens.css`, written 
 | Brand (button, mark) | `#4f46e5` | same |
 | Link | `#4338ca` | `#818cf8` |
 | On track, at risk, off track | `#15803d`, `#b45309`, `#b91c1c` on their tints | `#4ade80`, `#fbbf24`, `#f87171` on dark tints |
-| Font | `-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif` | same |
+| Font | `-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif` | same |
 
 Dark mode is an enhancement. A client that strips the `<style>` block (Gmail) shows the light version, which is complete on its own.
 
@@ -92,10 +94,10 @@ The subject of every workspace mail starts with the workspace name, as the nudge
 
 | Piece | Location | Why there |
 |---|---|---|
-| `renderEmail(blocks, frame)` returning `{ html, text }` | `packages/core/src/mail/` | Pure strings, no vendor SDK. Core already builds the digests and the invitation |
-| The six mail builders | beside the code that sends each mail today | Each sender keeps its own wording and data |
-| The `html` part on the email channel | `packages/adapters/src/drivers/channel/email.ts` | The channel can only carry text today. The port already has `html?` |
-| `sendMail` in the web app | `apps/web/lib/mail.ts` | It takes `{ to, subject, text }` today, so `html` is added |
+| `renderEmail(frame, blocks)` returning `{ html, text }` | `packages/core/src/mail/` | Pure strings, no vendor SDK. Core already builds the digests and the invitation |
+| The six mail builders | beside the code that sends each mail | Each sender keeps its own wording and data |
+| The `html` part on the email channel | `packages/adapters/src/drivers/channel/email.ts` | The channel carried text only; it now passes the port's `html?` on |
+| `sendMail` in the web app | `apps/web/lib/mail.ts` | It took `{ to, subject, text }`; `html` is added |
 
 There is no new dependency and no template engine. The layout is about 200 lines of string building, and the same function renders the mockup.
 

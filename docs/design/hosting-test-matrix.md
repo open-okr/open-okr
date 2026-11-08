@@ -208,7 +208,7 @@ Continuous integration runs all four with the rest of the suite.
 |---|---|
 | Each file writes the instance settings for its setup in `beforeAll` and deletes them in `afterAll` | Settings are read per request, so the same server becomes each setup with no restart, and every later spec on the shard meets the default again |
 | Every address carries the run, `RUN` in `e2e/hosting.ts` | A retry gets a fresh worker and must meet new people, not an address that already signed up |
-| Setups 3 and 4 point the instance's mail at a small SMTP listener inside the spec (`MailCatcher`) | The suite has no mailbox, and the relay strips an invitation's token once the mail is sent, so the email is the only place the link exists |
+| Setups 1, 3 and 4 point the instance's mail at a small SMTP listener inside the spec (`MailCatcher`) | The suite has no mailbox, and the relay strips an invitation's token once the mail is sent, so the email is the only place the link exists |
 | Setup 1 seals a Stripe secret key and webhook secret under the suite's root key (`e2e/root-key.ts`) | The server opens them as it opens an operator's. The key is never sent: no screen in the journey asks Stripe for anything |
 | A webhook is signed as Stripe signs it, `t=…,v1=…` over the body | Signature checking runs offline, so the real route is exercised with no network |
 

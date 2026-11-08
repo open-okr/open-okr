@@ -40,8 +40,9 @@ has the whole command. To run an image you built yourself, install the chart
 from a checkout with `helm install openokr ./deploy/helm` and set
 `image.repository` and `image.tag`.
 
-1. Have a PostgreSQL with the `pgvector` extension available, and a database
-   for OpenOKR.
+1. Have a PostgreSQL and a database for OpenOKR. The `pgvector` extension is
+   optional: with it, semantic search uses embeddings; without it, search falls
+   back to full text.
 2. **Connect as a role that is not a superuser and has no `BYPASSRLS`.** Row
    level security is what keeps one workspace out of another's rows, and
    Postgres never applies it to either kind of role. A role that owns the
@@ -68,7 +69,7 @@ at all: what the chart refuses, where migrations run, and that no credential
 lands in a pod spec. `sh deploy/helm/cluster-test.sh` installs it into a kind
 cluster, registers a user and upgrades.
 
-Continuous integration runs the first on every change.
+Continuous integration runs both on every change that is not documentation only.
 
 **The upgrade is the one worth rehearsing.** `.github/workflows/upgrade.yml`
 installs the release an instance is actually running, upgrades it to the

@@ -55,7 +55,7 @@ Elena prepares for the company-wide rollout:
 *Test:* Given directory sync on, when a person is added to the identity provider's "Northwind" group, then they appear as a member with standard access within the sync interval, and their first sign-in uses single sign-on.
 
 **NW-P-06 · 25 Nov 2026 · Priya · S-36 `/admin/rhythm` (terminology)**
-Northwind calls its teams "teams", so Priya renames "Space" to "Team" in terminology. Every screen, email and Slack message now says Team. Bahasa Melayu readers keep their own word, because a rename is the organisation's word, not a translation.
+Northwind calls its teams "teams", so Priya renames "Space" to "Team" in terminology. Every screen, email and Slack message now says Team. Bahasa Melayu readers see "Team" too, because a rename is the organisation's word, not a translation.
 *Test:* Given the label "Team" for Space, when any screen lists spaces, then it says "Teams", and the API keeps the stored name `space`.
 
 **NW-P-07 · 30 Nov 2026 · Elena · upgrade, S-36 practice settings · METHOD §12**
@@ -92,7 +92,7 @@ Leadership agreement on the frame is recorded.
 **NW-P-09 · 2 Dec 2026 · Elena · S-36 practice settings · METHOD §2.5, §12**
 Elena keeps the recommended profile. She decides how Northwind uses reviewers:
 - **Company objectives** are reviewed by Elena.
-- **Department objectives** are reviewed by the department head.
+- **Department objectives** are reviewed by the department head's manager: Elena, or Priya for Engineering.
 - **Team objectives** have no reviewer. The team's own weekly check-in is review enough.
 
 The reviewer setting stays at "Optional", which allows exactly that. Strict mode stays off, phase enforcement stays guided, and anybody can write at any time.

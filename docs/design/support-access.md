@@ -17,8 +17,8 @@ through.
 | The in-app inbox | `packages/core/src/notifications` | P2-T10 | Always on, needs no mail, and carries what a member must not miss |
 | `pnpm cadence:sweep`, the scheduler host | `packages/core`, P6-G01a | P6 | A place a recurring expiry sweep already belongs |
 
-**What does not exist.** No `operator_sessions` table, no grant flow, no
-expiry, and no way for an operator to read a single goal.
+**What did not exist before P8-T04.** No `operator_sessions` table, no grant
+flow, no expiry, and no way for an operator to read a single goal.
 
 ## 1. The decision this document exists to make
 
@@ -69,10 +69,13 @@ TECHNICAL-PLAN §4.13 fixes the columns. This adds the constraints.
 | `granted_by_member_id` | `uuid`, nullable | The owner who said yes. Null until they do |
 | `expires_at` | `timestamptz`, nullable | Set when granted. Section 3 |
 | `ended_at` | `timestamptz`, nullable | Set by expiry, by the owner revoking, or by the operator finishing |
-| `level` | `integer`, not null | An `ACCESS_LEVELS` value. Section 4 |
+| `ended_reason` | `text`, nullable | `expired`, `revoked`, `finished` or `refused`. Set with `ended_at` and only with it |
+| `member_id` | `uuid`, nullable | The guest member the grant provisioned |
+| `level` | `integer`, not null | An `ACCESS_LEVELS` value: 10, 40 or 70. Section 4 |
 
 **A partial unique index allows one live session per workspace per
-operator**, on `(workspace_id, operator_user_id) where ended_at is null`.
+operator**, on `(workspace_id, operator_user_id) where ended_at is null and
+deleted_at is null`.
 Two live sessions for the same person is a bug that would make the audit
 trail ambiguous about which one an action belonged to.
 
@@ -166,7 +169,7 @@ So both, with the check at use being the one that matters.
 
 | Mechanism | When | What it does |
 |---|---|---|
-| At use | Every action, inside `resolveActor` | A member whose operator session is past `expires_at` resolves as suspended. This is the enforcement |
+| At use | Every read and every action, inside `resolveMemberAccessLevel`, which `resolveActor` also calls | A member whose operator session is past `expires_at` reaches nothing. This is the enforcement |
 | The sweep | On the scheduler host, alongside the cadence sweep | Stamps `ended_at`, suspends the member row, notifies the owner that it ended. This is the tidying |
 
 The at-use check costs one join on a path that already loads the member

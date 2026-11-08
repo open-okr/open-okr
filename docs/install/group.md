@@ -13,7 +13,7 @@ Install on [one server](compose.md) or [Kubernetes](kubernetes.md) as usual, the
 | Setting | Value | Why |
 |---|---|---|
 | `OPENOKR_CLOUD` | `true` | Brings the operator console, and keeps instance-wide settings away from each company's administrators |
-| `OPENOKR_REGISTRATION` | `invite_only` | Without it, turning the flag on opens sign-up to anybody who can reach the instance |
+| `OPENOKR_REGISTRATION` | `invite_only` | Without it, and with no policy saved, turning the flag on opens sign-up to anybody who can reach the instance. Finishing the setup wizard saves Invitation only, which then wins over the variable |
 | `OPENOKR_CLOUD_PLANS` | Leave it unset | No plans means no seat limit and no plan screen |
 
 On one server, add these to `secrets/app.env` and run `./openokr up`. On Kubernetes,
@@ -21,9 +21,9 @@ set `cloud.enabled` and `instance.registration` in the chart's values.
 
 ## Set it up
 
-1. Grant yourself the operator role. [The cloud guide](cloud.md#operating-an-instance) has the command.
+1. Grant the operator role to whoever will run the console. The deployment does it, and nobody grants it to themselves, so two people must have accounts. [The cloud guide](cloud.md#operating-an-instance) has the command.
 2. Open `/operator`, and under **New workspace** name each company and who will administer it. With an account they own it straight away, and without one they get an invitation. You do not become a member.
-3. Each company's administrator invites their own people, or trusts their email domain on **Admin, Invitations**.
+3. Each company's administrator invites their own people on **Admin, Invitations**, or trusts their email domain on **Admin, General**.
 
 A workspace from before you turned the flag on appears in the console within the hour.
 `pnpm cloud:adopt` does it now, and it is also how to do it with `OPENOKR_SCHEDULER=off`.

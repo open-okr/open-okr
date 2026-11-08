@@ -1,9 +1,11 @@
 # Writing objectives and key results
 
 Twenty-six checks run as you type: five on objectives, seven on key results,
-and the rest on cycles and alignment. They are advisory by default and
-strictness is an administrator's setting, but the publish gates are not
-advisory: a set does not go out until the key results pass.
+and the rest on cycles and alignment. Most warn and coach by default, and
+strictness is an administrator's setting. A few block as the method sets them:
+an objective with no key result, no timeframe or no owner, and a key result
+with no target, date, owner or direction. The publish gates are not advisory:
+a set does not go out while anything fails a check set to block.
 
 Every message cites the rule behind it, so you can open the rule and argue with
 it. Nothing is a mysterious red dot.
@@ -24,7 +26,9 @@ What the checks look for:
 
 - An output verb at the front: launch, build, ship, deliver, roll out. A
   deliverable is not a destination.
-- No measure anywhere, so nobody can tell whether it happened.
+- No key result at all, so nobody can tell whether it happened.
+- A number in the objective. An objective is qualitative; the number belongs in
+  a key result.
 - Length. An objective nobody can repeat from memory is one nobody acts on.
 - More than the cap: five company objectives, three per unit. More than that is
   a list of work rather than a set of priorities.
@@ -79,14 +83,15 @@ this goal **contributes to** and how.
 
 Horizontal alignment is a dependency both teams know about, which is why a
 dependency has to be confirmed by the other side or logged with a named risk
-owner before the set can publish. An unconfirmed dependency is a plan built on
-somebody else's guess.
+owner. Publish gate 4 checks it: it warns by default, and a workspace may make
+it block. An unconfirmed dependency is a plan built on somebody else's guess.
 
 ## What the Coach does with all this
 
-It flags as you type, and it runs a nightly semantic sweep for what structure
-alone cannot see: two teams measuring the same thing in different words, a goal
-that belongs under a different parent, a dependency nobody declared.
+It flags as you type, and with an AI provider on it runs a nightly semantic
+sweep for what structure alone cannot see: two teams measuring the same thing
+in different words, a goal that belongs under a different parent, a dependency
+nobody declared.
 
 It proposes. A person approves. That is the default and changing it is an
 explicit, per-agent decision.

@@ -64,7 +64,7 @@ Default: `propose`. Every quality finding, relink suggestion, and rewrite
 is a proposal envelope in `proposed_changes`. A human applies or dismisses.
 Applying commits through the normal Operation pipeline with audit.
 
-`scoped_direct`: opt-in per workspace. Writes quality flags directly.
+`scoped_direct`: opt-in per agent. Writes quality flags directly.
 Still fully audited. Structural findings are still proposals.
 
 **A human-invoked assist is not an agent proposal (P4-T06c).** The rewrite
@@ -89,14 +89,14 @@ either way and only the suggested wording needs a provider.
 | `id` | uuid | |
 | `workspace_id` | uuid | RLS |
 | `source` | `'engine'` or `'coach'` | Engine = structural, Coach = semantic |
-| `kind` | string | `relink`, `dependency`, `conflict`, `gap`, `divergence`, `trend` |
-| `severity` | `'info'`, `'warning'`, `'error'` | |
+| `kind` | string | `structure`, `relink`, `dependency`, `conflict`, `gap`, `divergence` |
+| `severity` | `'high'`, `'medium'`, `'low'` | |
 | `subject_goal_id` | uuid, nullable | Null for anchor findings (AL-4) |
-| `related_goal_id` | uuid, nullable | The other goal in a conflict pair |
+| `target_goal_id` | uuid, nullable | The other goal in a conflict pair |
 | `reason` | text | Specific, not generic |
-| `rule_key` | string | Resolves to a check or trigger in the method package |
-| `dismissed` | boolean | Dismissing on one side dismisses everywhere |
-| `dismissed_by` | uuid, nullable | |
+| `rule_key` | string, nullable | Resolves to a check or trigger in the method package |
+| `state` | `'open'`, `'applied'`, `'dismissed'` | Dismissing on one side dismisses everywhere |
+| `decided_by_id` | uuid, nullable | |
 | `one_click_applicable` | boolean | True when the fix is mechanical (re-parent, add dependency) |
 
 The `alignment_findings` table from P3-T09 is this table. P4-T06 adds the
@@ -143,7 +143,9 @@ Same least-privilege model as the Coach. Bindings on:
 `createSpaceInTx` as each space is created. Goals and KPI trees are reached
 through the space's own access context rather than bound one by one, which is
 how every other principal reaches them; a per-goal binding would be a second
-access model beside the one `can()` already resolves. `view` rather than `edit`
+access model beside the one `can()` already resolves. The exception is an item
+that belongs to no space, such as a company goal, which is bound by name as it
+is created (`packages/core/src/agents/bindings.ts`). `view` rather than `edit`
 because everything the agent changes goes through a proposal, and a proposal
 needs no write grant. There is no binding on the workspace context, and a test
 reads `access_bindings` back to assert the absence.
@@ -172,9 +174,9 @@ the build.
 | `checkin.peer` | Grace exceeded, where the peer step is on | One peer from the goal's space | No | Yes |
 | `ack.owed` | 1 day after publication | Reviewer | No | Yes |
 | `ack.overdue` | 3 days after publication | Reviewer, then ladder | Yes | Yes |
-| `blocker.warning` | 20h after opening | Blocker owner | No | Yes |
-| `blocker.overdue` | 24h after opening | Coordinator | Yes | Yes |
-| `blocker.escalated` | 48h after opening | Sponsor | Yes | Yes |
+| `blocker.warning` | 1 day before the check-in the next action is due by | Blocker owner | No | Yes |
+| `blocker.overdue` | That check-in passes with the action open | Coordinator | Yes | Yes |
+| `blocker.escalated` | The check-in after it passes too, where the sponsor is in the ladders | Sponsor | Yes | Yes |
 | `confidence.critical` | A KR's confidence falls into the low band; at <= 0.3, the sponsor too where critical escalation is on (P9-T19a-c-a) | Coordinator, same day; sponsor where critical escalation is on | Yes | Yes |
 | `commitment.due` | End of commitment week | Owner | No | Yes |
 | `session.due_soon` | 1 day before weekly session | Coordinator + space | No | Yes |
@@ -187,7 +189,7 @@ the build.
 | `kpi.unhealthy` | KPI enters unhealthy corridor | KPI owner + sponsor | No | Yes |
 | `kpi.recovery_proposed` | Unhealthy for two consecutive periods (§11 `kpi.recoveryProposalDelayPeriods`) | KPI owner, carrying a drafted recovery OKR | No, the draft is `draftRecovery` in `packages/method` | Yes |
 | `kpi.recovered` | Real achievement re-enters the healthy corridor | KPI owner, proposing to close the recovery OKR | No | Yes |
-| `cycle.planning_opens` | 6w (annual) or 3w (quarterly) before start | Sponsor + facilitator | No | Yes |
+| `cycle.planning_opens` | 6w (annual) or 4w (quarterly) before start | Sponsor + facilitator | No | Yes |
 | `cycle.phase_blocked` | Phase conditions unmet as window closes | Facilitator | No | Yes |
 | `cycle.deadline` | 14, 7, 1 days before publication deadline | Sponsor + facilitator | No | Yes |
 | `cycle.starts` | Day one | Everyone | No | Yes |
@@ -219,6 +221,10 @@ the build.
 | `quality.process_health_low` | Process-health statement scores low | Sponsor | No | Yes |
 
 ### 3.3 Blocked triggers (awaiting P3 tasks)
+
+All three blocks have since cleared: `kpi.recovery_proposed` and `kpi.recovered`
+fire from `packages/core/src/nudges/sweep.ts`, the semantic sweep writes
+`quality.conflict` findings, and the demo workspace exists.
 
 > **BLOCKED: awaits P3-T14**
 >
@@ -295,7 +301,7 @@ From SS11 `cadence.nudgeDeduplicationHours` (24h) and the trigger catalogue.
 | Timezone | Member's own timezone |
 | Window | Configurable per member (default: no quiet hours) |
 | During quiet hours | Nudges queue to the next open window |
-| Exception | Urgent escalations (marked by the workspace) deliver during quiet hours |
+| Exception | Urgent escalations (an escalating trigger that has widened past the owner) deliver during quiet hours |
 | Workspace quiet mode | Silences everything except escalations |
 | Snooze | Per-nudge snooze silences the nudge. Never silences the review-inbox obligation |
 
@@ -315,7 +321,7 @@ reads what actually shipped.
 | `id` | uuid | |
 | `workspace_id` | uuid | RLS |
 | `kind` | string | `rhythm` or `quality`: which agent's remit, as §6.4's two tables split them. The volume dashboard reads by it, because "the Champion is noisy" is a different finding from "the Coach is" |
-| `subject_type` | string | `goal`, `check_in`, `blocker`, `kpi`, `session`, `cycle` |
+| `subject_type` | string | `goal`, `check_in`, `blocker`, `kpi`, `session`, `cycle`, `member` |
 | `subject_id` | uuid | |
 | `recipient_member_id` | uuid | The recipient |
 | `agent_id` | uuid, nullable | Null when the product produced it rather than a seeded agent. The due engine runs before either agent exists, and a fabricated id would misattribute it forever |
@@ -325,8 +331,10 @@ reads what actually shipped.
 | `sent_at` | timestamp, nullable | When it did. Two columns because quiet hours and batching move delivery without changing the decision, and one timestamp could not tell "held until morning" from "never sent" |
 | `acted_at` | timestamp, nullable | When the recipient did the thing it asked for. This is what makes a nudge measurable rather than merely countable |
 | `escalation_step` | smallint | 0 for non-escalating, 1+ for ladder |
-| `suppressed_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling`. Null when it was sent. Four of the five are decisions the product made rather than accidents, which is why they are recorded |
+| `suppressed_reason` | string, nullable | `dedup`, `quiet_hours`, `snooze`, `disabled`, `ceiling`, `holiday`, `leave`. Null when it was sent. Each is a decision the product made rather than an accident, which is why they are recorded |
+| `fallback_reason` | text, nullable | Why it went to a channel other than the one it was routed to (migration 0102) |
 | `snoozed_until` | timestamp, nullable | |
+| `proposal_id` | uuid, nullable | The proposal this nudge carries (migration 0040) |
 | `created_at` | timestamp | |
 
 A suppressed nudge is never also sent, enforced as a check constraint: both
@@ -374,8 +382,11 @@ daily, then the total nudge count per member stays under the SS11 volume ceiling
 ## 10. What P4-T05b built, and where it departs from §2.1
 
 Written when the daily, weekly and per-cycle runs landed. §2.1's table stands;
-this records what is behind each row today so nobody reads the table as a claim
-about what runs.
+this records what was behind each row then so nobody reads the table as a claim
+about what runs. Every "Not built" entry below has since landed:
+`packages/core/src/nudges/rhythm-triggers.ts` sends `digest.weekly`,
+`streak.at_risk` and `cycle.phase_blocked`, and the run stamps a blocker's
+`escalated_to_id` and `escalated_at` (completeness review H-10).
 
 | §2.1 row | Built | Not built, and why |
 |---|---|---|
@@ -416,9 +427,9 @@ Given a goal three days past its staleness grace, when the daily run executes,
 then that goal reads `outdated`, a second run changes nothing, and no check-in
 nudge is produced by that run.
 
-Given a blocker opened twenty-five hours ago, when the daily run executes, then
-`blocker.overdue` reaches its named owner and at least one member other than the
-owner, at escalation step 2.
+Given a blocker whose check-in has passed with the action open, when the daily
+run executes, then `blocker.overdue` reaches its named owner and at least one
+member other than the owner, at escalation step 2.
 
 Given a blocker that has been resolved, when the daily run executes at any point
 on its clock, then no blocker nudge is produced.
@@ -575,19 +586,19 @@ every goal write would nudge a champion on each keystroke-sized save.
 | Trigger | Fires | Source |
 |---|---|---|
 | `quality.all_lagging` | Yes | KR-4, condition "All lagging" |
-| `quality.no_baseline` | Yes | KR-3, condition "Baseline, target, date or owner missing" |
+| `quality.no_baseline` | Yes | KR-3, condition "Baseline missing" |
 | `quality.orphan_goal` | Yes | `alignment_findings` AL-1 |
 | `quality.level_skip` | Yes | `alignment_findings` AL-3 |
 | `quality.silo` | Yes, to the space manager | `alignment_findings` AL-6 |
 | `quality.dependency_unowned` | Yes | §5.4 register: unconfirmed and no risk owner |
 | `quality.draft_failing` | No: it is inline as the author types, which P4-T02b built. §6.4's own recipient is "Author, inline" | |
 | `quality.gate_blocked` | No: it is the publish attempt's own refusal, which P4-T03 built | |
-| `quality.no_not_doing`, `quality.no_cuts` | No: both fire at a phase transition, and no phase-transition hook exists | |
-| `quality.too_many_objectives` | No: OBJ-5 is evaluated and stored, but §6.4 addresses it to the facilitator and a cycle-level recipient is P4-T09's | |
-| `quality.sandbagging_draft`, `quality.sandbagging_close` | No: scoring at draft and at close, P4-T10b | |
-| `quality.divergence`, `quality.trending_off` | No: both are the nightly sweep's, P4-T06b | |
-| `quality.process_health_low` | No: needs the process-health survey, P4-T11b | |
-| `quality.conflict` | No: the one trigger in the catalogue that needs a provider, P4-T06b | |
+| `quality.no_not_doing`, `quality.no_cuts` | Yes, since completeness review H-11, read from the cycle workflow | `nudges/quality-triggers.ts` |
+| `quality.too_many_objectives` | Yes, to the facilitator, since completeness review H-11 | `nudges/quality-triggers.ts` |
+| `quality.sandbagging_draft`, `quality.sandbagging_close` | Yes, since completeness review H-11 | `nudges/quality-triggers.ts` |
+| `quality.divergence`, `quality.trending_off` | Yes: divergence from its open findings, trending off from the stored forecast | `nudges/quality.ts`, `nudges/quality-triggers.ts` |
+| `quality.process_health_low` | Yes, the night after the review closes, since completeness review H-11 | `nudges/quality-triggers.ts` |
+| `quality.conflict` | No nudge: the semantic sweep writes a `quality.conflict` finding, which needs a provider, and nothing turns it into a message | `alignment/semantic.ts` |
 
 **The mapping is keyed on the condition, not on the check id.** KR-4 trips on
 "All lagging" and on "All leading", and only the first is

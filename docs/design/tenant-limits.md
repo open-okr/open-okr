@@ -17,7 +17,7 @@ and the cloud flag this document assumes.
 | `callAction` | `packages/core/src/actions/registry.ts` | P5-T07 | The one door every surface comes through: the web app, REST, the command line, the agent tool catalogue, the chat commands. Already instrumented there for exactly that reason (P7-T06a) |
 | `ai_budgets` | `packages/db` | P2-T14 | A workspace-scoped spend cap. Crossing it disables every AI feature for that workspace, mid-flight |
 | The outbox relay and `JobQueue` | `packages/adapters` | P5-T01a | Every side effect. A write path may not enqueue; it inserts an outbox row and the relay enqueues after the commit |
-| The §13.1 budgets and their harness | `pnpm perf:budgets`, `pnpm perf:load` | P7-T01b, P7-T02 | Eight measured rows, and a load run with seven weighted scenarios judged against their own ceilings |
+| The §13.1 budgets and their harness | `pnpm perf:budgets`, `pnpm perf:load` | P7-T01b, P7-T02 | Nine measured rows, and a load run with seven weighted scenarios judged against their own ceilings |
 | Metrics, traces and the operator dashboards | `packages/adapters/src/drivers/telemetry` | P7-T06a to c | Per-action duration and outcome, queue depth and relay liveness |
 
 **What does not exist.** No per-tenant limit of any kind. No fair sharing
@@ -94,16 +94,19 @@ protects the database.
 
 ```
 callAction(context, name, input)
-  -> 0. tenant admission   (added at P8-T06, cloud flag only)
+  -> 0. tenant admission   (added at P8-T06, unlimited until a limit is set)
      1. metrics span       (exists, P7-T06a)
      2. the action handler (exists)
         -> runOperation    (exists: freeze, authorise, one transaction)
 ```
 
 Admission runs before the span opens, so a refused call costs one cache
-round trip and no database connection at all. That ordering is the point:
-a limiter that takes a pool slot to decide it should not have taken a pool
-slot has not limited anything.
+round trip and none of the action's own work. With the in-process cache
+driver that is no database connection at all; with the Postgres driver,
+which `apps/web/lib/cache.ts` builds on the application's own pool, it is
+one short indexed upsert. That ordering is the point: a limiter that takes a
+pool slot for the whole of an action to decide it should not have run has
+not limited anything.
 
 **Given** a tenant over its admission limit,
 **when** any of its members calls any action from any surface,
@@ -114,7 +117,8 @@ names the reset time, and no other tenant's latency moves.
 
 Every one of these is a §4.14 settings-map entry at instance scope,
 because it describes the deployment rather than the customer. Every one
-defaults to unlimited, and the cloud flag is what turns them on.
+defaults to unlimited, and setting a number is what turns it on. The limits
+are resolved once at boot, so a change takes effect on the next restart.
 
 | Setting | Default | Resolves to in the cloud | Guards |
 |---|---|---|---|
@@ -139,8 +143,9 @@ the key's own time to live cleans it up.
 **Zero means unlimited, and that is on purpose.** It matches
 `messageLogRetentionDays` and it means a self-hosted instance that never
 reads this document is never limited by a number nobody chose. The floor
-validation refuses a value between 1 and some small minimum, so an
-operator cannot set 1 and wonder why the product stopped.
+validation refuses a value between 1 and a floor (60 actions a minute, 2
+concurrent actions), so an operator cannot set 1 and wonder why the product
+stopped.
 
 ## 5. Noisy-neighbour protection, which is a different problem
 
@@ -172,7 +177,7 @@ here rather than left for a reader to find by diffing the code:
 | Nothing said about the tenant floor | Two test files defined "tenant-scoped" as "has a `workspace_id` column", which stopped being true the moment `outbox` gained one. The marker in migration 0001 is now the single authority, read by `db:lint` and by both tests through `notTenantScopedTables`. **The gap this does not close**: `outbox` has no row-level policy and its payloads carry workspace and entity identifiers, so an operator connection can read them, as it could before this column existed. That is P8-T01b's question |
 
 **The pool needs a ceiling that is not a limit.** `apps/web/lib/pool.ts`
-sets no `max`. It should, on every deployment, cloud or not, because the
+set no `max`. It should, on every deployment, cloud or not, because the
 default of ten is an accident rather than a decision and P7-T02 measured
 twenty as the working number on one machine. The pool size becomes an
 environment setting with a documented default, and the per-tenant
@@ -205,9 +210,9 @@ takes the next slice. Queue depth rises and falls and nothing is lost.
 ## 7. Self-host is unlimited, through the same code
 
 There is no second code path. Every limit above resolves through the same
-settings read, and every default is unlimited. With `cloud.enabled` false
-the admission step is a single comparison against zero, which returns
-immediately.
+settings read, and every default is unlimited. Admission is installed on
+every instance, and with both limits at zero, which is every self-hosted
+instance, it returns on two comparisons against zero.
 
 **Given** a self-hosted instance,
 **when** any action is called,
@@ -233,7 +238,7 @@ Written as the test plan P8-T06 inherits.
    connection is taken, proved by the query-count budget from P7-T01a
    reporting zero statements for that call.
 3. **Given** a self-hosted instance, **when** the whole §13.1 sweep runs,
-   **then** all eight measured rows are unchanged from their Phase 7 figures.
+   **then** all nine measured rows are unchanged from their Phase 7 figures.
 4. **Given** an import writing forty thousand outbox rows in one workspace,
    **when** a second workspace's nudge is enqueued behind it, **then** the
    nudge is delivered within its own window rather than after the import.

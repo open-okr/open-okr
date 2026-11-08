@@ -55,8 +55,8 @@ escalation about somebody else's work always gets through.
 | `scoring.draftComfortable` | 0.7 | §3.2 |
 | `scoring.draftAmbitious` | 0.3 | §3.2 |
 | `scoring.committedConfidenceFloor` | 0.7 | §3.2 |
-| `scoring.committedExpectedScore` | 1 | §2.8 |
-| `scoring.aspirationalExpectedAverage` | 0.7 | §2.8 |
+| `scoring.committedExpectedScore` | 1 | §3.3 |
+| `scoring.aspirationalExpectedAverage` | 0.7 | §3.3 |
 | `scoring.closeTooSafeShare` | 0.75 | §3.3 |
 | `scoring.rootCauseThreshold` | aspirational 0.6, committed 1 | §8.4 |
 | `scoring.progressSignalPass` | 75 | §3.7 |
@@ -74,8 +74,10 @@ quarters or more of the aspirational key results at 1.0 means the targets were
 too safe. A committed key result at 1.0 is a promise kept. One short of 1.0
 asks for a short explanation of the miss.
 
-**0.4 and 0.3 are where a goal becomes the session's business.** Below 0.4 it
-needs discussion; below 0.3 it needs a decision.
+**0.4 and 0.3 are where a key result becomes the session's business.** Below
+0.4 it gets a next action with an owner, and a fall below it tells the
+coordinator. At 0.3 and below it is critical, which reaches the sponsor the same
+day where your workspace turns that on.
 
 ## Quality
 
@@ -131,8 +133,9 @@ boundary of 99.5% is unhealthy, whatever 95 divided by 99.9 comes to.
 share of its target: ninety and above is healthy, below seventy is unhealthy.
 That suits a positive number counted from zero, and nothing else. When a KPI
 drops out of range the product drafts a recovery objective with at most four
-key results, one per leading child driver, and the KPI is marked "recovering"
-beside its real band while that objective moves. The band never changes to say
+key results: the KPI itself, then one per leading driver that is below its own
+target and has an owner. The KPI is marked "recovering" beside its real band
+while that objective moves. The band never changes to say
 so: a metric still under its red line still reads unhealthy.
 
 ## Sessions

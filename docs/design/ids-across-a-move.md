@@ -4,7 +4,7 @@ Status: approved 13 October 2026, with option A and the rule covering every `jso
 
 A workspace archive moves a workspace to another instance (TECHNICAL-PLAN §7.3). Every row gets a new id, and the import rewrites references to them. It rewrites a column that holds an id, and the mentions and attachments inside rich text (`RICH_TEXT_COLUMNS`). It does not rewrite an id anywhere else inside a `jsonb` value. This document is about those, starting with the review queue.
 
-## 1. What is wrong today
+## 1. What was wrong before this change
 
 | Where | What happens on a move | Found by |
 |---|---|---|
@@ -33,7 +33,7 @@ The run that made it does not travel. Two ways to carry the proposal anyway, and
 
 | Option | What it does | Cost |
 |---|---|---|
-| **A. Report, do not carry (recommended)** | The import leaves agent proposals out on purpose and says so: the difference report gains `proposalsLeftBehind`, with the count, and the admin preview says "N agent proposals stay behind: the Coach and the Champion propose again on their next run". The policy's reason is corrected | Nothing a person relies on is lost. Both agents are deterministic first, so a proposal still true of the moved data comes back on the next run, against the new ids. A decided proposal's history stays on the source instance, and the change it made is already in the data and in the activity feed |
+| **A. Report, do not carry (recommended)** | The import leaves agent proposals out on purpose and says so: the difference report gains `proposalsLeftBehind`, with the count, and the admin preview says "N agent proposal(s) stay behind: the run that made each one does not move. The Coach and the Champion propose again on their next run." The policy's reason is corrected | Nothing a person relies on is lost. Both agents are deterministic first, so a proposal still true of the moved data comes back on the next run, against the new ids. A decided proposal's history stays on the source instance, and the change it made is already in the data and in the activity feed |
 | B. Carry with an imported origin | A migration relaxes the origin check to allow a third origin, `imported`, with neither run nor thread. The import empties `run_id`, sets the origin and keeps which agent proposed it. The queue shows "Proposed by the Champion before this workspace moved" | A migration and a check-constraint change, a new origin every reader of `proposed_changes` must handle, and pending proposals that may no longer be true of the moved data |
 | C. Carry the runs | Export `agent_runs` too | Runs record cost and provider state against the source instance's provider, which is why they were left out |
 

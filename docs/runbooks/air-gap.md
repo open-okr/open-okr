@@ -35,7 +35,6 @@ never calls out.
 | Billing | Off, and the payment SDK is never loaded. It is for a provider selling a cloud, so an air-gapped instance has no reason to turn it on |
 | Single sign-on | Password and passkey sign-in, which is the default anyway |
 | Directory sync | Members are invited rather than provisioned |
-| Link enrichment and the agent's research tools | Absent. `outboundFetch` is the only way out and it is never called with nothing configured |
 | Update check | **On by default, so turn it off:** set `OPENOKR_UPDATE_CHECK=off`, or untick it in Admin, General. Left on, an isolated instance tries `api.github.com` once an hour, fails within three seconds without delaying any page, and shows only the running version. The request carries nothing about the instance |
 | Virus scanning | No scan, and a file is available as soon as it is uploaded. A clamd on the same isolated network works like any other; its signature updates need a mirror. See [Security](../admin/security.md#uploaded-files) |
 

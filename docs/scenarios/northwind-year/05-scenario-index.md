@@ -78,7 +78,7 @@ Every step in the year, by ID. Use this page to choose the steps an end-to-end s
 | NW-Q2-02 | Critical escalation turned on |
 | NW-Q2-03 | OBJ-1 raised to block |
 | NW-Q2-04 | The cap of two warns at a third |
-| NW-Q2-05 | A new hire provisioned; she follows a goal |
+| NW-Q2-05 | A new hire provisioned; she watches a goal |
 | NW-Q2-06 | The team step refused by OBJ-1; one rewrite, one override |
 | NW-Q2-07 | An unconfirmed dependency escalated |
 | NW-Q2-08 | Monthly review |
@@ -181,7 +181,7 @@ Every capability the year exercises, and the steps that exercise it.
 | Annual frame, annual OKRs and the annual review | NW-P-04, NW-P-08, NW-P-10, NW-P-14, NW-Q2-22, NW-Q2-23, NW-Q4-03, NW-Q4-06, NW-Q4-08 |
 | Scorecard and cycle snapshots | NW-Q1-26, NW-Q1-29, NW-Q3-01, NW-Q4-12 |
 | People, access and directory sync | NW-P-01, NW-P-05, NW-Q2-05, NW-Q2-12, NW-Q3-08, NW-Q4-02 |
-| The two agents | Champion: NW-P-04, NW-Q1-01, NW-Q1-16, NW-Q4-16. Coach: NW-Q1-21, NW-Q1-25, NW-Q3-04, NW-Q4-05 |
+| The two agents | Champion: NW-P-04, NW-Q1-01, NW-Q1-16, NW-Q3-04, NW-Q4-05, NW-Q4-16. Coach: NW-Q1-21, NW-Q1-25 |
 | AI assists and external agents | NW-Q2-01, NW-Q2-15, NW-Q1-12 and NW-Q3-04 (semantic review) |
 | Imports, exports and minutes | NW-P-11, NW-Q1-32, NW-Q4-07, NW-Q4-15 |
 | Terminology | NW-P-06 |
@@ -201,5 +201,5 @@ Northwind runs the recommended profile, with tweaks. A second scenario should co
 | Not exercised | Why it belongs elsewhere | Where it is tested instead |
 |---|---|---|
 | The governed, lightweight, Google-style and Radical Focus profiles; binding phases; the planning window; drafts approved by a reviewer | Each is a different organisation, not a different month at Northwind | The policy's profile matrix in `packages/method/test`, and the per-profile end-to-end spec |
-| Hundreds of objectives in one cycle | Northwind has about 25 | `pnpm perf:budgets` on the large dataset |
+| Hundreds of objectives in one cycle | Northwind has at most sixteen in a quarter | `pnpm perf:budgets` on the large dataset |
 | Individual OKRs | Off at Northwind all year | The profile matrix |
