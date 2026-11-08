@@ -82,6 +82,7 @@ session with no inputs produces objectives written from opinion.
 
 ## Next
 
+- [Choose a setup](setups.md), if one workspace is not the shape you need
 - [Administrator guide](../admin/README.md)
 - [People and access](../admin/people.md)
 - [Operations](../admin/operations.md)

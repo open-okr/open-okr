@@ -1,7 +1,7 @@
 # One instance for several companies
 
 For a group of companies, or one organisation that wants several workspaces, on its
-own servers.
+own servers: setups 3 and 4 in [Choose a setup](setups.md).
 
 **Each company gets its own workspace**, with its own people, goals and settings, and
 one person can belong to several and switch between them. Nothing crosses between

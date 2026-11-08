@@ -117,6 +117,7 @@ Every one of these has a working default, and none of them blocks the install.
 | `OPENOKR_IMAGE` | `ghcr.io/open-okr/open-okr:latest` | Pinning a release, running an image you built yourself, or running from a mirror |
 | Mail | The console driver: messages go to the log | You want invitations and reset links delivered. See [Settings](../admin/settings.md) |
 | AI | Off. Every AI affordance is hidden | You want drafting and rewriting. Bring your own key, or a local model |
+| The setup | One organisation with one workspace | You want several workspaces, a workspace per company, or a cloud of your own. See [Choose a setup](setups.md) |
 
 **Changing the address later is supported and has one consequence.**
 `./openokr up` notices a changed public URL and rewrites it, and says so.
@@ -138,4 +139,5 @@ More in the [incident runbook](../runbooks/incident.md).
 ## Next
 
 - [The first run](first-run.md): what the wizard did, and the five things worth doing next.
+- [Choose a setup](setups.md): several workspaces, a workspace per company, or a cloud of your own.
 - [Administrator guide](../admin/README.md): people, security, settings, operations.

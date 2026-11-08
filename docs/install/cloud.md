@@ -1,13 +1,16 @@
 # Start on the managed cloud
 
 For a team that does not want to run anything. Sign up, name a workspace,
-start.
+start. This page covers setups 1 and 2 of the four in
+[Choose a setup](setups.md): using a managed cloud, and running your own.
 
-> **No managed cloud is operating yet**, and there is no address to sign up
-> at. The tenant provisioning, the operator console and the plan model are
-> built and tested, and this page describes what they do. Until a vendor runs
-> an instance, [one server](compose.md) or [Kubernetes](kubernetes.md) are the
-> two ways to use OpenOKR.
+> **OKRGoal, the managed cloud OKR Institute runs at
+> [okrgoal.com](https://okrgoal.com), is not open for sign-up yet.** The
+> workspaces, the operator console, plans, payment and the lifecycle are built
+> and tested, and this page describes what they do. Until it opens,
+> [one server](compose.md) or [Kubernetes](kubernetes.md) are the ways to use
+> OpenOKR, and [Operating an instance](#operating-an-instance) is how to run a
+> cloud of your own.
 
 ## What you get
 
