@@ -77,6 +77,91 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
+
+0.6 adds six migrations, 0145 to 0150, and no data change. They add tables
+for billing and AI credits, one column, and a change to the audit trail's
+guard so that erasing a closed cloud workspace can delete its audit rows.
+Every other route to an audit row is still refused. None of them refuses to
+run, so `./openokr upgrade` is the whole upgrade, and no setting needs
+choosing. An instance coming from an older release still meets the sections
+below, and the one that can stop an upgrade is 0.3 to 0.4.
+
+Look at these before you upgrade.
+
+**A deployment AI key now serves every workspace that has none of its own.**
+`OPENOKR_AI_PROVIDER` and `OPENOKR_AI_API_KEY` name one provider and key for
+the whole instance. Up to 0.5 a workspace used them only after turning on
+that same provider itself, so on most instances they did nothing. From 0.6,
+every workspace without a provider of its own routes to them. **On a
+self-hosted instance that sets them, AI turns on in every such workspace.**
+A workspace with its own key keeps using its own.
+
+| Where it would be set | How to look |
+|---|---|
+| Compose | `grep OPENOKR_AI_PROVIDER deploy/docker/secrets/app.env` |
+| Helm | Nothing to look at. The chart had no way to pass it before 0.6, which adds `extraEnv` and `extraEnvFrom` |
+| Anywhere else | The environment you start the server with |
+
+If AI should stay off where nobody chose it, remove both variables before you
+upgrade.
+
+**AI budgets start to apply.** Up to 0.5 no AI call was recorded, so the
+usage card on Admin, AI always read zero and no budget ever stopped anything.
+0.6 records every call, including a copilot answer somebody stops partway.
+Once a workspace's budget is used up, every AI feature in that workspace is
+off until the period ends. If you set a budget earlier, look at it on Admin,
+AI in each workspace before people meet it.
+
+**A workspace that never chose its models moves to the current ones**:
+Claude Haiku, Sonnet and Opus 5.5, GPT-6 Luna, GPT-6.1 Terra and Sol, and
+Gemini 2.5 Flash Lite, 3.5 Flash Lite and 3.8 Flash. A workspace that chose a
+model keeps it. The built-in prices now match what each provider charges
+today, and cached tokens count at their cheaper rate, so usage figures move
+with them.
+
+**Only if you run a cloud with a plan catalogue** (`OPENOKR_CLOUD=true` and
+plans set):
+
+| What changes | What to do |
+|---|---|
+| A plan's AI allowance is now `aiCredits`. `aiMonthlyUsd` is ignored rather than refused, so the catalogue still loads | Give each plan that includes AI an `aiCredits` number. A budget `aiMonthlyUsd` wrote into a workspace earlier stays as that workspace's budget, and now applies |
+| The deployment key serves a workspace only when its plan has `aiCredits` above zero. A workspace with no plan, or a plan without credits, brings its own key. Up to 0.5 such a workspace could turn on the deployment's provider and use your key with no limit | The same: set `aiCredits` on the plans that should spend your key |
+| A workspace's own administrator can no longer change its plan, lift a suspension or the read-only mode that follows an unpaid subscription, or reopen a closed workspace. The one exception: an owner who closed an active workspace may reopen it until it is deleted | Change plans from the operator console |
+| A personal invitation holds a seat from the moment it is sent | Nothing. An invitation past the limit is refused when sent, naming both numbers |
+
+Everything else 0.6 adds is off or empty until you set it: billing
+(`OPENOKR_BILLING_PROVIDER`), the plan a new workspace starts on
+(`OPENOKR_CLOUD_DEFAULT_PLAN`), erasing closed workspaces
+(`OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS`, 0 by default, so nothing is erased),
+and the instance's own source, terms, privacy and support links.
+[Running a cloud](../install/cloud.md) says how to turn each one on.
+
+**Compose: the helper has two new commands.** `./openokr operator` grants the
+cloud operator role and `./openokr erase` erases closed workspaces past their
+window. They are in the `deploy/docker/openokr` file itself, which
+`./openokr upgrade` does not replace. In a clone, `git fetch --tags` and
+`git checkout v0.6.0` brings them. On a server that holds only a copy of
+`deploy/docker/`, copy the file across from the release.
+
+What an API client may meet: no action was removed.
+
+| Where | Change |
+|---|---|
+| `workspace.setLifecycle` | Needs a token with the destructive scope. Closing needs `confirmSlug`, the workspace's address. No longer one of an external agent's tools. Only a cloud workspace has a lifecycle |
+| `workspace.changePlan` | On a cloud, refused for a workspace's own administrator. No longer one of an external agent's tools |
+| `billing.summary`, `billing.startCheckout`, `billing.changePlan`, `billing.buyCredits`, `billing.openPortal`, `billing.settleEnded` | New, for a cloud with billing on |
+
+What people in an upgraded workspace will notice:
+
+| Area | In 0.6 |
+|---|---|
+| Buttons | A control that is saving shows a spinner after 200 milliseconds and cannot be pressed twice. It keeps keyboard focus while it waits |
+| Language | More messages follow the chosen language: account security, the coach strip, drafting assists, capacity, space membership, the operator lifecycle and the session screens |
+| AI drafting | Drafting, rewriting, check-in wording and thread summaries now work on Claude Sonnet 5.5, Opus 5.5 and Fable 5.1, where they quietly showed nothing. A model added by hand now answers too |
+| Account menu | The link to the code reads "Source code". Where sign-up is open to a person, the menu can start another workspace for them. Under invitation only, the default once an instance is claimed, it cannot |
+| Sign-up | Shows the terms and privacy links once the instance sets them |
+
 ## 0.4 to 0.5: who may sign up, and a check for new releases
 
 0.5 adds no migration and no data change, so `./openokr upgrade` is the whole
