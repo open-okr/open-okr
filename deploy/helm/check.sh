@@ -451,6 +451,22 @@ else
   fail "the erasure CronJob does not run with the owner role from a Secret"
 fi
 
+# --- values reused from an older release -------------------------------------
+# `helm upgrade --reuse-values` from 0.5 carries no `cloud`, `extraEnv` or
+# `extraEnvFrom` keys. Setting a key to null makes Helm delete it, which is the
+# same shape.
+if render --set cloud=null >/dev/null 2>&1; then
+  pass "renders when the cloud settings are missing from reused values"
+else
+  fail "does not render when the cloud settings are missing from reused values"
+fi
+
+if render --set cloud=null --set extraEnv=null --set extraEnvFrom=null >/dev/null 2>&1; then
+  pass "renders when cloud, extraEnv and extraEnvFrom are all missing"
+else
+  fail "does not render when cloud, extraEnv and extraEnvFrom are all missing"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2
