@@ -331,7 +331,11 @@ export async function AppShellLayout({
   const avatarItems = [
     ...accountItems.map((item) => ({ href: item.href, label: item.label })),
     ...(adminItems.length > 0
-      ? [{ href: "/admin", label: t("shell.avatar.workspaceAdmin") }]
+      ? [
+          // The first card directly: `/admin` redirects only after the shell
+          // has rendered, which drew every admin visit twice.
+          { href: "/admin/general", label: t("shell.avatar.workspaceAdmin") },
+        ]
       : []),
   ];
 
