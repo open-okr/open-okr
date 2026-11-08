@@ -31,6 +31,10 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // Changing or removing a connection is not recovery and stays refused.
   // Akmal's decision, 30 September 2026.
   "sso.setConnectionEnabled",
+  // Telling a closed workspace's owners that it is deleted in seven days
+  // (docs/design/workspace-erasure.md §12). A closed workspace is frozen, and
+  // this is the one thing that has to reach it while it is.
+  "workspace.remindErasure",
 ]);
 
 // `billing.` since docs/design/billing.md: paying again is how a workspace billing made

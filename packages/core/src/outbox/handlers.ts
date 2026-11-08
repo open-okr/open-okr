@@ -61,6 +61,7 @@ import {
 } from "../exports/worker.ts";
 import {
   closureMail,
+  erasureReminderMail,
   invitationMail,
   notificationDigestMail,
   renderStoredEmail,
@@ -75,6 +76,7 @@ import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import {
   END_SUBSCRIPTION_TOPIC,
+  ERASURE_REMINDER_TOPIC,
   readClosureNotice,
   WORKSPACE_CLOSED_TOPIC,
 } from "../tenancy/closing.ts";
@@ -962,6 +964,47 @@ const deleteCustomer: OutboxHandler = async (delivery, deps) => {
   await billing.deleteCustomer(customerRef);
 };
 
+/**
+ * Reminds a closed workspace's owners and administrators, seven days before it is
+ * erased (workspace-erasure.md §12, decision 3). Not sent once the workspace has
+ * been reopened, closed again, or claimed by erasure.
+ */
+const sendErasureReminder: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const closedAt = asString(delivery.payload.closedAt);
+  if (!workspaceId || !closedAt) {
+    throw new PermanentDispatchError(
+      "An erasure reminder needs a workspace and the instant it closed.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readClosureNotice(deps.pool, {
+    workspaceId,
+    byMemberId: null,
+  });
+  const schedule = notice.schedule;
+  if (!schedule?.eraseOn || schedule.closedAt.toISOString() !== closedAt) {
+    deps.onSkipped?.(delivery, "the workspace is no longer due for erasure");
+    return;
+  }
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...erasureReminderMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        closedAt: schedule.closedAt,
+        eraseOn: schedule.eraseOn,
+        ownerMayReopen: schedule.ownerMayReopen,
+      }),
+    });
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -1014,6 +1057,7 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // tell its owners and administrators when it will be deleted.
   [END_SUBSCRIPTION_TOPIC]: endSubscription,
   [WORKSPACE_CLOSED_TOPIC]: sendClosureNotice,
+  [ERASURE_REMINDER_TOPIC]: sendErasureReminder,
   // Erasure's half that only the server can do (workspace-erasure.md §4).
   [ERASE_FILES_TOPIC]: eraseFiles,
   [ERASE_CUSTOMER_TOPIC]: deleteCustomer,

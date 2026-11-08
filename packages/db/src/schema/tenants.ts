@@ -52,6 +52,11 @@ export const tenants = pgTable("tenants", {
    * nothing reopens it, and its audit rows may be deleted. Migration 0149.
    */
   erasingAt: timestamp("erasing_at", { withTimezone: true }),
+  /**
+   * When the owners and administrators were told it is deleted in seven days.
+   * Cleared on every lifecycle move. Migration 0150.
+   */
+  erasureRemindedAt: timestamp("erasure_reminded_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

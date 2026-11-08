@@ -131,7 +131,7 @@ refused for every role, and an instance with no tenant rows can never delete one
 
 Forward-only, with no legacy source (TECHNICAL-PLAN §7.2). No new table. Built as two
 migrations, one per change: 0148 adds `owner_may_reopen` with closing, and 0149 adds
-`erasing_at` and the trigger with erasure. The reminder's column is its own, below.
+`erasing_at` and the trigger with erasure. 0150 adds `erasure_reminded_at` for the reminder: the scheduler's hourly `cloud.remindErasure` job sets it and enqueues the mail once seven days are left, and every lifecycle move clears it, so each closure is reminded once. With retention of seven days or fewer there is no reminder, because the notice at closing already gave a date that close.
 
 | Change | Notes |
 |---|---|

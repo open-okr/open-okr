@@ -99,6 +99,8 @@ export async function setTenantStateInTx(
       // rather than in a trigger keeps the rule visible to a reader.
       closedAt: input.state === "closed" ? now : null,
       ownerMayReopen: input.state === "closed" && input.ownerMayReopen === true,
+      // A new closure is reminded afresh (workspace-erasure.md §12, decision 3).
+      erasureRemindedAt: null,
       updatedAt: now,
     })
     .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))

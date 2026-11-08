@@ -13,19 +13,26 @@ import {
   type OutboxMessage,
   tenants,
   users,
+  withInstanceAdmin,
   withWorkspace,
   workspaceMembers,
   workspaceRoles,
 } from "@openokr/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { runOperation } from "../operations/operation.ts";
 import { resolveCloudTenancy } from "./settings.ts";
 
 /** Asks the payment provider to end the subscription at the period's end. */
 export const END_SUBSCRIPTION_TOPIC = "billing.endSubscription";
 /** Tells the owners and administrators that the workspace closed, and when it goes. */
 export const WORKSPACE_CLOSED_TOPIC = "workspace.closed";
+/** Tells them again, seven days before it goes. */
+export const ERASURE_REMINDER_TOPIC = "workspace.erasureReminder";
+
+/** How long before erasure the reminder goes (workspace-erasure.md §12, decision 3). */
+const REMIND_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -191,4 +198,117 @@ export async function readClosureNotice(
       recipients,
     };
   });
+}
+
+/** Thrown inside the Operation when another run reminded first, to write nothing. */
+class AlreadyReminded extends Error {}
+
+/**
+ * Reminds the owners and administrators of every closed workspace that is erased in
+ * seven days or fewer, once per closure (docs/design/workspace-erasure.md §12,
+ * decision 3). Run hourly by the scheduler. Returns how many were reminded.
+ *
+ * **Nothing to do while retention is seven days or fewer**: the notice at closing
+ * already gave a date no further away than the reminder would.
+ */
+export async function remindBeforeErasure(
+  pool: Pool,
+  options: { readonly now?: Date } = {},
+): Promise<number> {
+  const cloud = await resolveCloudTenancy(pool);
+  if (!cloud.enabled || cloud.closureRetentionDays <= REMIND_DAYS) {
+    return 0;
+  }
+  const now = options.now ?? new Date();
+  const cutoff = new Date(
+    now.getTime() - (cloud.closureRetentionDays - REMIND_DAYS) * DAY_MS,
+  );
+  const due = await withInstanceAdmin(drizzle(pool), (tx) =>
+    tx
+      .select({ workspaceId: tenants.workspaceId })
+      .from(tenants)
+      .where(
+        activeOnly(
+          tenants,
+          and(
+            eq(tenants.state, "closed"),
+            isNull(tenants.erasingAt),
+            isNull(tenants.erasureRemindedAt),
+            lte(tenants.closedAt, cutoff),
+          ),
+        ),
+      ),
+  );
+  let reminded = 0;
+  for (const { workspaceId: id } of due) {
+    try {
+      await runOperation(
+        { pool },
+        {
+          action: "workspace.remindErasure",
+          workspaceId: id,
+          // Nobody is acting: the date arrived.
+          actor: { kind: "system" },
+          bootstrap: true,
+          async execute({ tx, workspaceId }) {
+            // openokr:allow-mutation: this Operation's own transaction. Marked
+            // here so two schedulers cannot remind twice.
+            const [marked] = await tx
+              .update(tenants)
+              .set({ erasureRemindedAt: now, updatedAt: now })
+              .where(
+                activeOnly(
+                  tenants,
+                  and(
+                    eq(tenants.workspaceId, workspaceId),
+                    eq(tenants.state, "closed"),
+                    isNull(tenants.erasingAt),
+                    isNull(tenants.erasureRemindedAt),
+                  ),
+                ),
+              )
+              .returning({ closedAt: tenants.closedAt });
+            if (!marked?.closedAt) {
+              throw new AlreadyReminded();
+            }
+            const eraseOn = erasureDate(
+              marked.closedAt,
+              cloud.closureRetentionDays,
+            ) as Date;
+            return {
+              result: undefined,
+              activity: {
+                kind: "workspace.erasure_reminded",
+                subjectType: "workspace",
+                subjectId: workspaceId,
+                payload: { eraseOn: eraseOn.toISOString() },
+              },
+              audit: {
+                action: "workspace.remindErasure",
+                targetType: "workspace",
+                targetId: workspaceId,
+                payload: { eraseOn: eraseOn.toISOString() },
+              },
+              outbox: [
+                {
+                  topic: ERASURE_REMINDER_TOPIC,
+                  payload: {
+                    workspaceId,
+                    closedAt: marked.closedAt.toISOString(),
+                  },
+                  idempotencyKey: `${ERASURE_REMINDER_TOPIC}:${workspaceId}:${marked.closedAt.getTime()}`,
+                },
+              ],
+            };
+          },
+        },
+      );
+      reminded += 1;
+    } catch (error) {
+      if (!(error instanceof AlreadyReminded)) {
+        throw error;
+      }
+    }
+  }
+  return reminded;
 }

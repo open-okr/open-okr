@@ -56,6 +56,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     level: z.number(),
   }),
   "support.ended": z.object({ reason: z.string() }),
+  "workspace.erasure_reminded": z.object({ eraseOn: z.string() }),
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),

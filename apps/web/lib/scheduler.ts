@@ -51,6 +51,7 @@ import {
   METRIC,
   measureAllWorkspaces,
   outboxRetentionDays,
+  remindBeforeErasure,
 } from "@openokr/core";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
@@ -114,6 +115,10 @@ export interface ScheduledRun {
     // usage figures the console and the plan screen read.
     | "tenancy.adopt"
     | "cloud.measureUsage"
+    // Reminding a closed workspace's owners seven days before it is erased
+    // (docs/design/workspace-erasure.md §12). Nothing with the flag off or
+    // with retention at seven days or fewer.
+    | "cloud.remindErasure"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -220,6 +225,13 @@ const TENANCY_ADOPT_CRON = "10 * * * *";
 const CLOUD_USAGE_JOB = "cloud.measureUsage";
 const CLOUD_USAGE_CRON = "40 * * * *";
 
+/**
+ * Hourly, so a reminder goes within the hour of its day arriving, wherever the
+ * owners are, rather than at one fixed hour that is the middle of somebody's night.
+ */
+const ERASURE_REMINDER_JOB = "cloud.remindErasure";
+const ERASURE_REMINDER_CRON = "50 * * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -286,6 +298,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: OUTBOX_PURGE_JOB,
     action: "outbox.purge",
     cron: OUTBOX_PURGE_CRON,
+    instance: true,
+  },
+  {
+    job: ERASURE_REMINDER_JOB,
+    action: "cloud.remindErasure",
+    cron: ERASURE_REMINDER_CRON,
     instance: true,
   },
 ];
@@ -437,6 +455,13 @@ async function runInstance(run: ScheduledRun): Promise<void> {
   if (run.action === "cloud.measureUsage") {
     if (await isCloudEnabled(getPool())) {
       await measureAllWorkspaces(getPool());
+    }
+    return;
+  }
+  if (run.action === "cloud.remindErasure") {
+    const reminded = await remindBeforeErasure(getPool());
+    if (reminded > 0) {
+      log(`cloud.remindErasure reminded ${reminded} workspace(s)`);
     }
     return;
   }

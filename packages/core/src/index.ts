@@ -1274,6 +1274,7 @@ export {
   readOwnUsage,
   readPlans,
   readWorkspaceLifecycle,
+  remindBeforeErasure,
   resolveAdmissionLimits,
   seatState,
   setDefaultAdmission,

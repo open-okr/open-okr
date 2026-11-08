@@ -162,7 +162,8 @@ uses on your key, and `OPENOKR_AI_PRICES` corrects a model's price without a rel
 **Closing.** An owner closes a workspace on Admin, General by typing its address.
 Everything stays readable until `OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS` days have passed,
 which is 0, meaning never, until you set it. An owner who closed an active workspace can
-reopen it until then. Only you can reopen one you closed, or one billing made read-only,
+reopen it until then. Seven days before deletion they are emailed again, when retention
+is longer than a week. Only you can reopen one you closed, or one billing made read-only,
 and only you can close one you suspended, so a suspension can serve as a legal hold.
 
 **Erasing.** When the window has passed, `pnpm cloud:erase --write` deletes the

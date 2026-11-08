@@ -39,6 +39,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.granted": (p) =>
     `Support access granted for ${asCount(p.hours)} hours`,
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
+  "workspace.erasure_reminded": (p) =>
+    `The owners and administrators were reminded that the workspace is deleted on ${asString(p.eraseOn).slice(0, 10)}`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
   "billing.requested": () => "Somebody used the billing screen",

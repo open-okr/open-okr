@@ -75,6 +75,13 @@ const en = {
   "closed.providerReopens": "Only the provider can reopen it.",
   "closed.footer": "Sent to the owners and administrators of {workspace}.",
 
+  "reminder.subject": "{workspace} will be deleted on {date}",
+  "reminder.preheader": "Seven days left to export it.",
+  "reminder.eyebrow": "Deleted in seven days",
+  "reminder.heading": "{workspace} will be deleted on {date}",
+  "reminder.body":
+    "It was closed on {closed}. On {date} everything in it is deleted for good, and cannot be brought back.",
+
   "digest.subjectOne": "{workspace}: 1 update",
   "digest.subjectMany": "{workspace}: {count} updates",
   "digest.headingOne": "1 update",
@@ -168,6 +175,13 @@ const ms: Readonly<Record<MailWordKey, string>> = {
     "Ditutup secara tidak sengaja? Pemilik boleh membukanya semula dari Pentadbiran, Umum sebelum ia dipadam.",
   "closed.providerReopens": "Hanya penyedia boleh membukanya semula.",
   "closed.footer": "Dihantar kepada pemilik dan pentadbir {workspace}.",
+
+  "reminder.subject": "{workspace} akan dipadam pada {date}",
+  "reminder.preheader": "Tinggal tujuh hari untuk mengeksportnya.",
+  "reminder.eyebrow": "Dipadam dalam tujuh hari",
+  "reminder.heading": "{workspace} akan dipadam pada {date}",
+  "reminder.body":
+    "Ia ditutup pada {closed}. Pada {date} semua kandungannya dipadam terus, dan tidak boleh dikembalikan.",
 
   "digest.subjectOne": "{workspace}: 1 kemas kini",
   "digest.subjectMany": "{workspace}: {count} kemas kini",

@@ -370,3 +370,54 @@ export function closureMail(input: {
   );
   return { subject: t("closed.subject", { workspace }), html, text };
 }
+
+/**
+ * The reminder seven days before a closed workspace is erased
+ * (docs/design/workspace-erasure.md §12, decision 3). The last chance to export it.
+ */
+export function erasureReminderMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly closedAt: Date;
+  readonly eraseOn: Date;
+  readonly ownerMayReopen: boolean;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const date = mailDate(mail, input.eraseOn);
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("reminder.preheader"),
+      footer: t("closed.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("reminder.eyebrow") },
+      { kind: "heading", text: t("reminder.heading", { workspace, date }) },
+      {
+        kind: "paragraph",
+        parts: [
+          t("reminder.body", {
+            closed: mailDate(mail, input.closedAt),
+            date,
+          }),
+        ],
+      },
+      {
+        kind: "action",
+        label: t("closed.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/imports`,
+      },
+      {
+        kind: "notice",
+        parts: [
+          input.ownerMayReopen
+            ? t("closed.mayReopen")
+            : t("closed.providerReopens"),
+        ],
+      },
+    ],
+  );
+  return { subject: t("reminder.subject", { workspace, date }), html, text };
+}

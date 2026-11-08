@@ -22,6 +22,7 @@ import {
 import {
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
+  remindBeforeErasure,
 } from "../src/tenancy/index.ts";
 import { joinWorkspaceForIdentity } from "../src/workspaces/directory-join.ts";
 import { createWorkspace } from "../src/workspaces/provisioning.ts";
@@ -507,5 +508,74 @@ describe("erasing one workspace now (AC 16)", () => {
       ready: false,
       reason: expect.stringMatching(/not a closed workspace/),
     });
+  });
+});
+
+describe("the reminder seven days before (decision 3)", () => {
+  const reminders = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select payload from outbox where topic = 'workspace.erasureReminder' order by created_at",
+    );
+    return rows.map((row) => row.payload as Record<string, unknown>);
+  };
+
+  it("goes once, when seven days are left, and says the date", async () => {
+    await closedDaysAgo(22);
+    await expect(remindBeforeErasure(owner)).resolves.toBe(0);
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update tenants set closed_at = now() - interval '23 days 1 minute' where workspace_id = $1",
+      [closing],
+    );
+    await expect(remindBeforeErasure(wb.appPool)).resolves.toBe(1);
+    await expect(remindBeforeErasure(wb.appPool)).resolves.toBe(0);
+    const [payload] = await reminders();
+    expect(payload).toMatchObject({ workspaceId: closing });
+
+    const sent: { to: string; subject: string; text: string }[] = [];
+    await dispatchOutbox(
+      {
+        topic: "workspace.erasureReminder",
+        payload: payload as Record<string, unknown>,
+        idempotencyKey: "r",
+        attempts: 0,
+      },
+      {
+        pool: wb.appPool,
+        baseUrl: "https://okr.example.com",
+        async sendMail(message) {
+          sent.push(message);
+        },
+      },
+    );
+    expect(sent.map((mail) => mail.to)).toEqual([`${OWNER}@example.com`]);
+    expect(sent[0]?.subject).toMatch(/will be deleted on \d{1,2} \w+ \d{4}$/);
+    expect(sent[0]?.text).toContain("Only the provider can reopen it.");
+  });
+
+  it("is sent afresh for a second closure, and not at all with retention of a week", async () => {
+    await closedDaysAgo(25);
+    const wb = await workerDb();
+    await remindBeforeErasure(wb.appPool);
+    await setLifecycleAsOperator(wb.appPool, {
+      workspaceId: closing,
+      operatorUserId: OPERATOR,
+      state: "active",
+      reason: "Back by request.",
+    });
+    await closedDaysAgo(25);
+    await expect(remindBeforeErasure(wb.appPool)).resolves.toBe(1);
+    expect(await reminders()).toHaveLength(2);
+
+    await settings({ [CLOUD_CLOSURE_RETENTION_KEY]: 7 });
+    await setLifecycleAsOperator(wb.appPool, {
+      workspaceId: closing,
+      operatorUserId: OPERATOR,
+      state: "active",
+      reason: "Back by request.",
+    });
+    await closedDaysAgo(6);
+    await expect(remindBeforeErasure(wb.appPool)).resolves.toBe(0);
   });
 });

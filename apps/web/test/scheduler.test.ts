@@ -98,11 +98,14 @@ describe("the run table", () => {
   // `tenancy.adopt` and `cloud.measureUsage` since docs/design/hosting-profiles.md
   // §5: each walks every workspace for the deployment rather than for one of
   // them, has no member to act as, and a tenant should not be able to start it.
+  // `cloud.remindErasure` since docs/design/workspace-erasure.md §12, for the
+  // same reason: it walks every closed workspace, as the system.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
     "tenancy.adopt",
     "cloud.measureUsage",
+    "cloud.remindErasure",
   ]);
 
   test("names a real action for every run", () => {
@@ -129,6 +132,7 @@ describe("the run table", () => {
       "outbox.purge",
       "tenancy.adopt",
       "cloud.measureUsage",
+      "cloud.remindErasure",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -137,6 +141,7 @@ describe("the run table", () => {
     expect(off.map((run) => run.job).sort()).toEqual([
       "audit.chain",
       "cloud.measureUsage",
+      "cloud.remindErasure",
       "outbox.purge",
       "tenancy.adopt",
     ]);

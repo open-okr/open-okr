@@ -24,6 +24,7 @@ export {
   closingOutbox,
   erasureDateFor,
   readClosureSchedule,
+  remindBeforeErasure,
 } from "./closing.ts";
 export {
   addCreditPackInTx,
