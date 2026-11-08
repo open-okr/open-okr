@@ -81,5 +81,6 @@ own baseline before an upgrade you care about.
 ## Next
 
 - [The first run](first-run.md)
+- [Choose a setup](setups.md): several workspaces, a workspace per company, or a cloud of your own
 - [Administrator guide](../admin/README.md)
 - [Upgrade runbook](../runbooks/upgrade.md)

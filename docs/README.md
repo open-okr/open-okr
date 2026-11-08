@@ -4,6 +4,7 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 
 | You are | Start here |
 |---|---|
+| Deciding how to run it: a managed cloud, your own cloud, a group, or one organisation | [Choose a setup](install/setups.md) |
 | Putting OpenOKR on a server | [Install on one server](install/compose.md) |
 | Putting it on Kubernetes | [Install on Kubernetes](install/kubernetes.md) |
 | Using the managed cloud | [Start on the cloud](install/cloud.md) |
@@ -18,6 +19,7 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 
 | Page | What it covers |
 |---|---|
+| [Choose a setup](install/setups.md) | The four ways one release runs, who does what in each, and the settings behind them |
 | [One server with Docker Compose](install/compose.md) | The whole install, from an empty machine to a signed-in owner |
 | [Kubernetes with Helm](install/kubernetes.md) | What the chart does, what it deliberately does not, and the secret to back up |
 | [The managed cloud](install/cloud.md) | Signing up, and what the vendor operates |

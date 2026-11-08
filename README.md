@@ -12,6 +12,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-the%20only%20required%20service-336791.svg)](#-the-stack)
 [![Self-hosted](https://img.shields.io/badge/self--host-never%20feature--gated-success.svg)](#-install-it)
 
+[Four ways to run it](#-four-ways-to-run-it) ·
 [Install it](#-install-it) ·
 [Documentation](docs/README.md) ·
 [The method](docs/specification/METHOD.md) ·
@@ -192,6 +193,21 @@ Nothing is gated behind a paid tier. The [product overview](docs/specification/O
 | **Channels and reach** | Browser, email, Slack, Microsoft Teams, WhatsApp, Telegram, and an external agent surface with a consent screen and a full audited tool catalogue |
 | **Platform** | Spaces, people and org chart, relationship-based access control with workspace roles, single sign-on and directory sync, comments and notifications with quiet hours, a live activity feed, search, admin, a tamper-evident audit log, signed workspace export, spreadsheet and FlowyTeam importers, WCAG 2.1 AA target, English and Bahasa Melayu |
 
+## 🏢 Four ways to run it
+
+One release runs all four, with every feature in each. A few settings decide which one you get, and changing them later moves no data.
+
+| Setup | For | Workspaces | Plans and payment |
+|---|---|---|---|
+| **1. A managed cloud** | A team that does not want to run anything. [OKRGoal](https://okrgoal.com) is the one OKR Institute runs | One per team, more as it grows | The provider's plans, paid by card |
+| **2. Your own cloud** | A company selling OKR software to its own customers, under its own name | One per customer | Your plans, prices and currency, through Stripe or by invoice |
+| **3. A group of companies** | A group running its companies on its own servers | One per company, made by your IT | None, and no seat limit |
+| **4. One organisation** | A company, university or public body on its own servers | One, or one per division | None, and no seat limit |
+
+Every setup has the same four people: an operator who runs the instance, a company administrator who owns the workspace, workspace administrators they appoint, and members doing the work. Each workspace stands alone, with its own people, goals and settings, and the database keeps each one's rows away from every other's.
+
+[Choose a setup](docs/install/setups.md) says who does what in each and gives the settings behind them. Setups 2, 3 and 4 install as below, with those settings added.
+
 ## 🚀 Install it
 
 PostgreSQL is the only service OpenOKR requires. No mail server, no AI provider, no identity provider. Every one of those is optional and the product is whole without them.
@@ -366,6 +382,7 @@ deploy/             Docker Compose, the Helm chart, and the cloud overlay
 | Read this | If you want |
 |---|---|
 | [**The documentation index**](docs/README.md) | Everything below, plus the administrator guide, the user guide, the API and the runbooks |
+| [Choose a setup](docs/install/setups.md) | To decide between a managed cloud, your own cloud, a group of companies and one organisation |
 | [Install on one server](docs/install/compose.md) · [on Kubernetes](docs/install/kubernetes.md) · [the first run](docs/install/first-run.md) | To put it on a machine |
 | [The OKR handbook](docs/handbook/README.md) | To run your organisation's OKRs, rather than to build the software |
 | [A year of OKRs at Northwind](docs/scenarios/northwind-year/README.md) | One company's full year in OpenOKR, step by step |
