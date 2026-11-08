@@ -170,6 +170,15 @@ else
   fail "the operator command does not run inside the image"
 fi
 
+# The erasure command too (docs/design/workspace-erasure.md §7), for the same
+# reason. A dry run on an instance that is not a cloud: being told so is the proof
+# it loaded, connected as the owner role and found it may delete audit rows.
+if ./openokr erase 2>&1 | grep -q "This instance is not a cloud"; then
+  pass "the erasure command runs inside the image, and erases nothing here"
+else
+  fail "the erasure command does not run inside the image"
+fi
+
 # --- an unconfigured instance leads to the wizard --------------------------
 location=$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/sign-in")
 case "$location" in
