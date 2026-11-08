@@ -27,6 +27,7 @@
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
+import { fillDateTime } from "./date-time.ts";
 import { expect, test } from "./fixtures.ts";
 import {
   goTo,
@@ -303,8 +304,8 @@ test("a site message's window is read on the operator's own clock", async () => 
   const body = `Planned maintenance ${Date.now()}`;
   await operatorPage.getByLabel("Message", { exact: true }).fill(body);
   // Years ahead, so the message is never live for a later spec.
-  await operatorPage.getByLabel("Shows from").fill("2031-03-04T09:00");
-  await operatorPage.getByLabel("Stops at").fill("2031-03-04T10:30");
+  await fillDateTime(operatorPage, "Shows from", "2031-03-04T09:00");
+  await fillDateTime(operatorPage, "Stops at", "2031-03-04T10:30");
   await expect(
     operatorPage.getByText("In America/Sao_Paulo time.").first(),
   ).toBeVisible();
@@ -332,8 +333,8 @@ test("a site message that ends before it starts is refused in words, and keeps w
   const body = `Refused window ${Date.now()}`;
   const message = operatorPage.getByLabel("Message", { exact: true });
   await message.fill(body);
-  await operatorPage.getByLabel("Shows from").fill("2031-03-04T10:00");
-  await operatorPage.getByLabel("Stops at").fill("2031-03-04T09:00");
+  await fillDateTime(operatorPage, "Shows from", "2031-03-04T10:00");
+  await fillDateTime(operatorPage, "Stops at", "2031-03-04T09:00");
   await operatorPage.getByRole("button", { name: "Show this message" }).click();
 
   const form = operatorPage.locator("form").filter({ has: message });
