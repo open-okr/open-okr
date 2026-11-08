@@ -442,19 +442,21 @@ test("company administrator: reopens it, and nobody sees a closure", async () =>
 });
 
 /**
- * **Found by this file, and not fixed by it.** plans-and-seats.md §2 makes an
- * invited person a seat, "the load-bearing choice", and the plan screen tells
- * the administrator so. But a personal invitation writes no member row until
- * it is accepted, and seats count member rows, so while seats are free any
- * number of invitations succeed and the surplus is refused at the link
- * instead. docs/design/hosting-test-matrix.md records it as a defect. Last in
- * the file so its invitation holds nothing a later test needs, and on Team, so
- * there are seats to hold.
+ * plans-and-seats.md §2: an invited person holds a seat from the moment the
+ * invitation is sent, so a full workspace refuses the administrator rather
+ * than the person clicking the link. Found missing by this file
+ * (docs/design/hosting-test-matrix.md, D-1). Last in the file so its
+ * invitation holds nothing a later test needs, and on Team, so there are seats
+ * to hold.
  */
-test.fixme("company administrator: a pending invitation holds a seat, as plans-and-seats.md §2 says", async () => {
-  await inviteByEmail(companyAdmin, `pending.${RUN}@acme-sdn-bhd.example`);
+test("company administrator: a pending invitation holds a seat, and is named on the plan screen", async () => {
+  const pending = `pending.${RUN}@acme-sdn-bhd.example`;
+  await inviteByEmail(companyAdmin, pending);
   await goTo(companyAdmin, "/admin/plan");
   await expect(companyAdmin.getByText("4 of 10", { exact: true })).toBeVisible({
     timeout: 15_000,
   });
+  await expect(
+    companyAdmin.getByRole("listitem").filter({ hasText: pending }),
+  ).toContainText("invited");
 });

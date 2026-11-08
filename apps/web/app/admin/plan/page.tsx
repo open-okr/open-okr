@@ -240,7 +240,7 @@ export default async function PlanPage({
             {holders.map((holder) => (
               <li
                 className="flex items-baseline justify-between gap-3 px-4 py-2 text-sm"
-                key={holder.memberId}
+                key={holder.id}
               >
                 <span className="text-ink">{holder.name}</span>
                 {holder.status === "invited" ? (

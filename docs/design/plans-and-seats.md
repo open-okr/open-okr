@@ -81,6 +81,29 @@ Counting the invitation moves the refusal to the admin who caused it.
 
 An invitation that expires or is revoked releases its seat.
 
+**How an invitation is counted.** A personal invitation writes a link and no
+member until it is accepted, so the seat is held by the link. This was missing
+until 8 November 2026: the count read only member rows, nothing ever wrote the
+`invited` status, and with seats free any number of invitations succeeded
+(`hosting-test-matrix.md`, D-1).
+
+| Counts as a held seat | Does not |
+|---|---|
+| A human member, `active` or `invited` | A guest, an agent or a placeholder |
+| A personal member invitation that is not accepted, revoked or expired, once per address | A guest's invitation, or a reusable workspace link, which is checked at the funnel instead |
+| | An invitation to an address somebody here already has |
+| | At the invitation and the funnel, invitations to the address being admitted: their seat is the one they are taking |
+
+A placeholder, an import's waiting row or the owner an operator's new workspace
+waits for, is not a seat itself, so its invitation is the seat.
+
+**Held seats and headcount are two numbers.** The invitation check, the funnel
+and S-49 use held seats. A move to a smaller plan, a checkout and the end of a
+subscription are judged by the people already here, because the rule they
+apply is that nobody loses access. A plan smaller than the held seats but not
+the people is allowed, and whoever arrives without a seat is refused at the
+funnel.
+
 ## 3. Two enforcement points, because one is not enough
 
 P8-T05's card asks for "enforcement at the member-provisioning funnel".
