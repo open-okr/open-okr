@@ -14,7 +14,7 @@ product owner on 26 October 2026. Authority: AI-NATIVE-PLAN.md §8,
 | `agentConfiguration(endpoint, token)` | `apps/web/app/account/api-tokens/agent-config.ts` | The `mcpServers` JSON shown on the token page |
 | `resourceIdentifier(instanceIssuer())` | `packages/core` | The one endpoint address every grant is checked against |
 
-**What does not exist.** No copy button anywhere in the product, and no text
+**What did not exist before this change.** No copy button anywhere in the product, and no text
 written for an agent to read rather than a person.
 
 ## 1. Two prompts, one builder
@@ -110,7 +110,7 @@ moves.
 |---|---|
 | Idle | The label |
 | Copied | "Copied", for two seconds, announced politely |
-| Clipboard refused | "Copy failed, select the text below", announced as an alert, and the prompt text is revealed in a read-only text area so it can be copied by hand |
+| Clipboard refused | "Copy failed. Select the text below and copy it by hand.", announced as an alert, and the prompt text is revealed in a read-only text area so it can be copied by hand |
 
 `navigator.clipboard.writeText` needs a secure context. An instance served on
 plain HTTP from a LAN address has none, so the refused state is a real path,

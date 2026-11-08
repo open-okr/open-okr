@@ -21,7 +21,7 @@ seats are `plans-and-seats.md`.
 | The freeze overlay | `packages/core/src/operations/freeze.ts` | P2-T09 | Suspension's enforcement, reused by the lifecycle rather than duplicated |
 | `can()` and the access getter | `packages/core/src/access` | P2-T02 | One enforcement point. Not-found on forbidden, suspended members excluded |
 
-**What does not exist.** No operator identity of any kind, no route that
+**What did not exist before P8-T03.** No operator identity of any kind, no route that
 serves more than one workspace, no instance feature flags, no site
 messages, and no screen in UIUX-PLAN past S-40.
 
@@ -106,11 +106,12 @@ established, and `tenant.ts` already describes the argument for it:
 
 | Table | Operator policy | What it gives |
 |---|---|---|
-| `tenants` | Read, and write for lifecycle changes | Plan, seats, state, region, closure |
-| `workspaces` | Read of the row, write of `state` only | Name, slug, state. **Not** `settings`, which holds branding and trusted domains and is the customer's own |
+| `tenants` | Read. Lifecycle writes go through the Operation pipeline under the workspace's own setting, not through this key | Plan, seats, state, region, closure |
+| `workspaces` | Read of the row. The console selects name, slug and state | Name, slug, state. **Not** `settings`, which holds branding and trusted domains and is the customer's own |
 | `instance_operators` | Read | So the console can show who else holds a grant |
 | `operator_sessions` | Read and write | The support-access contract |
 | Aggregate counts | Read, from the snapshot table | Section 5. Corrected at P8-T03b: this said "through named views", and a view cannot count a table the floor protects |
+| `billing_accounts` | Read | The billing status and customer reference S-46 shows (`billing.md`, migration 0145) |
 | **Everything else** | **None** | A goal, a check-in, a comment, a document, a message, a nudge, an AI usage row. All unreachable |
 
 The policy is written to check that the operator's grant is live:
@@ -133,7 +134,7 @@ P8-T03's card names five things. Each maps onto the table list above.
 | Suspend or reactivate | | `tenants.state` and `workspaces.state`, in one transaction |
 | Instance feature flags | `system_settings` | `system_settings`, under `app.instance_admin` |
 | Site messages | `site_messages` | `site_messages` |
-| Per-tenant health and usage | The aggregate views | |
+| Per-tenant health and usage | The usage snapshot, section 5 | |
 
 **Suspension is the lifecycle document's transition**, not a second
 mechanism. The operator's write sets both states in one transaction and
@@ -144,10 +145,10 @@ targeted at every workspace has no `workspace_id`:
 
 | Column | Notes |
 |---|---|
-| `id`, `body`, `level` | The message. Rich text through the one shared module, like everything else |
+| `id`, `body`, `level` | The message. Plain text, corrected at P8-T03c (migration 0088). `level` is `info`, `warn` or `bad` |
 | `starts_at`, `ends_at` | Expiring is not optional. A site message with no end is a banner somebody forgets, and every reader learns to ignore the banner |
-| `target` | `all`, or a list of workspace ids. Targeted, per the card |
-| `dismissible` | Per the card. A dismissal is per member and lives in the member's own settings |
+| `target_workspace_ids` | Null for everybody, or a list of workspace ids. Targeted, per the card |
+| `dismissible` | Per the card. A dismissal is per user, across every workspace they are in, in `site_message_dismissals` (corrected at P8-T03c) |
 
 ## 5. Health and usage, without reading content
 
@@ -286,9 +287,9 @@ Written as the test plan P8-T03 inherits.
    them out first.
 5. **Given** a self-hosted instance, **when** any operator route is
    requested by an instance administrator, **then** it is not-found.
-6. **Given** the usage view, **when** an operator reads it, **then** it
+6. **Given** the usage snapshot, **when** an operator reads it, **then** it
    carries counts and timestamps and no title, name or body from any
-   content table. Asserted on the view's column list, so adding a leaky
+   content table. Asserted on the table's column list, so adding a leaky
    column fails the test rather than passing review.
 7. **Given** `pnpm audit:verify`, **when** it runs after a batch of operator
    actions, **then** both chains verify and the instance chain holds one row
@@ -300,6 +301,6 @@ Written as the test plan P8-T03 inherits.
 |---|---|---|
 | 1 | How the first operator is created | Written here as "by the deployment", which in practice means a seeded row or a command. The mechanism is P8-T03's, and it should not be a screen, because a screen that creates the first operator can be reached by whoever gets there first. **Answered at completeness review H-21: a command**, `pnpm cloud:operator --email <address> --granted-by <address>`. Never self; once one operator exists only an operator grants another; every grant and revocation goes to the instance audit chain |
 | 2 | Whether an operator may read a workspace's own audit log without a support session | Written here as yes, on S-46, because investigating an incident is what the trail is for and the trail holds no content. An argument exists that the trail names people and is therefore personal data, which would put it behind a session |
-| 3 | Whether site messages are rich text or plain | Written here as rich text through the shared module, for consistency. Plain text would remove a sanitising surface that has an instance-wide audience |
+| 3 | Whether site messages are rich text or plain | Written here as rich text through the shared module, for consistency. Plain text would remove a sanitising surface that has an instance-wide audience. **Answered at P8-T03c: plain text** (migration 0088) |
 | 4 | The P1-T09 follow-up carried on the P8-T03 row | Instance settings writes sit outside the Operation pipeline behind an escape hatch. This design adds two more writers to `system_settings` (flags and site messages), so the follow-up gets larger rather than smaller and wants closing before or during P8-T03 |
 | 5 | Renaming the four e2e specs that took S-41 to S-44 | Skipped rather than renamed, because renaming specs is a change with no behaviour behind it. If the prefix is ever reclaimed, the gap is where it goes |

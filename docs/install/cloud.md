@@ -23,7 +23,7 @@ machine, the upgrades, the backups and the monitoring.
 |---|---|
 | The instance, its database and its backups | Your workspace, your people and your practice |
 | Upgrades, on the same tagged releases | Whether to configure AI, and whose key |
-| Availability and the status page | Your data, exportable as one signed archive at any time |
+| Availability and the status page | Your data, exportable at any time as one encrypted archive |
 
 ## Getting out
 
@@ -36,7 +36,7 @@ the exit is part of the product rather than a support ticket.
 ## Support access
 
 Nobody at the vendor can read your workspace by default. When you ask for
-help, support requests a session, you grant it with a reason and a time box,
+help, support requests a session with a reason, you grant it with a time box,
 and every action they take is attributed to them in your audit trail. Ending
 the session removes the access. The whole arrangement is visible to you on the
 support screen in admin.
@@ -61,7 +61,7 @@ needed for anything else:
 
 | Variable | What it does |
 |---|---|
-| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION` |
+| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION`. Neither applies once a policy is saved, and finishing the setup wizard saves Invitation only ([Choose a setup](setups.md#the-settings-behind-each-setup)) |
 | `OPENOKR_CLOUD_PLANS` | The plan catalogue. Without it nobody has a seat limit |
 
 On [one server](compose.md), add them to `secrets/app.env` and run `./openokr up`.
@@ -205,7 +205,7 @@ instance yours without changing any code:
 
 | Difference | Detail |
 |---|---|
-| Registration | Open, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account |
+| Registration | Open while no policy is saved, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account. The setup wizard saves Invitation only on either, and a saved policy wins |
 | Plans and seats | The cloud counts seats. Self-hosting does not |
 | Suspension and closure | A cloud workspace has a lifecycle the vendor operates. Nothing is erased without a retention window somebody set |
 

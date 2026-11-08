@@ -83,7 +83,7 @@ Written for the person holding the pager, not for a reader.
 | [The method](specification/METHOD.md) | The OKR practice canon. Every rule, threshold, gate and practice setting the product runs |
 | [The specification](specification/README.md) | Requirements, architecture, the schema, the AI design and the interface |
 | [The designs](design/) | The detailed design of each engine and subsystem |
-| [Reference mockups](mockups/README.md) | Eleven screens drawn from the interface specification |
+| [Reference mockups](mockups/README.md) | Key screens drawn from the interface specification |
 | [Governance](../GOVERNANCE.md) | Who decides what |
 | [Contributing](../CONTRIBUTING.md) | Getting a development instance running |
 
@@ -92,5 +92,7 @@ Written for the person holding the pager, not for a reader.
 `pnpm check:docs` refuses a link that resolves to nothing, a page nothing leads
 to, and an instruction naming a command that does not exist. It also checks
 every threshold [the numbers](handbook/numbers.md) quotes against the method
-registry, and the [API reference](api/reference.md) against the contract it is
-generated from. A page here cannot quietly stop being true.
+registry, the [API reference](api/reference.md) against the contract it is
+generated from, and every release a page pins against the current version. It
+cannot check what a sentence says the product does, so a change to behaviour
+updates the pages that describe it in the same change.

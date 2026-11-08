@@ -66,13 +66,13 @@ A database failover fails, and the platform is down for four hours. Uptime for D
 
 *Test:* Given uptime with a red boundary of 99.5, when 99.4 is recorded, then the KPI is unhealthy, the maintain key result's progress is below 100%, and choosing "fix it now" creates a task with an owner and a date and drafts no recovery OKR. Given Leo's check-in at 0.3 on a committed key result, then both messages are sent.
 
-**NW-Q4-05 · 6 Dec (W10) · Hugo, Coach · S-21 KPI detail, S-02 · METHOD §6.5**
+**NW-Q4-05 · 6 Dec (W10) · Hugo, Champion · S-21 KPI detail, S-02 · METHOD §6.5**
 November's operating margin is recorded: 13.6%, inside the healthy band for the first time since 2026. October had read 12.2%, in watch.
-- **The coach.** It proposes closing C6, once.
+- **The Champion.** It proposes closing C6, once.
 - **Hugo.** He dismisses the proposal for now: one healthy month is not a trend, and he will decide at the Q4 retrospective.
 - **The record.** Dismissing it is recorded, and the proposal is not sent again.
 
-*Test:* Given a KPI under recovery whose reading enters the healthy band, when the reading is recorded, then the coach proposes closing the recovery once. Given the proposal dismissed, then the dismissal is recorded and the proposal is not repeated.
+*Test:* Given a KPI under recovery whose reading enters the healthy band, when the reading is recorded, then the Champion proposes closing the recovery once. Given the proposal dismissed, then the dismissal is recorded and the proposal is not repeated.
 
 **NW-Q4-06 · 8 Dec · Priya facilitates; leadership · S-24 review of the 2027 annual cycle · METHOD §8**
 The annual review of 2027 is held before a word of 2028 is drafted. It runs as the same review a quarter gets, over the annual objectives, graded on their latest readings:
@@ -105,7 +105,7 @@ Q4 is graded early, before the holidays begin on 20 December. Across all scored 
 *Test:* Given the two committed misses, when the scoring stage runs, then it closes only once both have their explanations.
 
 **NW-Q4-10 · 15 Dec · Priya facilitates · S-24 review session, 60 minutes · METHOD §8.3**
-The review session holds stages 1 to 4. The scoring reveal shows no "too safe" note: a quarter of the aspirational key results scored 1.0, below the three-quarters pattern.
+The review session holds stages 1 to 4. The scoring reveal shows no "too safe" note: two of the nine aspirational key results scored 1.0, below the three-quarters pattern.
 *Test:* Given a quarter of the aspirational key results at 1.0, when the reveal completes, then no "too safe" note appears.
 
 **NW-Q4-11 · 16 Dec · Priya facilitates · S-24 retrospective, 45 minutes · METHOD §8.5, §8.6, §8.8, §8.9, §6.5**

@@ -69,7 +69,7 @@ a laptop and wrong for a server anybody else reaches.
 
 Open the address it printed. The wizard asks for one thing: the account that
 owns the instance. Name, address, and a password of at least twelve
-characters.
+characters. The instance's name is on the same form, already filled in.
 
 Registration closes the moment that account exists. Everybody after you joins
 by invitation, which is the point: an instance on the open internet with open

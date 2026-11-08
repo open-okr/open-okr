@@ -13,7 +13,7 @@ document.
 | Component | Where | Ships at | What it does today |
 |---|---|---|---|
 | `/api/health` | `apps/web/app/api/health/route.ts` | P1-T09 | Unauthenticated. `SELECT 1` against Postgres. Returns `{status: "ok"}` or 503. Used by compose `healthcheck` and the Caddy dependency graph. Says almost nothing on purpose |
-| `/api/metrics` | `apps/web/app/api/metrics/route.ts` | P7-T06a | Authenticated (instance admin). Prometheus text exposition. 16 series. Per-action duration, queue depth, relay liveness, nudges, channels, agents, AI usage |
+| `/api/metrics` | `apps/web/app/api/metrics/route.ts` | P7-T06a | Authenticated (instance admin). Prometheus text exposition. 16 series, 19 since P8-T06c added SS3.2's three. Per-action duration, queue depth, relay liveness, nudges, channels, agents, AI usage |
 | Two Grafana dashboards | `deploy/docker/observability/dashboards/` | P7-T06c | "Performance budgets" and "Delivery and the background". Provisioned from committed JSON. Off unless the observability profile is started |
 | The observability profile | `deploy/docker/compose.yaml` | P7-T06c | Prometheus + Grafana behind `profiles: ["observability"]`. Published on `127.0.0.1:3001`. Nothing leaves the compose network |
 | Outbox gauges | `packages/adapters/src/relay.ts` | P7-T06b | `openokr_outbox_pending` and `openokr_outbox_oldest_pending_seconds`, read at scrape time. The relay registers them at construction; a stopped relay keeps reporting a growing lag |
@@ -22,7 +22,8 @@ document.
 | Operator usage snapshots | `packages/db/src/schema/operator-usage.ts` | P8-T03b | Five per-workspace counts (members, goals, check-ins, storage, last activity) with `measured_at`. Above the tenant floor |
 | `/api/app-version` | `apps/web/app/api/app-version/route.ts` | P2-T10 | Authenticated. Returns the build id for the stale-deployment handshake. Not public, on the reasoning that a version string is reconnaissance |
 
-**What does not exist.** No public endpoint that reports whether the
+**What did not exist when this was written** (P8-T06c has since built SS2
+and SS3). No public endpoint that reports whether the
 instance is healthy in any dimension beyond "can it reach Postgres". No
 metric for connection-pool utilization, for concurrent actions in flight,
 or for admission refusals. No dashboard that charts capacity and limit
@@ -107,8 +108,8 @@ Three components, each with a verdict of `operational`, `degraded` or
 ```
 
 HTTP 200 for `operational` and `degraded`. HTTP 503 for `unavailable`.
-No `Content-Type` negotiation; JSON only. No caching headers; every
-request is a fresh probe.
+No `Content-Type` negotiation; JSON only. `Cache-Control: no-store`;
+every request is a fresh probe.
 
 ### 2.5 Relay health check
 
@@ -124,7 +125,9 @@ which `apps/web` may import). Two options:
 
 Option (a) is better because it keeps the definition of "how old is the
 oldest pending row" in one place. The relay already does this; a second
-copy would be a second answer that can quietly diverge.
+copy would be a second answer that can quietly diverge. Built as (a): a
+public static `OutboxRelay.oldestPendingSeconds(pool)` in
+`packages/adapters/src/relay.ts`, which the route calls.
 
 The thresholds are settings, because the right numbers depend on the
 deployment and on what the relay's normal lag looks like under load:
@@ -141,23 +144,25 @@ means nothing is draining.
 
 ### 2.6 Scheduler health check
 
-The scheduler runs as part of the same process. Its main jobs are the
-Champion's daily cadence, the usage sweep (hourly), and the audit chain
-check.
+The scheduler runs as part of the same process. Its jobs include the
+Champion's hourly, daily, weekly and cycle runs, the Coach's nightly run,
+the usage sweep (hourly), and the audit chain (every minute).
 
 Rather than coupling to pg-boss internals, the scheduler records its own
-heartbeat: a `last_scheduler_run_at` timestamp on `globalThis`, updated
-after each successful sweep. The status endpoint reads that timestamp
-and compares it against a grace period.
+heartbeat: an `openokrSchedulerLastRunAt` timestamp on `globalThis`,
+updated after each scheduled run. The status endpoint reads that timestamp
+and compares it against a grace period. A scheduler turned off by
+configuration reports `operational`, and one that failed to start reports
+`unavailable` at once.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `status.schedulerDegradedSeconds` | 7200 (2 hours) | No successful run in this window |
 | `status.schedulerUnavailableSeconds` | 14400 (4 hours) | The scheduler has likely stopped |
 
-The defaults are generous because the shortest scheduled interval is one
-hour (the usage sweep). A two-hour grace fires only when the scheduler
-has missed at least one full cycle.
+The defaults are generous: the scheduler runs something every minute (the
+audit chain), so a two-hour grace fires only when it has stopped running
+altogether.
 
 On a fresh start, before the first sweep completes, the scheduler
 component reports `operational` rather than immediately degraded. The
@@ -205,7 +210,7 @@ id, following the same privacy rule the existing sixteen series follow.
 
 | Series | Type | Labels | Registered by | What it answers |
 |---|---|---|---|---|
-| `openokr_pool_connections` | gauge | `state` (active, idle, waiting) | The pool in `apps/web/lib/pool.ts`, read at scrape time | How full is the connection pool? |
+| `openokr_pool_connections` | gauge | `state` (active, idle, waiting) | `apps/web/lib/telemetry.ts`, reading the pool from `apps/web/lib/pool.ts` at scrape time | How full is the connection pool? |
 | `openokr_concurrent_actions` | gauge | none | `callAction`, read at scrape time from the in-process counter P8-T06a already maintains | How many actions are in flight right now? |
 | `openokr_admission_refusals_total` | counter | `reason` (rate, concurrency) | `admit()` in `packages/core/src/tenancy/admission.ts`, counted on each refusal | How often are limits engaging, and which kind? |
 

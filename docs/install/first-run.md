@@ -76,9 +76,10 @@ database. A backup nobody has ever restored is a belief rather than a backup.
 ## Then start the practice
 
 The product knows which phase of the cycle it is in and what is missing. Open
-the Cycle screen and it will tell you what it is waiting for. Drafting is
-refused until the input pack is complete, which is deliberate: a planning
-session with no inputs produces objectives written from opinion.
+the Cycle screen and it will tell you what it is waiting for. By default it
+only shows what is missing. Set Phase enforcement to Binding and drafting waits
+until phases 1 to 3 are complete: a planning session with no inputs produces
+objectives written from opinion.
 
 ## Next
 

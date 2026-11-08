@@ -28,7 +28,7 @@ Two decisions inside that table are worth stating plainly.
 
 **The path is the action's name, not a resource.** A resource-shaped surface
 (`GET /api/v1/goals/{id}`, `PATCH /api/v1/goals/{id}`) would need a
-hand-written mapping from three hundred actions onto nouns and verbs. That
+hand-written mapping from four hundred actions onto nouns and verbs. That
 mapping is the thing that goes stale, and it would be a second registry with no
 test able to prove it complete. The action-named path reads as REST, is
 completely generated, and a client that can read `GET /api/v1` can reach
@@ -85,9 +85,10 @@ page: { cursorFrom: ["at", "id"] }   // activities.workspaceFeed
 Loading everything and slicing it in the transport would cost the same query and
 tell the caller it had not. So an action that cannot page says so.
 
-Only `activities.workspaceFeed` declares paging today, because it is the only
-registry action that already takes a cursor. Every other list returns its whole
-result, which is what the browser reads. Adding paging to a list is a change to
+Seven actions declare paging today: the four activity feeds
+(`activities.workspaceFeed`, `spaceFeed`, `goalFeed`, `profileFeed`),
+`audit.list`, `goals.list` and `notifications.list`. Every other list returns its
+whole result, which is what the browser reads. Adding paging to a list is a change to
 that list's query, and belongs to the task that needs it.
 
 ## 4. Tokens

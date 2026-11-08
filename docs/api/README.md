@@ -21,14 +21,14 @@ curl -H "Authorization: Bearer $OPENOKR_TOKEN" \
   https://okr.example.com/api/v1/goals/list
 ```
 
-Make one under **Account, then API tokens**. A token is shown once, hashed at
-rest, scoped, and it records when it was last used.
+Make one under **API tokens** in the avatar menu. A token is shown once,
+hashed at rest, scoped, and it records when it was last used.
 
 | Token property | Detail |
 |---|---|
 | Audience | **REST** for `/api/v1`, or **AI agent** for the agent endpoint. Each is refused at the other's door |
-| Scopes | `read` and `write`. Destructive actions are never granted by default |
-| Expiry | Set when you create it |
+| Scopes | `read`, `write` and `destructive`. The form starts with `read` alone, and destructive is never granted by default |
+| Expiry | Set in days when you create it, or left empty for none |
 | Revocation | Immediate. The next request fails |
 | Membership | Revalidated on every request. Suspending the member kills the token |
 
@@ -70,7 +70,7 @@ written.
 A coding agent in a terminal, or a desktop assistant set up from a file, has no
 browser to send you to a consent screen. Give it an **agent token** instead.
 
-1. Go to **Account, then API tokens**.
+1. Go to **API tokens** in the avatar menu.
 2. Under **What it is for**, choose **An AI agent**. Pick the scopes it needs.
    Read is enough for an agent that only reports.
 3. Create the token. It is shown once, already inside a configuration you can
@@ -91,7 +91,7 @@ The agent sends the token as a bearer token to the agent endpoint,
 }
 ```
 
-**An agent sees the `core` tools unless the address names more.** The 57 tools
+**An agent sees the `core` tools unless the address names more.** The 62 tools
 a member uses every week: goals and key results, check-ins, the review inbox,
 notifications, comments, KPIs, tasks, initiatives, documents, `search` and
 `fetch`. Name more toolsets in the address:
@@ -116,7 +116,7 @@ importer's and the scheduler's actions are not agent tools at all; they stay on
 | Who starts it | The agent, which sends you to a consent screen | You, on the tokens screen |
 | Scopes | What you approved | What you chose when you made it |
 | Lifetime | Until you revoke it, on access tokens that last an hour and refresh | Until it expires or you revoke it |
-| Where you see it | **Account, then Connected agents** | **Account, then API tokens**, with when it was last used |
+| Where you see it | **Connected apps** in the avatar menu, on the page headed Connected agents | **API tokens** in the avatar menu, with when it was last used |
 | Permissions | Yours, narrowed by its scopes | The same |
 
 **An agent token opens the agent endpoint and nothing else.** A REST token is
@@ -156,11 +156,13 @@ A refusal names what happened rather than leaving the caller to guess:
 
 | Status | Means |
 |---|---|
-| 400 | The input did not validate. The answer names the field |
+| 400 | A parameter this action does not declare. The answer names it |
 | 401 | No token, or a token that is expired or revoked |
-| 403 | Authenticated, and not allowed to do this |
-| 404 | No such thing, **or** something you may not see. The two are deliberately the same answer |
-| 409 | A rule refused, and the message says which |
+| 403 | Authenticated, and not allowed to do this, or the token's scopes do not cover it |
+| 404 | No such thing, **or** something you may not see. The two are deliberately the same answer. Also an action name that does not exist |
+| 405 | A read sent with POST, or a write sent with GET |
+| 409 | A conflict: the thing is not in a state that allows this, or somebody changed it since you read it, and then the answer carries what is stored now |
+| 422 | The input did not validate. The answer names the field |
 | 429 | Rate limited |
 
 **404 covering both "gone" and "forbidden" is deliberate.** A distinct 403 on a

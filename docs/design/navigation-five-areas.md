@@ -18,7 +18,7 @@ Source: the OKRGoal UX review (`docs/audits/okrgoal-ux-habit-review-2026-10-13.m
 |---|---|---|---|---|
 | Home | Home | `/` | none | Everyone. Becomes "My week" with the role homes (backlog 12) |
 | Updates | Updates | `/review` | To do (`/review`), Activity (`/inbox`) | Everyone. One badge: what is owed plus what is unread |
-| Goals | Goals | `/goals` | OKRs (`/goals`), KPIs (`/kpis`) | Everyone |
+| Goals | Goals | `/goals` | OKRs (`/goals`), KPIs (`/kpis`), Map (`/map`) | Everyone |
 | Work | Work | `/initiatives` | Initiatives (`/initiatives`), Board (`/board`) | Everyone |
 | Teams | the workspace's term for spaces, plural | `/spaces` | none | Everyone |
 | Cycle | Cycle | `/cycle` | as today | Workspace administrators, and members who are a coordinator or manager of any space |

@@ -53,13 +53,13 @@ sso_connections            the authority. workspace_id, RLS, soft delete
       |
       |  on write, and at boot
       v
-auth.api.registerSSOProvider / updateSSOProvider / deleteSSOProvider
+packages/core/src/auth/saml-sync.ts inserts or deletes the row, SAML only
       |
       v
-ssoProvider                derived. Better Auth owns it
+sso_providers              derived. Better Auth owns its shape
       |
       v
-OIDC via genericOAuth  |  SAML via @better-auth/sso
+SAML via @better-auth/sso  (OIDC via genericOAuth, configured from sso_connections)
       |
       v
 provisionUser  ->  tryJoinWorkspaceForIdentity   (the P8-T07b funnel)
@@ -117,7 +117,7 @@ On the refusals, not on the happy path.
 (GHSA-r683-v43c-6xqv, critical, patched 2.10.0), a token replay
 (GHSA-8jjf-w7j6-323c, high, patched 2.4.0-rc5) and an XML injection inside a
 signed assertion allowing privilege escalation (GHSA-34r5-q4jw-r36m, high,
-patched 2.13.0). The pinned version is 2.13.1, so all three are behind us.
+patched 2.13.0). The pinned version is 2.15.1, so all three are behind us.
 
 The pattern is the point. SAML is a protocol where an assertion can be
 correctly signed and still not mean what it appears to, and a suite that proves

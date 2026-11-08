@@ -41,8 +41,10 @@ when it is missing.
 somebody asks: `pnpm test:ci --shard=i/4` and `pnpm test:e2e --shard=i/4` run
 exactly what one CI machine runs.
 
-**`pnpm test` needs a PostgreSQL with `pgvector`.** `pnpm db:up` starts one in
-Docker, with PgBouncer and the MySQL the FlowyTeam connector's suites read.
+**`pnpm test` needs a PostgreSQL.** `pgvector` is optional: migration 0031
+creates it only when it is available, and search falls back to full text.
+`pnpm db:up` starts a plain `postgres:17-alpine` in Docker, with PgBouncer and
+the MySQL the FlowyTeam connector's suites read.
 `TEST_DB_PORT` points the suite at a PostgreSQL you already run instead. Never
 run two suites against the same database at once: the harness creates and
 drops a database per worker, so a second run tears the first one's out from
@@ -79,7 +81,7 @@ fix it and push again. A pull request merges only when CI is green.
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |
 | Flakiness report | Merges the shard reports and fails on real failures | Tests were skipped |
 | Build | `turbo run build --affected` | The push changed no code |
-| Release image | The release workflow's own image build (`image.yml`), amd64 and arm64 each on a native runner, nothing pushed. The only place the arm64 half is built before a tag. `image-rehearsal.yml` runs the same thing weekly on `main` | The push changed none of `deploy/docker/`, the lockfile, a `package.json`, `.npmrc`, `.nvmrc`, `.dockerignore`, or the image, rehearsal or release workflows. Nothing local runs both architectures; `docker build -f deploy/docker/Dockerfile .` checks your own |
+| Release image | The release workflow's own image build (`image.yml`), amd64 and arm64 each on a native runner, nothing pushed. The only place the arm64 half is built before a tag. `image-rehearsal.yml` runs the same thing weekly on `main` | The push changed none of `deploy/docker/`, the lockfile, `pnpm-workspace.yaml`, a `package.json`, `.npmrc`, `.nvmrc`, `.dockerignore`, or the image, rehearsal or release workflows. Nothing local runs both architectures; `docker build -f deploy/docker/Dockerfile .` checks your own |
 | Licences and sign-off | `pnpm check:licences`, `pnpm check:signoff` | Sign-off runs on pull requests only |
 | Changeset | `pnpm check:changeset` | Refuses a branch that changes what an instance does and names no version bump. Pull requests only |
 | Dependency review | `actions/dependency-review-action`, `fail-on-severity: moderate` plus the licence allow list | Pull requests only. Nothing local checks it |
@@ -148,8 +150,8 @@ forward with a new one.
 
 | It refuses | Because |
 |---|---|
-| A relative link in `docs/` that resolves to nothing | A reader follows it and believes the page exists. Renaming a page is the usual cause |
-| A page under `docs/install`, `docs/admin` or `docs/runbooks` that nothing in `docs/README.md` leads to | A page nobody can find is a page nobody wrote |
+| A relative link in `docs/README.md` or a page under `docs/install`, `docs/admin`, `docs/runbooks`, `docs/api`, `docs/handbook`, `docs/use` or `docs/import` that resolves to nothing | A reader follows it and believes the page exists. Renaming a page is the usual cause |
+| A page under one of those seven folders that nothing in `docs/README.md` leads to | A page nobody can find is a page nobody wrote |
 | `pnpm <script>` on a page when `package.json` defines no such script | An instruction that cannot be followed, which is worse than no instruction |
 | A threshold `docs/handbook/numbers.md` quotes that the method registry disagrees with | A handbook telling a practitioner something the product does not do |
 | `docs/api/reference.md` drifting from the contract | The registry moved and the page did not. `pnpm gen:docs` rewrites it |
@@ -166,6 +168,7 @@ index by folder rather than page by page.
 | `next/font/google` on any screen | It fetches while it builds, so an air-gapped build fails |
 | `curl`, `wget`, `apk add` or a package install in the image's runtime stage | A container that installs at boot needs a registry it does not have |
 | `ai_providers.enabled` defaulting to true | An instance nobody configured would call out |
+| `billing.provider` defaulting to anything but `none`, or the Stripe driver loaded statically | An instance with billing off would load a payment SDK it never uses |
 | `fetch` on an absolute address outside `packages/adapters` | `outboundFetch` validates the literal host and the resolved address, follows no redirect and caps size and time. A direct call does none of that |
 | A component registry fetched at render time | Components are added at build time, so an air-gapped install already carries them |
 | A checklist row in `docs/runbooks/air-gap.md` with no check, or a check with no row | The guide is a claim about the product, and a claim nothing tests stops being true without anybody noticing |
@@ -191,7 +194,7 @@ because the checker cannot see the caller. Mark it:
 await tx.update(table).set(...)
 ```
 
-The marker sits on the line **immediately above the statement**, and it needs
+The marker sits in the comment lines **immediately above the statement**, and it needs
 the colon and a reason. A marker without them is invisible to the gate.
 
 **It also holds every field to the kit** ([guided-inputs.md](../design/guided-inputs.md) §6).

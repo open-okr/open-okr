@@ -43,11 +43,14 @@ written down here instead.
 
 ## What is deliberately absent
 
-- **Italic.** Nothing in the product sets `font-style: italic` except one
-  mockup blockquote, which the fallback covers. Adding
-  `Geist-Italic[wght].woff2` costs another 71 KB for that.
-- **Geist Mono.** No surface calls for it yet. The rich text editor's code
-  block (S-30) is the first thing that will, and it can bring the file with it.
+- **Italic.** A few lines are set in italic: the quote on the cycle's
+  guidance rail, two empty-state lines on the check-in timeline and the goal
+  page, and italic text in the rich text editor. The browser slants the
+  upright face for them. Adding `Geist-Italic[wght].woff2` costs another 71 KB
+  for that.
+- **Geist Mono.** Nothing uses it yet. Code in the rich text editor and the
+  screens that show tokens and identifiers use the system's monospace face,
+  and whichever first wants Geist Mono can bring the file with it.
 - **Subsetting.** The Google build splits the family by `unicode-range` so a
   latin-only reader fetches roughly a fifth of this. This file is the whole
   character set in one 68 KB request. Worth revisiting if the font ever shows

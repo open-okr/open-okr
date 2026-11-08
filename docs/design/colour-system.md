@@ -73,8 +73,10 @@ the slight blue in it sits with indigo rather than against it.
 | `#E7ECF4` | | Progress track |
 | `#E4E9F2` | | Borders and dividers |
 | `#CDD6E4` | | Strong border, input outline |
-| `#94A3B8` | | Muted text and placeholders. Dark strong-secondary |
-| `#617087` | | Secondary text. Two steps below the ramp's `#64748B`, see below |
+| `#94A3B8` | | Secondary text on dark |
+| `#7D8BA1` | | The faintest text on dark |
+| `#617087` | | The faintest text on light. Two steps below the ramp's `#64748B`, see below |
+| `#55637A` | | Secondary text on light, a step below `#617087` |
 | `#334155` | | Strong secondary on light, hairlines on dark |
 | `#0F172A` | | Primary text on light |
 | `#1E293B` | `#1A2332` | Dark hairline and track; dark raised surface |
@@ -177,8 +179,8 @@ pair below for a spread of colours, from a near-black navy to near-white.
 |---|---|---|---|
 | `--ink` | `#0F172A` | `#F1F5F9` | Objective titles, body copy |
 | `--ink-2` | `#334155` | `#CBD5E1` | Strong secondary |
-| `--ink-3` | `#617087` | `#94A3B8` | Owners, metadata, timestamps |
-| `--ink-4` | `#94A3B8` | `#64748B` | Placeholders and disabled labels only |
+| `--ink-3` | `#55637A` | `#94A3B8` | Owners, metadata, timestamps |
+| `--ink-4` | `#617087` | `#7D8BA1` | The faintest text: column headers, helper lines, placeholders |
 | `--surface` | `#FFFFFF` | `#111827` | Cards, panels, modals |
 | `--bg` | `#F6F8FC` | `#0B1220` | App background behind cards |
 | `--raised` | `#EFF3F9` | `#1A2332` | Hover rows, nested panels, neutral chips |
@@ -186,9 +188,10 @@ pair below for a spread of colours, from a near-black navy to near-white.
 | `--line-2` | `#CDD6E4` | `#334155` | Hover on inputs |
 | `--track` | `#E7ECF4` | `#1E293B` | The unfilled part of a progress bar |
 
-`--ink-4` is the one text token below 4.5:1, and it is the one WCAG 1.4.3
-exempts: placeholders and disabled labels. It is never body copy. The test
-asserts a ceiling as well as a floor so nobody promotes it by accident.
+`--ink-4` is the faintest text token, and it clears 4.5:1 like the rest
+(P7-T05: it was `#94A3B8`, below 4.5:1 for placeholders and disabled labels,
+and seventeen screens failed contrast because of it). The test asserts a
+ceiling as well as a floor so it does not creep into `--ink-3`'s job.
 
 ### Status
 
@@ -205,11 +208,11 @@ asserts a ceiling as well as a floor so nobody promotes it by accident.
 |---|---|
 | **Primary button** | Fill `--brand`, text `--on-brand`, border `--brand-600`. Hover fills `--brand-600`, active fills `--brand-700`. Disabled drops out of the brand ramp entirely: `--raised` with `--ink-4`, so a dead button reads as dead rather than as a paler live one |
 | **Secondary button** | Fill `--surface`, text `--brand-text`, border `--brand-line`. Never a status colour on a button |
-| **Progress bar** | Track `--track`, fill `--brand-strong`, fully rounded. The fill does not change with health under any condition. 8px on objectives, 6px on key results |
+| **Progress bar** | Track `--track`, fill `--brand-strong`, fully rounded. The fill does not change with health under any condition. 6px high |
 | **Status pill** | Background `--{state}-bg`, text `--{state}`, optional dot in `--{state}-dot`. Always a text label. Fully rounded |
 | **Confidence indicator** | The same three colours as health. High maps to on track, medium to at risk, low to off track. Never a fourth colour for a fourth level; if you need more granularity, put a numeric score in neutral text beside a three-state dot |
 | **Metric tile** | Label `--ink-3`, value `--ink`. Override the value colour only when the metric is itself a status. See rule 3 |
-| **Objective card** | Surface `--surface`, border `--line`, radius 12px, no shadow |
+| **Objective card** | Surface `--surface`, border `--line`, radius 14px (`--card-radius-lg`), no shadow |
 | **Focus** | A 2px `--brand-strong` outline at 2px offset, optionally haloed with `--brand-line`. The halo is decoration; the outline is the indicator. Visible on every interactive element, including status pills when they are clickable |
 
 ### Elevation
@@ -279,8 +282,8 @@ If a surface ever renders a status colour without a label, the exemption stops a
 | Pair | Ratio | Note |
 |---|---|---|
 | `#0F172A` on white | 17.85:1 | Body copy, AAA |
-| `#617087` on `#F6F8FC` | 4.73:1 | Secondary text on the app background |
-| `#94A3B8` on white | 2.56:1 | Below AA on purpose. Muted only |
+| `#55637A` on white | 6.08:1 | Secondary text |
+| `#617087` on `#F6F8FC` | 4.73:1 | The faintest text on the app background |
 | `#4338CA` on white | 7.90:1 | Brand link, AAA |
 | white on `#4F46E5` | 6.29:1 | Primary button label, both themes |
 | `#15803D` on `#E4F9EC` | 6.06:1 | On-track pill label |
@@ -294,11 +297,12 @@ If a surface ever renders a status colour without a label, the exemption stops a
 
 ## What changed from the palette as it stood
 
-Two fixes, both measured. Everything else is the original palette, unchanged.
+Three fixes, all measured. Everything else is the original palette, unchanged.
 
 | What | Was | Now | Why |
 |---|---|---|---|
-| `--ink-3` | `#64748B` | `#617087` | 4.48:1 on the app background and 4.27:1 on a hover row. Secondary text sits on both constantly, and it was the only light-theme value that missed |
+| `--ink-3` | `#64748B` | `#55637A` | 4.48:1 on the app background and 4.27:1 on a hover row. Secondary text sits on both constantly, and it was the only light-theme value that missed. It went to `#617087` first, then a step further down when `--ink-4` took that value (P7-T05) |
+| `--ink-4` | `#94A3B8` / `#64748B` | `#617087` / `#7D8BA1` | Below 4.5:1 by design, for placeholders and disabled labels, and used for ordinary small text in 152 places (P7-T05) |
 | Dark `--ok`, `--warn`, `--bad`, `--info` | not defined | `#22C55E`, `#F59E0B`, `#F87171`, `#60A5FA` | The dark theme overrode the pill *backgrounds* and not the labels, so every status label on every dark screen was a light-theme 700 stop on a 900 background: 2.6:1 to 3.0:1. Nothing was reported because nothing measured it |
 
 Four tokens are new rather than changed, filling gaps the palette had no name for:

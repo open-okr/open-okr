@@ -9,7 +9,7 @@ Authority: AI-NATIVE-PLAN.md §8.3 (what the server exposes), then
 `docs/design/agent-surface.md` §5.2 and "The tool catalogue (P5-T09a)". This
 document proposes a change to both, listed in §7.
 
-## 0. What is true today
+## 0. What was true before this change
 
 `tools/list` answers every connection with the whole registry.
 
@@ -47,7 +47,7 @@ confused.
 ### 2.1 A token is shown only what its scopes can call
 
 `tools/list` leaves out a tool whose scope the connection does not hold. A
-read-only token sees 156 tools instead of 415. Calling a hidden tool still
+read-only token sees 141 tools instead of 380. Calling a hidden tool still
 answers the scope refusal it answers today, so nothing a client relied on
 breaks.
 
@@ -56,8 +56,8 @@ them. It is not listing what the server would refuse anyway.
 
 ### 2.2 Tools that are not for agents leave the agent surface
 
-Thirty-seven actions exist for the importer, the scheduler, the copilot's own
-bookkeeping, the token screen, or an AI provider the agent path never has, and an agent can only misuse or be refused
+Forty-five actions exist for the importer, the scheduler, the copilot's own
+bookkeeping, the token screen, billing, or an AI provider the agent path never has, and an agent can only misuse or be refused
 by them.
 
 | Kind | Actions |
@@ -66,6 +66,7 @@ by them.
 | Scheduler and housekeeping | `notifications.drainBatches`, `blobs.reapOrphans`, `channels.sweepMessageLog` |
 | The copilot's own bookkeeping | `copilot.recordAnswer`, `copilot.completeRun`, `copilot.recordProposal` |
 | Registration and the key check | `workspace.provision`, `ai.recordCredentialCheck` |
+| Billing and the workspace's own lifecycle | `billing.summary`, `billing.startCheckout`, `billing.openPortal`, `billing.buyCredits`, `billing.changePlan`, `billing.settleEnded`, `workspace.changePlan`, `workspace.setLifecycle` |
 | Refused to every token by design (§8.2 "a token cannot administer tokens") | `tokens.create`, `tokens.revoke`, `tokens.approveDevice`, `tokens.pendingDevice` |
 | AI assists, which answer null to every agent because the agent path carries no drafter (agent-surface.md §5.1). Added 30 October 2026, MCP audit finding 16 | `goals.draftObjective`, `goals.rewriteKeyResult`, `goals.decomposeKeyResult`, `goals.suggestMeasure`, `goals.suggestParent`, `goals.draftRetrospective`, `goals.parseFilter`, `kpis.suggest`, `kpis.narrateTrend`, `comments.summarise`, `blockers.summarise`, `sessions.clusterRetro`, `sessions.draftMinutes`, `sessions.narrateDiagnostic`, `sessions.narrateDigest`, `imports.proposeMapping`, `copilot.availability` |
 
@@ -80,12 +81,12 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 | Toolset | Holds | Tools |
 |---|---|---|
 | `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites, and checking an unsaved draft, and the member's own check-in streak | 62 |
-| `work` | The rest of everyday work: targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 77 |
+| `work` | The rest of everyday work: targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 78 |
 | `facilitation` | Running the rhythm: preparing, running remotely and following up sessions, the planning workflow, cycles, alignment, dependencies, decisions, closing | 91 |
 | `room` | The live room's own moves: private votes and their reveal, the mic, pulse, kudos, retro notes, anonymous process-health answers | 16 |
-| `admin` | Workspace, people, spaces, roles, invitations, settings, audit, agents, practice, nudges, exports | 84 |
+| `admin` | Workspace, people, spaces, roles, invitations, settings, audit, agents, practice, nudges, exports | 83 |
 | `integrations` | AI providers, chat channels, single sign-on, spreadsheet imports | 50 |
-| `all` | Every agent-surface tool | 377 |
+| `all` | Every agent-surface tool | 380 |
 
 Chosen in the address the client is configured with, so it works with every
 client and needs no new column:
@@ -126,10 +127,10 @@ From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 1
 
 | Connection | Tools today | Tools after |
 |---|---|---|
-| Full token, no toolsets named | 415 | 57 |
-| Read-only token, no toolsets named | 415 | 36 |
-| Full token, `core,work` | 415 | 146 |
-| Full token, `all` | 415 | 394 |
+| Full token, no toolsets named | 415 | 62 |
+| Read-only token, no toolsets named | 415 | 38 |
+| Full token, `core,work` | 415 | 140 |
+| Full token, `all` | 415 | 380 |
 
 `core` is about 41 KB instead of 280 KB.
 
@@ -147,7 +148,7 @@ From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 1
 ```
 Given a token with read, write and destructive scope
 When an agent calls tools/list on /api/mcp with no toolsets named
-Then it receives the 57 core tools
+Then it receives the 62 core tools
 And search, fetch and every tool a prompt cites are among them
 ```
 
@@ -173,7 +174,7 @@ Then it is refused, and the tool is not in tools/list for any toolset
 ```
 Given /api/mcp?toolsets=core,nonsense
 When the client connects
-Then the answer is 400 and lists core, work, facilitation, admin and all
+Then the answer is 400 and lists core, work, facilitation, room, admin, integrations and all
 ```
 
 ```

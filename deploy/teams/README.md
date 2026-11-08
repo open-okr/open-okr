@@ -16,17 +16,16 @@ Take three values away with you:
 
 | Value | Where | Goes in |
 |---|---|---|
-| Application (client) ID | the bot's Configuration page | the Bot token box |
-| Client secret | Certificates & secrets, a new secret | the Signing secret box |
-| Directory (tenant) ID | the directory's Overview page | the Workspace id box |
+| Application (client) ID | the bot's Configuration page | the Application (client) ID box |
+| Client secret | Certificates & secrets, a new secret | the Client secret box |
+| Directory (tenant) ID | the directory's Overview page | the Directory (tenant) ID box |
 
-The three boxes are named for Slack, because one form serves every provider. The
-hint on the Teams card says which is which.
+The Teams card names each box after the value that goes in it.
 
 ## 2. Connect it in OpenOKR
 
-Sign in as an administrator, open **Settings, Notifications and channels**, and
-fill in the Teams card. Nothing is verified at this point: the card says
+Sign in as an administrator, open **Admin, Channels**, and fill in the Teams
+card. Nothing is verified at this point: the card says
 "never verified" until a message actually arrives.
 
 ## 3. Upload the app

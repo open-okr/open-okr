@@ -18,20 +18,18 @@ Take four values away with you:
 
 | Value | Where | Goes in |
 |---|---|---|
-| Permanent access token | System User, Generate token | the Bot token box |
-| App secret | App settings, Basic | the Signing secret box, first |
-| A verify token you choose | anything, any length | the Signing secret box, second, after a space |
-| Phone number ID | WhatsApp, API Setup | the Workspace id box |
+| Permanent access token | System User, Generate token | the Permanent access token box |
+| App secret | App settings, Basic | the App secret box |
+| A verify token you choose | anything, any length | the Verify token box |
+| Phone number ID | WhatsApp, API Setup | the Phone number ID box |
 
 The verify token is not issued by Meta. You pick it, put it in the form, and
 give Meta the same string in step 3; it is how the endpoint proves it is yours.
 
 ## 2. Connect it in OpenOKR
 
-Sign in as an administrator, open **Settings, Notifications and channels**, and
-fill in the WhatsApp card. Two secrets go in one box separated by a space,
-because the form is one form for every provider and a third box would be a box
-every other card had to explain away.
+Sign in as an administrator, open **Admin, Channels**, and fill in the WhatsApp
+card. It has one box for each of the four values.
 
 ## 3. Point the webhook at this instance
 

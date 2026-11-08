@@ -17,7 +17,7 @@ specs, and one that never has been, for the wizard specs.
 ## What a filename's prefix means
 
 Most specs are named `sNN-<subject>` where `NN` is the UIUX-PLAN.md §6 screen
-the spec drives. Five are not, and the prefix on those is an older label rather
+the spec drives. Ten are not, and the prefix on those is an older label rather
 than a screen id:
 
 | File | Prefix reads as | Actually covers |
@@ -27,6 +27,9 @@ than a screen id:
 | `s37-api-tokens.spec.ts` | S-37, the AI console | `/account/api-tokens` and the REST surface |
 | `s38-device-login.spec.ts` | S-38, agent detail | The device login flow |
 | `s41-mcp-transport.spec.ts` | S-41, which does not exist | The agent endpoint over its real transport |
+| `s42-route-coverage.spec.ts`, `s42b-ordinary-member.spec.ts` | S-42, which does not exist | Routes no other spec opened, and the product as a member who did not create the workspace |
+| `s43-accessibility.spec.ts`, `s43b-accessibility-keyboard.spec.ts` | S-43, which does not exist | The accessibility scan of every screen, and the primary flows driven by keyboard alone |
+| `s44-web-vitals.spec.ts` | S-44, which does not exist | The web-vitals budgets only a browser can measure |
 
 **They are not renamed on purpose.** Design documents such as
 `docs/design/api-contract.md` and `docs/design/agent-surface.md` cite these

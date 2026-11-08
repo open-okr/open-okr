@@ -25,7 +25,7 @@ existing one given a cloud-shaped job.
 | The portability archive | `packages/core/src/portability` | P6-T04 | A whole-workspace export with a manifest and a checksum |
 | Personal export and erasure | `packages/core/src/people` | P7-T08b | Per-member, across every table that holds a member reference |
 
-**What does not exist.** No `tenants` table, no `operator_sessions` table,
+**What did not exist before Phase 8.** No `tenants` table, no `operator_sessions` table,
 no cloud flag, no signup that creates a workspace for somebody who has no
 account yet, no lifecycle beyond the three `workspaces.state` values, and
 no `deploy/cloud` directory at all.
@@ -68,7 +68,8 @@ never asked.
 
 The enforcement is `pnpm check:boundaries`, extended at P8-T02 with one
 rule: `tenants` may be imported by `packages/core/src/tenancy`, by the
-operator console's own actions, and by nothing else.
+operator console's own actions (`packages/core/src/operator`), by
+`packages/core/src/billing` since `billing.md`, and by nothing else.
 
 ## 2. The `tenants` table
 
@@ -84,6 +85,9 @@ types, the constraints and the reasons.
 | `trial_ends_at` | `timestamptz`, nullable | Null means no trial. A past value is not itself a state; a sweep moves the state |
 | `region` | `text`, not null | Section 5 |
 | `closed_at` | `timestamptz`, nullable | Set when `state` becomes `closed`. Section 6 |
+| `owner_may_reopen` | `boolean`, not null, default false | True only when the owner closed it while active. `workspace-erasure.md` §3, migration 0148 |
+| `erasing_at` | `timestamptz`, nullable | Set when erasure claims the workspace. `workspace-erasure.md` §4, migration 0149 |
+| `erasure_reminded_at` | `timestamptz`, nullable | When the seven-day reminder went out. `workspace-erasure.md` §12, migration 0150 |
 | `created_at`, `updated_at`, `deleted_at` | `timestamptz` | The repository's standard three. Soft delete is the default scope |
 
 **Row-level security.** `tenants` carries `workspace_id` and gets a policy
@@ -111,8 +115,9 @@ enforcement point. It **projects onto the one that exists.**
 Two consequences, both deliberate.
 
 **The freeze overlay's recovery list is what a suspended workspace keeps.**
-That list is `workspace.setState`, everything under `people.` and
-everything under `settings.`. A suspended customer can still remove a
+That list is `workspace.setState`, `workspace.setLifecycle`,
+`sso.setConnectionEnabled`, `workspace.remindErasure`, and everything under
+`people.`, `settings.` and `billing.`. A suspended customer can still remove a
 member and still fix their billing email. That is the right list for a
 suspension, and it is the list that already exists, so no new one is
 written.
@@ -136,7 +141,8 @@ reads and what the retention clock does, and neither of those belongs in
 **when** a member of that workspace publishes a check-in,
 **then** the write is refused by the existing overlay with the read-only
 message, the member sees the suspension banner with its reason, and a
-`workspace.setState` activity row records the actor and the transition.
+`workspace.lifecycle_changed` activity row, audited as
+`workspace.setLifecycle`, records the actor and the transition.
 
 **Given** the same member editing their own notification settings,
 **when** they save,
@@ -159,9 +165,8 @@ runOperation({ action: "workspace.provision", ... }, async (tx) => {
   ...                            // everything that exists today
   await seedTenantInTx(tx, {     // added at P8-T02
     workspaceId,
-    region: resolveRegion(),
-    planKey: null,               // free tier
-  })
+    cloud,                       // the resolved flag and cloud.region
+  })                             // plan_key and seats left null
 })
 ```
 
@@ -170,9 +175,11 @@ self-hosted path executes one function call and writes nothing.
 
 **The cloud flag is one instance setting.** `cloud.enabled` in
 `system_settings`, default `false`, with `source` set to `environment`
-when a deployment sets it at boot. It is the only thing separating a cloud
-instance from a self-hosted one, and it is read in three places:
-provisioning, the operator console's route guard, and the seat check.
+when a deployment sets it at boot (`OPENOKR_CLOUD`). It is the only thing
+separating a cloud instance from a self-hosted one, and it is read where a
+cloud behaves differently: provisioning, the operator console's route guard,
+the seat check, the registration default, the scheduler's cloud jobs and the
+cards Admin, General hides on a cloud.
 Everywhere else, its absence is what makes the product identical.
 
 A self-hosted instance that flips it on gets the tenant row and the
@@ -196,8 +203,7 @@ carrying the free tier and a region. No setting was answered.
 ## 5. Region is recorded, and nothing more
 
 `region` is not null and it is a plain string, resolved at provisioning
-from an instance setting (`cloud.region`, defaulting to the deployment's
-own).
+from an instance setting (`cloud.region`, default `local`).
 
 **This design does not route on it.** There is no region-aware connection
 string, no data residency guarantee, no cross-region migration. A
@@ -249,10 +255,10 @@ idempotent-by-ledger, which a cron job deleting rows is not.
 in its log.
 
 **Given** the same workspace where the setting is 90,
-**when** the sweep runs,
-**then** it enqueues the erasure data-change for that one workspace and
-records the decision in the audit trail with the retention number that
-caused it.
+**when** `pnpm cloud:erase --write` runs,
+**then** it runs the erasure data-change for that one workspace and records
+`workspace.erased` on the instance audit chain with the retention number
+that caused it.
 
 ## 7. What this design refuses
 
@@ -287,8 +293,9 @@ Written as the test plan P8-T02 inherits.
    runs against a workspace closed any number of days ago, **then** zero rows
    are deleted.
 6. **Given** the boundary gate, **when** any file outside
-   `packages/core/src/tenancy` and the operator console imports the `tenants`
-   schema, **then** the build fails naming the file.
+   `packages/core/src/tenancy`, `packages/core/src/operator` and
+   `packages/core/src/billing` imports the `tenants` schema, **then** the
+   build fails naming the file.
 7. **Given** the tenant property and fuzz suite from P7-T03a, **when** it runs
    against `tenants`, **then** a cross-tenant read returns zero rows, the same
    as every other business table.

@@ -24,7 +24,7 @@ Also here:
 - [CI-GATES.md](CI-GATES.md): every gate that refuses a change, the command that runs it locally, and what each one catches.
 - [reference/](reference/): the FlowyTeam data model, the ground truth the FlowyTeam importer is built against.
 
-Detailed designs, one per engine or subsystem, are in [`docs/design/`](../design/). Eleven screens are drawn as [reference mockups](../mockups/README.md).
+Detailed designs, one per engine or subsystem, are in [`docs/design/`](../design/). Key screens are drawn as [reference mockups](../mockups/README.md).
 
 ## How the pieces fit
 
@@ -47,7 +47,7 @@ docs/design/         the detailed design of each engine and subsystem
 | Source | What it contributes | Reference |
 |---|---|---|
 | Spreadsheets (CSV, XLSX) | Goals, key results, KPIs and records, initiatives, tasks. AI proposes the column mapping, a human confirms it, a dry run precedes every import | Templates in the product |
-| FlowyTeam | One company at a time: teams, cycles, objectives, key results, check-ins, KPIs with formulas, and tasks | [reference/flowyteam-okr-kpi-tasks-model.md](reference/flowyteam-okr-kpi-tasks-model.md) |
+| FlowyTeam | One company at a time: people, teams, cycles, objectives, key results, check-ins, KPIs with formulas, initiatives, tasks, comments and files | [reference/flowyteam-okr-kpi-tasks-model.md](reference/flowyteam-okr-kpi-tasks-model.md) |
 
 ## Provenance and licensing
 

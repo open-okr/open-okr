@@ -13,13 +13,13 @@ how many weeks remain. It does not ask you to tick a box saying you are done.
 | **1. Prepare** | The planning brief and a complete input pack |
 | **2. Diagnose** | Scored prior OKRs and a ranked issue list |
 | **3. Set direction** | A priority list for the horizon |
-| **4. Draft OKRs** | A draft set with owners, passing every quality check |
+| **4. Draft OKRs** | A draft set with owners, with nothing failing a check set to block |
 | **5. Align and commit** | A published, aligned OKR set |
 | **6. Run the cadence** | Check-ins, reviews and a decision log |
 | **7. Review and learn** | Scores, learnings, and the next cycle's inputs |
 
-**The phases guide; they do not lock.** Anybody who can edit a space can
-draft an objective at any time, and the screen names exactly what the earlier
+**The phases guide; they do not lock.** Anybody allowed to edit objectives can
+draft one at any time, and the screen names exactly what the earlier
 phases still miss beside the form. A planning session with no inputs still
 produces objectives written from opinion, so the gaps are worth closing, but a
 missing input pack never stops somebody writing. A workspace that runs a formal
@@ -37,12 +37,12 @@ structural gates block.
 
 | Gate | Default |
 |---|---|
-| 1. Every objective has a title and a champion | Blocks |
+| 1. Every objective has a title and an owner, and a reviewer where required | Blocks |
 | 2. Every objective has key results, and nothing fails a check set to block | Blocks |
 | 3. Alignment is mapped: each objective states what it contributes to | Warns |
 | 4. Every dependency is confirmed, or logged with a named risk owner | Warns |
-| 5. Capacity is checked, and nothing committed is left exceeding it | Warns |
-| 6. A publication date is set | Off |
+| 5. Capacity is checked, and nothing is left exceeding it | Warns |
+| 6. A publication date is set before day one of the cycle | Off |
 
 A workspace that runs a formal planning process can make any of them block,
 which is what the governed profile does for gates 3 to 5. An administrator
@@ -64,10 +64,13 @@ team meant.
 
 | Score | Reads as |
 |---|---|
-| 0.9 and above | Achieved |
-| 0.7 to 0.9 | Strong |
-| 0.4 to 0.7 | Partial |
-| Below 0.4 | Missed |
+| 1.0 | Fully achieved |
+| 0.6 to below 1.0 | Strong |
+| 0.3 to below 0.6 | Partial |
+| Below 0.3 | Little movement |
+
+A workspace may score by Doerr's colours instead, under **Score colours** in
+the practice settings, which moves the two lower lines to 0.7 and 0.4.
 
 **Committed and aspirational are read apart.** A committed key result is
 expected at 1.0, and one short of it gets a short explanation of the miss. For

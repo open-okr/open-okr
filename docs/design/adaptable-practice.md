@@ -29,9 +29,9 @@ How OpenOKR lets an organisation adapt the OKR practice: which rules are setting
 
 ## 2. The architecture: one registry, one policy, one snapshot
 
-The H-09 drafting lock ([`goals.ts`](../../packages/core/src/actions/goals.ts) `refuseUnreadyDrafting`) is the cautionary tale for the whole phase:
+The H-09 drafting lock (`refuseUnreadyDrafting` in [`goals.ts`](../../packages/core/src/actions/goals.ts), since removed) is the cautionary tale for the whole phase:
 - **A judgement became a lock.** METHOD.md said the facilitator *can* refuse, and the code refused everyone.
-- **It was added in one place.** It runs only when a caller passes `guided: true`, so the cycle screen refuses while the API, the command line and the copilot do not.
+- **It was added in one place.** It ran only when a caller passed `guided: true`, so the cycle screen refused while the API, the command line and the copilot did not.
 - **Nothing could switch it off.**
 
 The design prevents all three.
@@ -69,7 +69,7 @@ export function resolvePractice(profile: string, overrides: unknown): ResolvedPr
 | Decision | What was built | Why |
 |---|---|---|
 | A profile's thresholds | `switchProfile(current, to)` works out both halves of a switch. Practice is layered, so it only reports what moves. A threshold either profile names is written: one still at the old profile's value (or the canon's, if the old profile said nothing) follows the switch; one the workspace changed itself is kept and named. A value back at the canon is stored as nothing in `overrides`, and as the canon's value in a column | The same promise the practice makes, "this workspace's own changes are kept", held for the numbers too. One function serves the preview on the screen and the write in `practice.applyProfile`, so the two cannot disagree |
-| Strict mode's one home | The practice's strict mode is the workspace's switch. The rhythm card's "Coach strictness" select is gone and links to the practice instead. Data change 0015 turns strict mode on for a workspace whose `coach_strictness` was `strict` and returns the column to `warn`. The column, and `rhythm.update`'s field, stay for a release, and `strict` in it still reads as strict mode for a workspace an older release writes to. A space's own strictness is unchanged | Two switches for one behaviour is two places to look, and turning strict mode off would have done nothing while the column still said strict. `advisory` and `warn` now mean the same thing, so neither is carried |
+| Strict mode's one home | The practice's strict mode is the workspace's switch. The rhythm card's "Coach strictness" select is gone and links to the practice instead. Data change 0016 turns strict mode on for a workspace whose `coach_strictness` was `strict` and returns the column to `warn`. The column, and `rhythm.update`'s field, stay for a release, and `strict` in it still reads as strict mode for a workspace an older release writes to. A space's own strictness is unchanged | Two switches for one behaviour is two places to look, and turning strict mode off would have done nothing while the column still said strict. `advisory` and `warn` now mean the same thing, so neither is carried |
 | Option words | Each setting carries `optionLabels` in §12.1's own words, and `pnpm method:check` compares them with the options column in both directions. A column may leave out only the default, which §12.1 names in the next column | The screen shows a choice to a person, and "planningWindow" is not a word. Keeping the words beside the options, under the conformance suite, means the screen and the document cannot drift |
 | The screen | `/admin/practice`, between General and Rhythm in the admin navigation. A profile card with a preview, then one card per §12.1 group in the rhythm card's pattern: a form per card, a sticky header with its own save, "Unsaved", a toast, and "Reset to profile". A save sends only the settings that changed | The rhythm card's own lesson (P8-G11): a save ten screens from the field it commits is not a save anybody finds |
 | The drafting refusal's heading | "This workspace's practice does not let a new objective be written here now", in place of "Drafting waits for the earlier phases" | The planning window refuses for a reason that is not a phase, and the heading sat above that reason |
@@ -106,7 +106,7 @@ export function decide(intent: Intent, practice: ResolvedPractice, t: ResolvedTh
 ```
 
 In `packages/core`, one helper wraps it:
-- `requirePolicy(tx, workspaceId, intent)` loads the resolved practice inside the transaction, calls `decide`, and throws `OperationError("forbidden", reasons)` on block.
+- `requirePolicy(tx, { workspaceId, bulk }, intent)` loads the resolved practice inside the transaction, calls `decide`, and throws `OperationError("forbidden", reasons)` on block.
 - Warnings are returned with the action result, so the interface shows them beside the work.
 
 **As built at P9-T02** ([`policy.ts`](../../packages/method/src/policy.ts), [`practice/policy.ts`](../../packages/core/src/practice/policy.ts)):
@@ -124,13 +124,14 @@ In `packages/core`, one helper wraps it:
 Checks keep returning pass, warn, fail or todo, as [`quality.ts`](../../packages/method/src/quality.ts) does today. One step is added after evaluation: `applyEnforcement(verdicts, practice)`.
 - A check at **block** keeps its fails, and turns its warns into fails.
 - A check at **warn** turns any fail into a warn.
+- A check at **info** turns its fails and warns into notes, which count as a pass in the strength score (KR-4, KR-6 and the cycle checks outside binding phases, by default).
 - A check at **off** is dropped.
 
 The gates in [`workflow.ts`](../../packages/method/src/workflow.ts) `publishGates` read the enforced verdicts and their own level. Strict mode is "every check at block". The structural parts of OBJ-3, OBJ-4, KR-1 and KR-3 default to block; nothing that matches words does.
 
 ### 2.4 A cycle keeps the rules it was graded under
 
-`cycles.practice_snapshot` (jsonb) records the profile, the resolved practice and every threshold when a cycle closes, quality caps included, so a closed cycle's OKR-count warnings are as fixed as its score bands. Scorecards, portfolio verdicts and the diagnostic of a closed cycle read the snapshot, so changing a band next quarter never rewrites last quarter. Open cycles read the live settings.
+`cycles.practice_snapshot` (jsonb) records the resolved practice and every threshold, with the time it was taken, when a cycle closes, quality caps included, so a closed cycle's OKR-count warnings are as fixed as its score bands. Scorecards, portfolio verdicts and the diagnostic of a closed cycle read the snapshot, so changing a band next quarter never rewrites last quarter. Open cycles read the live settings.
 
 ### 2.5 Settings never destroy anything
 
@@ -151,21 +152,21 @@ All additive. Each new table gets `workspace_id` and its row-level security poli
 | Table | Change | Backfill (data-change runner) |
 |---|---|---|
 | `rhythm_settings` | `profile text not null default 'recommended'`, checked against the five profiles; `practice jsonb not null default '{}'`, checked to be an object (migration 0109, P9-T01) | None |
-| `goals` | `kind goal_kind not null default 'aspirational'` (`committed`, `aspirational`) | None; existing goals read aspirational |
+| `goals` | `kind text not null default 'aspirational'`, checked to `committed` or `aspirational` (migration 0113) | None; existing goals read aspirational |
 | `goals` | `added_mid_cycle_at timestamptz` (migration 0115, P9-T13-a), `standalone_reason text`, `draft_state` (`draft`, `awaiting_approval`; null means it follows its cycle). **As built at P9-T13-b-b**, `draft_state` is text with a check constraint (migration 0117), as every other enumerated goal column is | None |
 | `goals` | `reviewer_id` drops `not null` | None |
-| `key_results` | `kind key_result_kind not null default 'metric'` (`metric`, `maintain`, `milestone`, `baseline`), `done_at timestamptz` | `maintain` where `direction = 'maintain'` |
+| `key_results` | `kind text not null default 'metric'`, checked to `metric`, `maintain`, `milestone` or `baseline`, and `done_at timestamptz` (migration 0114) | `maintain` where `direction = 'maintain'` (data change 0017) |
 | `key_results` | `target_value` drops `not null` (migration 0116, P9-T13-b-a). Not in the original plan: §2.9's acceptance needs a metric key result saved before its target is known | None; every existing row has a target |
 | `key_results` | `score_computed numeric`, `score_reason text` (migration 0120, P9-T14a) | `score_computed = score` where scored (data change 0018) |
-| New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `reason`, `actor`, `changed_at`, `mid_cycle` | None |
+| New `key_result_target_changes` | `workspace_id`, `key_result_id`, `from_value`, `to_value`, `baseline_value`, `eased`, `reason`, `actor_member_id`, `changed_at`, `mid_cycle` (migration 0112) | None |
 | `cycles` | `practice_snapshot jsonb` (migration 0121, P9-T14b) | Closed cycles get today's canon. **As built, at read time rather than by backfill**: the canon is resolved by `packages/method`, which the data-change runner in `packages/db` does not reach, so a closed cycle with no snapshot reads the canon when it is read |
 | `cycles` | `company_published_at timestamptz`, the first publish step (METHOD v2 §4.5, migration 0110). **Changed at P9-T03b** from a `teams_published_at` for the second step: `published_at` keeps meaning "the whole set is out" for every reader that relies on it, so a cycle published before the release needs no backfill | None |
-| New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `note` | None |
+| New `space_holidays` | `workspace_id`, `space_id`, `starts_on`, `ends_on`, `label` (migration 0131) | None |
 | New `member_leave` (G-2) | `workspace_id`, `member_id`, `starts_on`, `ends_on`, `delegate_member_id` | None |
-| Root-cause enum | add `other`; sessions gain `secondary_root_cause` | None |
-| Blocker-type enum | add `approach`, `other` | None |
+| Root causes | a ninth cause, "Other", stored by its key with its line in `detail`; `root_causes` gains `secondary_cause_key` (migration 0134) | None |
+| Blocker-type enum | add `approach_not_working`, `other` (migration 0128) | None |
 | Close-decision enum | add `achieved`, `defer` | None |
-| `kpis` | `target_type`, `green_value`, `red_value`, `band_low`, `band_high`; aggregate enum adds `last`, `first` | `target_type` from `direction` |
+| `kpis` | `target_type`, `green_low`, `green_high`, `red_low`, `red_high`; aggregate enum adds `last`, `first` (migration 0125) | `target_type` from `direction` |
 | `cycle_calibrations` | Stop writing in this release. The unique one-per-cycle index is dropped. The table is removed one release later | None |
 
 DATABASE.md and the TECHNICAL-PLAN.md §7.2 importer mapping change in the same task as each migration. For FlowyTeam there is no key result type to map: corrected at P9-T12a, because neither its schema (`reference/flowyteam-okr-kpi-tasks-model.md`, "There is no KR 'type' enum") nor its API carries the `metric_type` this line once named. An imported key result is metric, or maintain where the importer already reads its equal baseline and target as one.
@@ -180,7 +181,7 @@ New actions in the registry, which regenerates REST, OpenAPI, the CLI and the ag
 | `goals.tree` | read | One read for the list and the diagram: a cycle's objectives, key results, alignment and dependencies for a scope, plus every parent in another cycle (an annual objective) as read-only context |
 | `goals.patch`, `goals.patchKeyResult` | edit | One field at a time, for inline editing, with an optimistic concurrency token, so a stale edit is refused with the current value rather than overwriting it |
 | `goals.changeTarget` | edit | Records the change in `key_result_target_changes`, asks the policy whether a reason is needed |
-| `goals.deleteKeyResult` | edit | Soft delete; there is no way to remove a key result today |
+| `goals.removeKeyResult` | edit | Soft delete; there was no way to remove a key result before it |
 | `goals.setKind` | edit | Committed or aspirational, recorded in the activity |
 | `goals.publishDraft`, `goals.approveDraft` | edit, reviewer | For workspaces whose mid-cycle objectives start as drafts, and for a mid-cycle addition that is a draft until it passes the checks set to block |
 | `workflow.publish` gains `step: "company" \| "teams"`, absent for whatever is left | full | The two publish steps (METHOD v2 §4.5). Each step judges only what it publishes, and only a gate at block holds it |

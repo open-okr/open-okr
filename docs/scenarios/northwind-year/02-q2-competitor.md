@@ -68,8 +68,8 @@ Engineering drafts a third objective. OBJ-5 now warns at three, because the cap 
 *Test:* Given the objectives-per-unit cap at 2, when a third Engineering objective is saved, then OBJ-5 warns and the save succeeds.
 
 **NW-Q2-05 · 12 Apr · Directory sync, Yuki · S-33 `/people`, OKRs list**
-Yuki Tanaka joins as Product Manager, Growth. Directory sync creates her as a member on her first morning, and Priya adds her to the Product space. She reads the Company tab of OKRs, opens C1 in the drawer, and follows P1, so it appears under Mine. Individual OKRs are off, so she writes none.
-*Test:* Given a person added to the identity provider's group, when directory sync runs, then they are a member with standard access, can read every company OKR on first sign-in, and can follow a goal.
+Yuki Tanaka joins as Product Manager, Growth. Directory sync creates her as a member on her first morning, and Priya adds her to the Product space. She reads the Company tab of OKRs, opens C1 in the drawer, and watches P1, so what happens on it reaches her inbox. Individual OKRs are off, so she writes none.
+*Test:* Given a person added to the identity provider's group, when directory sync runs, then they are a member with standard access, can read every company OKR on first sign-in, and can watch a goal.
 
 **NW-Q2-06 · 15 Apr · Elena, Nadia, Hugo · S-10 publish, second step · METHOD §4.5, OBJ-1**
 The department and team step is refused twice, because OBJ-1 is at block.
@@ -116,7 +116,7 @@ Ben resigns, and his last day is 21 May. Daniel reassigns S2.1 to Jonas, and the
 *Test:* Given Ben suspended, when the Champion runs, then Ben receives no nudge, S2.1's owner is Jonas, and Ben's past check-ins stay readable on S2.
 
 **NW-Q2-13 · 14 May · Elena · S-36 practice settings · METHOD §2.9, §12**
-One objective and four key results were added in one week. Elena changes "Reason when adding mid-cycle" from Optional to Required. The change is audited, and the additions already made are untouched.
+One objective and three key results were added in one week. Elena changes "Reason when adding mid-cycle" from Optional to Required. The change is audited, and the additions already made are untouched.
 *Test:* Given the setting at Required, when a key result is added mid-cycle without a reason, then it is refused with the sentence naming the setting, from the screen and from the API alike.
 
 **NW-Q2-14 · 17 May (W7) · Mei, Elena · S-15 check-in, S-02 · METHOD §3.2, §2.8**
@@ -206,7 +206,7 @@ The retrospective holds the Retro and Reset acts, stages 5 to 11.
 
 ## Mid-year
 
-**NW-Q2-22 · 21 Jun (W12) · Leadership · S-06 `/cycle?phase=3` for Q3 · METHOD §2.1, §2.9**
+**NW-Q2-22 · 21 Jun (W12) · Leadership · S-08 `/cycle?phase=3` for Q3 · METHOD §2.1, §2.9**
 The mid-year revalidation runs as Phase 3 of Q3, after Q2's retrospective. The frame holds, with two documented changes:
 - **A4's win rate.** The annual objective's win-rate target is eased from 35% to 32%, with the reason "Brightline's entry into the segment on 10 May". A new key result is added: "Win rate against Brightline 31% → 50% by year-end".
 - **The not-doing list.** "No pricing rebuild before July" is removed, with the reason "Competitive price point; the pricing review starts in Q3".

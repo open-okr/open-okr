@@ -14,7 +14,7 @@ The cost: the stored format is coupled to ProseMirism's document model. Accepted
 
 ## 2. Storage
 
-Every rich-text-bearing column is a pair: `<name>` (`jsonb`, the document) and `<name>_version` (`integer`, the schema version the document was validated against when written). `workspace_members.bio`/`bio_version` is the only such pair that exists in the schema today (migration `0005_workspaces.sql`); every later table that needs rich text (`goals.description`, `comments.body`, `documents.body`, …) follows the identical pair, added by whichever task builds that table.
+Every rich-text-bearing column is a pair: `<name>` (`jsonb`, the document) and `<name>_version` (`integer`, the schema version the document was validated against when written). `workspace_members.bio`/`bio_version` was the only such pair in the schema when this was written (migration `0005_workspaces.sql`); every later table that needs rich text (`goals.description`, `comments.body`, `documents.body`, …) follows the identical pair, added by whichever task builds that table.
 
 `RICH_TEXT_SCHEMA_VERSION = 1` today. A version mismatch on read is not an error: `parseRichText` accepts any version this module still knows how to read and normalises it to the current in-memory shape. There is no version 0 to migrate from and no migration path built yet, because there is nothing to migrate — this is the first version. The column exists so a future breaking schema change (removing a node type, changing an attribute) has somewhere to branch on, per TECHNICAL-PLAN's own instruction, without every existing document needing an eager rewrite.
 
@@ -42,11 +42,11 @@ Structural validation rejects any node or mark type not on this list, recursivel
 
 ### Marks
 
-`bold`, `italic`, `code`, `strike`, `link` (`attrs.href` restricted to `http:`, `https:` and `mailto:` — never `javascript:` or a bare unscheme string a browser might interpret as a relative path into somewhere unexpected).
+`bold`, `italic`, `code`, `strike`, `underline` (added by [guided-inputs.md](guided-inputs.md) §4.7), `link` (`attrs.href` restricted to `http:`, `https:` and `mailto:` — never `javascript:` or a bare unscheme string a browser might interpret as a relative path into somewhere unexpected).
 
 ### What is deliberately not here
 
-Underline, text colour, font family, text alignment, subscript/superscript, embedded video, and any node with a `style` attribute. None are named by S-30 or UIUX-PLAN §2, and an allow-list's value is in what it excludes — every one of these is a plain addition to the two tables above whenever a real screen asks for it, not a reason to widen the list speculatively now.
+Text colour, font family, text alignment, subscript/superscript, embedded video, and any node with a `style` attribute. None are named by S-30 or UIUX-PLAN §2, and an allow-list's value is in what it excludes — every one of these is a plain addition to the two tables above whenever a real screen asks for it, not a reason to widen the list speculatively now.
 
 ## 4. `packages/core/src/rich-text/`
 
@@ -90,7 +90,7 @@ An `attachment` node with `status: "uploading"` renders as its filename with no 
 function excerptRichText(doc: RichTextDocument, maxLength: number, resolvers?: Pick<RichTextResolvers, "resolveMention">): string
 ```
 
-Walks the same tree, concatenates text content with single spaces between block boundaries, renders a `mention` as `@Name` (via the resolver, falling back to `@member`) and an `entityLink`/`attachment` as its `label`/`filename`, then truncates to `maxLength` on a word boundary with a trailing `…`. Used by the inbox and the feed's own row summaries once those exist; nothing calls it yet, the same "built ahead of its consumer" position P2-T06/T07 already left several utilities in.
+Walks the same tree, concatenates text content with single spaces between block boundaries, renders a `mention` as `@Name` (via the resolver, falling back to `@member`) and an `entityLink`/`attachment` as its `label`/`filename`, then truncates to `maxLength` on a word boundary with a trailing `…`. Used by activity rows, the search and embedding indexes, the digest, the minutes and the AI assists.
 
 ### `extract.ts`
 
@@ -103,11 +103,11 @@ Decode-safe per TECHNICAL-PLAN §4.10's explicit line: malformed or unparseable 
 
 ## 5. Mentions
 
-`id` is a `workspace_members.id`. Nothing enforces at write time that the mentioned member still exists or is active — the same reasoning as `render.ts`'s resolver fallback: a mention written today and read after that member is erased must degrade to plain text, not corrupt the document or refuse to render the surrounding paragraph. Fan-out (turning a mention into a notification) is a future consumer's job, using `extractMentionIds`, the same "engine built, no caller wired yet" position as P2-T06's `notifyRecipients`.
+`id` is a `workspace_members.id`. Nothing enforces at write time that the mentioned member still exists or is active — the same reasoning as `render.ts`'s resolver fallback: a mention written today and read after that member is erased must degrade to plain text, not corrupt the document or refuse to render the surrounding paragraph. Fan-out (turning a mention into a notification) is the comment write's job: `packages/core/src/comments/service.ts` reads `extractMentionIds`, subscribes each member mentioned and the comment action notifies them.
 
 ## 6. Entity autolink
 
-Typing `#` opens a suggestion popup (the same TipTap `Suggestion` mechanism as `@mention`, a second configured instance) that a caller wires to whatever entity search it has available — `packages/core` has no search of its own yet (S-32's index is unbuilt), so the editor component takes an `entitySearch(query): Promise<{shortId, label}[]>` prop rather than assuming one. Selecting a result inserts an `entityLink` node with the entity's current title snapshotted into `label`. Resolving `shortId` back to a live href and a live (possibly renamed) label at render time is `render.ts`'s resolver, supplied by whichever surface actually has a database connection.
+Typing `#` opens a suggestion popup (the same TipTap `Suggestion` mechanism as `@mention`, a second configured instance) that a caller wires to whatever entity search it has available, so the editor component takes a `searchEntities(query)` prop rather than assuming one. Selecting a result inserts an `entityLink` node with the entity's current title snapshotted into `label`. Resolving `shortId` back to a live href and a live (possibly renamed) label at render time is `render.ts`'s resolver, supplied by whichever surface actually has a database connection.
 
 ## 7. Attachments
 
@@ -119,9 +119,9 @@ An `attachment` node is a reference, not a copy: `blobId` names a row P2-T05's b
 3. The caller's own upload function (P2-T05's `prepareBlob`/upload flow, via a prop, not a direct import — `packages/ui` does not reach into `packages/core` for this) resolves to a real `blobId`, and the node's attrs update to `status: "ready"` with that id.
 4. A failed upload removes the node rather than leaving a permanently-broken reference — "deletion on failure," per the task's own build list.
 
-**Submit gating**: before a submit handler is allowed to fire, the editor component checks `extractAttachments(doc).some(a => a.status === "uploading")` and refuses (with a visible reason, not a silent no-op) if any are still in flight. This is the literal acceptance line: "given a comment with an upload in flight, when the user submits, then submission waits for the upload or fails loudly, never dropping the attachment silently." The gating lives in the editor component (`packages/ui`), because it is the one place that knows the live upload state; a server-side belt-and-braces check (refusing a write whose extracted attachments include any `"uploading"` status) sits in the shared validator too, since a client is never fully trusted at the write boundary.
+**Submit gating**: before a submit handler is allowed to fire, the editor component checks for any attachment node still `"uploading"` (`hasUploadsInProgress()` on its handle) and refuses (with a visible reason, not a silent no-op) if any are still in flight. This is the literal acceptance line: "given a comment with an upload in flight, when the user submits, then submission waits for the upload or fails loudly, never dropping the attachment silently." The gating lives in the editor component (`packages/ui`), because it is the one place that knows the live upload state; a server-side belt-and-braces check (refusing a write whose extracted attachments include any `"uploading"` status) sits in the shared validator too, since a client is never fully trusted at the write boundary.
 
-Nothing writes an `attachments` join row (P2-T05's table) from this task: that row belongs to the entity the rich text is attached to (a comment, a document), and none of those tables exist yet. `extractAttachments` is what a future comment/document action calls, inside its own `Operation`, to insert the join rows atomically with the write — documented here as the contract, not built here as a caller with nothing to call it on.
+Nothing writes an `attachments` join row (P2-T05's table) from this task: that row belongs to the entity the rich text is attached to (a comment, a document), and none of those tables existed then. `extractAttachments` is what a future comment/document action calls, inside its own `Operation`, to insert the join rows atomically with the write — documented here as the contract, not built here as a caller with nothing to call it on.
 
 ## 8. Draft autosave
 
@@ -142,16 +142,17 @@ value: { content: RichTextDocument; baseFingerprint: string; savedAt: number; ex
 - `@tiptap/extension-table` (bundles `Table`/`TableRow`/`TableCell`/`TableHeader` in the installed version).
 - `@tiptap/extension-mention` + `@tiptap/suggestion`, one configured instance for `@` (members) and a second for `#` (entity autolink, §6) — `@tiptap/extension-mention` names its own trigger character per instance, so both live side by side rather than needing a fully custom node for one of them.
 - A hand-written `Node.create({ name: "attachment", ... })` (`@tiptap/core`), atomic and inline, with `addNodeView()` rendering the upload/ready states described in §7.
+- A local `Underline` mark (`packages/ui/src/rich-text/underline.ts`), since underline joined the allow-list; StarterKit's own stays off.
 
-A slash-command menu (`/` opens a picker for heading/list/table/code-block/quote) is `@tiptap/suggestion` a third time, triggered on `/` at the start of an empty block, matching UIUX-PLAN §2's "slash commands" line.
+A slash-command menu (`/` opens a picker for heading/list/table/code-block/quote) is `@tiptap/suggestion` a third time, triggered on `/` at the start of an empty block, matching UIUX-PLAN §2's "slash commands" line. Only the `full` variant has it.
 
-TECHNICAL-PLAN §1's own package table restricts `packages/ui` to depending on `packages/method` only — never `packages/core`, where §4's validator lives. The editor component takes an optional `validate?: (json: unknown) => boolean | Promise<boolean>` prop instead of importing `parseRichText` directly; a host wires the real function in. This is the same dependency-injection shape as `entitySearch` (§6) and the upload function (§7), for the identical reason: `packages/ui` cannot reach across that boundary, so anything on the other side of it arrives as a prop. The editor calls `validate` on every update; what a caller does with the result (and whether it surfaces a warning at all) is entirely the caller's own closure — the component does not interpret the return value itself. Either way this is a client-side early warning, not the enforcement — `bioInputSchema`'s own call to `isValidRichText` at the write boundary (§10) is what actually refuses a bad document, exactly as `packages/core`'s access rules are never satisfied by a client-side check alone.
+TECHNICAL-PLAN §1's own package table restricts `packages/ui` to depending on `packages/method` only — never `packages/core`, where §4's validator lives. The editor component takes an optional `validate?: (json: unknown) => boolean | Promise<boolean>` prop instead of importing `parseRichText` directly; a host wires the real function in. This is the same dependency-injection shape as `searchEntities` (§6) and the upload function (§7), for the identical reason: `packages/ui` cannot reach across that boundary, so anything on the other side of it arrives as a prop. The editor calls `validate` on every update; what a caller does with the result (and whether it surfaces a warning at all) is entirely the caller's own closure — the component does not interpret the return value itself. Either way this is a client-side early warning, not the enforcement — `bioInputSchema`'s own call to `isValidRichText` at the write boundary (§10) is what actually refuses a bad document, exactly as `packages/core`'s access rules are never satisfied by a client-side check alone.
 
 `validate` is `async` for a reason discovered the hard way, not designed in from the start: `packages/core`'s barrel (`index.ts`) re-exports its Postgres/Drizzle code alongside the pure rich-text functions, and *any* Client Component that imports anything from that barrel — not just `packages/ui`, `apps/web` too — pulls the whole module graph into the browser bundle, including Node built-ins (`net`, `tls`, `util/types`) a browser cannot resolve. `tsc` sees nothing wrong with this; only `pnpm build`'s actual bundler catches it, which is what happened to `apps/web/app/dev/rich-text`'s own preview page before this line existed. The fix generalises: a Client Component never imports `@openokr/core` directly, full stop, even in `apps/web` where the package boundary check would otherwise allow it. The real function reaches a validating prop through a Server Action (`"use server"`), which is why the prop has to be `async` — a Server Action is the *only* shape "hand a browser-side caller something backed by `@openokr/core`" can take, so a synchronous signature here was a promise this prop could never have kept.
 
 ## 10. What this task does not build
 
-- Any actual consumer: no `comments`, `documents`, `goals.description` or similar rich-text-bearing table exists yet (all are later phases). The one real integration point today is `workspace_members.bio`/`bio_version`, upgraded from `z.unknown()` (P2-T03's own placeholder) to `parseRichText` against this schema — P2-T03's STATUS.md row named exactly this as the thing it was waiting on.
-- Syntax highlighting in code blocks, text colour, alignment, underline — see §3's exclusion list.
-- A server-side mention-to-notification fan-out, or an attachment-join-row writer — both are `extractMentionIds`/`extractAttachments` callers that do not exist yet, per §5 and §7.
+- Any actual consumer: no `comments`, `documents`, `goals.description` or similar rich-text-bearing table existed yet (all were later phases). The one real integration point then was `workspace_members.bio`/`bio_version`, upgraded from `z.unknown()` (P2-T03's own placeholder) to `parseRichText` against this schema — P2-T03's STATUS.md row named exactly this as the thing it was waiting on.
+- Syntax highlighting in code blocks, text colour, alignment — see §3's exclusion list.
+- A server-side mention-to-notification fan-out, or an attachment-join-row writer. The fan-out arrived with comments (§5); nothing calls `extractAttachments` yet (§7).
 - Email/export rendering surfaces calling `renderRichTextToHtml` — the function is built and tested against synthetic documents; wiring it into the mail adapter or an export job is that job's own task.

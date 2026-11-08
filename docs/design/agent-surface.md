@@ -9,14 +9,14 @@ sessions and the tool catalogue).
 
 | Component | Package | Ships at | What it holds |
 |---|---|---|---|
-| The action registry | `packages/core` | P1-T07 onward | 250 actions, each with a name, input and output schemas, an access level and a safety class |
+| The action registry | `packages/core` | P1-T07 onward | 423 actions, each with a name, input and output schemas, an access level and a safety class |
 | `defineReadAction` / `defineWriteAction` | `packages/core` | P1-T07 | A write is built from an operation spec, so no registry entry can write without the pipeline |
 | `can()` and the access getter | `packages/core` | P2-T04 | One authorisation decision, not-found on forbidden |
 | `registry.test.ts` invariants | `packages/core` | P2-T04 | No write reachable at `view`; every mutating action runs through the pipeline |
 | Better Auth | `apps/web` | P1-T05 | Sessions, accounts, verifications, passkeys, two factors. Session tokens hashed at rest |
 | `audit_events` with a hash chain | `packages/db` | P2-T03 | Append-only, verified by `pnpm audit:verify` |
 
-**What does not exist.** No REST surface, no OpenAPI document, no command line.
+**What did not exist at the design gate.** No REST surface, no OpenAPI document, no command line.
 No `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_access_tokens`,
 `oauth_refresh_tokens` or `mcp_sessions` table. No MCP transport. The registry
 is the one thing all of it is generated from, and it is ready.
@@ -87,18 +87,19 @@ unauthorised.
 
 | Registry field | REST |
 |---|---|
-| `name` | The path. `goals.create` becomes `POST /api/v1/goals` where the shape is obvious, otherwise `POST /api/v1/actions/goals.create` |
-| `safety: "read"` | `GET`, or `POST` where the input is too large for a query string |
-| `safety: "write"` | `POST` or `PATCH` |
-| `safety: "destructive"` | `DELETE`, and the token needs write scope |
+| `name` | The path. `goals.create` becomes `POST /api/v1/goals/create` |
+| `safety: "read"` | `GET` |
+| `safety: "write"` | `POST`, and the token needs write scope |
+| `safety: "destructive"` | `POST`, and the token needs destructive scope |
 | `input` schema | The request body or the query, and the OpenAPI schema |
 | `output` schema | The response body, and the OpenAPI schema |
-| `access` | The minimum scope, and `can()` still runs underneath |
+| `access` | The level `can()` checks underneath. The scope comes from `safety` |
 
-**A resource-shaped path where one exists, and a generic one where it does
-not.** A registry with 250 actions has plenty that are not CRUD, and forcing
+**The action's name is the path, for every action.** A registry with 423
+actions has plenty that are not CRUD, and forcing
 `sessions.revealObjectiveScore` into a noun is how a REST surface becomes
-fiction. The generic form is honest and the generator picks it by default.
+fiction. A mapping onto nouns would also be a hand-written table that goes
+stale, so `packages/core/src/api/surface.ts` uses the generic form throughout.
 
 ### 3.2 Pagination, filtering and errors
 
@@ -106,7 +107,7 @@ fiction. The generic form is honest and the generator picks it by default.
 |---|---|
 | Pagination | Cursor, never offset. A cursor is opaque and encodes the sort key and the id, so a page cannot skip or repeat a row while somebody writes |
 | Filtering | One grammar across every list, generated from each action's own input schema. A filter the action does not accept is a 400 naming the field |
-| Errors | Typed: `not_found`, `forbidden`, `invalid`, `conflict`, `rate_limited`. `forbidden` is only ever returned for something the caller can see exists |
+| Errors | Typed: `unauthenticated`, `insufficient_scope`, `not_found`, `forbidden`, `invalid_input`, `unsupported_parameter`, `conflict`, `rate_limited` and the rest of `API_ERROR_CODES`. `forbidden` is only ever returned for something the caller can see exists |
 | Not-found on forbidden | Kept. The REST surface does not become the one place the product confirms a private thing exists |
 
 ### 3.3 The command line
@@ -129,7 +130,7 @@ artifact is stale.
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `oauth_clients` | `client_id`, `metadata jsonb`, `allow_listed bool`, `registered_at` | Static allow-list plus dynamic registration. Public clients only |
+| `oauth_clients` | `client_id`, `name`, `redirect_uris`, `source` (`allow_list` or `registered`), `metadata_url` | Static allow-list plus dynamic registration. Public clients only |
 | `oauth_grants` | `member_id`, `workspace_id`, `client_id`, `scopes`, `revoked_at?` | One grant is one person and one workspace |
 | `oauth_codes` | `code_hash`, `challenge`, `resource`, `grant_id`, `consumed_at?` | Single use, consumed inside the transaction that issues the token |
 | `oauth_access_tokens` | `token_hash`, `grant_id`, `resource`, `expires_at` | Short-lived |
@@ -228,15 +229,16 @@ Generated from the registry. Each tool carries:
 | name, description | The action's `name` and `summary` |
 | input schema | The action's `input`, unchanged |
 | read-only or destructive hint | The action's `safety` |
-| required scope | The action's `access` |
-| examples | Hand-written per action, because a generated example is a lie about what people do |
+| required scope | The action's `safety` |
+| examples | Generated from the schema's own required fields, because a hand-written example goes stale when a field is renamed |
 
 **The catalogue is per connection since 23 October 2026** (docs/design/mcp-toolsets.md).
 A connection is offered the toolsets its address names, `core` by default,
-intersected with what its scopes can call. Thirty-seven actions marked
+intersected with what its scopes can call. Forty-five actions marked
 `agentSurface: false` (the importer's, the scheduler's, the copilot's own
-bookkeeping, the token administration every token is refused, and the AI
-assists that need a provider the agent path never has) are not tools at all.
+bookkeeping, the token administration every token is refused, billing and the
+workspace's own lifecycle, and the AI assists that need a provider the agent
+path never has) are not tools at all.
 Every other tool is in exactly one toolset, which a test holds.
 
 **Fields only the server sets are not in a tool's schema.** `legacy`, the
@@ -247,11 +249,11 @@ the dispatcher refuses a call that sends either, before anything runs.
 **Lifecycle and destructive actions are included.** Hiding them would not make
 an agent safer; it would make the agent's user do the same thing by hand with
 less oversight. What makes them safe is that `can()` runs, the token needs
-write scope, and every call writes a tool-call row and an audit event.
+destructive scope, and every call writes a tool-call row and an audit event.
 
 A catalogue invariant test pins every tool's safety classification, so an
 action that loses its `destructive` class fails the build rather than quietly
-becoming something an agent may call without write scope.
+becoming something an agent may call without destructive scope.
 
 ### 5.3 The two tools that are not registry actions
 
@@ -533,8 +535,9 @@ is named, and no token in the lineage works.
 ## The tool catalogue (P5-T09a)
 
 A third projection of the one action registry, beside `contract/openapi.json`
-and `contract/cli.json`. 275 tools, one per action. Since mcp-toolsets.md, one per action except
-those marked `agentSurface: false`, and offered per connection by toolset.
+and `contract/cli.json`. 275 tools at P5-T09a, one per action. Since mcp-toolsets.md, one per action except
+those marked `agentSurface: false`, and offered per connection by toolset: 380
+in `contract/mcp.json` today, `search` and `fetch` included.
 
 | What a tool carries | Where it comes from |
 |---|---|
@@ -583,7 +586,8 @@ drift gate refuses a change that leaves them out of step.
 | 1 | Origin | A page in a browser talked into pointing at a local agent's instance |
 | 2 | Access token | An unauthenticated caller learning which tools exist, one refusal at a time |
 | 3 | Protocol version | A client and a server speaking past each other |
-| 4 | Session | An identifier from one grant used on another |
+| 4 | Rate limit | One grant or agent token taking more than 600 requests a minute |
+| 5 | Session | An identifier from one grant used on another |
 
 ### The session is ours, not the transport's
 

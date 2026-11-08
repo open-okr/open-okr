@@ -16,9 +16,9 @@ migration will take.
 ## Prerequisites
 
 - Access to both instances (source and target) as a workspace administrator
-- The source instance's root key (`OPENOKR_ENCRYPTION_KEY`). If the target
-  has a different key, add the source key to `OPENOKR_PREVIOUS_ENCRYPTION_KEYS`
-  on the target so the archive can be decrypted.
+- A passphrase of at least twelve characters, chosen at export. The archive
+  is sealed under it rather than under either instance's root key, so the
+  target needs the passphrase and not the source's `OPENOKR_ENCRYPTION_KEY`.
 - `pnpm okr` (the CLI) or `curl` for REST API calls on both instances
 - For a FlowyTeam source: read-only MySQL access and `pnpm import:flowyteam`
 
@@ -28,7 +28,7 @@ migration will take.
 |-------|---------|------|
 | Source is reachable | `curl -s https://source.example.com/api/v1/openapi.json -H "Authorization: Bearer $TOKEN"` | 200 |
 | Target is provisioned | Sign in to the target instance, verify the workspace exists | A workspace loads |
-| Encryption keys compatible | Compare key fingerprints or add the source key to `OPENOKR_PREVIOUS_ENCRYPTION_KEYS` on the target | The target can open a test archive from the source |
+| Passphrase ready | Choose one of at least twelve characters and keep it with the archive | Whoever runs the import has it |
 | Target is empty (or acceptable) | Check member count on the target | Only the founding admin, or members you expect to merge |
 
 ## Phase 1: Freeze the source
@@ -39,7 +39,7 @@ available.
 
 ```sh
 # Via the CLI
-pnpm okr workspace set-state --state frozen --url https://source.example.com --token $TOKEN
+pnpm okr workspace setState --state frozen --url https://source.example.com --token $TOKEN
 
 # Via the REST API
 curl -X POST https://source.example.com/api/v1/workspace/setState \
@@ -67,15 +67,21 @@ target if anything goes wrong.
 Export from the source and import as a dry run on the target.
 
 ```sh
-# Export (via the admin UI at /admin/imports, or via the CLI/REST API)
-pnpm okr workspace export-archive --url https://source.example.com --token $SOURCE_TOKEN
+# Export (via the admin UI at /admin/imports, or via the CLI/REST API).
+# The answer is JSON, with the archive itself as base64 in archiveBase64.
+pnpm okr workspace exportArchive --passphrase "$PASSPHRASE" --url https://source.example.com --token $SOURCE_TOKEN
 
-# Dry-run import on the target
-pnpm okr workspace import-archive --dry-run --url https://target.example.com --token $TARGET_TOKEN < archive.okr
+# Dry-run import on the target, with that base64 saved to archive.b64
+pnpm okr workspace importArchive --dry-run --archive-base64 @archive.b64 --passphrase "$PASSPHRASE" --url https://target.example.com --token $TARGET_TOKEN
 ```
 
 Or use the admin cards on `/admin/imports` on the target: upload the `.okr`
-file and the dry-run runs automatically.
+file with its passphrase and the dry-run runs automatically.
+
+**The export is refused while the source is frozen.** `workspace.exportArchive`
+is a write, and a workspace that is not active refuses every write except
+member, settings and billing management, the state change itself and turning
+single sign-on on or off.
 
 **Verify:** review the difference report.
 
@@ -94,7 +100,7 @@ only and cannot be overridden.
 Run the import for real. The report MUST match the dry run exactly.
 
 ```sh
-pnpm okr workspace import-archive --url https://target.example.com --token $TARGET_TOKEN < archive.okr
+pnpm okr workspace importArchive --dry-run false --archive-base64 @archive.b64 --passphrase "$PASSPHRASE" --url https://target.example.com --token $TARGET_TOKEN
 ```
 
 Or click "Confirm import" on the admin card after reviewing the dry-run.
@@ -136,7 +142,7 @@ for a production migration, 1 day for a rehearsal.
 
 ```sh
 # Unfreeze the source
-pnpm okr workspace set-state --state active --url https://source.example.com --token $TOKEN
+pnpm okr workspace setState --state active --url https://source.example.com --token $TOKEN
 
 # Point DNS back to the source
 # app.example.com -> source-instance.example.com

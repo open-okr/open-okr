@@ -6,7 +6,7 @@ This is a change to access, so it is designed before it is built (CLAUDE.md, "Th
 
 ## 1. What is true today
 
-The safety class of an action is three things at once (`packages/core/src/api/surface.ts`, `catalogue.ts`):
+The safety class of an action is three things at once (`packages/core/src/api/surface.ts`, `packages/core/src/api/mcp/catalogue.ts`):
 
 | It decides | How |
 |---|---|
@@ -14,7 +14,7 @@ The safety class of an action is three things at once (`packages/core/src/api/su
 | The hint a client shows before an agent's call | `destructiveHint` is true only for `destructive` |
 | Nothing in the browser | A signed-in person is not scoped. `can()` and the access level decide |
 
-The registry's rule for `destructive` today is written on `cycles.close`: "Not destructive in the registry's sense, because nothing a person can see is removed." 31 actions are destructive, all of them deletions or removals.
+The registry's rule for `destructive` today is written on `cycles.close`: "Not destructive in the registry's sense, because nothing a person can see is removed." 33 actions are destructive, all of them deletions or removals.
 
 | Action | Class today | Access | Reversible |
 |---|---|---|---|

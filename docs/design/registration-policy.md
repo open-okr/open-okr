@@ -62,7 +62,7 @@ Open question **Q1**: is `zoho.com` a free provider here? Zoho Mail has a free t
 | Policy | No invitation, company address | No invitation, free mail address | With a usable invitation for that address |
 |---|---|---|---|
 | Invitation only | Refused | Refused | Admitted, joins the inviting workspace |
-| Company email addresses | Admitted, gets a workspace of their own (or the `/join` offer when a workspace trusts the domain and the address is confirmed) | Refused with "Use your company email address to start a workspace." | Admitted |
+| Company email addresses | Admitted, gets a workspace of their own (or the `/join` offer when a workspace trusts the domain and the address is confirmed) | Refused with "Use your company email address to start a workspace. A Gmail, Yahoo, Outlook or other free mail address needs an invitation from a workspace admin." | Admitted |
 | Anyone | Admitted | Admitted | Admitted |
 
 The refusal happens in the same `user.create.before` hook as today, so no sign-in path (email, passkey, a future social provider) can bypass it. Single sign-on callbacks stay exempt as today: the identity provider decides.
@@ -81,24 +81,26 @@ Who may create an account on this instance.
 ( ) Anyone
     Anyone with the link can sign up and start a workspace.
 
-Set here. (or: From OPENOKR_REGISTRATION. / The default.)
+Set here. (or: From the deployment's environment variable. A choice saved
+here overrides it. / The default: open until somebody claims the instance,
+invitation only after that.)
 [Save]
 ```
 
-The sign-up page under Company email addresses shows a line under the email field: "Use your company email address." A refused attempt shows the refusal sentence on the form, not a closed page.
+The sign-up page under Company email addresses shows a line under the email field: "Use your company email address. A free mail address needs an invitation." A refused attempt shows the refusal sentence on the form, not a closed page.
 
 ## 5. Acceptance criteria
 
-- Given a claimed instance with no stored value and no variable, when an admin opens General, then Registration shows Invitation only and "The default."
+- Given a claimed instance with no stored value and no variable, when an admin opens General, then Registration shows Invitation only and "The default: open until somebody claims the instance, invitation only after that."
 - Given an admin with `full` access, when they choose Company email addresses and save, then `registration.policy` is `company_domains` with source `admin`, and one `instance.registration_changed` audit event names them.
 - Given a member below `full`, when they post the action directly, then nothing changes.
 - Given Company email addresses, when `ana@acme.com` signs up with no invitation, then the account is created and gets its own workspace.
-- Given Company email addresses, when `ana@gmail.com` signs up with no invitation, then no account is created and the form says "Use your company email address to start a workspace."
+- Given Company email addresses, when `ana@gmail.com` signs up with no invitation, then no account is created and the form says "Use your company email address to start a workspace. A Gmail, Yahoo, Outlook or other free mail address needs an invitation from a workspace admin."
 - Given Company email addresses and a usable invitation for `ana@gmail.com`, when she signs up through it, then she joins the inviting workspace.
 - Given Invitation only, when `ana@acme.com` signs up with no invitation, then she is refused as today.
-- Given no stored value and `OPENOKR_REGISTRATION=open`, when anybody signs up, then they are admitted, and General shows "From OPENOKR_REGISTRATION."
+- Given no stored value and `OPENOKR_REGISTRATION=open`, when anybody signs up, then they are admitted, and General shows "From the deployment's environment variable. A choice saved here overrides it."
 - Given `cloud.enabled`, when an admin opens General, then there is no Registration card, and sign-up stays open.
-- Given the trusted email domains field, when an admin enters `gmail.com`, then saving is refused with "A free mail provider cannot be trusted: anybody can have an address there."
+- Given the trusted email domains field, when an admin enters `gmail.com`, then saving is refused with "gmail.com is a free mail provider and cannot be trusted: anybody can have an address there."
 
 ## 6. Tests
 

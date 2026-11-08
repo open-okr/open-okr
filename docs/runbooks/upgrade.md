@@ -68,8 +68,9 @@ it.
 ## Backfills never hold up a boot
 
 Schema migrations run on start. Data changes run separately through
-`pnpm db:change`, on your schedule, and `status` reports what is pending. An
-upgrade is never held open by a long backfill.
+`pnpm db:change`, on your schedule: it runs every script not yet complete and
+names what it ran, or says nothing was left. An upgrade is never held open by
+a long backfill.
 
 Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
 seals identity-provider tokens stored before they were encrypted needs the

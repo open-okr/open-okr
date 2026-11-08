@@ -16,7 +16,7 @@ reminder seven days before deletion. One rule in §3 was narrowed while building
 | Not configured must never mean delete | `tenant-lifecycle.md` §6 | `cloud.closureRetentionDays` stays 0, meaning never. OKRGoal sets 30 |
 | Every setup keeps working | PLAN §5.2 | Self-hosted, group and single company never erase anything unless somebody chooses to |
 
-## 2. What is wrong today
+## 2. What was wrong before this change
 
 | Finding | Effect |
 |---|---|

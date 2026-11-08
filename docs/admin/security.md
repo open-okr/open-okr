@@ -177,7 +177,8 @@ passed and the provider erases it: its own audit rows go with it, by a command
 running as the database owner, never by the application. The provider keeps a
 receipt that records the chain's last position and hash.
 
-**Verify the chain** checks three things, and each catches a different attack:
+**Check the chain**, under Verify the audit chain, checks three things, and
+each catches a different attack:
 every hash recomputes, which catches an edit; every row points at the one
 before it, which catches an edit whose hash was recomputed to cover it; and the
 positions run from one with no gaps, which catches a deletion. When it breaks

@@ -16,9 +16,9 @@ surface, cut into the one-line commands and the conversational check-in).
 | `notifications` | `packages/db` | P2-T06 | One row per recipient, with `channel` and `sent_at` |
 | `nudges`, `nudge_rules` | `packages/db` | P4-T04a | Every proactive message, with `rule_key`, `channel`, `escalation_step`, `suppressed_reason` |
 | Nudge engine | `packages/core` | P4-T04a to c | Deduplication, quiet hours, the escalation ladder, the volume ceiling |
-| Mail port and driver | `packages/adapters` | P1-T06 | SMTP send. Used today for invitations only |
+| Mail port and driver | `packages/adapters` | P1-T06 | SMTP send. Used then for invitations only |
 
-**What does not exist.** No `channel_connections`, `channel_identities` or
+**What did not exist at the design gate.** No `channel_connections`, `channel_identities` or
 `channel_messages` table. No driver but `none`. Every nudge is written with
 `channel: "in_app"`, and `nudges/service.ts` already carries the comment saying
 the member's own channel is resolved at delivery. Phase 5 is where delivery
@@ -53,7 +53,7 @@ Three, exactly as TECHNICAL-PLAN §4.11 lists them. Every one carries
 |---|---|---|
 | `provider` | `slack` / `teams` / `whatsapp` / `telegram` | Email needs no connection: it is the instance's mail settings |
 | `state` | `connected` / `error` / `disabled` | `error` is a connection that verified once and stopped working |
-| `credentials_ciphertext`, `data_key`, `key_id` | text | Envelope-encrypted, the same shape `ai_credentials` uses |
+| `ciphertext`, `data_key`, `key_id` | text | Envelope-encrypted, the same shape `ai_credentials` uses |
 | `config` | `jsonb` | Provider-specific: team id, tenant id, phone number id, bot username |
 | `installed_by_id` | member | Who connected it, for the audit trail |
 | `last_verified_at` | timestamptz | Set by the verify call, not by the install |
@@ -101,19 +101,20 @@ One function, `resolveDelivery`, in `packages/core`. Pure apart from the reads
 it needs, so the decision is testable without a provider.
 
 ```
-member + nudge kind + now
-  -> { channel, sendAt, suppressedReason? }
+member + urgent + connected providers + rule channel + now
+  -> { channel, sendAt, fallbackReason? }
 ```
 
-The order it decides in, which is §5.4's own order:
+The order it decides in, which is §5.4's own order. Step 1 is the nudge
+engine's, decided before `resolveDelivery` is called:
 
 | Step | Rule | Outcome when it applies |
 |---|---|---|
-| 1 | The workspace is in quiet mode and the nudge is not an escalation | Suppressed, reason `workspace_quiet_mode` |
+| 1 | The workspace is in quiet mode, the nudge is not urgent, and its rule is not exempt from quiet mode | Suppressed, reason `quiet_hours` |
 | 2 | The member has a verified identity on their primary channel | That channel |
 | 3 | No verified identity, or the provider is disconnected | Email, plus in-app |
 | 4 | The chosen channel is inside the member's quiet hours | Queued to the next open window. **Built at P5-T01b-b, and it found the opposite shipped**: `suppressionFor` returned `quiet_hours` and the row was written with a reason and never sent, so a member whose night covered the sweep never heard about their overdue check-in at all. Member quiet hours now defer; workspace quiet mode still suppresses, because an organisation that switched the product off for a week is not asking to be told everything at once when it comes back |
-| 5 | The nudge is an escalation the workspace marked urgent | Sent inside quiet hours anyway |
+| 5 | The nudge is urgent: an escalation that has widened past the owner | Sent inside quiet hours anyway |
 
 **In-app is never routed away.** A notification row is written whatever the
 channel decides, because §5.4's last line is that snoozing never silences the
@@ -257,8 +258,9 @@ carries no detail about why.
 
 ## 7. The command surface
 
-One router, generated from the action registry, in `packages/core`. §5.3's
-seven commands, each mapping to exactly one registry action:
+One router, declared once in `packages/core/src/channels/commands.ts` and
+tested against the action registry. Nine commands, §5.3's seven plus `resolve`
+and `take`, each mapping to exactly one registry action:
 
 | Command | Registry action | Access it needs | Built |
 |---|---|---|---|
@@ -267,6 +269,8 @@ seven commands, each mapping to exactly one registry action:
 | status | `goals.read` | view | Built at P5-T06a |
 | ack | `goals.acknowledgeCheckIn` | edit | Built at P5-T06a |
 | commit | `sessions.setCommitments` | edit | Built at P5-T06c |
+| resolve | `sessions.resolveBlocker` | edit | Built at P5-T03b |
+| take | `sessions.reassignBlocker` | edit | Built at P5-T03b |
 | ask | `copilot.ask` | comment | Built at P5-T06a |
 | snooze | `nudges.snooze` | comment | Built at P5-T06a |
 
@@ -313,8 +317,8 @@ audited with the channel on it.
 
 ## 8. Conversational flows
 
-Slack and Teams have modals. WhatsApp and Telegram do not, so the check-in and
-the blocker are collected across turns.
+Slack and Teams have modals. WhatsApp and Telegram do not, so the check-in is
+collected across turns. The blocker is one line on every provider (§7).
 
 ### 8.1 The state machine
 

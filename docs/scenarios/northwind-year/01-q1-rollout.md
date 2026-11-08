@@ -52,7 +52,7 @@ Of the eleven department and team objectives, six were proposed by the teams the
 Planning for Q1 opens four weeks before the quarter. The release Northwind ran in October opened it three weeks before; 0.2.0 opens it four. The Champion tells the sponsor and the facilitator. Phase 1 is a light refresh of the annual pack.
 *Test:* Given Q1 starting 1 January and a quarterly planning-open lead of four weeks, when the Champion runs on 4 December, then Elena and Priya each receive one planning-open message, citing its rule.
 
-**NW-Q1-02 · 15 Dec 2026 · Priya, leadership · S-05 `/cycle?phase=2` · METHOD §2.3 phase 2**
+**NW-Q1-02 · 15 Dec 2026 · Priya, leadership · S-07 `/cycle?phase=2` · METHOD §2.3 phase 2**
 Phase 2: diagnose. It runs the day after the pilot's review (NW-P-13), so the prior cycle is scored at 0.55. Baseline health is recorded from the KPI grid. Four strategic issues are ranked:
 - onboarding speed (impact 5);
 - support cost (5);
@@ -61,7 +61,7 @@ Phase 2: diagnose. It runs the day after the pilot's review (NW-P-13), so the pr
 
 *Test:* Given the pilot scored, baseline health recorded and four issues ranked, when Phase 2 is evaluated, then it is complete.
 
-**NW-Q1-03 · 16 Dec 2026 · Leadership · S-06 `/cycle?phase=3` · METHOD §2.3 phase 3**
+**NW-Q1-03 · 16 Dec 2026 · Leadership · S-08 `/cycle?phase=3` · METHOD §2.3 phase 3**
 Phase 3: the annual frame is revalidated in 40 minutes and holds. The focus areas for the quarter are the first week, support load and audit readiness.
 *Test:* Given a quarterly cycle, when the revalidation is recorded as "holds" with focus areas chosen, then Phase 3 is complete without priorities or a not-doing list, which are annual-only (CY-4, CY-5).
 
@@ -93,7 +93,7 @@ Jonas drafts the Sales team's objective with "Make 300 cold calls" and "Hold 40 
 *Test:* Given the key result "Make 300 cold calls", when it is typed, then KR-5 warns with its prompt and the draft saves.
 
 **NW-Q1-09 · 6 Jan · Mei · S-13 OKRs list · METHOD §2.7, OBJ-5**
-Engineering drafts five objectives. OBJ-5 warns: "a unit with more than 3 objectives". Mei leaves it for the peer review.
+Engineering drafts five objectives. OBJ-5 warns: "More objectives than a unit can hold in mind at once." Mei leaves it for the peer review.
 *Test:* Given a fourth and a fifth objective in the Engineering space, when they are saved, then OBJ-5 warns on the space, and both save.
 
 **NW-Q1-10 · 7 Jan · Nadia · OKRs diagram · METHOD v2 AL-1, AL-3, §5.1**
@@ -111,7 +111,7 @@ Finance's "Close the books in five days" supports no 2027 strategy. Hugo marks i
 **NW-Q1-12 · 12 Jan · Facilitator Priya, all teams · S-09 drafts read across teams, S-16 findings · METHOD §9 phase 4, §5.3**
 In the peer review, each team reads another team's drafts:
 - **Marketing reads Sales.** Nadia asks Jonas what the 300 calls are for. He rewrites S2 as conversion (leading) and qualified pipeline (lagging), and KR-5 passes.
-- **Two edits at once.** While Jonas is rewriting, Daniel edits the same title from his own screen. The second commit is refused with the current value, "Changed by Jonas a moment ago", and Daniel takes Jonas's wording.
+- **Two edits at once.** While Jonas is rewriting, Daniel edits the same title from his own screen. The second commit is refused with the current value, "Jonas changed this since you read it", and Daniel takes Jonas's wording.
 - **Engineering cuts five objectives to three.** The other two become initiatives under E1.
 - **A duplicate.** The semantic review flags P1's third key result, "Bulk import available to every new account", as the same delivery as Engineering's E3.1. Sara deletes it, with the undo toast, and P1 records a dependency on E3 instead.
 
@@ -140,7 +140,7 @@ The department and team sets publish, which is the second step. Gate 5 asks abou
 The first company-wide Monday check-ins take place:
 - **Sales.** Jonas checks in from Slack with the one-tap check-in, and his narrative and confidence land on the goal.
 - **Product.** The team votes on confidence privately, and the votes reveal together with the average.
-- **Department objectives.** They have reviewers, so Elena and the department heads find acknowledgements in their review inbox.
+- **Department objectives.** They have reviewers, so Elena and Priya find acknowledgements in their review inbox.
 - **Team objectives.** They have no reviewer, so their check-ins owe nobody an acknowledgement.
 
 *Test:* Given a check-in posted from Slack on a department objective, when it publishes, then the goal shows it, and the reviewer's inbox lists one acknowledgement owed. Given a team objective with no reviewer, then its check-in creates no acknowledgement.
@@ -151,7 +151,7 @@ Marketing's check-in is due on Monday 25 January. The Champion sends three nudge
 2. **Monday:** the due nudge.
 3. **Tuesday:** a nudge one day overdue.
 
-Nadia checks in on Wednesday, inside the three-day grace. M1 never reads "outdated". On Friday the Champion's digest goes to every space.
+Nadia checks in on Wednesday, inside the three-day grace. M1 never reads "outdated". After each weekly session, the Champion's digest goes to that space.
 *Test:* Given a weekly goal due Monday and checked in on Wednesday, when health is read on Thursday, then it is not outdated, and Nadia received exactly three nudges: due-soon, due and overdue.
 
 **NW-Q1-17 · 1 Feb (W5) · Tomás, Kofi · S-20 KPI grid, S-19 recovery board · METHOD §6.4, §6.5, §2.9**
@@ -181,7 +181,7 @@ Bulk import ships on 12 February. Mei ticks E3.1 done, and the milestone reads 1
 *Test:* Given a milestone key result, when its owner marks it done, then its progress is 100%. The blocker that named it can be closed, with the dependency shown as delivered.
 
 **NW-Q1-21 · 22 Feb (W8) · Coach, Nadia · S-02 inbox · METHOD §3.5, §10**
-For four weeks Marketing has reported M1 as on track, while M1.1 (target-profile share of leads) has not moved from 44%. The coach notices: "Reported on track, but this key result has not moved within the divergence window." Nadia changes her status to "at risk" and writes why: the target profile changed in January, and her lead scoring has not caught up.
+For four weeks Marketing has reported M1 as on track, while M1.1 (target-profile share of leads) has not moved from 44%. The coach notices: "Reported on track, but M1.1 has not moved in 4 weeks." Nadia changes her status to "at risk" and writes why: the target profile changed in January, and her lead scoring has not caught up.
 *Test:* Given a goal reported on track for four weekly check-ins while a metric key result is unchanged, when the coach runs, then one divergence message is sent, citing its rule.
 
 **NW-Q1-22 · 26 Feb (W8) · Mei · S-14 drawer · METHOD §2.10, §3.7**
@@ -217,7 +217,7 @@ Tomás escalates to Elena. She approves two support agents spending three weeks 
 **NW-Q1-26 · 15 to 17 Mar (W11) · All champions · S-24 scoring, scorecard · METHOD §3.3**
 Grading runs two weeks before the quarter ends, and each score is computed from progress.
 - **One adjustment.** C1.2 reads 55%, which computes to 0.57. The last three days of March's cohort are missing from the warehouse; with them, activation reads 56%. Sara adjusts the score to 0.71 with that reason.
-- **Both numbers are kept.** The scorecard shows 0.71, with 0.57 computed beside it. On 22 March the full cohort arrives, and she records 56% as C1.2's last value.
+- **Both numbers are kept.** The scorecard shows 0.71, with 0.57 computed beside it. On 22 March the full cohort arrives, after Q1 has closed, and she records 56% as C1.2's starting value in the Q2 draft.
 
 *Test:* Given a computed score of 0.57, when it is adjusted to 0.71 with a reason, then the closed cycle shows 0.71 and the scorecard shows 0.57 beside it as computed.
 
@@ -271,7 +271,7 @@ Every objective gets a close decision:
 | Modify | C2 (re-sliced for Q2), M1 (measure lead quality directly), S2 |
 
 Learnings carried forward include "We learned that a release regression shows in tickets within ten days; watch the reopen rate weekly". Kept and modified objectives pre-fill Q2's drafts, each key result starting from its last recorded value.
-*Test:* Given C1 closed as Keep, when Q2's drafting opens, then C1 appears as a pre-filled draft whose C1.2 baseline is 56, its last recorded value, and it still passes Q2's checks before it publishes.
+*Test:* Given C1 closed as Keep, when Q2's drafting opens, then C1 appears as a pre-filled draft whose C1.2 baseline is its last recorded value, and it still passes Q2's checks before it publishes.
 
 **NW-Q1-32 · 19 Mar · Priya · S-25 minutes · METHOD §8.10**
 The minutes export as a PDF for the board pack:

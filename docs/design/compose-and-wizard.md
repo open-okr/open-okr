@@ -97,9 +97,11 @@ duplicate address.
 objectives, key results and a cycle, and those arrive in Phase 3. A checkbox
 that seeded nothing would be worse than its absence. Recorded on P3-T01.
 
-**Channel and AI connection tests.** Both report "not in this build" rather
-than a tick. The framework is complete; the probes arrive with the drivers in
-Phase 5 and Phase 6.
+**Channel and AI connection tests.** At first both reported "not in this
+build" rather than a tick. The framework was complete, and the probes arrived
+with the drivers in Phase 5 and Phase 6: `channelsProbe` and `aiProbe` in
+`packages/core/src/setup/probes.ts`, beside the database, mail and storage
+probes. Only the database blocks the wizard.
 
 ## Measured
 

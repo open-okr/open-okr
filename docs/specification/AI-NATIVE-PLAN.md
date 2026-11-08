@@ -175,24 +175,26 @@ One `Channel` port, one driver per provider, all behind the same interface (TECH
 
 ### 5.3 The command surface
 
-Generated from the action registry, so a chat command is the same action as a button:
+Declared once in `packages/core/src/channels/commands.ts`, each command naming one registry action and tested against the registry, so a chat command is the same action as a button:
 
 | Command | Does |
 |---|---|
-| Check in | Walks the member through their due check-ins: status, confidence, one line of narrative, key result values. Conversational on WhatsApp and Telegram, a modal on Slack and Teams |
-| Blocker | Logs a blocker on a key result: type, owner, next action, due by the next check-in |
-| Status | Returns a goal, a key result, a space or the member's own review inbox |
+| Check in | Walks the member through their due check-ins: status, confidence, one line of narrative, key result values. Conversational on WhatsApp and Telegram, a modal on Slack and Teams that asks the first three; key result values stay with the conversation and the browser |
+| Blocker | Logs a blocker on a key result in the session that is running: type and next action, due by the next check-in |
+| Resolve | Closes a blocker that is done |
+| Take | Takes a blocker on as the sender |
+| Status | Returns one goal's health, progress and next check-in |
 | Ack | Acknowledges a check-in awaiting the member's review |
-| Commit | Sets or closes a weekly commitment |
+| Commit | Adds one commitment to the session that is running |
 | Ask | Sends the message to the copilot, grounded and permission-filtered |
-| Snooze | Quiets nudges for a stated period, never the review inbox |
+| Snooze | Quiets nudges about one thing for a stated number of hours, a day by default, never the review inbox |
 
 Every inbound message is signature-verified, resolved to a linked member, rate-limited, run through `can()`, and recorded with the channel named in the audit entry. An unlinked sender receives nothing at all, because a helpful error would confirm the workspace exists.
 
 ### 5.4 Routing and volume
 
 - Each member has a primary channel and quiet hours in their own timezone.
-- A nudge outside quiet hours goes to the primary channel. Inside them it queues to the next open window, unless it is an escalation the workspace has marked as urgent.
+- A nudge outside quiet hours goes to the primary channel. Inside them it queues to the next open window, unless it is urgent: an escalation that has widened past the owner, step 3 or later.
 - One nudge per subject per member per day, except when the escalation step increases.
 - A workspace quiet mode silences everything except escalations.
 - Snoozing a nudge never silences the review inbox. The obligation stays visible in the product.
@@ -291,7 +293,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `kpi.unhealthy` | A KPI enters the unhealthy corridor | KPI owner, and the active cycle's sponsor where one exists |
 | `kpi.recovery_proposed` | Unhealthy for two periods | KPI owner, with a drafted recovery OKR |
 | `kpi.recovered` | Achievement re-enters the healthy corridor | KPI owner, proposing to close the recovery OKR |
-| `cycle.planning_opens` | Six weeks (annual) or three weeks (quarterly) before the start | Sponsor and facilitator |
+| `cycle.planning_opens` | Six weeks (annual) or four weeks (quarterly) before the start | Sponsor and facilitator |
 | `cycle.phase_blocked` | A phase's completion conditions are unmet as its window closes | Facilitator |
 | `cycle.deadline` | 14, 7 and 1 days before the publication deadline | Sponsor and facilitator |
 | `cycle.starts` | Day one | Everyone |

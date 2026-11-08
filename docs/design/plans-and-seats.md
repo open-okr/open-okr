@@ -23,7 +23,7 @@ was decided.
 | The §4.14 settings map and registry | `packages/core/src/settings` | P2-T13 | Every setting with a default a fresh workspace resolves without configuration |
 | `tenants` | This gate | P8-T02 | `plan_key` nullable, `seats` nullable |
 
-**What does not exist.** No plan, no catalogue, no seat count, no billing
+**What did not exist before P8-T05.** No plan, no catalogue, no seat count, no billing
 surface, and no code anywhere that asks how many people are in a
 workspace.
 
@@ -112,8 +112,8 @@ are needed and they catch different things.
 
 | Point | Catches | Message |
 |---|---|---|
-| **At invitation** | The ordinary case. An admin adding the eleventh person to a ten-seat plan | "This workspace has 10 of 10 seats in use. Free one, or add seats." Named numbers, and a link to the billing screen |
-| **At the funnel** | The reusable link. One workspace invite link admits everybody who holds it, so checking only at invite time lets a single link overflow the plan by any amount | The same numbers, phrased for the person arriving: "This workspace is full. Ask an administrator to add a seat." |
+| **At invitation** | The ordinary case. An admin adding the eleventh person to a ten-seat plan | "This workspace has 10 of 10 seats in use. Free one, or add seats, before inviting anybody else." Named numbers, and a link to the billing screen |
+| **At the funnel** | The reusable link. One workspace invite link admits everybody who holds it, so checking only at invite time lets a single link overflow the plan by any amount | The same numbers, phrased for the person arriving: "This workspace is full: 10 of 10 seats are in use. Ask an administrator to free one or add seats." |
 
 The funnel check is the one that must be right, because it is the one
 place a row is actually inserted. The invitation check is the one that
@@ -252,8 +252,8 @@ Written as the test plan P8-T05 inherits.
 
 ## 9. Decided on 7 November 2026
 
-By the project owner. The later designs build on these, and none of them is
-built yet. One provider's own commercial terms are not here: OKRGoal's are in
+By the project owner. The later designs build on these: `billing.md` and
+`ai-credits.md`. One provider's own commercial terms are not here: OKRGoal's are in
 `docs/okr-goal/pages/pricing.md`.
 
 | Decision | Detail |
