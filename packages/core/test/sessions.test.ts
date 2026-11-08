@@ -8,11 +8,13 @@
  * - a reconnecting client lands on the current stage (tested as: sessions.read
  *   always returns the current stage_key)
  */
+import { periodStartOf } from "@openokr/method";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { richTextFromPlainText } from "../src/rich-text/from-text.ts";
 import type { RichTextDocument } from "../src/rich-text/schema.ts";
+import { localDateOf } from "../src/sessions/booking.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 const FACILITATOR = "session-facilitator";
@@ -1278,12 +1280,18 @@ describe("the streak counts weeks of check-ins (completeness review M-04)", () =
     expect((await readStreak()).currentWeeks).toBe(1);
     // The last check-in a fortnight's period ago: a week of the fortnight
     // passed with nothing, which on weekly periods reads as broken.
+    // The date comes from the workspace's timezone like the action's own
+    // "today", not from the database server's current_date.
+    const { rows: zoneRows } = await wb.admin.query(
+      "select settings->>'timezone' as tz from workspaces where id = $1",
+      [workspaceId],
+    );
+    const today = localDateOf(new Date(), zoneRows[0]?.tz || "UTC");
+    const thisWeek = new Date(`${periodStartOf(today, "weekly")}T00:00:00Z`);
+    thisWeek.setUTCDate(thisWeek.getUTCDate() - 14);
     await wb.admin.query(
-      `update streaks
-          set last_session_week =
-                (date_trunc('week', current_date) - interval '14 days')::date
-        where space_id = $1`,
-      [spaceId],
+      "update streaks set last_session_week = $2::date where space_id = $1",
+      [spaceId, thisWeek.toISOString().slice(0, 10)],
     );
     expect((await readStreak()).currentWeeks).toBe(1);
 
