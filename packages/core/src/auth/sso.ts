@@ -547,7 +547,8 @@ export function validateSSOConnectionInput(
   if (input.enforce && !input.emailDomains?.trim()) {
     // The rule `listEnforcingConnections` already applies, said at the moment
     // somebody can still fix it rather than discovered later as nothing
-    // happening.
+    // happening. Enforcement reaches the members of this connection's
+    // workspace only; the message below is the administrator's wording.
     return {
       field: "emailDomains",
       message:
