@@ -88,11 +88,11 @@ Northwind lands on the **Recommended** profile when it upgrades to 0.2.0 (NW-P-0
 | When | Setting | From → To | Why | Step |
 |---|---|---|---|---|
 | 25 Nov 2026, setup | Terminology: Space | Space → Team | The word the company already uses | NW-P-06 |
-| 2 Dec 2026, setup | Reviewer per goal | Left at Optional; used for company and department objectives, not team ones | Elena reviews company objectives and department heads review department ones; a team's weekly check-in is review enough | NW-P-09 |
+| 2 Dec 2026, setup | Reviewer per goal | Left at Optional; used for company and department objectives, not team ones | Elena reviews company objectives, and each department head's manager reviews the department's; a team's weekly check-in is review enough | NW-P-09 |
 | 2 Apr, after Q1 | Objectives per unit cap | 3 → 2 | Q1's lowest process-health statement was "few enough OKRs" | NW-Q1-29 |
 | 2 Apr | Critical confidence escalation | Off → On | Elena heard about C1.3 at 3 in 10 only at the monthly review, three weeks late | NW-Q2-02 |
 | 2 Apr | OBJ-1, objective starts with a deliverable | Warn → Block | Q1's first drafts were full of deliverables; Elena tries the stricter level for a quarter | NW-Q2-03 |
-| 14 May | Reason when adding mid-cycle | Optional → Required | The competitive response added an objective and four key results in a week | NW-Q2-13 |
+| 14 May | Reason when adding mid-cycle | Optional → Required | The competitive response added an objective and three key results in a week | NW-Q2-13 |
 | 7 Jun | Quarterly review format | One session → Review and retrospective separately | Q1's review ran 40 minutes over | NW-Q2-18 |
 | Late June, for Q3 | OBJ-1, objective starts with a deliverable | Block → Warn | In Q2 it cost a week of rewrites and one override, for little gain over the warning | NW-Q3-01 |
 | 1 Jul | Check-in frequency, Sales space | Weekly → Every two weeks | Deal cycles move in fortnights; weekly check-ins were repeating themselves | NW-Q3-02 |
@@ -109,7 +109,7 @@ Quarters follow the calendar. Weekly check-ins are on Mondays. "W3" means week 3
 | 20 Nov to 18 Dec 2026 | Annual planning for 2027: planning opens 20 November; single sign-on, directory sync and Slack 25 November; the upgrade to 0.2.0 on 30 November; the offsite 1 December; 2026 imported 3 December; annual OKRs published 18 December | 0 |
 | 4 to 23 Dec 2026 | Q1 planning opens; the company OKRs drafted and published, the first step | 1 |
 | 4 to 15 Jan 2027 | Q1 department and team OKRs drafted, peer-reviewed on 12 January, aligned and published, the second step | 1 |
-| Every Monday | Weekly check-ins; the Champion's digest on Friday | all |
+| Every Monday | Weekly check-ins; the Champion's digest after each weekly session | all |
 | First Monday of each month | Monthly review: continue, update, start, stop | all |
 | 15 to 18 Mar | Q1 graded, then reviewed and closed in one session, two weeks before the end | 1 |
 | 10 May (Q2 W6) | The competitor launches; leadership responds on 12 May | 2 |
@@ -131,7 +131,7 @@ The demo is the year as of today. `pnpm db:seed` places the scenario on the real
 |---|---|---|
 | Q1 W2 (11 January) | Team drafting before peer review: coach warnings on Sales' task-shaped key results, Engineering over the cap, a diagonal alignment and a standalone objective with its reason | NW-P-01 to NW-Q1-11 |
 | Q1 W6 (8 February) | A running quarter: a key result added mid-cycle for a KPI that dropped, a confidence drop, a blocker with its next action | Up to NW-Q1-19 |
-| Q2 W7 (17 May) | The week after the competitor: a stopped objective, a started one, a kind changed openly, an eased target with its reason, a committed key result escalated, a draft check-in from an AI assistant | Up to NW-Q2-15, with NW-Q2-12 under way: Ben's last day is 21 May |
+| Q2 W7 (17 May) | The week after the competitor: a stopped objective, a started one, a kind changed openly, an eased target with its reason, and a committed key result escalated | Up to NW-Q2-15, with NW-Q2-12 under way: Ben's last day is 21 May |
 | Q3 W7 (16 August) | The margin recovery beside its real KPI band, Support merged into Customer Success, Leo covering for Mei, the new Growth team, a holiday week with no check-in due, and a trend warning before the status changes | Up to NW-Q3-10, with NW-Q3-05 and NW-Q3-06 under way |
 | 24 December | The year closed: the annual review, four quarters on one scorecard, 2028's annual OKRs published and Q1 2028 drafted | The whole year |
 

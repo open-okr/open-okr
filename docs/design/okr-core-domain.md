@@ -45,7 +45,7 @@ recommended unless you say otherwise.** All fifteen were approved as written on
 | # | Question | Kind | Recommendation | Blocks |
 |---|---|---|---|---|
 | D-1 | For a `maintain` key result, what is the band and how is "the distance back to the band" scaled? | Practice | Band is `[min(baseline, target), max(baseline, target)]`. Outside it, progress is `100 × (1 − distance / bandWidth)`, clamped at 0. A zero-width band scores 100 only on an exact match. No new setting, because §11 forbids numerics outside the registry | P3-T05 |
-| D-2 | A child goal aligned to a parent **key result**: does it change that key result's progress? | Practice | No. The key result keeps its own measurement, and the child rolls into the parent **goal** as a weighted item, exactly like a goal-aligned child. Otherwise a measured 40% key result can display 80% because another team did well, which breaks "key results are the proof" | P3-T05 |
+| D-2 | A child goal aligned to a parent **key result**: does it change that key result's progress? | Practice | No. The key result keeps its own measurement, and the child rolls into the parent **goal** as a weighted item, exactly like a goal-aligned child. Otherwise a measured 40% key result can display 80% because another team did well, which breaks "key results are the proof". Since P9-T12b whether aligned children count at all is the practice setting `progress.rollUp`, off by default | P3-T05 |
 | D-3 | What is the progress of a goal whose items all carry weight 0, or which has no items? | Mechanical | 0%, and health `pending` when there is no published check-in. Weight 0 means "tracked, does not count" | P3-T05 |
 | D-4 | A KPI-backed key result reads the KPI. Which number? | Practice | The KPI's latest real reading becomes the key result's current value, and progress runs from the key result's own baseline to its own target (METHOD §3.1). Revised on 30 October 2026: until then it read the KPI's real `achievement_pct`, so "from 31% to 35%" at 31 read 89% (OKRGoal UX review, finding T1). Never `effective_pct`, which would let a recovery goal's own progress feed its own key result | P3-T14 |
 | D-5 | The trend forecast fits "a linear fit over the recent window". §11 defines no window, and §11 forbids numerics outside itself | Practice | Fit over every value point inside the goal's cycle, projecting to the cycle end date. For a contextual goal with no cycle, fit over points since the goal was created and project to the key result's due date. Needs at least two points at distinct timestamps. The alternative is adding a window parameter to §11, which is a METHOD.md change and therefore yours | P3-T05 |
@@ -103,7 +103,7 @@ cycle revalidates it and never rewrites it.
 |---|---|
 | At most one frame per workspace is current | Partial unique index on `(workspace_id) where superseded_at is null` |
 | A quarterly cycle cannot write frame fields | The frame's update action requires the acting cycle to be `mode = 'annual'`, or no cycle at all |
-| 2 to 5 annual strategies | `annual_strategy_bounds` in the §11 registry. Below 2 fails Phase 0 completion, above 5 warns |
+| 2 to 5 annual strategies | `quality.annualStrategyBounds` in the §11 registry. Below 2 or above 5 holds Phase 0 completion |
 | The not-doing list is text, not a relation | METHOD.md §2.1 lists it as part of the frame. Rich text, one field |
 
 ### 3.2 Cycle states and the phase pointer
@@ -114,7 +114,7 @@ Two separate things, deliberately. `status` is the cycle's own lifecycle.
 | `status` | Meaning | Entered by |
 |---|---|---|
 | `planning` | Phases 0 to 5 are running. Goals may be drafted, nothing is published | Creation |
-| `active` | Published, inside its dates. Phase 6 | Publication, on or after `starts_on` |
+| `active` | Published, inside its dates. Phase 6 | Publication of the whole set, which also moves the pointer to phase 6 |
 | `closing` | Past `ends_on`, Phase 7 running | The cycle-end job, or the facilitator |
 | `closed` | Scored and archived | The archive action (P3-T15) |
 
@@ -126,8 +126,8 @@ phases before it.
 |---|---|
 | Phase 0 exists only for `mode = 'annual'` | A quarterly cycle's predicate for phase 0 returns `not_applicable` |
 | Moving the pointer forward is always allowed | The facilitator can look ahead. The surface renders what is missing |
-| Phase 4 drafting is blocked while Phase 1 is incomplete | METHOD.md §2.6: the facilitator can refuse to run Phase 4 without a complete input pack. The product refuses on their behalf, naming each missing item |
-| Publication is blocked while any of the six gates is red | Hard, always, regardless of strictness (METHOD.md §4.5) |
+| Drafting waits for phases 1 to 3 only where the practice says so | Under binding phase enforcement, or `writing.when` set to `afterPhases` (`draftingWaitsForPhases`), the product refuses drafting while an earlier phase is incomplete, naming each missing item. By default (guided, anytime) nothing is refused and the surface shows what is missing |
+| Publication is blocked while any gate set to block is red or cannot be evaluated | Gates 1 and 2 block by default, 3 to 5 warn and 6 is off (METHOD.md §4.5, §12). A member with full access may override with a written reason where the practice allows it (`gates.override`) |
 
 ### 3.3 Cycle generation from the cadence
 
@@ -163,14 +163,14 @@ user-settable boolean.
 
 | Phase | Predicate |
 |---|---|
-| 0 | `annual_frames.mission` and `.strategy` non-empty, 2 to 5 `annual_strategies`, at least one goal at `level = 'company'` in this cycle with at least one key result. `not_applicable` when `mode = 'quarterly'` |
-| 1 | `sponsor_id` and `facilitator_id` set, all 7 `cycle_pack_items` rows `gathered`, `pack_distributed_at` at least `input_pack_lead_time` working days before the first `session_dates` entry |
-| 2 | `first_cycle` is true, or every `cycle_prior_scores` row has a score; a `cycle_baseline_health` row exists; at least `strategic_issue_bounds.min` `cycle_issues` rows each with an impact |
+| 0 | `annual_frames.mission` and `.strategy` non-empty, 2 to 5 `annual_strategies` (`quality.annualStrategyBounds`), at least one goal at `level = 'company'` in this cycle with at least one key result. `not_applicable` when `mode = 'quarterly'` |
+| 1 | `sponsor_id` and `facilitator_id` set, all 7 `cycle_pack_items` rows `gathered`, `pack_distributed_at` at least `quality.inputPackLeadWorkingDays` working days before the first `session_dates` entry |
+| 2 | `first_cycle` is true, or every `cycle_prior_scores` row has a score; a `cycle_baseline_health` row exists; at least `quality.strategicIssueMinimum` `cycle_issues` rows |
 | 3 | Annual: 3 to 5 `cycle_priorities` each with a non-empty `success_statement`, `annual_frames.not_doing` non-empty, `agreed` true. Quarterly: a `cycle_revalidations` row with `holds` true or `changed` true with a `change_note`, plus at least one `cycle_focus_key_results` row (or a non-empty `focus_note` when the frame has no annual key results) |
-| 4 | Every goal in the cycle passes the METHOD.md §4 checks at the workspace strictness. Returns `todo` until P4-T01 ships the evaluator, and reports that reason rather than passing |
-| 5 | All six `cycle_gate_state` rows `passed`, and `published_at` set |
-| 6 | Sessions cover the cycle and at least one decision exists. Returns `todo` with "sessions arrive at P4-T04" until then |
-| 7 | Every key result in the cycle has a `score`, and a cycle retrospective exists. The retrospective input returns `todo` until P4-T08 |
+| 4 | No objective or key result in the cycle fails a METHOD.md §4 check at its practice level, judged over the set. A fail holds the phase and a warn does not |
+| 5 | Every gate set to block passed and could be evaluated, and `published_at` set |
+| 6 | Sessions cover the cycle and at least one decision exists |
+| 7 | Every key result in the cycle has a `score`, and a cycle retrospective exists |
 
 Working days for Phase 1 mean Monday to Friday in the workspace timezone. No
 holiday calendar. Recorded as a known simplification.
@@ -189,36 +189,42 @@ count that could drift from the first.
 | 1 | 10 always: the two roles, the seven §2.6 items, the distribution and its lead time |
 | 2 | 3, or 2 when `first_cycle` is true and there is nothing to score |
 | 3 | Annual 4, quarterly 2 |
-| 4 | 1 once P4-T01 ships, 0 until then |
-| 5 | The gates that can be judged, plus publication. A gate nobody can evaluate is not in the denominator, so the bar cannot fill by having fewer things checkable |
-| 6 | 2 once P4-T04 ships, 0 until then |
-| 7 | 1 per shipped input, so 0 today |
+| 4 | 1 per objective, or 1 when nothing is drafted yet |
+| 5 | The gates set to block that can be judged, plus publication. A gate nobody can evaluate is not in the denominator, so the bar cannot fill by having fewer things checkable |
+| 6 | 2 |
+| 7 | 2: the scores and the retrospective |
 
 ### 3.5 The six publish gates
 
-METHOD.md §4.5, one `cycle_gate_state` row per gate, recomputed on every write
-that could change it. Never stored as a user-set boolean.
+METHOD.md §4.5, one `cycle_gate_state` row per gate. The rows are rewritten by
+every `workflow.*` write and by an initiative change, and `workflow.read` and
+`workflow.publish` evaluate the gates afresh rather than trusting the rows.
+Never stored as a user-set boolean. Each gate has a practice level
+(`gates.1` to `gates.6`).
 
-| Gate | Green when | Recomputed by a write to |
+| Gate | Green when | Default level |
 |---|---|---|
-| 1 | Every goal in the cycle has a non-empty title, a `champion_id` and a `reviewer_id` | goals |
-| 2 | Every key result passes the §4.2 checks | key results, goals. `todo` until P4-T01 |
-| 3 | Every goal has a parent pointer or a non-empty `contribution_statement` | goals |
-| 4 | Every `key_result_dependencies` row is `confirmed`, or has a `risk_owner_id` | key result dependencies |
-| 5 | No key result has `capacity = 'exceeds'`, and a `cycle_capacity_notes` row with non-empty `cuts` exists | key results, capacity notes |
-| 6 | `publication_deadline` is set and falls before `starts_on` | the cycle |
+| 1 | Every goal in the cycle has a non-empty title and a `champion_id`, and a `reviewer_id` where the practice requires reviewers | Block |
+| 2 | Every goal has at least one key result, and no objective or key result check set to block fails | Block |
+| 3 | Every goal has a parent pointer, a non-empty `contribution_statement` or a `standalone_reason` | Warn |
+| 4 | Every `key_result_dependencies` row is `confirmed`, has a `risk_owner_id` or has an `escalated_to_id` | Warn |
+| 5 | No key result or initiative serving a committed OKR has `capacity = 'exceeds'`, and a `cycle_capacity_notes` row with non-empty `cuts` exists | Warn |
+| 6 | `publication_deadline` is set and falls before `starts_on` | Off |
 
-Gate 2 returns `todo` before P4-T01, which keeps publication blocked. That is
-the correct failure direction: a gate that cannot evaluate must not pass.
+A gate that cannot evaluate its input is reported as not evaluable, which holds
+publication just as a red gate does when the gate is set to block. That is the
+correct failure direction: a gate that cannot evaluate must not pass.
 
 **Given** a cycle with one key result whose dependency is neither confirmed nor
-risk-owned, **when** the facilitator publishes, **then** the write is refused,
-gate 4 is red, and the response names that key result and its dependency.
+risk-owned, **when** the facilitator publishes, **then** gate 4 is red and the
+response names that key result. Gate 4 is at warn by default, so the set
+publishes and the response lists gate 4 among the warned gates; the write is
+refused only where the workspace sets gate 4 to block.
 
 ### 3.6 Rhythm settings
 
 One row per workspace holding the METHOD.md §11 registry deviations and the
-terminology labels.
+terminology labels, and since Phase 9 the §12 practice settings and profile.
 
 | Field | Rule |
 |---|---|
@@ -257,7 +263,8 @@ which is what the P4-T01 conformance suite compares.
 facilitator can act on a count and cannot act on a rounded share.
 
 **The strip appears only when all three hold**: a cycle exists, its status is
-`planning`, and a `publication_deadline` is set. §3 calls it a countdown, and a
+`planning`, and a `publication_deadline` is set. It also stays hidden where the
+practice hides the phases (`phases.enforcement` at `hidden`). §3 calls it a countdown, and a
 countdown with no target is decoration. Its blocking line is the first reason
 with a count of the rest; the panel on the page lists them all.
 
@@ -282,17 +289,17 @@ quarter.
 | Header | S-04's mode toggle (Quarterly, Annual) where a chip used to name the mode, and a picker of every cycle in the chosen horizon when there is more than one. Planning happens before a period starts (§2.4), which is when the cycle being planned is not the one containing today |
 | Links inside the screen | A cycle opened by id or through the annual horizon travels with every phase link and every gate remedy that points back at `/cycle`. The quarter keeps the short address |
 | Create | Makes a cycle in the horizon being read, then opens it. The empty annual horizon says what the annual cycle holds and offers the create to a member with full access |
-| Phase 6 calibration | The §7.6 record, or the form that makes it: a written reason, offered at full access while the cycle is open and unused. The rule shown above it is §7.6's own sentences from `packages/method`, which `pnpm method:check` compares word for word |
+| Phase 6 calibration | §7.6's own sentences from `packages/method`, which `pnpm method:check` compares word for word, and a calibration recorded before P9-T13-c-b, shown read-only. The form that made one is gone: METHOD v2 retired the once-a-cycle calibration (migration 0118), and a target now moves under §2.9's rule |
 
 **Given** a workspace with only its provisioned quarter, **when** a member with
 full access opens the annual horizon, enters a day in this year and presses
 Create, **then** the annual cycle for this year exists at phase 0 and the page
 opens it, and phase 4 in the rail stays on that cycle.
 
-**Given** an open cycle with no calibration, **when** a member with full access
-records one with its reason on phase 6, **then** the reason, its author and its
-date replace the form, and a second attempt through the action is refused in
-words.
+Until P9-T13-c-b retired it: **given** an open cycle with no calibration,
+**when** a member with full access recorded one with its reason on phase 6,
+**then** the reason, its author and its date replaced the form, and a second
+attempt through the action was refused in words.
 
 ## 4. Goals
 
@@ -304,18 +311,18 @@ behaviour attached.
 | Field | Rule |
 |---|---|
 | `champion_id` | Required. Exactly one member, never a team (METHOD.md §2.5) |
-| `reviewer_id` | Required. Warned when equal to the champion, never refused: a one-person team has no other option |
+| `reviewer_id` | Optional by default; required only where the practice requires reviewers (`reviewer`). Warned when equal to the champion, never refused: a one-person team has no other option |
 | `level` | `company` / `department` / `team` / `individual`. Drives the level-skip and anchor rules |
 | `owner_kind` | `workspace` / `space` / `member`, with exactly one of `space_id` / `member_id` set to match |
 | `cycle_id` or `timeframe` | Exactly one. A goal with neither fails OBJ-3 |
 | `weight` | Numeric, default 1, 0 to 100 (`WEIGHT_MIN` and `WEIGHT_MAX` in `packages/method`). An action refuses a weight outside the range ([guided-inputs.md](guided-inputs.md) §4.8); the service and both importers clamp it, for a row that reaches the table another way. 0 means tracked but not counted |
 | `parent_goal_id` / `parent_key_result_id` | At most one of the two. Cycles rejected |
 | `contribution_statement` | Required to pass gate 3 when there is no parent |
-| `progress_pct`, `health` | Derived columns, written only by the recompute job |
+| `progress_pct`, `health` | Derived columns, written only by the recompute, which runs inside the writing transaction |
 
-`health` is an enum with seven values: `pending`, `on_track`, `caution`,
-`off_track`, `outdated`, `achieved`, `missed`. The last two are the closed
-outcomes, so a closed goal never has to borrow a live status.
+`health` is an enum with eight values: `pending`, `on_track`, `caution`,
+`off_track`, `outdated`, `achieved`, `missed`, `abandoned`. The last three are
+the closed outcomes, so a closed goal never has to borrow a live status.
 
 ### 4.2 The single-parent invariant
 
@@ -342,7 +349,7 @@ and A's parent is unchanged.
 
 | Transition | Requires | Produces |
 |---|---|---|
-| close | `success_status` of `achieved` or `missed`, a `close_decision` of `keep` / `modify` / `abandon`, and a non-empty retrospective body | `closed_at`, `closed_by_id`, a `goal_retrospectives` row, an audit event, health `achieved` or `missed` |
+| close | `success_status` of `achieved`, `missed` or `abandoned`, a `close_decision` of `achieved` / `keep` / `modify` / `defer` / `abandon`, and a non-empty retrospective body | `closed_at`, `closed_by_id`, a `goal_retrospectives` row, an audit event, health equal to the `success_status` |
 | reopen | Nothing beyond edit access | Clears `closed_at`, `success_status`, `close_decision`. **Keeps** the retrospective. Health recomputes from the check-in cascade |
 
 **Given** an open goal with two key results, **when** the champion closes it
@@ -407,7 +414,7 @@ reviewer owes none, and the acknowledged one is untouched.
 | Allowed while the target cycle is `planning` or `active` | A closed cycle refuses the move |
 | Check-in history moves with the goal | History belongs to the goal, not the cycle |
 | Prior-cycle scores do not move | `cycle_prior_scores` is a record of a scoring event in that cycle |
-| Both cycles' gates and alignment scores recompute | Enqueued through the outbox in the same transaction |
+| Both cycles' alignment scores recompute | In the same transaction, not through the outbox. The gates are evaluated afresh whenever the cycle's workflow is read |
 
 ## 5. Key results
 
@@ -415,14 +422,14 @@ reviewer owes none, and the acknowledged one is untouched.
 
 | Field | Rule |
 |---|---|
-| `direction` | `increase` / `reduce` / `maintain` / `move`. KR-7 fails on anything else |
-| `indicator_type` | `leading` / `lagging`. Required. KR-4 fails on an untagged key result |
-| `baseline_value`, `target_value` | Both required (KR-3). Equal values score 0, which is intentional and visible |
+| `direction` | `increase` / `reduce` / `maintain` / `move`. KR-7 fails only when a metric key result has none and none can be derived from its baseline and target |
+| `indicator_type` | `leading` / `lagging`. Required. KR-4, at info by default, notes a set that is all leading or all lagging |
+| `baseline_value`, `target_value` | The baseline is asked of a metric and a maintain key result; the target may wait, and KR-3 fails until it is set. A milestone or a baseline key result is stored 0 to 1. Equal values score 0, which is intentional and visible |
 | `current_value` | Defaults to `baseline_value` on create, so progress starts at 0 rather than undefined |
 | `weight` | Same domain and clamping as a goal's |
 | `kpi_id` | Optional. When set, `current_value` and progress are read from the KPI and manual value entry is refused |
 | `capacity` | `fits` / `tight` / `exceeds`. Gate 5 reads it |
-| `progress_pct`, `forecast`, `score` | Derived. `score` is writable only during Phase 7 |
+| `progress_pct`, `forecast`, `score` | Derived. `score` is written only through a quarterly review session (`sessions.scoreKeyResult`) |
 | `carry_forward` | Set at close. Feeds the next cycle's issue list at impact 4 (§11) |
 
 ### 5.2 The value history
@@ -480,11 +487,11 @@ One transaction, in this order:
 | Step | Detail |
 |---|---|
 | 1 | Refuse without a non-empty narrative, a status, and a confidence |
-| 2 | Stamp `snapshot` from every key result's live state |
-| 3 | Write a `key_result_values` row per key result whose value the composer changed, with `source = 'check_in'` |
+| 2 | Write a `key_result_values` row per key result whose value the composer changed, with `source = 'check_in'` |
+| 3 | Stamp `snapshot` from every key result's live state, after those values landed |
 | 4 | Set `goals.last_check_in_id` and recompute `progress_pct` and `health` |
 | 5 | Advance `goals.next_check_in_at` through the cadence engine |
-| 6 | Create the reviewer's acknowledgement obligation |
+| 6 | Create the reviewer's acknowledgement obligation, where the goal has a reviewer and the practice has not turned reviewers off |
 | 7 | Activity row, audit row, one outbox row for notification fan-out |
 
 The snapshot is immutable and holds, per key result: identifier, value,
@@ -531,7 +538,7 @@ longer owes an acknowledgement.
 
 | Rule | Detail |
 |---|---|
-| Only the reviewer of record may acknowledge | Anyone else, including an admin, is refused. An admin who wants to close the loop reassigns the reviewer first, which is audited |
+| Only the reviewer of record may acknowledge | Or whoever stands in for them while they are on leave. Anyone else, including an admin, is refused. An admin who wants to close the loop reassigns the reviewer first, which is audited |
 | Idempotent | Acknowledging twice is a no-op, not an error |
 | A published check-in awaiting acknowledgement is a first-class state | Derived from `acknowledged_at is null`, per REQUIREMENTS.md §51 |
 | Acknowledgement never changes health | It closes a loop. It is not a second opinion on the status |
@@ -559,9 +566,10 @@ connected client sees the same four numbers and the same average.
 
 ## 7. The recompute and invalidation map
 
-Derived values are written by a job the outbox drives, never inline in a
-request. `recomputeGoal(graph, change)` is the single entry point
-(TECHNICAL-PLAN.md §6.2).
+Derived values are recomputed inside the writing transaction, not by a job the
+outbox drives, because no relay host drains such a job yet
+(`packages/core/src/scoring/recompute.ts`). `recomputeForGoal` and
+`recomputeForCycle` are the entry points (TECHNICAL-PLAN.md §6.2).
 
 | Write | Invalidates |
 |---|---|
@@ -575,8 +583,8 @@ request. `recomputeGoal(graph, change)` is the single entry point
 | Rhythm settings | Nothing stored. Thresholds resolve per read |
 | Space membership | No derived value. Access only |
 
-Every fan-out is idempotent and safe to replay, because the outbox is
-at-least-once.
+Every fan-out is idempotent and safe to replay, so the same function can move
+behind the at-least-once outbox once a relay host drains it.
 
 ## 8. Settings this phase adds
 
@@ -596,7 +604,7 @@ What is actually left, then, is one entry:
 
 | Key | Scope | Default | Added at |
 |---|---|---|---|
-| `demoEnabled` | Instance or workspace, decided at the task | false | P3-T17 |
+| `demoEnabled` | Workspace | false | P3-T17 |
 
 Everything else Phase 3 needs is already answered: by §4.14's existing entries
 (the workspace timezone every date is read in), by §11's registry (every

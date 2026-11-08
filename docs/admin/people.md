@@ -9,8 +9,9 @@
 | Single sign-on | Admin, Single sign-on | An organisation that already has an identity provider. First sign-in creates the account and puts them in this workspace |
 | Directory sync | Admin, Directory sync | An organisation whose identity provider should own the member list outright |
 
-Registration is closed on a self-hosted instance the moment the owner account
-exists. An invitation, single sign-on and directory sync are the exceptions
+By default, registration is closed on a self-hosted instance the moment the
+owner account exists. [Who may register](settings.md#instance) can open it
+again. While it is closed, an invitation, single sign-on and directory sync are the exceptions
 that create an account there. A trusted domain is not one of them: it admits
 people who already have an account, or who can create one because
 registration is open, as it is on a managed cloud.
@@ -22,17 +23,22 @@ Four, and they compose: where two grants overlap, the higher one wins.
 | Level | Can |
 |---|---|
 | **View** | Read what has been shared with them |
-| **Comment** | That, and take part: comments, reactions, confidence votes |
-| **Edit** | That, and do the work: goals, check-ins, initiatives, tasks, exports |
-| **Full** | That, and administer: settings, people, access, the admin screens |
+| **Comment** | That, and take part: comments and reactions |
+| **Edit** | That, and do the work: goals, check-ins, confidence votes, initiatives, tasks, exports |
+| **Full** | That, and administer: settings, people, access, the admin screens. Roles and permissions calls it **Manage** |
 
-Access is a relationship, not a role list: a grant is on a named space, goal or
-KPI tree, and every read goes through one access-aware getter that returns
-not-found rather than forbidden. A suspended member is excluded everywhere.
+Access is a relationship plus a workspace role. A grant is on a named space,
+goal or KPI tree. A role (Owner, Admin, Member, Viewer, or one you add under
+Admin, **Roles and permissions**) grants a level per domain: objectives, KPIs,
+initiatives, tasks, comments, spaces and the workspace. The two compose by
+taking the higher, so a role raises access and never lowers it. Every read
+goes through one access-aware getter that returns not-found rather than
+forbidden. A suspended member is excluded everywhere.
 
 ## When somebody leaves
 
-**Suspend them.** Admin, People, then the member. Suspension takes back every
+**Suspend them.** **People** (the "Who is here" link on the Work Map), then the
+member, then **Suspend** under Lifecycle. Suspension takes back every
 access immediately: their sessions stop working, their API tokens stop working,
 and every grant they held stops answering. What they wrote stays, attributed to
 them, because a check-in whose author vanished is a falsified record.
@@ -55,8 +61,8 @@ not for offboarding.
 | Their sign-in account | Anonymised, signed out everywhere and its password, passkeys and second factor removed, **but only when this was their only workspace**. If they belong to another workspace the account is left for it, and the audit entry says how many other workspaces there are |
 | Their data | Handed to you as one document before anything is removed |
 
-Anybody can take the same document about themselves at any time from **Account,
-Security, Your data**. Nobody is asked or told.
+Anybody can take the same document about themselves at any time from
+**Security** in the avatar menu, under **Your data**. Nobody is asked or told.
 
 ## Guests
 

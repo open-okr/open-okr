@@ -16,10 +16,11 @@ at P5-T10a and P5-T10b (initiatives), P5-T11 (tasks and the board), P5-T12
 | `embeddings` and retrieval | `packages/core` | P4-T13a, b | Access-filtered hybrid retrieval, degrading to full text |
 | Soft delete as the default scope | `packages/db` | P1-T04 | `activeOnly` everywhere, with a lint that catches an unscoped write |
 
-**What does not exist.** No `initiatives`, `initiative_key_results`, `tasks`,
-`task_assignees`, `checklist_items`, `documents`, `attachments` or
-`search_documents` table. The Work Map draws goals and KPIs and nothing below
-them.
+**What did not exist before Phase 5.** No `initiatives`,
+`initiative_key_results`, `tasks`, `task_assignees`, `checklist_items`,
+`documents` or `attachments` table, and `search_documents` (there since
+migration 0003) had no `context_id`. The Work Map drew goals and KPIs and
+nothing below them.
 
 ## 1. The decision this document exists to make
 
@@ -178,16 +179,18 @@ and the key result's progress is still the measured one.
 
 **Where the divergence lives, decided at P5-T11.** The rule is
 `packages/method/src/linked-work.ts`, pure, and it names both figures in one
-sentence. What it is *not* yet is an `alignment_findings` row: that table carries
+sentence. What it was *not*, at P5-T11, was an `alignment_findings` row: that table carried
 `subject_goal_id` and `target_goal_id`, its `kind` is a fixed enum, and the
-existing sweep deliberately writes one finding per goal because the finding
-identity is (rule key, subject, target). A key-result-scoped finding needs the
+existing sweep deliberately wrote one finding per goal because the finding
+identity was (rule key, subject, target). A key-result-scoped finding needed the
 identity widened, which is a change to a coaching surface four other sweeps use.
 
-So the rail and `tasks.linkedWork` carry it, the Coach's finding inbox does not,
-and P5-T11's original acceptance criterion is half met on purpose. Agung chose
+So at P5-T11 the rail and `tasks.linkedWork` carried it, the Coach's finding inbox did not,
+and P5-T11's original acceptance criterion was half met on purpose. Agung chose
 this on 3 September 2026, with the widening left as its own row rather than
-folded into a task about tasks.
+folded into a task about tasks. P5-T14 widened the identity with
+`subject_key_result_id`, and the Coach's divergence sweep now writes one finding
+per key result (`packages/core/src/alignment/divergence.ts`).
 
 **No new METHOD.md rule and no new §11 threshold.** The comparison is between two
 facts the product already holds, so there is no band to tune and no wording to
@@ -268,9 +271,9 @@ the same parser.
 
 | Column | Notes |
 |---|---|
-| `subject_type`, `subject_id` | What it indexes |
+| `entity_type`, `entity_id` | What it indexes |
 | `title`, `body` | Plain text, extracted through the shared module |
-| `tsv` | The generated full-text vector |
+| `document` | The generated full-text vector |
 | `context_id` | The access context, for filtering |
 
 Written by an outbox-driven worker, exactly as `embeddings` already is

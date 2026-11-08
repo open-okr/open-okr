@@ -1,6 +1,7 @@
 import { ACCESS_LEVELS, listSupportSessions } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import { requireAccessLevel } from "../../../lib/access.ts";
+import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
@@ -45,6 +46,7 @@ function when(value: Date | string): string {
 export default async function SupportAccessPage() {
   const access = await requireAccessLevel(ACCESS_LEVELS.full);
   const { t } = await getTranslations();
+  const instanceName = await getInstanceName();
   const sessions = await listSupportSessions(getPool(), access.workspaceId);
 
   const pending = sessions.filter(
@@ -61,7 +63,9 @@ export default async function SupportAccessPage() {
         <h1 className="font-bold text-ink text-lg">
           {t("admin.support.title")}
         </h1>
-        <p className="text-ink-2 text-sm">{t("admin.support.intro")}</p>
+        <p className="text-ink-2 text-sm">
+          {t("admin.support.intro", { name: instanceName })}
+        </p>
       </header>
 
       <section className="flex flex-col gap-3">
@@ -116,7 +120,7 @@ export default async function SupportAccessPage() {
         </h2>
         {past.length === 0 ? (
           <p className="rounded-lg border border-line bg-surface px-4 py-3 text-ink-2 text-sm">
-            {t("admin.support.nobodyHasBeen")}
+            {t("admin.support.nobodyHasBeen", { name: instanceName })}
           </p>
         ) : (
           <ul className="flex flex-col gap-2">

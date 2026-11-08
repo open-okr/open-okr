@@ -47,16 +47,23 @@ must not claim the same predecessor.
 | Per-workspace sequence with asynchronous chaining | Faster, but the trail can lag the state it describes, which §8.1 forbids |
 
 The cost is real: concurrent writes in one workspace serialise at the end. An
-OKR workspace's write rate is human-paced, so this should not bind. **P7-T01
-measures it.** If it does bind, the fallback is a sequence column with retry,
-which keeps verifiability and trades away the single lock.
+OKR workspace's write rate is human-paced, so this should not bind. **P7-T02
+measured it, and it did bind**: 14.8 seconds at the 95th percentile at fifty
+concurrent members in one workspace. On 10 September 2026 Agung chose to move
+the chaining off the write path rather than take the sequence-and-retry
+fallback. Migration 0080 lets the audit row arrive in the change's own
+transaction with `seq`, `prev_hash` and `row_hash` null, and
+`packages/core/src/audit/chainer.ts` takes the same advisory lock once per
+pass, as a single writer, to fill them in insertion order. The scheduler runs
+it every minute, and `pnpm audit:chain` runs it on demand. Until a row is
+chained the verifier counts it as pending, never as verified.
 
 ## Decision 3: append-only is enforced twice
 
 | Guard | Stops | Does not stop |
 |---|---|---|
 | No UPDATE or DELETE grant to the application role | The application, including any bug in it | The owner, a superuser |
-| A trigger that raises on UPDATE and DELETE | Everybody, including a psql prompt | Someone who disables the trigger |
+| A trigger that raises on UPDATE and DELETE, except an unchained row gaining its three chain columns (migration 0080) and the rows of a workspace whose erasure has started (migration 0149) | Everybody, including a psql prompt | Someone who disables the trigger |
 | The hash chain | Nobody | Nothing, but it makes all of the above detectable |
 
 The third row is the point. The first two raise the cost of tampering; only the
@@ -67,10 +74,10 @@ TRUNCATE is deliberately not blocked: it empties the table, which is obvious the
 moment anybody verifies, and anyone who can truncate can drop the table anyway.
 Blocking it would only break the test harness's per-test reset.
 
-The grants live in `packages/db/grants.ts`, not in a migration, because the
+The grants live in `packages/db/src/grants.ts`, not in a migration, because the
 application role's name belongs to the deployment. One function is called by the
-test harness and by the P1-T09 wizard, so the tests and production cannot
-disagree about what the role may do.
+test harness and by the migration step (`deploy/docker/migrate.ts`), so the tests
+and production cannot disagree about what the role may do.
 
 ## The verifier must not pass while blind
 
@@ -91,15 +98,15 @@ that cannot see anything reporting success. Worth watching for in every gate.
 
 | Seam | Filled by | Today |
 |---|---|---|
-| `resolveActor`'s level | P2-T02 `can()` | Every active member resolves to `full` |
-| Access bindings written by an operation | P2-T01 | Not written; the pipeline has the slot |
-| Typed activity catalogue and per-kind payloads | P2-T07 | `kind` is a free string; the table is real |
-| `context_id` on activities | P2-T07's fail-closed resolver | Nullable, unset |
-| REST, OpenAPI, MCP, CLI, chat projections | P5-T07 onwards | The internal typed client is the first projection |
-| Optimistic concurrency versions (§14) | P3-T04 | Nothing here has a conflict to lose yet |
+| `resolveActor`'s level | P2-T02 `can()` | Filled: the member's level on the workspace context, through `resolveMemberAccessLevel` |
+| Access bindings written by an operation | P2-T01 | Filled: written inside the operation's transaction |
+| Typed activity catalogue and per-kind payloads | P2-T07 | Filled: `packages/core/src/activities/catalogue.ts` |
+| `context_id` on activities | P2-T07's fail-closed resolver | Filled: from the activity, or resolved from its subject |
+| REST, OpenAPI, MCP, CLI, chat projections | P5-T07 onwards | Filled: `contract/openapi.json`, `contract/mcp.json`, `contract/cli.json` and the chat commands |
+| Optimistic concurrency versions (§14) | P3-T04 | Goal edits compare the fields the caller read and refuse with `conflict` when one moved, rather than a row version |
 
-The level comparison in `runOperation` is real machinery over a placeholder
-answer. When P2-T02 lands, one function changes and no handler does.
+The level comparison in `runOperation` was real machinery over a placeholder
+answer. When P2-T02 landed, one function changed and no handler did.
 
 ## Acceptance criteria
 

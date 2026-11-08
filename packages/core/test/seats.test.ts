@@ -3,7 +3,12 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { provisionMemberForInvite } from "../src/invitations/provisioning.ts";
-import { countSeats, seatState } from "../src/tenancy/index.ts";
+import {
+  countSeats,
+  listSeatHolders,
+  seatState,
+} from "../src/tenancy/index.ts";
+import { applyPlanInTx } from "../src/tenancy/plans.ts";
 import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -191,5 +196,157 @@ describe("both enforcement points", () => {
   it("lets an invitation through on an unlimited plan", async () => {
     await onPlan(null);
     await expect(invite()).resolves.toBeTruthy();
+  });
+});
+
+/**
+ * A pending invitation holds a seat (plans-and-seats.md §2, the matrix's D-1).
+ *
+ * The rule above was only ever true of a member row with status `invited`,
+ * which no path writes: a personal invitation writes a link and no member until
+ * it is accepted. So with seats free, any number of invitations succeeded and
+ * the surplus met the refusal at the link. These count the link itself.
+ */
+describe("a pending invitation holds a seat", () => {
+  const personal = async (
+    email: string,
+    options: { readonly expiresInDays?: number } = {},
+  ) => {
+    const wb = await workerDb();
+    return callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "invitations.createPersonalLink",
+      { email, ...options },
+    );
+  };
+
+  const used = async (id = workspaceId) => {
+    const wb = await workerDb();
+    return (await seatState(wb.appPool, id)).used;
+  };
+
+  it("from the moment it is sent, before anybody clicks", async () => {
+    await onPlan(3);
+    await personal("first@example.com");
+    await expect(used()).resolves.toBe(2);
+  });
+
+  it("so the invitation past the limit is refused, naming both numbers", async () => {
+    await onPlan(3);
+    await personal("first@example.com");
+    await personal("second@example.com");
+    await expect(personal("third@example.com")).rejects.toThrow(
+      /3 of 3 seats in use/,
+    );
+  });
+
+  it("and the invited person takes the seat it holds, rather than being refused for it", async () => {
+    const wb = await workerDb();
+    await onPlan(2);
+    await seedUser("joiner");
+    const link = await personal("joiner@example.com");
+    await expect(used()).resolves.toBe(2);
+    await expect(
+      callAction(
+        {
+          pool: wb.appPool,
+          workspaceId,
+          actor: { kind: "human", userId: "joiner" },
+        },
+        "invitations.acceptLink",
+        { token: link.token },
+      ),
+    ).resolves.toBeTruthy();
+    await expect(used()).resolves.toBe(2);
+  });
+
+  it("once per address, so asking the same person again needs no second seat", async () => {
+    await onPlan(2);
+    await personal("first@example.com");
+    await expect(personal("first@example.com")).resolves.toBeTruthy();
+    await expect(used()).resolves.toBe(2);
+  });
+
+  it("until it is revoked", async () => {
+    const wb = await workerDb();
+    await onPlan(2);
+    const link = await personal("first@example.com");
+    await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "invitations.revokeLink",
+      { linkId: link.id },
+    );
+    await expect(used()).resolves.toBe(1);
+    await expect(personal("second@example.com")).resolves.toBeTruthy();
+  });
+
+  it("until it expires", async () => {
+    const wb = await workerDb();
+    await onPlan(2);
+    await personal("first@example.com");
+    await wb.admin.query(
+      "update invite_links set expires_at = now() - interval '1 minute' where workspace_id = $1",
+      [workspaceId],
+    );
+    await expect(used()).resolves.toBe(1);
+  });
+
+  it("but not for somebody already here", async () => {
+    await onPlan(3);
+    await personal(`${OWNER}@example.com`);
+    await expect(used()).resolves.toBe(1);
+  });
+
+  it("and not twice for the owner an operator's workspace is waiting for", async () => {
+    const wb = await workerDb();
+    const waiting = (
+      await createWorkspace(wb.appPool, {
+        waitingOwner: { email: "new.owner@example.com" },
+      })
+    ).workspaceId;
+    await wb.admin.query(
+      "insert into tenants (workspace_id, state, region, seats) values ($1, 'active', 'local', 3)",
+      [waiting],
+    );
+    // The waiting member is the seat; the invitation that will claim it is not a second.
+    await expect(used(waiting)).resolves.toBe(1);
+  });
+
+  it("is named among the seat holders, so an administrator can see whose it is", async () => {
+    const wb = await workerDb();
+    await onPlan(3);
+    await personal("first@example.com");
+    await expect(listSeatHolders(wb.appPool, workspaceId)).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          name: "first@example.com",
+          status: "invited",
+        }),
+      ]),
+    );
+  });
+
+  it("but the headcount a smaller plan is judged by is the people, not the invitations", async () => {
+    const wb = await workerDb();
+    await onPlan(5);
+    await personal("first@example.com");
+    await personal("second@example.com");
+    const db = (await import("drizzle-orm/node-postgres")).drizzle(wb.appPool);
+    const { withWorkspace } = await import("@openokr/db");
+    // One person and two invitations, onto two seats: nobody loses access, so
+    // it is allowed, and the funnel refuses whoever arrives without a seat.
+    await expect(
+      withWorkspace(db, workspaceId, (tx) =>
+        applyPlanInTx(tx, { workspaceId, plan: null, seats: 2 }),
+      ),
+    ).resolves.toBe(true);
   });
 });

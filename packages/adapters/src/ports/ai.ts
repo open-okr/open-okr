@@ -50,11 +50,16 @@ export interface ChatRequest {
   readonly temperature?: number;
   readonly maxTokens?: number;
   readonly purpose?: AIPurpose;
+  /** Which feature asked, for the usage row. Never sent to the provider. */
+  readonly feature?: string;
 }
 
 export interface TokenUsage {
+  /** Every input token, including any the provider served from its cache. */
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /** How many of `inputTokens` came from the cache, at the cheaper rate. */
+  readonly cachedInputTokens?: number;
 }
 
 export interface ChatResponse {
@@ -66,6 +71,8 @@ export interface ChatResponse {
 export interface EmbedRequest {
   readonly model: string;
   readonly input: readonly string[];
+  /** Which feature asked, for the usage row. Never sent to the provider. */
+  readonly feature?: string;
 }
 
 export interface EmbedResponse {
@@ -91,7 +98,15 @@ export interface ModelCapabilities {
 
 export interface AIProvider {
   chat(request: ChatRequest): Promise<ChatResponse>;
-  stream(request: ChatRequest): AsyncIterable<string>;
+  /**
+   * `onUsage` is told what the provider counted, once the stream has ended. It
+   * may never be told: a stream cut off early has no total, and some
+   * OpenAI-compatible endpoints do not send one.
+   */
+  stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string>;
   chatWithTools(
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ): Promise<ChatResponse>;

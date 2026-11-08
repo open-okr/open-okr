@@ -647,6 +647,7 @@ const TENANCY_ALLOWED_PREFIXES: readonly string[] = [
   "packages/db/",
   "packages/core/src/tenancy/",
   "packages/core/src/operator/",
+  "packages/core/src/billing/",
 ];
 
 /** Packages whose product paths must not know a tenant exists. */
@@ -688,9 +689,10 @@ const TENANCY_CHECKED_PREFIXES: readonly string[] = [
  * The word boundaries are load-bearing either way: without them the rule
  * fires on any identifier that merely starts with the table name.
  */
-const TENANCY_READ = /\.from\s*\(\s*tenants\s*\)/g;
+const TENANCY_READ =
+  /\.from\s*\(\s*(?:tenants|billingAccounts|billingEvents)\s*\)/g;
 const TENANCY_IMPORT =
-  /^[ \t]*import\b[^;]*?\{[^}]*?\btenants\b[^}]*?\}[^;]*?\bfrom\b/gm;
+  /^[ \t]*import\b[^;]*?\{[^}]*?\b(?:tenants|billingAccounts|billingEvents)\b[^}]*?\}[^;]*?\bfrom\b/gm;
 
 /** Checks the tenancy rule for one file. */
 const checkTenancy = (file: BoundarySourceFile): BoundaryViolation[] => {

@@ -139,6 +139,23 @@ describe.skipIf(!runnable)("a round trip against a real service", () => {
     );
   });
 
+  it("deletes one workspace's whole prefix and nobody else's", async () => {
+    const mine = `ws_${randomUUID().slice(0, 8)}`;
+    const theirs = `ws_${randomUUID().slice(0, 8)}`;
+    await storage.put(`${mine}/a`, Buffer.from("a"));
+    await storage.put(`${mine}/exports/run/b`, Buffer.from("b"));
+    await storage.put(`${theirs}/c`, Buffer.from("c"));
+    await storage.deletePrefix(`${mine}/`);
+    await expect(storage.get(`${mine}/a`)).rejects.toBeInstanceOf(
+      ObjectNotFoundError,
+    );
+    await expect(storage.get(`${mine}/exports/run/b`)).rejects.toBeInstanceOf(
+      ObjectNotFoundError,
+    );
+    expect(await storage.get(`${theirs}/c`)).toEqual(Buffer.from("c"));
+    await storage.delete(`${theirs}/c`);
+  });
+
   it("deletes an absent object without complaining", async () => {
     // The same no-op the local driver's `force` gives, so a cleanup job that
     // runs twice is not a failure.

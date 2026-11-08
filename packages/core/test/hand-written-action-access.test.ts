@@ -117,7 +117,7 @@ afterAll(async () => {
 });
 
 describe("workspace.provision", () => {
-  it("refuses a person, even the workspace owner, and creates nothing", async () => {
+  it("refuses a person under an invitation-only policy, even the workspace owner, and creates nothing", async () => {
     const wb = await workerDb();
     const before = await count("workspaces");
     for (const userId of [OWNER, MEMBER]) {
@@ -130,7 +130,9 @@ describe("workspace.provision", () => {
             name: "Made through the surface",
           },
         ),
-      ).rejects.toThrow(/signs up/);
+        // The owner is naming somebody else, and the member themselves. Starting a
+        // workspace of your own where sign-up is open is `create-workspace.test.ts`.
+      ).rejects.toThrow(/for somebody else|created by whoever runs it/);
     }
     expect(await count("workspaces")).toBe(before);
   });

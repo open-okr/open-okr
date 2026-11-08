@@ -241,7 +241,7 @@ A key result and a check-in have no screen of their own, so what hangs on them i
 
 **S-39 Copilot.** A side panel opened with ⌘J, workspace-scoped or entity-scoped. A thread of turns with streaming and a stop control, inline action proposals rendered as a preview or difference with apply and dismiss, and citations only to what the viewer may see. States: empty, AI off with a link for admins, rate-limited or capped. A proposal names what it is ("New objective", "New task") rather than the registry action, and its preview labels are in the reader's language (completeness review M-09). Where each §2 assist sits on the screens above is tabled in AI-NATIVE-PLAN.md §2.
 
-**S-40 Consent.** The screen an external agent's user sees when connecting: the client's identity, the workspace picker, the scopes requested in plain language, and approve or deny. Granted connections are listed in the admin console with their last use and a revoke control.
+**S-40 Consent.** The screen an external agent's user sees when connecting: the client's identity, the workspace picker, the scopes requested in plain language, and approve or deny. Granted connections are listed on the member's own Connections page (`/account/connections`) with their last use and a revoke control.
 
 ### Cloud operator screens
 
@@ -262,8 +262,8 @@ more than one tenant at a time. Columns: name, slug, plan, state, seats
 used against seats available, last activity, region. Filter by state and
 by plan, search by name or slug. No content of any kind: the design behind
 this is `docs/design/operator-console.md`, and the counts come
-from a named read-only view rather than from a policy on any content
-table. Row click opens S-46. Empty state on a fresh instance reads as a
+from the per-tenant snapshot in `operator_workspace_usage`, refreshed by a
+scheduled job, rather than from a policy on any content table. Row click opens S-46. Empty state on a fresh instance reads as a
 statement rather than an error.
 
 **S-46 Operator workspace detail.** One tenant. Header with name, slug,
@@ -320,13 +320,26 @@ list.
 
 **S-49 Plan and seats.** A workspace administrator's screen rather than an
 operator's, reached from the S-36 admin navigation. The current plan,
-seats used against seats available with the list of who holds them, AI
-spend against its cap, and the upgrade and downgrade controls. A downgrade
-below the current headcount is refused naming both numbers and links to
-the member list, because the product never picks who loses access. With
-`cloud.enabled` false the section is absent from the navigation and the
-route is not-found: P8-T05 asks that no billing surface appears, and a
+seats used against seats available with the list of who holds them, and AI
+spend against its cap. With billing off it names who to contact to change the plan,
+because a change with no payment behind it was a free upgrade to anything in the
+catalogue. With billing on it shows every plan at the price the provider states, in
+the provider's currency, with **Upgrade**, a monthly or yearly choice and **Manage
+billing**, and says when a payment failed, when a subscription ends, and when a
+downgrade takes effect. If the subscription ended and the people do not fit the
+default plan, it says the workspace is read-only, that nobody was removed, and how to
+get out. See [billing.md](../design/billing.md) §9. A change below the current headcount is refused
+naming both numbers, because the product never picks who loses access. With
+`cloud.enabled` false, or no plans in the catalogue, the section is absent from the
+navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a
 disabled control is an appearance.
+
+**S-50 New workspace.** A signed-in person starting another workspace, reached from
+the avatar menu where sign-up is open to them and not-found anywhere else. A name, and
+a refusal that names the free limit when that is why. The new workspace becomes the
+active one, and its owner goes to S-34. An operator creates one on S-45 instead, naming
+who will own it, and does not become a member. See
+[hosting-profiles.md](../design/hosting-profiles.md) §3.
 
 ### Power-floor stubs
 
@@ -375,7 +388,7 @@ This checklist is what a UI task must satisfy to ship. To check whether one did,
 
 ## 10. Reference mockups
 
-Eleven of the screens in §6 are drawn as working HTML in `docs/mockups/`, rendered to PNG. Look at the mockup before starting a UI task. It shows the target: the density, the chips, the states and the composition that this document describes in words.
+Key screens in §6 are drawn as working HTML in `docs/mockups/`, rendered to PNG. Look at the mockup before starting a UI task. It shows the target: the density, the chips, the states and the composition that this document describes in words.
 
 **They are reference, not authority.** If a mockup and this document disagree, this document wins and the mockup gets fixed. If a mockup and METHOD.md disagree on a rule, band, threshold or key, METHOD.md wins. Never cite a mockup as the reason for a behaviour, cite the specification.
 
@@ -388,11 +401,13 @@ Where a mockup shows a concrete detail that no document specifies, a spacing, a 
 | S-04, S-06 | [02-cycle-workspace](../mockups/png/02-cycle-workspace.png) | P3-T03 |
 | S-09 | [03-draft-coach](../mockups/png/03-draft-coach.png), [03b-rule-card](../mockups/png/03b-rule-card.png) | P4-T02 |
 | S-10 | [04-gates-capacity](../mockups/png/04-gates-capacity.png) | P4-T03, P3-T09 |
+| S-13, as first proposed | [12-okr-home](../mockups/png/12-okr-home.png), [12b-okr-create](../mockups/png/12b-okr-create.png) | |
 | S-16 | [05-alignment-studio](../mockups/png/05-alignment-studio.png) | P3-T10, P3-T09, P4-T06, redrawn at P9-T09b as the diagram |
 | S-18, S-19 | [06-kpi-recovery](../mockups/png/06-kpi-recovery.png) | P3-T14 |
 | S-22 | [07-weekly-session](../mockups/png/07-weekly-session.png) | P4-T07 |
 | S-24 | [08-quarterly-review](../mockups/png/08-quarterly-review.png) | P4-T10, P4-T11 |
 | Channels (AI-NATIVE-PLAN.md §5) | [09-channels](../mockups/png/09-channels.png) | P5-T02 to P5-T05 |
+| Email (AI-NATIVE-PLAN.md §5) | [12-email-templates](../mockups/src/12-email-templates.html) | |
 
 The remaining screens have no mockup. Build them from the specification in §6 and the patterns in §4, and ask rather than invent.
 

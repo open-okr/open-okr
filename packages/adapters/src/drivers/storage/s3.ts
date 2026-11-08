@@ -27,7 +27,9 @@
  */
 import {
   DeleteObjectCommand,
+  DeleteObjectsCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   NoSuchKey,
   PutObjectCommand,
   S3Client,
@@ -39,6 +41,7 @@ import {
   type PutOptions,
   type StoredObject,
 } from "../../ports/storage.ts";
+import { directoryPrefix } from "./local-disk.ts";
 
 export interface S3StorageOptions {
   readonly bucket: string;
@@ -169,6 +172,34 @@ export class S3Storage implements FileStorage {
         Key: this.#objectKey(key),
       }),
     );
+  }
+
+  async deletePrefix(prefix: string): Promise<void> {
+    const directory = `${this.#objectKey(directoryPrefix(prefix))}/`;
+    // A thousand at a time, which is what one DeleteObjects takes. Listing again
+    // after each delete rather than paging, so a key deleted in between cannot
+    // leave a continuation token pointing at nothing.
+    for (;;) {
+      const listed = await this.#client.send(
+        new ListObjectsV2Command({
+          Bucket: this.#bucket,
+          Prefix: directory,
+          MaxKeys: 1000,
+        }),
+      );
+      const keys = (listed.Contents ?? [])
+        .map((object) => object.Key)
+        .filter((key): key is string => typeof key === "string");
+      if (keys.length === 0) {
+        return;
+      }
+      await this.#client.send(
+        new DeleteObjectsCommand({
+          Bucket: this.#bucket,
+          Delete: { Objects: keys.map((Key) => ({ Key })), Quiet: true },
+        }),
+      );
+    }
   }
 
   async signedUrl(key: string, expiresInSeconds?: number): Promise<string> {

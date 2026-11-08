@@ -101,6 +101,8 @@ async function countOf(query: string, values: unknown[] = []) {
  * these tests are about. `model` is what the host's choke point would
  * answer, and null is a workspace with no provider for the agent's tier.
  */
+const askedForAgents: string[] = [];
+
 async function drain(
   model: AgentRunModel | null = mockRunModel(),
 ): Promise<string[]> {
@@ -119,7 +121,10 @@ async function drain(
         pool: wb.appPool,
         continueAgentRun: (job) =>
           continueAgentRun(wb.appPool, job, {
-            modelFor: async () => model,
+            modelFor: async (_workspace, _tier, agentId) => {
+              askedForAgents.push(agentId);
+              return model;
+            },
           }),
         onSkipped: (_delivery, reason) => skipped.push(reason),
       });
@@ -236,6 +241,9 @@ describe("a run carried by the relay", () => {
     });
 
     await drain();
+
+    // Named to the host, so the step's usage counts against this agent's budget.
+    expect(askedForAgents).toContain(agent.id);
 
     const state = await runOf(run.id);
     expect(state.status).toBe("completed");

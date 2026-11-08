@@ -22,9 +22,9 @@ import { createWorkspace } from "../src/workspaces/provisioning.ts";
  * Three gaps, each with its claims:
  *
  *   1. Nothing wrote a tenant's plan or seats after it was created, so no
- *      seat limit could ever apply. Now an administrator and an operator can
- *      both move a workspace, by the same rule: never below the headcount,
- *      refused naming both numbers.
+ *      seat limit could ever apply. Now an operator can move a workspace, never
+ *      below the headcount, refused naming both numbers. An administrator cannot
+ *      move their own: nothing would make them pay for what they chose.
  *   2. The first operator needed hand-written SQL. Now a command grants it,
  *      never to oneself, and only an operator can grant the next.
  *   3. S-49 had no seat list. The list is read by the rule the count uses.
@@ -44,9 +44,9 @@ const seedUser = async (id: string) => {
 };
 
 const PLANS = [
-  { key: "team", name: "Team", seats: 3, aiMonthlyUsd: 20 },
-  { key: "solo", name: "Solo", seats: 1, aiMonthlyUsd: null },
-  { key: "org", name: "Organisation", seats: null, aiMonthlyUsd: 200 },
+  { key: "team", name: "Team", seats: 3 },
+  { key: "solo", name: "Solo", seats: 1 },
+  { key: "org", name: "Organisation", seats: null },
 ];
 
 const asOwner = () =>
@@ -104,11 +104,43 @@ afterAll(async () => {
   await wb.close();
 });
 
-describe("an administrator changes plan", () => {
-  it("takes the seats from the plan, so the limit now applies", async () => {
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: "team",
+describe("an administrator cannot change their own plan", () => {
+  it.each([["team"], [null]])(
+    "is refused for %s, and nothing moves",
+    async (planKey) => {
+      await expect(
+        callAction(await asOwner(), "workspace.changePlan", { planKey }),
+      ).rejects.toThrow(
+        /through billing, or through whoever runs this instance/,
+      );
+      expect(await tenantRow()).toEqual({ plan_key: null, seats: null });
+      expect(await workspaceBudget()).toEqual([]);
+    },
+  );
+});
+
+describe("an operator changes plan", () => {
+  beforeEach(async () => {
+    const wb = await workerDb();
+    await grantOperator(wb.appPool, {
+      email: `${OPERATOR}@example.com`,
+      grantedByEmail: `${OWNER}@example.com`,
     });
+  });
+
+  const asOperator = async (planKey: string | null, seats?: number) => {
+    const wb = await workerDb();
+    return setPlanAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      planKey,
+      ...(seats === undefined ? {} : { seats }),
+      reason: "As agreed",
+    });
+  };
+
+  it("takes the seats from the plan, so the limit now applies", async () => {
+    await asOperator("team");
     expect(await tenantRow()).toEqual({ plan_key: "team", seats: 3 });
     const wb = await workerDb();
     await expect(seatState(wb.appPool, workspaceId)).resolves.toMatchObject({
@@ -118,44 +150,32 @@ describe("an administrator changes plan", () => {
     });
   });
 
-  it("writes the plan's AI allowance as the workspace's monthly budget", async () => {
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: "team",
-    });
-    expect(await workspaceBudget()).toEqual([{ period: "month", limit: 20 }]);
-
-    // Moving again updates the same row rather than adding a second.
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: "org",
-    });
-    expect(await workspaceBudget()).toEqual([{ period: "month", limit: 200 }]);
+  it("leaves the workspace's own AI budget alone", async () => {
+    // A plan's allowance is credits, kept apart, because an administrator can edit a
+    // budget (docs/design/ai-credits.md).
+    await asOperator("team");
+    expect(await workspaceBudget()).toEqual([]);
   });
 
   it("refuses a plan with fewer seats than are in use, naming both numbers", async () => {
     await addHuman("invited");
-    await expect(
-      callAction(await asOwner(), "workspace.changePlan", { planKey: "solo" }),
-    ).rejects.toThrow(/1 seat\(s\) and 2 are in use/);
+    await expect(asOperator("solo")).rejects.toThrow(
+      /1 seat\(s\) and 2 are in use/,
+    );
     // Nothing moved.
     expect(await tenantRow()).toEqual({ plan_key: null, seats: null });
   });
 
   it("moves back to the free tier, which is unlimited", async () => {
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: "team",
-    });
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: null,
-    });
+    await asOperator("team");
+    await asOperator(null);
     expect(await tenantRow()).toEqual({ plan_key: null, seats: null });
   });
 
   it("refuses a plan the catalogue does not hold", async () => {
-    await expect(
-      callAction(await asOwner(), "workspace.changePlan", {
-        planKey: "enterprise",
-      }),
-    ).rejects.toThrow(/no plan called "enterprise"/);
+    await expect(asOperator("enterprise")).rejects.toThrow(
+      /no plan called "enterprise"/,
+    );
   });
 
   it("is refused on a self-hosted instance, which has no tenant row", async () => {
@@ -163,15 +183,11 @@ describe("an administrator changes plan", () => {
     await wb.admin.query("delete from tenants where workspace_id = $1", [
       workspaceId,
     ]);
-    await expect(
-      callAction(await asOwner(), "workspace.changePlan", { planKey: "team" }),
-    ).rejects.toThrow(/no tenant record/);
+    await expect(asOperator("team")).rejects.toThrow(/no tenant record/);
   });
 
-  it("records the change in the feed and the audit log", async () => {
-    await callAction(await asOwner(), "workspace.changePlan", {
-      planKey: "team",
-    });
+  it("records the change in the feed", async () => {
+    await asOperator("team");
     const wb = await workerDb();
     const { rows } = await wb.admin.query(
       "select kind, payload from activities where workspace_id = $1 and kind = 'workspace.plan_changed'",
@@ -183,16 +199,6 @@ describe("an administrator changes plan", () => {
         payload: { plan: "Team", seats: 3 },
       },
     ]);
-  });
-});
-
-describe("an operator changes plan", () => {
-  beforeEach(async () => {
-    const wb = await workerDb();
-    await grantOperator(wb.appPool, {
-      email: `${OPERATOR}@example.com`,
-      grantedByEmail: `${OWNER}@example.com`,
-    });
   });
 
   it("may set a seat count of their own, for a contract no plan matches", async () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import type { LegalLinks } from "@openokr/core";
 import { Button, EmailInput, SecretInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -15,8 +16,15 @@ import { AuthCard, Field, FormError } from "../auth-card";
  */
 export function SignUpForm({
   companyOnly = false,
+  legal,
 }: {
   readonly companyOnly?: boolean;
+  /**
+   * The provider's legal pages, when it has any. A self-hosted instance
+   * usually has none, and then the form says nothing rather than pointing at a
+   * page that does not exist.
+   */
+  readonly legal: LegalLinks;
 }) {
   const { t } = useTranslations();
 
@@ -88,6 +96,31 @@ export function SignUpForm({
             : t("auth.signUp.signUpForm.createAccount")}
         </Button>
       </form>
+      {legal.termsUrl || legal.privacyUrl ? (
+        <p className="mt-3 flex flex-wrap gap-x-2 text-ink-3 text-xs">
+          <span>{t("auth.signUp.signUpForm.agreement")}</span>
+          {legal.termsUrl ? (
+            <a
+              className="text-brand-text hover:underline"
+              href={legal.termsUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("auth.signUp.signUpForm.terms")}
+            </a>
+          ) : null}
+          {legal.privacyUrl ? (
+            <a
+              className="text-brand-text hover:underline"
+              href={legal.privacyUrl}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("auth.signUp.signUpForm.privacy")}
+            </a>
+          ) : null}
+        </p>
+      ) : null}
       <FormError>{error}</FormError>
     </AuthCard>
   );

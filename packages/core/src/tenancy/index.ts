@@ -18,21 +18,52 @@ export {
   currentConcurrentActions,
   setDefaultAdmission,
 } from "./admission.ts";
-export { setTenantStateInTx } from "./lifecycle.ts";
+export { adoptWorkspaces } from "./adopt.ts";
+export {
+  type ClosureSchedule,
+  closingOutbox,
+  erasureDateFor,
+  readClosureSchedule,
+  remindBeforeErasure,
+} from "./closing.ts";
+export {
+  addCreditPackInTx,
+  type CreditSummary,
+  chargeCreditsInTx,
+  creditsPausedReason,
+  creditValueUsd,
+  type HostedAccess,
+  readCreditSummary,
+  readHostedAccess,
+} from "./credits.ts";
+export {
+  readLifecycleInTx,
+  readWorkspaceLifecycle,
+  refuseOwnLifecycleMove,
+  refuseOwnStateChange,
+  setTenantStateInTx,
+  type TenantLifecycle,
+} from "./lifecycle.ts";
 export {
   applyPlanInTx,
   countSeats,
+  hasPlanScreen,
   listSeatHolders,
+  type Plan,
   planByKey,
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  requireFreeWorkspaceRoom,
+  resolveDefaultPlan,
   seatState,
+  seatsInUseInTx,
 } from "./plans.ts";
 export {
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,
+  guardsAIEndpoints,
   isCloudEnabled,
   resolveAdmissionLimits,
   resolveCloudTenancy,

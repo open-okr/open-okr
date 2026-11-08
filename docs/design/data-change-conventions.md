@@ -6,7 +6,8 @@ is `packages/db/src/data-change.ts`; registered scripts live in `packages/db/src
 ## When a data change, not a migration
 
 A schema migration reshapes a table: adds a column, an index, a constraint. It runs once, forward
-only, and is immutable once shipped (EXECUTION-GUIDE §9).
+only, and is immutable once shipped (PLAN.md §5.1; `pnpm db:lint` refuses an edit to a
+migration the newest release tag shipped).
 
 A data change reshapes the rows already in a table. It exists because a migration that adds a
 column cannot also know what value every existing row should have — that is a product decision,

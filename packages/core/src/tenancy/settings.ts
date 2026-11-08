@@ -61,6 +61,21 @@ export async function isCloudEnabled(pool: Pool): Promise<boolean> {
   return resolve<boolean>(pool, CLOUD_ENABLED_KEY);
 }
 
+/**
+ * Whether an administrator's AI base URL is checked on every request.
+ *
+ * On a public cloud a workspace administrator is not the operator, so an address
+ * inside the network would be a request the server makes for a stranger. A group
+ * running its own model trusts its administrators, and only whoever runs the
+ * deployment can say so.
+ */
+export async function guardsAIEndpoints(pool: Pool): Promise<boolean> {
+  return (
+    (await isCloudEnabled(pool)) &&
+    !(await resolve<boolean>(pool, "ai.allowPrivateEndpoints"))
+  );
+}
+
 export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
   const enabled = await isCloudEnabled(pool);
   // The other two are only meaningful when the cloud is on, and asking for

@@ -12,7 +12,7 @@ Large unsolicited pull requests are hard to land, because a change has to keep t
 
 ## Setup
 
-You need Node.js 22 or newer. The repository pins its package manager (pnpm) through Corepack, which ships with Node.
+You need Node.js 22: `package.json` asks for 22 and not 23 or later. The repository pins its package manager (pnpm) through Corepack, which ships with Node.
 
 ```sh
 corepack enable   # once per machine; makes the pinned pnpm available
@@ -57,6 +57,13 @@ encryption key is regenerated per process. That last one means anything sealed
 locally, such as a stored provider key, stops opening after a restart. Set
 `OPENOKR_ENCRYPTION_KEY` if you need it to survive one.
 
+To fill the workspace with a year of demo data after the wizard, pass the same
+connection string to the seed:
+
+```sh
+DATABASE_URL=postgres://postgres:postgres@localhost:55432/openokr pnpm db:seed
+```
+
 The database keeps its data in memory, so `pnpm db:down` discards it. Starting
 again means repeating the `CREATE DATABASE` and `pnpm db:migrate` above.
 `pnpm dev` on its own leaves it alone.
@@ -95,8 +102,8 @@ Before you push, `pnpm check:fast` and `pnpm test:changed` are enough. CI runs
 the full suites, split across machines, and all of it must pass before a change
 is reviewed.
 
-Some need a database. `pnpm db:up` starts Postgres and PgBouncer in Docker,
-and `pnpm db:down` stops them.
+Some need a database. `pnpm db:up` starts Postgres, PgBouncer and a test-only
+MySQL (the FlowyTeam importer's source) in Docker, and `pnpm db:down` stops them.
 
 | Command | What it does |
 |---|---|
@@ -111,9 +118,13 @@ And the gates continuous integration runs, all of which you can run yourself:
 | Command | What it checks |
 |---|---|
 | `pnpm check:boundaries` | Vendor SDKs stay in `packages/adapters`, application code consumes ports, write paths cause side effects only through the outbox, and domain writes go through the Operation pipeline |
+| `pnpm method:check` | METHOD.md and `packages/method` agree |
+| `pnpm check:contract` | The committed contract files match the action registry |
+| `pnpm check:docs` | Every documentation link resolves and every command a page names exists |
+| `pnpm check:air-gap` | Each row of the air-gap checklist still holds in the source |
 | `pnpm check:licences` | Every dependency licence is on the allow list |
 | `pnpm check:signoff` | Commits carry a sign-off |
-| `pnpm audit:verify` | The append-only audit hash chain is intact |
+| `pnpm check:changeset` | A change to what a running instance does names a version bump |
 | `sh deploy/docker/smoke-test.sh` | The compose target boots from nothing and reaches a secured instance |
 | `sh deploy/helm/check.sh` | What the chart refuses, and that no credential lands in a pod spec |
 

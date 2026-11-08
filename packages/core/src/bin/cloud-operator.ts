@@ -16,11 +16,14 @@
 import { parseArgs } from "node:util";
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
+// The file rather than the operator index, which reaches most of the domain. This
+// also runs inside the image, from a pruned copy of the sources (`./openokr
+// operator`), and a module that copy lacks fails only there.
 import {
   grantOperator,
   OperatorGrantError,
   revokeOperator,
-} from "../operator/index.ts";
+} from "../operator/grants.ts";
 
 const write = (line: string): void => {
   process.stdout.write(`${line}\n`);

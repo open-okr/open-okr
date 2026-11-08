@@ -3,8 +3,9 @@
  *
  * The design gave the operator console a plan control and nothing wrote
  * `plan_key` or `seats` after a tenant was created. This is the operator's
- * door, and `workspace.changePlan` is the administrator's: both go through
- * `applyPlanInTx`, so the headcount rule is the same on either side.
+ * door. A workspace's own administrator has none: `workspace.changePlan` refuses
+ * them, because nothing would make them pay for what they chose. It goes through
+ * `applyPlanInTx`, so the headcount rule holds here as it will for billing.
  *
  * An operator may also set a seat count of their own, for a contract that
  * does not match a catalogue row. An administrator may not.

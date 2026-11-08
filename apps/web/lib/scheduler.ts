@@ -42,14 +42,18 @@ import {
 } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
 import {
+  adoptWorkspaces,
   callAction,
   chainWorkspace,
   defaultMetrics,
+  isCloudEnabled,
   listLiveWorkspaces,
   METRIC,
+  measureAllWorkspaces,
   outboxRetentionDays,
+  remindBeforeErasure,
 } from "@openokr/core";
-import { drafterFor } from "./drafter";
+import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -106,6 +110,15 @@ export interface ScheduledRun {
     // Instance housekeeping, run once rather than per workspace: settled
     // outbox rows have no tenant to scope to (completeness review M-19).
     | "outbox.purge"
+    // Instance housekeeping too, and each does nothing with the cloud flag off:
+    // giving workspaces from before the flag a tenant record, and refreshing the
+    // usage figures the console and the plan screen read.
+    | "tenancy.adopt"
+    | "cloud.measureUsage"
+    // Reminding a closed workspace's owners seven days before it is erased
+    // (docs/design/workspace-erasure.md §12). Nothing with the flag off or
+    // with retention at seven days or fewer.
+    | "cloud.remindErasure"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -201,6 +214,24 @@ const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
 const OUTBOX_PURGE_JOB = "outbox.purge";
 const OUTBOX_PURGE_CRON = "0 4 * * *";
 
+/** Hourly, so a flag turned on today shows in the console within the hour. */
+const TENANCY_ADOPT_JOB = "tenancy.adopt";
+const TENANCY_ADOPT_CRON = "10 * * * *";
+
+/**
+ * Hourly. The figures carry the instant they were measured, so a reader can see how
+ * old they are, and nobody should have to run a command to have any at all.
+ */
+const CLOUD_USAGE_JOB = "cloud.measureUsage";
+const CLOUD_USAGE_CRON = "40 * * * *";
+
+/**
+ * Hourly, so a reminder goes within the hour of its day arriving, wherever the
+ * owners are, rather than at one fixed hour that is the middle of somebody's night.
+ */
+const ERASURE_REMINDER_JOB = "cloud.remindErasure";
+const ERASURE_REMINDER_CRON = "50 * * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -252,9 +283,27 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     cron: MESSAGE_LOG_SWEEP_CRON,
   },
   {
+    job: TENANCY_ADOPT_JOB,
+    action: "tenancy.adopt",
+    cron: TENANCY_ADOPT_CRON,
+    instance: true,
+  },
+  {
+    job: CLOUD_USAGE_JOB,
+    action: "cloud.measureUsage",
+    cron: CLOUD_USAGE_CRON,
+    instance: true,
+  },
+  {
     job: OUTBOX_PURGE_JOB,
     action: "outbox.purge",
     cron: OUTBOX_PURGE_CRON,
+    instance: true,
+  },
+  {
+    job: ERASURE_REMINDER_JOB,
+    action: "cloud.remindErasure",
+    cron: ERASURE_REMINDER_CRON,
     instance: true,
   },
 ];
@@ -396,6 +445,26 @@ async function listWorkspaces(): Promise<readonly SchedulableWorkspace[]> {
  * domain change anybody could audit.
  */
 async function runInstance(run: ScheduledRun): Promise<void> {
+  if (run.action === "tenancy.adopt") {
+    const adopted = await adoptWorkspaces(getPool());
+    if (adopted > 0) {
+      log(`tenancy.adopt adopted ${adopted} workspace(s)`);
+    }
+    return;
+  }
+  if (run.action === "cloud.measureUsage") {
+    if (await isCloudEnabled(getPool())) {
+      await measureAllWorkspaces(getPool());
+    }
+    return;
+  }
+  if (run.action === "cloud.remindErasure") {
+    const reminded = await remindBeforeErasure(getPool());
+    if (reminded > 0) {
+      log(`cloud.remindErasure reminded ${reminded} workspace(s)`);
+    }
+    return;
+  }
   if (run.action === "outbox.purge") {
     const pool = getPool();
     const purged = await purgeSettledOutbox(
@@ -420,7 +489,10 @@ async function runOne(
   workspace: SchedulableWorkspace,
   run: ScheduledRun,
 ): Promise<void> {
-  const drafter = await drafterFor(workspace.id);
+  const drafter = await drafterForAgent(
+    workspace.id,
+    run.action === "agents.runCoach" ? "coach" : "champion",
+  );
   const context = {
     pool: getPool(),
     workspaceId: workspace.id,

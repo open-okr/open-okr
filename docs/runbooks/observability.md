@@ -3,10 +3,10 @@
 What this instance measures about itself, what leaves the host, and how to
 look at any of it.
 
-The series names and the settings below are asserted
-against the code by `packages/adapters/test/telemetry.test.ts`, so a claim on
-this page that stops being true fails the build rather than misleading the
-next operator.
+The series names below, and this page's claims about what leaves the host,
+are asserted against the code by `packages/adapters/test/telemetry.test.ts`, so
+one of those claims that stops being true fails the build rather than
+misleading the next operator.
 
 ## The short version
 
@@ -14,7 +14,7 @@ next operator.
 |---|---|
 | Does OpenOKR send anything anywhere by default? | No. |
 | What has to be configured before it measures itself? | Nothing. |
-| Where are the numbers? | `GET /api/metrics`, for an instance administrator. |
+| Where are the numbers? | `GET /api/metrics`, for a signed-in member with `full` access. |
 | What makes data leave the host? | One setting: `observability.otlp.endpoint`. It is empty. |
 
 ## Two settings, and they are not the same thing
@@ -35,29 +35,29 @@ configured before it can be watched is a product nobody watches. Turning it
 off costs nothing rather than a little: the driver that replaces the meter
 does nothing at all, and the gauges' database queries are never run.
 
-Both can be set by environment variable at boot
-(`OPENOKR_OBSERVABILITY_METRICS`, `OPENOKR_OTLP_ENDPOINT`) or through the
-admin screens. The boot-time read is the environment, deliberately: the meter
-is built before the first request and therefore before any query, so reading
-the stored row would either block boot on Postgres or leave the first requests
-unmeasured.
+Both are read from the environment at boot
+(`OPENOKR_OBSERVABILITY_METRICS`, `OPENOKR_OTLP_ENDPOINT`), and no admin screen
+sets them. `OPENOKR_OBSERVABILITY_METRICS=false` or `0` turns metrics off. The
+environment is read deliberately: the meter is built before the first request
+and therefore before any query, so reading the stored row would either block
+boot on Postgres or leave the first requests unmeasured.
 
 ## Reading the numbers by hand
 
-```
-curl -H "Authorization: Bearer $TOKEN" https://your-instance/api/metrics
-```
+Open `https://your-instance/api/metrics` in a browser signed in as a member
+with `full` access in the workspace it has open. Anything else gets a
+not-found, which is the same answer a signed-out visitor gets: the endpoint is
+deliberately not an oracle for whether this instance is measuring itself.
 
-The token comes from `/account/api-tokens` and must belong to a member with
-`full` access. Anything else gets a not-found, which is the same answer a
-signed-out visitor gets: the endpoint is deliberately not an oracle for
-whether this instance is measuring itself.
+**An API token is not accepted here.** The endpoint reads the browser
+session, and a token from `/account/api-tokens` is checked only on `/api/v1`.
+A request with no session cookie is sent to the sign-in page.
 
 The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Twenty series. Every one is a count, a duration, a queue reading or a
+Twenty-two series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -159,12 +159,15 @@ responses off, set `LOG_LEVEL=debug` and they come back.
 Off unless asked for. `./openokr up` starts three services and none of this.
 
 ```
-# one instance administrator token, for Prometheus to read /api/metrics
+# the file Prometheus sends as a bearer token to /api/metrics
 printf '%s' "$TOKEN" > deploy/docker/secrets/observability-token
 
 docker compose --profile observability up -d
 open http://localhost:3001          # Grafana, admin/admin on first run
 ```
+
+The `openokr` target reads nothing until `/api/metrics` accepts a token (see "Reading the numbers by
+hand"); the `caddy` target, the proxy's HTTP series, needs none.
 
 Three dashboards are provisioned from files in
 `deploy/docker/observability/dashboards/`, so they are reviewable in a diff
@@ -207,14 +210,17 @@ and no socket is opened.
 
 ## What is kept, and for how long
 
-By default, everything. Nothing in this product deletes a record on a clock
-unless an administrator has put a number somewhere on purpose.
+By default, everything anybody wrote. Two kinds of bookkeeping are cleared on
+a clock out of the box; the channel message log is cleared only once an
+administrator puts a number on it.
 
 | Setting | Default | What it sweeps |
 |---|---|---|
 | `messageLogRetentionDays` | `0`, meaning keep everything | Rows in the channel message log older than the window |
+| `outbox.retentionDays` (`OPENOKR_OUTBOX_RETENTION_DAYS`) | `30` | Outbox rows delivered or given up on longer ago than that, daily at 04:00 UTC. Zero keeps every row |
+| `orphanBlobMinutes` | `1440`, a day | Uploads that were started and never attached to anything, daily at 03:20 UTC |
 
-Zero is off. The sweep reads the setting and returns without touching a row
+For the message log, zero is off. The sweep reads the setting and returns without touching a row
 unless it finds a number, because "not configured" must never mean "delete
 everything": an instance upgrading into this feature loses nothing it did
 not agree to lose.

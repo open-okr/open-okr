@@ -119,12 +119,21 @@ export async function provisionMemberForInvite<
   // Above the insert and inside the caller's transaction, so the count and
   // the insert cannot disagree under concurrency. A guest is not a seat, so a
   // support session is never refused for one.
+  //
+  // The seat a personal invitation to this person holds is the one they are
+  // taking, so their own address is left out of the count.
   if ((input.kind ?? "human") === "human") {
+    const [arriving] = await tx
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, input.user.id))
+      .limit(1);
     await requireSeatInTx(
       tx,
       input.workspaceId,
       (used, limit) =>
         `This workspace is full: ${used} of ${limit} seats are in use. Ask an administrator to free one or add seats.`,
+      arriving?.email ? { arriving: arriving.email } : {},
     );
   }
 
@@ -226,6 +235,7 @@ async function claimWaitingMember<
       input.workspaceId,
       (used, limit) =>
         `This workspace is full: ${used} of ${limit} seats are in use. Ask an administrator to free one or add seats.`,
+      { arriving: user.email },
     );
   }
   // openokr:allow-mutation: the caller's Operation transaction, like the
@@ -236,6 +246,9 @@ async function claimWaitingMember<
       userId: input.user.id,
       kind: "human",
       status: "active",
+      // A row an operator made for an address has only the address as a name. An
+      // import's has the person's real one, which stands.
+      name: sql`case when lower(${workspaceMembers.name}) = lower(${user.email}) then ${input.user.name} else ${workspaceMembers.name} end`,
       placeholderEmail: null,
       // The first sign-in of somebody an import left waiting: their browser's
       // zone, unless the import already gave them one.

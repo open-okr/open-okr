@@ -36,17 +36,18 @@ TECHNICAL-PLAN.md §4.9 (blobs) and §4.14 (settings map), UIUX-PLAN.md S-36.
 
 ## 3. The card
 
-One card per image, under the colour card: "Logo" and "Favicon".
+One section per image beside the colour, in the one Branding card since
+[branding-page.md](branding-page.md): "Logo" and "Favicon".
 
 | State | Shown |
 |---|---|
 | Nothing stored | The default (initials tile, or product icon) and "Choose an image" |
-| Stored | The stored image, "Replace" and "Remove" |
-| Image chosen, not saved | **The preview card** (below), with "Save" and "Cancel" |
-| Uploading | "Saving..." on the button, which cannot be pressed twice |
+| Stored | The stored image, "Replace with another image" and "Remove" |
+| Image chosen, not saved | **The preview** (below), with "Cancel"; the page's one "Save changes" stores it |
+| Uploading | "Saving..." on the Save changes button, which cannot be pressed twice |
 | Refused | The reason in an alert: wrong type, over 2 MB, not an image, too many pixels |
 
-**The preview card** appears the moment a file is chosen, before any upload.
+**The preview**, the page's mirror since the revamp, shows the file the moment it is chosen, before any upload.
 It reads the file in the browser (`URL.createObjectURL`), so nothing is sent
 until Save.
 

@@ -1,6 +1,6 @@
 {
   "name": "@openokr/web",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -38,6 +38,7 @@
     "@types/react-dom": "19.3.0",
     "jsdom": "catalog:",
     "postcss": "catalog:",
+    "stripe": "23.1.0",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",
     "typescript5": "catalog:",

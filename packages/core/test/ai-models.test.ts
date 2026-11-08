@@ -6,6 +6,7 @@ import { seededModelsForProvider } from "../src/ai/model-catalog.ts";
 import { defaultPromptFor } from "../src/ai/prompts.ts";
 import {
   resolveFeatureTier,
+  resolveModelRates,
   resolveTierRoute,
 } from "../src/ai/tier-routing.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -162,6 +163,35 @@ describe("readModelCatalog combines the seeded list with custom entries", () => 
     );
     expect(added.costInPerMillion).toBe(0.5);
     expect(added.costOutPerMillion).toBe(1.5);
+
+    // Read back the way the host reads it. Only the seed was read before, so a
+    // model an administrator added was unpriced, and an unpriced model is
+    // refused: no OpenAI-compatible endpoint could ever answer.
+    await expect(
+      resolveModelRates(wb.appPool, {
+        workspaceId,
+        provider: "openai-compatible",
+        modelId: "self-hosted-mixtral",
+      }),
+    ).resolves.toEqual({ costInPerMillion: 0.5, costOutPerMillion: 1.5 });
+  });
+
+  it("falls back to the seeded price, and to nothing for an unknown model", async () => {
+    const wb = await workerDb();
+    await expect(
+      resolveModelRates(wb.appPool, {
+        workspaceId,
+        provider: "anthropic",
+        modelId: "claude-sonnet-5-5",
+      }),
+    ).resolves.toMatchObject({ costInPerMillion: 2, costOutPerMillion: 10 });
+    await expect(
+      resolveModelRates(wb.appPool, {
+        workspaceId,
+        provider: "anthropic",
+        modelId: "no-such-model",
+      }),
+    ).resolves.toBeUndefined();
   });
 });
 

@@ -4,6 +4,7 @@ import {
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
   registrationRefusal,
+  resolveLegalLinks,
 } from "@openokr/core";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -69,5 +70,10 @@ export default async function SignUpPage() {
       "someone@gmail.com",
     )) === COMPANY_EMAIL_MESSAGE;
 
-  return <SignUpForm companyOnly={companyOnly} />;
+  return (
+    <SignUpForm
+      companyOnly={companyOnly}
+      legal={await resolveLegalLinks(getPool())}
+    />
+  );
 }

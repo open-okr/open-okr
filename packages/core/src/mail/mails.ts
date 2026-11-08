@@ -1,6 +1,7 @@
 /**
  * The workspace mails, in the shared layout (docs/design/email-templates.md
- * §5): the invitation, the notification digest and an agent's nudge.
+ * §5): the invitation, the notification digest, an agent's nudge and the notice
+ * that a workspace closed.
  *
  * Each builder takes data and the workspace's identity and returns the
  * subject and both parts. None reads the database: the callers already hold
@@ -299,4 +300,124 @@ export function renderStoredEmail(input: {
     }),
     input.stored.blocks,
   );
+}
+
+const mailDate = (mail: WorkspaceMail, date: Date): string =>
+  date.toLocaleDateString(mail.locale === "ms" ? "ms-MY" : "en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
+/**
+ * The notice that a workspace closed, to its owners and administrators
+ * (docs/design/workspace-erasure.md §3): who closed it, when it will be deleted,
+ * how to export it, and whether they can undo it.
+ */
+export function closureMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  /** Null when the provider closed it. */
+  readonly closedByName: string | null;
+  readonly closedAt: Date;
+  /** Null while retention is off: nothing will delete it. */
+  readonly eraseOn: Date | null;
+  readonly ownerMayReopen: boolean;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const closed = mailDate(mail, input.closedAt);
+  const erase = input.eraseOn ? mailDate(mail, input.eraseOn) : null;
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: erase
+        ? t("closed.preheader", { date: erase })
+        : t("closed.preheaderKept"),
+      footer: t("closed.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("closed.eyebrow") },
+      { kind: "heading", text: t("closed.heading", { workspace }) },
+      {
+        kind: "paragraph",
+        parts: input.closedByName
+          ? [{ bold: input.closedByName }, t("closed.by", { date: closed })]
+          : [t("closed.byProvider", { date: closed })],
+      },
+      {
+        kind: "paragraph",
+        parts: [
+          erase ? t("closed.deletedOn", { date: erase }) : t("closed.kept"),
+        ],
+      },
+      {
+        kind: "action",
+        label: t("closed.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/imports`,
+      },
+      {
+        kind: "notice",
+        parts: [
+          input.ownerMayReopen
+            ? t("closed.mayReopen")
+            : t("closed.providerReopens"),
+        ],
+      },
+    ],
+  );
+  return { subject: t("closed.subject", { workspace }), html, text };
+}
+
+/**
+ * The reminder seven days before a closed workspace is erased
+ * (docs/design/workspace-erasure.md §12, decision 3). The last chance to export it.
+ */
+export function erasureReminderMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly closedAt: Date;
+  readonly eraseOn: Date;
+  readonly ownerMayReopen: boolean;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const date = mailDate(mail, input.eraseOn);
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("reminder.preheader"),
+      footer: t("closed.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("reminder.eyebrow") },
+      { kind: "heading", text: t("reminder.heading", { workspace, date }) },
+      {
+        kind: "paragraph",
+        parts: [
+          t("reminder.body", {
+            closed: mailDate(mail, input.closedAt),
+            date,
+          }),
+        ],
+      },
+      {
+        kind: "action",
+        label: t("closed.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/imports`,
+      },
+      {
+        kind: "notice",
+        parts: [
+          input.ownerMayReopen
+            ? t("closed.mayReopen")
+            : t("closed.providerReopens"),
+        ],
+      },
+    ],
+  );
+  return { subject: t("reminder.subject", { workspace, date }), html, text };
 }

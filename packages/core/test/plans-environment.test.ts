@@ -9,7 +9,7 @@ import { readPlans } from "../src/tenancy/plans.ts";
  * or said how to, so a cloud instance offered Free and nothing else.
  * OPENOKR_CLOUD_PLANS now bootstraps it, and a stored catalogue still wins.
  */
-const TEAM = [{ key: "team", name: "Team", seats: 20, aiMonthlyUsd: 50 }];
+const TEAM = [{ key: "team", name: "Team", seats: 20 }];
 
 beforeEach(async () => {
   const wb = await workerDb();
@@ -46,9 +46,7 @@ describe("the plan catalogue", () => {
   it("prefers a stored catalogue over the variable", async () => {
     const wb = await workerDb();
     process.env.OPENOKR_CLOUD_PLANS = JSON.stringify(TEAM);
-    const stored = [
-      { key: "small", name: "Small", seats: 5, aiMonthlyUsd: null },
-    ];
+    const stored = [{ key: "small", name: "Small", seats: 5 }];
     await wb.admin.query(
       "insert into system_settings (key, value) values ('cloud.plans', $1::jsonb)",
       [JSON.stringify(stored)],

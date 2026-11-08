@@ -158,6 +158,27 @@ case "$health" in
 esac
 pass "the scheduler is running and the tenant floor is enforced"
 
+# --- the operator command runs inside the image -----------------------------
+# A provider on this target has no checkout, so `pnpm cloud:operator` is not there
+# for them. The image holds a pruned copy of the sources, so a module the command
+# needs and the copy lacks only fails here. Nobody has signed up yet, and being
+# told so is the proof it loaded and reached the database.
+if ./openokr operator --email ops@example.com --granted-by founder@example.com 2>&1 \
+  | grep -q "Nobody has signed up"; then
+  pass "the operator command runs inside the image"
+else
+  fail "the operator command does not run inside the image"
+fi
+
+# The erasure command too (docs/design/workspace-erasure.md §7), for the same
+# reason. A dry run on an instance that is not a cloud: being told so is the proof
+# it loaded, connected as the owner role and found it may delete audit rows.
+if ./openokr erase 2>&1 | grep -q "This instance is not a cloud"; then
+  pass "the erasure command runs inside the image, and erases nothing here"
+else
+  fail "the erasure command does not run inside the image"
+fi
+
 # --- an unconfigured instance leads to the wizard --------------------------
 location=$(curl -s -o /dev/null -w '%{redirect_url}' "$BASE/sign-in")
 case "$location" in

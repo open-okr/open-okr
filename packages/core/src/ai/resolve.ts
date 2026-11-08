@@ -189,7 +189,7 @@ async function findCredential(
  * member's key waits for them rather than answering a request queued before
  * the suspension.
  */
-async function activePersonFor(
+export async function activePersonFor(
   pool: Pool,
   workspaceId: string,
   userId: string,

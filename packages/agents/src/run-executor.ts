@@ -590,7 +590,11 @@ export interface AgentRunHost {
    * The provider and model a tier routes to for this workspace, or null when
    * nothing is configured for it. `providerForTier` in the web app.
    */
-  modelFor(workspaceId: string, tier: ModelTier): Promise<AgentRunModel | null>;
+  modelFor(
+    workspaceId: string,
+    tier: ModelTier,
+    agentId: string,
+  ): Promise<AgentRunModel | null>;
 }
 
 /**
@@ -615,6 +619,7 @@ export async function continueAgentRun(
         status: agentRuns.status,
         currentTaskIndex: agentRuns.currentTaskIndex,
         tier: agents.tier,
+        agentId: agents.id,
       })
       .from(agentRuns)
       .innerJoin(agents, eq(agents.id, agentRuns.agentId))
@@ -648,6 +653,7 @@ export async function continueAgentRun(
   const model = await host.modelFor(
     job.workspaceId,
     current.tier ?? DEFAULT_AGENT_RUN_TIER,
+    current.agentId,
   );
 
   try {

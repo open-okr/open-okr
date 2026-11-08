@@ -185,6 +185,7 @@ Sign in as any of these:
   ...
 
 Password: northwind-uat-2026
+Titles, managers and spaces are left empty on purpose. UAT modules M06 and M07 set them.
 ```
 
 `--password <at least 12 characters>` sets a different shared password.

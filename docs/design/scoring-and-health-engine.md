@@ -18,15 +18,22 @@ decision register. Decisions D-1, D-2, D-3, D-4, D-5 and D-13 land here.
 ## 1. Contract
 
 ```
-recomputeGoal(graph, change, thresholds) -> { goals: GoalDerived[], keyResults: KeyResultDerived[], diagnostics: Diagnostic[] }
+keyResultProgress(input, thresholds) -> number
+cascadeProgress(goals, thresholds, { rollUp }) -> { goals: Map<goalId, pct>, diagnostics: string[] }
+goalHealth(input) -> GoalHealth
+trendForecast(points, horizon, target, minimumValues) -> { projected, trendingOffTrack } | null
 ```
+
+`packages/core/src/scoring/recompute.ts` calls them through
+`recomputeForGoal(tx, workspaceId, goalId, thresholds, now)` and
+`recomputeForCycle(...)`, inside the writing transaction.
 
 | Rule | Detail |
 |---|---|
 | Pure | No database, no clock, no network. The clock is an argument (`now`), the thresholds are an argument |
 | Total | Every input produces an answer. Nothing throws on bad data. Impossible states become a diagnostic and a defined value |
 | Rounding | Stored percentages carry 2 decimals, rounded half away from zero. Rounding happens once, at the boundary, never between cascade levels |
-| Clamping | Progress is clamped to 0 to 100 after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure. Since guided-inputs §4.8 an action refuses a weight outside the range rather than clamping it; the service and the importers still clamp |
+| Clamping | Progress is clamped to 0 to the progress ceiling (100 by default) after the direction formula, before weighting. Weights are clamped to 0 to 100 inside the average as well as on write, because an imported row carrying 150 must not dominate a company figure. Since guided-inputs §4.8 an action refuses a weight outside the range rather than clamping it; the service and the importers still clamp |
 
 Three numbers stay separate everywhere and are never averaged together
 (METHOD.md §3): progress is backward-looking 0 to the progress ceiling,
@@ -133,12 +140,15 @@ is 0%, not 89%.
 
 ## 3. Goal progress and the upward cascade
 
-METHOD.md §3.1: the weighted average of the key results' progress, including
-the weighted contribution of goals aligned beneath it.
+METHOD.md §3.1: the weighted average of the key results' progress, and, where
+the practice turns roll-up on (`progress.rollUp`, off by default since
+P9-T12b), the weighted contribution of goals aligned beneath it. The matrices
+below are read with roll-up on, which is what `cascadeProgress` does when the
+option is left out.
 
 | Rule | Detail |
 |---|---|
-| Items | Every key result of the goal, plus every goal whose parent pointer targets this goal **or any of its key results** |
+| Items | Every key result of the goal, plus, with roll-up on, every goal whose parent pointer targets this goal **or any of its key results** |
 | Weights | `weight` held to 0 to 100: refused outside it by an action, clamped by the service and the importers. Weight 0 excludes an item from the average while keeping it visible |
 | No items, or total weight 0 | Progress 0 (decision D-3) |
 | A child aligned to a key result | Contributes to this **goal**, and leaves that key result's own measured progress alone (decision D-2) |
@@ -213,7 +223,7 @@ METHOD.md §3.5. Precedence, first match wins. Never a formula over progress.
 
 | Order | Condition | Health |
 |---|---|---|
-| 1 | `closed_at` is set | `achieved` or `missed`, from `success_status` |
+| 1 | `closed_at` is set | `achieved`, `missed` or `abandoned`, from `success_status` |
 | 2 | Now is later than `next_check_in_at` plus the staleness grace | `outdated` |
 | 3 | A published check-in exists | Its `status`: `on_track`, `caution`, `off_track` |
 | 4 | Otherwise | `pending` |
@@ -247,8 +257,14 @@ outdated.
 
 ## 5. The progress signal
 
-METHOD.md §3.7. A red, amber or green signal from progress alone, shown beside
-health and never instead of it.
+METHOD.md §3.7. A red, amber or green signal, shown beside health and never
+instead of it.
+
+**Pace-aware by default since P9-T15a** (practice `progress.signal`): progress
+is compared with the progress expected for the date (`expectedProgressPct`),
+amber when behind by more than 10 points and red when behind by more than 25
+(`scoring.progressSignalPaceGaps`). The absolute signal below, which the matrix
+covers, applies where the workspace chooses it or no cycle dates are known.
 
 | Condition | Signal |
 |---|---|
@@ -283,7 +299,8 @@ METHOD.md §3.6, and decision D-5 for the window the canon does not define.
 |---|---|
 | Window | Every `key_result_values` point inside the goal's cycle. For a contextual goal, every point since the goal was created |
 | Horizon | The cycle's `ends_on`. For a contextual goal, the key result's `due_on` |
-| Fit | Ordinary least squares over (timestamp, value). At least two points at distinct timestamps, otherwise no forecast |
+| Fit | Ordinary least squares over (timestamp, value). The product asks for at least `scoring.forecastMinimumValues` points (4 by default, P9-T15a), and never fewer than two at distinct timestamps; otherwise no forecast. The matrix calls `trendForecast` with its own floor of two |
+| Which key results | Metric key results with a target. Milestone, baseline and maintain key results get none (P9-T15a) |
 | Projection | Not clamped. A linear fit can project past the possible, and the comparison is what matters |
 | Trending flag | `increase` and `move`: true when the projection is below the target. `reduce`: true when the projection is above it. `maintain`: true when the projection falls outside the band |
 | Output | `{ projected, trendingOffTrack }` in the key result's `forecast` column, or null |
@@ -316,10 +333,15 @@ wrong, and the forecast already says it will land at 73.
 
 METHOD.md §3.3. Scored at the close against the key result as written.
 
-The score defaults to `progress / 100` when Phase 7 opens, and is editable by
-the facilitator through the scoring surface until the cycle closes. It is never
-recomputed after an edit, because a score is a judgement and progress is a
-measurement.
+The computed score is §2.10's, by kind (`computedScore`): a metric scores its
+progress / 100, capped at 1.0; a maintain scores its share of time inside the
+band; a milestone or a baseline scores 1.0 when done and 0 when not. The room
+grades each key result in the quarterly review with a one-line reason
+(`sessions.scoreKeyResult`), and the session's close writes `score`, keeps
+`score_computed` beside it, and keeps the reason where the two differ. A
+workspace may forbid adjusting the computed number (`scoring.adjustment`). The
+score is never recomputed after it is written, because a score is a judgement
+and progress is a measurement.
 
 Notes are judged by the objective's kind (METHOD.md §2.8, P9-T11a), in the
 canon's order, first match wins. A committed key result short of 1.0 asks for
@@ -348,8 +370,10 @@ Rewritten at P9-T14a for METHOD v2's bands, 1.0, 0.6 and 0.3: a key result is ac
 
 ## 8. The portfolio verdict
 
-METHOD.md §3.4, the average across any scored set. Boundaries are inclusive at
-the bottom of each band except the top one, which the canon words as "above".
+METHOD.md §3.4, the average across a scored set of aspirational key results.
+Committed key results are judged by the share met instead (`committedShareMet`).
+Boundaries are inclusive at the bottom of each band except the top one, which
+the canon words as "above".
 
 <!-- golden: scoring.portfolio -->
 
@@ -386,8 +410,11 @@ METHOD.md §3.2. Per key result, live.
 | no confidence at all | 0 | low | yes |
 
 The same-day escalation column is the one extra rule inside the low band: at
-0.3 and below the coordinator raises it with management the same day. The nudge
-engine at P4-T05 consumes this flag; P3-T05 only computes it.
+0.3 and below the sponsor is told the same day, but only where the workspace
+turns on `escalation.criticalConfidence`, which is off by default. A fall into
+the low band tells the coordinator either way (`confidence.critical`). P3-T05
+only computes the flag; the Champion's rhythm triggers act on it
+(`packages/core/src/nudges/rhythm-triggers.ts`).
 
 ## 10. The draft set verdict
 
@@ -427,8 +454,10 @@ date passed four days ago with a three-day grace, **when** any surface renders
 it, **then** its health reads `outdated`.
 
 **Given** a key result at 12 against a target of 100 with three rising points,
-**when** the forecast runs, **then** it projects 73.33 and flags the key result
-as trending off track, before any human changes its status.
+**when** `trendForecast` runs with its own floor of two, **then** it projects
+73.33 and flags the key result as trending off track, before any human changes
+its status. The product's floor is §11's `scoring.forecastMinimumValues`, 4 by
+default, so the recompute waits for a fourth point.
 
 **Given** a reduce-direction key result from 9 to 2, **when** its value is 2,
 **then** progress reads 100%, and **when** its value is 12, **then** progress

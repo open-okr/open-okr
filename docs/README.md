@@ -4,9 +4,11 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 
 | You are | Start here |
 |---|---|
+| Deciding how to run it: a managed cloud, your own cloud, a group, or one organisation | [Choose a setup](install/setups.md) |
 | Putting OpenOKR on a server | [Install on one server](install/compose.md) |
 | Putting it on Kubernetes | [Install on Kubernetes](install/kubernetes.md) |
 | Using the managed cloud | [Start on the cloud](install/cloud.md) |
+| Running several companies on one instance | [One instance for several companies](install/group.md) |
 | Running an instance somebody installed | [Administrator guide](admin/README.md) |
 | Using OpenOKR day to day | [User guide](use/README.md) |
 | Running your organisation's OKRs | [The OKR handbook](handbook/README.md) |
@@ -17,9 +19,11 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 
 | Page | What it covers |
 |---|---|
+| [Choose a setup](install/setups.md) | The four ways one release runs, who does what in each, and the settings behind them |
 | [One server with Docker Compose](install/compose.md) | The whole install, from an empty machine to a signed-in owner |
 | [Kubernetes with Helm](install/kubernetes.md) | What the chart does, what it deliberately does not, and the secret to back up |
 | [The managed cloud](install/cloud.md) | Signing up, and what the vendor operates |
+| [One instance for several companies](install/group.md) | A workspace per company on your own servers, and running your own model |
 | [The first run](install/first-run.md) | The wizard, the owner account, and the five things to do next |
 | [A public demonstration instance](install/demo.md) | The seeded, self-resetting instance anybody can sign into |
 | [A staging instance for acceptance testing](install/staging.md) | An empty instance plus seven test accounts, for testing by hand |
@@ -79,7 +83,7 @@ Written for the person holding the pager, not for a reader.
 | [The method](specification/METHOD.md) | The OKR practice canon. Every rule, threshold, gate and practice setting the product runs |
 | [The specification](specification/README.md) | Requirements, architecture, the schema, the AI design and the interface |
 | [The designs](design/) | The detailed design of each engine and subsystem |
-| [Reference mockups](mockups/README.md) | Eleven screens drawn from the interface specification |
+| [Reference mockups](mockups/README.md) | Key screens drawn from the interface specification |
 | [Governance](../GOVERNANCE.md) | Who decides what |
 | [Contributing](../CONTRIBUTING.md) | Getting a development instance running |
 
@@ -88,5 +92,7 @@ Written for the person holding the pager, not for a reader.
 `pnpm check:docs` refuses a link that resolves to nothing, a page nothing leads
 to, and an instruction naming a command that does not exist. It also checks
 every threshold [the numbers](handbook/numbers.md) quotes against the method
-registry, and the [API reference](api/reference.md) against the contract it is
-generated from. A page here cannot quietly stop being true.
+registry, the [API reference](api/reference.md) against the contract it is
+generated from, and every release a page pins against the current version. It
+cannot check what a sentence says the product does, so a change to behaviour
+updates the pages that describe it in the same change.

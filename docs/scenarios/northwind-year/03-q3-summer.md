@@ -46,7 +46,7 @@ Published 14 July. Two per unit at most.
 
 ## Planning Q3
 
-**NW-Q3-01 · 21 to 28 Jun · Leadership, Elena · S-05, S-09, S-36 · METHOD §8.9, §12**
+**NW-Q3-01 · 21 to 28 Jun · Leadership, Elena · S-07, S-09, S-36 · METHOD §8.9, §12**
 Phase 2 runs after Q2's retrospective and ranks the strategic issues:
 1. Brightline (impact 5).
 2. Margin (5).
@@ -72,19 +72,19 @@ June's readings are recorded:
 Both KPIs read unhealthy, their real band, with their six-month trends.
 *Test:* Given operating margin at 7.8 in May and 7.6 in June with a red boundary of 8, when June's reading is recorded, then the KPI reads unhealthy for the second consecutive period.
 
-**NW-Q3-04 · 6 Jul (W1) · Coach, Hugo, Elena, Tomás · S-02 review inbox, S-19 recovery board · METHOD §6.5, §5.3**
-Two consecutive unhealthy periods make the coach propose, not create, a response for each KPI. The proposals land in the review inbox with the three responses.
+**NW-Q3-04 · 6 Jul (W1) · Champion, Hugo, Elena, Tomás · S-02 review inbox, S-19 recovery board · METHOD §6.5, §5.3**
+Two consecutive unhealthy periods make the Champion propose, not create, a response for each KPI. The proposals land in the review inbox with the three responses.
 
 **Operating margin.** Elena and Hugo choose a recovery OKR. The draft:
 - committed;
 - a number-free objective, "Margins we can run the business on again", with the why left to Hugo;
 - its first key result is the KPI itself, 7.6% to its healthy boundary of 13.5%;
-- then the leading drivers that are below target and have owners: expansion seats, tickets per account and self-serve deflection.
+- then the leading drivers in the margin's own tree that are below target and have owners, which here is tickets per account alone. Deflection sits under tickets and expansion seats in the Growth tree, so neither is drawn in.
 
-The semantic review flags two of them, "These two claim the same movement": tickets per account is already C2.2, and deflection is already SU1.1. Hugo removes both and adds "Average renewal discount 14% → 6%", the lever Brightline's discounting opened. C6 launches inside the publication window, so it is part of Q3's plan.
+The semantic review flags that driver, "These two claim the same movement": tickets per account is already C2.2. Hugo removes it and adds expansion seats and "Average renewal discount 14% → 6%", the lever Brightline's discounting opened. C6 launches inside the publication window, so it is part of Q3's plan.
 
 **Expansion seats.** Tomás chooses the second response, "add a key result", and records that C6.2 is that key result.
-*Test:* Given two unhealthy periods, when June's reading is recorded, then the coach proposes, and the draft is committed, its objective has no number, and its first key result is the KPI from 7.6 to 13.5. Given a drafted driver already owned by another objective's key result, then the semantic review flags a possible double count (AI on).
+*Test:* Given two unhealthy periods, when June's reading is recorded, then the Champion proposes, and the draft is committed, its objective has no number, and its first key result is the KPI from 7.6 to 13.5. Given a drafted driver already owned by another objective's key result, then the semantic review flags a possible double count (AI on).
 
 **NW-Q3-05 · Jul to Sep · Hugo, Elena · S-19 recovery board, S-21 KPI detail · METHOD §6.4**
 While C6 runs, the operating margin KPI shows its real band beside the recovery's progress, never a projection in place of the reading.

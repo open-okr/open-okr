@@ -54,9 +54,9 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
     apiOnly: true,
     why: "an agent checks a draft before creating it; the browser's composer runs the same checks as the person types",
   },
-  "workspace.provision": {
-    caller: "packages/core/src/workspaces/provisioning.ts",
-    why: "the pipeline calls it, from registration and the setup wizard",
+  "workspace.changePlan": {
+    caller: "packages/core/src/operator/plans.ts",
+    why: "an operator's plan change on the console is audited under it; a workspace's own members are refused",
   },
   "people.importMember": {
     caller: "packages/importer/src/flowyteam/mappers/organisation.ts",
@@ -118,13 +118,6 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   "cycles.snapshot": {
     caller: "packages/core/src/demo/builder.ts",
     why: "the demo builder records a closed cycle's result through it; a person records it by closing the cycle with `cycles.close`",
-  },
-  // The operator console presses it through the typed
-  // `setLifecycleAsOperator` rather than by naming the action, so the scan of
-  // the browser code walks past a caller that is real.
-  "workspace.setLifecycle": {
-    caller: "packages/core/src/operator/lifecycle.ts",
-    why: "the operator console suspends, closes and reopens a workspace through the typed `setLifecycleAsOperator`, which runs this",
   },
 
   "goals.reviewDecision": {

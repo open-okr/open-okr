@@ -43,6 +43,7 @@ import type {
   EmbedResponse,
   ExtractRequest,
   ModelCapabilities,
+  TokenUsage,
   ToolDefinition,
 } from "../ports/ai.ts";
 import { isBlockedAddress } from "./guard.ts";
@@ -427,7 +428,31 @@ export interface EgressGuardOptions {
    * still refused or still redacted.
    */
   readonly onWithheld?: (event: AIEgressEvent) => void | Promise<void>;
+  /**
+   * Told what each call used, once it has an answer. A failure here does not
+   * lose the answer: the provider has already been paid for it.
+   */
+  readonly onUsage?: (record: AIUsageRecord) => void | Promise<void>;
 }
+
+/** What one provider call used, for whoever is keeping count. */
+export interface AIUsageRecord {
+  readonly model: string;
+  /** Which feature asked, when the caller said. */
+  readonly feature?: string;
+  readonly usage: TokenUsage;
+  /** True when the provider gave no total and this is counted from the text. */
+  readonly estimated: boolean;
+}
+
+/**
+ * Four characters to a token, the usual rough rule for English.
+ *
+ * Only for a stream with no total. It is close enough to keep a cap honest, and
+ * being exact would mean shipping every provider's tokeniser.
+ */
+const estimateTokens = (characters: number): number =>
+  Math.ceil(characters / 4);
 
 /**
  * A provider every call to which passes the workspace's egress controls.
@@ -459,27 +484,69 @@ export class EgressGuardedProvider implements AIProvider {
   }
 
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    return this.#inner.chat(await this.#admitChat(request));
+    const response = await this.#inner.chat(await this.#admitChat(request));
+    await this.#record(request, response.usage);
+    return response;
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
-    yield* this.#inner.stream(await this.#admitChat(request));
+  /**
+   * Recorded in `finally`, because a reader who stops an answer still cost what
+   * was generated, and stopping must not be a way to spend for free. A stream
+   * cut short never reports a total, so that one is counted from the text.
+   */
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
+    const admitted = await this.#admitChat(request);
+    let counted: TokenUsage | undefined;
+    let written = 0;
+    try {
+      for await (const piece of this.#inner.stream(admitted, (usage) => {
+        counted = usage;
+        onUsage?.(usage);
+      })) {
+        written += piece.length;
+        yield piece;
+      }
+    } finally {
+      const sent = admitted.messages.reduce(
+        (total, message) => total + message.content.length,
+        0,
+      );
+      await this.#record(
+        request,
+        counted ?? {
+          inputTokens: estimateTokens(sent),
+          outputTokens: estimateTokens(written),
+        },
+        counted === undefined,
+      );
+    }
   }
 
   async chatWithTools(
     request: ChatRequest & { readonly tools: readonly ToolDefinition[] },
   ): Promise<ChatResponse> {
-    return this.#inner.chatWithTools(await this.#admitChat(request));
+    const response = await this.#inner.chatWithTools(
+      await this.#admitChat(request),
+    );
+    await this.#record(request, response.usage);
+    return response;
   }
 
   async extract(request: ExtractRequest): Promise<ChatResponse> {
-    return this.#inner.extract(await this.#admitChat(request));
+    const response = await this.#inner.extract(await this.#admitChat(request));
+    await this.#record(request, response.usage);
+    return response;
   }
 
   /** Always retrieval: an embedding is the search index being built. */
   async embed(request: EmbedRequest): Promise<EmbedResponse> {
     const input = await this.#admit("retrieval", request.input);
-    return this.#inner.embed({ ...request, input });
+    const response = await this.#inner.embed({ ...request, input });
+    await this.#record(request, response.usage);
+    return response;
   }
 
   capabilities(model: string): ModelCapabilities {
@@ -543,6 +610,24 @@ export class EgressGuardedProvider implements AIProvider {
       await this.#report({ purpose, outcome: "redacted", emails, phones });
     }
     return redacted;
+  }
+
+  async #record(
+    request: { readonly model: string; readonly feature?: string },
+    usage: TokenUsage,
+    estimated = false,
+  ): Promise<void> {
+    try {
+      await this.#options.onUsage?.({
+        model: request.model,
+        ...(request.feature ? { feature: request.feature } : {}),
+        usage,
+        estimated,
+      });
+    } catch {
+      // The provider has answered and been paid. Losing the answer as well
+      // over a row that could not be written would help nobody.
+    }
   }
 
   async #report(

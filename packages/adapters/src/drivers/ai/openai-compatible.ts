@@ -19,6 +19,7 @@ import type {
   EmbedResponse,
   ExtractRequest,
   ModelCapabilities,
+  TokenUsage,
   ToolDefinition,
 } from "../../ports/ai.ts";
 
@@ -69,6 +70,15 @@ function toTool(tool: ToolDefinition): OpenAI.Chat.ChatCompletionTool {
   };
 }
 
+const usageOf = (usage: OpenAI.CompletionUsage | undefined): TokenUsage => {
+  const cached = usage?.prompt_tokens_details?.cached_tokens ?? 0;
+  return {
+    inputTokens: usage?.prompt_tokens ?? 0,
+    outputTokens: usage?.completion_tokens ?? 0,
+    ...(cached > 0 ? { cachedInputTokens: cached } : {}),
+  };
+};
+
 function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
   const message = completion.choices[0]?.message;
   const usage = completion.usage;
@@ -89,10 +99,7 @@ function fromCompletion(completion: OpenAI.Chat.ChatCompletion): ChatResponse {
 
   return {
     content: message?.content ?? "",
-    usage: {
-      inputTokens: usage?.prompt_tokens ?? 0,
-      outputTokens: usage?.completion_tokens ?? 0,
-    },
+    usage: usageOf(usage),
     ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
   };
 }
@@ -124,7 +131,10 @@ export class OpenAiCompatibleProvider implements AIProvider {
     return fromCompletion(completion);
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
     const stream = await this.#client.chat.completions.create({
       ...this.#extraBody,
       model: request.model,
@@ -132,8 +142,13 @@ export class OpenAiCompatibleProvider implements AIProvider {
       temperature: request.temperature,
       max_completion_tokens: request.maxTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
       stream: true,
+      // Without this the API sends no token counts on a stream at all.
+      stream_options: { include_usage: true },
     });
     for await (const chunk of stream) {
+      if (chunk.usage) {
+        onUsage?.(usageOf(chunk.usage));
+      }
       const delta = chunk.choices[0]?.delta?.content;
       if (delta) {
         yield delta;

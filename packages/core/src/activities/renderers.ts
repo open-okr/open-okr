@@ -29,6 +29,7 @@ const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
 
 export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "workspace.provisioned": (p) => `Workspace "${asString(p.name)}" created`,
+  "workspace.adopted": () => "Workspace added to the operator console",
   "workspace.renamed": (p) =>
     `Workspace renamed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "workspace.onboarded": () => "Workspace setup finished",
@@ -38,8 +39,15 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "support.granted": (p) =>
     `Support access granted for ${asCount(p.hours)} hours`,
   "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
+  "workspace.erasure_reminded": (p) =>
+    `The owners and administrators were reminded that the workspace is deleted on ${asString(p.eraseOn).slice(0, 10)}`,
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
+  "billing.requested": () => "Somebody used the billing screen",
+  "billing.credits_purchased": (p) =>
+    `${String(p.credits)} AI credits were bought`,
+  "billing.subscription_changed": (p) =>
+    `The subscription is now ${asString(p.status)}`,
   "workspace.plan_changed": (p) =>
     typeof p.seats === "number"
       ? `Workspace moved to the ${asString(p.plan)} plan, with ${p.seats} seats`

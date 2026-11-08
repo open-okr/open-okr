@@ -39,7 +39,7 @@ compared the result against §3. Eight rows is not a design; it is a changelog.
 ## 2. The fourth is deliberate and is the product
 
 Drafting is blocked until the earlier phases pass. That is METHOD.md §2,
-implemented in [phaseWorkAllowed](../../packages/method/src/workflow.ts#L1035),
+implemented in [phaseWorkAllowed](../../packages/method/src/workflow.ts#L1200),
 and it is the reason this product is not a tracker. The FlowyTeam screen in the
 complaint shows four key results at 100 per cent with no signal about whether
 any of them was worth measuring. Copying that layout means copying that

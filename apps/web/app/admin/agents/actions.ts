@@ -4,7 +4,7 @@ import { loadEnv } from "@openokr/config";
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
-import { drafterFor } from "../../../lib/drafter";
+import { drafterForAgent } from "../../../lib/drafter";
 import { getInstanceName } from "../../../lib/instance-name";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -38,7 +38,7 @@ export async function runChampionAction(
   // No reader passed: this is the Champion's run, whoever pressed the button,
   // so it speaks on the workspace's key and never on the administrator's own
   // (completeness review M-36).
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterForAgent(workspace.workspaceId, "champion");
   await callAction(
     {
       pool: getPool(),
@@ -62,7 +62,7 @@ export async function runChampionAction(
 export async function runCoachAction() {
   const { session, workspace } = await requireWorkspace();
   // The Coach's run, on the workspace's key, for the same reason (M-36).
-  const drafter = await drafterFor(workspace.workspaceId);
+  const drafter = await drafterForAgent(workspace.workspaceId, "coach");
   await callAction(
     {
       pool: getPool(),

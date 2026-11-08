@@ -2,9 +2,11 @@ import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
   callAction,
-  isCloudEnabled,
+  hasPlanScreen,
+  mayCreateOwnWorkspace,
   navigationFor,
   OperationError,
+  resolveSourceUrl,
 } from "@openokr/core";
 import {
   AppShell,
@@ -40,9 +42,11 @@ import { AppFooter } from "./app-footer.tsx";
 import { AppearanceControl, AppearanceSync } from "./appearance.tsx";
 import { getAuth } from "./auth.ts";
 import { brandingImageUrl } from "./branding-image.ts";
+import { CreditsBanner } from "./credits-banner.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
 import { embedFor } from "./embedder";
+import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { getInstanceName } from "./instance-name";
 import { navBlocks, navLabel } from "./nav-groups.ts";
@@ -290,10 +294,10 @@ export async function AppShellLayout({
   // The pages the palette offers (completeness review M-21): the sidebar's,
   // the account's and the administration cards, from the same registry and
   // filtered by the same level, so the palette can open nothing the sidebar
-  // would not. A cloud-only card is left out on a self-hosted instance, as the
-  // admin layout leaves it out.
-  const cloud = adminItems.some((item) => item.cloudOnly)
-    ? await isCloudEnabled(getPool())
+  // would not. The plan card is left out with no plans to read, as the admin layout
+  // leaves it out.
+  const plans = adminItems.some((item) => item.needsPlans)
+    ? await hasPlanScreen(getPool())
     : false;
   const paletteDestinations: PaletteDestination[] = [
     ...sidebarItems.map((item) => ({
@@ -309,7 +313,7 @@ export async function AppShellLayout({
       area: "page" as const,
     })),
     ...adminItems
-      .filter((item) => cloud || !item.cloudOnly)
+      .filter((item) => plans || !item.needsPlans)
       .map((item) => ({
         id: item.id,
         label: item.label,
@@ -336,6 +340,11 @@ export async function AppShellLayout({
           // has rendered, which drew every admin visit twice.
           { href: "/admin/general", label: t("shell.avatar.workspaceAdmin") },
         ]
+      : []),
+    // Only where sign-up is open to this person, because anywhere else the page
+    // it opens is not-found (docs/design/hosting-profiles.md §3).
+    ...((await mayCreateOwnWorkspace(getPool(), session.user.email))
+      ? [{ href: "/workspaces/new", label: t("shell.avatar.newWorkspace") }]
       : []),
   ];
 
@@ -447,6 +456,7 @@ export async function AppShellLayout({
               avatarMenu={
                 <AvatarMenu
                   name={workspace.name}
+                  sourceUrl={await resolveSourceUrl(getPool())}
                   // From the registry rather than a literal list. A literal one
                   // is how /account/channels shipped unlinked at P5-T02c and how
                   // /account/connections was still unlinked four tasks later:
@@ -503,6 +513,7 @@ export async function AppShellLayout({
            * one that is about who is looking over the reader's shoulder, and
            * the only one that cannot be dismissed. */}
           <SupportBanner workspaceId={workspace.workspaceId} />
+          <CreditsBanner workspaceId={workspace.workspaceId} />
           {/* What the vendor is saying, above the workspace's own state
            * banner (P8-T03c). A site message is news from outside the
            * organisation and the state banner is a fact about the workspace,
@@ -516,6 +527,7 @@ export async function AppShellLayout({
               <WorkspaceStateBanner
                 state={workspace.state}
                 canRecover={level >= ACCESS_LEVELS.full}
+                hold={await readHold(workspace.workspaceId)}
               />
             </div>
           )}

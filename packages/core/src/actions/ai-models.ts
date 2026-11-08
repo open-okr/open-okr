@@ -344,7 +344,7 @@ const tierRouteOutput = z.object({
   modelId: z.string().nullable(),
   temperature: z.number().nullable(),
   maxTokens: z.number().int().nullable(),
-  source: z.enum(["policy", "seeded-default", "unresolved"]),
+  source: z.enum(["policy", "seeded-default", "deployment", "unresolved"]),
 });
 
 export const readTierRouting = defineReadAction({

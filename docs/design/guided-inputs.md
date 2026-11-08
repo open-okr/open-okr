@@ -1,6 +1,6 @@
 # Guided input fields
 
-**Status: design approved on 8 October 2026. Nothing here is built yet.** Asked for on 8 October 2026: review every input field, and replace free text with guided, validated input where the value has a known format. Every decision in §8 was answered the same day.
+**Status: design approved on 8 October 2026. Changes 1a to 13b in §6 are built; `PhoneInput` (§4.12) and the server field errors of §4.2 are not.** Asked for on 8 October 2026: review every input field, and replace free text with guided, validated input where the value has a known format. Every decision in §8 was answered the same day.
 
 This document is the review and the plan. §1 answers the request in one table. §2 is what the review found. §3 and §4 are the design. §5 lists the defects found along the way. §6 is the order of work, §7 the acceptance criteria and §8 the decisions that need a person. The appendix goes field by field.
 
@@ -60,7 +60,7 @@ Every `<input>`, `<textarea>`, `<select>` and editor in `apps/web` and `packages
 1. **The server stays the authority.** A browser check is guidance. Every rule the browser checks is the server's own rule, from one shared function (§4.1), so the two cannot disagree.
 2. **Guide while typing, judge on leaving.** A format error appears when the person leaves the field or submits, never on the first keystroke. Coaching verdicts keep their UIUX-PLAN §4 behaviour: they never block typing.
 3. **Keep what the browser does well.** Native date and time controls stay. They are accessible, they open the phone's own picker, and they cost no dependency. The kit adds bounds, ranges, the right timezone and a relative label.
-4. **No new runtime dependency.** Everything in §4 is built on what is installed: Base UI 1.0.0-rc.0 (`Field`, `Form`, `Combobox`, `Autocomplete`, `NumberField`, `Toolbar`), TipTap 3.31.4 and the browser's `Intl`. The one exception is the phone input, which waits for Q1.
+4. **No new runtime dependency.** Everything in §4 is built on what is installed: Base UI 1.0.0-rc.0 (`Field`, `Form`, `Combobox`, `Autocomplete`, `NumberField`, `Toolbar`), TipTap 3.32.2 and the browser's `Intl`. The one exception is the phone input, which waits for Q1.
 5. **One skin.** One token-based style per density replaces the 99 class strings.
 6. **A label, a description and an error, linked.** UIUX-PLAN §7 already requires it. The kit makes it the only way to draw a field.
 7. **No practice changes.** No rule, threshold or message in METHOD.md moves. Where a field touches the method (confidence, due dates, titles), the kit reads `packages/method` and the workspace's practice settings.
@@ -84,11 +84,11 @@ The kit lives in `packages/ui/src/fields/` and is exported from `@openokr/ui`. E
 |---|---|
 | `isEmailAddress(text)` | `EmailInput`, invitations, sign-up |
 | `isDomain(text)` | Trusted domains, invitation domains and SSO domains, which follow three different rules today |
-| `isHostname(text)` | The AI egress allow-list |
-| `isHttpUrl(text, { httpsOnly })` | The AI base URL and the SSO URLs |
-| `isLocalDate(text)`, `isClockTime(text)` | Every date and time field |
-| `isHexColour(text)`, `isStatusLikeColour(hex)` | Branding, which refuses red, amber and green |
-| `normaliseTimezone(name, zones)` | `TimezoneSelect` and `timezoneSchema` |
+| `isHostName(text)`, `hostOf(entry)` | The AI egress allow-list |
+| `isWebUrl(text, { secure })` | The AI base URL and the SSO URLs |
+| `isLocalDate(text)`, `isWallClock(text)` | Every date and time field |
+| `isHexColour(text)`, `statusHueOf(hex)` | Branding, which refuses red, amber and green |
+| `isListedTimezone(name)`, `matchListedTimezone(name)`, `listTimezones()` | `TimezoneSelect` and `timezoneSchema` |
 | `DEVICE_CODE_ALPHABET`, `DEVICE_USER_CODE_GROUPS`, `formatDeviceUserCode` | `CodeInput` for a terminal login code, and the code the server issues |
 
 **The alternative.** Keep the rules in a pure subpath of core, `@openokr/core/formats`, and pass each rule into the kit as a prop, the way the editor already takes `validate`. That adds no package, but every call site has to remember to wire in the check. Q2 chose the new package, so TECHNICAL-PLAN §1's package table and PLAN.md's package list gain `packages/formats` in change 1.
@@ -180,7 +180,7 @@ The existing `RichTextEditor` gains a `variant` prop:
 | `packages/core/src/rich-text/schema.ts` | `underline` joins the mark allow-list. The schema version stays 1: every stored document is still valid |
 | `packages/core/src/rich-text/render.ts` | `underline` renders as `<u>`, so the screen, email and exports show it |
 | `excerpt.ts`, chat messages, search, embeddings | Nothing. They read plain text, and an underline has no text of its own |
-| `packages/ui/src/rich-text/editor.tsx` | StarterKit's `underline` extension is switched on (it ships in the installed version and is disabled today) |
+| `packages/ui/src/rich-text/editor.tsx` | The local `Underline` mark from `underline.ts` is added, and StarterKit's own `underline` stays switched off (step 1 below) |
 | `packages/ui/src/styles/rich-text.css` | Links keep their brand colour, and underlined text keeps the text colour, so underlined text never looks like a link. The file arrived with 4c, for the editor and the rendered HTML alike, because the `prose` classes both carried came from a typography plugin the product does not install and lists showed no markers |
 
 **It ships in two steps, as PLAN.md §5.1 asks of anything a newer release writes and an older one reads.** An editor built without the underline mark cannot load a document that carries one: ProseMirror refuses a mark its schema does not know. During a rolling upgrade, or in a browser tab left open across one, an older editor would meet underlined text written by a newer one. So:

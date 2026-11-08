@@ -70,13 +70,14 @@ needs to see the invitation link to click it, and masking the address would
 make the driver useless for the purpose it exists for.
 
 The question is not whether the driver should log. It is whether a *long
-running* instance should still be on it, and whether anything says so. Today
-nothing does: an instance can serve for months on the console transport with
-no warning anywhere.
+running* instance should still be on it, and whether anything says so. At the
+time of the review nothing did: an instance could serve for months on the
+console transport with no warning anywhere. P7-T08d added a notice on Admin,
+General (`apps/web/app/admin/general/console-mail-notice.tsx`).
 
 ## Finding 2. An unrecognised transport silently becomes `console`
 
-`packages/core/src/secrets/mail-settings.ts` resolves the transport as:
+`packages/core/src/secrets/mail-settings.ts` resolved the transport as:
 
 ```ts
 transport: transport.value === "smtp" ? "smtp" : "console",
@@ -100,11 +101,12 @@ value and say which setting is wrong.
 Narrowest fix, for a human to approve: keep the fallback when the setting is
 unset or empty, and treat a non-empty unrecognised value as a configuration
 error naming the setting. It would surface a misconfiguration that currently
-loses mail in silence.
+loses mail in silence. P7-T08d built it: `readTransport` returns `console` for
+an empty value and throws for an unrecognised one.
 
 ## Finding 3. The password-reset fallback writes an address and a live link
 
-`packages/core/src/auth/auth.ts` writes, when no mailer is configured:
+`packages/core/src/auth/auth.ts` wrote, when no mailer is configured:
 
 ```
 --- password reset (no mailer configured) ---
@@ -115,15 +117,17 @@ link: <live reset link>
 The same shape of finding as 1 and for the same reason: the path has to work
 because mail is optional by design. Worth listing separately because a reset
 link is not only personal data, it is **a credential**. Anyone who can read
-the log can take the account.
+the log can take the account. Since P7-T08d the link is withheld when
+`NODE_ENV` is `production`; the address is still written.
 
 ## Finding 4. Erasure stops at the member row
 
-`people.erase` anonymises `workspace_members`: name, title, bio, avatar,
-timezone, quiet hours and the user link. It exports the prior profile and
-suspends the row.
+At the time of the review, `people.erase` anonymised `workspace_members`:
+name, title, bio, avatar, timezone, quiet hours and the user link. It exported
+the prior profile and suspended the row. P7-T08b has since extended it
+(`packages/core/src/people/erasure.ts`, `packages/core/src/people/export.ts`).
 
-It does not touch:
+It did not touch:
 
 | Where | What is left |
 |---|---|
@@ -134,10 +138,10 @@ It does not touch:
 | `api_tokens`, `oauth` grants | Tokens issued to them |
 
 The acceptance criterion says no personal data of theirs remains in message
-logs or prompts. Today it does.
+logs or prompts. At the time of the review it did.
 
-**The export is also thinner than the criterion.** It produces the prior
-profile, not the member's own content, so "an export is produced" is met in
+**The export was also thinner than the criterion.** It produced the prior
+profile, not the member's own content, so "an export is produced" was met in
 form rather than in substance.
 
 ## What P7-T08b and P7-T08c need decided first

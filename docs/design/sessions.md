@@ -18,10 +18,10 @@ Reference, not authority: UIUX-PLAN.md SS10.
 | Cadence engine | `packages/core` | P3-T06 | Next-check-in, staleness, escalation |
 | Rhythm streak data | `packages/method` | P3-T06 | Streak break-on-skip rule |
 | Scoring engine | `packages/method` | P3-T05 | Bands, verdicts, forecast, cascade |
-| Workflow predicates | `packages/method` | P3-T03 | Phase completion (phases 6, 7 return `todo`) |
+| Workflow predicates | `packages/method` | P3-T03 | Phase completion for all eight phases |
 | Diagnostic thresholds | `packages/method` | P3-T02 | `sessions.*` parameters in the registry |
-| Blocker taxonomy | METHOD.md SS7.3 | Specified | 5 types (in method-package.md SS5) |
-| Root-cause taxonomy | METHOD.md SS8.4 | Specified | 8 causes (in method-package.md SS6) |
+| Blocker taxonomy | METHOD.md SS7.3 | Specified | 7 types (in method-package.md SS5) |
+| Root-cause taxonomy | METHOD.md SS8.4 | Specified | 9 causes, the ninth "Other" (in method-package.md SS6) |
 
 ## 1. The session record
 
@@ -61,7 +61,7 @@ Four stages. 15 to 30 minutes. One per space per week.
 ### 2.1 State machine
 
 ```
-scheduled -> open -> stage_1 (confidence) -> stage_2 (diagnose) -> stage_3 (commitments) -> stage_4 (digest) -> closed
+scheduled -> running -> stage_1 (confidence) -> stage_2 (diagnose) -> stage_3 (commitments) -> stage_4 (digest) -> closed
 scheduled -> skipped (when the Champion marks it missed)
 ```
 
@@ -75,7 +75,7 @@ Every key result in the space's active cycle gets a confidence from 0.0 to 1.0.
 | Element | Behaviour |
 |---|---|
 | Key result list | All KRs grouped by objective, current value and progress shown |
-| Confidence dial | 0.0 to 1.0 in 0.1 steps. SS3.2 band shortcuts at 0.3, 0.4, 0.7 |
+| Confidence dial | 0.0 to 1.0 in 0.1 steps, shown on the workspace's scale (x in 10 by default). SS3.2 band shortcuts at the workspace's three boundaries (canon 0.3, 0.4, 0.7) |
 | Vote mode | Each member submits privately. Votes reveal together with team average |
 | Reveal | Atomic: one write, all clients see the result at the same time |
 | Champion confirms | The champion sets the final confidence after seeing votes |
@@ -104,9 +104,10 @@ inventing one where there was only a next step.
 | Next action | One concrete action, with a named owner, due by the goal's next check-in (`session_confidences.next_action`) |
 | Blocker, where blocked | A type from the seven in SS7.3, a named owner, and its own next action, due by the same check-in |
 
-At or below the critical threshold (SS11 `scoring.confidenceCritical`, 0.3):
-the coordinator raises it with management the same day, and the escalation
-fires immediately (trigger `confidence.critical`).
+A confidence that falls below the low boundary tells the coordinator the same
+day (trigger `confidence.critical`). At or below the critical threshold (SS11
+`scoring.confidenceCritical`, 0.3) it reaches the cycle's sponsor too, where
+the workspace turns critical escalation on; it is off by default.
 
 **Completion condition:** Every low-confidence KR has a next action and an
 owner, or an open blocker raised in this session.
@@ -151,7 +152,9 @@ The product assembles:
 | Wins | The week's wins, or that none were named (P9-T19a-d-c) |
 | Coordinator note | Free text from the coordinator for leadership |
 
-Posts to the team's channel (in-app and email now; chat channels in Phase 5).
+Reaches the space and the cycle's sponsor as the Champion's `digest.weekly`
+nudge once the session closes, and the coordinator can post it to the space's
+Slack or Teams channel (`sessions.postDigest`).
 
 ### 2.6 The streak (SS7.4)
 
@@ -163,7 +166,7 @@ breaks it. Shown on the space home.
 |---|---|
 | Session closed | Streak increments |
 | Session skipped | Streak resets to 0 |
-| No session by end of week | Streak resets to 0 |
+| No session by the end of the period | Streak resets to 0, unless the period is marked as a holiday |
 
 ### 2.7 Twelve-week confidence trend
 
@@ -176,7 +179,7 @@ A chart of the weekly average confidence over the last 12 weeks.
 ### 3.1 State machine
 
 ```
-scheduled -> open -> closed
+scheduled -> running -> closed
 ```
 
 Simpler than weekly. No staged advancement. The facilitator records each item
@@ -239,18 +242,20 @@ Given / When / Then:
 
 ## 4. The quarterly review (SS8)
 
-60 minutes. Three acts, eleven stages. Each act asks one question.
+90 minutes by default (SS11 `sessions.quarterlyMinutes`). Four acts, eleven
+stages. Each act asks one question.
 
 | Act | Question | Stages |
 |---|---|---|
-| Review | Did we achieve the results we set out to? | 1-4 |
+| Open | Where is everyone, before the numbers? | 1 |
+| Review | Did we achieve the results we set out to? | 2-4 |
 | Retro | How did we work together to get there? | 5-8 |
 | Reset | What do we decide for the next cycle? | 9-11 |
 
 ### 4.1 The eleven-stage state machine
 
 ```
-scheduled -> open -> stage_1 -> stage_2 -> ... -> stage_11 -> closed
+scheduled -> running -> stage_1 -> stage_2 -> ... -> stage_11 -> closed
 ```
 
 Each stage has:
@@ -278,22 +283,23 @@ notes in between, so nothing leaked, and the shape was still wrong. The activity
 payload names the stage and never the note, because an activity row is read by
 everybody who can see the space.
 
-*Live synchronisation is still blocked.* The outbox rows exist now; nothing
-drains them. See PHASE-4-SPLIT.md.
+*Live synchronisation runs through the outbox.* The relay drains the rows and
+publishes them to the session's server-sent event stream
+(`/api/session/[id]/live`).
 
 | # | Stage | Act | Minutes | Completion condition |
 |---|---|---|---|---|
 | 1 | Open and check-in | Open | 5 | Every participant has a pulse score and one word |
-| 2 | Score the key results | Review | 12 | Every KR has a score, evidence, and reason |
-| 3 | Objective narratives | Review | 9 | Each objective's owner has spoken (facilitator marks) |
-| 4 | Recognition and wins | Review | 3 | At least one recognition entered |
-| 5 | Team retro | Retro | 7 | Writing phase complete, dot voting complete |
-| 6 | Management retro | Retro | 3 | All four questions answered |
-| 7 | Root cause and diagnostic | Retro | 5 | Every KR under 0.7 has a cause |
-| 8 | OKR process health | Retro | 3 | All participants have submitted |
-| 9 | Keep, modify or abandon | Reset | 5 | Every objective has a decision |
-| 10 | Learnings and next drafts | Reset | 4 | At least one learning captured |
-| 11 | Decisions and actions | Reset | 4 | Every action has a name and a date |
+| 2 | Score the key results | Review | 20 | Every KR has a score, evidence, and reason |
+| 3 | Objective narratives | Review | 12 | Each objective's owner has spoken (facilitator marks) |
+| 4 | Recognition and wins | Review | 5 | At least one recognition entered |
+| 5 | Team retro | Retro | 10 | Writing phase complete, dot voting complete |
+| 6 | Management retro | Retro | 8 | All four questions answered |
+| 7 | Root cause and diagnostic | Retro | 8 | Every KR below its root-cause threshold has a cause |
+| 8 | OKR process health | Retro | 4 | All participants have submitted |
+| 9 | Keep, modify, abandon or defer | Reset | 8 | Every objective has a decision |
+| 10 | Learnings | Reset | 5 | At least one learning captured |
+| 11 | Decisions and actions | Reset | 5 | Every action has a name and a date |
 
 ### 4.2 Stage 1: Open and check-in (SS8.2)
 
@@ -424,11 +430,10 @@ room a blank where the number goes.
 number that is already out. The reveal decides who sees it first, not when the
 argument ends.
 
-*The push is an outbox row and no relay drains it yet*, the same position
-P4-T10a-a recorded for `session.stageChanged`. The write is one write and every
-client that re-reads gets the same answer; `session.scoresRevealed` is declared,
-enqueued and listened for, and it reaches nobody until a relay host exists. The
-end-to-end spec reloads the second client rather than claiming a live rail.
+*The push is an outbox row*, the same position P4-T10a-a recorded for
+`session.stageChanged`. The write is one write and every client that re-reads
+gets the same answer; `session.scoresRevealed` is declared, enqueued and
+listened for, and the outbox relay publishes it to the session's live stream.
 
 *An end-to-end defect this task uncovered rather than caused.* P4-T10b-a's spec
 filled `getByLabel("Score")`, which matched the facilitator's private note
@@ -479,8 +484,8 @@ takes the mic after the last owner and without it that owner is never marked.
 objective for a question. `spoken_at` is stamped once and never re-stamped, so
 the record says when the story was told rather than when it was last discussed.
 
-*The narrative is nullable and usually null.* Section 8.1 gives the stage nine
-minutes of talking, not writing. A row appears when the mic moves on, carrying
+*The narrative is nullable and usually null.* Section 8.1 gives the stage
+twelve minutes of talking, not writing. A row appears when the mic moves on, carrying
 no body and no author. Storing an empty document instead would put "somebody
 wrote nothing" in the same shape as "nobody wrote", and the minutes at P4-T12
 have to tell those apart. Clearing a note drops the body and the author
@@ -494,8 +499,8 @@ else's story. Passing the mic is the facilitator's; the note is the room's.
 
 *The narrative is a textarea, not an editor.* Collected as plain text and
 stored as editor JSON through the one shared rich text module, the same path
-the check-in composer uses (P3-T07). A stage with nine minutes of talking in it
-does not need a toolbar.
+the check-in composer uses (P3-T07). A stage with twelve minutes of talking in
+it does not need a toolbar.
 
 Given / When / Then:
 - Given a narratives stage, when the facilitator passes the mic, then every
@@ -547,7 +552,7 @@ Given / When / Then:
 SS11 states it plainly: every numeric value the product enforces is a parameter
 in that registry, and a value not in the registry is not a setting. A cap that
 shapes how a room votes is enforced, so the alternative homes were closed. Three
-because the stage has seven minutes: it forces a room to choose, where more
+because the stage has ten minutes: it forces a room to choose, where more
 turns the vote into a full ranking, which is a different exercise. It lands in
 `rhythm_settings` like every other SS11 parameter, so it is already tunable from
 the rhythm card on S-36 with no new surface.
@@ -623,17 +628,19 @@ Given / When / Then:
 
 ### 4.8 Stage 7: Root cause and diagnostic (SS8.4, SS8.6)
 
-Every key result scoring below 0.7 (SS11 `scoring.rootCauseThreshold`) gets
-one primary cause from the 8-cause taxonomy (method-package.md SS6).
+Every aspirational key result scoring below 0.6, and every committed one below
+1.0 (SS11 `scoring.rootCauseThreshold`), gets one primary cause from the
+9-cause taxonomy (method-package.md SS6), and may name a second.
 Plus a detail field for context.
 
-Then the rhythm diagnostic renders (method-package.md SS9):
+Then the rhythm diagnostic renders (method-package.md SS9). The rhythm is the
+share of due check-ins published within tolerance, measured by the product:
 
 | Condition | Diagnosis |
 |---|---|
-| Cycle score >= 0.7 | Results delivered |
-| Cycle score < 0.7, rhythm >= 3.5 | Strategy or OKR-quality problem |
-| Cycle score < 0.7, rhythm < 3.5 | Rhythm problem |
+| Cycle score >= 0.6 | Results delivered |
+| Cycle score < 0.6, rhythm >= 75% | Strategy or OKR-quality problem |
+| Cycle score < 0.6, rhythm < 75% | Rhythm problem |
 
 The diagnostic is deterministic. With AI on, a narrative adds specifics from
 this cycle. With AI off, the verdict sentence is the same.
@@ -651,7 +658,7 @@ comparison would pass on a shuffled list and the picker shows the order.
 *The list reads `review_scores`, not `key_results.score`.* Grades do not land on
 the key results until the session closes (P4-T10b-a) and stage seven runs before
 that, so reading the key result would show an empty list in every live review.
-Strictly below the threshold, because SS8.4 says "below 0.7": a key result that
+Strictly below the threshold, because SS8.4 says "below 0.6": a key result that
 scored exactly it met it, and asking a room to explain a result it did not miss
 is how a stage loses its credibility.
 
@@ -685,7 +692,7 @@ Given / When / Then:
   renders, then it is not in it.
 
 Given / When / Then:
-- Given a cycle score below 0.7 and a rhythm score above 3.5, when the
+- Given a cycle score below 0.6 and a rhythm above 75%, when the
   diagnostic renders, then it reads as a strategy or quality problem with
   the specific figures.
 
@@ -700,27 +707,30 @@ Five statements, anonymous, 1 to 5 (method-package.md SS7).
 | Live averages | Running average and response count shown |
 | Lowest statement | Becomes next cycle's process priority (SS8.9 feed-forward) |
 
-The rhythm score (average of statements 2 and 5) feeds the SS8.6 diagnostic.
+The rhythm score (average of statements 2 and 5) is shown beside the SS8.6
+diagnostic's measured rhythm as a cross-check.
 
 Given / When / Then:
 - Given 5 participants, when 3 have submitted, then the live average updates
-  and shows "3 of 5 submitted" without revealing who.
+  and shows "3 responses" without revealing who.
 
-### 4.10 Stage 9: Keep, modify or abandon (SS8.8)
+### 4.10 Stage 9: Keep, modify, abandon or defer (SS8.8)
 
 Every objective is closed deliberately.
 
 | Decision | Meaning |
 |---|---|
-| Keep | Carry forward deliberately |
-| Modify | Adjust target or wording from what we learned |
+| Achieved | Done. Close it |
+| Keep | Still relevant. It pre-fills next cycle's draft, and still passes next cycle's checks |
+| Modify | Adjust the target or wording from what we learned, then keep it |
+| Defer | Still worth doing, not next cycle. It goes to the issue list |
 | Abandon | Priority shifted. End it cleanly |
 
 Each requires a one-line why. Nothing carries over by default.
 
 On session close, the decision writes back to the goal.
 
-### 4.11 Stage 10: Learnings and next drafts (SS8.9)
+### 4.11 Stage 10: Learnings (SS8.9)
 
 - Capture learnings as "we learned that..."
 - Promote the top dot-voted retro themes (from stage 5) into learnings
@@ -742,9 +752,9 @@ All three session kinds use the same synchronisation model.
 | Reconnection | A client that reconnects sees the current stage, not the one it left |
 | Multiple facilitators | Not supported. One active facilitator per session |
 
-Implementation uses the realtime port (TECHNICAL-PLAN.md SS5). The port has no
-host in the current build. Until one exists, the session works via polling with
-server-action revalidation (the same model P3-T07 uses for the vote reveal).
+Implementation uses the realtime port (TECHNICAL-PLAN.md SS5). The outbox
+relay publishes each change over Postgres listen/notify, and the browser
+receives it as server-sent events from `/api/session/[id]/live`.
 
 ## 6. The digest engine (SS7.2 step 4)
 
@@ -764,18 +774,17 @@ Assembles after the weekly session closes.
 
 | Channel | When |
 |---|---|
-| In-app feed | Immediately on session close |
-| Email | Immediately on session close |
-| Chat channels | Phase 5 (Slack, Teams, WhatsApp, Telegram) |
+| The Champion's `digest.weekly` nudge, to each space member and the cycle's sponsor on their own channels | The Champion's next run after the session closes |
+| The space's Slack or Teams channel | When the coordinator posts it (`sessions.postDigest`) |
 
 ## 7. The streak engine (SS7.4)
 
 | Rule | Detail |
 |---|---|
-| Increment | Session closed for this week |
-| Break | Session skipped, or no session by end of week |
+| Increment | Session closed for this check-in period |
+| Break | Session skipped, or no session by the end of the period; a holiday period does not break it |
 | Display | Space home, as a ribbon |
-| Trigger | `streak.at_risk` fires when the week would break the streak |
+| Trigger | `streak.at_risk` fires on the last working day of a period that would break the streak |
 
 ## 8. Feed-forward (SS8.9)
 
@@ -804,7 +813,7 @@ before it, only if that cycle is closed and has fed no other cycle yet.
 | From this cycle | Into the next cycle | Written as |
 |---|---|---|
 | Every KR and its score | Phase 2, the prior-cycle scoring list | `cycle_prior_scores` |
-| Every carry-forward KR and learning | Phase 2, the strategic issue list at impact 4 | `cycle_issues`, source `carry_forward`, impact `quality.carryForwardIssueImpact` |
+| Every carry-forward KR and learning, and every deferred objective | Phase 2, the strategic issue list at impact 4 | `cycle_issues`, source `carry_forward`, impact `quality.carryForwardIssueImpact` |
 | Learnings and the retrospective | Phase 1, the input pack | `cycle_pack_items` item 2, note rewritten |
 | The lowest process-health statement | Phase 3, a process priority | `cycle_priorities`, last position |
 | The annual frame | Reference | `cycles.frame_id`; focus flags are per cycle, so nothing to clear |
@@ -828,27 +837,25 @@ as a priority and not as an issue, and closing again is refused.
 
 ## 9. Minutes (SS8.10)
 
-> **BLOCKED: partially awaits P3-T16 (comments, reactions).**
->
-> The minutes reference discussion threads from the review. P3-T16 builds the
-> comment tables. The minutes structure itself can be designed now.
+Built at P4-T12 (`sessions.minutes`, `/session/[id]/minutes`).
 
 Minutes contain:
 
 | Section | Content |
 |---|---|
-| Executive summary | Cycle score, objectives and KRs reviewed, KRs below 0.7, team pulse, learnings carried, actions agreed |
+| Executive summary | Cycle score, committed key results met, objectives and KRs reviewed, KRs below their root-cause threshold, team pulse, learnings carried, actions agreed |
 | Per-stage record | Every stage's data as captured during the session |
 
-Exportable as document and PDF. A link from the closed cycle to its minutes.
+Exportable as a Markdown document (`/session/[id]/minutes/export`) and a PDF
+(`/session/[id]/minutes/pdf`). A link from the closed cycle to its minutes.
 
 ## 10. Acceptance criteria
 
 **Weekly session (P4-T07):**
 Given a session where one key result scores below the threshold, when the
 coordinator tries to continue, then it is refused until that key result has a
-blocker type, a named owner and a next action, and the blocker's clock starts
-on save.
+next action with a named owner, or an open blocker with its own next action,
+due by the goal's next check-in.
 
 **Weekly session (P4-T08):**
 Given a completed session, when it closes, then the digest is generated with

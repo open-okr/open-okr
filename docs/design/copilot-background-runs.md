@@ -111,7 +111,7 @@ no words in it is still refused.
 | The run, driven the way the relay drives it | `packages/core/test/copilot-background.test.ts` |
 | The budget halting before a token is spent | the same file |
 | Redelivery not charging twice | the same file |
-| The panel rejoining after a reload | `e2e/s39-copilot-background.spec.ts` |
+| The panel rejoining after a reload | `e2e/s39c-copilot-background.spec.ts` |
 
 The run is driven through `dispatchOutbox` rather than by calling
 `runCopilotAnswer` directly, so a row enqueued with no handler fails the test

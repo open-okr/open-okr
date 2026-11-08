@@ -1,24 +1,19 @@
 #!/usr/bin/env node
 /**
  * `pnpm cloud:sweep`: lists the closed workspaces whose retention window has
- * passed (P8-T02c).
+ * passed (P8-T02c), and with `--erased`, the receipt of every erasure
+ * (docs/design/workspace-erasure.md §7).
  *
- * **It deletes nothing, and it is not a dry run of something that does.** The
- * erasure itself is a data-change script and does not exist yet, deliberately:
- * `cloud.closureRetentionDays` is zero on every instance until an operator
- * sets it, and nothing can set it until the operator console lands at P8-T03.
- * Writing an untriggerable destructive path now, months before anybody can
- * reach it, is how a delete gets shipped without ever being exercised.
- *
- * So this is the reporting half, and it is useful on its own: an operator
- * running it sees whether retention is on, what number it is running, and
- * exactly which workspaces a future erasure would name.
+ * **It deletes nothing.** `pnpm cloud:erase` does, as the owner role, on the
+ * deployment's schedule. This is the reporting half: whether retention is on,
+ * what number it is running, which workspaces are due, and what has gone.
  *
  * The same shape as `pnpm audit:chain` and `pnpm cadence:sweep`: a command for
  * an operator who wants the answer now.
  */
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
+import { listErasureReceipts } from "../tenancy/erasure.ts";
 import { sweepClosedTenants } from "../tenancy/index.ts";
 
 const write = (line: string): void => {
@@ -29,6 +24,19 @@ const env = loadEnv();
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
 
 try {
+  if (process.argv.includes("--erased")) {
+    // The receipts hold no name, no email and no content: an id, a digest of the
+    // address, dates and counts. A customer quoting their address is matched by
+    // its SHA-256.
+    const receipts = await listErasureReceipts(pool);
+    if (receipts.length === 0) {
+      write("No workspace has been erased on this instance.");
+    }
+    for (const receipt of receipts) {
+      write(`${receipt.at.toISOString()}  ${JSON.stringify(receipt.payload)}`);
+    }
+    process.exit(0);
+  }
   const result = await sweepClosedTenants(pool);
 
   if (result.reason === "not_a_cloud") {
@@ -55,7 +63,7 @@ try {
       }
       write("");
       write(
-        "Nothing was deleted. Erasure is a data-change script and arrives with P8-T03.",
+        "Nothing was deleted. pnpm cloud:erase --write erases them, as the owner role.",
       );
     }
   }

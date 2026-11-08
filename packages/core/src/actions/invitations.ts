@@ -320,11 +320,14 @@ export const createPersonalLink = defineWriteAction({
         // colleague who clicked a link. A guest is not a seat
         // (plans-and-seats.md), so a guest invitation is never
         // refused for one.
+        // Asking somebody again whose invitation already holds a seat needs
+        // no second one, so their own address is left out of the count.
         await requireSeatInTx(
           tx,
           workspaceId,
           (used, limit) =>
             `This workspace has ${used} of ${limit} seats in use. Free one, or add seats, before inviting anybody else.`,
+          { arriving: input.email },
         );
       }
 

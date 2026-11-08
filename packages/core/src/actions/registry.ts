@@ -108,6 +108,14 @@ import {
   verifyAudit,
 } from "./audit.ts";
 import {
+  buyCredits,
+  changeBillingPlan,
+  openPortal,
+  readBilling,
+  settleEnded,
+  startCheckout,
+} from "./billing.ts";
+import {
   claimUpload,
   getBlobForDownload,
   prepareImport,
@@ -521,6 +529,12 @@ export const ACTION_MAP = {
   "workspace.finishOnboarding": finishOnboarding,
   "workspace.reopenOnboarding": reopenOnboarding,
   "workspace.changePlan": changeWorkspacePlan,
+  "billing.summary": readBilling,
+  "billing.startCheckout": startCheckout,
+  "billing.openPortal": openPortal,
+  "billing.buyCredits": buyCredits,
+  "billing.changePlan": changeBillingPlan,
+  "billing.settleEnded": settleEnded,
   "workspace.setLifecycle": setWorkspaceLifecycle,
   "workspace.setState": setWorkspaceState,
   "workspace.provision": provisionWorkspace,

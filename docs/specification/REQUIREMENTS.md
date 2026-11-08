@@ -46,7 +46,7 @@ The phases guide. By default they never stop anybody writing an objective or a k
 
 ### 3.2 Quality at the point of writing
 
-Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. Every check and each of the six publish gates in METHOD.md §4.5 has an enforcement level the workspace sets: block, warn or off (METHOD.md §12). By default only structural defects block publishing: an objective with no key result, a key result with no target or date, and a goal with no owner. Every other check warns and coaches.
+Every objective and key result is checked live against the quality checks in METHOD.md §4 as it is typed. Each check returns pass, warn or fail with a specific coaching prompt, a reason, and a weak-versus-strong example. The set carries a strength score. Every check and each of the six publish gates in METHOD.md §4.5 has an enforcement level the workspace sets: block, warn or off (METHOD.md §12). By default only structural defects block publishing: an objective with no key result or no timeframe, a key result with no target, date, owner or derivable direction, a goal with no owner, and a goal aligned under two parents. Every other check warns and coaches.
 
 *Acceptance:* Given an objective beginning "Launch the new mobile app", when the champion types it, then the outcome-not-output check warns inline with the coaching prompt, the strength score drops, and the set can still be published. Given a workspace that has set that check to block, then publishing is refused until it passes or the workspace overrides with a recorded reason.
 
@@ -154,7 +154,7 @@ One channel port with one driver per provider. Every inbound message resolves to
 - **Activity feed (P0).** Typed, human-readable, permission-filtered, live, at workspace, space, goal and profile scope. Separate from the compliance audit log.
 - **Search and command palette (P0).** ⌘K for entity jump, actions and full-text search across everything the member may see. Semantic search arrives with the AI layer.
 - **Admin (P0).** Workspace settings, members and access, practice settings and profiles, cycle and rhythm defaults, thresholds, terminology labels, notification and channel defaults, security, branding, the audit log with chain verification, a read-only freeze switch, backups, import and export.
-- **Portability (P0).** Signed, encrypted, checksummed workspace export and dry-run import between any two OpenOKR instances, self-host and cloud in both directions.
+- **Portability (P0).** Encrypted, checksummed workspace export and dry-run import between any two OpenOKR instances, self-host and cloud in both directions.
 
 ## 5. Deployment (P0)
 
@@ -162,10 +162,12 @@ One codebase, one tagged release, two ways to run it.
 
 | Way | Who | What it takes |
 |---|---|---|
-| **Self-hosted** | Any organisation that wants its data on its own servers. Universities, regulated sectors, privacy-minded teams | Docker Compose on one server with a first-run web setup wizard (target: under 30 minutes), or the Helm chart on their own Kubernetes |
-| **Managed cloud** | Teams that do not want to run anything | Sign up, pick a workspace name, start. Operated by us, on the same release |
+| **Self-hosted** | Any organisation that wants its data on its own servers, on one workspace or several. A group of companies, with one workspace per company. Universities, regulated sectors, privacy-minded teams | Docker Compose on one server with a first-run web setup wizard (target: under 30 minutes), or the Helm chart on their own Kubernetes |
+| **Managed cloud** | Teams that do not want to run anything | Sign up, pick a workspace name, start. Run by a provider on the same release: OKR Institute runs OKRGoal, and any other provider may run its own on its own servers |
 
-The cloud is the same container release under vendor operation, plus a tenant lifecycle surface: signup and provisioning, plans and seat limits behind a flag, an operator console, per-tenant limits, and time-boxed support access that is visible to the customer. It is not a different product and not a different runtime.
+The cloud is the same container release under vendor operation, plus a tenant lifecycle surface: signup and provisioning, plans and seat limits behind a flag, billing, an operator console, per-tenant limits, and time-boxed support access that is visible to the customer. It is not a different product and not a different runtime.
+
+A cloud is priced per workspace: a flat price with a seat limit, and a free plan. Plans differ only in people, AI allowance and support. Each provider sets its own plans, prices and currency, so the release names none of them, and billing stays off until a provider turns it on.
 
 Self-host is never seat-limited and never feature-gated.
 
@@ -216,8 +218,8 @@ Deferred but not blocked. Each keeps a design-for note in TECHNICAL-PLAN.md §16
 8. Real-time co-editing of documents.
 9. Native mobile applications. The responsive web app and the chat channels cover mobile in v1.
 10. An importer for any source beyond FlowyTeam and CSV.
+11. OKRs and reports across the workspaces of a group. Each company's workspace stands alone in v1.
 
 ## 10. Open questions
 
-- Cloud pricing model. Nothing is gated; the cloud sells operation, not features.
 - Sector-specific compliance beyond PDPA and GDPR.

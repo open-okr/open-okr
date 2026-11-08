@@ -44,6 +44,10 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           env:
             {{- include "openokr.commonEnv" . | nindent 12 }}
             # Migrations run in the pre-install and pre-upgrade hook, not here.
@@ -67,6 +71,41 @@ spec:
               value: {{ .Values.instance.telemetry | quote }}
             - name: OPENOKR_REGISTRATION
               value: {{ .Values.instance.registration | quote }}
+            {{- with .Values.instance.sourceUrl }}
+            - name: OPENOKR_SOURCE_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.instance.termsUrl }}
+            - name: OPENOKR_TERMS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.instance.privacyUrl }}
+            - name: OPENOKR_PRIVACY_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.instance.supportEmail }}
+            - name: OPENOKR_SUPPORT_EMAIL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.cloud.enabled }}
+            - name: OPENOKR_CLOUD
+              value: "true"
+            {{- with .Values.cloud.region }}
+            - name: OPENOKR_CLOUD_REGION
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.cloud.plans }}
+            - name: OPENOKR_CLOUD_PLANS
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.cloud.defaultPlan }}
+            - name: OPENOKR_CLOUD_DEFAULT_PLAN
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             - name: OPENOKR_MAIL_TRANSPORT
               value: {{ .Values.mail.transport | quote }}
             {{- if eq .Values.mail.transport "smtp" }}

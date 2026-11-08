@@ -32,9 +32,9 @@ never calls out.
 | AI provider | Every AI affordance is hidden or disabled. `ai_providers.enabled` defaults to false, and no provider is seeded |
 | Mail | The console transport. A reset link is printed for an operator rather than sent, and email verification is not required to sign in |
 | Chat channels | No Slack, Teams, WhatsApp or Telegram. Nudges arrive in the product |
+| Billing | Off, and the payment SDK is never loaded. It is for a provider selling a cloud, so an air-gapped instance has no reason to turn it on |
 | Single sign-on | Password and passkey sign-in, which is the default anyway |
 | Directory sync | Members are invited rather than provisioned |
-| Link enrichment and the agent's research tools | Absent. `outboundFetch` is the only way out and it is never called with nothing configured |
 | Update check | **On by default, so turn it off:** set `OPENOKR_UPDATE_CHECK=off`, or untick it in Admin, General. Left on, an isolated instance tries `api.github.com` once an hour, fails within three seconds without delaying any page, and shows only the running version. The request carries nothing about the instance |
 | Virus scanning | No scan, and a file is available as soon as it is uploaded. A clamd on the same isolated network works like any other; its signature updates need a mirror. See [Security](../admin/security.md#uploaded-files) |
 
@@ -69,6 +69,7 @@ that this page cannot quietly stop being true.
 | `no-external-hosts` | No shipped source names a CDN or a font service to fetch from at runtime |
 | `no-runtime-network-install` | The image's runtime stage installs nothing from a network, so a container starts with no registry |
 | `ai-off-by-default` | No AI provider is enabled until somebody enables one, so an instance nobody configured makes no AI call |
+| `billing-off-by-default` | No payment provider is configured until somebody chooses one, and with none the payment SDK is never loaded |
 | `outbound-goes-through-the-port` | Every outbound request goes through `outboundFetch`, which validates the literal host and the resolved address, follows no redirect, and caps size and time |
 | `registries-are-build-time` | Interface components are added into `packages/ui` at build time, so no component is fetched when a page renders |
 

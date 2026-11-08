@@ -9,7 +9,7 @@ operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
 
 | Component | Where | What it gives this change |
 |---|---|---|
-| The running version | `apps/web/package.json` `version` (0.4.0 today) | The number to show. The release pull request bumps it, and `check:docs` already pins pages to it |
+| The running version | `apps/web/package.json` `version` (0.5.0 today) | The number to show. The release pull request bumps it, and `check:docs` already pins pages to it |
 | A version is kept behind a session | `apps/web/app/api/app-version/route.ts` | The stance: a version string is reconnaissance, so it is never shown signed out |
 | The content pane | `apps/web/lib/app-shell.tsx`, inside `main` | Where the line goes: at the foot of every signed-in screen, on the right. Moved there from the sidebar footer at the product owner's request on 2 November 2026, so the sidebar holds navigation only |
 | `outboundFetch` | `packages/adapters/src/outbound/guard.ts` | The only way out: timeout, size cap, no redirects, address checks |
@@ -43,14 +43,14 @@ operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
 | State | Shown, for a member with `full` |
 |---|---|
 | Up to date, or not known | `v0.4.0` |
-| Behind | `v0.4.0` and, beneath it, a link "v0.5.0 available" to the release's `html_url` |
+| Behind | `v0.4.0` and, beside it, a brand chip "v0.5.0 available" linking to the release's `html_url` |
 | Check off | `v0.4.0` |
 | Managed cloud | `v0.4.0` |
 
-Small text (`text-xs text-ink-4`), right-aligned, at the foot of the content
+Small text (`text-xs text-ink-3`, the band's), right-aligned, at the foot of the content
 area: after the screen's content, and at the bottom of the pane when the
 content is shorter than it. The same at every width, because the content pane
-has room the icon-only sidebar did not. Members without `full` get no footer.
+has room the icon-only sidebar did not. Members without `full` get no version (§8).
 
 ## 4. The switch
 
@@ -106,7 +106,7 @@ The owner asked for the footer to be separated from the content by a rule and a 
 | Part | Rule |
 |---|---|
 | Band | A hairline (`line`) over a `surface` band, the width of the content pane: it takes `main`'s padding back as negative margins |
-| Left, everyone | The instance's name, when somebody has named it. The "Built on OpenOKR, open source" link moved on 4 November 2026, at the owner's request, to the avatar menu as "OpenOKR on GitHub", still shown to every member because AGPL-3.0 §13 offers the source to every network user |
+| Left, everyone | The instance's name, when somebody has named it. The "Built on OpenOKR, open source" link moved on 4 November 2026, at the owner's request, to the avatar menu as "Source code", still shown to every member because AGPL-3.0 §13 offers the source to every network user |
 | Right, everyone | ⌘K Search, and ⌘J Ask only while the copilot can answer (an AI affordance is hidden when the provider is off). Hidden on a phone, which has no ⌘ key |
 | Right, full access | The running version, and the newer release as a brand chip, as §3 |
 | Position | Sticky to the foot of the content pane, always in view while the page scrolls under it (the owner asked for it to stay put). On a phone it sits on the fixed tab bar |

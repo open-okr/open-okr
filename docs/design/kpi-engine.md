@@ -114,8 +114,9 @@ Green is inclusive and red is strict, as the method writes them. A KPI with no
 thresholds, or half a pair, falls back to the table below, and every read says
 which basis it used. A range has no ratio, because it has no single target to
 divide by. The grid colours each period by its own band from the server rather
-than working the ratio out in the browser. `kpiStateOf(band, recovery)` keeps
-the precedence below until P9-T17b moves the recovery beside the band.
+than working the ratio out in the browser. `kpiStateOf(band)` turns the band
+into a state, no data first, and `kpiRecovering(recovery)` marks a recovery
+beside it (P9-T17b-a).
 
 The fallback, as built at P3-T12. METHOD.md §6.4. Precedence, first match wins:
 no data, then the band. Both thresholds are §11 parameters, defaults 90 and 70.
@@ -298,7 +299,7 @@ every dependent, then their dependents, in topological order, each exactly once.
 | Self-reference | Refused on write |
 | Cycles | Refused on write. The check walks the existing graph before inserting the new edge |
 | Order | Topological. A diamond recomputes the shared dependent once, after both branches |
-| Driven from the outbox | The write commits the edge and an outbox row. The relay runs the cascade |
+| Run in the writing Operation | Not through the outbox, which no relay drains yet (§10). `kpis.record`, `kpis.setFormula` and `kpis.update` run the cascade in their own transaction |
 | Idempotent | Replaying the cascade produces the same values |
 
 In the matrix, `dependencies` lists `[dependent, dependsOn]` pairs.
@@ -333,7 +334,7 @@ KPI itself, then up to three drivers.
 | A leading child | A candidate directly |
 | A lagging child | Descended through, until its nearest leading descendants are reached |
 | Which candidates | Only a driver below its own target with an owner. One at or past its target is skipped, because it would ask a number to go the wrong way: "Improve Sales calls per week from 120 to 100" marked increase |
-| Cap | The §11 `recovery_key_result_cap`, four, the KPI included: the KPI and three drivers |
+| Cap | The §11 `kpi.recoveryKeyResultCap`, four, the KPI included: the KPI and three drivers |
 | Driver key result | `Improve <driver title> from <current> to <target>`, `increase` or `reduce` by the driver's direction, owned by the driver's named owner or the member whose list it is on, indicator type `leading` |
 | At launch | `recovery_started_pct` stores the KPI's achievement and `recovery_goal_id` links back. The state stays the band (P9-T17b-a). One Operation, one transaction |
 
@@ -361,9 +362,10 @@ and 100% when the KPI reaches its boundary.
 ## 9. The recovery proposal and its closure
 
 Two separate things. The **draft** is available for one-click launch the moment
-a KPI turns unhealthy. The **proactive proposal** from the Coach waits for two
-consecutive unhealthy periods (§11 `recovery_proposal_delay`), so one bad month
-never generates an unsolicited OKR.
+a KPI turns unhealthy. The **proactive proposal** from the Champion's daily
+sweep waits for two consecutive unhealthy periods (§11
+`kpi.recoveryProposalDelayPeriods`), so one bad month never generates an
+unsolicited OKR.
 
 Periods are read newest last. "Consecutive" means the two most recent periods,
 with no other state between them.
@@ -394,7 +396,8 @@ periods is read** (P9-T18b, METHOD.md §6.5 and §12):
 | Somebody answers the KPI another way while a proposal is pending | The proposal is settled as dismissed, decided by whoever answered, in the same transaction |
 
 Closure runs the other way. When **real** achievement re-enters the healthy
-corridor, the Coach proposes closing the recovery goal, exactly once. Real, not
+corridor, the recompute stamps `recovery_close_proposed_at` and the Champion's
+sweep proposes closing the recovery goal (`kpi.recovered`), exactly once. Real, not
 effective: closing on the projection would close a recovery because the recovery
 was progressing, which is circular.
 
@@ -435,15 +438,17 @@ value changes, **then** the dependent recomputes for that period, anything
 depending on it follows in topological order, and a self-referencing formula is
 refused at write time.
 
-**Given** an unhealthy KPI with three leading children, **when** the owner
-launches recovery, **then** a goal exists with three key results carrying those
-children's current values as baselines and their targets as targets, the KPI
-reads `recovering`, and `recovery_started_pct` holds the achievement at launch.
+**Given** an unhealthy KPI with three leading children below their targets,
+each with an owner, **when** the owner launches recovery, **then** a committed
+goal exists with four key results: the KPI itself first, then the three
+children, carrying their current values as baselines and their targets as
+targets. The KPI's state stays its band, it is marked recovering beside it, and
+`recovery_started_pct` holds the achievement at launch.
 
 **Given** a KPI whose children are all lagging, **when** recovery is drafted,
-**then** the key results come from the nearest leading descendants. **Given** a
-subtree with no leading KPI at all, **then** there is exactly one placeholder key
-result.
+**then** the driver key results come from the nearest leading descendants.
+**Given** a subtree with no leading KPI at all, **then** the KPI itself is the
+only key result.
 
 **Given** a recovering KPI whose real achievement is 50, launched at 45, whose
 recovery goal is halfway, **then** its effective health reads 67.5 and its real

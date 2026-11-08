@@ -11,7 +11,7 @@ This file is the architecture authority. Product scope lives in REQUIREMENTS.md.
 One codebase that ships as one product and runs two ways from day one:
 
 1. **Self-hosted.** A single Docker Compose file on a modest server, guided by a first-run web setup wizard. Target: under 30 minutes. Or the Helm chart on the customer's own Kubernetes, with their Postgres, their single sign-on and their backups.
-2. **Managed cloud.** The same release, operated by us, with a tenant lifecycle surface on top: signup, provisioning, plans and seats behind a flag, an operator console and support access that the customer can see.
+2. **Managed cloud.** The same release, operated by a provider, with a tenant lifecycle surface on top: signup, provisioning, plans and seats behind a flag, billing behind a port, an operator console and support access that the customer can see. OKR Institute runs OKRGoal this way, and any other provider may run its own on its own servers.
 
 Same repository, same tagged release, same behaviour. The cloud is a way of operating the product, not a second product.
 
@@ -22,7 +22,7 @@ Same repository, same tagged release, same behaviour. The cloud is a way of oper
 3. **Agent-native to the core.** Every read and every write is defined once in one contract. The browser, the public API, the command line, the MCP server and the built-in agents are projections of it. There is no capability a human has that an agent cannot be granted, and no path an agent takes that skips a permission check.
 4. **AI-native, never AI-dependent.** Every AI feature accelerates a complete manual path. The Draft Coach's rules, the alignment score, the health corridors and the diagnostics are deterministic and work with AI switched off. AI adds rewriting, semantic judgement and natural language. Continuous integration proves the product is whole with the provider set to off.
 5. **Postgres is the only hard dependency.** Everything else is optional or swappable.
-6. **No vendor SDK outside the adapter package.** Jobs, realtime, storage, mail, cache, search, AI and channels all sit behind ports.
+6. **No vendor SDK outside the adapter package.** Jobs, realtime, storage, mail, cache, search, AI, channels and billing all sit behind ports.
 7. **Two layers of security by construction.** Row-level security in Postgres is the tenant floor: a forgotten filter cannot cross workspaces. A relationship-based access model behind a single `can()` is the authorisation model. Neither replaces the other.
 8. **Every write is one transaction.** Domain change, access bindings, activity, audit row and outbox row commit together. Side effects run from the outbox after commit, never as fire-and-forget calls on the write path.
 9. **Opinion first, configuration later.** The rhythm, the roles, the gates and the map work with zero setup. Every setting has a working default, so registering is the whole of setup and configuration is how an organisation adapts the product later, never how it starts. Custom fields, custom workflows and query builders are deferred (REQUIREMENTS.md §9) and are never the lead.
@@ -48,22 +48,24 @@ packages/
   db/                  Drizzle schema, migrations, row-level security policies,
                        seed, data-change runner
   adapters/            Ports and drivers (jobs, realtime, storage, mail, cache,
-                       search, ai, channels) and the outbox relay
-  agents/              The Coach and Champion runtimes, the trigger scheduler,
-                       run state machines, proposal envelopes
+                       search, ai, channels, billing) and the outbox relay
+  agents/              Run state machines, the schedule the agent runs are
+                       registered under, structured extraction. The Coach's and
+                       Champion's seeding, scope and triggers live in core
   importer/            CSV/XLSX and FlowyTeam importers (command line)
+  cli/                 The `okr` command line, generated from the registry
   ui/                  Shared components
   config/              Shared TypeScript, lint and environment schema
   test-support/        Factory that builds through core services, test harness
 deploy/
   docker/              Dockerfile, compose, reverse proxy, setup wizard
   helm/                Helm chart
-  cloud/               Vendor-operated overlay: provisioning, operator console,
-                       tenant limits
+  demo/, staging/      The public demonstration and staging instances
+  teams/, whatsapp/    Channel setup notes and the Teams app manifest
 docs/
   specification/       This specification set
   design/              Detailed designs, one per engine or subsystem
-  mockups/             Reference mockups of eleven screens
+  mockups/             Reference mockups of key screens
 ```
 
 `packages/method` is deliberately separate from `packages/core`. It has no database access and no framework. It is a pure library of the OKR canon, which means every rule is unit-testable in isolation, the agents and the browser share one implementation, and a change to practice is a change to one package.
@@ -79,20 +81,21 @@ One runtime: the container profile. It runs on a customer's server, on their Kub
 | Port | Driver |
 |---|---|
 | JobQueue | pg-boss, inside Postgres |
-| Realtime | WebSocket server with Postgres listen and notify. Compact typed events carrying an id and a version, an 8 KB payload guard, self-echo suppression |
+| Realtime | Postgres listen and notify, streamed to the browser as server-sent events. Compact typed events carrying an id and a version, an 8,000-byte payload guard, self-echo suppression |
 | FileStorage | Local disk, MinIO or any S3-compatible service |
 | Mailer | SMTP, with settings stored encrypted in the database and editable by an admin |
 | Cache and rate limit | In-process plus Postgres |
 | Search | Postgres full-text search, with pgvector for semantic search |
 | AIProvider | Anthropic, OpenAI, Google, OpenRouter, Ollama, any OpenAI-compatible endpoint, or off |
 | Channel | Slack, Microsoft Teams, WhatsApp Business, Telegram, email, or none |
+| Billing | Stripe, or none |
 
 Rules that make this real:
 
 - Vendor SDKs are imported only inside `packages/adapters`.
-- Feature code calls `jobs.enqueue(...)`, `channels.send(...)`, `realtime.publish(...)`. It never knows which driver is running.
-- **Transactional enqueue is the only enqueue.** `enqueue` writes an outbox row inside the caller's transaction. A relay drains committed rows to the driver after commit, at least once, with idempotency keys. A direct network call on a write path fails the build.
-- The AI provider and every channel are selected by stored configuration, not by the runtime variable. No configuration means that capability reports unavailable and the product degrades cleanly.
+- Feature code calls ports such as `channels.send(...)` and `realtime.publish(...)`. It never knows which driver is running.
+- **Transactional enqueue is the only enqueue.** A write path never calls `jobs.enqueue` itself: `enqueueOutbox` writes an outbox row inside the caller's transaction. A relay drains committed rows to the driver after commit, at least once, with idempotency keys. A direct network call on a write path fails the build.
+- The AI provider, every channel and billing are selected by stored configuration, not by the runtime variable. No configuration means that capability reports unavailable and the product degrades cleanly.
 
 ### Multi-tenancy
 
@@ -115,21 +118,23 @@ Why a contributor licence agreement: it keeps the right to dual-license or run a
 
 Nothing is feature-gated. The managed cloud sells operation, not features. Self-host gets every capability, with no seat limit.
 
+Any provider may run its own cloud from this code, with its own name, plans, prices and currency, under the same licence: whoever changes the code and offers it over a network publishes the changes.
+
 Also ship early: the product name as a trademark, `LICENSE`, `CONTRIBUTING.md` and `GOVERNANCE.md` stating that the project owner has the final say while the project is young. Continuous integration enforces a licence-compatibility gate on dependencies and a sign-off check on commits.
 
 ## 5. Deployment tiers
 
 | Tier | Who | Stack | Setup effort |
 |---|---|---|---|
-| Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. A first-run web wizard generates every secret, tests the database, mail, channel and AI connections, seeds the admin and offers demo data | About 30 minutes on any small server |
+| Single server | Small and medium organisations, privacy-minded teams | Compose: app, Postgres, reverse proxy with automatic certificates, optional object storage. The lifecycle helper generates every secret on first run. A first-run web wizard tests the database, mail, storage, channel and AI connections and seeds the admin, and the onboarding wizard offers demo data | About 30 minutes on any small server |
 | Enterprise | Universities, large organisations | Helm chart on their Kubernetes, external Postgres, single sign-on, their backups | Their platform team, hours not weeks |
-| Managed cloud | Teams that want no operations | The same image under vendor operation, plus the tenant lifecycle overlay | Sign up and start |
+| Managed cloud | Teams that want no operations | The same image under vendor operation, with the cloud flag on | Sign up and start |
 
 All tiers run the same tagged release. Signed images are published on every release. A lifecycle helper ships with the self-hosted tarball for upgrade, status, logs and key rotation, with a documented rollback.
 
 ### 5.1 Upgrade policy
 
-Every instance upgrades itself. There is no auto-update and no version check that leaves the instance. An administrator chooses when, and the product never chooses for them.
+Every instance upgrades itself. There is no auto-update. A version check asks GitHub once a day for the newest release, sends nothing about the instance, and is turned off with `OPENOKR_UPDATE_CHECK=off`. An administrator chooses when, and the product never chooses for them.
 
 - **Versioning is semantic.** A major release carries a change an administrator must act on, and the release notes name the action. A minor release carries features and migrations that need nothing from them. A patch carries fixes.
 - **Supported range.** Any release upgrades directly to any later release in the same major, with no stops. Crossing a major means stopping at the last release of the current major first. Downgrading is not supported once migrations have applied. The direct jump within a major is what lets old migrations retire at a major boundary; without it, every migration ever written stays runnable forever.
@@ -139,12 +144,26 @@ Every instance upgrades itself. There is no auto-update and no version check tha
 
 How a release is produced is §9: changesets for the version, changelog and release notes, a signed image and a software bill of materials per release, and customers pin versions.
 
+### 5.2 The setups one release has to keep working
+
+| Setup | Cloud flag | Plan catalogue | Billing | Registration |
+|---|---|---|---|---|
+| OKRGoal, run by OKR Institute | On | OKRGoal's | Stripe | Open |
+| A cloud run by another provider on its own servers | On | Its own | Stripe, or none | Its choice |
+| A group of companies on its own servers, one workspace per company | On | Empty | None | Invitation or company email |
+| One organisation with several workspaces | On | Empty | None | Invitation |
+| One organisation with one workspace | Off | Empty | None | The default: closed after the first account |
+
+The switches are independent. The cloud flag brings tenant records, the operator console and the lifecycle. The catalogue brings plans and seat limits, so an empty one means no limit and no plan screen. The billing provider brings payment. The release names no price and no currency: those are each provider's own configuration.
+
+A change that breaks any row is a defect, and `packages/core/test/hosting-profiles.test.ts` and `e2e/hosting-profiles.spec.ts` hold a section per setup to catch it. Each hosted row also has a browser journey, `e2e/hosting-okrgoal.spec.ts`, `hosting-provider`, `hosting-group` and `hosting-one-company`, walked as its operator, a company administrator, a workspace administrator and a member, and `docs/design/hosting-test-matrix.md` maps every scenario to the test that proves it.
+
 ## 6. Security model
 
 The authority is TECHNICAL-PLAN.md §8. The summary:
 
 - **Authentication.** Better Auth. Email and password, passkeys and time-based one-time passwords from the first phase. Single sign-on through OIDC and SAML in the open core, because institutions will not adopt without it. Directory sync and provisioning in the enterprise phase. Session tokens are hashed at rest.
-- **Authorisation.** Relationship-based: access contexts, graded bindings (view, comment, edit, full, with champion and reviewer tags) and access groups (per person, workspace standard, space standard, anonymous). Effective access is the maximum over every reachable binding. Suspended members yield no access. One `can(member, level, resource)` in `packages/core` is the single enforcement point for the browser, REST, MCP, the command line, the channels and the agents. Every read of a protected aggregate goes through one access-aware getter that returns not-found on forbidden.
+- **Authorisation.** Relationship-based: access contexts, graded bindings (view, comment, edit, full, with champion, reviewer, sponsor, facilitator and coordinator tags) and access groups (per person, workspace standard, space standard, anonymous). Effective access is the maximum over every reachable binding. Suspended members yield no access. One `can(member, level, resource)` in `packages/core` is the single enforcement point for the browser, REST, MCP, the command line, the channels and the agents. Every read of a protected aggregate goes through one access-aware getter that returns not-found on forbidden.
 - **Audit.** An append-only audit table from day one, with database grants that forbid update and delete, written inside the mutating transaction, with a per-workspace hash chain for tamper evidence. The social activity feed is a separate, typed system.
 - **Agent safety.** Built-in agents run under their own member principal with least-privilege bindings scoped to named spaces and goals. Never a workspace-wide grant. Sandbox mode produces a full dry run. The default write policy is proposal plus human approval. Hard cost caps halt a run mid-flight. Retrieved content is data, never instruction.
 - **Channel safety.** Every inbound message is verified against the provider's signature, resolved to a member, rate-limited, and run through `can()`. An unrecognised sender gets nothing, not an error that confirms the workspace exists.
@@ -158,7 +177,7 @@ The authority is TECHNICAL-PLAN.md §8. The summary:
 
 Ship now: presence, live lists and feeds, a live notification and review badge, live session state (everyone in a weekly session sees the same stage and the same votes revealing), live agent run streams.
 
-Everything goes through the Realtime port with channel semantics such as `workspace:{id}:goal:{id}`, publishing compact typed events defined in a shared event registry so payloads are type-checked end to end. Clients refetch through the normal read path, which keeps row-level security and `can()` in the loop.
+Everything goes through the Realtime port with channel semantics such as `workspace:{id}:session:{id}`, publishing compact typed events defined in a shared event registry so payloads are type-checked end to end. Clients refetch through the normal read path, which keeps row-level security and `can()` in the loop.
 
 Design rules that keep collaborative editing a later addition rather than a rewrite:
 
@@ -171,15 +190,15 @@ Design rules that keep collaborative editing a later addition rather than a rewr
 
 - Forward-only migrations, committed with the feature that needs them. A separate data-change runner handles reshaping after launch, so schema changes and backfills never mix.
 - Soft delete is a repository-wide default scope, injected by the query helper with an explicit opt-in to see deleted rows.
-- A seed script and an in-product demo workspace builder create a realistic organisation in one transaction with notifications suppressed. This powers the public demo, onboarding and local development.
+- A seed script and an in-product demo workspace builder create a realistic organisation through the action registry, each write its own transaction. This powers the public demo, onboarding and local development.
 - Rich text is editor JSON. One shared core module owns parsing, validation, sanitised rendering, excerpting and mention extraction, used identically by the app, email, exports, search indexing and the importers.
-- Derived values (progress, health, next check-in, alignment score, KPI achievement, streaks, next step) are recomputed by jobs driven from the outbox and stored in columns. Never computed per row at render.
+- Derived values (progress, health, next check-in, alignment score, KPI achievement, streaks, next step) are recomputed inside the writing transaction and stored in columns. Never computed per row at render.
 
 ## 9. Quality, CI and releases
 
 - Vitest for unit and integration tests. Playwright for end-to-end. A test-support factory that builds through core domain services rather than raw inserts, so every test's setup exercises row-level security and the access layer.
-- End-to-end database isolation is designed, not hoped: a migrated template database cloned per worker, with the workspace identifier set per test.
-- Continuous integration runs the affected graph with a remote cache, shards the test suites, cancels superseded runs, tracks flaky tests with automatic quarantine, gates dead code and dependency licences, and checks commit sign-off.
+- Test database isolation is designed, not hoped: a migrated template database cloned per Vitest worker, with the workspace identifier set per test.
+- Continuous integration runs the affected graph with a remote cache, shards the test suites, cancels superseded runs, tracks flaky tests and lists quarantine candidates for a committed quarantine list, gates dead code and dependency licences, and checks commit sign-off.
 - **Contract drift checks.** The generated OpenAPI document, the MCP tool catalogue and the generated command line are re-derived in CI and compared against committed artifacts. The single contract registry cannot silently drift.
 - **Method conformance checks.** `packages/method` carries a golden-master suite for every rule, band, corridor and diagnostic in METHOD.md, and CI fails when the implementation and the document disagree.
 - **AI-off leg.** CI boots with the provider set to off and asserts every P0 flow passes and every AI affordance is hidden or disabled.
@@ -192,7 +211,7 @@ Decisions that shape the product as a whole. Changing any of them is a maintaine
 
 | # | Decision | Options | Position |
 |---|---|---|---|
-| 1 | Cloud pricing model | Per seat, per workspace, usage-based, free tier shape | Per seat with a free tier; no feature gating |
+| 1 | Cloud pricing model | Per seat, per workspace, usage-based, free tier shape | Per workspace: a flat price with a seat limit, and a free plan. No feature gating. Each provider sets its own prices and currency |
 | 2 | Whether any feature is ever gated | Nothing gated / an enterprise layer | Nothing gated |
 | 3 | Default agent autonomy | Propose and approve / scoped direct writes | Propose and approve; direct writes are opt-in per agent |
 | 4 | Coach strictness default | Advisory / warn / strict | Only structural defects block publishing by default, and every quality check and publish gate has its own level, block, warn or off (METHOD.md §4, §4.5, §12) |

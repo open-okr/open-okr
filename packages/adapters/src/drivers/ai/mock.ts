@@ -16,6 +16,7 @@ import type {
   EmbedResponse,
   ExtractRequest,
   ModelCapabilities,
+  TokenUsage,
   ToolCall,
   ToolDefinition,
 } from "../../ports/ai.ts";
@@ -82,11 +83,15 @@ export class MockAIProvider implements AIProvider {
     return this.#chatResponse;
   }
 
-  async *stream(request: ChatRequest): AsyncIterable<string> {
+  async *stream(
+    request: ChatRequest,
+    onUsage?: (usage: TokenUsage) => void,
+  ): AsyncIterable<string> {
     this.calls.push({ method: "stream", request });
     for (const chunk of this.#streamChunks) {
       yield chunk;
     }
+    onUsage?.(this.#chatResponse.usage);
   }
 
   async chatWithTools(

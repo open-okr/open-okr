@@ -21,6 +21,8 @@
  */
 import {
   type AIProviderKind,
+  activeOnly,
+  agents,
   aiUsageEvents,
   type UsageSource,
   withWorkspace,
@@ -30,6 +32,9 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
+import { chargeCreditsInTx, readHostedAccess } from "../tenancy/index.ts";
+import { costOfUsage, type ModelRates } from "./model-catalog.ts";
+import { activePersonFor } from "./resolve.ts";
 
 export interface RecordUsageEventInput {
   readonly workspaceId: string;
@@ -37,6 +42,10 @@ export interface RecordUsageEventInput {
   readonly agentId?: string;
   readonly featureKey?: string;
   readonly source: UsageSource;
+  /** Whose key paid. A credit is spent only on the provider's own. */
+  readonly keySource?: "user" | "workspace" | "deployment";
+  /** Set when this call spends AI credits: the month's allowance, in dollars. */
+  readonly creditAllowanceUsd?: number;
   readonly provider: AIProviderKind;
   readonly modelId: string;
   readonly inputTokens: number;
@@ -121,6 +130,7 @@ export async function recordUsageEvent(
             agentId: input.agentId ?? null,
             featureKey: input.featureKey ?? null,
             source: input.source,
+            keySource: input.keySource ?? null,
             provider: input.provider,
             modelId: input.modelId,
             inputTokens: input.inputTokens,
@@ -134,6 +144,15 @@ export async function recordUsageEvent(
           .returning({ id: aiUsageEvents.id });
         if (!inserted) {
           throw new Error("Could not record the usage event.");
+        }
+
+        if (input.creditAllowanceUsd !== undefined) {
+          await chargeCreditsInTx(tx, {
+            workspaceId,
+            costUsd: input.cost,
+            allowanceUsd: input.creditAllowanceUsd,
+            agent: input.source === "agent",
+          });
         }
 
         // **Recorded beside the row, not instead of it** (P7-T06b). The
@@ -187,6 +206,87 @@ export async function recordUsageEvent(
       },
     },
   );
+}
+
+export interface CallRecorderInput {
+  readonly workspaceId: string;
+  readonly provider: AIProviderKind;
+  readonly rates: ModelRates;
+  /** The signed-in person a request is for. Nobody, for an agent or the scheduler. */
+  readonly forUser?: string;
+  /** Defaults to an assist when a person asked, and an agent when nobody did. */
+  readonly source?: UsageSource;
+  /** The agent whose run this step belongs to, for its own budget. */
+  readonly agentId?: string;
+  /** Whose key answered. On the provider's own, the call spends credits. */
+  readonly keySource?: "user" | "workspace" | "deployment";
+}
+
+/**
+ * What a provider tells about each call, turned into a usage row.
+ *
+ * **Without this nothing wrote one**, so every budget read zero and no cap ever
+ * tripped (AI-NATIVE-PLAN §1 rule 7: "every call records tokens and cost"). The
+ * host builds one per provider, because the host is what knows the workspace,
+ * the person and the model's price.
+ */
+export function callRecorder(pool: Pool, input: CallRecorderInput) {
+  return async (record: {
+    readonly model: string;
+    readonly feature?: string;
+    readonly usage: {
+      readonly inputTokens: number;
+      readonly outputTokens: number;
+      readonly cachedInputTokens?: number;
+    };
+  }): Promise<void> => {
+    const memberId = input.forUser
+      ? await activePersonFor(pool, input.workspaceId, input.forUser)
+      : undefined;
+    // Read here because a tenant's transaction cannot read the catalogue.
+    const hosted =
+      input.keySource === "deployment"
+        ? await readHostedAccess(pool, input.workspaceId)
+        : null;
+    await recordUsageEvent(pool, {
+      workspaceId: input.workspaceId,
+      ...(input.keySource ? { keySource: input.keySource } : {}),
+      ...(hosted?.kind === "credits"
+        ? { creditAllowanceUsd: hosted.allowanceUsd }
+        : {}),
+      ...(memberId ? { memberId } : {}),
+      ...(input.agentId ? { agentId: input.agentId } : {}),
+      ...(record.feature ? { featureKey: record.feature } : {}),
+      source: input.source ?? (input.forUser ? "assist" : "agent"),
+      provider: input.provider,
+      modelId: record.model,
+      inputTokens: record.usage.inputTokens,
+      outputTokens: record.usage.outputTokens,
+      cost: costOfUsage(input.rates, record.usage),
+    });
+  };
+}
+
+/** A workspace's Coach or Champion, so its calls count against its own budget. */
+export async function builtInAgentId(
+  pool: Pool,
+  workspaceId: string,
+  kind: "coach" | "champion",
+): Promise<string | undefined> {
+  const [agent] = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    tx
+      .select({ id: agents.id })
+      .from(agents)
+      .where(
+        activeOnly(
+          agents,
+          eq(agents.workspaceId, workspaceId),
+          eq(agents.kind, kind),
+        ),
+      )
+      .limit(1),
+  );
+  return agent?.id;
 }
 
 export interface UsageSummaryRow {

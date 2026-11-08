@@ -10,9 +10,10 @@ worth nothing.
 
 ## What a visitor sees
 
-They arrive at the sign-in page, which names twelve people and publishes the
-one password they share. They pick one, and they are that person: their goals,
-their check-ins, their review inbox, their nudges.
+They arrive at the sign-in page, which names everybody the year has brought in
+by today, up to twelve people, and publishes the one password they share. They
+pick one, and they are that person: their goals, their check-ins, their review
+inbox, their nudges.
 
 The workspace holds Northwind Labs' year, the one written up in
 `docs/scenarios/northwind-year`, placed on the real calendar: the scenario's
@@ -59,7 +60,7 @@ The reset is the same script. Run it from cron on the host:
 
 **It destroys everything every time, and that is the design.** An instance
 strangers can write to accumulates whatever they wrote. A reset that deleted
-only what visitors added would be a delete path across 129 tables that nobody
+only what visitors added would be a delete path across nearly 150 tables that nobody
 exercises, and the one failure mode it cannot avoid is leaving half of
 something behind. Starting from an empty volume cannot.
 

@@ -64,7 +64,7 @@
       "method": "POST",
       "path": "/workspace/changePlan",
       "scope": "write",
-      "summary": "Move this cloud workspace onto another plan from the catalogue.",
+      "summary": "Refused for a workspace's own members. A plan changes through billing, or through the instance's operator.",
       "flags": [
         {
           "name": "plan-key",
@@ -76,12 +76,106 @@
       "pages": false
     },
     {
+      "name": "billing summary",
+      "action": "billing.summary",
+      "method": "GET",
+      "path": "/billing/summary",
+      "scope": "read",
+      "summary": "The plan, its status, and every plan's price as the payment provider states it.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "billing startCheckout",
+      "action": "billing.startCheckout",
+      "method": "POST",
+      "path": "/billing/startCheckout",
+      "scope": "write",
+      "summary": "An address to pay at, to start a subscription on this plan.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "interval",
+          "field": "interval",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "month",
+            "year"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "billing openPortal",
+      "action": "billing.openPortal",
+      "method": "POST",
+      "path": "/billing/openPortal",
+      "scope": "write",
+      "summary": "An address to manage cards and invoices, and to cancel.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "billing buyCredits",
+      "action": "billing.buyCredits",
+      "method": "POST",
+      "path": "/billing/buyCredits",
+      "scope": "write",
+      "summary": "An address to pay at, for the provider's pack of AI credits.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "billing changePlan",
+      "action": "billing.changePlan",
+      "method": "POST",
+      "path": "/billing/changePlan",
+      "scope": "write",
+      "summary": "Moves a subscription to another plan: now for more seats, at the period's end for fewer. Refused below the headcount.",
+      "flags": [
+        {
+          "name": "plan-key",
+          "field": "planKey",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "interval",
+          "field": "interval",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "month",
+            "year"
+          ]
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "billing settleEnded",
+      "action": "billing.settleEnded",
+      "method": "POST",
+      "path": "/billing/settleEnded",
+      "scope": "write",
+      "summary": "Moves a workspace billing made read-only to the default plan, once its people fit.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace setLifecycle",
       "action": "workspace.setLifecycle",
       "method": "POST",
       "path": "/workspace/setLifecycle",
-      "scope": "write",
-      "summary": "Move a cloud workspace between active, suspended and closed.",
+      "scope": "destructive",
+      "summary": "Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's.",
       "flags": [
         {
           "name": "state",
@@ -93,6 +187,12 @@
             "suspended",
             "closed"
           ]
+        },
+        {
+          "name": "confirm-slug",
+          "field": "confirmSlug",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -125,13 +225,13 @@
       "method": "POST",
       "path": "/workspace/provision",
       "scope": "write",
-      "summary": "Create a workspace and its first member for a newly registered person.",
+      "summary": "Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy.",
       "flags": [
         {
           "name": "user",
           "field": "user",
           "type": "object",
-          "required": true
+          "required": false
         },
         {
           "name": "name",
