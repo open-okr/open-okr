@@ -252,6 +252,14 @@ export const METRIC = {
   concurrentActions: "openokr_concurrent_actions",
   /** Admission refusals, by reason (rate or concurrency). */
   admissionRefusalsTotal: "openokr_admission_refusals_total",
+
+  /**
+   * Unexpected errors, by where they were caught (error-reporting.md D3, plan
+   * 0.7.0 E1). Every one is counted, including those the caps hold back, so
+   * this is the number to alert on. `source` is one of eight fixed values; the
+   * workspace and the member are fields in the log line, never labels (D7).
+   */
+  errorsTotal: "openokr_errors_total",
 } as const;
 
 /**

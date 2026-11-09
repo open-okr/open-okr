@@ -12,6 +12,7 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
+import { reportError } from "../errors/report.ts";
 import { OperationError } from "../operations/errors.ts";
 import {
   ACCESS_LEVEL_NAMES,
@@ -1034,6 +1035,36 @@ type ActionOutput<K extends ActionName> = Awaited<
  * everywhere at once rather than on five surfaces independently.
  */
 export async function callAction<K extends ActionName>(
+  context: ActionCallContext,
+  name: K,
+  input: ActionInput<K>,
+): Promise<ActionOutput<K>> {
+  try {
+    return await admitAndCall(context, name, input);
+  } catch (error) {
+    // **The one door is the one place that sees every unexpected error**
+    // (docs/design/error-reporting.md D2, plan 0.7.0 E1). REST, the agent
+    // endpoint and the chat commands turn a fault into `internal` before
+    // Next could see it, and many server actions answer with a sentence.
+    // Held, not sent: the request around this call adds the digest Next
+    // shows the person, and a refusal returns from the classifier at once.
+    reportError(
+      error,
+      {
+        source: "action",
+        action: name,
+        workspaceId: context.workspaceId,
+        memberId: context.actor.memberId ?? null,
+        userId: context.actor.userId ?? null,
+      },
+      { hold: true },
+    );
+    throw error;
+  }
+}
+
+/** Admission, then the measured call: what `callAction` was before E1. */
+async function admitAndCall<K extends ActionName>(
   context: ActionCallContext,
   name: K,
   input: ActionInput<K>,

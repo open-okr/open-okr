@@ -800,6 +800,30 @@ export {
   type ScimFilter,
   setDirectoryUserActive,
 } from "./directory-sync/users.ts";
+export {
+  classifyError,
+  type DescribedError,
+  describeError,
+  ERROR_SOURCES,
+  type ErrorFrame,
+  type ErrorSource,
+  FRAME_LIMIT,
+  fingerprintOf,
+  parseStack,
+  scrubFile,
+} from "./errors/classify.ts";
+export {
+  type ErrorReport,
+  type ErrorReportContext,
+  type ErrorReportingOptions,
+  type ErrorReportSink,
+  flushErrorReports,
+  installErrorReporting,
+  REPORTS_PER_FINGERPRINT_PER_MINUTE,
+  REPORTS_PER_MINUTE,
+  reportDescribedError,
+  reportError,
+} from "./errors/report.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.

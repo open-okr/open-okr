@@ -46,6 +46,10 @@ vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
 vi.mock("../lib/tenant-floor", () => ({
   tenantFloor: vi.fn(async () => "enforced"),
 }));
+// The eighth (plan 0.7.0 E1). `lib/error-reporting` reaches `@openokr/core`
+// and the meter, and the real one adds process listeners that would outlive
+// the test. Mocked for both.
+vi.mock("../lib/error-reporting", () => ({ installErrorReports: vi.fn() }));
 // Not for the import cost: the real one replaces `console.error` for the
 // whole process, and the tests below spy on it (completeness review L-04).
 vi.mock("../lib/abandoned-responses", () => ({

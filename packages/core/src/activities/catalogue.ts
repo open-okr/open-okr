@@ -851,6 +851,9 @@ export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
 ]);
 
 export class UnregisteredActivityKindError extends Error {
+  /** The kind is a code value, so a report may carry it (error-reporting.md D5). */
+  readonly safeMessage = true;
+
   constructor(kind: string) {
     super(
       `"${kind}" is not in the activity catalogue ` +

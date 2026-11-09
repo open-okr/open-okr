@@ -2,6 +2,7 @@ import { EnvironmentError, loadEnv } from "@openokr/config";
 import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
+import { installErrorReports } from "./lib/error-reporting";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
@@ -112,6 +113,29 @@ export function startTelemetry(): void {
     // an observability feature into an availability risk.
     process.stderr.write(
       `telemetry: could not start: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Installs error reporting (docs/design/error-reporting.md, plan 0.7.0 E1):
+ * the release and region every report carries, and the process's own
+ * last-resort hooks. Sends nothing anywhere; the log line and the counter
+ * are local.
+ *
+ * Skipped during `next build` like the meter, and non-fatal for the meter's
+ * reason: a product that refused to serve because it could not report its
+ * errors would have made reporting the outage.
+ */
+export function startErrorReporting(): void {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    installErrorReports();
+  } catch (error) {
+    process.stderr.write(
+      `errors: could not start reporting: ${error instanceof Error ? error.name : "unknown"}\n`,
     );
   }
 }

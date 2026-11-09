@@ -64,7 +64,7 @@ The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Twenty-two series. Every one is a count, a duration, a queue reading or a
+Twenty-seven series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -107,6 +107,12 @@ capacity gauge.
 | `openokr_concurrent_actions` | none |
 | `openokr_admission_refusals_total` | reason (rate, concurrency) |
 | `openokr_sign_in_held_total` | scope (pair, account). A password attempt refused by a sign-in hold. A steady `account` rate is somebody guessing one account from many networks |
+
+**Errors**
+
+| Series | Labels |
+|---|---|
+| `openokr_errors_total` | source (request, action, relay, dead_letter, job, agent, process, browser). Every unexpected error, including those the caps below hold back. Refusals are not errors and are not counted here: they are the `refused` and `not_found` outcomes above. Alert on this one |
 
 ### The four readings that are taken at scrape time
 
@@ -154,6 +160,40 @@ Six of the TECHNICAL-PLAN §13.1 budgets need a browser or a real channel and
 so cannot come from a server-side series at all. They are named on the
 budgets dashboard with the tool that measures each, rather than left silently
 absent.
+
+## Unexpected errors
+
+Every unexpected error is one JSON line on stderr, on every install, with
+nothing to configure. A refusal (forbidden, not found, a conflict, input that
+failed validation, a limit) is not an error and writes nothing; neither does
+Next's own `notFound()` or `redirect()`. Design:
+[error-reporting.md](../design/error-reporting.md).
+
+```
+docker compose logs app | grep '"kind":"error.report"'
+```
+
+| Field | What it is |
+|---|---|
+| `source` | Where it was caught: `request`, `action`, `relay`, `dead_letter`, `job`, `agent`, `process` or `browser` |
+| `class`, `message` | The error's class. The message only for a class whose messages name code, such as `TypeError`; every other message reads `(message withheld)`, because a message here can quote what somebody typed |
+| `fingerprint` | The same for every repeat of one error, across releases |
+| `digest` | The reference the error page showed the person. Search for it when somebody quotes one |
+| `traceId`, `spanId` | The span it failed inside, with tracing on |
+| `route`, `method`, `action` | The route pattern (`/goals/[id]`, never the address), the method, and the action's name |
+| `workspaceId`, `memberId`, `userId` | Who was affected, as ids. In the line, never in a metric label |
+| `sqlState`, `constraint` | For a database error, instead of its message, which quotes the row |
+| `stack` | The frames, with the machine's own directories removed |
+
+One error is reported once, by the first place that catches it, and carries
+what the later ones knew: an action that fails inside a page carries the
+action's name and the page's digest. A dead letter is always reported, because
+giving up on work is its own event.
+
+**Caps.** One error at most ten times a minute and sixty reports a minute in
+all. Past either, the error is still counted in `openokr_errors_total` and not
+written; one `"kind":"error.report.held"` line a minute says how many were held
+back. A broken page under load cannot flood the log.
 
 ## One error the log leaves out
 

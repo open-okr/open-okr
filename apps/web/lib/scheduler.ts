@@ -55,6 +55,7 @@ import {
   purgeStaleSignInAttempts,
   remindBeforeErasure,
   remindTrialsEnding,
+  reportError,
   sweepEndedCycles,
   sweepExpiredSessions,
   sweepTrials,
@@ -815,9 +816,17 @@ export function startScheduler(): PgBossJobQueue | null {
               logError(
                 `${job.job} failed for ${workspace.slug}: ${reason(error)}`,
               );
+              // An action the run called has usually reported it already;
+              // this adds the job name to that report (error-reporting.md D2).
+              reportError(error, {
+                source: "job",
+                tags: { job: job.job },
+                workspaceId: workspace.id,
+              });
             },
             onInstanceError(job, error) {
               logError(`${job.job} failed: ${reason(error)}`);
+              reportError(error, { source: "job", tags: { job: job.job } });
             },
           });
           recordSchedulerHeartbeat();

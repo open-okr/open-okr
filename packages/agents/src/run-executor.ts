@@ -34,6 +34,7 @@ import {
   METRIC,
   OperationError,
   type OperationTx,
+  reportError,
   resolveAgentRunCostCap,
   resolveMemberAccessLevel,
   resolveSubjectContext,
@@ -673,6 +674,11 @@ export async function continueAgentRun(
     if (error instanceof OperationError && error.code === "not_found") {
       return { kind: "skipped", reason: error.message };
     }
+    // An agent run that ends in error (error-reporting.md D2). Reported here,
+    // where the workspace is known, before the relay retries the step; a
+    // refusal returns from the classifier, and a dead letter, if it comes to
+    // that, is reported as its own event.
+    reportError(error, { source: "agent", workspaceId: job.workspaceId });
     throw error;
   }
   return { kind: "stepped" };

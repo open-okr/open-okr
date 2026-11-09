@@ -50,6 +50,7 @@ import {
   parseTeamsSecret,
   parseTelegramSecret,
   parseWhatsAppSecret,
+  reportError,
 } from "@openokr/core";
 import { outboxRowsPerMinute } from "./admission";
 import { providerForTier } from "./ai-provider";
@@ -484,6 +485,8 @@ export function startRelay(): OutboxRelay | null {
     },
     onError(error) {
       logError(`drain failed: ${reason(error)}`);
+      // The drain itself failed, not one row (error-reporting.md D2).
+      reportError(error, { source: "relay" });
     },
     onDeadLetter(record, error) {
       // The loudest line this process writes. A dead letter is work the product
@@ -492,6 +495,16 @@ export function startRelay(): OutboxRelay | null {
         `dead letter ${record.topic} (${record.idempotencyKey}) after ` +
           `${record.attempts} attempts: ${reason(error)}`,
       );
+      // The topic and the workspace, never the payload: a row carries an
+      // address, a token or a message body (error-reporting.md D4).
+      reportError(error, {
+        source: "dead_letter",
+        tags: { topic: record.topic },
+        workspaceId:
+          typeof record.payload.workspaceId === "string"
+            ? record.payload.workspaceId
+            : null,
+      });
     },
   });
 
