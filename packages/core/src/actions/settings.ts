@@ -379,7 +379,7 @@ export const updateWorkspaceGeneralSettings = defineWriteAction({
  * workspace's console page; its administrators may not, and may not reset
  * them either. On a self-hosted instance they are the administrator's.
  */
-export const PROVIDER_LIMIT_KEYS: ReadonlySet<string> = new Set([
+const PROVIDER_LIMIT_KEYS: ReadonlySet<string> = new Set([
   "storageQuotaBytes",
   "agentRunCostCapUsd",
 ]);

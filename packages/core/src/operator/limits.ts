@@ -146,6 +146,10 @@ export async function readWorkspaceLimitsAsOperator(
   const [row] = await withOperator(db, operatorUserId, (tx) =>
     tx
       .select({ settings: workspaces.settings })
+      // openokr:allow-raw-read: an operator is not a member, so there is no
+      // member getter to go through. `withOperator` applies the operator's own
+      // policy, as the plan and billing reads beside this one do, and the
+      // caller has already checked the grant.
       .from(workspaces)
       .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
       .limit(1),
