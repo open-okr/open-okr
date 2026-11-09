@@ -311,7 +311,7 @@ behaviour attached.
 | Field | Rule |
 |---|---|
 | `champion_id` | Required. Exactly one member, never a team (METHOD.md §2.5) |
-| `reviewer_id` | Optional by default; required only where the practice requires reviewers (`reviewer`). Warned when equal to the champion, never refused: a one-person team has no other option |
+| `reviewer_id` | Optional by default; required only where the practice requires reviewers (`reviewer`). Warned when equal to the champion, never refused: a one-person team has no other option. The warning is derived from the two ids on screen, not stored and not a quality check: the drafting form says it as the two are chosen, and the goal's page, its drafting card, its row on the OKRs list and its drawer say it while it holds |
 | `level` | `company` / `department` / `team` / `individual`. Drives the level-skip and anchor rules |
 | `owner_kind` | `workspace` / `space` / `member`, with exactly one of `space_id` / `member_id` set to match |
 | `cycle_id` or `timeframe` | Exactly one. A goal with neither fails OBJ-3 |

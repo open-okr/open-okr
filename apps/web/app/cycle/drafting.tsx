@@ -31,6 +31,7 @@ import {
 import { healthWord } from "../../lib/health-words.ts";
 import type { KpiOption } from "../../lib/kpi-options.ts";
 import { searchPeople } from "../../lib/member-search.ts";
+import { ReviewerIsChampionNote } from "../../lib/reviewer-is-champion-note.tsx";
 import { getTranslations } from "../../lib/translations";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { ActionForm } from "./action-form.tsx";
@@ -39,6 +40,7 @@ import {
   SuggestMeasure,
   SuggestParent,
 } from "./assists.tsx";
+import { ChampionAndReviewer } from "./champion-and-reviewer.tsx";
 import { DraftCoach } from "./draft-coach.tsx";
 import {
   addKeyResult,
@@ -271,6 +273,12 @@ export async function Drafting({
                       name: goal.champion.name,
                     })}
               </p>
+              <ReviewerIsChampionNote
+                championId={goal.champion.id}
+                reviewerId={goal.reviewer?.id}
+                name={goal.champion.name}
+                className="mt-1 self-start"
+              />
             </div>
             <span className="flex flex-wrap items-center gap-2">
               <Chip tone={HEALTH_TONE[goal.health] ?? "neutral"}>
@@ -686,23 +694,19 @@ export async function Drafting({
                     </option>
                   ))}
                 </SelectInput>
-                {/* Opens on whoever is drafting, where the select it replaced
-                 * opened on whoever came first in the directory. */}
-                <EntityPicker
-                  id="goal-champion"
-                  label={t("common.champion")}
-                  hideLabel
-                  name="championId"
-                  required
-                  defaultValue={
+                {/* The champion opens on whoever is drafting, where the
+                 * select it replaced opened on whoever came first in the
+                 * directory, and the warning when the reviewer is the same
+                 * person comes with the two (plan 0.7.0, O3). */}
+                <ChampionAndReviewer
+                  people={people}
+                  defaultChampionId={
                     members.some((member) => member.id === memberId)
                       ? memberId
                       : null
                   }
-                  options={people}
+                  reviewer={practice.reviewer}
                   search={searchPeople}
-                  className="w-44"
-                  inputClassName="text-xs"
                 />
                 {/* The kind of promise (METHOD.md §2.8, P9-T11b-a), offered
                  * only where the workspace uses both, and starting at its
@@ -722,33 +726,6 @@ export async function Drafting({
                     <option value="committed">{t("okrKind.committed")}</option>
                   </SelectInput>
                 ) : null}
-                {/* The reviewer follows the practice (METHOD.md §2.5, P9-T04):
-                 * off asks for none, so there is no picker; optional offers
-                 * "No reviewer" after the members; required offers members
-                 * only, and the server refuses a goal without one either way. */}
-                {practice.reviewer === "off" ? null : (
-                  <>
-                    {/* Opens on nobody, where the select it replaced opened on
-                     * whoever came first in the directory: a reviewer is
-                     * somebody chosen, and "No reviewer" is offered only where
-                     * the practice makes one optional. */}
-                    <EntityPicker
-                      id="goal-reviewer"
-                      label={t("common.reviewer")}
-                      hideLabel
-                      name="reviewerId"
-                      required={practice.reviewer === "required"}
-                      defaultValue={null}
-                      options={people}
-                      {...(practice.reviewer === "optional"
-                        ? { noneLabel: t("cycle.drafting.noReviewer") }
-                        : {})}
-                      search={searchPeople}
-                      className="w-44"
-                      inputClassName="text-xs"
-                    />
-                  </>
-                )}
                 {spaces.length > 0 ? (
                   <EntityPicker
                     id="goal-space"
@@ -770,9 +747,6 @@ export async function Drafting({
                   {t("cycle.drafting.addObjective")}
                 </Button>
               </div>
-              <p className="text-xs text-ink-3">
-                {t("cycle.drafting.methodMd")}
-              </p>
             </ActionForm>
           </CardBody>
         </Card>

@@ -1095,8 +1095,11 @@ export const createGoal = defineWriteAction({
        * asked for. `null` is nobody, and a workspace that requires reviewers
        * refuses that through the policy, from every caller alike.
        *
-       * A reviewer who is also the champion is a quality finding rather than
-       * a refusal: §4 reports it, and reporting it is what makes it fixable.
+       * A reviewer who is also the champion is warned about, never refused
+       * (okr-core-domain.md §4.1): a one-person team has nobody else. No
+       * quality check reports it, because METHOD.md makes no rule of it. The
+       * screens that set or show both derive the warning from the two ids
+       * (`apps/web/lib/reviewer-is-champion.ts`, plan 0.7.0 O3).
        */
       championId: z.uuid().optional(),
       reviewerId: z.uuid().nullable().optional(),

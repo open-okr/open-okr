@@ -37,6 +37,8 @@ import {
   useOkrDetail,
   usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { reviewerIsChampion } from "../../lib/reviewer-is-champion.ts";
+import { ReviewerIsChampionNote } from "../../lib/reviewer-is-champion-note.tsx";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { setStandaloneReason, unlinkGoals } from "./alignment-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
@@ -399,6 +401,17 @@ function DrawerBody({
             <dd className="px-1 text-ink-2">
               {goal.reviewer?.name ?? t("okrList.noReviewer")}
             </dd>
+            {/* Warned, never refused (okr-core-domain.md §4.1, plan 0.7.0
+             * O3), under the reviewer it is about. */}
+            {reviewerIsChampion(goal.champion.id, goal.reviewer?.id) ? (
+              <dd className="col-start-2">
+                <ReviewerIsChampionNote
+                  championId={goal.champion.id}
+                  reviewerId={goal.reviewer?.id}
+                  name={goal.champion.name}
+                />
+              </dd>
+            ) : null}
             <dt className="text-ink-3">{t("okrDrawer.level")}</dt>
             <dd className="px-1 text-ink-2">{goal.level}</dd>
             {/* §2.9: a team that merges or splits takes its OKRs with it. */}

@@ -11,6 +11,7 @@ import {
   Avatar,
   Bar,
   Button,
+  Chip,
   formatConfidence,
   Spinner,
   TextInput,
@@ -38,6 +39,7 @@ import {
   useOkrTree,
   usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
+import { reviewerIsChampion } from "../../lib/reviewer-is-champion.ts";
 import { unitsInUse } from "../../lib/units-in-use.ts";
 import { addKeyResult, addObjective } from "./editor-actions.ts";
 import { HealthChip } from "./health-chip.tsx";
@@ -1007,6 +1009,16 @@ function ObjectiveRow({
               <>
                 {t("okrDrawer.reviewer")}{" "}
                 <span className="text-ink-2">{goal.reviewer.name}</span>
+                {/* Warned, never refused (okr-core-domain.md §4.1, plan
+                 * 0.7.0 O3). Short here; the drawer says it in full. */}
+                {reviewerIsChampion(goal.champion.id, goal.reviewer.id) ? (
+                  <Chip
+                    className="ml-1 h-4.5 bg-warn-bg text-[11px] text-warn"
+                    data-testid="reviewer-is-champion-chip"
+                  >
+                    {t("okrList.reviewerIsChampion")}
+                  </Chip>
+                ) : null}
               </>
             ) : (
               t("okrList.noReviewer")

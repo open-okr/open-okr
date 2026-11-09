@@ -151,6 +151,7 @@ const goal = (
 const tree = (
   keyResults = [keyResult()],
   kind: "committed" | "aspirational" = "aspirational",
+  reviewer: { id: string; name: string } | null = null,
 ): OkrTree => ({
   cycle: {
     id: "c",
@@ -165,6 +166,7 @@ const tree = (
     {
       ...goal("g", "Make onboarding the reason teams stay", keyResults, "p"),
       kind,
+      reviewer,
     },
     goal("p", "Grow the business on the teams we keep", []),
   ],
@@ -226,10 +228,13 @@ async function render(options: {
   canEdit?: boolean;
   keyResults?: OkrTree["goals"][number]["keyResults"];
   kind?: "committed" | "aspirational";
+  reviewer?: { id: string; name: string } | null;
 }) {
   window.history.replaceState(null, "", `/goals${options.address}`);
   // A read again returns what the server holds, which is what was drawn.
-  readOkrTree.mockResolvedValue(tree(options.keyResults, options.kind));
+  readOkrTree.mockResolvedValue(
+    tree(options.keyResults, options.kind, options.reviewer),
+  );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -239,7 +244,11 @@ async function render(options: {
         <TranslationsProvider locale="en">
           <ToastProvider>
             <OkrTable
-              initialTree={tree(options.keyResults, options.kind)}
+              initialTree={tree(
+                options.keyResults,
+                options.kind,
+                options.reviewer,
+              )}
               initialAt={Date.now()}
               scope="all"
               filters={{ includeClosed: false }}
@@ -501,6 +510,35 @@ describe("what a reader may do", () => {
     expect(inDrawer(`Current value for ${KR}`)).toBeNull();
     expect(inList(`Current value for ${KR}`)).toBeNull();
     expect(inDrawer(`Target for ${KR}`)).not.toBeNull();
+  });
+});
+
+/**
+ * A champion who reviews their own objective is warned about in the row and
+ * the drawer, and nothing is refused (plan 0.7.0, O3; okr-core-domain.md
+ * §4.1).
+ */
+describe("a reviewer who is the champion", () => {
+  const chips = () =>
+    container.querySelectorAll('[data-testid="reviewer-is-champion-chip"]');
+  const note = () =>
+    drawer()?.querySelector('[data-testid="reviewer-is-champion"]') ?? null;
+
+  test("is marked on the row and said in full in the drawer", async () => {
+    await render({ address: "?okr=g", reviewer: PRIYA });
+    expect(chips()).toHaveLength(1);
+    expect(chips()[0]?.textContent).toBe("Also the owner");
+    expect(note()?.textContent).toBe(
+      "Priya is both owner and reviewer. Name another reviewer where the team has somebody else.",
+    );
+    // A warning, not a lock: the reader can still edit the objective.
+    expect(inDrawer(`Title of ${KR}`)).not.toBeNull();
+  });
+
+  test("is not said when somebody else reviews it", async () => {
+    await render({ address: "?okr=g", reviewer: MEI });
+    expect(chips()).toHaveLength(0);
+    expect(note()).toBeNull();
   });
 });
 

@@ -45,6 +45,7 @@ import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { ReviewerIsChampionNote } from "../../../lib/reviewer-is-champion-note.tsx";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
@@ -336,6 +337,14 @@ export default async function GoalPage({
                       weight: goal.weight,
                     })}
               </p>
+              {/* Warned, never refused (okr-core-domain.md §4.1, plan 0.7.0
+               * O3). The Roles card below is where it is changed. */}
+              <ReviewerIsChampionNote
+                championId={goal.champion.id}
+                reviewerId={goal.reviewer?.id}
+                name={goal.champion.name}
+                className="mt-1 self-start"
+              />
             </div>
             <Chip tone={closed ? "neutral" : "brand"}>
               {closed
