@@ -357,3 +357,86 @@ What the export writes while the workspace is frozen, all of it bookkeeping and 
 
 `docs/runbooks/migration-cutover.md` loses its warning. This section's list of recovery actions (§3) gains the export.
 
+## 11. The trial sweep (release 0.7.0, P4)
+
+Status: proposed 9 November 2026 for release 0.7.0 (plan P4), waiting for "design approved". Tenant lifecycle and a schema change, so it is designed first.
+
+### 11.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| `trial_ends_at` | `packages/db/src/schema/tenants.ts:41`, migration 0082 | Nothing writes it and nothing reads it. S-46 does not show it either (`apps/web/app/operator/[workspaceId]/page.tsx:352`) |
+| §3 above | This document | Says the trial sweep may suspend |
+| A subscription that ends | `billing.md` §6; `settleOntoPlanInTx` in `packages/core/src/billing/webhook.ts:75-105` | People fit the default plan: moved there. Otherwise read-only, with `billing_accounts.suspended_by_billing` set |
+| Settling afterwards | `settleEndedInTx`, `packages/core/src/billing/service.ts:435` | Only for a workspace billing made read-only |
+| Who may lift what | `refuseOwnLifecycleMove`, `packages/core/src/tenancy/lifecycle.ts:190` | A customer may close from billing's read-only mode, never lift an operator's suspension |
+| The default plan | `resolveDefaultPlan`, `packages/core/src/tenancy/plans.ts:285`; applied at sign-up in `packages/core/src/workspaces/provisioning.ts:210` | Empty means no plan and no seat limit |
+| Free workspaces per person | `requireFreeWorkspaceRoom`, `packages/core/src/tenancy/plans.ts:303` | Counts workspaces the person owns on the default plan |
+| A dated cloud job | `remindBeforeErasure`, `packages/core/src/tenancy/closing.ts:214`; `cloud.remindErasure` in `apps/web/lib/scheduler.ts` | Hourly, instance-wide, one `runOperation` per due workspace as `system` |
+
+A `billing_accounts` row needs a provider and a customer reference, so a workspace on a trial with no card has none. Billing's flag cannot mark a trial suspension.
+
+### 11.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| T1 | **A trial is a catalogue plan with an end date and no subscription.** It gates nothing: the workspace runs exactly as on that plan | §7 refuses feature gating. A trial only changes seats and allowance, like any plan |
+| T2 | **An operator starts, extends or removes a trial on S-46**: `setTrialAsOperator`, a date (or none) and the customer-facing reason, recorded on both audit chains like every operator action. Extending past now lifts a suspension the trial caused | Nothing writes the column today, so a sweep alone would have nothing to sweep. An operator needs the extension anyway |
+| T3 | **Choosing a plan ends the trial.** The webhook applying a live subscription, `setPlanAsOperator` and `billing.settleEnded` each clear `trial_ends_at` in their own transaction | A trial nobody resolved is the only thing the sweep should see |
+| T4 | **The sweep, `cloud.sweepTrials`**: an hourly instance job, nothing with the cloud flag off. It lists active tenants with `trial_ends_at <= now()` and no erasure claim, then runs one `runOperation` per workspace as `system`, which re-reads and locks the tenant row before acting | The same shape as `cloud.remindErasure`. Re-reading inside the transaction is what keeps two scheduler replicas from settling one trial twice |
+| T5 | **At the end, the rule billing.md §6 uses for a subscription that ends.** A live subscription: only the date is cleared. People fit the default plan: moved to it, still active. They do not fit: read-only through `suspended`. With no default plan configured, the default is no plan and no limit, so everybody fits | "The product never chooses who loses access" (billing.md §1). §3 above said the sweep suspends; that sentence changes to "billing, or the trial sweep when people do not fit the default plan" |
+| T6 | In the same transaction: `trial_ends_at` cleared, a `workspace.trial_ended` activity with the outcome, and a `workspace.endTrial` audit row naming the plan moved to | A past date is not a state (§2). Clearing it is what makes the next pass find nothing |
+| T7 | **Migration: `tenants.suspended_by_trial boolean not null default false`.** Read only while the tenant is `suspended`; cleared by `setTenantStateInTx` on every move, as `erasure_reminded_at` is. No check constraint | The marker `suspended_by_billing` is for billing, on a row a trial workspace does not have. Without a constraint, a replica of the previous release moving the tenant during a rolling upgrade cannot fail on it |
+| T8 | **The customer lifts a trial suspension the way they lift billing's.** Subscribing lifts it (the webhook treats the flag like billing's). Removing people and pressing Settle on S-49 moves it to the default plan (`billing.settleEnded` accepts either flag). Closing is allowed. An operator's own suspension is never lifted by any of these | One rule for both kinds of "you are over your plan". `refuseOwnLifecycleMove` and `refuseOwnStateChange` read the new flag beside billing's |
+| T9 | A workspace on a trial counts as one of its owner's free workspaces at sign-up | It lands on the default plan when the trial ends. Otherwise each new trial is a way past `cloud.limits.freeWorkspacesPerPerson` |
+| T10 | **A banner, not a message**, for members with `full` access during the last seven days: the end date, the plan, and what happens if nobody chooses. Seven is the erasure reminder's `REMIND_DAYS`. After a suspension, the existing read-only banner gains the trial's sentence | A banner is page state, so it needs no new message kind |
+| T11 | `pnpm cloud:trials` lists the trials that are due and what each would become; `--write` applies them. For `OPENOKR_SCHEDULER=off` | Every cloud job has a command for an instance without the scheduler |
+| T12 | Self-hosted is untouched: no tenant rows, the job returns before reading anything | §1 |
+
+### 11.3 Open questions
+
+**Q1. Does a sign-up start a trial by itself?** Proposed: **yes, when a provider says so.** Two instance settings in TECHNICAL-PLAN §4.14: `cloud.trialDays`, default 0, and `cloud.trialPlan`, default empty, a catalogue key. With either unset, nobody starts a trial and only T2 can. A key the catalogue does not hold reads as no trial, as `cloud.defaultPlan` does. If no, only an operator starts trials and neither setting exists.
+
+**Q2. Are the owners and administrators told by email?** That is a new proactive message kind, so it is yours. Proposed: **yes, two emails shaped like the erasure reminder** (`workspace-erasure.md` §12): seven days before the end and when the sweep acts, each saying what happened and what to do, sent through the outbox in the sweep's own transaction. That adds `trial_reminded_at` to the same migration, cleared whenever the end date moves. If no, the banner in T10 is the only notice, and a trial can end for an administrator who did not sign in that week.
+
+### 11.4 Acceptance criteria
+
+- Given a cloud tenant on Team with a trial ending yesterday, five people and a default plan of ten seats, when the sweep runs, then it is on the default plan, active, with `trial_ends_at` null, one activity and one audit row.
+- Given the same with twelve people, then it is read-only with `suspended_by_trial`, and no member is suspended.
+- Given that read-only workspace, when an administrator removes two people and presses Settle, then it is active on the default plan.
+- Given that read-only workspace, when a subscription to Team becomes active, then it is active on Team.
+- Given an operator suspended the workspace with a reason, when a subscription becomes active or Settle is pressed, then it stays suspended.
+- Given a trial ending tomorrow and a live subscription since yesterday, when the sweep runs, then the trial date was already cleared and nothing is written.
+- Given a trial that ended, when the sweep runs twice, then the second run writes nothing.
+- Given the cloud flag off, when the sweep runs, then it reads no tenant.
+- Given an operator extends a suspended trial to next month, then the workspace is active on the trial plan and the extension is on both audit chains.
+- Given a person who owns one free workspace with the limit at one, when they sign up for a trial workspace, then it is refused (with Q1 yes).
+
+### 11.5 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/trial-sweep.test.ts` (new) | Every row of T5, idempotence, the lock under two runs, the flag off |
+| Integration | `packages/core/test/tenant-lifecycle.test.ts` (existing) | The new flag in both refusals, cleared on every move |
+| Integration | `packages/core/test/billing-webhook.test.ts` (existing) | A subscription lifts a trial suspension and clears the date; an operator's stays |
+| Integration | `packages/core/test/seats.test.ts` (existing) | A trial counts as a free workspace |
+| Unit | `apps/web/test/scheduler.test.ts` (existing) | `cloud.sweepTrials` has a cron and a worker |
+| Browser | `e2e/s45-operator-console.spec.ts` (existing) | Setting and extending a trial on S-46; the banner |
+
+### 11.6 Documents changed in the same change
+
+- This document: §2's `trial_ends_at` row, §3's "who can set it" column, §8 gains the criteria above.
+- `billing.md` §6, and `plans-and-seats.md` for T9.
+- TECHNICAL-PLAN §4.13 and DATABASE.md (the `tenants` columns); §4.14 for Q1's settings. `tenants` already has no legacy source in §7.2.
+- UIUX-PLAN S-46 (the trial end fact and its control) and S-49 (the trial line, and Settle for either flag).
+- `docs/install/cloud.md`: how a provider offers trials.
+- CLAUDE.md: `pnpm cloud:trials`.
+- `docs/runbooks/upgrade.md`, "0.6 to 0.7": one additive migration; nothing changes until a trial is set.
+
+### 11.7 What this does not do
+
+- No trial through the payment provider's own trial feature. A card-first trial is a subscription, and billing.md already handles its end.
+- Nothing deleted, and no member suspended.
+- No feature differs during a trial.
+- No email unless Q2 says yes.
+

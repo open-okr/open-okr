@@ -314,3 +314,60 @@ Written as the test plan P8-T03 inherits.
 | 3 | Whether site messages are rich text or plain | Written here as rich text through the shared module, for consistency. Plain text would remove a sanitising surface that has an instance-wide audience. **Answered at P8-T03c: plain text** (migration 0088) |
 | 4 | The P1-T09 follow-up carried on the P8-T03 row | Instance settings writes sit outside the Operation pipeline behind an escape hatch. This design adds two more writers to `system_settings` (flags and site messages), so the follow-up gets larger rather than smaller and wants closing before or during P8-T03 |
 | 5 | Renaming the four e2e specs that took S-41 to S-44 | Skipped rather than renamed, because renaming specs is a change with no behaviour behind it. If the prefix is ever reclaimed, the gap is where it goes |
+
+## 11. Seats used on the snapshot (release 0.7.0, P3)
+
+Status: proposed 9 November 2026 for release 0.7.0 (plan P3, seats used), waiting for "design approved". A schema change, so it is designed first. The rest of P3 is built (§8).
+
+### 11.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The snapshot | `packages/db/src/schema/operator-usage.ts`; migration 0086 with three policies (operator read, instance admin write, tenant read) | `member_count`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at`, `measured_at` |
+| The measure | `measureOne`, `packages/core/src/operator/usage.ts:71-123`; run hourly by `cloud.measureUsage` and by `pnpm cloud:usage` | `member_count` is humans with status `active` |
+| The seat limit | `SEAT_STATUSES` and `pendingInvitations`, `packages/core/src/tenancy/plans.ts:107-150`; `seatState` at `:215`, `seatCheckInTx` at `:392` | Humans `active` or `invited`, plus personal invitations still waiting, one per address, none for an address already here |
+| The list | `apps/web/app/operator/page.tsx:327-331` | Active members against the plan's seats, so a workspace full of pending invitations looks half empty |
+| The customer's plan screen | `apps/web/app/admin/plan/page.tsx:83` | Reads `seatState` live, not the snapshot. Unaffected |
+
+### 11.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| P1 | **`operator_workspace_usage.seat_count integer`, nullable, no default** | Null means no release that counts seats has measured this row yet, and the console says "not measured". A default of 0 would be a wrong number that looks like an answer, the failure `usage.ts` warns about |
+| P2 | **One definition of a seat.** `plans.ts` exports `seatsHeldInTx(tx, workspaceId, arriving?)`: the `SEAT_STATUSES` count plus the pending invitations. `seatState`, `seatCheckInTx` and `measureOne` all call it | The console and the limit cannot then disagree about who holds a seat. Two counts would be two answers |
+| P3 | `measureOne` calls it inside its existing `withWorkspace` transaction, naming the workspace explicitly as every count there does | The same floor and the same reason (`usage.ts:52-68`) |
+| P4 | **`member_count` stays** and keeps meaning active people. S-45's column becomes seats used against seats (`seat_count / seats`), in the warning tone at or over the limit. S-46's usage panel shows both | They answer different questions: who works here, and what the plan counts. Removing a column spans two releases, and nothing needs this one gone |
+| P5 | **Migration**: the column only, the next free number. The table's policies from 0086 already cover it | A new column needs no new policy |
+| P6 | **No backfill.** The hourly measure fills every row within the hour; `pnpm cloud:usage` does it at once | The snapshot is replaced on every run (`onConflictDoUpdate`), so a data change would fill a value the next run overwrites |
+| P7 | During a rolling upgrade, a replica of the previous release writes no `seat_count`: a new row stays null and an updated row keeps its last value beside a fresher `measured_at`, until the rollout ends | Acceptable for one hour at most. It cannot read as a different workspace's number |
+| P8 | A count, not a list. No address, name or invitation leaves the workspace | §5 and acceptance criterion 6 in §9 |
+
+### 11.3 Acceptance criteria
+
+- Given a workspace with three active and one invited human, personal invitations waiting for two addresses (one sent twice), a guest invitation, an invitation to an address already a member, the Coach and the Champion, when the measure runs, then `member_count` is 3 and `seat_count` is 6.
+- Given the same workspace, when `seatState` is read at the same moment, then its `used` equals `seat_count`.
+- Given a snapshot row written before this change, when an operator opens S-45, then the seats cell reads "not measured", and after the next measure it reads `6 / 10`.
+- Given a workspace at 10 of 10 seats, when the list renders, then the cell is in the warning tone.
+- Given the operator wall's column check, when it reads the table, then `seat_count` is an integer column and nothing else was added.
+
+### 11.4 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/seats.test.ts` (existing) | `seatsHeldInTx` against the counted cases, and `seat_count` equal to `seatState.used` |
+| Integration | `packages/core/test/operator-wall.test.ts` (existing) | The column list |
+| Unit | `apps/web/test/operator-workspace-list.test.ts` (existing) | Seats used, not measured, at the limit |
+| Browser | `e2e/s45-operator-console.spec.ts` (existing) | The column against a measured workspace |
+
+### 11.5 Documents changed in the same change
+
+- §8 above: "Seats used" becomes built.
+- TECHNICAL-PLAN §4.13 (`operator_workspace_usage`) and DATABASE.md. §7.2 already lists the table as having no legacy source.
+- UIUX-PLAN S-45 (already names seats used) and S-46's usage panel.
+- `docs/runbooks/upgrade.md`, "0.6 to 0.7": one additive migration; the console shows "not measured" until the next hourly measure.
+
+### 11.6 What this does not do
+
+- No change to how the seat limit counts.
+- No live count on the console. It still reads only the snapshot.
+- No change to S-49, which reads the seat state live.

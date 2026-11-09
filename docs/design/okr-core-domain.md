@@ -632,3 +632,94 @@ recorded here before P3-T01 starts.
 their suites, **then** they load the matrices from these documents directly
 through `loadGoldenTable`, so a change to a matrix breaks the build rather than
 drifting away from it.
+
+## 10. Moving a cycle to closing (release 0.7.0, O2)
+
+Status: proposed 9 November 2026 for release 0.7.0 (plan O2), waiting for "design approved". New engine behaviour, so it is designed first.
+
+### 10.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The status column | `packages/db/src/schema/cycles.ts:38-43`; the check in `packages/db/migrations/0020_cycles_and_rhythm.sql:90` | Allows `closing`. Nothing writes it |
+| Creating a named cycle | `packages/core/src/cycles/service.ts:325` (`createCycleInTx`) | Always `planning`, even for a period that has ended. The FlowyTeam importer makes every historic cycle this way (`packages/importer/src/flowyteam/mappers/organisation.ts:397`) |
+| Creating the current cycle | `packages/core/src/cycles/service.ts:171` (`ensureCurrentCycleInTx`) | Calls `statusForDate`, but only for the period holding today, so it can only answer `planning` |
+| `statusForDate` | `packages/core/src/cycles/generation.ts:222-235` | Answers `closing` once today is past `ends_on`. Never `closed`, on purpose |
+| Publication | `packages/core/src/actions/cycle-workflow.ts:1458` | Writes `active` and phase 6. Refuses only a set already published (`:1369`) |
+| The close | `packages/core/src/cycles/archive.ts:943-1031` (`closeCycleInTx`) | From any status but `closed`, once phase 7 passes. Writes `closed` and phase 7. Checks no date |
+| Moving a goal in | `packages/core/src/actions/goals.ts:2095` | Already refuses a `closing` or `closed` cycle |
+| The `cycle.closing` nudge | `packages/method/src/countdown.ts:108`, `packages/core/src/nudges/rituals.ts:338` | Daily once the end has passed, for `active` and `closing`. A `planning` cycle past its end is silent |
+| The staleness sweep | `packages/core/src/nudges/run.ts:267-274`, `packages/core/src/bin/sweep-staleness.ts` | Runs inside the Champion's daily run, so a sandboxed Champion commits nothing |
+| The scheduler host | `apps/web/lib/scheduler.ts:270` (`SCHEDULED_RUNS`), `:521` (`runOne`) | Runs agent cadences and housekeeping per workspace as the `system` principal |
+
+So `closing` is a state the schema, the action output (`packages/core/src/actions/cycles.ts:91`) and the nudge all expect, and nothing produces.
+
+### 10.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| C1 | **The date moves it.** A per-workspace scheduled run, `cycles.sweepEnded`, moves every `active` cycle, and every `planning` one unless Q1 says otherwise, for which `statusForDate` answers `closing`. Hourly, at a minute no other run uses | `statusForDate` already holds the rule, so the sweep calls it rather than restating it. Hourly with an idempotent check is how every local-date job on this host works (`packages/agents/src/schedule.ts:44-62`), so a cycle moves within the hour after the workspace's own midnight |
+| C2 | It runs as the `system` principal through `runOperation`, like `cadence.sweepStaleness`. Not an agent run and not a registry action | A date passing is a fact, not a proposal, so it neither waits in the review queue nor is held by a sandboxed Champion. The Champion's bindings are on named spaces and a cycle is workspace-wide (least privilege). Like `audit.chain`, nobody calls it, so it stays off REST, the command line and the agent catalogue |
+| C3 | One update, one activity (`cycle.closing_started`, `by: "date"`) and one audit row per cycle moved, in one transaction. A workspace with nothing due writes nothing | The trail says when and why a cycle changed state. A pass that changed nothing records nothing, as `support.sweepExpired` does |
+| C4 | **The facilitator can start it early.** A new write action, `cycles.setClosing { cycleId, closing }`, at `full` access like `cycles.update` and `cycles.close`. `true` moves `planning` or `active` to `closing`. `false` moves it back to `active` when published, else `planning`, and is refused once `ends_on` has passed | METHOD.md §8 holds the quarterly review about two weeks before the cycle ends, and §2.4 grades the ending quarter then. A team that has started its review can say so. Undoing is allowed only while the date would not move it straight back |
+| C5 | Entering `closing` moves the phase pointer to 7. Undoing moves it to 6 when published, else leaves it | Publication already moves it to 6 and the close to 7 (§3.2). The page opens on Review and learn, where the close control is. The pointer still gates nothing |
+| C6 | **`closing` permits what `active` permits, with two refusals**: publication (`workflow.publish`: "This cycle has ended or is closing. Score it and close it instead of publishing it."), and moving a goal in, which is refused today | The close is the only thing that freezes a cycle (§3.2). Final readings and scores are entered after the end date, so refusing writes would block the review. New objectives stay allowed: METHOD.md §2.9 never refuses writing for planning reasons by default, and the importer writes historic objectives into ended cycles |
+| C7 | `cycles.create` writes `statusForDate(period, today, false)`, with pointer 7 for `closing` and the current rule otherwise | The plan row's finding. A quarter that is over read as "being planned" |
+| C8 | **No migration.** The check has allowed `closing` since 0020, and activity kinds are a catalogue in code | Nothing in the schema changes |
+| C9 | Ended cycles that exist at upgrade move on the first sweep after it, through the same run. No data change | It is the ordinary rule meeting old rows, with an audit row each, and it is idempotent |
+| C10 | `pnpm cadence:sweep` also moves ended cycles, for `OPENOKR_SCHEDULER=off`, and prints both counts | One command for the two date sweeps rather than a second command of the same shape |
+
+### 10.3 Against METHOD.md
+
+| METHOD.md | Here |
+|---|---|
+| §2.2: "Phase 6 runs through the cycle. Phase 7 closes it" | `active` is phase 6's state and `closing` is phase 7's. C5 keeps the pointer in step |
+| §2.3 phase 7: every key result scored and the retrospective written | Still the only condition on the close. `closing` adds none and removes none |
+| §2.4 and §8: the review about two weeks before the end | C4. Nothing makes a team start early |
+| §8.9: at close, the product feeds the next cycle | Unchanged. The feed happens at `closed`, never at `closing` |
+
+METHOD.md does not name `closing` and needs no change. AI-NATIVE-PLAN §6.4's `cycle.closing` ("the cycle ends unscored") keeps firing as today.
+
+### 10.4 Open question
+
+**Q1. Does a cycle that was never published move to `closing` when its end passes?** `statusForDate` says yes. A workspace that hides the phases never publishes, so its cycles stay `planning` for good today. Moving them means a named sponsor or facilitator starts getting the daily `cycle.closing` nudge for that cycle, which they do not get now. Proposed: **yes**, because a status that means "being planned" about a finished quarter is wrong, and the nudge reaches only somebody named to run the cycle. The alternative is to move only `active` cycles and leave the rest as they are.
+
+### 10.5 Acceptance criteria
+
+- Given an `active` quarterly cycle ending 31 March in `Asia/Jakarta`, when the sweep runs at 23:30 local on 31 March, then it stays `active`; when it runs at 00:30 on 1 April, then it is `closing` at phase 7, with one `cycle.closing_started` activity and one audit row.
+- Given the same cycle already `closing`, when the sweep runs again, then nothing is written.
+- Given a `closed` cycle whose end has passed, when the sweep runs, then it stays `closed`.
+- Given an `active` cycle ending in 14 days, when a member with `full` access calls `cycles.setClosing` with `true`, then it is `closing`; with `false` the next day, then it is `active` at phase 6.
+- Given a `closing` cycle whose end has passed, when `cycles.setClosing` is called with `false`, then it is refused, naming the end date.
+- Given a `closing` cycle, when a member publishes a check-in, edits a key result, creates an objective or scores a key result, then each succeeds.
+- Given a `closing` cycle that was never published, when `workflow.publish` is called, then it is refused.
+- Given a `closing` cycle with phase 7 complete, when `cycles.close` is called, then it is `closed` and feeds the next cycle, as today.
+- Given today is 9 November 2026, when `cycles.create` makes Q1 2026, then it is `closing` at phase 7; Q1 2027 is `planning`.
+- Given an instance with `OPENOKR_SCHEDULER=off`, when `pnpm cadence:sweep` runs, then ended cycles move and the output names both counts.
+
+### 10.6 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Unit | `packages/core/test/cycles.test.ts` (existing) | `cycles.create` for a past, current and future period |
+| Integration | `packages/core/test/cycle-closing.test.ts` (new) | The sweep across a timezone boundary, idempotence, `closed` untouched, audit and activity rows, `cycles.setClosing` both ways and its refusal, publish refused |
+| Integration | `packages/core/test/cycle-close.test.ts` (existing) | The close from `closing` |
+| Unit | `apps/web/test/scheduler.test.ts` (existing) | `cycles.sweepEnded` has a cron and a worker |
+| Browser | `e2e/s04-cycle-closing.spec.ts` (new) | The Closing chip, starting and undoing it on phase 7 |
+
+### 10.7 Documents changed in the same change
+
+- This section, and §3.2's "Entered by" column, which gains `cycles.setClosing`.
+- UIUX-PLAN S-04: a status chip in the header, and on phase 7 a "Start closing" control, its undo while the end has not passed, and one line saying the cycle has ended and what the close still needs.
+- TECHNICAL-PLAN §4.3 (`cycles`): who writes each status.
+- AI-NATIVE-PLAN §6.4 only if Q1's answer changes who hears `cycle.closing`.
+- CLAUDE.md and `docs/runbooks/upgrade.md`, "0.6 to 0.7": `pnpm cadence:sweep` moves ended cycles too; the first sweep after the upgrade moves every ended, unclosed cycle to `closing` and writes an audit row for each.
+- `packages/ui/src/i18n/messages/en.json` and `ms.json`: the chip, the control and the refusal.
+- The contract artifacts, regenerated for `cycles.setClosing`, and its toolset in `packages/core/src/api/mcp/toolset-data.ts`.
+
+### 10.8 What this does not do
+
+- No automatic close. Closing stays a person's act behind phase 7 (`statusForDate` never answers `closed`).
+- No change to which nudges fire, apart from Q1.
+- No refusal of check-ins, edits or new objectives in a `closing` cycle.
+- No change to METHOD.md or the §11 registry.
