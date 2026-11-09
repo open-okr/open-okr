@@ -2,6 +2,7 @@
 
 import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
 import { TriangleAlert } from "lucide-react";
+import { CopyErrorDetails } from "./error-details";
 
 /**
  * One route segment's error boundary (P6-G24a).
@@ -60,6 +61,7 @@ export function SegmentError({
               {t("common.reference", { digest: error.digest })}
             </p>
           ) : null}
+          <CopyErrorDetails error={error} />
         </CardBody>
       </Card>
     </div>

@@ -34,6 +34,21 @@ body:
     validations:
       required: true
   - type: textarea
+    id: details
+    attributes:
+      label: Error details
+      description: >
+        If you saw the error page, press "Copy details" on it and paste here.
+        It gives the version, the reference, the time and the page, and names
+        nobody. The reference also finds the matching line in the server log,
+        `"kind":"error.report"`.
+      render: text
+      placeholder: |
+        OpenOKR 0.7.0
+        Reference: 3141592653
+        Time: 2026-11-09T10:00:00.000Z
+        Page: /goals/[id]
+  - type: textarea
     id: evidence
     attributes:
       label: Evidence

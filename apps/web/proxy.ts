@@ -129,6 +129,10 @@ const PUBLIC_PREFIXES = [
   // was sent to the sign-in page before the route ran. The route decides, and
   // answers not-found without a valid token or a session with full access.
   "/api/metrics",
+  // A browser's error report (docs/design/error-reporting.md D17, plan 0.7.0
+  // E3). The route answers 204 to everybody and acts only on a session, so a
+  // redirect here would be the one answer that told a caller anything.
+  "/api/client-errors",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

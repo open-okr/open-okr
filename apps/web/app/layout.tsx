@@ -14,6 +14,7 @@ import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { brandingImageUrl, tabIcons } from "../lib/branding-image";
 import { BrowserTimezoneCookie } from "../lib/browser-timezone-cookie";
+import { ClientErrorReporter } from "../lib/client-error-reporter";
 import { getInstanceName } from "../lib/instance-name";
 import { InstanceNameProvider } from "../lib/instance-name-context";
 import { resolveLocale } from "../lib/locale";
@@ -139,6 +140,12 @@ export default async function RootLayout({
          * one.
          */}
         <BrowserTimezoneCookie />
+        {/*
+         * Sends the page's unexpected errors to our own server, never to a
+         * tracker (docs/design/error-reporting.md D16). On every page, and
+         * the server keeps a report only from a signed-in person.
+         */}
+        <ClientErrorReporter />
         <ThemeProvider>
           <TranslationsProvider locale={locale} renamed={renamed}>
             {/*

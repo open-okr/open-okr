@@ -801,6 +801,14 @@ export {
   setDirectoryUserActive,
 } from "./directory-sync/users.ts";
 export {
+  BROWSER_ERROR_BODY_LIMIT,
+  BROWSER_ERRORS_PER_MINUTE,
+  type BrowserError,
+  describeBrowserError,
+  isExpectedBrowserError,
+  parseBrowserError,
+} from "./errors/browser.ts";
+export {
   classifyError,
   type DescribedError,
   describeError,

@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_ENCRYPTION_KEY } from "./e2e/root-key.ts";
+import { TRACKER_DSN } from "./e2e/tracker.ts";
 
 /**
  * End-to-end tests (P1-T08, extended in P1-T09).
@@ -138,6 +139,11 @@ export default defineConfig({
         ...serverEnv(APP_PORT, APP_URL),
         E2E_DATABASE_NAME: "openokr_e2e",
         DATABASE_URL: databaseUrl("openokr_e2e"),
+        // A fake tracker that error-reporting.spec.ts listens on for its own
+        // length (plan 0.7.0 E3). With nothing listening, a report is dropped
+        // and counted, and no other spec sees a difference.
+        OPENOKR_ERROR_DSN: TRACKER_DSN,
+        OPENOKR_ERROR_ENVIRONMENT: "e2e",
       },
     },
     {

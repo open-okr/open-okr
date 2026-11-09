@@ -187,6 +187,13 @@ docker compose logs app | grep '"kind":"error.report"'
 | `sqlState`, `constraint` | For a database error, instead of its message, which quotes the row |
 | `stack` | The frames, with the machine's own directories removed |
 
+**Errors in the browser** reach the log the same way, with source `browser`.
+The page posts each to `/api/client-errors` on the instance itself, which
+keeps one only from a signed-in person, at most ten a minute each, and always
+answers 204. The frames are resolved to source files from the source maps the
+build writes beside the browser's scripts. A browser's message is always
+withheld, because on that route anybody signed in could have written it.
+
 One error is reported once, by the first place that catches it, and carries
 what the later ones knew: an action that fails inside a page carries the
 action's name and the page's digest. A dead letter is always reported, because
