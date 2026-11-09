@@ -260,6 +260,12 @@ export const METRIC = {
    * workspace and the member are fields in the log line, never labels (D7).
    */
   errorsTotal: "openokr_errors_total",
+  /**
+   * Reports that did not reach the tracker, by reason: `queue_full`,
+   * `rate_limited` (the tracker said 429) or `send_failed` (D10, plan 0.7.0
+   * E2). Zero on an instance with no DSN, which sends nothing to drop.
+   */
+  errorReportsDroppedTotal: "openokr_error_reports_dropped_total",
 } as const;
 
 /**

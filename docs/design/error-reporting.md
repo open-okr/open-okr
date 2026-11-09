@@ -105,7 +105,7 @@ Four rows. Each layer works without the ones after it.
 | Another SaaS provider | Their own tracker's DSN in their deployment's secret | The same as OKRGoal, with their tracker |
 | OKRGoal | E4 | Sentry, with its MCP, CLI and Seer for AI triage |
 
-Compose: `OPENOKR_ERROR_DSN` and `OPENOKR_ERROR_ENVIRONMENT` join `deploy/docker/compose.yaml` the way `OPENOKR_CLAMD_HOST` does, empty by default. Helm: two values in `values.yaml`, with the DSN read from a Secret key when it is set.
+Compose: `OPENOKR_ERROR_ENVIRONMENT` joins `deploy/docker/compose.yaml` the way `OPENOKR_CLAMD_HOST` does, `production` by default, and `staging` in the staging overlay. `OPENOKR_ERROR_DSN` goes in `secrets/app.env` instead, because it is a credential and a line in the `environment:` block would override that file with an empty value (§10, C1). Helm: two values in `values.yaml`, with the DSN read from a Secret key when it is set.
 
 ## 4. OKRGoal (E4)
 
@@ -214,3 +214,14 @@ Readings the build had to make, and what it measured. Each is within a decision 
 | B11 | **The browser source is reserved now and arrives in E3**, so the metric's label set does not change between rows | |
 
 **D19, measured.** On the production build of 9 November 2026 (`apps/web/.next`, Next 16.4.3 with Turbopack): the build already writes server source maps, **160.8 MB in 1,053 files beside 41.6 MB of server JavaScript**, and the standalone output the image ships traces only 0.4 MB of them. Holding all of them in Node's `SourceMap`, which is what `--enable-source-maps` does for every module it loads, took **2.1 seconds and 1,005 MB of heap** on Node 22. Either cost lands on every instance, so server source maps stay off: the image does not grow and Node's flag is not set. The server's compiled frames are minified, so on the server the class, the digest, the route pattern, the action name and the fingerprint carry a report, and the frames point at a compiled chunk. Resolving a server frame only when a report is written, as D18 does for the browser, would cost the 161 MB on disk and almost no memory; that is a decision for later, not part of 0.7.0. Measured with a script that parses every map once; it needs no build of its own.
+
+### E2
+
+| # | Reading | Why |
+|---|---|---|
+| C1 | **Compose names the environment and not the DSN.** The DSN goes in `secrets/app.env`, beside the other credentials. The staging overlay sets `staging` | A Compose `environment:` line wins over `env_file`, so a DSN line there would empty the one in the secrets file |
+| C2 | **Helm:** `errors.existingSecret` and `errors.dsnKey` (default `dsn`) give the DSN by `secretKeyRef`, and `errors.environment` (default `production`). Read through `default dict`, so a release upgraded with `--reuse-values` renders. `deploy/helm/check.sh` checks all three | D14: never in values, where `helm get values` reads it back |
+| C3 | **One event per envelope**, which is what the protocol allows. A batch is up to twenty POSTs, one after another. A send with no answer within three seconds drops the rest of its batch; a refusal other than `429` drops only that event | A tracker that did not answer one will not answer the next inside the same two seconds |
+| C4 | **`openokr_error_reports_dropped_total{reason}`**, `reason` one of `queue_full`, `rate_limited`, `send_failed`. The driver calls `onDropped`; the host counts, so the metric's name lives in `recorder.ts` with every other | Which loss it was is the operator's first question |
+| C5 | **The event carries** `event_id`, `timestamp` (Unix seconds), `platform` (`node`, or `javascript` for a browser report), `level`, `logger`, `release` (the plain version, `0.7.0`), `environment`, `transaction` (the route pattern, else the action), one exception with its frames oldest first and `in_app`, `fingerprint`, `tags` and, with tracing, `contexts.trace`. Never `user`, `request`, `server_name`, `breadcrumbs`, `extra` or `modules` | D4's allow-list, in the protocol's words. The release matches what OKRGoal names its Sentry release (§4) |
+| C6 | **The DSN's shape is checked in `packages/config`** at boot, and parsed again by the driver | `packages/config` sits below `packages/adapters` and cannot call it; the shape is not protocol code |

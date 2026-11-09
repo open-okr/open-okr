@@ -424,6 +424,26 @@ else
   pass "no clamd host means no scan"
 fi
 
+# Error reports (docs/design/error-reporting.md D14, D22).
+if render_one deployment.yaml | grep -q "OPENOKR_ERROR_DSN"; then
+  fail "error reports are sent somewhere although no Secret is named"
+else
+  pass "no error Secret means no error reports leave"
+fi
+if render_one deployment.yaml --set errors=null | grep -q "^kind: Deployment"; then
+  pass "a release from before the errors block still renders"
+else
+  fail "a release from before the errors block fails to render on upgrade"
+fi
+errors=$(render_one deployment.yaml --set errors.existingSecret=tracker \
+  --set errors.environment=staging)
+if echo "$errors" | grep -A3 "OPENOKR_ERROR_DSN" | grep -q "secretKeyRef" \
+  && echo "$errors" | grep -A1 "OPENOKR_ERROR_ENVIRONMENT" | grep -q '"staging"'; then
+  pass "a named error Secret gives the DSN by reference, with the environment"
+else
+  fail "a named error Secret does not reach the pod by reference"
+fi
+
 # --- the setups in PLAN.md section 5.2 -------------------------------------
 if render_one deployment.yaml | grep -q "OPENOKR_CLOUD"; then
   fail "an ordinary install is told it is a cloud"

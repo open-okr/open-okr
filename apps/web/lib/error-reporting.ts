@@ -1,19 +1,24 @@
 /**
  * This process's error reporting (docs/design/error-reporting.md, plan 0.7.0
- * E1).
+ * E1 and E2).
  *
  * The classification, the scrub, the counter and the log line are in
  * `@openokr/core`, so the relay, the scheduler and every action share one
  * rule. What lives here is what only the web process knows: its version, its
  * trace, Next's request hook, and the process's own last-resort events.
  *
- * Nothing in this file sends anything anywhere. The local floor (one JSON line
- * on stderr and `openokr_errors_total`) is all an instance gets until an
- * operator names a tracker.
+ * The local floor (one JSON line on stderr and `openokr_errors_total`) is all
+ * an instance gets until an operator sets `OPENOKR_ERROR_DSN`. With it set,
+ * the Sentry-protocol driver sends each report on (plan 0.7.0 E2); without it,
+ * the driver that does nothing is all that is built.
  */
+import { createErrorReporter } from "@openokr/adapters";
+import { loadEnv } from "@openokr/config";
 import {
+  defaultMetrics,
   flushErrorReports,
   installErrorReporting,
+  METRIC,
   reportError,
 } from "@openokr/core";
 import { RUNNING_VERSION } from "./app-version";
@@ -42,10 +47,25 @@ const SHUTDOWN_FLUSH_MS = 2_000;
  * so the first error is counted on the meter the endpoint serves.
  */
 export function installErrorReports(): void {
+  // Through the validated environment, so a DSN that is not one has already
+  // refused the boot by the time this runs (D14).
+  const env = loadEnv();
   installErrorReporting({
     release: RUNNING_VERSION,
+    environment: env.OPENOKR_ERROR_ENVIRONMENT,
     region: region(),
     traceOf: (error) => getTelemetry().traceOf(error),
+    sink: createErrorReporter({
+      dsn: env.OPENOKR_ERROR_DSN,
+      release: RUNNING_VERSION,
+      onDropped(reason, count) {
+        defaultMetrics().count(
+          METRIC.errorReportsDroppedTotal,
+          { reason },
+          count,
+        );
+      },
+    }),
   });
   installProcessHandlers();
 }

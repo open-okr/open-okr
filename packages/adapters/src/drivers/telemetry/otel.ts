@@ -79,6 +79,8 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
     "Money spent on AI, by provider and model, in the smallest currency unit.",
   openokr_errors_total:
     "Unexpected errors, by where they were caught. Counted even when the caps hold a report back.",
+  openokr_error_reports_dropped_total:
+    "Error reports that did not reach the tracker, by reason. Zero with no tracker configured.",
 };
 
 function descriptionFor(name: string): string {

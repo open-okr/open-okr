@@ -53,6 +53,17 @@ span leaves the host.
 Nothing leaves at all unless `observability.otlp.endpoint` is set, and it is
 empty.
 
+**Error reports are the second setting that can send anything off the host**,
+`observability.errors.dsn` (`OPENOKR_ERROR_DSN`), and it is empty too. A report
+does carry a workspace id and a member or user id, as tags a tracker indexes,
+never as metric labels. Everything else in it is on an allow-list: the class,
+the scrubbed frames, the fingerprint, the digest, the route pattern and the
+action. A message is sent only for a class whose messages name code, such as
+`TypeError`; every other message is withheld, and a Postgres error sends its
+SQLSTATE and constraint name, never the row its detail quotes. The same rule
+keeps text a tenant typed away from whoever reads the tracker, an AI agent
+included. [error-reporting.md](error-reporting.md) has the decisions.
+
 **Nothing to do here.** This half of the acceptance criterion holds today.
 
 ## Finding 1. The console mail driver logs every message, and it is the default

@@ -206,6 +206,20 @@ scan:
     host: ""
     port: 3310
 
+# Error reports (docs/runbooks/observability.md, "Sending errors to a
+# tracker"). Every unexpected error is a JSON line in the pod's log and a
+# count in openokr_errors_total either way. To also send each one to a
+# tracker that speaks Sentry's protocol (Sentry, GlitchTip, Bugsink), put its
+# DSN in a Secret and name it here. Empty sends nothing anywhere. The DSN is
+# read from a Secret and never from values, because its key lets anyone write
+# into the tracker and `helm get values` would read it back.
+errors:
+  existingSecret: ""
+  dsnKey: "dsn"
+  # Which deployment a report came from, so staging can share production's
+  # tracker project without mixing with it.
+  environment: "production"
+
 serviceAccount:
   create: true
   name: ""

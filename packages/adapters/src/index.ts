@@ -26,6 +26,10 @@ export {
   type GuardedAIProvider,
 } from "./create-ai-provider.ts";
 export { type BillingConfig, createBilling } from "./create-billing.ts";
+export {
+  createErrorReporter,
+  type ErrorReporterConfig,
+} from "./create-error-reporter.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
 export {
   createTelemetry,
@@ -202,6 +206,12 @@ export type {
   InboundRequest,
   InboundSubmission,
 } from "./ports/channel.ts";
+export type {
+  ErrorEvent,
+  ErrorEventFrame,
+  ErrorReportDropReason,
+  ErrorReporter,
+} from "./ports/errors.ts";
 export type {
   EncodedImage,
   ImageFormat,

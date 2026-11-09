@@ -63,6 +63,12 @@ services:
       # service the product needs.
       OPENOKR_CLAMD_HOST: ${OPENOKR_CLAMD_HOST:-}
       OPENOKR_CLAMD_PORT: ${OPENOKR_CLAMD_PORT:-3310}
+      # Error reports go nowhere unless OPENOKR_ERROR_DSN names a tracker that
+      # speaks Sentry's protocol. The DSN is a credential, so it belongs in
+      # secrets/app.env and deliberately has no line here: a line here would
+      # override that file with an empty value. This only says which
+      # deployment a report came from.
+      OPENOKR_ERROR_ENVIRONMENT: ${OPENOKR_ERROR_ENVIRONMENT:-production}
     volumes:
       - storage:/app/storage
     expose:

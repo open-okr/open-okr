@@ -48,6 +48,50 @@ describe("parseEnv", () => {
     expect(parseEnv(VALID).OPENOKR_METRICS_TOKEN).toBeUndefined();
   });
 
+  // docs/design/error-reporting.md D14 and D15, plan 0.7.0 E2.
+  test("sends errors nowhere by default, and names production", () => {
+    const env = parseEnv(VALID);
+    expect(env.OPENOKR_ERROR_DSN).toBeUndefined();
+    expect(env.OPENOKR_ERROR_ENVIRONMENT).toBe("production");
+    expect(
+      parseEnv({ ...VALID, OPENOKR_ERROR_DSN: "" }).OPENOKR_ERROR_DSN,
+    ).toBeUndefined();
+  });
+
+  test("accepts a DSN from any Sentry-protocol tracker", () => {
+    for (const dsn of [
+      "https://0123456789abcdef@o1.ingest.de.sentry.io/4508",
+      "http://key@glitchtip:8000/1",
+      "https://key@bugsink.example.com/errors/3",
+    ]) {
+      expect(
+        parseEnv({ ...VALID, OPENOKR_ERROR_DSN: dsn }).OPENOKR_ERROR_DSN,
+      ).toBe(dsn);
+    }
+  });
+
+  test("refuses to boot on a DSN that is not one, naming the variable and not the value", () => {
+    for (const dsn of [
+      "not-a-dsn",
+      "https://tracker.example.com/1",
+      "ftp://key@tracker.example.com/1",
+    ]) {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, OPENOKR_ERROR_DSN: dsn }),
+      );
+      expect((error as EnvironmentError).variables).toEqual([
+        "OPENOKR_ERROR_DSN",
+      ]);
+      expect(error.message).not.toContain(dsn);
+    }
+  });
+
+  test("refuses an environment name that is not one word", () => {
+    expect(() =>
+      parseEnv({ ...VALID, OPENOKR_ERROR_ENVIRONMENT: "prod; drop" }),
+    ).toThrow(/OPENOKR_ERROR_ENVIRONMENT/);
+  });
+
   test("never puts a variable's value in the error message", () => {
     const secret = "postgres://user:hunter2@localhost:5432/db?sslmode=nonsense";
     const error = captureError(() =>

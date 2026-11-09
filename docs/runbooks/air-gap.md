@@ -37,6 +37,7 @@ never calls out.
 | Directory sync | Members are invited rather than provisioned |
 | Update check | **On by default, so turn it off:** set `OPENOKR_UPDATE_CHECK=off`, or untick it in Admin, General. Left on, an isolated instance tries `api.github.com` once an hour, fails within three seconds without delaying any page, and shows only the running version. The request carries nothing about the instance |
 | Virus scanning | No scan, and a file is available as soon as it is uploaded. A clamd on the same isolated network works like any other; its signature updates need a mirror. See [Security](../admin/security.md#uploaded-files) |
+| Error tracker | No report leaves the instance. Every unexpected error is still a JSON line in the log and a count in `openokr_errors_total`. A GlitchTip or Bugsink on the same isolated network works like any other tracker: set `OPENOKR_ERROR_DSN` to its DSN. See [Watching an instance](observability.md#sending-errors-to-a-tracker) |
 
 **A local AI provider counts as no route out.** An OpenAI-compatible server on
 the same isolated network is configured as a base URL like any other provider,
@@ -72,6 +73,7 @@ that this page cannot quietly stop being true.
 | `billing-off-by-default` | No payment provider is configured until somebody chooses one, and with none the payment SDK is never loaded |
 | `outbound-goes-through-the-port` | Every outbound request goes through `outboundFetch`, which validates the literal host and the resolved address, follows no redirect, and caps size and time |
 | `registries-are-build-time` | Interface components are added into `packages/ui` at build time, so no component is fetched when a page renders |
+| `errors-off-by-default` | `OPENOKR_ERROR_DSN` has no default, and with none the error reporter is the driver that does nothing, so no report is sent and no socket opens |
 
 ## Validating on the isolated machine
 

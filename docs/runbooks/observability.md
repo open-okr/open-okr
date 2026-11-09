@@ -15,7 +15,7 @@ misleading the next operator.
 | Does OpenOKR send anything anywhere by default? | No. |
 | What has to be configured before it measures itself? | Nothing. |
 | Where are the numbers? | `GET /api/metrics`, for a signed-in member with `full` access. |
-| What makes data leave the host? | One setting: `observability.otlp.endpoint`. It is empty. |
+| What makes data leave the host? | Two settings, both empty: `observability.otlp.endpoint` for traces, and `observability.errors.dsn` for error reports. |
 
 ## Two settings, and they are not the same thing
 
@@ -28,6 +28,7 @@ operator believed it did not.
 | `instance.telemetry` | off | Anonymous usage reporting **to the OpenOKR project**. Data leaving your instance. Unrelated to everything else here. |
 | `observability.metrics` | **on** | This instance measuring itself and serving the numbers at `/api/metrics`. Local. Nothing leaves. |
 | `observability.otlp.endpoint` | **empty** | Where to send traces. The only setting in this product that can make a measurement leave the host. |
+| `observability.errors.dsn` | **empty** | Where to send error reports: the DSN of a tracker that speaks Sentry's protocol. The only other setting that can make anything leave the host. See [Sending errors to a tracker](#sending-errors-to-a-tracker). |
 
 `observability.metrics` defaults to on because a local endpoint behind an
 administrator session sends nothing anywhere, and a product that has to be
@@ -64,7 +65,7 @@ The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Twenty-seven series. Every one is a count, a duration, a queue reading or a
+Twenty-eight series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -113,6 +114,7 @@ capacity gauge.
 | Series | Labels |
 |---|---|
 | `openokr_errors_total` | source (request, action, relay, dead_letter, job, agent, process, browser). Every unexpected error, including those the caps below hold back. Refusals are not errors and are not counted here: they are the `refused` and `not_found` outcomes above. Alert on this one |
+| `openokr_error_reports_dropped_total` | reason (queue_full, rate_limited, send_failed). A report the tracker did not get. Always zero with no tracker. A steady `send_failed` is a tracker that is down or a DSN pointing at the wrong place |
 
 ### The four readings that are taken at scrape time
 
@@ -194,6 +196,38 @@ giving up on work is its own event.
 all. Past either, the error is still counted in `openokr_errors_total` and not
 written; one `"kind":"error.report.held"` line a minute says how many were held
 back. A broken page under load cannot flood the log.
+
+## Sending errors to a tracker
+
+Only do this if you run a tracker. It is the second thing on this page that
+leaves the host. Any tracker that speaks Sentry's protocol works: Sentry,
+self-hosted Sentry, GlitchTip or Bugsink. No SDK is involved; the instance
+POSTs one small envelope per report.
+
+```
+OPENOKR_ERROR_DSN=https://<key>@<tracker host>/<project id>
+OPENOKR_ERROR_ENVIRONMENT=production    # the default; staging for a staging instance
+```
+
+Copy the DSN from the tracker's project settings and restart. A value that is
+not a DSN refuses to boot and names the variable. The DSN is never logged and
+never shown on a screen, because its key lets anyone write into your tracker;
+in Compose it belongs in `secrets/app.env`, in Helm in a Secret
+(`errors.existingSecret`).
+
+| What the tracker receives | What it never receives |
+|---|---|
+| The class, the safe message (see "Unexpected errors" above), the scrubbed frames, the fingerprint the tracker groups by, the digest, the trace id with tracing on, the release (the version), the environment, `cloud.region`, the route pattern, the action, the method, and the workspace, member or user id as tags | A request body, a query string, a cookie, a header value, a name or email address, rich text, an AI prompt or reply, a provider's response, local variables |
+
+The local floor does not change: every error is still a JSON line and a count.
+Sending never slows a request: reports wait in a queue of at most a hundred and
+go out every two seconds, each send gives up after three seconds, and a `429`
+from the tracker pauses sending for as long as its `Retry-After` says. What
+does not arrive is counted in `openokr_error_reports_dropped_total`.
+
+**A tracker's reader may be an AI agent**, through Sentry's MCP server or
+Bugsink's API. Text a person typed into the product never reaches the tracker,
+so nobody can plant instructions there for it.
 
 ## One error the log leaves out
 
@@ -307,5 +341,6 @@ somebody removes them or the member is erased.
 
 Everything on this page works with no outbound network at all. The exposition
 is served by the instance to whoever asks it. The profile scrapes over the
-compose network. Leave `observability.otlp.endpoint` empty and nothing in the
-product has an address to dial.
+compose network. Leave `observability.otlp.endpoint` and
+`observability.errors.dsn` empty and nothing in the product has an address to
+dial. A tracker on the same isolated network is fine.
