@@ -580,7 +580,7 @@ export const Q1_PLAN_EVENTS: readonly YearEvent[] = [
     },
   },
   {
-    on: "2026-11-26",
+    on: "2026-11-25",
     step: "NW-P-04",
     label: "The annual pack distributed",
     async run(context) {
