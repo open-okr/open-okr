@@ -230,12 +230,6 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "One-time verification tokens, in flight and short-lived.",
   },
   {
-    table: "sign_in_attempts",
-    decision: "exclude",
-    reason:
-      "Counters of wrong passwords against this instance's accounts, from networks that tried them here. Nothing about a workspace.",
-  },
-  {
     table: "passkeys",
     decision: "exclude",
     reason:
@@ -801,12 +795,6 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "export",
     reason:
       "Proposals a person made through the copilot, sitting in the review queue. Somebody has to answer them, and they should not have to answer them twice. An agent's proposals stay behind with the run that made it.",
-  },
-  {
-    table: "alignment_scores",
-    decision: "exclude",
-    reason:
-      "A stored alignment score (plan 0.7.0 D2) is derived from the goals it scores, so it is recomputed after an import rather than trusted: the hourly fill stores it, and the read computes a missing one meanwhile.",
   },
   {
     table: "alignment_findings",
