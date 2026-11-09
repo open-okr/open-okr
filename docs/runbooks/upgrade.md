@@ -92,7 +92,11 @@ root key, and refuses to finish without it rather than report them sealed.
 
 ## 0.6 to 0.7
 
-Notes are added here as 0.7.0 is built, and finished before it is tagged.
+Twelve migrations, **0151 to 0164** (0156 and 0160 are unused numbers), and
+two data changes, **0033 and 0034**. The migrations run on their own as the
+new version starts. Run the data changes after it is up: `./openokr
+data-change` on Compose, or `pnpm db:change`; `./openokr status` lists any
+still to run. Nothing on screen waits for them.
 
 - **A short identifier on every goal, key result, cycle, initiative, task,
   document and session.** Migration 0163 adds a nullable `short_id` and a
@@ -195,6 +199,39 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   is refused with "A file in this text is still uploading. Wait for it to
   finish, then save." The browser already waited; a script sending its own
   editor JSON has to send finished files.
+
+- **Repeated wrong passwords hold an account for a while.** Migration 0154
+  adds `sign_in_attempts`. After several wrong passwords in a row the next
+  attempt waits, a little longer each time, and the account holder gets one
+  email saying so. A correct sign-in, or a password reset, clears it. The
+  second factor has its own lock, recorded in the audit log. Nothing needs
+  configuring; a person locked out uses "Forgot password".
+- **Agent tokens and support access say why they ended.** Migrations 0151
+  and 0152 add the reasons behind three inbox notices and an API token's
+  revocation. Nothing to do.
+- **A token's scopes now hold for everything a call causes.** A REST or agent
+  token without the destructive scope can no longer apply an agent's or the
+  copilot's proposal whose action is destructive; it is answered
+  `insufficient_scope`, naming the action. Applying from the review inbox in
+  the browser is unchanged. An integration that applies proposals with a
+  write-only token needs a token with the destructive scope.
+- **Error reporting is off until you turn it on.** Setting
+  `OPENOKR_ERROR_DSN` to a tracker that speaks Sentry's protocol (Sentry,
+  GlitchTip, Bugsink) sends every unexpected error there as well as to the
+  log; leave it unset and nothing leaves the instance. A value that is not a
+  DSN stops the instance starting, so check it before you upgrade. See
+  [Sending errors to a tracker](observability.md#sending-errors-to-a-tracker).
+- **A saved prompt version is now the one sent.** A system prompt saved on
+  the AI console before 0.7.0 was stored but never sent; from 0.7.0 the newest
+  version is sent while it passes its evaluation examples, and the built-in
+  text goes otherwise. The usage card shows which. Check a saved version
+  still says what you want.
+- **A plan can carry its own limits** (cloud only). `limits` in the plan
+  catalogue replaces the instance's actions-a-minute and concurrent actions
+  for that plan's workspaces. Without it, nothing changes.
+- **A custom agent's instructions are versioned.** The text an agent was made
+  with is its version 0; nothing moves. "Plan a run" appears on Admin, Agents
+  where an AI provider is configured.
 
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 
