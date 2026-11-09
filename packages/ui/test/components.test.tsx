@@ -20,6 +20,31 @@ describe("Button", () => {
       true,
     );
   });
+
+  /**
+   * The AI-off leg finds an AI affordance by this mark (docs/design/
+   * ai-off-leg.md §4). A mark the `ai` variant did not carry would let that
+   * spec pass on a screen full of assists.
+   */
+  test("the ai variant marks itself as an AI affordance, and no other does", () => {
+    render(
+      <>
+        <Button variant="ai">Draft it</Button>
+        <Button variant="primary">Save</Button>
+        <Button>Cancel</Button>
+      </>,
+    );
+    expect(
+      screen
+        .getByRole("button", { name: "Draft it" })
+        .hasAttribute("data-ai-affordance"),
+    ).toBe(true);
+    for (const name of ["Save", "Cancel"]) {
+      expect(
+        screen.getByRole("button", { name }).hasAttribute("data-ai-affordance"),
+      ).toBe(false);
+    }
+  });
 });
 
 describe("Chip", () => {

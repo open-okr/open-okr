@@ -75,7 +75,7 @@ fix it and push again. A pull request merges only when CI is green.
 |---|---|---|
 | Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm check:air-gap`, `pnpm check:docs`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, four shards, each against its own Postgres | The push changed no code |
-| End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs | The push changed no code |
+| End to end, AI off | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs. **This is the AI-off leg** (`docs/design/ai-off-leg.md`): the servers boot with every deployment AI variable empty, every test carries `@ai-off`, `e2e/ai-off.spec.ts` fails if the copilot has a provider or any main screen draws an AI affordance, and `e2e/p0-flows.ts` names the P0 flows the run contains | The push changed no code |
 | Accessibility and web vitals | Part of the same end-to-end job. `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a TECHNICAL-PLAN §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |

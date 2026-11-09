@@ -39,6 +39,21 @@ is never ambiguous.
 **A new spec takes the screen number it drives**, or no prefix at all when it
 drives something with no screen.
 
+## The AI-off leg
+
+The whole suite runs with no AI provider, on purpose: it is the AI-off leg
+(`docs/design/ai-off-leg.md`). `playwright.config.ts` empties every deployment
+AI variable for both servers, so a key in your shell does not reach them, and
+`ai-off.spec.ts` fails if the copilot has a provider or a main screen draws an
+AI button. A spec that opens a provider puts it back in `afterAll`.
+
+`p0-flows.ts` names the P0 flows and the files that walk them. To run only
+those:
+
+```
+pnpm test:e2e $(node --experimental-strip-types --no-warnings e2e/p0-flows.ts)
+```
+
 ## Coverage
 
 `apps/web/test/reachability.test.ts` asserts every route is findable in the

@@ -54,6 +54,14 @@ const serverEnv = (port: number, url: string) => ({
   OPENOKR_ENCRYPTION_KEY: E2E_ENCRYPTION_KEY,
   // The suite makes no call to GitHub (docs/design/version-footer.md §6).
   OPENOKR_UPDATE_CHECK: "off",
+  // **This run is the AI-off leg** (PLAN.md §9, AI-NATIVE-PLAN §10,
+  // docs/design/ai-off-leg.md). Playwright lays this `env` over the runner's
+  // own, so a key exported in a shell or set on a job would otherwise reach
+  // the instance and turn on every assist the specs assert is absent. Empty is
+  // "unset" to the settings registry, so no deployment-wide provider exists.
+  OPENOKR_AI_PROVIDER: "",
+  OPENOKR_AI_API_KEY: "",
+  OPENOKR_AI_BASE_URL: "",
 });
 
 export default defineConfig({
@@ -64,6 +72,10 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
+  // Every test in the report says which leg it ran in (docs/design/
+  // ai-off-leg.md §3). There is one leg; the tag is so a report read later,
+  // or merged with another, cannot be mistaken for one with a provider.
+  tag: "@ai-off",
   /**
    * **The flakiness report is not optional, and it did not exist** (P8-T15).
    *
