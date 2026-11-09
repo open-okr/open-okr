@@ -598,7 +598,7 @@ every goal write would nudge a champion on each keystroke-sized save.
 | `quality.sandbagging_draft`, `quality.sandbagging_close` | Yes, since completeness review H-11 | `nudges/quality-triggers.ts` |
 | `quality.divergence`, `quality.trending_off` | Yes: divergence from its open findings, trending off from the stored forecast | `nudges/quality.ts`, `nudges/quality-triggers.ts` |
 | `quality.process_health_low` | Yes, the night after the review closes, since completeness review H-11 | `nudges/quality-triggers.ts` |
-| `quality.conflict` | No nudge: the semantic sweep writes a `quality.conflict` finding, which needs a provider, and nothing turns it into a message | `alignment/semantic.ts` |
+| `quality.conflict` | Yes, since plan 0.7.0 A5: each open conflict finding tells both champions, each about their own goal, while both goals are open. Only from a run whose semantic review ran, so with AI off a finding kept from an earlier run says nothing | `alignment/semantic.ts`, `nudges/quality.ts` |
 
 **The mapping is keyed on the condition, not on the check id.** KR-4 trips on
 "All lagging" and on "All leading", and only the first is

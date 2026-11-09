@@ -219,6 +219,9 @@ export async function runDueNudgesInTx(
   let staleFlipped = 0;
   let diverged = 0;
   let reviewed = 0;
+  // Whether the semantic review ran this time, which is what lets a conflict
+  // finding become a message (plan 0.7.0 A5).
+  let semanticReviewed = false;
   const due: DueNudge[] = [];
 
   if (cadence === "hourly") {
@@ -338,17 +341,22 @@ export async function runDueNudgesInTx(
       // §5.3's semantic review, the one part of the Coach that needs a
       // provider. With none it writes nothing **and clears nothing**, so a
       // workspace that turns AI off keeps the findings it already had.
-      reviewed = (
-        await sweepSemanticInTx(tx, {
-          workspaceId,
-          cycleId,
-          ...(input.drafter ? { drafter: input.drafter } : {}),
-          ...scoped,
-        })
-      ).found;
+      const semantic = await sweepSemanticInTx(tx, {
+        workspaceId,
+        cycleId,
+        ...(input.drafter ? { drafter: input.drafter } : {}),
+        ...scoped,
+      });
+      reviewed = semantic.found;
+      semanticReviewed = !semantic.skipped;
     }
     due.push(
-      ...(await dueQualityNudges(tx, { workspaceId, thresholds, ...scoped })),
+      ...(await dueQualityNudges(tx, {
+        workspaceId,
+        thresholds,
+        semanticReviewed,
+        ...scoped,
+      })),
       ...(await dueObjectiveQualityNudges(tx, {
         workspaceId,
         thresholds,
