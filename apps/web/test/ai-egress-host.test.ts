@@ -54,6 +54,8 @@ vi.mock("@openokr/core", () => ({
 }));
 vi.mock("@openokr/agents", () => ({
   createProviderDrafter: () => ({ drafted: true }),
+  // No stored prompt versions: the drafter sends the built-in texts.
+  workspacePrompts: async () => ({}),
 }));
 vi.mock("../lib/pool", () => ({ getPool: () => "the pool" }));
 vi.mock("../lib/auth", () => ({ getPool: () => "the pool" }));

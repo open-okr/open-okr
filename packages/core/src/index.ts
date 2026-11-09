@@ -197,9 +197,18 @@ export {
   seededModelsForProvider,
 } from "./ai/model-catalog.ts";
 export {
+  evaluationPasses,
+  type PromptEvaluation,
+  type PromptEvaluator,
+  setDefaultPromptEvaluator,
+} from "./ai/prompt-evaluation.ts";
+export { currentPromptVersions } from "./ai/prompt-versions.ts";
+export {
   DEFAULT_PROMPTS,
   defaultPromptFor,
   knownPromptKeys,
+  PROMPT_KEYS,
+  type PromptKey,
 } from "./ai/prompts.ts";
 export {
   type AICredentialSource,

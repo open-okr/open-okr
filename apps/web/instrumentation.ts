@@ -16,6 +16,7 @@ export async function register(): Promise<void> {
     validateEnvironment,
     startTelemetry,
     startErrorReporting,
+    startPromptEvaluation,
     startOutboxRelay,
     startRecurringWork,
     resolveAdmission,
@@ -34,6 +35,9 @@ export async function register(): Promise<void> {
   // serves, and before the relay and the scheduler, which report into it
   // (plan 0.7.0 E1).
   startErrorReporting();
+  // Before anything can call `ai.updatePrompt`, which refuses every version
+  // until the evaluation set is installed (plan 0.7.0 A9).
+  startPromptEvaluation();
   // Before the relay and the scheduler, because both call actions and an
   // unlimited first minute is the minute a burst arrives in (P8-T06a).
   await resolveAdmission();

@@ -52,7 +52,12 @@ import type {
   ThreadSummary,
   TrendContext,
 } from "@openokr/core";
-import { costOfUsage } from "@openokr/core";
+import {
+  costOfUsage,
+  DEFAULT_PROMPTS,
+  PROMPT_KEYS,
+  type PromptKey,
+} from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
 
@@ -111,18 +116,8 @@ const REWRITE_JSON_SCHEMA = {
   properties: { rewritten: { type: "string", maxLength: 500 } },
 } as const;
 
-/**
- * The assist is told the rule and asked for one sentence.
- *
- * It is **not** asked to claim it fixed anything: the caller re-runs §4 over
- * whatever comes back and reports what actually passes, so a persuasive rewrite
- * that fixes nothing is caught by the catalogue rather than believed.
- */
-const REWRITE_SYSTEM =
-  "You rewrite one key result so that it satisfies a named check, changing as " +
-  "little as possible and keeping the author's intent. Return one line. Keep " +
-  "any number, unit or date that is already there unless the check is about " +
-  "that number. Never add a number that was not given to you.";
+// The rewrite's own prompt is `rewrite.failing_rule` in core's catalogue, with
+// the objective draft's: the two a workspace may version (plan 0.7.0 A9).
 
 /**
  * The copilot's voice (AI-NATIVE-PLAN.md §2.4, P4-T14a-b).
@@ -386,14 +381,6 @@ const PARENT_JSON_SCHEMA = {
     reason: { type: "string", maxLength: 400 },
   },
 } as const;
-
-const OBJECTIVE_SYSTEM =
-  "You turn an ambition somebody typed into one objective and the measures " +
-  "under it. The objective says what changes, not what gets done. Each " +
-  "measure carries a baseline and a target as real numbers, and its sentence " +
-  "carries them too. Never repeat an objective that already exists. Never " +
-  "invent a number you were not given: if you have to choose one, choose a " +
-  "round figure the writer will obviously want to correct.";
 
 const MEASURE_SYSTEM =
   "You put numbers on a key result somebody is part way through writing: a " +
@@ -944,6 +931,16 @@ export interface ProviderDrafterOptions {
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
   readonly costCachedInPerMillion?: number;
+  /**
+   * The workspace's own text for an editable prompt, by prompt key (plan
+   * 0.7.0 A9, docs/design/ai-evaluation.md §6).
+   *
+   * A key left out, or given blank, sends core's built-in text. The host
+   * passes only versions that pass their evaluation set, so this is never
+   * where a prompt is judged; the evaluation set builds a drafter with a
+   * candidate here, which is how it runs exactly the code a workspace runs.
+   */
+  readonly systemPrompts?: Readonly<Record<string, string>>;
 }
 
 /** Editor JSON from one paragraph of plain text, which is all a model returns. */
@@ -961,6 +958,12 @@ export function createProviderDrafter(
   options: ProviderDrafterOptions,
 ): AgentDrafter {
   let spent = 0;
+
+  /** The workspace's version of an editable prompt, or the built-in text. */
+  const systemPromptFor = (key: PromptKey): string => {
+    const own = options.systemPrompts?.[key];
+    return own !== undefined && own.trim() !== "" ? own : DEFAULT_PROMPTS[key];
+  };
 
   /** The provider, with each call saying which feature asked, for the usage row. */
   const forFeature = (feature: string): AIProvider => {
@@ -1275,7 +1278,10 @@ export function createProviderDrafter(
           maxTokens: 900,
           onUsage: charge,
           messages: [
-            { role: "system", content: OBJECTIVE_SYSTEM },
+            {
+              role: "system",
+              content: systemPromptFor(PROMPT_KEYS.draftObjective),
+            },
             {
               role: "user",
               content:
@@ -1956,7 +1962,10 @@ export function createProviderDrafter(
           maxTokens: 200,
           onUsage: charge,
           messages: [
-            { role: "system", content: REWRITE_SYSTEM },
+            {
+              role: "system",
+              content: systemPromptFor(PROMPT_KEYS.rewriteForRule),
+            },
             {
               role: "user",
               content:

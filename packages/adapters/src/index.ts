@@ -38,7 +38,9 @@ export {
 export { McpAgentServer } from "./drivers/agent/mcp.ts";
 // The mock driver is exported by name, the same way the socket server is:
 // infrastructure another package's own test suite constructs directly,
-// not something resolved through createAIProvider.
+// not something resolved through createAIProvider. The evaluation set runs
+// on it at run time too, to check a prompt before it is saved; it calls
+// nothing outside the process (plan 0.7.0 A9).
 export {
   MockAIProvider,
   type MockAIProviderOptions,
@@ -148,6 +150,11 @@ export {
   AIEgressRefusedError,
   type AIEgressTarget,
   type AIUsageRecord,
+  // The detector itself, read-only: the evaluation set asks it whether a
+  // request holds an address or a number, so "no personal data in prompts"
+  // means exactly what the redaction control means (plan 0.7.0 A9).
+  type Redacted,
+  redactPersonalData,
 } from "./outbound/ai-egress.ts";
 export {
   type CheckedUrl,

@@ -101,6 +101,8 @@ vi.mock("@openokr/core", async (original) => ({
   recordAIEgressWithheld: async () => undefined,
   resolveAgentRunCostCap: async () => 2,
   checkFeatureAvailability: async () => ({ available: true }),
+  // No stored prompt versions (plan 0.7.0 A9): the pool here is a string.
+  currentPromptVersions: async () => ({}),
 }));
 vi.mock("../lib/pool", () => ({ getPool: () => "the pool" }));
 vi.mock("../lib/auth", () => ({ getPool: () => "the pool" }));

@@ -63,7 +63,7 @@ Against the mock, latency is the product's own time around the call: building th
 
 ## 5. The sets, and each one's pass bar
 
-One set per capability, named by the drafter method, which is also the `feature` on its usage row. Each set holds at least one reply the product accepts and one it must refuse.
+One set per capability, named by the drafter method, which is also the `feature` on its usage row. Each set holds at least two fixtures: a reply the product accepts, and one it must refuse wherever the capability can refuse. The streamed copilot answer always ends on an answer; its refusal is keeping the sources line from the reader, which its first fixture proves. At 0.7.0 that is 23 sets and 56 fixtures, and `pnpm ai:evaluate` prints the count per set.
 
 **Pass bar, decision A4: every fixture in the set passes against the mock.** Proposed to Akmal on 9 November 2026 with no objection. A set either passes whole or the gate refuses: there is no partial score to argue with.
 
@@ -93,7 +93,7 @@ One set per capability, named by the drafter method, which is also the `feature`
 | `streamGrounded` | Built in | 4,000 | Every fixture |
 | `reviewAlignment` | Built in | 4,000 | Every fixture |
 
-**Why 2,000.** Every request with its fixture is well under 1,000 estimated tokens today. 2,000 leaves room for a prompt several times the longest built-in one, and stops a pasted document from multiplying the cost and the wait of every call. The four at 4,000 carry passages, offered actions with their schemas, or a list of goals. A budget is a check on a representative request, not a production guard: the context-window guard (`packages/core/src/ai/context-guard.ts`) is that.
+**Why 2,000.** Every fixture's request is under 300 estimated tokens today, and the longest built-in prompt is about 100. 2,000 leaves room for a prompt many times that, and stops a pasted document from multiplying the cost and the wait of every call. The four at 4,000 carry passages, offered actions with their schemas, or a list of goals. A budget is a check on a representative request, not a production guard: the context-window guard (`packages/core/src/ai/context-guard.ts`) is that.
 
 ## 6. Prompts become real
 
@@ -122,7 +122,7 @@ The result is deterministic, so it is remembered for the life of the process, by
 
 1. Runs the key's set with the new text.
 2. Refuses a key with no set: "There is no evaluation set for this prompt, so a version of it cannot be checked."
-3. Refuses a version that fails, on the field `systemPrompt`, naming each failed check and the fixture, and writes nothing. For example: "Not saved. This version fails its evaluation set: personal-data on "an ambition with a team" (an email address is sent)."
+3. Refuses a version that fails, on the field `systemPrompt`, naming the first three failed checks with their fixtures and counting the rest, and writes nothing. For example: "Not saved. This version fails 4 of the 4 examples in its evaluation set: personal-data on "an ambition with a team and two objectives already" (an email address in the system prompt); ..."
 4. Stores a version that passes as the next version, exactly as today.
 
 **Where the runner comes from.** `packages/core` may not import `packages/agents`, where the drafter lives. Core declares the evaluator's shape, as it already declares the drafter's, and the host installs the one from `@openokr/agents` at boot, beside admission and the metrics recorder and on `globalThis` for the reason those are (Next loads the boot module and the request path separately). A caller may pass its own on the call context, which is how core's tests do it.
@@ -153,7 +153,7 @@ The results need no provider. They show with AI off, and they are not an AI affo
 ## 10. Acceptance criteria
 
 1. **Given** the built-in prompts, **when** the unit suite runs, **then** every set passes.
-2. **Given** an administrator on S-37, **when** they save a version of "Objective drafting" that holds an email address, **then** it is refused under the field, the message names the `personal-data` check, and no version is stored.
+2. **Given** an administrator on S-37, **when** they save a version of "Objective drafting" that holds an email address, **then** it is refused with a message on the form naming the `personal-data` check, the refusal names `systemPrompt` as its field for REST, and no version is stored.
 3. **Given** a version longer than its set's budget allows, **when** it is saved, **then** it is refused naming the `budget` check.
 4. **Given** a version that passes, **when** it is saved, **then** it is stored as the next version, and the next objective draft sends it as its system message.
 5. **Given** a stored version that fails the current set, **when** an assist runs, **then** the built-in text is sent, and the usage card says the version fails and the built-in text is sent instead.

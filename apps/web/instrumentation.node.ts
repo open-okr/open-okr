@@ -3,6 +3,7 @@ import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
 import { installErrorReports } from "./lib/error-reporting";
+import { installPromptEvaluator } from "./lib/prompt-evaluation";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
@@ -138,6 +139,19 @@ export function startErrorReporting(): void {
       `errors: could not start reporting: ${error instanceof Error ? error.name : "unknown"}\n`,
     );
   }
+}
+
+/**
+ * Installs the evaluation set that gates a new prompt version (plan 0.7.0 A9,
+ * docs/design/ai-evaluation.md §7).
+ *
+ * Pure: it reads nothing and opens nothing, so it is installed in every phase
+ * and cannot fail the boot. Before the first request, because until it is in
+ * place `ai.updatePrompt` refuses every version rather than store one
+ * unchecked.
+ */
+export function startPromptEvaluation(): void {
+  installPromptEvaluator();
 }
 
 /**

@@ -10,6 +10,9 @@ export {
   createProviderDrafter,
   type ProviderDrafterOptions,
 } from "./drafter.ts";
+// The evaluation set (plan 0.7.0 A9): what the host installs for the prompt
+// gate and the usage card, and what a drafter's prompts are read through.
+export { evaluatePrompt, workspacePrompts } from "./evaluation/index.ts";
 export {
   type AgentRunHost,
   type AgentRunModel,

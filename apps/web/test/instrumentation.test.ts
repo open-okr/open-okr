@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
 import { installAdmission } from "../lib/admission";
 import { resolveSignupPolicy } from "../lib/auth";
+import { installPromptEvaluator } from "../lib/prompt-evaluation";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
 import { installStatusThresholds } from "../lib/status-thresholds";
@@ -50,6 +51,12 @@ vi.mock("../lib/tenant-floor", () => ({
 // and the meter, and the real one adds process listeners that would outlive
 // the test. Mocked for both.
 vi.mock("../lib/error-reporting", () => ({ installErrorReports: vi.fn() }));
+// The ninth (plan 0.7.0 A9). `lib/prompt-evaluation` reaches the drafter and
+// the mock driver through `@openokr/agents`, which carries the adapters graph.
+// Mocked for the import cost.
+vi.mock("../lib/prompt-evaluation", () => ({
+  installPromptEvaluator: vi.fn(),
+}));
 // Not for the import cost: the real one replaces `console.error` for the
 // whole process, and the tests below spy on it (completeness review L-04).
 vi.mock("../lib/abandoned-responses", () => ({
@@ -73,6 +80,7 @@ afterEach(() => {
   vi.mocked(installTelemetry).mockClear();
   vi.mocked(resolveSignupPolicy).mockClear();
   vi.mocked(installAdmission).mockClear();
+  vi.mocked(installPromptEvaluator).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -248,6 +256,25 @@ test("a boot that cannot resolve its limits fails, rather than serving unlimited
   );
 
   await expect(register()).rejects.toThrow(/below the floor/);
+});
+
+test("the prompt evaluation set is installed before the relay, the scheduler and the first request (plan 0.7.0 A9)", async () => {
+  // Until it is, `ai.updatePrompt` refuses every version rather than store one
+  // unchecked, so a boot that forgot it would leave S-37's Prompts card unable
+  // to save anything. Pure, so a build worker installs it too.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+
+  await register();
+
+  expect(installPromptEvaluator).toHaveBeenCalledTimes(1);
+  expect(
+    vi.mocked(installPromptEvaluator).mock.invocationCallOrder[0],
+  ).toBeLessThan(vi.mocked(startRelay).mock.invocationCallOrder[0] as number);
+  expect(
+    vi.mocked(installPromptEvaluator).mock.invocationCallOrder[0],
+  ).toBeLessThan(
+    vi.mocked(resolveSignupPolicy).mock.invocationCallOrder[0] as number,
+  );
 });
 
 test("a build worker installs no admission, because it reaches no database", async () => {

@@ -126,7 +126,7 @@ the machine-readable document.
 | `ai.updateCustomModel`<br/>Edits a custom model's context window, cost figures or tier tags. | `POST /api/v1/ai/updateCustomModel` | writes |
 | `ai.updateFeatureSetting`<br/>Turns one AI feature on or off, and optionally pins it to a different tier. | `POST /api/v1/ai/updateFeatureSetting` | writes |
 | `ai.updatePrivacySettings`<br/>Change what may leave for an AI provider off this network: the context level, redaction, no-training and the host allow-list. | `POST /api/v1/ai/updatePrivacySettings` | writes |
-| `ai.updatePrompt`<br/>Records a new version of a feature or agent phase's system prompt. | `POST /api/v1/ai/updatePrompt` | writes |
+| `ai.updatePrompt`<br/>Records a new version of a feature's system prompt, once it passes that prompt's evaluation set. | `POST /api/v1/ai/updatePrompt` | writes |
 | `ai.updateProviderConfig`<br/>Turns a provider on or off for this workspace, and whether members may add a personal key for it. | `POST /api/v1/ai/updateProviderConfig` | writes |
 
 ## alignment

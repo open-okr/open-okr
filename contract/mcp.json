@@ -3236,7 +3236,7 @@
     },
     {
       "name": "ai.updatePrompt",
-      "description": "Records a new version of a feature or agent phase's system prompt.",
+      "description": "Records a new version of a feature's system prompt, once it passes that prompt's evaluation set.",
       "inputSchema": {
         "type": "object",
         "properties": {

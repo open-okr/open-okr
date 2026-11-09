@@ -3102,7 +3102,7 @@
       "method": "POST",
       "path": "/ai/updatePrompt",
       "scope": "write",
-      "summary": "Records a new version of a feature or agent phase's system prompt.",
+      "summary": "Records a new version of a feature's system prompt, once it passes that prompt's evaluation set.",
       "flags": [
         {
           "name": "prompt-key",

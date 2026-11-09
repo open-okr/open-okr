@@ -230,6 +230,15 @@ moment somebody calls it.
 no row, and each row naming a table that does not exist. The row either names
 the FlowyTeam source or says `No legacy source` with a reason.
 
+**A change to a built-in AI prompt, or to the code around one, runs the
+evaluation set.** `packages/agents/test/evaluation.test.ts` runs one set of
+golden fixtures per AI capability against the deterministic mock provider and
+fails naming the capability, the fixture and the check: the result the product
+returns, the schema, the prompt sent, personal data in the request, the size
+of the request, and the time taken. `pnpm ai:evaluate` prints the same run per
+capability. The server runs a prompt's set again before `ai.updatePrompt`
+saves a new version (`docs/design/ai-evaluation.md`).
+
 `pnpm test` runs Turbo's per-package tasks, so it caches and only re-runs what
 changed. `pnpm test:ci` is the whole repository as one suite, which is what CI
 shards and what you want before a pull request. If you run Vitest directly,

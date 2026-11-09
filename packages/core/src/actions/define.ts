@@ -18,6 +18,7 @@ import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { PromptEvaluator } from "../ai/prompt-evaluation.ts";
 import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
 import {
@@ -99,6 +100,15 @@ export interface ActionCallContext {
    * and never decides that the proposal should exist.
    */
   readonly drafter?: AgentDrafter;
+  /**
+   * Runs a prompt key's evaluation set over a new version, for
+   * `ai.updatePrompt` (plan 0.7.0 A9, docs/design/ai-evaluation.md §7).
+   *
+   * Absent on almost every call, which means the one the host installed at
+   * boot. A caller that names its own wins, which is how a test gates a save
+   * without touching the process. With neither, a save is refused.
+   */
+  readonly evaluatePrompt?: PromptEvaluator;
   /**
    * The instance's own address, for the links inside a message an action
    * sends (completeness review H-12). The scheduler and the web host pass it;
