@@ -4227,7 +4227,7 @@
       "method": "POST",
       "path": "/spaces/update",
       "scope": "write",
-      "summary": "Renames a space or rewrites its mission.",
+      "summary": "Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -4245,6 +4245,12 @@
           "name": "mission",
           "field": "mission",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -4711,7 +4717,7 @@
       "method": "POST",
       "path": "/cycles/update",
       "scope": "write",
-      "summary": "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
+      "summary": "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -4765,6 +4771,12 @@
           "name": "session-dates",
           "field": "sessionDates",
           "type": "array",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -5654,7 +5666,7 @@
       "method": "POST",
       "path": "/documents/update",
       "scope": "write",
-      "summary": "Edits a document. Editing a published one changes it without publishing a version.",
+      "summary": "Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -5672,6 +5684,12 @@
           "name": "body",
           "field": "body",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -6348,7 +6366,7 @@
       "method": "POST",
       "path": "/tasks/update",
       "scope": "write",
-      "summary": "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+      "summary": "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -6396,6 +6414,12 @@
           "name": "key-result-id",
           "field": "keyResultId",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -6771,7 +6795,7 @@
       "method": "POST",
       "path": "/initiatives/update",
       "scope": "write",
-      "summary": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+      "summary": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -6831,6 +6855,12 @@
           "name": "capacity",
           "field": "capacity",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -9440,7 +9470,7 @@
       "method": "POST",
       "path": "/kpis/update",
       "scope": "write",
-      "summary": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
+      "summary": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "kpi-id",
@@ -9563,6 +9593,12 @@
           "name": "watch-pct",
           "field": "watchPct",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],

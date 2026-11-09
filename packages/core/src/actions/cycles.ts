@@ -75,6 +75,11 @@ import { ADDRESS } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { cycleLevelsInTx } from "../practice/levels.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
@@ -760,33 +765,52 @@ export const setCycleClosing = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `cycles.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). Levels and session dates are lists, read
+ * and compared in the order they are stored.
+ */
+const CYCLE_READ = [
+  "phase",
+  "sponsorId",
+  "facilitatorId",
+  "publicationDeadline",
+  "levels",
+  "contributingUnits",
+  "firstCycle",
+  "sessionDates",
+] as const;
+
 export const updateCycle = defineWriteAction({
   name: "cycles.update",
   summary:
-    "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
-  input: z.object({
-    id: ADDRESS.cycle,
-    phase: z.number().int().min(0).max(7).optional(),
-    sponsorId: z.uuid().nullable().optional(),
-    facilitatorId: z.uuid().nullable().optional(),
-    publicationDeadline: z
-      .string()
-      .regex(LOCAL_DATE_PATTERN)
-      .nullable()
-      .optional(),
-    levels: z.array(z.enum(GOAL_LEVELS)).min(1).optional(),
-    contributingUnits: z.string().max(2000).nullable().optional(),
-    firstCycle: z.boolean().optional(),
-    sessionDates: z
-      .array(
-        z.object({
-          key: z.string().min(1).max(60),
-          on: z.string().regex(LOCAL_DATE_PATTERN),
-        }),
-      )
-      .max(20)
-      .optional(),
-  }),
+    "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
+  input: z
+    .object({
+      id: ADDRESS.cycle,
+      phase: z.number().int().min(0).max(7).optional(),
+      sponsorId: z.uuid().nullable().optional(),
+      facilitatorId: z.uuid().nullable().optional(),
+      publicationDeadline: z
+        .string()
+        .regex(LOCAL_DATE_PATTERN)
+        .nullable()
+        .optional(),
+      levels: z.array(z.enum(GOAL_LEVELS)).min(1).optional(),
+      contributingUnits: z.string().max(2000).nullable().optional(),
+      firstCycle: z.boolean().optional(),
+      sessionDates: z
+        .array(
+          z.object({
+            key: z.string().min(1).max(60),
+            on: z.string().regex(LOCAL_DATE_PATTERN),
+          }),
+        )
+        .max(20)
+        .optional(),
+      read: readOf(CYCLE_READ, ["levels", "sessionDates"]),
+    })
+    .refine(...readsEveryChange(CYCLE_READ)),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -822,6 +846,42 @@ export const updateCycle = defineWriteAction({
           "This cycle is closed. Its record does not change after the archive.",
         );
       }
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "cycle",
+        subjectId: input.id,
+        fields: CYCLE_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              phase: cycles.phase,
+              sponsorId: cycles.sponsorId,
+              facilitatorId: cycles.facilitatorId,
+              publicationDeadline: cycles.publicationDeadline,
+              levels: cycles.levels,
+              contributingUnits: cycles.contributingUnits,
+              firstCycle: cycles.firstCycle,
+              sessionDates: cycles.sessionDates,
+            })
+            .from(cycles)
+            .where(
+              activeOnly(
+                cycles,
+                eq(cycles.id, input.id),
+                eq(cycles.workspaceId, workspaceId),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return (
+            row && {
+              ...row,
+              sessionDates: row.sessionDates.map((entry) => ({ ...entry })),
+            }
+          );
+        },
+      });
       if (
         input.publicationDeadline &&
         input.publicationDeadline >= existing.startsOn

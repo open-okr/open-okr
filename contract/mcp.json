@@ -4266,7 +4266,7 @@
     },
     {
       "name": "spaces.update",
-      "description": "Renames a space or rewrites its mission.",
+      "description": "Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4290,6 +4290,27 @@
                 "type": "null"
               }
             ]
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "mission": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -5011,7 +5032,7 @@
     },
     {
       "name": "cycles.update",
-      "description": "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
+      "description": "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -5106,6 +5127,117 @@
                 "key",
                 "on"
               ]
+            }
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "phase": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "sponsorId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "facilitatorId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "publicationDeadline": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "levels": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              "contributingUnits": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "firstCycle": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "sessionDates": {
+                "type": "array",
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                        "null"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {
+                        "type": [
+                          "string",
+                          "number",
+                          "boolean",
+                          "null"
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
             }
           }
         },
@@ -6416,7 +6548,7 @@
     },
     {
       "name": "documents.update",
-      "description": "Edits a document. Editing a published one changes it without publishing a version.",
+      "description": "Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6435,6 +6567,19 @@
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
             "x-openokr-rich-text": true
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -7216,7 +7361,7 @@
     },
     {
       "name": "tasks.update",
-      "description": "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+      "description": "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7283,6 +7428,51 @@
               }
             ],
             "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "dueOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "initiativeId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "keyResultId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -7772,7 +7962,7 @@
     },
     {
       "name": "initiatives.update",
-      "description": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+      "description": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -7859,6 +8049,67 @@
               }
             ],
             "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ownerId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "startsOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "endsOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "confidence": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "capacity": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         },
         "required": [
@@ -11185,7 +11436,7 @@
     },
     {
       "name": "kpis.update",
-      "description": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
+      "description": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -11351,6 +11602,147 @@
                 "type": "null"
               }
             ]
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "direction": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "targetType": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "greenLow": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "greenHigh": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "redLow": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "redHigh": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "indicatorType": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "tier": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ownerMemberId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "targetDefault": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "parentKpiId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "treeId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "categoryId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "healthyPct": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "watchPct": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            }
           }
         },
         "required": [

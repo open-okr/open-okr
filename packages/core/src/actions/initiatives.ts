@@ -54,6 +54,12 @@ import {
 } from "../initiatives/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import {
+  changedFields,
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -619,10 +625,25 @@ export const createInitiative = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `initiatives.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). The description is rich text, which V5
+ * leaves out.
+ */
+const INITIATIVE_READ = [
+  "title",
+  "ownerId",
+  "startsOn",
+  "endsOn",
+  "status",
+  "confidence",
+  "capacity",
+] as const;
+
 export const updateInitiative = defineWriteAction({
   name: "initiatives.update",
   summary:
-    "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+    "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
   input: z
     .object({
       id: ADDRESS.initiative,
@@ -634,10 +655,12 @@ export const updateInitiative = defineWriteAction({
       status: z.enum(INITIATIVE_STATUSES).optional(),
       confidence: z.number().min(0).max(1).nullable().optional(),
       capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
+      read: readOf(INITIATIVE_READ),
     })
-    .refine((value) => Object.keys(value).length > 1, {
+    .refine((value) => changedFields(value).length > 0, {
       message: "an update has to change something",
-    }),
+    })
+    .refine(...readsEveryChange(INITIATIVE_READ)),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -657,6 +680,36 @@ export const updateInitiative = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "initiative",
+        subjectId: input.id,
+        fields: INITIATIVE_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              title: initiatives.title,
+              ownerId: initiatives.ownerId,
+              startsOn: initiatives.startsOn,
+              endsOn: initiatives.endsOn,
+              status: initiatives.status,
+              confidence: initiatives.confidence,
+              capacity: initiatives.capacity,
+            })
+            .from(initiatives)
+            .where(
+              activeOnly(
+                initiatives,
+                eq(initiatives.workspaceId, workspaceId),
+                eq(initiatives.id, input.id),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row && { ...row, confidence: asNumber(row.confidence) };
+        },
+      });
       // A change to one end is checked against the other as it is stored.
       assertWindow(
         input.startsOn === undefined ? loaded.startsOn : input.startsOn,
@@ -718,7 +771,9 @@ export const updateInitiative = defineWriteAction({
           subjectType: "initiative",
           subjectId: input.id,
           payload: {
-            fields: Object.keys(input).filter((key) => key !== "id"),
+            // The changed fields, never `read` (D3), and the status a webhook
+            // event reads (D5).
+            fields: changedFields(input),
             ...(input.status === undefined ? {} : { status: input.status }),
           },
         },
@@ -726,7 +781,7 @@ export const updateInitiative = defineWriteAction({
           action: "initiatives.update",
           targetType: "initiative",
           targetId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: { fields: changedFields(input) },
         },
       };
     },

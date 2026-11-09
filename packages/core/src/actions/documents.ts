@@ -55,6 +55,12 @@ import { resolveRecipients } from "../notifications/recipients.ts";
 import { ensureSubscriptionList } from "../notifications/subscriptions.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import {
+  changedFields,
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { diffLines } from "../rich-text/diff.ts";
 import { plainTextLines } from "../rich-text/excerpt.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
@@ -454,19 +460,28 @@ export const createDocument = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `documents.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4): the title. The body is rich text, which V5
+ * leaves out.
+ */
+const DOCUMENT_READ = ["title"] as const;
+
 export const updateDocument = defineWriteAction({
   name: "documents.update",
   summary:
-    "Edits a document. Editing a published one changes it without publishing a version.",
+    "Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now.",
   input: z
     .object({
       id: ADDRESS.document,
       title: z.string().trim().min(1).max(300).optional(),
       body: richText.optional(),
+      read: readOf(DOCUMENT_READ),
     })
-    .refine((value) => Object.keys(value).length > 1, {
+    .refine((value) => changedFields(value).length > 0, {
       message: "an update has to change something",
-    }),
+    })
+    .refine(...readsEveryChange(DOCUMENT_READ)),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -479,6 +494,28 @@ export const updateDocument = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, actor }) {
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "document",
+        subjectId: input.id,
+        fields: DOCUMENT_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({ title: documents.title })
+            .from(documents)
+            .where(
+              activeOnly(
+                documents,
+                eq(documents.workspaceId, workspaceId),
+                eq(documents.id, input.id),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row;
+        },
+      });
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx
         .update(documents)

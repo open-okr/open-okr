@@ -48,6 +48,12 @@ import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import {
+  changedFields,
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { boardChannel } from "../tasks/live.ts";
@@ -945,10 +951,23 @@ async function notifyAssignees(
   });
 }
 
+/**
+ * The fields `tasks.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). The description is rich text, which V5
+ * leaves out.
+ */
+const TASK_READ = [
+  "title",
+  "status",
+  "dueOn",
+  "initiativeId",
+  "keyResultId",
+] as const;
+
 export const updateTask = defineWriteAction({
   name: "tasks.update",
   summary:
-    "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+    "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
   input: z
     .object({
       id: ADDRESS.task,
@@ -958,10 +977,12 @@ export const updateTask = defineWriteAction({
       dueOn: localDate.nullable().optional(),
       initiativeId: ADDRESS.initiative.nullable().optional(),
       keyResultId: ADDRESS.keyResult.nullable().optional(),
+      read: readOf(TASK_READ),
     })
-    .refine((value) => Object.keys(value).length > 1, {
+    .refine((value) => changedFields(value).length > 0, {
       message: "an update has to change something",
-    }),
+    })
+    .refine(...readsEveryChange(TASK_READ)),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -981,6 +1002,34 @@ export const updateTask = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "task",
+        subjectId: input.id,
+        fields: TASK_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              title: tasks.title,
+              status: tasks.status,
+              dueOn: tasks.dueOn,
+              initiativeId: tasks.initiativeId,
+              keyResultId: tasks.keyResultId,
+            })
+            .from(tasks)
+            .where(
+              activeOnly(
+                tasks,
+                eq(tasks.workspaceId, workspaceId),
+                eq(tasks.id, input.id),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row;
+        },
+      });
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx
         .update(tasks)
@@ -1019,7 +1068,9 @@ export const updateTask = defineWriteAction({
           subjectType: "task",
           subjectId: input.id,
           payload: {
-            fields: Object.keys(input).filter((key) => key !== "id"),
+            // The changed fields, never `read` (D3), and the status a webhook
+            // event reads (D5).
+            fields: changedFields(input),
             ...(input.status === undefined ? {} : { status: input.status }),
           },
         },
@@ -1027,7 +1078,7 @@ export const updateTask = defineWriteAction({
           action: "tasks.update",
           targetType: "task",
           targetId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: { fields: changedFields(input) },
         },
       };
     },

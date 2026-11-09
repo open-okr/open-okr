@@ -268,7 +268,7 @@ the machine-readable document.
 | `cycles.scorecard`<br/>Every archived cycle's result with its band counts and verdict, oldest first, each read under the rules it closed with, and what moved in it. Drives the scorecard. | `GET /api/v1/cycles/scorecard` | reads |
 | `cycles.setClosing`<br/>Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7. | `POST /api/v1/cycles/setClosing` | writes |
 | `cycles.snapshot`<br/>Records what a cycle achieved: the result, the band counts and the portfolio verdict, one snapshot per owner. | `POST /api/v1/cycles/snapshot` | writes |
-| `cycles.update`<br/>Sets a cycle's roles, phase, levels, session dates or publication deadline. | `POST /api/v1/cycles/update` | writes |
+| `cycles.update`<br/>Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/cycles/update` | writes |
 
 ## decisions
 
@@ -288,7 +288,7 @@ the machine-readable document.
 | `documents.publish`<br/>Publishes a document, writing a version and telling the subject's watchers. | `POST /api/v1/documents/publish` | writes |
 | `documents.read`<br/>One document with its body and its version list. | `GET /api/v1/documents/read` | reads |
 | `documents.restore`<br/>Brings back a deleted document. Its versions were never removed, so they come back with it. | `POST /api/v1/documents/restore` | writes |
-| `documents.update`<br/>Edits a document. Editing a published one changes it without publishing a version. | `POST /api/v1/documents/update` | writes |
+| `documents.update`<br/>Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/documents/update` | writes |
 
 ## exports
 
@@ -396,7 +396,7 @@ the machine-readable document.
 | `initiatives.read`<br/>One initiative with the key results it serves. | `GET /api/v1/initiatives/read` | reads |
 | `initiatives.restore`<br/>Brings back a deleted initiative and the key result links that were deleted with it. | `POST /api/v1/initiatives/restore` | writes |
 | `initiatives.unlinkKeyResult`<br/>Removes the link between an initiative and a key result. | `POST /api/v1/initiatives/unlinkKeyResult` | destroys |
-| `initiatives.update`<br/>Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. | `POST /api/v1/initiatives/update` | writes |
+| `initiatives.update`<br/>Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/initiatives/update` | writes |
 
 ## invitations
 
@@ -429,7 +429,7 @@ the machine-readable document.
 | `kpis.spaceTrees`<br/>One space's KPIs, grouped by the driver tree each is filed in. Drives the space home. | `GET /api/v1/kpis/spaceTrees` | reads |
 | `kpis.suggest`<br/>Suggests a metric, its corridor and its formula from a sentence, with the KPI formula parser checking the formula first. | `GET /api/v1/kpis/suggest` | reads |
 | `kpis.tree`<br/>One driver tree as nodes with their corridor state and recovery progress. | `GET /api/v1/kpis/tree` | reads |
-| `kpis.update`<br/>Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. | `POST /api/v1/kpis/update` | writes |
+| `kpis.update`<br/>Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/kpis/update` | writes |
 
 ## notifications
 
@@ -638,7 +638,7 @@ the machine-readable document.
 | `spaces.removeMember`<br/>Removes a member from a space and takes back its access. | `POST /api/v1/spaces/removeMember` | destroys |
 | `spaces.setHolidays`<br/>Sets the spans a space marks as holidays: no check-in is due in them, nobody is nudged for them, and the streak does not break. | `POST /api/v1/spaces/setHolidays` | writes |
 | `spaces.setMemberRole`<br/>Changes a space member's role, replacing what that role grants. | `POST /api/v1/spaces/setMemberRole` | writes |
-| `spaces.update`<br/>Renames a space or rewrites its mission. | `POST /api/v1/spaces/update` | writes |
+| `spaces.update`<br/>Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/spaces/update` | writes |
 | `spaces.updateSettings`<br/>Sets one space's team voting, strictness override, default check-in frequency and the Slack or Teams channel it posts to. | `POST /api/v1/spaces/updateSettings` | writes |
 
 ## sso
@@ -675,7 +675,7 @@ the machine-readable document.
 | `tasks.restore`<br/>Brings back a deleted task with the assignments and checklist lines deleted with it. | `POST /api/v1/tasks/restore` | writes |
 | `tasks.setChecklistItem`<br/>Ticks or unticks one checklist line. | `POST /api/v1/tasks/setChecklistItem` | writes |
 | `tasks.unassign`<br/>Removes an assignment and the edit access it granted. | `POST /api/v1/tasks/unassign` | writes |
-| `tasks.update`<br/>Updates a task's own fields. Its position is moved with tasks.move, not here. | `POST /api/v1/tasks/update` | writes |
+| `tasks.update`<br/>Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now. | `POST /api/v1/tasks/update` | writes |
 
 ## tokens
 

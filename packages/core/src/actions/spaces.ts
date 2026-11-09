@@ -50,6 +50,11 @@ import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import {
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
+import {
   resolveSpaceSettingsFrom,
   spaceChannelSchema,
 } from "../settings/registry.ts";
@@ -834,14 +839,24 @@ export const createSpace = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `spaces.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4).
+ */
+const SPACE_READ = ["name", "mission"] as const;
+
 export const updateSpace = defineWriteAction({
   name: "spaces.update",
-  summary: "Renames a space or rewrites its mission.",
-  input: z.object({
-    id: z.uuid(),
-    name: z.string().trim().min(1).max(80).optional(),
-    mission: z.string().trim().max(280).nullable().optional(),
-  }),
+  summary:
+    "Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
+  input: z
+    .object({
+      id: z.uuid(),
+      name: z.string().trim().min(1).max(80).optional(),
+      mission: z.string().trim().max(280).nullable().optional(),
+      read: readOf(SPACE_READ),
+    })
+    .refine(...readsEveryChange(SPACE_READ)),
   output: z.object({ id: z.uuid(), name: z.string() }),
   // A space manager passes on their own space binding; a workspace admin passes
   // through requireSpaceAdmin. Declaring `full` here would lock managers out.
@@ -859,6 +874,28 @@ export const updateSpace = defineWriteAction({
         memberId: actor.memberId,
         spaceId: input.id,
         workspaceLevel: actor.level,
+      });
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "space",
+        subjectId: input.id,
+        fields: SPACE_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({ name: spaces.name, mission: spaces.mission })
+            .from(spaces)
+            .where(
+              activeOnly(
+                spaces,
+                eq(spaces.id, input.id),
+                eq(spaces.workspaceId, workspaceId),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row;
+        },
       });
 
       const patch: Record<string, unknown> = { updatedAt: new Date() };

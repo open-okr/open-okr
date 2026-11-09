@@ -30,4 +30,30 @@ describe("the same field", () => {
     expect(sameField("2026-11-30", "2026-11-30")).toBe(true);
     expect(sameField("2026-11-30", "2026-12-01")).toBe(false);
   });
+
+  it("compares a list by what it holds, in the order it holds it", () => {
+    expect(sameField(["company", "team"], ["company", "team"])).toBe(true);
+    expect(sameField(["team", "company"], ["company", "team"])).toBe(false);
+    expect(sameField(["company"], ["company", "team"])).toBe(false);
+  });
+
+  it("compares the records in a list whatever order their keys were written in", () => {
+    expect(
+      sameField(
+        [{ key: "draft", on: "2026-06-20" }],
+        [{ on: "2026-06-20", key: "draft" }],
+      ),
+    ).toBe(true);
+    expect(
+      sameField(
+        [{ key: "draft", on: "2026-06-20" }],
+        [{ key: "draft", on: "2026-06-21" }],
+      ),
+    ).toBe(false);
+  });
+
+  it("reads an empty list as nothing, and a list is never one value", () => {
+    expect(sameField([], null)).toBe(true);
+    expect(sameField(["company"], "company")).toBe(false);
+  });
 });
