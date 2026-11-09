@@ -330,6 +330,35 @@ describe("OutboxRelay", () => {
     expect(dispatches).toBe(1);
   });
 
+  it("retries a topic on its own schedule and ceiling, and every other topic on the relay's (outbound-webhooks.md W9)", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "webhooks.deliver", "hook:1");
+    await enqueue(wb.admin, "mail.send", "mail:1");
+
+    const deadLettered: string[] = [];
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 1,
+      retryPolicy: {
+        "webhooks.deliver": { maxAttempts: 3, backoffSeconds: () => 3_600 },
+      },
+      dispatch: async () => {
+        throw new Error("the receiver is down");
+      },
+      onDeadLetter: (record) => deadLettered.push(record.idempotencyKey),
+    });
+
+    await relay.drainOnce();
+    // The mail reached the relay's ceiling of one; the webhook waits an hour.
+    expect(deadLettered).toEqual(["mail:1"]);
+    const { rows } = await wb.admin.query<{ wait: number }>(
+      `select extract(epoch from available_at - now())::int as wait
+         from outbox where idempotency_key = 'hook:1'`,
+    );
+    expect(rows[0]?.wait).toBeGreaterThan(3_500);
+    expect(rows[0]?.wait).toBeLessThanOrEqual(3_600);
+  });
+
   it("still retries an ordinary failure, so one permanent case does not make every failure fatal", async () => {
     const wb = await workerDb();
     await enqueue(wb.admin, "mail.send", "transient:1");

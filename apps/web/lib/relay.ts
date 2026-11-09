@@ -43,6 +43,7 @@ import {
   memberEmail,
   memberExternalId,
   OUTBOX_REDACT_ON_DELIVERY,
+  OUTBOX_RETRY_POLICY,
   type OutboxDelivery,
   type OutboxHandlerDeps,
   openConnection,
@@ -59,6 +60,7 @@ import { drafterFor } from "./drafter";
 import { embedFor } from "./embedder";
 import { getInstanceName } from "./instance-name";
 import { getMailSettings, mailerFrom } from "./mail";
+import { postWebhook } from "./outbound";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
@@ -161,6 +163,11 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
     // reading the setting. Null means no scanner, and the handler keeps the
     // file held rather than releasing it unscanned.
     scanner: getFileScanner,
+    // A webhook's secret is opened with the ring at the moment it signs, and
+    // the body goes out through the outbound guard (outbound-webhooks.md W6,
+    // W7). Both always present: neither needs a service.
+    ring: getKeyRing(),
+    postWebhook,
     ...(mail
       ? {
           async sendMail(message) {
@@ -472,6 +479,9 @@ export function startRelay(): OutboxRelay | null {
     // A delivered invitation keeps neither its token nor its address
     // (completeness review M-19). Core names the fields per topic.
     redactOnDelivery: OUTBOX_REDACT_ON_DELIVERY,
+    // A webhook retries for about a day rather than a quarter of an hour
+    // (outbound-webhooks.md W9). Core names the topics and their schedules.
+    retryPolicy: OUTBOX_RETRY_POLICY,
     // Passing this also registers the two queue gauges, which are read at
     // scrape time rather than written during a drain (P7-T06b). That is what
     // makes a relay that has stopped legible: counters go quiet and look like

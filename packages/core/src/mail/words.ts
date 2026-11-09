@@ -116,6 +116,17 @@ const en = {
   "trial.endedSubscribed": "It carries on under its subscription.",
   "trial.noPlan": "no plan, with no seat limit",
 
+  // A webhook turned itself off after a run of failures (outbound-webhooks.md W9).
+  "webhookOff.subject": "{workspace}: the webhook {name} was turned off",
+  "webhookOff.preheader": "Its last {count} deliveries all failed.",
+  "webhookOff.eyebrow": "Webhook turned off",
+  "webhookOff.heading": "The webhook {name} was turned off",
+  "webhookOff.body":
+    "Its last {count} deliveries to {host} all failed, so nothing more is sent to it. Check the receiver, then turn the webhook back on. Each failed delivery is on its page with the reason.",
+  "webhookOff.action": "Open the webhooks",
+  "webhookOff.footer":
+    "Sent to whoever made this webhook in {workspace}. Sent once each time it turns off.",
+
   "digest.subjectOne": "{workspace}: 1 update",
   "digest.subjectMany": "{workspace}: {count} updates",
   "digest.headingOne": "1 update",
@@ -252,6 +263,16 @@ const ms: Readonly<Record<MailWordKey, string>> = {
     "Orangnya tidak muat dalam {fallback}, jadi ia baca sahaja sehingga seseorang memilih pelan, atau mengeluarkan orang dan menekan Selesaikan. Tiada sesiapa dikeluarkan dan tiada apa yang dipadam.",
   "trial.endedSubscribed": "Ia diteruskan di bawah langganannya.",
   "trial.noPlan": "tiada pelan, tanpa had tempat duduk",
+
+  "webhookOff.subject": "{workspace}: webhook {name} telah dimatikan",
+  "webhookOff.preheader": "{count} penghantaran terakhirnya semua gagal.",
+  "webhookOff.eyebrow": "Webhook dimatikan",
+  "webhookOff.heading": "Webhook {name} telah dimatikan",
+  "webhookOff.body":
+    "{count} penghantaran terakhirnya ke {host} semua gagal, jadi tiada apa lagi dihantar kepadanya. Semak penerima, kemudian hidupkan semula webhook itu. Setiap penghantaran yang gagal ada di halamannya bersama sebabnya.",
+  "webhookOff.action": "Buka webhook",
+  "webhookOff.footer":
+    "Dihantar kepada pembuat webhook ini dalam {workspace}. Dihantar sekali setiap kali ia dimatikan.",
 
   "digest.subjectOne": "{workspace}: 1 kemas kini",
   "digest.subjectMany": "{workspace}: {count} kemas kini",

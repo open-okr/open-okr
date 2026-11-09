@@ -98,6 +98,7 @@ An instance runs these on a clock, all on by default:
 | Cloud housekeeping | Hourly, at :10, :40 and :50 | With the cloud flag on: adopts workspaces into the operator console, refreshes the usage snapshot and sends erasure reminders. Nothing without the flag |
 | Support session expiry | Every 5 minutes | Ends each support session past its time box: stamps when it ended, suspends the support member and records it in the audit trail. Access is refused at expiry either way; this is what tells the owner's screen the session is over |
 | Outbox purge | 04:00 UTC | Deletes delivered and given-up outbox rows older than `outbox.retentionDays`, 30 by default, 0 to keep them. A delivered invitation loses its token and address the moment it is sent |
+| Webhook delivery log | 04:50 UTC | Deletes each webhook's delivery records older than 30 days. A delivery that fails is retried by the outbox for about a day, and a webhook whose last 50 deliveries all failed turns itself off and emails whoever made it |
 | Alignment scores | Hourly, at :35 | Stores the alignment score of each cycle nothing has changed since it was upgraded to 0.7. Until then the score is computed when it is read, so the figure is right either way |
 
 `OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,

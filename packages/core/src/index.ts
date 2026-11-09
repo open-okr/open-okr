@@ -1093,6 +1093,7 @@ export {
   memberEmail,
   OUTBOX_HANDLERS,
   OUTBOX_REDACT_ON_DELIVERY,
+  OUTBOX_RETRY_POLICY,
   type OutboxDelivery,
   type OutboxHandler,
   type OutboxHandlerDeps,
@@ -1357,6 +1358,7 @@ export {
   type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
+export { purgeWebhookDeliveries } from "./webhooks/retention.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
 export {
   createOwnWorkspace,

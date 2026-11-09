@@ -505,3 +505,46 @@ export function trialEndedMail(input: {
   );
   return { subject: t("trial.endedSubject", { workspace }), html, text };
 }
+
+/**
+ * A webhook turned itself off after a run of failed deliveries, to whoever
+ * made it (docs/design/outbound-webhooks.md W9). The host, never the address,
+ * which can carry the receiver's own token.
+ */
+export function webhookTurnedOffMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly name: string;
+  readonly host: string;
+  readonly failures: number;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const count = String(input.failures);
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("webhookOff.preheader", { count }),
+      footer: t("webhookOff.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("webhookOff.eyebrow") },
+      { kind: "heading", text: t("webhookOff.heading", { name: input.name }) },
+      {
+        kind: "paragraph",
+        parts: [t("webhookOff.body", { count, host: input.host })],
+      },
+      {
+        kind: "action",
+        label: t("webhookOff.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/webhooks`,
+      },
+    ],
+  );
+  return {
+    subject: t("webhookOff.subject", { workspace, name: input.name }),
+    html,
+    text,
+  };
+}

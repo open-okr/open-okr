@@ -115,6 +115,10 @@ describe("the run table", () => {
   // `alignment.fillScores` since plan 0.7.0 D2 (alignment-engine.md §10): it
   // walks every workspace storing the scores no write has stored yet, as the
   // system, and a reader already gets the same answer from `alignment.score`.
+  // `webhooks.purgeDeliveries` since plan 0.7.0 D5 (outbound-webhooks.md
+  // W10): it deletes delivery bookkeeping past thirty days, as the outbox
+  // purge does, and a caller emptying a hook's log would be hiding what it
+  // sent.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
@@ -126,6 +130,7 @@ describe("the run table", () => {
     "cloud.sweepTrials",
     "cycles.sweepEnded",
     "alignment.fillScores",
+    "webhooks.purgeDeliveries",
   ]);
 
   test("names a real action for every run", () => {
@@ -158,6 +163,7 @@ describe("the run table", () => {
       "cloud.sweepTrials",
       "cycles.sweepEnded",
       "alignment.fillScores",
+      "webhooks.purgeDeliveries",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -174,6 +180,7 @@ describe("the run table", () => {
       "outbox.purge",
       "support.sweepExpired",
       "tenancy.adopt",
+      "webhooks.purgeDeliveries",
     ]);
     for (const run of off) {
       expect(run.cron, run.job).toBeTruthy();

@@ -128,6 +128,21 @@ export interface OutboxRelayOptions {
    * Rows that belong to no workspace are never held.
    */
   readonly rowsPerMinute?: () => number;
+  /**
+   * A topic that retries on its own schedule rather than `backoffSeconds`
+   * and `maxAttempts` (docs/design/outbound-webhooks.md W9). A webhook
+   * receiver down for a deploy is retried for about a day; an email is not.
+   * The host names the topics; this package knows nothing about webhooks.
+   */
+  readonly retryPolicy?: Readonly<
+    Record<
+      string,
+      {
+        readonly maxAttempts: number;
+        readonly backoffSeconds: (attempts: number) => number;
+      }
+    >
+  >;
 }
 
 /**
@@ -247,6 +262,7 @@ export class OutboxRelay {
       | "metrics"
       | "redactOnDelivery"
       | "rowsPerMinute"
+      | "retryPolicy"
     >
   > &
     Pick<
@@ -256,6 +272,7 @@ export class OutboxRelay {
       | "metrics"
       | "redactOnDelivery"
       | "rowsPerMinute"
+      | "retryPolicy"
     >;
   #timer: NodeJS.Timeout | undefined;
   #running = false;
@@ -275,6 +292,7 @@ export class OutboxRelay {
       metrics: options.metrics,
       redactOnDelivery: options.redactOnDelivery,
       rowsPerMinute: options.rowsPerMinute,
+      retryPolicy: options.retryPolicy,
     };
 
     // **Registered here, not in the drain loop, and read at scrape time.**
@@ -750,9 +768,11 @@ export class OutboxRelay {
     const truncated = message.slice(0, 2000);
     const permanent =
       error instanceof Error && error.name === "PermanentDispatchError";
+    const policy = this.#options.retryPolicy?.[record.topic];
+    const maxAttempts = policy?.maxAttempts ?? this.#options.maxAttempts;
     const client = await this.#pool.connect();
     try {
-      if (permanent || record.attempts >= this.#options.maxAttempts) {
+      if (permanent || record.attempts >= maxAttempts) {
         await client.query(
           `update outbox
               set last_error = $2, dead_lettered_at = now()
@@ -763,7 +783,9 @@ export class OutboxRelay {
         return true;
       }
 
-      const backoff = this.#options.backoffSeconds(record.attempts);
+      const backoff = (policy?.backoffSeconds ?? this.#options.backoffSeconds)(
+        record.attempts,
+      );
       await client.query(
         `update outbox
             set last_error = $2,

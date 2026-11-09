@@ -74,6 +74,7 @@ import {
   type StoredEmail,
   trialEndedMail,
   trialReminderMail,
+  webhookTurnedOffMail,
 } from "../mail/mails.ts";
 import { mailWords } from "../mail/words.ts";
 import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
@@ -81,6 +82,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
+import type { KeyRing } from "../secrets/key-ring.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import {
   END_SUBSCRIPTION_TOPIC,
@@ -95,6 +97,19 @@ import {
 } from "../tenancy/trial-topics.ts";
 import { readTrialNotice } from "../tenancy/trials.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
+import {
+  deliverWebhook,
+  readTurnedOff,
+  type WebhookPost,
+} from "../webhooks/deliver.ts";
+import {
+  FAILURES_BEFORE_OFF,
+  parseWebhookJob,
+  WEBHOOK_DELIVER_TOPIC,
+  WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_TURNED_OFF_TOPIC,
+  webhookRetrySeconds,
+} from "../webhooks/jobs.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
 /** One delivered outbox row, as a handler sees it. */
@@ -234,6 +249,17 @@ export interface OutboxHandlerDeps {
    * the reason `putFile` is one. Absent means no storage, and erasure waits.
    */
   readonly deleteFiles?: (prefix: string) => Promise<void>;
+  /**
+   * The root key ring, which opens a webhook's signing secret at the moment
+   * it signs (outbound-webhooks.md W6). Absent, a webhook waits for a relay
+   * that has one rather than being skipped.
+   */
+  readonly ring?: KeyRing;
+  /**
+   * Posts one signed webhook body through the outbound guard (W7). A
+   * function rather than the guard, which lives in `packages/adapters`.
+   */
+  readonly postWebhook?: WebhookPost;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -1116,6 +1142,97 @@ const sendTrialEnded: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Signs and posts one webhook event (docs/design/outbound-webhooks.md W8).
+ *
+ * **Safe to run twice** in the sense a receiver needs: a relay that dies
+ * after the post sends the same event again, with the same `webhook-id`, so a
+ * receiver that keeps the ids it has seen drops the copy. Every attempt is a
+ * row in the hook's log.
+ *
+ * A failure is thrown, so the relay backs off and tries again for about a day
+ * (`OUTBOX_RETRY_POLICY`). The last attempt is not thrown: a receiver that was
+ * down all day is the receiver's problem rather than a dead letter on this
+ * instance, and its log says it gave up. A refusal and a withheld subject are
+ * never retried, because waiting changes neither.
+ */
+const deliverWebhookEvent: OutboxHandler = async (delivery, deps) => {
+  const job = parseWebhookJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not name a workspace, a webhook and an event, so nothing can be sent.`,
+    );
+  }
+  const outcome = await deliverWebhook(job, {
+    pool: deps.pool,
+    ...(deps.ring ? { ring: deps.ring } : {}),
+    ...(deps.postWebhook ? { post: deps.postWebhook } : {}),
+    attempt: Math.max(1, delivery.attempts),
+    lastAttempt: WEBHOOK_MAX_ATTEMPTS,
+  });
+  if (outcome.kind === "failed" && outcome.retry) {
+    throw new Error(outcome.reason);
+  }
+  if (outcome.kind === "skipped" || outcome.kind === "refused") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+  if (outcome.kind === "withheld") {
+    deps.onSkipped?.(delivery, "the webhook's owner cannot see the subject");
+  }
+  if (outcome.kind === "failed") {
+    deps.onSkipped?.(delivery, `gave up: ${outcome.reason}`);
+  }
+};
+
+/**
+ * Tells a webhook's creator it turned itself off after a run of failures
+ * (W9). Not sent once somebody has turned it back on or removed it. Safe to
+ * run twice in the only sense mail can be, like the digest.
+ */
+const sendWebhookTurnedOff: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const webhookId = asString(delivery.payload.webhookId);
+  const failures =
+    typeof delivery.payload.failures === "number"
+      ? delivery.payload.failures
+      : FAILURES_BEFORE_OFF;
+  if (!workspaceId || !webhookId) {
+    throw new PermanentDispatchError(
+      "A webhook's turned-off mail needs a workspace and a webhook.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const hook = await readTurnedOff(deps.pool, workspaceId, webhookId);
+  if (!hook) {
+    deps.onSkipped?.(delivery, "the webhook is on again, or gone");
+    return;
+  }
+  const to = await memberEmail(deps.pool, workspaceId, hook.creatorMemberId);
+  if (!to) {
+    deps.onSkipped?.(delivery, "the webhook's creator has no address");
+    return;
+  }
+  let host = "";
+  try {
+    host = new URL(hook.url).host;
+  } catch {
+    host = "";
+  }
+  await deps.sendMail({
+    to,
+    ...webhookTurnedOffMail({
+      mail: await workspaceMail(deps.pool, workspaceId),
+      baseUrl: deps.baseUrl,
+      name: hook.name,
+      host,
+      failures,
+    }),
+  });
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -1179,6 +1296,32 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // Erasure's half that only the server can do (workspace-erasure.md §4).
   [ERASE_FILES_TOPIC]: eraseFiles,
   [ERASE_CUSTOMER_TOPIC]: deleteCustomer,
+  // Outbound webhooks (docs/design/outbound-webhooks.md W8, W9).
+  [WEBHOOK_DELIVER_TOPIC]: deliverWebhookEvent,
+  [WEBHOOK_TURNED_OFF_TOPIC]: sendWebhookTurnedOff,
+};
+
+/**
+ * Topics that retry on a schedule of their own rather than the relay's.
+ *
+ * The relay's default gives up after ten attempts in about a quarter of an
+ * hour, which is right for an email and wrong for a webhook receiver that is
+ * down for a deploy: W9 retries for about a day. The relay host passes this
+ * table to the relay, as it passes `OUTBOX_REDACT_ON_DELIVERY`.
+ */
+export const OUTBOX_RETRY_POLICY: Readonly<
+  Record<
+    string,
+    {
+      readonly maxAttempts: number;
+      readonly backoffSeconds: (attempts: number) => number;
+    }
+  >
+> = {
+  [WEBHOOK_DELIVER_TOPIC]: {
+    maxAttempts: WEBHOOK_MAX_ATTEMPTS,
+    backoffSeconds: webhookRetrySeconds,
+  },
 };
 
 /**

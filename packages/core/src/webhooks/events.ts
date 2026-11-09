@@ -69,6 +69,11 @@ export function subjectTypeOf(event: WebhookEvent): WebhookSubjectType {
   return "cycle";
 }
 
+/** Whether an event reports a subject that no longer exists (W4). */
+export function isDeletionEvent(event: DeliveredEvent): boolean {
+  return event === "objective.deleted";
+}
+
 /**
  * One activity kind's route to an event.
  *

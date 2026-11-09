@@ -53,6 +53,7 @@ import {
   measureAllWorkspaces,
   outboxRetentionDays,
   purgeStaleSignInAttempts,
+  purgeWebhookDeliveries,
   remindBeforeErasure,
   remindTrialsEnding,
   reportError,
@@ -116,6 +117,9 @@ export interface ScheduledRun {
     | "channels.sweepMessageLog"
     // Plan 0.7.0 A2: the agent tool call record's retention, per workspace.
     | "connections.sweepToolCalls"
+    // Plan 0.7.0 D5: the webhook delivery log's thirty days, per workspace.
+    // Not a registry action: delivery bookkeeping, as the outbox purge is.
+    | "webhooks.purgeDeliveries"
     // Plan 0.7.0 O2: moving every ended cycle to closing, per workspace, as
     // the system. Not a registry action: a date passing is not something an
     // API caller starts (okr-core-domain.md §10 C2).
@@ -259,6 +263,14 @@ const TOOL_CALL_SWEEP_JOB = "connections.sweepToolCalls";
 const TOOL_CALL_SWEEP_CRON = "20 4 * * *";
 
 /**
+ * The webhook delivery log's retention (outbound-webhooks.md W10, plan 0.7.0
+ * D5). Daily at 04:50 UTC, after the sign-in purge, for the reason
+ * housekeeping takes turns. Per workspace, under each one's tenant setting.
+ */
+const WEBHOOK_PURGE_JOB = "webhooks.purgeDeliveries";
+const WEBHOOK_PURGE_CRON = "50 4 * * *";
+
+/**
  * Moving ended cycles to closing (okr-core-domain.md §10 C1, plan 0.7.0 O2).
  * Hourly, so a cycle moves within the hour after its workspace's own
  * midnight, at a minute no agent cadence uses.
@@ -371,6 +383,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: CYCLE_CLOSING_SWEEP_JOB,
     action: "cycles.sweepEnded",
     cron: CYCLE_CLOSING_SWEEP_CRON,
+  },
+  {
+    job: WEBHOOK_PURGE_JOB,
+    action: "webhooks.purgeDeliveries",
+    cron: WEBHOOK_PURGE_CRON,
   },
   {
     job: TENANCY_ADOPT_JOB,
@@ -643,6 +660,14 @@ async function runOne(
   workspace: SchedulableWorkspace,
   run: ScheduledRun,
 ): Promise<void> {
+  // Delivery bookkeeping past its thirty days (D5), straight to the purge.
+  if (run.action === "webhooks.purgeDeliveries") {
+    const purged = await purgeWebhookDeliveries(getPool(), workspace.id);
+    if (purged > 0) {
+      log(`webhooks.purgeDeliveries removed ${purged} delivery row(s)`);
+    }
+    return;
+  }
   // A date passing, as the system, through its own Operations (O2).
   if (run.action === "cycles.sweepEnded") {
     const moved = await sweepEndedCycles(getPool(), workspace.id);
