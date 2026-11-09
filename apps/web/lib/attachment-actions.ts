@@ -40,6 +40,12 @@ export interface AttachResult {
   readonly error: string | null;
 }
 
+/** A file stored for the text, or the sentence that says why it was not. */
+export interface TextFileResult {
+  readonly blobId: string | null;
+  readonly error: string | null;
+}
+
 async function context() {
   const { session, workspace } = await requireWorkspace();
   return {
@@ -89,23 +95,65 @@ export async function uploadAttachment(
       blobId: stored.blobId,
     });
   } catch (error) {
-    // An image that is not one is the refusal a person can act on, so it is
-    // said in their language. Every other refusal is the action's own words.
-    if (error instanceof ImageRefusedError) {
-      const { t } = await getTranslations();
-      return {
-        error:
-          error.reason === "too_many_pixels"
-            ? t("attachmentActions.imageTooLarge", {
-                megapixels: MAX_IMAGE_PIXELS / 1_000_000,
-              })
-            : t("attachmentActions.imageUnreadable"),
-      };
-    }
-    return refused(error);
+    return refusedUpload(error);
   }
   revalidatePath("/", "layout");
   return { error: null };
+}
+
+/**
+ * An image that is not one is the refusal a person can act on, so it is said
+ * in their language. Every other refusal is the action's own words.
+ */
+async function refusedUpload(error: unknown): Promise<AttachResult> {
+  if (error instanceof ImageRefusedError) {
+    const { t } = await getTranslations();
+    return {
+      error:
+        error.reason === "too_many_pixels"
+          ? t("attachmentActions.imageTooLarge", {
+              megapixels: MAX_IMAGE_PIXELS / 1_000_000,
+            })
+          : t("attachmentActions.imageUnreadable"),
+    };
+  }
+  return refused(error);
+}
+
+/**
+ * A file pasted or dropped into a comment or a document (plan 0.7.0 R4,
+ * rich-text-editor.md §11 Q2).
+ *
+ * **The files panel's upload, without the attach.** The same `storeUpload`
+ * prepares, writes and claims the file, so the editor's node turns `ready`
+ * only once the bytes are kept and claimed, which is what the write boundary
+ * asks (R1). Nothing is hung on anything here: the comment or document write
+ * records the row when the text is saved (R2), and a file taken out before
+ * saving stays its uploader's alone, as §11.4 says.
+ */
+export async function uploadTextFile(
+  formData: FormData,
+): Promise<TextFileResult> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    const { t } = await getTranslations();
+    return { blobId: null, error: t("attachmentActions.emptyFile") };
+  }
+  try {
+    const stored = await storeUpload(
+      await context(),
+      { storage: getStorage(), images: getImageProcessor() },
+      {
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        bytes: Buffer.from(await file.arrayBuffer()),
+      },
+    );
+    return { blobId: stored.blobId, error: null };
+  } catch (error) {
+    const refusal = await refusedUpload(error);
+    return { blobId: null, error: refusal.error };
+  }
 }
 
 export async function detachAttachment(input: {

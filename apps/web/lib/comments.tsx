@@ -17,11 +17,13 @@ import {
   guardPress,
   isBlankDocument,
   RichTextEditor,
+  type RichTextEditorHandle,
   RichTextView,
   Spinner,
   useTranslations,
 } from "@openokr/ui";
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
+import { type StoreTextFile, useTextFileUpload } from "./text-file-upload.ts";
 
 /** One emoji's reactions on one subject, as `reactions.list` groups them. */
 export interface ReactionGroupData {
@@ -68,6 +70,8 @@ interface CommentThreadProps {
   readonly searchMembers?: (
     query: string,
   ) => Promise<readonly { readonly id: string; readonly label: string }[]>;
+  /** Stores a file pasted or dropped into a comment (plan 0.7.0 R4). */
+  readonly storeFile?: StoreTextFile;
 }
 
 export function CommentThread({
@@ -82,6 +86,7 @@ export function CommentThread({
   onDelete,
   onReact,
   searchMembers,
+  storeFile,
 }: CommentThreadProps) {
   const { t } = useTranslations();
 
@@ -165,6 +170,7 @@ export function CommentThread({
                 initialBody={comment.body}
                 onSave={(body) => handleEdit(comment.id, body)}
                 searchMembers={searchMembers}
+                storeFile={storeFile}
                 onCancel={() => setEditingId(null)}
                 saving={isPending && acting === `edit:${comment.id}`}
                 busy={isPending}
@@ -234,6 +240,7 @@ export function CommentThread({
           busy={isPending}
           placeholder={t("comments.thread.writeAComment")}
           searchMembers={searchMembers}
+          storeFile={storeFile}
         />
       </div>
     </div>
@@ -349,6 +356,7 @@ interface CommentEditorProps {
   readonly searchMembers?: (
     query: string,
   ) => Promise<readonly { readonly id: string; readonly label: string }[]>;
+  readonly storeFile?: StoreTextFile;
 }
 
 /**
@@ -356,6 +364,10 @@ interface CommentEditorProps {
  * strike, code, lists and links from its toolbar, and `@` to mention
  * somebody. An edit opens on the stored document itself, so what was
  * formatted stays formatted; the plain textarea this replaced flattened it.
+ *
+ * **A file pasted or dropped in is uploaded at once** (plan 0.7.0 R4), and
+ * Post waits for it: a comment naming a file still uploading would be refused
+ * by the server, so the composer says so first.
  */
 function CommentEditor({
   initialBody,
@@ -365,17 +377,24 @@ function CommentEditor({
   busy,
   placeholder,
   searchMembers,
+  storeFile,
 }: CommentEditorProps) {
   const { t } = useTranslations();
+  const editor = useRef<RichTextEditorHandle>(null);
+  const { uploadFile, problem, clearProblem } = useTextFileUpload(storeFile);
+  const [waiting, setWaiting] = useState(false);
 
   // Only what was typed here. An edit nobody has changed has nothing to save,
   // so Save waits for a change rather than sending the stored body back.
   const [body, setBody] = useState<RichTextDocument | null>(null);
 
+  const said = waiting ? t("comments.thread.fileStillUploading") : problem;
+
   return (
     <div className="space-y-2">
       <div className="rounded-control border border-line-2 bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
         <RichTextEditor
+          ref={editor}
           label={
             initialBody
               ? t("comments.thread.editComment")
@@ -384,14 +403,35 @@ function CommentEditor({
           variant="compact"
           content={initialBody ?? null}
           placeholder={placeholder ?? t("comments.thread.writeSomething")}
-          onUpdate={(json) => setBody(json as RichTextDocument)}
+          onUpdate={(json) => {
+            setBody(json as RichTextDocument);
+            setWaiting(false);
+          }}
           searchMembers={searchMembers}
+          uploadFile={uploadFile}
         />
       </div>
+      {said ? (
+        <p
+          role="alert"
+          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
+        >
+          {said}
+        </p>
+      ) : null}
       <div className="flex gap-2">
         <Button
           size="sm"
-          onClick={() => body && onSave(body)}
+          onClick={() => {
+            if (editor.current?.hasUploadsInProgress()) {
+              setWaiting(true);
+              return;
+            }
+            clearProblem();
+            if (body) {
+              onSave(body);
+            }
+          }}
           disabled={busy || !body || isBlankDocument(body)}
           pending={saving}
         >

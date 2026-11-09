@@ -10,6 +10,10 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useRef, useState, useTransition } from "react";
+import {
+  type StoreTextFile,
+  useTextFileUpload,
+} from "../../lib/text-file-upload.ts";
 import type { WriteState } from "../cycle/write-state.ts";
 
 /**
@@ -31,6 +35,7 @@ export function DocumentEditor({
   canEdit,
   onSave,
   onPublish,
+  storeFile,
 }: {
   /** The document's own title names the editor, which is what a screen
    * reader user needs to hear when they land in it. */
@@ -46,10 +51,16 @@ export function DocumentEditor({
   readonly canEdit: boolean;
   readonly onSave: (body: RichTextDocument | null) => Promise<WriteState>;
   readonly onPublish: () => Promise<WriteState>;
+  /**
+   * Stores a file pasted or dropped into the text (plan 0.7.0 R4). Save
+   * records it against the document, and refuses while one is uploading.
+   */
+  readonly storeFile?: StoreTextFile;
 }) {
   const { t } = useTranslations();
 
   const editor = useRef<RichTextEditorHandle>(null);
+  const { uploadFile, problem } = useTextFileUpload(storeFile);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -93,7 +104,17 @@ export function DocumentEditor({
         label={title}
         content={body ?? null}
         placeholder={t("documents.documentEditor.whatIsThePlan")}
+        uploadFile={uploadFile}
       />
+
+      {problem ? (
+        <p
+          role="alert"
+          className="rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"
+        >
+          {problem}
+        </p>
+      ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
         {/* Refused with `aria-disabled`, not `disabled`, so the pressed button

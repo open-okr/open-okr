@@ -297,3 +297,14 @@ Where the build settled something §11.2 left open. None changes a decision.
 | D10, the files panel | A `text` row shows "In the text. Take it out of the text to remove it." and no Detach | A button the server refuses is a dead end |
 | Q1, the batch | One workspace a batch, listed through the scheduler's read-only scan setting and opened through its own tenant setting. The runner gained an optional `rowsSkipped`, reported for the run and printed by `pnpm db:change`, not kept in the ledger | A deployment's admin role may be the table owner, which FORCE ROW LEVEL SECURITY binds. Lifting the floor would lock live tables |
 | Q1, which text | Comments and documents whether deleted or not, and every published version | Rows on a deleted subject open nothing (D9), and `documents.restore` brings them back with the document |
+
+### 11.11 Q2 as built: a file pasted or dropped into the text (plan 0.7.0 R4)
+
+| Piece | Built as |
+|---|---|
+| The upload | `uploadTextFile` in `apps/web/lib/attachment-actions.ts`: the files panel's own `storeUpload` (prepare, write, claim), without the attach. The comment or document write records the row when the text is saved. No new endpoint |
+| The editor's `uploadFile` | `useTextFileUpload` in `apps/web/lib/text-file-upload.ts`. It resolves with the stored blob's id, so a node turns `ready` only once the file is claimed. A refusal is kept for the field to show and the promise rejects, so the editor takes the node out (§7 step 4) and the person is told why |
+| Where | The comment composer and a comment's edit (`SubjectComments` passes it), and the document editor. Other rich text fields still take no file: their text records no rows (§11.9) |
+| Saving while a file uploads | Post and Save refuse with a sentence while a node is `uploading`; the server refuses the same (R1) |
+| The field | Says "Paste or drop a file to attach it." under the text where a file can go in. The node's spinner and remove button are named in the reader's language, and the remove button is drawn only where the text can change |
+| A member who may not upload | `blobs.prepareUpload` needs edit. The refusal is shown beside the field and the node goes |

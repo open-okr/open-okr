@@ -3,6 +3,7 @@ import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { uploadTextFile } from "../../../lib/attachment-actions.ts";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
@@ -178,6 +179,7 @@ export default async function DocumentPage({
                 document.subjectType,
                 document.subjectId,
               )}
+              storeFile={uploadTextFile}
             />
           </CardBody>
         </Card>
