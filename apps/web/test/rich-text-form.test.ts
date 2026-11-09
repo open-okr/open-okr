@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { documentOrNull, readRichTextField } from "../lib/rich-text-form.ts";
+import {
+  documentOrNull,
+  readRichTextField,
+  unreadableFields,
+} from "../lib/rich-text-form.ts";
 
 /**
  * Reading a rich text field a form posted (docs/design/guided-inputs.md §4.7).
@@ -90,5 +94,16 @@ describe("a field from a form that writes every field on each save", () => {
     expect(documentOrNull(form({ stable: "Churn" }), "stable")).toBe(
       "malformed",
     );
+  });
+});
+
+describe("a field that could not be read (guided-inputs §4.2, plan U1b)", () => {
+  it("is refused under its own name, and only the ones that could not be", () => {
+    expect(
+      unreadableFields(
+        { stable: PARAGRAPH, declining: "malformed", businessAsUsual: null },
+        "That text could not be read.",
+      ),
+    ).toEqual({ declining: "That text could not be read." });
   });
 });

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import {
   archiveCycle,
+  type CycleResult,
   createCycle,
   updateCycleDates,
 } from "./admin-actions.ts";
@@ -58,19 +59,20 @@ export function CycleAdmin({
   // Which button started the write in flight, so only that one spins.
   const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // A refusal about one of the two dates, shown under it (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
   const [on, setOn] = useState("");
   const [deadline, setDeadline] = useState(publicationDeadline ?? "");
 
-  const run = (
-    name: string,
-    work: () => Promise<{ error: string | null; id?: string }>,
-  ) => {
+  const run = (name: string, work: () => Promise<CycleResult>) => {
     setProblem(null);
+    setRefused({});
     setActing(name);
     start(async () => {
       const result = await work();
-      if (result.error) {
+      if (result.error || result.fields) {
         setProblem(result.error);
+        setRefused(result.fields ?? {});
         return;
       }
       if (result.id) {
@@ -102,6 +104,7 @@ export function CycleAdmin({
               hideLabel
               value={on}
               disabled={pending}
+              error={refused.on}
               onValueChange={(next) => setOn(next ?? "")}
               inputClassName="h-auto px-2 py-1 text-xs"
             />
@@ -134,6 +137,7 @@ export function CycleAdmin({
                   hideLabel
                   value={deadline === "" ? null : deadline}
                   disabled={pending}
+                  error={refused.publicationDeadline}
                   onValueChange={(next) => setDeadline(next ?? "")}
                   inputClassName="h-6.5 text-xs"
                 />

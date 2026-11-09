@@ -9,6 +9,8 @@
 export interface WriteState {
   /** A refusal in words, or null. Never a stack trace. */
   readonly error: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   /**
    * What the write did, in words, for a screen that does not otherwise show
    * it (M-05). Closing a cycle from the scorecard feeds a cycle the scorecard

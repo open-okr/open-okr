@@ -9,13 +9,15 @@
  * `withGateRecompute` refreshes the six gates. This file's whole job is turning
  * a form submission into one of those calls and then revalidating the page.
  *
- * A refusal is a normal outcome, not a crash: an `OperationError` becomes a
- * message the screen shows back, which is why each of these returns a state
- * object rather than throwing into the error boundary.
+ * A refusal is a normal outcome, not a crash: an `OperationError` or a
+ * schema's refusal becomes a message the screen shows back, under the field it
+ * is about when it names one (guided-inputs §4.2), which is why each of these
+ * returns a state object rather than throwing into the error boundary.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusedByField } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
@@ -35,10 +37,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = refusedByField(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -100,7 +103,10 @@ export async function addIssue(
   const impact = Number(formData.get("impact") ?? 3);
   if (text === "") {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.issueNeedsASentence") };
+    return {
+      error: null,
+      fields: { text: t("cycle.actions.issueNeedsASentence") },
+    };
   }
   return run((context) =>
     callAction(context, "workflow.addIssue", {
@@ -140,7 +146,10 @@ export async function addPriority(
   const fromIssueId = String(formData.get("fromIssueId") ?? "");
   if (text === "") {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.priorityNeedsASentence") };
+    return {
+      error: null,
+      fields: { text: t("cycle.actions.priorityNeedsASentence") },
+    };
   }
   return run((context) =>
     callAction(context, "workflow.addPriority", {

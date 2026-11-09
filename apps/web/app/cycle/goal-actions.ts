@@ -5,12 +5,14 @@
  *
  * Same shape as the workflow writes next door: turn a form submission into one
  * registry call, let the Operation pipeline do the rest, and hand a refusal back
- * as a sentence rather than throwing it into the error boundary.
+ * under the field it is about, or as a sentence, rather than throwing it into
+ * the error boundary.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
 import { formNumber } from "../../lib/form-number";
+import { refusedByField } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
@@ -30,10 +32,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = refusedByField(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -59,7 +62,10 @@ export async function createGoal(
 
   if (title === "") {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.objectiveNeedsASentence") };
+    return {
+      error: null,
+      fields: { title: t("cycle.actions.objectiveNeedsASentence") },
+    };
   }
 
   return run((context) =>
@@ -96,12 +102,22 @@ export async function addKeyResult(
   const { t } = await getTranslations();
 
   if (title === "") {
-    return { error: t("cycle.actions.keyResultNeedsASentence") };
+    return {
+      error: null,
+      fields: { title: t("cycle.actions.keyResultNeedsASentence") },
+    };
   }
   if (!Number.isFinite(baselineValue) || !Number.isFinite(targetValue)) {
     // METHOD.md KR-3: both are required. A missing baseline is the second most
-    // common defect in a draft, so the refusal says which one is missing.
-    return { error: t("cycle.actions.keyResultNeedsBaselineAndTarget") };
+    // common defect in a draft, so the refusal stands under each one missing.
+    const message = t("cycle.actions.keyResultNeedsBaselineAndTarget");
+    return {
+      error: null,
+      fields: {
+        ...(Number.isFinite(baselineValue) ? {} : { baselineValue: message }),
+        ...(Number.isFinite(targetValue) ? {} : { targetValue: message }),
+      },
+    };
   }
 
   const ownerId = String(formData.get("ownerId") ?? "");
@@ -143,7 +159,10 @@ export async function recordValue(
   const value = formNumber(formData, "value");
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.valueHasToBeANumber") };
+    return {
+      error: null,
+      fields: { value: t("cycle.actions.valueHasToBeANumber") },
+    };
   }
   return run((context) =>
     callAction(context, "goals.recordValue", { id, value }),

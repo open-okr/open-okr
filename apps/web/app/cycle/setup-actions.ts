@@ -12,12 +12,13 @@
  * neither a write nor a screen.
  *
  * Same shape as the other cycle writes: one registry call per form, and a
- * refusal returned as a sentence.
+ * refusal returned under the field it is about, or as a sentence.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
-import { documentOrNull } from "../../lib/rich-text-form.ts";
+import { refusedByField } from "../../lib/refusal";
+import { documentOrNull, unreadableFields } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
@@ -28,6 +29,8 @@ async function run(
     workspaceId: string;
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
+  /** A refused input path to the form field it was typed in, where they differ. */
+  fieldOf: (path: string) => string = (path) => path,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -37,10 +40,21 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = refusedByField(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused.fields === undefined
+      ? refused
+      : {
+          error: refused.error,
+          fields: Object.fromEntries(
+            Object.entries(refused.fields).map(([path, message]) => [
+              fieldOf(path),
+              message,
+            ]),
+          ),
+        };
   }
   revalidatePath("/", "layout");
   return NO_ERROR;
@@ -63,17 +77,26 @@ export async function saveCycleSetup(
 ): Promise<WriteState> {
   const sponsorId = text(formData, "sponsorId");
   const facilitatorId = text(formData, "facilitatorId");
-  return run((context) =>
-    callAction(context, "cycles.update", {
-      id: text(formData, "cycleId"),
-      sponsorId: sponsorId === "" ? null : sponsorId,
-      facilitatorId: facilitatorId === "" ? null : facilitatorId,
-      firstCycle: formData.get("firstCycle") === "on",
-      sessionDates: SESSION_KEYS.map((key) => ({
-        key,
-        on: text(formData, `session-${key}`),
-      })).filter((entry) => entry.on !== ""),
-    }),
+  const sessionDates = SESSION_KEYS.map((key) => ({
+    key,
+    on: text(formData, `session-${key}`),
+  })).filter((entry) => entry.on !== "");
+  return run(
+    (context) =>
+      callAction(context, "cycles.update", {
+        id: text(formData, "cycleId"),
+        sponsorId: sponsorId === "" ? null : sponsorId,
+        facilitatorId: facilitatorId === "" ? null : facilitatorId,
+        firstCycle: formData.get("firstCycle") === "on",
+        sessionDates,
+      }),
+    // A refused date is the one typed into that session's field, which the
+    // input names by its place in the list of dates filled in.
+    (path) => {
+      const at = /^sessionDates\.(\d+)(\.|$)/.exec(path);
+      const entry = at ? sessionDates[Number(at[1])] : undefined;
+      return entry ? `session-${entry.key}` : path;
+    },
   );
 }
 
@@ -92,7 +115,13 @@ export async function saveBaselineHealth(
     declining === "malformed" ||
     businessAsUsual === "malformed"
   ) {
-    return { error: t("fields.richTextUnreadable") };
+    return {
+      error: null,
+      fields: unreadableFields(
+        { stable, declining, businessAsUsual },
+        t("fields.richTextUnreadable"),
+      ),
+    };
   }
   if (stable === null && declining === null && businessAsUsual === null) {
     // A row with three empty columns would read as "recorded" to phase 2.
@@ -119,7 +148,13 @@ export async function saveRevalidation(
   const focusNote = documentOrNull(formData, "focusNote");
   if (changeNote === "malformed" || focusNote === "malformed") {
     const { t } = await getTranslations();
-    return { error: t("fields.richTextUnreadable") };
+    return {
+      error: null,
+      fields: unreadableFields(
+        { changeNote, focusNote },
+        t("fields.richTextUnreadable"),
+      ),
+    };
   }
   return run((context) =>
     callAction(context, "workflow.setRevalidation", {
@@ -153,11 +188,11 @@ export async function saveCapacityCuts(
   const { t } = await getTranslations();
   const cuts = documentOrNull(formData, "cuts");
   if (cuts === "malformed") {
-    return { error: t("fields.richTextUnreadable") };
+    return { error: null, fields: { cuts: t("fields.richTextUnreadable") } };
   }
   if (cuts === null) {
     // §5.5: "If the answer is nothing, capacity was not checked."
-    return { error: t("cycle.cuts.writeSomething") };
+    return { error: null, fields: { cuts: t("cycle.cuts.writeSomething") } };
   }
   return run((context) =>
     callAction(context, "workflow.setCapacityNotes", {

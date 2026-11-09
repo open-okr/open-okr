@@ -13,13 +13,27 @@
  * vision yet" and "our vision is blank" are different answers and the column
  * can hold both.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
-import { documentOrNull } from "../../lib/rich-text-form.ts";
+import { refusedByField } from "../../lib/refusal";
+import { documentOrNull, unreadableFields } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
+
+/**
+ * A refused write as the form shows it: under the field it is about, or as
+ * the form's sentence (guided-inputs §4.2). Anything that was not a refusal
+ * goes on to the error page.
+ */
+async function refused(error: unknown): Promise<WriteState> {
+  const state = refusedByField(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
 
 export async function setFrame(
   _previous: WriteState,
@@ -38,7 +52,13 @@ export async function setFrame(
     notDoing === "malformed"
   ) {
     const { t } = await getTranslations();
-    return { error: t("fields.richTextUnreadable") };
+    return {
+      error: null,
+      fields: unreadableFields(
+        { mission, vision, strategy, notDoing },
+        t("fields.richTextUnreadable"),
+      ),
+    };
   }
 
   // The two lists arrive positionally, one entry per row of the fieldset, and
@@ -87,10 +107,7 @@ export async function setFrame(
       },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -135,10 +152,7 @@ export async function closeCycle(
       ? t("cycle.actions.closedAndFed", { next: closed.fedInto.name })
       : t("cycle.actions.closedNothingToFeed");
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   revalidatePath("/scorecard");
@@ -182,7 +196,10 @@ export async function sendForward(
 
   if (title === "") {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.quarterlyObjectiveNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("cycle.actions.quarterlyObjectiveNeedsATitle") },
+    };
   }
 
   try {
@@ -203,10 +220,7 @@ export async function sendForward(
       weight: 1,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -242,10 +256,7 @@ export async function linkToStrategy(
       },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -274,10 +285,7 @@ export async function setClosing(
       { cycleId, closing },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;

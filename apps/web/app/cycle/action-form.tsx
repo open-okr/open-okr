@@ -1,5 +1,6 @@
 "use client";
 
+import { RefusedFields } from "@openokr/ui";
 import { useActionState } from "react";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
 
@@ -42,7 +43,8 @@ export function ActionForm({
       aria-busy={pending}
       aria-label={label}
     >
-      {children}
+      {/* Each field shows what the server refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       {state.error ? (
         <p
           role="alert"
