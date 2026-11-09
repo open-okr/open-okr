@@ -1,4 +1,6 @@
 {{- include "openokr.validate" . -}}
+{{- /* `cloud` is absent from values reused from a release older than 0.6 (helm upgrade --reuse-values). */ -}}
+{{- $cloud := .Values.cloud | default dict }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -87,18 +89,18 @@ spec:
             - name: OPENOKR_SUPPORT_EMAIL
               value: {{ . | quote }}
             {{- end }}
-            {{- if .Values.cloud.enabled }}
+            {{- if $cloud.enabled }}
             - name: OPENOKR_CLOUD
               value: "true"
-            {{- with .Values.cloud.region }}
+            {{- with $cloud.region }}
             - name: OPENOKR_CLOUD_REGION
               value: {{ . | quote }}
             {{- end }}
-            {{- with .Values.cloud.plans }}
+            {{- with $cloud.plans }}
             - name: OPENOKR_CLOUD_PLANS
               value: {{ . | quote }}
             {{- end }}
-            {{- with .Values.cloud.defaultPlan }}
+            {{- with $cloud.defaultPlan }}
             - name: OPENOKR_CLOUD_DEFAULT_PLAN
               value: {{ . | quote }}
             {{- end }}

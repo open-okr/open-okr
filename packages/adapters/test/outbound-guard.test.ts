@@ -57,6 +57,39 @@ describe("addresses a server must never be talked into reaching", () => {
     }
   });
 
+  it("blocks every IPv6 form that embeds a private IPv4 address", () => {
+    for (const address of [
+      "::ffff:a9fe:a9fe",
+      "::ffff:7f00:1",
+      "::a9fe:a9fe",
+      "::ffff:0:a9fe:a9fe",
+      "64:ff9b::a9fe:a9fe",
+      "64:ff9b::7f00:1",
+      "2002:a9fe:a9fe::1",
+      "2002:7f00:1::",
+      "2001:0:4136:e378::1",
+      "fe90::1",
+      "febf::1",
+      "fec0::1",
+      "[::ffff:a9fe:a9fe]",
+      "fe80::1%eth0",
+    ]) {
+      expect(isBlockedAddress(address), address).toBe(true);
+    }
+  });
+
+  it("allows IPv6 addresses that embed a public IPv4 address", () => {
+    for (const address of [
+      "2606:4700:4700::1111",
+      "2001:4860:4860::8888",
+      "64:ff9b::808:808",
+      "2002:808:808::1",
+      "::ffff:808:808",
+    ]) {
+      expect(isBlockedAddress(address), address).toBe(false);
+    }
+  });
+
   it("refuses anything that is not an address at all", () => {
     expect(isBlockedAddress("not-an-address")).toBe(true);
     expect(isBlockedAddress("")).toBe(true);
@@ -83,6 +116,16 @@ describe("checking a URL before fetching it", () => {
       // Asking would give a name server a say it should not have. If this ran,
       // the empty answer would produce "unreachable" rather than the refusal
       // the assertion below expects.
+      resolve: async () => ["1.1.1.1"],
+    });
+    expect(outcome.ok).toBe(false);
+    if (!outcome.ok) {
+      expect(outcome.refusal).toBe("address_not_allowed");
+    }
+  });
+
+  it("refuses a literal IPv6 address that embeds a private IPv4 address", async () => {
+    const outcome = await checkUrl("http://[::ffff:169.254.169.254]/", {
       resolve: async () => ["1.1.1.1"],
     });
     expect(outcome.ok).toBe(false);

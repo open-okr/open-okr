@@ -7,6 +7,7 @@ import {
   isProviderSignInPath,
 } from "../src/auth/sso-enforcement.ts";
 import { encryptSecret, parseKeyRing } from "../src/secrets/key-ring.ts";
+import { joinWorkspaceForIdentity } from "../src/workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -42,6 +43,22 @@ const post = (path: string, body: unknown) =>
       body: JSON.stringify(body),
     }),
   );
+
+/** An account that is an active member of the enforcing workspace. */
+const addMember = async (id: string, email: string) => {
+  const wb = await workerDb();
+  await wb.admin.query(
+    `insert into users (id, name, email, email_verified, created_at, updated_at)
+     values ($1, $1, $2, true, now(), now())
+     on conflict (id) do nothing`,
+    [id, email],
+  );
+  await joinWorkspaceForIdentity(wb.appPool, {
+    workspaceId,
+    user: { id, name: id },
+    via: "sso",
+  });
+};
 
 const signUp = (email: string) =>
   post("/sign-up/email", { email, password: PASSWORD, name: email });
@@ -109,6 +126,10 @@ beforeAll(async () => {
     [workspaceId, sealed.ciphertext, sealed.dataKey, sealed.keyId],
   );
 
+  await addMember("enforced-user", "enforced@acme.com");
+  await addMember("enforced-uk", "member@acme.co.uk");
+  await addMember("enforced-saml", "member@saml.example");
+
   auth = createAuth({
     pool: wb.appPool,
     secret: SECRET,
@@ -128,6 +149,7 @@ describe("which provider claims an address", () => {
   const connections = [
     {
       providerId: "sso-okta-1",
+      workspaceId: "ws-a",
       kind: "oidc" as const,
       displayName: "Okta",
       domains: ["acme.com"],
@@ -153,6 +175,7 @@ describe("which provider claims an address", () => {
       enforcingProviderFor("a@acme.com", [
         {
           providerId: "sso-x-1",
+          workspaceId: "ws-a",
           kind: "oidc" as const,
           displayName: "X",
           domains: [],
@@ -162,24 +185,8 @@ describe("which provider claims an address", () => {
   });
 });
 
-describe("an address an enforcing provider claims", () => {
-  it("cannot create a local account", async () => {
-    const response = await signUp("new@acme.com");
-
-    expect(response.status).toBe(403);
-    expect(await response.text()).toContain("Okta");
-  });
-
+describe("a member of the enforcing workspace", () => {
   it("cannot sign in with a password", async () => {
-    const wb = await workerDb();
-    // The account exists already, which is the case that matters: somebody
-    // who had a password before the workspace turned enforcement on.
-    await wb.admin.query(
-      `insert into users (id, name, email, email_verified, created_at, updated_at)
-       values ('enforced-user', 'Enforced', 'enforced@acme.com', true, now(), now())
-       on conflict (id) do nothing`,
-    );
-
     const response = await post("/sign-in/email", {
       email: "enforced@acme.com",
       password: PASSWORD,
@@ -206,17 +213,42 @@ describe("an address an enforcing provider claims", () => {
     // The point of the row this came from: enforcement knew about one
     // protocol, so a workspace that had configured SAML and switched
     // enforcement on watched password sign-in carry on working.
-    const response = await signUp("someone@saml.example");
+    const response = await post("/sign-in/email", {
+      email: "member@saml.example",
+      password: PASSWORD,
+    });
 
     expect(response.status).toBe(403);
     expect(await response.text()).toContain("ADFS");
   });
 
   it("is refused on every domain the connection lists, not just the first", async () => {
-    const response = await signUp("someone@acme.co.uk");
+    const response = await post("/sign-in/email", {
+      email: "member@acme.co.uk",
+      password: PASSWORD,
+    });
 
     expect(response.status).toBe(403);
     expect(await response.text()).toContain("Okta");
+  });
+});
+
+describe("an account on an enforced domain that is not a member", () => {
+  it("signs up and signs in with a password", async () => {
+    const created = await signUp("new@acme.com");
+    expect(created.status).toBe(200);
+
+    const signedIn = await post("/sign-in/email", {
+      email: "new@acme.com",
+      password: PASSWORD,
+    });
+    expect(signedIn.status).toBe(200);
+  });
+
+  it("is not refused a sign-up on a SAML-enforced domain either", async () => {
+    const response = await signUp("someone@saml.example");
+
+    expect(response.status).toBe(200);
   });
 });
 
@@ -260,6 +292,28 @@ describe("the backstop, for the factors that carry no address", () => {
     expect(await enforcedProviderForUser(wb.appPool, "nobody")).toBeNull();
   });
 
+  it("does not recognise an account that is not an active member", async () => {
+    const wb = await workerDb();
+    // Never a member of the enforcing workspace.
+    await wb.admin.query(
+      `insert into users (id, name, email, email_verified, created_at, updated_at)
+       values ('enforced-stranger', 'Stranger', 'stranger@acme.com', true, now(), now())
+       on conflict (id) do nothing`,
+    );
+    expect(
+      await enforcedProviderForUser(wb.appPool, "enforced-stranger"),
+    ).toBeNull();
+
+    // A member who has been suspended.
+    await addMember("enforced-suspended", "suspended@acme.com");
+    await wb.admin.query(
+      "update workspace_members set status = 'suspended' where user_id = 'enforced-suspended'",
+    );
+    expect(
+      await enforcedProviderForUser(wb.appPool, "enforced-suspended"),
+    ).toBeNull();
+  });
+
   it("lets the identity provider's own sign-in through and nothing else", () => {
     expect(isProviderSignInPath("/callback/sso-okta-abc12345")).toBe(true);
     expect(isProviderSignInPath("/sign-in/social")).toBe(true);
@@ -285,12 +339,25 @@ describe("the backstop, for the factors that carry no address", () => {
 describe("enforcement when the workspace turns it off", () => {
   it("stops applying without a restart", async () => {
     const wb = await workerDb();
+    expect((await signUp("switch@acme.com")).status).toBe(200);
+    const { rows } = await wb.admin.query(
+      "select id from users where email = 'switch@acme.com'",
+    );
+    await joinWorkspaceForIdentity(wb.appPool, {
+      workspaceId,
+      user: { id: rows[0].id as string, name: "switch" },
+      via: "sso",
+    });
+    const signIn = () =>
+      post("/sign-in/email", { email: "switch@acme.com", password: PASSWORD });
+
+    expect((await signIn()).status).toBe(403);
+
     await wb.admin.query(
       "update sso_connections set enforce = false where provider_id = 'okta'",
     );
     try {
-      const response = await signUp("after-the-switch@acme.com");
-      expect(response.status).toBe(200);
+      expect((await signIn()).status).toBe(200);
     } finally {
       await wb.admin.query(
         "update sso_connections set enforce = true where provider_id = 'okta'",

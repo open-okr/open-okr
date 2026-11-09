@@ -33,12 +33,21 @@ failed: a failing backup on upgrade day is the backup you were about to need.
 ## Going back
 
 ```
+./openokr down
+OPENOKR_IMAGE=<the previous tag> docker compose create app
+docker compose up -d --wait db
 ./openokr restore <the backup directory the upgrade wrote>
 OPENOKR_IMAGE=<the previous tag> ./openokr up
+./openokr status
 ```
 
-In that order. The restore is the part that matters, because the schema moved
-and the old image cannot read the new database.
+In that order. `restore` stops and starts the application container that
+already exists, and that container runs the migrations when it starts. If the
+container is still on the new image, it migrates the restored database forward
+again. Creating the container on the previous image first, without starting
+it, means the new image never runs against the restored data. The schema
+moved, so the old image cannot read the new database until the restore has
+put the old one back.
 
 The backup directory is self-contained and sealed with the instance's root
 key: a database dump, the blob storage, a manifest and a checksum. `restore`

@@ -282,47 +282,66 @@ verify_checksum() {
   log "checksum OK"
 }
 
-# Decrypt a backup's database dump, trying the current key and then any
-# previous keys (P8-T06d). Sets $dump_path to the decrypted file on success.
+# Decrypt one backup file, trying the current key and then any previous keys
+# (P8-T06d). Extracted from the restore case so the dump and the blobs use the
+# same logic. A second copy would be the one that gets the key fallback wrong.
 #
-# Extracted from the restore case so restore and verify-backup use the same
-# logic. A second copy would be the one that gets the key fallback wrong.
-#
-# Arguments: $1 = backup directory
+# Arguments: $1 = encrypted file, $2 = output file, $3 = what the file holds
+#            (for messages), $4 = optional function that returns 0 when the
+#            output is usable. AES-CBC can accept a wrong key by chance, so a
+#            file with a known shape is checked before the key is trusted.
 # Reads: $APP_ENV for OPENOKR_ENCRYPTION_KEY and OPENOKR_PREVIOUS_ENCRYPTION_KEYS
-# Writes: $1/db.dump (caller is responsible for cleanup)
-decrypt_dump() {
-  _dd_dir="$1"
-  _dd_enc_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
-  _dd_prev_keys="$(grep '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' "$APP_ENV" | cut -d= -f2- || true)"
+decrypt_file() {
+  _df_in="$1"
+  _df_out="$2"
+  _df_what="$3"
+  _df_check="${4:-}"
+  _df_enc_key="$(grep '^OPENOKR_ENCRYPTION_KEY=' "$APP_ENV" | cut -d= -f2-)"
+  _df_prev_keys="$(grep '^OPENOKR_PREVIOUS_ENCRYPTION_KEYS=' "$APP_ENV" | cut -d= -f2- || true)"
 
-  _dd_try() {
+  _df_try() {
     openssl enc -d -aes-256-cbc -pbkdf2 \
       -pass "pass:$1" \
-      -in "$_dd_dir/db.dump.enc" \
-      -out "$_dd_dir/db.dump" 2>/dev/null
+      -in "$_df_in" \
+      -out "$_df_out" 2>/dev/null || return 1
+    [ -z "$_df_check" ] || "$_df_check" "$_df_out"
   }
 
-  if _dd_try "$_dd_enc_key"; then
+  if _df_try "$_df_enc_key"; then
     log "decrypted with current key"
     return 0
   fi
 
   # Try previous keys (comma-separated).
-  _dd_old_ifs="$IFS"
+  _df_old_ifs="$IFS"
   IFS=','
-  for _dd_key in $_dd_prev_keys; do
-    _dd_key="$(echo "$_dd_key" | tr -d ' ')"
-    if [ -n "$_dd_key" ] && _dd_try "$_dd_key"; then
-      IFS="$_dd_old_ifs"
+  for _df_key in $_df_prev_keys; do
+    _df_key="$(echo "$_df_key" | tr -d ' ')"
+    if [ -n "$_df_key" ] && _df_try "$_df_key"; then
+      IFS="$_df_old_ifs"
       log "decrypted with a previous key"
       return 0
     fi
   done
-  IFS="$_dd_old_ifs"
+  IFS="$_df_old_ifs"
 
-  echo "openokr: could not decrypt the database dump with any known key" >&2
+  rm -f "$_df_out"
+  echo "openokr: could not decrypt the $_df_what with any known key" >&2
   return 1
+}
+
+# Decrypt a backup's database dump. Writes $1/db.dump (caller cleans up).
+decrypt_dump() {
+  decrypt_file "$1/db.dump.enc" "$1/db.dump" "database dump"
+}
+
+_blobs_tar_valid() {
+  tar -tf "$1" >/dev/null 2>&1
+}
+
+# Decrypt a backup's uploaded files. Writes $1/blobs.tar (caller cleans up).
+decrypt_blobs() {
+  decrypt_file "$1/blobs.tar.enc" "$1/blobs.tar" "uploaded files" _blobs_tar_valid
 }
 
 case "${1:-help}" in
@@ -433,14 +452,15 @@ somewhere else."
       just_written="$(ls -1d "${OPENOKR_BACKUP_DIR:-./backups}"/*/ 2>/dev/null | sort | tail -n 1)"
     fi
     log "current image: ${current:-unknown}"
-    # **Not "run the previous tag"** (P7-T09c). That was wrong and was printed
-    # here until 11 September 2026. Migrations are forward-only: once one has
-    # applied, the previous image is looking at a schema it does not know, and
-    # starting it is not a rollback but a second failure on top of the first.
-    log "to roll back: ./openokr restore ${just_written:-<the backup directory just written>},"
-    log "then OPENOKR_IMAGE=${current:-<previous tag>} ./openokr up. Restoring first is"
-    log "the part that matters: the schema moved, so the old image cannot read"
-    log "the new database."
+    # **Not "run the previous tag"** (P7-T09c). Migrations are forward-only, so
+    # the previous image must exist before the restore: restore restarts the
+    # existing app container, which migrates on start.
+    log "to roll back (docs/runbooks/upgrade.md):"
+    log "  ./openokr down"
+    log "  OPENOKR_IMAGE=${current:-<previous tag>} docker compose create app"
+    log "  docker compose up -d --wait db"
+    log "  ./openokr restore ${just_written:-<the backup directory just written>}"
+    log "  OPENOKR_IMAGE=${current:-<previous tag>} ./openokr up"
 
     # A failed pull is not fatal. An air-gapped install has no registry to
     # reach and a locally built image has nothing to pull, and both are
@@ -618,6 +638,14 @@ MANIFEST
     validate_backup_dir "$backup_dir" "restore"
     verify_checksum "$backup_dir" || fail "checksum verification failed"
     decrypt_dump "$backup_dir" || fail "decryption failed"
+    # Uploaded files are decrypted before anything is dropped, so a key that
+    # cannot open them stops the restore while the instance is still whole.
+    if [ -f "$backup_dir/blobs.tar.enc" ]; then
+      if ! decrypt_blobs "$backup_dir"; then
+        rm -f "$backup_dir/db.dump"
+        fail "the uploaded files in this backup cannot be decrypted. Nothing was changed."
+      fi
+    fi
 
     # **The application stops first** (completeness review H-19). Postgres
     # refuses to drop a database somebody is connected to, and the running
@@ -636,12 +664,10 @@ MANIFEST
     rm -f "$backup_dir/db.dump"
 
     # Restore blobs if the backup has them.
-    if [ -f "$backup_dir/blobs.tar.enc" ]; then
+    if [ -f "$backup_dir/blobs.tar" ]; then
       log "restoring blob storage..."
-      openssl enc -d -aes-256-cbc -pbkdf2 \
-        -pass "pass:$encryption_key" \
-        -in "$backup_dir/blobs.tar.enc" | \
-        docker cp - "$(compose ps -aq app | head -1):/app/storage"
+      docker cp - "$(compose ps -aq app | head -1):/app/storage" < "$backup_dir/blobs.tar"
+      rm -f "$backup_dir/blobs.tar"
       log "blobs restored"
     fi
 
