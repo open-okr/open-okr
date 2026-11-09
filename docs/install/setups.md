@@ -56,10 +56,12 @@ Three switches, each independent of the others:
 public.** With the flag on and no policy saved, sign-up is open to anybody who can
 reach the instance unless you say otherwise.
 
-**A saved policy wins over the variable, and finishing the setup wizard saves one:
-Invitation only.** After that, `OPENOKR_REGISTRATION` changes nothing. On an
-instance without the cloud flag, the Registration card on Admin, General changes
-the saved policy. With the cloud flag on, that card is hidden.
+**A saved policy wins over the variable.** The setup wizard saves none from
+0.7.0, so the variable keeps working after setup. On an instance without the
+cloud flag, the Registration card on Admin, General saves a policy. With the
+cloud flag on, that card is hidden and the operator sets the policy on the
+console's Instance screen instead. An instance set up before 0.7.0 keeps the
+Invitation only the wizard saved then, until somebody chooses again.
 
 **Where the settings go.** On one server, add them to `deploy/docker/secrets/app.env`
 and run `./openokr up`. On Kubernetes they are values in the chart:

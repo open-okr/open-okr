@@ -5,8 +5,10 @@ import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import {
   COMPANY_EMAIL_MESSAGE,
   readRegistrationPolicy,
+  registrationPolicyOrigin,
   registrationRefusal,
   setRegistrationPolicy,
+  setRegistrationPolicyAsOperator,
 } from "../src/workspaces/registration.ts";
 
 /**
@@ -140,6 +142,56 @@ describe("saving the policy", () => {
     expect(outcome).toBe("unchanged");
     const events = await wb.admin.query("select 1 from instance_audit_events");
     expect(events.rows).toHaveLength(0);
+  });
+});
+
+// registration-policy.md §9 D12 to D15, plan 0.7.0 B1: on a cloud the policy
+// is the operator's, set on S-47, saved with its own source and recorded on
+// the instance chain.
+describe("an operator setting the policy", () => {
+  it("stores it as the operator's and writes one instance audit event naming them", async () => {
+    const wb = await workerDb();
+    await claim();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('operator', 'Op', 'op@example.com'), ('granter', 'Gr', 'gr@example.com') on conflict do nothing",
+    );
+    await wb.admin.query(
+      "insert into instance_operators (user_id, granted_by_user_id) values ('operator', 'granter')",
+    );
+    const outcome = await setRegistrationPolicyAsOperator(wb.appPool, ring, {
+      policy: "open",
+      operatorUserId: "operator",
+    });
+    expect(outcome).toBe("changed");
+
+    const { rows } = await wb.admin.query<{ source: string }>(
+      "select source from system_settings where key = 'registration.policy'",
+    );
+    expect(rows[0]?.source).toBe("operator");
+    expect(await registrationPolicyOrigin(wb.appPool, NO_VARIABLE)).toBe(
+      "operator",
+    );
+    const events = await wb.admin.query<{
+      payload: Record<string, unknown>;
+    }>(
+      "select payload from instance_audit_events where action = 'instance.registration_changed'",
+    );
+    expect(events.rows).toHaveLength(1);
+    expect(events.rows[0]?.payload).toMatchObject({
+      to: "open",
+      operatorUserId: "operator",
+    });
+  });
+
+  it("refuses somebody who is not an operator, as not-found", async () => {
+    const wb = await workerDb();
+    const owner = await claim();
+    await expect(
+      setRegistrationPolicyAsOperator(wb.appPool, ring, {
+        policy: "open",
+        operatorUserId: owner.userId,
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
   });
 });
 

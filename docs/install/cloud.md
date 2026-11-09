@@ -67,7 +67,7 @@ needed for anything else:
 
 | Variable | What it does |
 |---|---|
-| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION`. Neither applies once a policy is saved, and finishing the setup wizard saves Invitation only ([Choose a setup](setups.md#the-settings-behind-each-setup)) |
+| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION` or on the console's Instance screen. A policy saved there wins over the variable ([Choose a setup](setups.md#the-settings-behind-each-setup)) |
 | `OPENOKR_CLOUD_PLANS` | The plan catalogue. Without it nobody has a seat limit |
 
 On [one server](compose.md), add them to `secrets/app.env` and run `./openokr up`.
@@ -211,7 +211,7 @@ instance yours without changing any code:
 
 | Difference | Detail |
 |---|---|
-| Registration | Open while no policy is saved, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account. The setup wizard saves Invitation only on either, and a saved policy wins |
+| Registration | Open while no policy is saved, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account. The operator sets the policy on the console's Instance screen, and a saved policy wins. Before 0.7.0 the setup wizard saved Invitation only, which a cloud keeps until the operator chooses again |
 | Plans and seats | The cloud counts seats. Self-hosting does not |
 | Suspension and closure | A cloud workspace has a lifecycle the vendor operates. Nothing is erased without a retention window somebody set |
 

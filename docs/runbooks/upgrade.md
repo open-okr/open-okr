@@ -90,6 +90,18 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.6 to 0.7
+
+Notes are added here as 0.7.0 is built, and finished before it is tagged.
+
+- **Registration on a cloud.** The setup wizard no longer saves a
+  registration policy. A cloud set up before 0.7.0 still holds the Invitation
+  only the wizard saved then, so new customers cannot sign up. Open the
+  console's Instance screen: its Registration card says "Saved by the setup
+  wizard before 0.7.0", and a choice there replaces it. A self-hosted
+  instance is unaffected, except that `OPENOKR_REGISTRATION` now works after
+  setup where nothing else was saved.
+
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 
 0.6 adds six migrations, 0145 to 0150, and no data change. They add tables

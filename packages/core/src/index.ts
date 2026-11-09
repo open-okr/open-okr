@@ -1313,11 +1313,14 @@ export {
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
   REGISTRATION_POLICIES,
+  type RegistrationOrigin,
   type RegistrationPolicy,
   readRegistrationPolicy,
   registrationOpenOrInvited,
+  registrationPolicyOrigin,
   registrationRefusal,
   setRegistrationPolicy,
+  setRegistrationPolicyAsOperator,
 } from "./workspaces/registration.ts";
 export {
   type LiveWorkspace,

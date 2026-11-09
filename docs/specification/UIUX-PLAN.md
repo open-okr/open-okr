@@ -293,7 +293,9 @@ like it changes somebody else's day, and it names the workspace inside its
 own button.
 
 **S-47 Operator instance.** Instance feature flags, the plan catalogue
-(`cloud.plans`), and site messages. A site message carries its body, its
+(`cloud.plans`), the registration policy (a Registration card with the three
+choices of Admin, General and a line saying who chose it, from 0.7.0), and
+site messages. A site message carries its body, its
 level, its window of `starts_at` and `ends_at`, its target of all or a
 named list, and whether a member may dismiss it. The window is required:
 a site message with no end is a banner everybody learns to ignore.

@@ -17,11 +17,16 @@
  * looks like, which is what an operator running a public instance or a closed
  * one actually wants.
  */
+import { systemSettings } from "@openokr/db";
 import { isFreeMailAddress } from "@openokr/formats";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
 import { inviteTokenFromCookies } from "../invitations/pending.ts";
 import { addressMayAccept, previewInvite } from "../invitations/preview.ts";
+import { OperationError } from "../operations/errors.ts";
+import { isLiveOperator } from "../operator/store.ts";
 import {
   environmentValue,
   getInstanceSetting,
@@ -168,6 +173,75 @@ export async function setRegistrationPolicy(
     },
   });
   return "changed";
+}
+
+/**
+ * Saves the policy a cloud operator chose on S-47 (registration-policy.md §9
+ * D12 to D15, plan 0.7.0 B1).
+ *
+ * On a cloud the policy is the operator's and no workspace screen offers it,
+ * so this is the only door short of the database. The grant is checked here,
+ * the row is saved with source `operator` so the card can say who chose it,
+ * and the change is recorded on the instance chain only: the policy belongs
+ * to no workspace. Compared against the policy in force, which on a cloud
+ * with nothing stored is open, rather than against the computed default.
+ */
+export async function setRegistrationPolicyAsOperator(
+  pool: Pool,
+  ring: KeyRing,
+  input: {
+    readonly policy: RegistrationPolicy;
+    readonly operatorUserId: string;
+  },
+  environment: Environment = process.env,
+): Promise<RegistrationChange> {
+  if (!(await isLiveOperator(pool, input.operatorUserId))) {
+    throw new OperationError("not_found", "No such setting.");
+  }
+  const inForce = await policyInForce(pool, environment);
+  if (inForce === input.policy) {
+    return "unchanged";
+  }
+  await writeSettings(pool, ring, [
+    { key: POLICY_KEY, value: input.policy, source: "operator" },
+  ]);
+  await recordInstanceAuditEvent(pool, {
+    action: "instance.registration_changed",
+    payload: {
+      from: inForce,
+      to: input.policy,
+      operatorUserId: input.operatorUserId,
+    },
+  });
+  return "changed";
+}
+
+/** Who chose the policy in force, for the S-47 card's source line (§9.3). */
+export type RegistrationOrigin =
+  | "operator"
+  | "admin"
+  | "wizard"
+  | "environment"
+  | "default";
+
+export async function registrationPolicyOrigin(
+  pool: Pool,
+  environment: Environment = process.env,
+): Promise<RegistrationOrigin> {
+  const read = await readRegistrationPolicy(pool, environment);
+  if (read.source !== "database") {
+    return read.source;
+  }
+  const [row] = await drizzle(pool)
+    .select({ source: systemSettings.source })
+    .from(systemSettings)
+    .where(eq(systemSettings.key, POLICY_KEY))
+    .limit(1);
+  // A row the wizard saved before 0.7.0 is kept (§9 D16, Akmal's Q2 answer),
+  // and the card says so, which is how an operator finds it.
+  return row?.source === "operator" || row?.source === "wizard"
+    ? row.source
+    : "admin";
 }
 
 /**

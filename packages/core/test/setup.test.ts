@@ -257,13 +257,32 @@ describe("registration after setup", () => {
     expect(await isRegistrationOpen(wb.appPool)).toBe(true);
   });
 
-  it("closes when the wizard asks it to", async () => {
+  // registration-policy.md §9, plan 0.7.0 B1. The wizard saved `invite_only`
+  // on every instance, which closed a cloud behind its first account and made
+  // OPENOKR_REGISTRATION stop working after setup. The computed default
+  // already closes a claimed self-hosted instance, so the wizard writes none.
+  it("writes no policy, and a claimed instance still closes by the default", async () => {
     const wb = await workerDb();
-    await completeSetup(wb.appPool, ring, {
-      settings: [],
-      closeRegistration: true,
-    });
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('u', 'A', 'a@example.com')",
+    );
+    await completeSetup(wb.appPool, ring, { settings: [] });
+    const { rows } = await wb.admin.query(
+      "select 1 from system_settings where key = 'registration.policy'",
+    );
+    expect(rows).toHaveLength(0);
     expect(await isRegistrationOpen(wb.appPool)).toBe(false);
+  });
+
+  it("keeps OPENOKR_REGISTRATION working after setup", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('u', 'A', 'a@example.com')",
+    );
+    await completeSetup(wb.appPool, ring, { settings: [] });
+    expect(
+      await isRegistrationOpen(wb.appPool, { OPENOKR_REGISTRATION: "open" }),
+    ).toBe(true);
   });
 
   it("can be forced open by an operator running a public instance", async () => {

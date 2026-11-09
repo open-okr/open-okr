@@ -178,7 +178,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 
 | Row | Status | Note |
 |---|---|---|
-| B1 | design approved | `docs/design/registration-policy.md` §9 |
+| B1 | done | `docs/design/registration-policy.md` §9 |
 | B2 | done | Also closes P1 |
 | B3 | design approved | `docs/design/metrics-scrape-token.md` |
 | B4 | done | #192 |
