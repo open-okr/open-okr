@@ -41,12 +41,8 @@ import type {
   VerifiedBillingEvent,
 } from "./gateway.ts";
 import { DEFAULT_CREDIT_PACK_MONTHS, readCreditPack } from "./settings.ts";
+import { LIVE_STATUSES } from "./statuses.ts";
 
-/** Paying, or about to be. */
-export const LIVE_STATUSES: ReadonlySet<string> = new Set([
-  "active",
-  "trialing",
-]);
 /** Over. Anything else, `past_due` for one, keeps what it has while Stripe retries. */
 const ENDED_STATUSES: ReadonlySet<string> = new Set([
   "canceled",

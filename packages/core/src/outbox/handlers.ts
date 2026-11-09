@@ -66,6 +66,8 @@ import {
   notificationDigestMail,
   renderStoredEmail,
   type StoredEmail,
+  trialEndedMail,
+  trialReminderMail,
 } from "../mail/mails.ts";
 import { mailWords } from "../mail/words.ts";
 import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
@@ -81,6 +83,11 @@ import {
   WORKSPACE_CLOSED_TOPIC,
 } from "../tenancy/closing.ts";
 import { ERASE_CUSTOMER_TOPIC, ERASE_FILES_TOPIC } from "../tenancy/erasure.ts";
+import {
+  TRIAL_ENDED_TOPIC,
+  TRIAL_REMINDER_TOPIC,
+} from "../tenancy/trial-topics.ts";
+import { readTrialNotice } from "../tenancy/trials.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
@@ -1005,6 +1012,77 @@ const sendErasureReminder: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Seven days before a trial ends, to the owners and administrators
+ * (tenant-lifecycle.md §11 Q2, plan 0.7.0 P4c). Not sent once the date has
+ * moved or the trial is over: the mail would be about a day that no longer
+ * comes.
+ */
+const sendTrialReminder: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const trialEndsAt = asString(delivery.payload.trialEndsAt);
+  if (!workspaceId || !trialEndsAt) {
+    throw new PermanentDispatchError(
+      "A trial reminder needs a workspace and the day the trial ends.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readTrialNotice(deps.pool, workspaceId);
+  if (notice.trialEndsAt?.toISOString() !== trialEndsAt) {
+    deps.onSkipped?.(delivery, "the trial no longer ends on that day");
+    return;
+  }
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...trialReminderMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        endsAt: notice.trialEndsAt,
+        planName: notice.planName ?? "",
+        fallbackName: notice.defaultPlanName ?? mail.words("trial.noPlan"),
+      }),
+    });
+  }
+};
+
+/** What the end of a trial did, to the owners and administrators (§11 Q2). */
+const sendTrialEnded: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const outcome = asString(delivery.payload.outcome);
+  if (
+    !workspaceId ||
+    (outcome !== "subscribed" && outcome !== "moved" && outcome !== "suspended")
+  ) {
+    throw new PermanentDispatchError(
+      "A trial's end needs a workspace and what the end did.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readTrialNotice(deps.pool, workspaceId);
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  const fallbackName =
+    asString(delivery.payload.defaultPlanName) ?? mail.words("trial.noPlan");
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...trialEndedMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        outcome,
+        fallbackName,
+      }),
+    });
+  }
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -1058,6 +1136,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [END_SUBSCRIPTION_TOPIC]: endSubscription,
   [WORKSPACE_CLOSED_TOPIC]: sendClosureNotice,
   [ERASURE_REMINDER_TOPIC]: sendErasureReminder,
+  [TRIAL_REMINDER_TOPIC]: sendTrialReminder,
+  [TRIAL_ENDED_TOPIC]: sendTrialEnded,
   // Erasure's half that only the server can do (workspace-erasure.md §4).
   [ERASE_FILES_TOPIC]: eraseFiles,
   [ERASE_CUSTOMER_TOPIC]: deleteCustomer,

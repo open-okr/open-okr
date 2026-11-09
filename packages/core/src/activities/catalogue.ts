@@ -69,6 +69,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     endsAt: z.string().nullable(),
     plan: z.string().nullable(),
   }),
+  "workspace.trial_reminded": z.object({ endsAt: z.string() }),
   "workspace.trial_ended": z.object({
     outcome: z.enum(["subscribed", "moved", "suspended"]),
     plan: z.string().nullable(),

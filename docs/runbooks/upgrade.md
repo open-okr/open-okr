@@ -121,7 +121,9 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   job then ends each trial past its date: a live subscription carries on,
   people who fit the default plan move to it, and a workspace whose people
   do not fit goes read-only until somebody subscribes or makes them fit.
-  `pnpm cloud:trials` shows what is due; `--write` ends them now.
+  `pnpm cloud:trials` shows what is due; `--write` ends them now. The
+  owners and administrators are emailed seven days before a trial ends and
+  again when it ends, and see a notice in the trial's last week.
 
 - **Seats used on the operator console.** Migration 0157 adds `seat_count`
   to the usage snapshot. The console's list now shows seats used, as the

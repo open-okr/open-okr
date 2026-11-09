@@ -12,6 +12,8 @@ import { getPool } from "./pool";
 export type Hold =
   | { readonly kind: "provider" }
   | { readonly kind: "unpaid" }
+  /** The trial ended and its people do not fit (tenant-lifecycle.md §11). */
+  | { readonly kind: "trial" }
   | {
       readonly kind: "closed";
       readonly closedAt: Date;
@@ -40,7 +42,13 @@ export async function holdOf(
     return null;
   }
   if (lifecycle.state === "suspended") {
-    return { kind: lifecycle.suspendedByBilling ? "unpaid" : "provider" };
+    return {
+      kind: lifecycle.suspendedByTrial
+        ? "trial"
+        : lifecycle.suspendedByBilling
+          ? "unpaid"
+          : "provider",
+    };
   }
   const schedule = await readClosureSchedule(getPool(), workspaceId).catch(
     () => null,

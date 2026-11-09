@@ -380,7 +380,7 @@ describe("what closing sets going (workspace-erasure.md §3)", () => {
     expect(sent[0]?.text).toContain(`stays readable until ${eraseOn}`);
     expect(sent[0]?.text).toContain("The Owner closed it on");
     expect(sent[0]?.text).toContain("An owner can reopen it");
-    expect(sent[0]?.text).toContain("https://okr.example.com/admin/imports");
+    expect(sent[0]?.text).toContain("https://okr.example.com/admin/backups");
   });
 
   it("says nothing will be deleted while retention is off, and that only the provider reopens what it closed", async () => {

@@ -84,11 +84,13 @@ async function setState(formData: FormData): Promise<void> {
  * card says so and offers nothing the server would refuse
  * (docs/design/workspace-erasure.md §2).
  */
-export type HeldBy = "provider" | "unpaid" | "closed" | null;
+export type HeldBy = "provider" | "unpaid" | "trial" | "closed" | null;
 
 const HELD = {
   provider: "admin.state.heldByProvider",
   unpaid: "admin.state.heldUnpaid",
+  // A trial that ended with too many people (tenant-lifecycle.md §11).
+  trial: "admin.state.heldTrial",
   closed: "admin.state.heldClosed",
 } as const;
 

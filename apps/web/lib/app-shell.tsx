@@ -66,7 +66,7 @@ import {
   workspaceBrandImages,
   workspaceTerms,
 } from "./workspace-presentation.ts";
-import { WorkspaceStateBanner } from "./workspace-state.tsx";
+import { TrialEndingBanner, WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
  * The authenticated app shell (UIUX-PLAN.md §3, P2-T10). Every top-level
@@ -522,6 +522,11 @@ export async function AppShellLayout({
             userId={session.user.id}
             workspaceId={workspace.workspaceId}
           />
+          {workspace.state === "active" && level >= ACCESS_LEVELS.full ? (
+            <div className="mb-4.5 empty:hidden">
+              <TrialEndingBanner workspaceId={workspace.workspaceId} />
+            </div>
+          ) : null}
           {workspace.state === "active" ? null : (
             <div className="mb-4.5">
               <WorkspaceStateBanner

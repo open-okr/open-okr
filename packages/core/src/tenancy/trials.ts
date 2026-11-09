@@ -26,19 +26,22 @@ import {
   withInstanceAdmin,
   withWorkspace,
 } from "@openokr/db";
-import { and, eq, isNull, lte } from "drizzle-orm";
+import { and, eq, gt, isNull, lte } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
-import { LIVE_STATUSES } from "../billing/webhook.ts";
+import { LIVE_STATUSES } from "../billing/statuses.ts";
 import { type OperationTx, runOperation } from "../operations/operation.ts";
+import { ownerAndAdminRecipientsInTx } from "./closing.ts";
 import { setTenantStateInTx } from "./lifecycle.ts";
 import {
   applyPlanInTx,
   type Plan,
+  planByKey,
   resolveDefaultPlan,
   seatsInUseInTx,
 } from "./plans.ts";
 import { isCloudEnabled } from "./settings.ts";
+import { TRIAL_ENDED_TOPIC, TRIAL_REMINDER_TOPIC } from "./trial-topics.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -69,6 +72,9 @@ export async function startTrialInTx(
     })
     .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)));
 }
+
+/** How far ahead the reminder goes, as the erasure reminder's. */
+const REMIND_DAYS = 7;
 
 /** What a trial ending did to its workspace. */
 type TrialOutcome = "subscribed" | "moved" | "suspended";
@@ -240,6 +246,20 @@ async function endTrial(
             targetId: id,
             payload: { outcome, planKey, people },
           },
+          // Q2's second email: what the end did, to the owners and
+          // administrators, in this transaction (tenant-lifecycle.md §11).
+          outbox: [
+            {
+              topic: TRIAL_ENDED_TOPIC,
+              payload: {
+                workspaceId: id,
+                outcome,
+                planKey,
+                defaultPlanName: input.defaultPlan?.name ?? null,
+              },
+              idempotencyKey: `${TRIAL_ENDED_TOPIC}:${id}:${locked.trialEndsAt?.getTime() ?? 0}`,
+            },
+          ],
         };
       },
     },
@@ -297,4 +317,148 @@ export async function sweepTrials(
     }
   }
   return { due, ended };
+}
+
+/** Thrown inside the Operation when another run reminded first. */
+class AlreadyReminded extends Error {}
+
+/**
+ * Reminds the owners and administrators of every trial ending within seven
+ * days, once per end date (tenant-lifecycle.md §11 Q2, plan 0.7.0 P4c). Run
+ * hourly beside the sweep. Returns how many were reminded. Nothing with the
+ * cloud flag off.
+ */
+export async function remindTrialsEnding(
+  pool: Pool,
+  options: { readonly now?: Date } = {},
+): Promise<number> {
+  if (!(await isCloudEnabled(pool))) {
+    return 0;
+  }
+  const now = options.now ?? new Date();
+  const horizon = new Date(now.getTime() + REMIND_DAYS * DAY_MS);
+  const due = await withInstanceAdmin(drizzle(pool), (tx) =>
+    tx
+      .select({ workspaceId: tenants.workspaceId })
+      // openokr:allow-raw-read: a dated job finding which tenants are due, as
+      // `listDue` above. Ids only.
+      .from(tenants)
+      .where(
+        activeOnly(
+          tenants,
+          and(
+            eq(tenants.state, "active"),
+            isNull(tenants.erasingAt),
+            isNull(tenants.trialRemindedAt),
+            gt(tenants.trialEndsAt, now),
+            lte(tenants.trialEndsAt, horizon),
+          ),
+        ),
+      ),
+  );
+  let reminded = 0;
+  for (const { workspaceId } of due) {
+    try {
+      await runOperation(
+        { pool },
+        {
+          action: "workspace.remindTrial",
+          workspaceId,
+          actor: { kind: "system" },
+          bootstrap: true,
+          async execute({ tx, workspaceId: id }) {
+            // openokr:allow-mutation: this Operation's own transaction.
+            // Marked here so two schedulers cannot remind twice.
+            const [marked] = await tx
+              .update(tenants)
+              .set({ trialRemindedAt: now, updatedAt: now })
+              .where(
+                activeOnly(
+                  tenants,
+                  and(
+                    eq(tenants.workspaceId, id),
+                    eq(tenants.state, "active"),
+                    isNull(tenants.trialRemindedAt),
+                    gt(tenants.trialEndsAt, now),
+                    lte(tenants.trialEndsAt, horizon),
+                  ),
+                ),
+              )
+              .returning({ trialEndsAt: tenants.trialEndsAt });
+            if (!marked?.trialEndsAt) {
+              throw new AlreadyReminded();
+            }
+            const endsAt = marked.trialEndsAt.toISOString();
+            return {
+              result: undefined,
+              activity: {
+                kind: "workspace.trial_reminded",
+                subjectType: "workspace",
+                subjectId: id,
+                payload: { endsAt },
+              },
+              audit: {
+                action: "workspace.remindTrial",
+                targetType: "workspace",
+                targetId: id,
+                payload: { endsAt },
+              },
+              outbox: [
+                {
+                  topic: TRIAL_REMINDER_TOPIC,
+                  payload: { workspaceId: id, trialEndsAt: endsAt },
+                  idempotencyKey: `${TRIAL_REMINDER_TOPIC}:${id}:${marked.trialEndsAt.getTime()}`,
+                },
+              ],
+            };
+          },
+        },
+      );
+      reminded += 1;
+    } catch (error) {
+      if (!(error instanceof AlreadyReminded)) {
+        throw error;
+      }
+    }
+  }
+  return reminded;
+}
+
+/**
+ * What a trial notice says, read when it is sent or drawn: the end date, the
+ * trial's plan and the default plan by name, and who to tell. Null when the
+ * workspace has no trial running.
+ */
+export async function readTrialNotice(
+  pool: Pool,
+  workspaceId: string,
+): Promise<{
+  readonly trialEndsAt: Date | null;
+  readonly planName: string | null;
+  readonly defaultPlanName: string | null;
+  readonly recipients: readonly { name: string; email: string }[];
+}> {
+  const { tenant, recipients } = await withWorkspace(
+    drizzle(pool),
+    workspaceId,
+    async (tx) => {
+      const [row] = await tx
+        .select({ trialEndsAt: tenants.trialEndsAt, planKey: tenants.planKey })
+        .from(tenants)
+        .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
+        .limit(1);
+      return {
+        tenant: row,
+        recipients: await ownerAndAdminRecipientsInTx(tx, workspaceId),
+      };
+    },
+  );
+  const plan = tenant?.planKey ? await planByKey(pool, tenant.planKey) : null;
+  const fallback = await resolveDefaultPlan(pool);
+  return {
+    trialEndsAt: tenant?.trialEndsAt ?? null,
+    planName: plan?.name ?? tenant?.planKey ?? null,
+    defaultPlanName: fallback?.name ?? null,
+    recipients,
+  };
 }

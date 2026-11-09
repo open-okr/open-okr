@@ -97,6 +97,25 @@ const en = {
   "reminder.body":
     "It was closed on {closed}. On {date} everything in it is deleted for good, and cannot be brought back.",
 
+  // A trial ending, and what its end did (tenant-lifecycle.md §11 Q2).
+  "trial.subject": "{workspace}: your trial of {plan} ends on {date}",
+  "trial.preheader": "Choose a plan before then to keep what you have.",
+  "trial.eyebrow": "Trial ends in seven days",
+  "trial.heading": "The trial of {plan} ends on {date}",
+  "trial.body":
+    "If nobody chooses a plan by then, {workspace} moves to {fallback}. If its people do not fit {fallback}, it becomes read-only until somebody chooses a plan or removes people. Nothing is deleted and nobody is removed.",
+  "trial.action": "Choose a plan",
+  "trial.endedSubject": "{workspace}: the trial has ended",
+  "trial.endedPreheader": "Here is what happened to the workspace.",
+  "trial.endedEyebrow": "Trial ended",
+  "trial.endedHeading": "The trial of {workspace} has ended",
+  "trial.endedMoved":
+    "It moved to {fallback}. Everything is as it was; the plan's limits now apply.",
+  "trial.endedSuspended":
+    "Its people do not fit {fallback}, so it is read-only until somebody chooses a plan, or removes people and presses Settle. Nobody was removed and nothing was deleted.",
+  "trial.endedSubscribed": "It carries on under its subscription.",
+  "trial.noPlan": "no plan, with no seat limit",
+
   "digest.subjectOne": "{workspace}: 1 update",
   "digest.subjectMany": "{workspace}: {count} updates",
   "digest.headingOne": "1 update",
@@ -214,6 +233,25 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "reminder.heading": "{workspace} akan dipadam pada {date}",
   "reminder.body":
     "Ia ditutup pada {closed}. Pada {date} semua kandungannya dipadam terus, dan tidak boleh dikembalikan.",
+
+  "trial.subject": "{workspace}: percubaan {plan} anda tamat pada {date}",
+  "trial.preheader":
+    "Pilih pelan sebelum itu untuk mengekalkan apa yang anda ada.",
+  "trial.eyebrow": "Percubaan tamat dalam tujuh hari",
+  "trial.heading": "Percubaan {plan} tamat pada {date}",
+  "trial.body":
+    "Jika tiada sesiapa memilih pelan menjelang itu, {workspace} beralih ke {fallback}. Jika orangnya tidak muat dalam {fallback}, ia menjadi baca sahaja sehingga seseorang memilih pelan atau mengeluarkan orang. Tiada apa yang dipadam dan tiada sesiapa dikeluarkan.",
+  "trial.action": "Pilih pelan",
+  "trial.endedSubject": "{workspace}: percubaan telah tamat",
+  "trial.endedPreheader": "Inilah yang berlaku kepada ruang kerja.",
+  "trial.endedEyebrow": "Percubaan tamat",
+  "trial.endedHeading": "Percubaan {workspace} telah tamat",
+  "trial.endedMoved":
+    "Ia beralih ke {fallback}. Semuanya kekal seperti biasa; had pelan itu kini terpakai.",
+  "trial.endedSuspended":
+    "Orangnya tidak muat dalam {fallback}, jadi ia baca sahaja sehingga seseorang memilih pelan, atau mengeluarkan orang dan menekan Selesaikan. Tiada sesiapa dikeluarkan dan tiada apa yang dipadam.",
+  "trial.endedSubscribed": "Ia diteruskan di bawah langganannya.",
+  "trial.noPlan": "tiada pelan, tanpa had tempat duduk",
 
   "digest.subjectOne": "{workspace}: 1 kemas kini",
   "digest.subjectMany": "{workspace}: {count} kemas kini",

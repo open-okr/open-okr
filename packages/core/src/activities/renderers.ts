@@ -58,6 +58,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : p.plan
         ? `A trial of the ${asString(p.plan)} plan runs until ${asString(p.endsAt).slice(0, 10)}`
         : `The trial now runs until ${asString(p.endsAt).slice(0, 10)}`,
+  "workspace.trial_reminded": (p) =>
+    `The owners and administrators were reminded that the trial ends on ${asString(p.endsAt).slice(0, 10)}`,
   "workspace.trial_ended": (p) =>
     p.outcome === "moved"
       ? `The trial ended and the workspace moved to the ${asString(p.plan, "free")} plan`

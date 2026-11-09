@@ -71,4 +71,10 @@ export {
 } from "./settings.ts";
 export { readTenant, seedTenantInTx } from "./store.ts";
 export { sweepClosedTenants } from "./sweep.ts";
-export { dueTrials, startTrialInTx, sweepTrials } from "./trials.ts";
+export {
+  dueTrials,
+  readTrialNotice,
+  remindTrialsEnding,
+  startTrialInTx,
+  sweepTrials,
+} from "./trials.ts";

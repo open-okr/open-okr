@@ -54,6 +54,7 @@ import {
   outboxRetentionDays,
   purgeStaleSignInAttempts,
   remindBeforeErasure,
+  remindTrialsEnding,
   sweepEndedCycles,
   sweepExpiredSessions,
   sweepTrials,
@@ -574,6 +575,11 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     const { ended } = await sweepTrials(getPool());
     if (ended > 0) {
       log(`cloud.sweepTrials ended ${ended} trial(s)`);
+    }
+    // The week's warning, beside the end it warns of (§11 Q2, P4c).
+    const reminded = await remindTrialsEnding(getPool());
+    if (reminded > 0) {
+      log(`cloud.sweepTrials reminded ${reminded} workspace(s)`);
     }
     return;
   }

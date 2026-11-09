@@ -7,11 +7,12 @@ import { applyBillingEvent } from "../src/billing/webhook.ts";
 import { setLifecycleAsOperator } from "../src/operator/lifecycle.ts";
 import { setPlanAsOperator } from "../src/operator/plans.ts";
 import { setTrialAsOperator } from "../src/operator/trials.ts";
+import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { CLOUD_ENABLED_KEY, readTenant } from "../src/tenancy/index.ts";
 import { requireFreeWorkspaceRoom } from "../src/tenancy/plans.ts";
-import { sweepTrials } from "../src/tenancy/trials.ts";
+import { remindTrialsEnding, sweepTrials } from "../src/tenancy/trials.ts";
 import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -410,5 +411,102 @@ describe("a sign-up's own trial", () => {
     await expect(requireFreeWorkspaceRoom(wb.appPool, SIGNER)).rejects.toThrow(
       /free workspace/,
     );
+  });
+});
+
+/**
+ * Telling the owners and administrators (tenant-lifecycle.md §11 Q2, approved
+ * yes, plan 0.7.0 P4c): once seven days before the end, and once when the
+ * sweep acts. Through the outbox, in the writing transaction.
+ */
+describe("the trial's two emails", () => {
+  const outboxRows = async (topic: string) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select payload from outbox where topic = $1 and payload->>'workspaceId' = $2",
+      [topic, workspaceId],
+    );
+    return rows.map((row) => row.payload as Record<string, unknown>);
+  };
+
+  const deliver = async (topic: string, payload: Record<string, unknown>) => {
+    const wb = await workerDb();
+    const sent: { to: string; subject: string; text: string }[] = [];
+    await dispatchOutbox(
+      { topic, payload, idempotencyKey: "t", attempts: 0 },
+      {
+        pool: wb.appPool,
+        baseUrl: "https://okr.example.com",
+        async sendMail(message) {
+          sent.push(message);
+        },
+      },
+    );
+    return sent;
+  };
+
+  it("reminds once, seven days before the end, naming the plan and the day", async () => {
+    const wb = await workerDb();
+    await setTrialAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      planKey: "team",
+      endsAt: new Date(Date.now() + 5 * DAY),
+      reason: "A short trial.",
+    });
+
+    expect(await remindTrialsEnding(wb.appPool)).toBe(1);
+    expect(await remindTrialsEnding(wb.appPool)).toBe(0);
+
+    const [payload] = await outboxRows("workspace.trialReminder");
+    expect(payload).toMatchObject({ workspaceId });
+    const sent = await deliver("workspace.trialReminder", payload ?? {});
+    expect(sent.map((mail) => mail.to)).toEqual([`${OWNER}@example.com`]);
+    expect(sent[0]?.subject).toMatch(/trial of Team ends on/);
+    expect(sent[0]?.text).toContain("Free");
+  });
+
+  it("does not remind a trial that ends further off than a week", async () => {
+    const wb = await workerDb();
+    await setTrialAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      planKey: "team",
+      endsAt: new Date(Date.now() + 20 * DAY),
+      reason: "A longer trial.",
+    });
+    expect(await remindTrialsEnding(wb.appPool)).toBe(0);
+  });
+
+  it("sends nothing for a reminder whose trial has since moved", async () => {
+    const wb = await workerDb();
+    await setTrialAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      planKey: "team",
+      endsAt: new Date(Date.now() + 5 * DAY),
+      reason: "A short trial.",
+    });
+    await remindTrialsEnding(wb.appPool);
+    const [payload] = await outboxRows("workspace.trialReminder");
+    await setTrialAsOperator(wb.appPool, {
+      workspaceId,
+      operatorUserId: OPERATOR,
+      endsAt: new Date(Date.now() + 40 * DAY),
+      reason: "Extended while procurement signs.",
+    });
+    expect(await deliver("workspace.trialReminder", payload ?? {})).toEqual([]);
+  });
+
+  it("tells them what the end did", async () => {
+    await trialEndedYesterday();
+    await addPeople(11);
+    await sweep();
+
+    const [payload] = await outboxRows("workspace.trialEnded");
+    expect(payload).toMatchObject({ workspaceId, outcome: "suspended" });
+    const sent = await deliver("workspace.trialEnded", payload ?? {});
+    expect(sent.map((mail) => mail.to)).toEqual([`${OWNER}@example.com`]);
+    expect(sent[0]?.text).toMatch(/read-only/);
   });
 });

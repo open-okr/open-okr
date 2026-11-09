@@ -133,6 +133,8 @@ export interface TenantLifecycle {
    * fit the plan its trial ended on (tenant-lifecycle.md §11 T7, T8).
    */
   readonly suspendedByTrial: boolean;
+  /** When a running trial ends, for the last week's notice (§11 T10). */
+  readonly trialEndsAt: Date | null;
 }
 
 /**
@@ -151,6 +153,7 @@ export async function readLifecycleInTx(
       closedAt: tenants.closedAt,
       ownerMayReopen: tenants.ownerMayReopen,
       suspendedByTrial: tenants.suspendedByTrial,
+      trialEndsAt: tenants.trialEndsAt,
     })
     .from(tenants)
     .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
@@ -171,6 +174,7 @@ export async function readLifecycleInTx(
     ownerMayReopen: tenant.ownerMayReopen,
     suspendedByBilling: account?.suspendedByBilling ?? false,
     suspendedByTrial: tenant.suspendedByTrial,
+    trialEndsAt: tenant.trialEndsAt,
   };
 }
 

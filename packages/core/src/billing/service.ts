@@ -34,7 +34,8 @@ import {
 } from "../tenancy/index.ts";
 import type { BillingGateway } from "./gateway.ts";
 import { readCreditPack } from "./settings.ts";
-import { LIVE_STATUSES, planForPrice } from "./webhook.ts";
+import { LIVE_STATUSES } from "./statuses.ts";
+import { planForPrice } from "./webhook.ts";
 
 export type BillingInterval = "month" | "year";
 
