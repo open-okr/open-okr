@@ -190,7 +190,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B11 | done | |
 | M1 to M4 | done | One change |
 | Section 3 | done | Stale text, one change |
-| A1 to A13 | to do | A1 and A6 design first. A2 design written: `docs/design/agent-tool-calls.md`, Q1 to Q3 for you. A4 design written: `docs/design/agent-connections-admin.md`, Q1 and Q2 |
+| A1 to A13 | to do | A1 and A6 design first. A2 design written: `docs/design/agent-tool-calls.md`, Q1 to Q3 for you. A4 design written: `docs/design/agent-connections-admin.md`, Q1 and Q2. A3 done |
 | O1 to O6 | to do | O2 and O5 design first. O6 design rechecked: `docs/design/irreversible-scope.md`, its Q1 to Q3 |
 | S1 to S3 | to do | S2 done |
 | U1 to U3 | to do | U3 design first |

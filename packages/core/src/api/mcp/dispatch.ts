@@ -20,8 +20,10 @@
  */
 import type { Pool } from "pg";
 import { ZodError } from "zod";
+import { ACCESS_LEVELS } from "../../access/levels.ts";
 import { type ActionName, callAction } from "../../actions/registry.ts";
 import { OperationError } from "../../operations/errors.ts";
+import { runOperation } from "../../operations/operation.ts";
 import { richTextFromPlainText } from "../../rich-text/from-text.ts";
 import type { KeyRing } from "../../secrets/key-ring.ts";
 import { errorFor } from "../errors.ts";
@@ -58,6 +60,58 @@ export interface DispatchResult {
 const refusal = (text: string): DispatchResult => ({ text, isError: true });
 
 /**
+ * Writes down that a connection asked for more than it was granted
+ * (agent-surface.md's acceptance: "the denial is audited", plan 0.7.0 A3).
+ *
+ * Through the pipeline, like `recordAIEgressWithheld`: an audit row naming the
+ * member whose agent asked, the tool, the scope it needed and the scopes it
+ * holds, with the channel merged in as on every write from an agent. The
+ * activity is private, so a retrying agent cannot fill the workspace feed.
+ *
+ * **Never in the way of the answer.** A frozen workspace refuses the write and
+ * a member who has left cannot be resolved; either way the agent still gets
+ * the refusal it would have got, and nothing is recorded.
+ */
+async function auditScopeRefusal(
+  pool: Pool,
+  principal: DispatchPrincipal,
+  tool: string,
+  needed: string,
+): Promise<void> {
+  try {
+    await runOperation(
+      { pool },
+      {
+        action: "agent.scope_refused",
+        workspaceId: principal.workspaceId,
+        actor: { kind: "human", userId: principal.userId },
+        requires: ACCESS_LEVELS.view,
+        channel: "mcp",
+        async execute({ workspaceId }) {
+          return {
+            result: undefined,
+            activity: {
+              kind: "agent.scope_refused",
+              subjectType: "workspace",
+              subjectId: workspaceId,
+              payload: { tool, needed },
+            },
+            audit: {
+              action: "agent.scope_refused",
+              targetType: "workspace",
+              targetId: workspaceId,
+              payload: { tool, needed, granted: [...principal.scopes] },
+            },
+          };
+        },
+      },
+    );
+  } catch {
+    // Recorded where it can be; the refusal is the answer either way.
+  }
+}
+
+/**
  * Runs one tool, or says why not.
  *
  * The `channel` on the call is what puts "this came from an external agent" on
@@ -85,6 +139,7 @@ export async function dispatchTool(
   }
 
   if (!principal.scopes.includes(tool.scope)) {
+    await auditScopeRefusal(pool, principal, name, tool.scope);
     // Before the action runs, and named, because a person debugging their agent
     // needs to know which scope to ask for next time.
     return refusal(

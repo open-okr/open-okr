@@ -135,6 +135,25 @@ describe("the two gates, and neither substituting for the other", () => {
     expect(outcome.text).toContain("goals.create needs write");
   });
 
+  // agent-surface.md's acceptance says the denial is audited, and it was not:
+  // the refusal returned before anything was written (plan 0.7.0, A3).
+  it("records the refusal in the workspace's audit log, naming the channel", async () => {
+    await run("goals.create", { title: "Never written" }, ["read"]);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select action, payload from audit_events where workspace_id = $1 and action = 'agent.scope_refused'",
+      [workspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload).toMatchObject({
+      tool: "goals.create",
+      needed: "write",
+      granted: ["read"],
+      channel: "mcp",
+    });
+  });
+
   it("refuses before the action runs, so nothing is half done", async () => {
     await run("goals.create", { title: "Never written" }, ["read"]);
 

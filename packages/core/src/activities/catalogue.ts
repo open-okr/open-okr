@@ -246,6 +246,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     provider: z.string(),
     outcome: z.enum(["refused", "redacted"]),
   }),
+  // Plan 0.7.0 A3: an agent connection asked for a tool beyond its scope.
+  "agent.scope_refused": z.object({ tool: z.string(), needed: z.string() }),
   "agent.created": z.object({}).catchall(z.unknown()),
   "agent.enabled_changed": z.object({ enabled: z.boolean() }),
   "agent.scope_bound": z.object({}).catchall(z.unknown()),
@@ -767,6 +769,9 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   // Somebody closing their own first-visit tour (L-08). The pipeline needs the
   // row; the workspace's feed has no reader for it.
   "member.tour_finished",
+  // An agent connection refused a tool beyond its scope (plan 0.7.0 A3).
+  // A retrying agent would fill the feed; the audit row is the record.
+  "agent.scope_refused",
 ]);
 
 /**
