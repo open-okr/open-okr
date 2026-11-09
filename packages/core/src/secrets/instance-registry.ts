@@ -210,6 +210,15 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "Actions one workspace may have running at once. Zero means unlimited. This is the one a per-minute window cannot see: sixty calls in one second pass a per-minute limit and empty the connection pool.",
   },
+  // The outbox rate (docs/design/tenant-limits.md §10, plan 0.7.0 P6 and P7).
+  {
+    key: "cloud.limits.outboxRowsPerMinute",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE",
+    summary:
+      "Outbox rows the relay may claim for one workspace a minute, retries included. Zero means unlimited, which is every self-hosted instance. Below 60 is refused. Nothing is refused or dropped: a workspace over its rate waits, so one tenant's import cannot hold up everybody else's mail and nudges.",
+  },
   // The optional virus scan (completeness review M-24). Off unless a host is
   // named, because Postgres is the only service the product requires and a
   // scanner is a second one. With a host, every claimed file waits in

@@ -1,5 +1,6 @@
 import { OutboxRelay } from "@openokr/adapters";
 import { NextResponse } from "next/server";
+import { outboxRowsPerMinute } from "../../../lib/admission";
 import { getPool } from "../../../lib/pool";
 import {
   schedulerBootedAt,
@@ -72,7 +73,12 @@ async function checkDatabase(): Promise<ComponentStatus> {
 
 async function checkRelay(): Promise<ComponentStatus> {
   try {
-    const lagSeconds = await OutboxRelay.oldestPendingSeconds(getPool());
+    // With an outbox rate set, a workspace at its rate is not lag
+    // (tenant-limits.md §10 R10): the relay is keeping up with all it may.
+    const lagSeconds = await OutboxRelay.oldestPendingSeconds(
+      getPool(),
+      outboxRowsPerMinute(),
+    );
     if (lagSeconds <= 0) return "operational";
     if (lagSeconds >= relayUnavailableSeconds()) return "unavailable";
     if (lagSeconds >= relayDegradedSeconds()) return "degraded";

@@ -11,6 +11,7 @@ import {
   admit,
   MIN_ACTIONS_PER_MINUTE,
   MIN_CONCURRENT_ACTIONS,
+  MIN_OUTBOX_ROWS_PER_MINUTE,
   validateAdmissionLimits,
 } from "../src/tenancy/admission.ts";
 
@@ -213,6 +214,23 @@ describe("the floors, so a number nobody thought about cannot stop the product",
       );
       expect((thrown as Error).message).toContain("0 for unlimited");
     }
+  });
+
+  // The outbox rate (tenant-limits.md §10 R1, plan 0.7.0 P6): resolved and
+  // validated with the other two, zero unlimited, below sixty refused.
+  it("refuses an outbox rate below the floor, naming the key, and accepts zero", () => {
+    const limits = (outboxRowsPerMinute: number) => ({
+      actionsPerMinute: 0,
+      concurrentActions: 0,
+      outboxRowsPerMinute,
+    });
+    expect(() => validateAdmissionLimits(limits(0))).not.toThrow();
+    expect(() =>
+      validateAdmissionLimits(limits(MIN_OUTBOX_ROWS_PER_MINUTE)),
+    ).not.toThrow();
+    expect(() => validateAdmissionLimits(limits(30))).toThrow(
+      /cloud\.limits\.outboxRowsPerMinute is 30, which is below the floor of 60/,
+    );
   });
 
   it("refuses a concurrency of one, which serialises a whole tenant", () => {

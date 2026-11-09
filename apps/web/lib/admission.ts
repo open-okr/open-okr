@@ -6,6 +6,20 @@ import {
 import { getCache } from "./cache";
 import { getPool } from "./pool";
 
+const globals = globalThis as typeof globalThis & {
+  openokrOutboxRowsPerMinute?: number;
+};
+
+/**
+ * The outbox rate per workspace, as boot resolved it (docs/design/
+ * tenant-limits.md §10, plan 0.7.0 P6 and P7). Zero, unlimited, until then
+ * and on every instance that sets none. The relay reads this on every claim
+ * and the status check on every request, so neither depends on boot order.
+ */
+export function outboxRowsPerMinute(): number {
+  return globals.openokrOutboxRowsPerMinute ?? 0;
+}
+
 /**
  * The instance's admission limits, resolved once at boot (P8-T06a).
  *
@@ -45,4 +59,7 @@ export async function installAdmission(): Promise<void> {
     counters: getCache(),
   };
   setDefaultAdmission(admission);
+  // Validated with the other two by `resolveAdmissionLimits`, so a number
+  // below the floor has already stopped the boot with a sentence.
+  globals.openokrOutboxRowsPerMinute = limits.outboxRowsPerMinute ?? 0;
 }

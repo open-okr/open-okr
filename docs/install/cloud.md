@@ -107,6 +107,12 @@ from the account menu, wherever sign-up is open to them. On a plan with a free t
 `OPENOKR_CLOUD_FREE_WORKSPACES_PER_PERSON` limits how many free ones a person may own.
 It defaults to 1, and zero means unlimited.
 
+**One tenant's burst waits its turn.** `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE`
+is how many outbox rows, the mail and nudges a write sets going, the relay may
+claim for one workspace a minute. Zero, the default, is unlimited; below 60 is
+refused at boot. Over it, a workspace's rows wait without being refused or
+dropped, and `openokr_outbox_rate_held_rows` shows how many.
+
 Nobody grants the role to themselves. Once one operator exists, only an
 operator can grant another. Every grant and revocation is written to the
 instance audit chain. An operator sets a workspace's plan, or a seat count of

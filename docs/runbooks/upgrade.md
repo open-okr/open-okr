@@ -94,6 +94,12 @@ root key, and refuses to finish without it rather than report them sealed.
 
 Notes are added here as 0.7.0 is built, and finished before it is tagged.
 
+- **The outbox rate.** Migration 0159 adds `outbox.claimed_at` and a partial
+  index on it. Nothing changes unless you set
+  `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE` (60 or more; 0, the default, is
+  unlimited). With it set, one workspace's burst of mail and nudges waits
+  its turn rather than delaying everybody else's.
+
 - **Trials.** Migration 0158 adds two columns to `tenants`. Nothing changes
   until an operator sets a trial on a workspace's console page. An hourly
   job then ends each trial past its date: a live subscription carries on,

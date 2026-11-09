@@ -98,6 +98,7 @@ export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
 // nothing imports, and it is right to.
 const CLOUD_ACTIONS_PER_MINUTE_KEY = "cloud.limits.actionsPerMinute";
 const CLOUD_CONCURRENT_ACTIONS_KEY = "cloud.limits.concurrentActions";
+const CLOUD_OUTBOX_ROWS_PER_MINUTE_KEY = "cloud.limits.outboxRowsPerMinute";
 
 /**
  * The two admission limits, resolved and validated (P8-T06a).
@@ -121,6 +122,10 @@ export async function resolveAdmissionLimits(
     concurrentActions: await resolve<number>(
       pool,
       CLOUD_CONCURRENT_ACTIONS_KEY,
+    ),
+    outboxRowsPerMinute: await resolve<number>(
+      pool,
+      CLOUD_OUTBOX_ROWS_PER_MINUTE_KEY,
     ),
   };
   validateAdmissionLimits(limits);

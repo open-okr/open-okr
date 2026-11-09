@@ -51,6 +51,7 @@ import {
   parseTelegramSecret,
   parseWhatsAppSecret,
 } from "@openokr/core";
+import { outboxRowsPerMinute } from "./admission";
 import { providerForTier } from "./ai-provider";
 import { getBilling } from "./billing";
 import { drafterFor } from "./drafter";
@@ -475,6 +476,9 @@ export function startRelay(): OutboxRelay | null {
     // makes a relay that has stopped legible: counters go quiet and look like
     // a quiet queue, while the gauges keep reporting a lag that grows.
     metrics: getTelemetry(),
+    // One tenant's import cannot take every other tenant's delivery capacity
+    // (tenant-limits.md §10). Zero, the default, is today's relay.
+    rowsPerMinute: outboxRowsPerMinute,
     async dispatch(record) {
       await dispatchOutbox(record, await relayDeps(record));
     },

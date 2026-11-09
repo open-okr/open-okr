@@ -86,6 +86,8 @@ capacity gauge.
 | `openokr_outbox_pending` | none |
 | `openokr_outbox_oldest_pending_seconds` | none |
 | `openokr_outbox_dead_lettered_total` | topic |
+| `openokr_outbox_rate_held_workspaces` | none. Workspaces at their outbox rate now (`cloud.limits.outboxRowsPerMinute`). 0 while the limit is unset |
+| `openokr_outbox_rate_held_rows` | none. Due rows waiting only because their workspace is at its rate. A steady number here is the limit doing its job, not an outage: those rows are not counted as relay lag |
 | `openokr_job_runs_total` | job, outcome |
 | `openokr_job_duration_seconds` | job |
 | `openokr_nudges_total` | rule, outcome, channel |

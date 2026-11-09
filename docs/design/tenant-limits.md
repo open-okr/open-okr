@@ -265,7 +265,7 @@ Written as the test plan P8-T06 inherits.
 
 ## 10. The outbox rate (release 0.7.0, P6 and P7)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plans P6 and P7), waiting for "design approved". Shared infrastructure on every deployment, so it is designed first. P6 is the setting and P7 is the relay; one cannot be built without the other, so they are one change.
+Status: approved by Akmal on 9 November 2026 ("design approved") and built at release 0.7.0 (plans P6 and P7) as one change, migration 0159. **Settled while building:** the relay takes the rate as a function it reads on every claim, because the host resolves settings after the relay starts; the claim keeps one `claimed_at` per row, so a retry inside the same minute counts once rather than twice, which R9's bound already allows for.
 
 ### 10.1 What exists
 

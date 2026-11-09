@@ -191,6 +191,14 @@ export const METRIC = {
   outboxOldestPendingSeconds: "openokr_outbox_oldest_pending_seconds",
   /** Rows given up on, by topic. */
   outboxDeadLetteredTotal: "openokr_outbox_dead_lettered_total",
+  /**
+   * Workspaces at their outbox rate now, and their due rows waiting only
+   * because of it (tenant-limits.md §10 R11, plan 0.7.0 P7). Read at scrape
+   * time, 0 without a query while the limit is unset. No workspace label: an
+   * unbounded label is what P7-T06b refused.
+   */
+  outboxRateHeldWorkspaces: "openokr_outbox_rate_held_workspaces",
+  outboxRateHeldRows: "openokr_outbox_rate_held_rows",
 
   /** Scheduled runs, by job name and outcome. */
   jobRunsTotal: "openokr_job_runs_total",
