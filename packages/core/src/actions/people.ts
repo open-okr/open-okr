@@ -65,7 +65,11 @@ import {
   requireAvatarImage,
   shareAvatar,
 } from "../people/profile.ts";
-import { markedAsRichText } from "../rich-text/field-schema.ts";
+import {
+  filesFinished,
+  markedAsRichText,
+  UPLOADING_MESSAGE,
+} from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
@@ -86,7 +90,11 @@ const bioInputSchema = markedAsRichText(
       {
         message: "bio must be a valid rich text document.",
       },
-    ),
+    )
+    // Plan 0.7.0 R1, as on every other rich text field.
+    .refine((value) => value === null || filesFinished(value), {
+      message: UPLOADING_MESSAGE,
+    }),
 ).optional();
 
 const memberSummary = z.object({

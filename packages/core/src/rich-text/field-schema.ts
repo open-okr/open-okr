@@ -9,6 +9,7 @@
  */
 import { richTextLength } from "@openokr/formats";
 import { z } from "zod";
+import { extractAttachments } from "./extract.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "./schema.ts";
 import { isValidRichText } from "./validate.ts";
 
@@ -39,6 +40,23 @@ export function richTextSchema(options: { maxCharacters?: number } = {}) {
   return markedAsRichText(documentSchema(options));
 }
 
+/**
+ * Whether every file in the text finished uploading (rich-text-editor.md §7
+ * and §11 D1, plan 0.7.0 R1).
+ *
+ * Checked here, at the write boundary, and deliberately not in
+ * `parseRichText`: the read path calls that, and a stricter parser would hide
+ * a stored document that was valid when it was written (§11 D2).
+ */
+export function filesFinished(value: unknown): boolean {
+  return extractAttachments(value).every(
+    (file) => file.status === "ready" && file.blobId !== undefined,
+  );
+}
+
+export const UPLOADING_MESSAGE =
+  "A file in this text is still uploading. Wait for it to finish, then save.";
+
 function documentSchema(options: { maxCharacters?: number }) {
   const { maxCharacters } = options;
   return z
@@ -48,6 +66,9 @@ function documentSchema(options: { maxCharacters?: number }) {
         value === null || isValidRichText(value, RICH_TEXT_SCHEMA_VERSION),
       { message: "not valid editor JSON for the current rich text schema" },
     )
+    .refine((value) => value === null || filesFinished(value), {
+      message: UPLOADING_MESSAGE,
+    })
     .superRefine((value, context) => {
       if (maxCharacters === undefined || value === null) {
         return;

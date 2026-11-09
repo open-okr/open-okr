@@ -40,7 +40,11 @@ import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { extractMentionIds } from "../rich-text/extract.ts";
-import { markedAsRichText } from "../rich-text/field-schema.ts";
+import {
+  filesFinished,
+  markedAsRichText,
+  UPLOADING_MESSAGE,
+} from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -52,7 +56,10 @@ const richText = markedAsRichText(
     .unknown()
     .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
       message: "not valid editor JSON for the current rich text schema",
-    }),
+    })
+    // Plan 0.7.0 R1: a file still uploading is refused here as it is in
+    // every field built on `richTextSchema()`.
+    .refine(filesFinished, { message: UPLOADING_MESSAGE }),
 );
 
 function requireMemberId(memberId: string | null | undefined): string {
