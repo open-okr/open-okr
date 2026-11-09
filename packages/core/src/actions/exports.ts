@@ -37,6 +37,7 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { actingMemberId } from "../exports/collect.ts";
 import { EXPORT_TOPIC, EXPORTABLE, FORMATS } from "../exports/kinds.ts";
 import { exportFilename, gather, render } from "../exports/lists.ts";
+import { ADDRESS } from "../ids/address.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -87,7 +88,7 @@ export const exportList = defineWriteAction({
   input: z.object({
     list: z.enum(EXPORTABLE),
     /** Narrows a goal or task list the way the screen narrows it. */
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     spaceId: z.uuid().optional(),
     // CSV by default, because it is the format every tool reads and the one a
     // caller who names nothing almost certainly wants.

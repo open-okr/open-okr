@@ -531,7 +531,7 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `search.entities`<br/>The things of every kind whose name matches a phrase, that the caller may open. The palette's jump. | `GET /api/v1/search/entities` | reads |
-| `search.jump`<br/>The entity one short identifier means, for the palette's jump. | `GET /api/v1/search/jump` | reads |
+| `search.jump`<br/>The thing one short identifier names, of any kind, for the palette's jump. | `GET /api/v1/search/jump` | reads |
 | `search.query`<br/>Everything in this workspace matching a phrase that the caller may read. | `GET /api/v1/search/query` | reads |
 
 ## sessions

@@ -234,9 +234,11 @@ describe("a read validates its input before its handler runs", () => {
     }
 
     // No database is reachable through this context, so a rejection that is a
-    // `ZodError` rather than a connection failure proves the order.
+    // `ZodError` rather than a connection failure proves the order. A number:
+    // since 0.7.0 any short string is an address, and one that names nothing
+    // answers not-found rather than a validation error (short-ids.md S4).
     await expect(
-      action.handler(CONTEXT, { id: "nope" }),
+      action.handler(CONTEXT, { id: 42 } as never),
     ).rejects.toBeInstanceOf(ZodError);
   });
 
@@ -247,7 +249,7 @@ describe("a read validates its input before its handler runs", () => {
     }
 
     const thrown = await action
-      .handler(CONTEXT, { id: "nope" })
+      .handler(CONTEXT, { id: 42 } as never)
       .catch((error: unknown) => error);
 
     expect(errorFor(thrown)).toEqual({

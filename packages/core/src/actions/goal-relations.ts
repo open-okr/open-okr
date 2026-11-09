@@ -30,6 +30,7 @@ import {
   loadDependencyRegister,
   loadProvidingKeyResults,
 } from "../alignment/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -37,7 +38,7 @@ export const readGoalRelations = defineReadAction({
   name: "goals.relations",
   summary:
     "The parent, children, horizontal dependencies and register entries of one goal.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({
     parent: z
       .object({ id: z.uuid(), title: z.string(), level: z.string() })

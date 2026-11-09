@@ -71,6 +71,7 @@ import {
   resolveWorkspaceCadence,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -218,7 +219,7 @@ export const readCycleRules = defineReadAction({
   name: "cycles.rules",
   summary:
     "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     source: z.enum(["live", "snapshot", "canon"]),
     thresholds: z.record(z.string(), z.unknown()),
@@ -273,7 +274,7 @@ export const readCycleLevels = defineReadAction({
   name: "cycles.levelsInUse",
   summary:
     "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({ levels: z.array(z.enum(GOAL_LEVELS)) }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -661,7 +662,7 @@ export const setCycleClosing = defineWriteAction({
   name: "cycles.setClosing",
   summary:
     "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
-  input: z.object({ cycleId: z.uuid(), closing: z.boolean() }),
+  input: z.object({ cycleId: ADDRESS.cycle, closing: z.boolean() }),
   output: z.object({ id: z.uuid(), status: z.string(), phase: z.number() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -759,7 +760,7 @@ export const updateCycle = defineWriteAction({
   summary:
     "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.cycle,
     phase: z.number().int().min(0).max(7).optional(),
     sponsorId: z.uuid().nullable().optional(),
     facilitatorId: z.uuid().nullable().optional(),
@@ -873,7 +874,7 @@ export const updateCycle = defineWriteAction({
 export const archiveCycle = defineWriteAction({
   name: "cycles.archive",
   summary: "Archives a cycle. Its goals and scores stay readable.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.cycle }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -1483,7 +1484,7 @@ export const setAnnualFrame = defineWriteAction({
      * reference, and its phase 3 revalidates the frame without rewriting it
      * (METHOD.md §2.1).
      */
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
   }),
   output: frameOutput,
   access: ACCESS_LEVELS.full,
@@ -1813,7 +1814,7 @@ export const snapshotCycle = defineWriteAction({
   name: "cycles.snapshot",
   summary:
     "Records what a cycle achieved: the result, the band counts and the portfolio verdict, one snapshot per owner.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     snapshots: z.number().int(),
     resultValue: z.number().nullable(),
@@ -2038,7 +2039,7 @@ export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
     "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
-  input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
+  input: z.object({ fromCycleId: ADDRESS.cycle, toCycleId: ADDRESS.cycle }),
   output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -2098,7 +2099,7 @@ export const closeCycle = defineWriteAction({
   name: "cycles.close",
   summary:
     "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     cycleId: z.uuid(),
     snapshots: z.number().int(),

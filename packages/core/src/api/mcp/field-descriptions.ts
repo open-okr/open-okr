@@ -13,26 +13,27 @@
  */
 
 const ID_BY_FAMILY: Readonly<Record<string, string>> = {
-  goals: "The goal's id, from goals.list, goals.due or goals.tree.",
+  goals: "The goal's id or short id, from goals.list, goals.due or goals.tree.",
   spaces: "The space's id, from spaces.list.",
-  documents: "The document's id, from documents.list.",
-  tasks: "The task's id, from tasks.list or tasks.board.",
-  initiatives: "The initiative's id, from initiatives.list.",
-  sessions: "The session's id, from sessions.mine.",
+  documents: "The document's id or short id, from documents.list.",
+  tasks: "The task's id or short id, from tasks.list or tasks.board.",
+  initiatives: "The initiative's id or short id, from initiatives.list.",
+  sessions: "The session's id or short id, from sessions.mine.",
   people: "The member's id, from people.directory.",
   kpis: "The KPI's id, from kpis.list.",
-  cycles: "The cycle's id, from cycles.list or cycles.current.",
+  cycles: "The cycle's id or short id, from cycles.list or cycles.current.",
 };
 
 const FIELDS: Readonly<Record<string, string>> = {
-  goalId: "The goal's id, from goals.list, goals.due or goals.tree.",
+  goalId:
+    "The goal's id or short id, from goals.list, goals.due or goals.tree.",
   keyResultId:
-    "The key result's id, from the keyResults of goals.read or goals.list.",
+    "The key result's id or short id, from the keyResults of goals.read or goals.list.",
   keyResultIds:
     "Key result ids, from the keyResults of goals.read or goals.list.",
   spaceId: "The space's id, from spaces.list.",
-  cycleId: "The cycle's id, from cycles.current or cycles.list.",
-  initiativeId: "The initiative's id, from initiatives.list.",
+  cycleId: "The cycle's id or short id, from cycles.current or cycles.list.",
+  initiativeId: "The initiative's id or short id, from initiatives.list.",
   kpiId: "The KPI's id, from kpis.list.",
   memberId: "A member's id, from people.directory.",
   ownerId: "The member who owns it, by id from people.directory.",

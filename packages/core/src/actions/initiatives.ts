@@ -42,6 +42,7 @@ import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { refreshGateStateFor } from "../cycles/workflow.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import {
@@ -371,7 +372,7 @@ export const listInitiatives = defineReadAction({
   summary: "Initiatives in a space, or the ones serving one key result.",
   input: z.object({
     spaceId: z.uuid().optional(),
-    keyResultId: z.uuid().optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
     status: z.enum(INITIATIVE_STATUSES).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
   }),
@@ -456,7 +457,7 @@ export const listInitiatives = defineReadAction({
 export const readInitiative = defineReadAction({
   name: "initiatives.read",
   summary: "One initiative with the key results it serves.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: initiativeOutput,
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -523,7 +524,7 @@ export const createInitiative = defineWriteAction({
     status: z.enum(INITIATIVE_STATUSES).optional(),
     confidence: z.number().min(0).max(1).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
-    keyResultIds: z.array(z.uuid()).max(50).optional(),
+    keyResultIds: z.array(ADDRESS.keyResult).max(50).optional(),
     /** The source-system identity, when an import is creating this (P6-T01a). */
     legacy: legacyKey.optional(),
   }),
@@ -619,7 +620,7 @@ export const updateInitiative = defineWriteAction({
     "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
   input: z
     .object({
-      id: z.uuid(),
+      id: ADDRESS.initiative,
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       ownerId: z.uuid().optional(),
@@ -729,7 +730,7 @@ export const linkInitiativeKeyResult = defineWriteAction({
   domain: "initiative",
   summary:
     "Records that this initiative is one of the ones that will move a key result.",
-  input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative, keyResultId: ADDRESS.keyResult }),
   output: z.object({ linked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -801,7 +802,7 @@ export const unlinkInitiativeKeyResult = defineWriteAction({
   name: "initiatives.unlinkKeyResult",
   domain: "initiative",
   summary: "Removes the link between an initiative and a key result.",
-  input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative, keyResultId: ADDRESS.keyResult }),
   output: z.object({ unlinked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -848,7 +849,7 @@ export const unlinkInitiativeKeyResult = defineWriteAction({
 export const deleteInitiative = defineWriteAction({
   name: "initiatives.delete",
   summary: "Soft-deletes an initiative and the links it held.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -965,7 +966,7 @@ export const restoreInitiative = defineWriteAction({
   name: "initiatives.restore",
   summary:
     "Brings back a deleted initiative and the key result links that were deleted with it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: z.object({ id: z.uuid(), links: z.number().int() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -1032,7 +1033,7 @@ export const readCapacity = defineReadAction({
   name: "initiatives.capacity",
   summary:
     "One cycle's capacity check: every key result's verdict and every initiative behind it.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     keyResults: z.array(
       z.object({

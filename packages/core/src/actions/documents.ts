@@ -48,6 +48,7 @@ import {
   readableDocuments,
   requireDocumentSubject,
 } from "../documents/access.ts";
+import { ADDRESS, subjectAddress } from "../ids/address.ts";
 import { freshShortId } from "../ids/short.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
@@ -136,7 +137,7 @@ export const listDocuments = defineReadAction({
   name: "documents.list",
   summary:
     "The documents on one subject. Somebody else's draft is not among them.",
-  input: z.object({ subjectType, subjectId: z.uuid() }),
+  input: z.object({ subjectType, subjectId: subjectAddress() }),
   output: z.array(documentSummary),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -206,7 +207,7 @@ export const listDocuments = defineReadAction({
 export const readDocument = defineReadAction({
   name: "documents.read",
   summary: "One document with its body and its version list.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.document }),
   output: documentSummary.extend({
     body: z.unknown().nullable(),
     versions: z.array(
@@ -277,7 +278,7 @@ export const readDocumentDifference = defineReadAction({
   summary:
     "What changed between two published versions of a document, line by line.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.document,
     /** The older version. Defaults to the one before `to`. */
     from: z.number().int().min(1).optional(),
     /** The newer version. Defaults to the latest. */
@@ -376,7 +377,7 @@ export const createDocument = defineWriteAction({
     "Starts a document on a subject. It is a draft, and a draft is private to its author.",
   input: z.object({
     subjectType,
-    subjectId: z.uuid(),
+    subjectId: subjectAddress(),
     title: z.string().trim().min(1).max(300),
     body: richText.optional(),
   }),
@@ -457,7 +458,7 @@ export const updateDocument = defineWriteAction({
     "Edits a document. Editing a published one changes it without publishing a version.",
   input: z
     .object({
-      id: z.uuid(),
+      id: ADDRESS.document,
       title: z.string().trim().min(1).max(300).optional(),
       body: richText.optional(),
     })
@@ -588,7 +589,7 @@ export const publishDocument = defineWriteAction({
   name: "documents.publish",
   summary:
     "Publishes a document, writing a version and telling the subject's watchers.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.document }),
   output: z.object({ id: z.uuid(), version: z.number().int() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -687,7 +688,7 @@ export const publishDocument = defineWriteAction({
 export const deleteDocument = defineWriteAction({
   name: "documents.delete",
   summary: "Soft-deletes a document and the versions under it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.document }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -880,7 +881,7 @@ export const restoreDocument = defineWriteAction({
   name: "documents.restore",
   summary:
     "Brings back a deleted document. Its versions were never removed, so they come back with it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.document }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -954,7 +955,10 @@ const attachmentSubject = z.enum([
 export const listAttachments = defineReadAction({
   name: "attachments.list",
   summary: "The files attached to one subject.",
-  input: z.object({ subjectType: attachmentSubject, subjectId: z.uuid() }),
+  input: z.object({
+    subjectType: attachmentSubject,
+    subjectId: subjectAddress(),
+  }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -1040,7 +1044,7 @@ export const attachFile = defineWriteAction({
   summary: "Hangs an uploaded file on a subject.",
   input: z.object({
     subjectType: attachmentSubject,
-    subjectId: z.uuid(),
+    subjectId: subjectAddress(),
     blobId: z.uuid(),
   }),
   output: z.object({ id: z.uuid(), attached: z.boolean() }),

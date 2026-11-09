@@ -21,6 +21,7 @@ import type { AgentDrafter } from "../agents/drafter.ts";
 import type { PromptEvaluator } from "../ai/prompt-evaluation.ts";
 import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
+import { resolveAddresses } from "../ids/address.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -278,7 +279,13 @@ export function defineReadAction<TInput, TOutput>(definition: {
     // Declared after the spread, so it wraps the handler the caller passed
     // rather than being replaced by it.
     async handler(context, rawInput) {
-      const input = definition.input.parse(rawInput);
+      // A short identifier anywhere an address is taken becomes the UUID it
+      // names before the handler sees it (docs/design/short-ids.md S5).
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
+      );
       const required = definition.access ?? ACCESS_LEVELS.view;
       // **The declared level is enforced here, once, for every read** (P6-G31).
       // It used to be recorded and never checked: twenty-nine reads declared
@@ -368,11 +375,19 @@ export function defineWriteAction<
       ? { agentSurface: false as const }
       : {}),
     async handler(context, rawInput) {
-      const input = definition.input.parse(rawInput);
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
+      );
       return run(context, input, false);
     },
     async validate(context, rawInput) {
-      const input = definition.input.parse(rawInput);
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
+      );
       return { input, result: await run(context, input, true) };
     },
   };

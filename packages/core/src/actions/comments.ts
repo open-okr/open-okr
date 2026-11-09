@@ -38,6 +38,7 @@ import {
   removeReaction,
   updateComment,
 } from "../comments/service.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
@@ -145,7 +146,7 @@ export const listCommentsAction = defineReadAction({
   summary: "List comments on a subject",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z.array(
     z.object({
@@ -205,7 +206,7 @@ export const listReactionsAction = defineReadAction({
   summary: "List reactions on a subject, grouped by emoji",
   input: z.object({
     subjectType: z.string(),
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z.array(
     z.object({
@@ -253,7 +254,7 @@ export const previewNotifyAction = defineReadAction({
     "Preview who would be notified by a comment with this body on this subject",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     body: z.unknown(),
   }),
   output: z.array(z.string().uuid()),
@@ -282,7 +283,7 @@ export const createCommentAction = defineWriteAction({
     "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     body: richText,
   }),
   output: z.object({ id: z.string().uuid() }),
@@ -792,7 +793,7 @@ export const addReactionAction = defineWriteAction({
   summary: "Add a reaction to any subject",
   input: z.object({
     subjectType: z.string(),
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     emoji: z.string().min(1).max(32),
   }),
   output: z.object({ id: z.string().uuid() }),

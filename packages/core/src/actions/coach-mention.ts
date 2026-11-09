@@ -52,6 +52,7 @@ import { agentSeesGoal } from "../agents/scope.ts";
 import { createComment } from "../comments/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { recordAndDeliverInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
@@ -71,7 +72,7 @@ export const answerCoachMention = defineWriteAction({
   agentSurface: false,
   input: z.object({
     commentId: z.uuid(),
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     /** The goal's space as the comment saw it, or null for none. */
     spaceId: z.uuid().nullable(),
   }),

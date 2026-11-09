@@ -84,6 +84,7 @@ import {
   wouldCloseAlignmentLoop,
 } from "../goals/service.ts";
 import { weightSchema } from "../goals/weight.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { readLinkableKpi } from "../kpis/linked.ts";
@@ -497,7 +498,7 @@ export const listGoals = defineReadAction({
   summary:
     "Goals in a cycle, or the whole workspace, with their key results attached.",
   input: z.object({
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     /** Closed goals are excluded unless asked for: a set is what is live in it. */
     includeClosed: z.boolean().default(false),
     level: z.enum(GOAL_LEVELS).optional(),
@@ -722,7 +723,7 @@ export const readGoal = defineReadAction({
   name: "goals.read",
   summary:
     "One goal with its key results and its retrospective, if it has one.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: goalOutput,
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -983,7 +984,7 @@ export const readKeyResultHistory = defineReadAction({
   summary:
     "One key result's value history, newest first. Drives the sparkline.",
   input: z.object({
-    keyResultId: z.uuid(),
+    keyResultId: ADDRESS.keyResult,
     limit: z.number().int().min(1).max(500).default(100),
   }),
   output: z.object({
@@ -1076,7 +1077,7 @@ export const createGoal = defineWriteAction({
     .object({
       title: z.string().trim().min(1).max(500),
       description: richText.optional(),
-      cycleId: z.uuid().optional(),
+      cycleId: ADDRESS.cycle.optional(),
       timeframe: timeframe.optional(),
       level: z.enum(GOAL_LEVELS),
       /**
@@ -1113,8 +1114,8 @@ export const createGoal = defineWriteAction({
        */
       championId: z.uuid().optional(),
       reviewerId: z.uuid().nullable().optional(),
-      parentGoalId: z.uuid().optional(),
-      parentKeyResultId: z.uuid().optional(),
+      parentGoalId: ADDRESS.goal.optional(),
+      parentKeyResultId: ADDRESS.keyResult.optional(),
       /**
        * The §2.1 annual strategy this objective serves (P6-G14b).
        *
@@ -1380,15 +1381,15 @@ export const updateGoal = defineWriteAction({
   // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9); a level it moves to asks the policy below (§2.7), and its target goes through goals.changeTarget.
   summary: "Edits a goal's own fields, including its alignment pointer.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.goal,
     title: z.string().trim().min(1).max(500).optional(),
     description: richText.optional(),
     level: z.enum(GOAL_LEVELS).optional(),
     weight: weightSchema.optional(),
     contributionStatement: z.string().trim().max(1000).nullable().optional(),
     /** Null clears the alignment. A goal with no parent is an island, not an error. */
-    parentGoalId: z.uuid().nullable().optional(),
-    parentKeyResultId: z.uuid().nullable().optional(),
+    parentGoalId: ADDRESS.goal.nullable().optional(),
+    parentKeyResultId: ADDRESS.keyResult.nullable().optional(),
     /**
      * Why this goal stands alone (METHOD.md §5.2, P9-T16a). Setting one clears
      * the parent, and setting a parent clears it, because a goal that aligns
@@ -1678,7 +1679,7 @@ export const goalReviewDecision = defineReadAction({
   name: "goals.reviewDecision",
   summary:
     "The keep/modify/abandon decision the last quarterly review reached for this goal.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({
     decision: z.enum(GOAL_CLOSE_DECISIONS).nullable(),
     why: z.string().nullable(),
@@ -1745,7 +1746,7 @@ export const closeGoal = defineWriteAction({
   summary:
     "Closes a goal with an outcome, a keep/modify/abandon decision and a retrospective.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.goal,
     successStatus: z.enum(GOAL_SUCCESS_STATUSES),
     closeDecision: z.enum(GOAL_CLOSE_DECISIONS),
     closeReason: z.string().trim().max(2000).optional(),
@@ -1840,7 +1841,7 @@ export const stopGoal = defineWriteAction({
   summary:
     "Stops an objective that no longer matters: closes it as abandoned, with a one-line reason.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.goal,
     /** One line: why it no longer matters. */
     reason: z.string().trim().min(1).max(280),
   }),
@@ -1916,7 +1917,7 @@ export const reopenGoal = defineWriteAction({
   // openokr:policy-exempt: reopening undoes a close on an objective that exists, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Reopens a closed goal, clearing its outcome and keeping its retrospective.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1974,7 +1975,7 @@ export const reassignGoalRole = defineWriteAction({
     "Moves the champion or the reviewer to another member, rebinding access with it. A reviewer can also be taken off.",
   input: z
     .object({
-      id: z.uuid(),
+      id: ADDRESS.goal,
       role: z.enum(["champion", "reviewer"]),
       /**
        * Null takes the reviewer off (P9-T04), which the practice refuses where
@@ -2066,8 +2067,8 @@ export const moveGoalToCycle = defineWriteAction({
   summary:
     "Moves a goal into another cycle, taking its check-in history with it. Arriving in a running cycle is judged as starting it there.",
   input: z.object({
-    id: z.uuid(),
-    cycleId: z.uuid(),
+    id: ADDRESS.goal,
+    cycleId: ADDRESS.cycle,
     /** Why it starts in this cycle now, where the practice asks (§2.9). */
     reason: z.string().trim().min(1).max(500).optional(),
   }),
@@ -2232,7 +2233,7 @@ export const createKeyResult = defineWriteAction({
     "Adds a key result to a goal, with its baseline recorded as history.",
   input: z
     .object({
-      goalId: z.uuid(),
+      goalId: ADDRESS.goal,
       title: z.string().trim().min(1).max(500),
       unit: z.string().trim().max(60).optional(),
       /**
@@ -2414,7 +2415,7 @@ export const updateKeyResult = defineWriteAction({
   summary:
     "Edits a key result's definition. The current value has its own action, because it is history. A target goes through the same rule and history as goals.changeTarget.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.keyResult,
     title: z.string().trim().min(1).max(500).optional(),
     unit: z.string().trim().max(60).nullable().optional(),
     /** Metric, maintain, milestone or baseline (METHOD.md §2.10, P9-T12b). */
@@ -2607,7 +2608,7 @@ export const recordKeyResultValue = defineWriteAction({
   // openokr:policy-exempt: a value is a fact about the world recorded against a key result, which no practice setting may refuse.
   summary: "Moves a key result's value and records the movement as history.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.keyResult,
     value: z.number(),
     note: z.string().trim().max(500).optional(),
   }),
@@ -2678,7 +2679,7 @@ export const updateKeyResultConfidence = defineWriteAction({
   summary:
     "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.keyResult,
     /** METHOD.md §3.2's own scale, as a check-in sends it. */
     confidence: z.number().min(0).max(1),
   }),
@@ -2754,7 +2755,7 @@ export const removeKeyResult = defineWriteAction({
   // openokr:policy-exempt: removing a key result is a change to an objective that exists, which stays open under every setting (METHOD.md §2.9); access decides who may, at full.
   summary:
     "Removes one key result from its goal, which is not the same as closing the goal.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.keyResult }),
   output: z.object({ id: z.uuid() }),
   // `full`, like `goals.delete` and unlike the edits above. Removing a measure
   // takes its whole value history out of the set, and a reader who may edit a
@@ -2864,7 +2865,7 @@ export const linkKeyResultKpi = defineWriteAction({
   // openokr:policy-exempt: linking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Links a KPI to a key result, which from then on reads its value and progress from it.",
-  input: z.object({ id: z.uuid(), kpiId: z.uuid() }),
+  input: z.object({ id: ADDRESS.keyResult, kpiId: z.uuid() }),
   output: z.object({ id: z.uuid(), kpiId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -2953,7 +2954,7 @@ export const unlinkKeyResultKpi = defineWriteAction({
   name: "goals.unlinkKpi",
   // openokr:policy-exempt: unlinking a KPI changes where a key result reads its value from, which stays open under every setting (METHOD.md §2.9).
   summary: "Unlinks a KPI, keeping the value it last reported as a manual one.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.keyResult }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -3043,7 +3044,7 @@ export const deleteGoal = defineWriteAction({
   // openokr:policy-exempt: deleting is governed by access and is undone from deleted items; no practice setting decides it (design §2.5).
   summary:
     "Removes a goal and its key results, which is not the same as closing one.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -3168,7 +3169,7 @@ export const restoreGoal = defineWriteAction({
   // openokr:policy-exempt: restoring undoes a delete, and no setting may stop data coming back (design §2.5).
   summary:
     "Brings back a deleted goal and the key results that were deleted with it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({ id: z.uuid(), keyResults: z.number().int() }),
   access: ACCESS_LEVELS.full,
   operation: (context, input) => ({
@@ -3284,7 +3285,7 @@ export const rewriteKeyResult = defineReadAction({
   summary:
     "Suggests a corrected key result for one failing check, and reports which checks the suggestion actually passes.",
   input: z.object({
-    keyResultId: z.uuid(),
+    keyResultId: ADDRESS.keyResult,
     /** The §4 check id to fix, for example `KR-2`. */
     ruleId: z.string().trim().min(1).max(20),
   }),

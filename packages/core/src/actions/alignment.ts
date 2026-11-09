@@ -53,6 +53,7 @@ import {
   scopesForGoal,
 } from "../alignment/service.ts";
 import { cycleRulesInTx } from "../cycles/rules.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -336,8 +337,8 @@ export const addGoalDependency = defineWriteAction({
   summary:
     "Links two goals as depending on each other. Stored once; direction carries no meaning.",
   input: z.object({
-    fromGoalId: z.uuid(),
-    toGoalId: z.uuid(),
+    fromGoalId: ADDRESS.goal,
+    toGoalId: ADDRESS.goal,
     note: z.string().trim().max(500).optional(),
   }),
   output: z.object({ id: z.uuid() }),
@@ -551,7 +552,7 @@ export const addKeyResultDependency = defineWriteAction({
     "Records a key result's dependency on a providing team, for the register.",
   input: z
     .object({
-      keyResultId: z.uuid(),
+      keyResultId: ADDRESS.keyResult,
       providerSpaceId: z.uuid().optional(),
       providerText: z.string().trim().max(200).optional(),
       /**
@@ -559,7 +560,7 @@ export const addKeyResultDependency = defineWriteAction({
        * goal a space owns, and that space becomes the provider; a
        * `providerSpaceId` naming another space is refused.
        */
-      providerKeyResultId: z.uuid().optional(),
+      providerKeyResultId: ADDRESS.keyResult.optional(),
       note: z.string().trim().max(500).optional(),
       riskOwnerId: z.uuid().optional(),
     })
@@ -680,7 +681,7 @@ export const confirmKeyResultDependency = defineWriteAction({
      * O5, K4). It must sit in the providing space. Left out, whatever the
      * entry already names is kept.
      */
-    providerKeyResultId: z.uuid().optional(),
+    providerKeyResultId: ADDRESS.keyResult.optional(),
   }),
   output: z.object({ id: z.uuid(), confirmed: z.boolean() }),
   access: ACCESS_LEVELS.edit,
@@ -966,7 +967,10 @@ export const setDependencyProvider = defineWriteAction({
   name: "goals.setDependencyProvider",
   summary:
     "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
-  input: z.object({ id: z.uuid(), providerKeyResultId: z.uuid().nullable() }),
+  input: z.object({
+    id: z.uuid(),
+    providerKeyResultId: ADDRESS.keyResult.nullable(),
+  }),
   output: z.object({
     id: z.uuid(),
     confirmed: z.boolean(),
@@ -1356,7 +1360,7 @@ export const dismissAlignmentFinding = defineWriteAction({
 export const readAlignmentGraph = defineReadAction({
   name: "alignment.graph",
   summary: "The cascade as nodes and edges, for the alignment studio canvas.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     nodes: z.array(
       z.object({
@@ -1556,7 +1560,7 @@ export const readAlignment = defineReadAction({
   summary:
     "The alignment health score for one cycle, with every open finding and the goal each one opens.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     spaceId: z.uuid().optional(),
     /** Dismissed findings are hidden by default; the studio can ask for them. */
     includeDismissed: z.boolean().default(false),
@@ -1989,7 +1993,7 @@ export const readAlignmentScore = defineReadAction({
   summary:
     "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     /** One space's score. The workspace's when absent. */
     spaceId: z.uuid().optional(),
   }),

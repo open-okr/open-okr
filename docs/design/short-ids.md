@@ -4,7 +4,7 @@ Status: approved 10 November 2026 for release 0.7.0 (plan D1), Q1 and Q2 answere
 
 Authority: TECHNICAL-PLAN §3 ("Public identifiers are separate") and DATABASE.md §1.
 
-## 0. What exists
+## 0. What existed
 
 | Piece | Where | Today |
 |---|---|---|
@@ -49,7 +49,8 @@ So the rule is written and broken everywhere but KPIs. Fixing it is not one chan
 | Unit | `packages/core/test/short-ids.test.ts` | The generator, collision retry, every create filling one, the resolver's two forms and its not-found |
 | Integration | `packages/db/test/data-change.test.ts` | 0034 backfills, batches, keeps what is there, and sees every workspace under the tenant floor |
 | Integration | `packages/core/test/portability-import.test.ts` (existing) | A moved goal keeps its short id, and a colliding one gets a fresh one |
-| Integration | `packages/core/test/search.test.ts` (existing) | `search.jump` for all eight kinds |
+| Integration | `packages/core/test/search-palette.test.ts` (existing) | `search.jump` for all eight kinds, a guest, a deleted goal and `kinds` |
+| Integration | `packages/core/test/mcp-research.test.ts` (existing) | `fetch` of a short link, and another workspace's reader holding it |
 | Contract | `pnpm check:contract` | The widened inputs |
 | Browser | `e2e/short-links.spec.ts` | Copy link, open it, land on the page |
 
@@ -69,6 +70,15 @@ Where the build moved from §1, and why.
 | B2 | Data change 0035 | 0034 | The next free number |
 | B3 | Unique on `(workspace_id, short_id)` | Not partial, unlike `kpis_short_id_idx` | A deleted row keeps its address, so restoring it never collides and a link to it never comes to mean something else. `freshShortId` checks deleted rows too |
 | B4 | Every write fills it | Each service's insert calls `freshShortId`; the Drizzle column also carries `$defaultFn(newShortId)`, as `id` carries `newId` | The default is the backstop for an insert that names none, so 0.8.0's not-null cannot be broken by a write path nobody remembered. The performance dataset (`perf/large-dataset.ts`) draws one per row too, so its index is measured |
+| B5 | `resolveAddress(tx, kind, value)` | `resolveAddress(tx, reader, kind, value)` in `packages/core/src/ids/address.ts`, answering `{ id, shortId }`. `reader` is the workspace and the member, or a null member for the system, which no rule narrows | The access getter needs to know who is asking |
+| B6 | Each surface accepts both | Inputs use `ADDRESS.goal` (and `.cycle`, `.keyResult`, `.initiative`, `.task`, `.document`, `.session`) instead of `z.uuid()`, and `subjectAddress()` where a sibling `subjectType` says the kind. Both action builders call `resolveAddresses` after the input parses and before the handler runs: it finds the address fields once per schema, leaves a UUID as it is, and turns anything else into the key through `resolveAddress`. About 225 fields in 30 action files; no handler changed | One place, so no surface can take one form and refuse the other, and a nested call (`goals.read` inside an assist) already holds the key |
+| B7 | The rule per kind | A goal, initiative or task through `getAccessScoped` on itself; a key result through its goal; a document by the draft rule then its subject; a session by the workspace and `sessions.read`'s room rule; a cycle and a KPI through the workspace. Deleted rows are found, so `goals.restore` takes the address of what it restores | The kind's own read, so the resolver never lets through what the action would refuse, nor refuses what it would show |
+| B8 | Malformed answers not-found | The address schema takes any string of 1 to 64 characters, and the resolver answers "No such goal, or you do not have access to it." for malformed, unknown and unseen alike. A number or an empty string is still a validation error | Anything else would make the schema an oracle |
+| B9 | `search.jump` for all eight | It takes an optional `kinds`, so a page asks for its own kind; with none it tries goal, key result, KPI, initiative, task, document, session, cycle in that order and answers the first the reader can open. A deleted row is not offered | Uniqueness is per table, so two kinds could share a short id; the order breaks the tie |
+| B10 | Not in S5 | The agent's `fetch` tool takes a short link (`/goals/<short id>`, `openokr://goal/<short id>`) and cites the goal by its key | An agent handed a copied link has to be able to read it |
+| B11 | The contract | An address field is `{ "type": "string", "minLength": 1, "maxLength": 64 }`, with no `format`. The MCP field descriptions say "id or short id" for the seven | A description on the schema itself would replace the per-field sentence an agent reads |
+
+Inputs left on `z.uuid()` on purpose, because only the importer, the agent runner or the copilot's own bookkeeping sends them, each with a key it already holds: `comments.importComment`, `subscriptions.importWatcher`, `copilot.recordProposal`, `copilot.completeRun`, `copilot.recordAnswer`, `agents.startRun` and `audit.list`'s `targetId`.
 
 ### The 0.8.0 step, not built here
 

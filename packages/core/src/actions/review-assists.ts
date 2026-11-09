@@ -33,6 +33,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { REVIEW_ASSIST_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
@@ -111,7 +112,7 @@ export const clusterRetroNotes = defineReadAction({
   agentSurface: false,
   summary:
     "Groups one review's retro notes into themes, before the dot vote, without writing anything.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z
     .object({
       themes: z.array(
@@ -233,7 +234,7 @@ export const narrateDiagnostic = defineReadAction({
   agentSurface: false,
   summary:
     "Narrates the closing diagnostic with this cycle's specifics, beside the verdict and never instead of it.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z
     .object({
       /** §8.6's own, from `packages/method`, unchanged. */
@@ -294,7 +295,7 @@ export const draftMinutes = defineReadAction({
   agentSurface: false,
   summary:
     "Drafts the review minutes as prose over the record the session already holds.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({ narrative: z.string() }).nullable(),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -373,7 +374,7 @@ export const draftRetrospective = defineReadAction({
   agentSurface: false,
   summary:
     "Drafts a goal's closing retrospective from its published check-ins, as plain text a person edits.",
-  input: z.object({ goalId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal }),
   output: z.object({ narrative: z.string() }).nullable(),
   access: ACCESS_LEVELS.edit,
   async handler(context, input) {

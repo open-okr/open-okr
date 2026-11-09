@@ -46,6 +46,7 @@ import {
   type SpacePostProvider,
   spacePostTargets,
 } from "../channels/space-posts.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError } from "../operations/operation.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
@@ -59,7 +60,7 @@ export const postDigest = defineWriteAction({
   name: "sessions.postDigest",
   summary:
     "Posts a closed weekly session's digest to the Slack or Teams channel its space is linked to, once per channel.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** Queued now, and delivered by the relay. */
     posted: z.array(providerSchema),

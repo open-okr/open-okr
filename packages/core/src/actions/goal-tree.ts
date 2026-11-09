@@ -59,6 +59,7 @@ import {
   requireActiveMember,
 } from "../goals/service.ts";
 import { weightSchema } from "../goals/weight.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requireUnchanged } from "../operations/unchanged.ts";
 import {
@@ -567,7 +568,7 @@ export const readGoalTree = defineReadAction({
   summary:
     "One cycle's objectives with their key results, alignment and dependencies, shaped for the OKR list and diagram, with parents outside the set as read-only context.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     /**
      * "mine" is the objectives this member champions or reviews, or owns a key
      * result under. Always about the person asking, never an id in the URL.
@@ -835,7 +836,7 @@ export const readCreationPolicy = defineReadAction({
   name: "goals.creationPolicy",
   summary:
     "Whether a new objective may be written in a cycle now, with the practice's reasons and the settings behind them when it may not.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     allowed: z.boolean(),
     reasons: z.array(z.string()),
@@ -905,11 +906,15 @@ const keyResultFields = z.object({
  * not validated as input, and a title read before a length rule tightened
  * must still be comparable.
  */
-function patchInput<T extends z.ZodRawShape>(fields: z.ZodObject<T>) {
+function patchInput<T extends z.ZodRawShape>(
+  fields: z.ZodObject<T>,
+  /** The address of what is patched: a goal's or a key result's. */
+  id: z.ZodString,
+) {
   const readable = z.union([z.string(), z.number(), z.boolean(), z.null()]);
   return z
     .object({
-      id: z.uuid(),
+      id,
       set: fields.partial(),
       read: z.record(z.string(), readable),
     })
@@ -932,7 +937,7 @@ export const patchGoal = defineWriteAction({
   // openokr:policy-exempt: changing an objective that exists stays open under every setting (METHOD.md §2.9), and its target changes go through goals.changeTarget.
   summary:
     "Changes some of an objective's fields, refused with the current values if any of them changed since the caller read them.",
-  input: patchInput(goalFields),
+  input: patchInput(goalFields, ADDRESS.goal),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1072,7 +1077,7 @@ export const patchKeyResult = defineWriteAction({
   // openokr:policy-exempt: changing a key result that exists stays open under every setting (METHOD.md §2.9); its target is not among these fields and goes through goals.changeTarget, and a kind it is given asks the policy here (P9-T12b).
   summary:
     "Changes some of a key result's fields, refused with the current values if any of them changed since the caller read them. The target and the current value have their own actions.",
-  input: patchInput(keyResultFields),
+  input: patchInput(keyResultFields, ADDRESS.keyResult),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -1270,9 +1275,9 @@ export const placeGoal = defineWriteAction({
   summary:
     "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.goal,
     /** The objective it goes after, or null to put it first. */
-    afterId: z.uuid().nullable(),
+    afterId: ADDRESS.goal.nullable(),
   }),
   output: z.object({ order: z.array(z.uuid()) }),
   access: ACCESS_LEVELS.edit,
@@ -1352,9 +1357,9 @@ export const placeKeyResult = defineWriteAction({
   summary:
     "Puts a key result straight after another under its objective, or first, and renumbers the objective's key results.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.keyResult,
     /** The key result it goes after, or null to put it first. */
-    afterId: z.uuid().nullable(),
+    afterId: ADDRESS.keyResult.nullable(),
   }),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,

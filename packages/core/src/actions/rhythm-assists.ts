@@ -49,6 +49,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { daysPastDue } from "../cadence/service.ts";
 import { spacePostTargets } from "../channels/space-posts.ts";
 import { workspaceTimeZone } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
@@ -361,7 +362,7 @@ export const readDigest = defineReadAction({
   name: "sessions.digest",
   summary:
     "The weekly digest for one session, assembled with no provider involved.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z
     .object({
       weekStart: z.string(),
@@ -443,7 +444,7 @@ export const narrateDigest = defineReadAction({
   agentSurface: false,
   summary:
     "Rewrites the weekly digest as prose, refusing any narration that states a number the product did not compute.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z
     .object({
       narrative: z.string(),

@@ -55,6 +55,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { freshShortId } from "../ids/short.ts";
 import {
   assertLegacyKeyFree,
@@ -1268,7 +1269,7 @@ export const launchKpiRecovery = defineWriteAction({
   input: z.object({
     kpiId: z.uuid(),
     /** The cycle the objective lives in. The caller resolves the current one. */
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     /**
      * A title instead of §6.5's template sentence (P4-T05c-b).
      *
@@ -1357,9 +1358,9 @@ export const recordKpiResponse = defineWriteAction({
     kpiId: z.uuid(),
     kind: z.enum(["fix_now", "key_result"]),
     /** The task that fixes it, for `fix_now`. */
-    taskId: z.uuid().optional(),
+    taskId: ADDRESS.task.optional(),
     /** The key result that answers it, for `key_result`. */
-    keyResultId: z.uuid().optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
   }),
   output: z.object({
     kpiId: z.uuid(),

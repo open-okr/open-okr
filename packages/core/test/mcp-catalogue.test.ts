@@ -181,12 +181,22 @@ describe("what a tool tells an agent", () => {
   });
 
   it("names an identifier by its format, not by a regular expression", () => {
-    const properties = toolNamed("goals.delete")?.inputSchema.properties as
+    const properties = toolNamed("spaces.archive")?.inputSchema.properties as
       | Record<string, object>
       | undefined;
     const id = properties?.id;
     expect(id).toMatchObject({ type: "string", format: "uuid" });
     expect(id).not.toHaveProperty("pattern");
+  });
+
+  it("tells an agent a goal takes its short id as well as its UUID (short-ids.md S5)", () => {
+    const properties = toolNamed("goals.delete")?.inputSchema.properties as
+      | Record<string, { format?: string; description?: string }>
+      | undefined;
+    const id = properties?.id;
+    expect(id).toMatchObject({ type: "string" });
+    expect(id?.format).toBeUndefined();
+    expect(id?.description).toMatch(/short id/);
   });
 
   it("carries no identifier pattern anywhere in the catalogue", () => {
@@ -219,7 +229,7 @@ describe("what a tool tells an agent", () => {
   });
 
   it("builds an example holding exactly the required fields", () => {
-    const tool = toolNamed("goals.delete");
+    const tool = toolNamed("spaces.archive");
     expect(Object.keys(tool?.example ?? {})).toEqual(["id"]);
     expect(tool?.example.id).toBe("00000000-0000-4000-8000-000000000000");
   });

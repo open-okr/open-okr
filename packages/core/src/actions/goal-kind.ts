@@ -18,6 +18,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
 import { recomputeGoalQualityInTx } from "../quality/service.ts";
@@ -56,7 +57,7 @@ export const setGoalKind = defineWriteAction({
   summary:
     "Marks an objective committed or aspirational, recording the change and its reason in the objective's activity.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.goal,
     kind: z.enum(GOAL_KINDS),
     /** Why the promise changed. Asked for, never required. */
     reason: z.string().trim().min(1).max(500).optional(),

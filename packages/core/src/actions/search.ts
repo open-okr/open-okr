@@ -10,22 +10,17 @@
  * the filtering. A member who loses a space stops seeing its rows on the next
  * query with no reindex.
  */
-import {
-  accessContexts,
-  activeOnly,
-  kpis,
-  withContext,
-  workspaceMembers,
-} from "@openokr/db";
-import { and, eq } from "drizzle-orm";
+import { activeOnly, withContext, workspaceMembers } from "@openokr/db";
+import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { accessFilterMember, accessScopeFilter } from "../access/reads.ts";
+import { resolveAddress } from "../ids/address.ts";
+import { type AddressKind, isShortId, SHORT_ID_TABLES } from "../ids/short.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { findByName, NAMED_KINDS } from "../search/entities.ts";
-import { resolveHrefs } from "../search/hrefs.ts";
+import { hrefsInTx, resolveHrefs } from "../search/hrefs.ts";
 import { searchWithSemantic } from "../search/service.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -189,10 +184,43 @@ export const findEntities = defineReadAction({
   },
 });
 
+/**
+ * The eight kinds a short identifier names, in the order the jump tries them.
+ * Uniqueness is per table, so two kinds could in principle share one; the
+ * first the reader can open wins, and `kinds` narrows the question.
+ */
+const JUMP_KINDS = [
+  "goal",
+  "key_result",
+  "kpi",
+  "initiative",
+  "task",
+  "document",
+  "session",
+  "cycle",
+] as const satisfies readonly AddressKind[];
+
+/** The column each kind's name is in. */
+const TITLE_COLUMN: Readonly<Record<AddressKind, string>> = {
+  cycle: "name",
+  goal: "title",
+  key_result: "title",
+  kpi: "title",
+  initiative: "title",
+  task: "title",
+  document: "title",
+  session: "title",
+};
+
 export const readPaletteJump = defineReadAction({
   name: "search.jump",
-  summary: "The entity one short identifier means, for the palette's jump.",
-  input: z.object({ shortId: z.string().trim().min(1).max(40) }),
+  summary:
+    "The thing one short identifier names, of any kind, for the palette's jump.",
+  input: z.object({
+    shortId: z.string().trim().min(1).max(40),
+    /** Only these kinds, as a page asks for its own. Every kind when absent. */
+    kinds: z.array(z.enum(JUMP_KINDS)).min(1).optional(),
+  }),
   output: z
     .object({
       entityType: z.string(),
@@ -203,26 +231,31 @@ export const readPaletteJump = defineReadAction({
     .nullable(),
   access: ACCESS_LEVELS.view,
   /**
-   * **One table carries a short identifier today, and it is `kpis`.** S-32 asks
-   * for an entity jump by short code, and only `kpis.short_id` exists: goals,
-   * initiatives and tasks have none. So this answers for a KPI and answers null
-   * for everything else, rather than pretending to a lookup it cannot do.
+   * **Every addressable kind since 0.7.0** (docs/design/short-ids.md S5). It
+   * answered a KPI's code and null for anything else while only `kpis` had a
+   * short identifier.
    *
-   * The jump by name is `search.entities`, beside this, and reaches every kind
-   * (completeness review M-21). The palette asks both. Giving the other kinds a
-   * short code is a schema change with an allocation scheme behind it, and it
-   * belongs to whichever task decides what those codes look like. Recorded on
-   * the P5-T13 row rather than guessed at.
+   * Each kind is found through `resolveAddress`, so the rule is the one every
+   * action applies to a short identifier: the kind's own read, through the
+   * access getter. A guest who types a KPI's code gets nothing, as the jump by
+   * name beside this gives them nothing (completeness review M-21), and a
+   * session opens only for somebody in its room. A deleted row is not offered,
+   * and nor is one with no page this reader may open.
+   *
+   * The jump by name is `search.entities`; the palette asks both.
    */
   async handler(context, input) {
     const userId = context.actor.userId;
     if (!userId) {
       return null;
     }
-    // **Not upper-cased.** `kpis.shortId` draws from a mixed-case alphabet
-    // (`123456789abc…XYZ`), so folding the case makes every jump miss. Found by
-    // a test that created a KPI and asked for its own code back.
+    // **Not upper-cased.** The alphabet is mixed-case (`123456789abc…XYZ`), so
+    // folding the case makes every jump miss. Found by a test that created a
+    // KPI and asked for its own code back.
     const code = input.shortId.trim();
+    if (!isShortId(code)) {
+      return null;
+    }
 
     return withContext(
       drizzle(context.pool),
@@ -231,53 +264,38 @@ export const readPaletteJump = defineReadAction({
         const tx = rawTx as OperationTx;
         // Resolved so a suspended member gets nothing, the same as every read.
         const memberId = await actingMember(tx, context.workspaceId, userId);
+        const reader = { workspaceId: context.workspaceId, memberId };
 
-        // **Through the workspace's own context, which is the rule the index
-        // applies to a KPI** (completeness review M-21). This read used to
-        // answer any active member, so a guest who typed a KPI's code got its
-        // title from the jump while the jump by name, beside it, rightly
-        // offered them nothing. The two answer in one list, so they have to
-        // agree about who may see what.
-        const [kpi] = await tx
-          .select({ id: kpis.id, title: kpis.title })
-          .from(kpis)
-          .innerJoin(
-            accessContexts,
-            activeOnly(
-              accessContexts,
-              eq(accessContexts.workspaceId, context.workspaceId),
-              eq(accessContexts.resourceType, "workspace"),
-              eq(accessContexts.resourceId, kpis.workspaceId),
-            ),
-          )
-          .where(
-            and(
-              activeOnly(
-                kpis,
-                eq(kpis.workspaceId, context.workspaceId),
-                eq(kpis.shortId, code),
-              ),
-              accessScopeFilter(accessContexts.id, {
-                workspaceId: context.workspaceId,
-                memberId,
-                minLevel: ACCESS_LEVELS.view,
-                member: await accessFilterMember(tx, {
-                  workspaceId: context.workspaceId,
-                  memberId,
-                }),
-              }),
-            ),
-          )
-          .limit(1);
-
-        return kpi
-          ? {
-              entityType: "kpi",
-              entityId: kpi.id,
-              title: kpi.title,
-              href: `/kpis/${kpi.id}`,
+        for (const kind of input.kinds ?? JUMP_KINDS) {
+          let id: string;
+          try {
+            ({ id } = await resolveAddress(tx, reader, kind, code));
+          } catch (error) {
+            if (error instanceof OperationError && error.code === "not_found") {
+              continue;
             }
-          : null;
+            throw error;
+          }
+          const { rows } = await tx.execute<{ title: string }>(
+            sql`select ${sql.identifier(TITLE_COLUMN[kind])} as title
+                  from ${sql.identifier(SHORT_ID_TABLES[kind])}
+                 where workspace_id = ${context.workspaceId}
+                   and id = ${id}
+                   and deleted_at is null`,
+          );
+          const title = rows[0]?.title;
+          if (title === undefined) {
+            continue;
+          }
+          const hrefs = await hrefsInTx(tx, context.workspaceId, memberId, [
+            { entityType: kind, entityId: id },
+          ]);
+          const href = hrefs.get(`${kind}:${id}`);
+          if (href) {
+            return { entityType: kind, entityId: id, title, href };
+          }
+        }
+        return null;
       },
     );
   },

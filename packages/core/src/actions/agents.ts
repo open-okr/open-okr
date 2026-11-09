@@ -45,6 +45,7 @@ import { championInTx } from "../agents/champion.ts";
 import { coachInTx } from "../agents/coach.ts";
 import { agentRunChangedEvent } from "../agents/live.ts";
 import { agentRunStep } from "../agents/run-steps.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { type NudgeCadence, runAgentNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
@@ -322,7 +323,7 @@ export const bindAgentScope = defineWriteAction({
   input: z.object({
     agentId: z.uuid(),
     resourceType: z.string().trim().min(1),
-    resourceId: z.uuid(),
+    resourceId: subjectAddress("resourceType"),
     level: z.number().int().min(ACCESS_LEVELS.view).max(ACCESS_LEVELS.full),
   }),
   output: z.object({

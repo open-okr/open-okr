@@ -34,6 +34,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { asNumber } from "../goals/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
 import { recomputeGoalQualityInTx } from "../quality/service.ts";
@@ -227,7 +228,7 @@ export const changeKeyResultTarget = defineWriteAction({
   summary:
     "Changes a key result's target and records the change. Easing it toward its baseline needs a reason where the workspace asks for one.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.keyResult,
     targetValue: z.number(),
     reason: targetReason.optional(),
   }),
@@ -334,7 +335,7 @@ export const readTargetHistory = defineReadAction({
   name: "goals.targetHistory",
   summary:
     "Every change to a key result's target, oldest first, with who made it and the reason given for easing it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.keyResult }),
   output: z.object({
     changes: z.array(
       z.object({
@@ -429,7 +430,7 @@ export const restoreKeyResult = defineWriteAction({
   // openokr:policy-exempt: bringing back a key result somebody removed puts an existing objective back as it was, which stays open under every setting (METHOD.md §2.9).
   summary:
     "Brings back a key result that was removed on its own, with its value history.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.keyResult }),
   output: z.object({ goal: treeGoal }),
   // The level its removal asked, so whoever could take it out can put it back.
   access: ACCESS_LEVELS.full,

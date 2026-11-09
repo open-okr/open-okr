@@ -138,6 +138,7 @@ import {
   readRhythmRow,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { freshShortId } from "../ids/short.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -721,7 +722,7 @@ export const createSession = defineWriteAction({
     "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
   input: z.object({
     spaceId: z.uuid(),
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     kind: z.enum(SESSION_KINDS),
     title: z.string().trim().min(1).max(200),
     scheduledFor: z.iso.datetime({ offset: true, local: true }),
@@ -861,7 +862,7 @@ export const bookCycleSessions = defineWriteAction({
   input: z.object({
     spaceId: z.uuid(),
     /** The current cycle when omitted. */
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     /** 1 for Monday to 5 for Friday. */
     weekday: z.number().int().min(1).max(5),
     /** `HH:MM` where the workspace is. */
@@ -1084,7 +1085,7 @@ export const openSession = defineWriteAction({
   name: "sessions.open",
   summary:
     "Opens a scheduled session, setting it to running and starting the first stage.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1179,7 +1180,7 @@ export const advanceStage = defineWriteAction({
   summary:
     "Advances a running session to its next stage, recording elapsed time.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.session,
     /**
      * The stage the caller is looking at (docs/design/sessions.md §5). When
      * given and the session has already left it, the advance is refused, so
@@ -1534,7 +1535,7 @@ export const advanceStage = defineWriteAction({
 export const skipSession = defineWriteAction({
   name: "sessions.skip",
   summary: "Marks a scheduled session as skipped.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1620,7 +1621,7 @@ export const skipSession = defineWriteAction({
 export const closeSession = defineWriteAction({
   name: "sessions.close",
   summary: "Closes a running session.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
@@ -1939,7 +1940,7 @@ export const closeSession = defineWriteAction({
 export const readSession = defineReadAction({
   name: "sessions.read",
   summary: "One session by id. Returns not-found when the caller lacks access.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: sessionOutput,
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<SessionOutput> {
@@ -2223,7 +2224,7 @@ export const listSessions = defineReadAction({
 export const listParticipants = defineReadAction({
   name: "sessions.participants",
   summary: "Active space members for a session's space.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.array(
     z.object({
       memberId: z.uuid(),
@@ -2300,8 +2301,8 @@ export const castSessionVote = defineWriteAction({
   summary:
     "A private confidence vote on one key result within a session. Upserts: a second vote replaces the first.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     confidence: z.number().min(0).max(1),
   }),
   output: z.object({ id: z.uuid() }),
@@ -2399,8 +2400,8 @@ export const revealSessionVotes = defineWriteAction({
   name: "sessions.revealVotes",
   summary: "Reveals every vote on a key result in one session, atomically.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
   }),
   output: z.object({ revealed: z.number().int() }),
   access: ACCESS_LEVELS.edit,
@@ -2464,8 +2465,8 @@ export const confirmSessionConfidence = defineWriteAction({
   summary:
     "The champion confirms the final confidence and writes the what-changed note.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     confidence: z.number().min(0).max(1),
     whatChanged: z.string().trim().min(1).max(500),
   }),
@@ -2616,8 +2617,8 @@ export const sessionVotes = defineReadAction({
   summary:
     "Votes for one KR in a session. Before reveal: own vote only. After reveal: all.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
   }),
   output: z.array(
     z.object({
@@ -2705,7 +2706,7 @@ export const sessionVotes = defineReadAction({
 export const sessionConfidenceStatus = defineReadAction({
   name: "sessions.confidenceStatus",
   summary: "Which KRs are confirmed vs unconfirmed in this session.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       keyResultId: z.uuid(),
@@ -2904,8 +2905,8 @@ export const createSessionBlocker = defineWriteAction({
   summary:
     "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     type: z.enum(BLOCKER_TYPES),
     description: z.string().max(500).optional(),
     ownerId: z.uuid(),
@@ -3011,8 +3012,8 @@ export const setSessionNextAction = defineWriteAction({
   summary:
     "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     nextAction: z.string().trim().min(1).max(500),
     ownerId: z.uuid(),
   }),
@@ -3130,7 +3131,7 @@ export const readSessionLowScores = defineReadAction({
   name: "sessions.lowScores",
   summary:
     "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       keyResultId: z.uuid(),
@@ -3430,7 +3431,7 @@ export const reassignSessionBlocker = defineWriteAction({
 export const sessionBlockerStatus = defineReadAction({
   name: "sessions.blockerStatus",
   summary: "Blockers for a session, with aging information.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3525,12 +3526,12 @@ export const setSessionCommitments = defineWriteAction({
   summary:
     "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     items: z.array(
       z.object({
         text: z.string().trim().min(1).max(500),
         ownerId: z.uuid(),
-        keyResultId: z.uuid().optional(),
+        keyResultId: ADDRESS.keyResult.optional(),
       }),
     ),
   }),
@@ -3682,7 +3683,7 @@ export const closeSessionCommitments = defineWriteAction({
 export const listSessionCommitments = defineReadAction({
   name: "sessions.listCommitments",
   summary: "Commitments for a session.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3755,7 +3756,7 @@ export const carriedCommitments = defineReadAction({
   name: "sessions.carriedCommitments",
   summary:
     "Commitments set by earlier sessions in this session's space and not yet closed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3938,7 +3939,7 @@ export const setCoordinatorNote = defineWriteAction({
   name: "sessions.setCoordinatorNote",
   summary: "Adds the coordinator's note to the session digest.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
     note: richTextSchema({
       maxCharacters: COORDINATOR_NOTE_MAX_CHARACTERS,
@@ -4140,8 +4141,8 @@ export const setTrend = defineWriteAction({
   name: "sessions.setTrend",
   summary: "Records the room's trend for one objective in a monthly review.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     trend: z.enum(OBJECTIVE_TRENDS),
   }),
   output: z.object({ id: z.uuid() }),
@@ -4264,7 +4265,7 @@ export const setShifts = defineWriteAction({
   name: "sessions.setShifts",
   summary: "Records the resource or priority shifts noted in a monthly review.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * Editor JSON, or null for no shift. Plain text was taken until 0.4
      * (guided-inputs change 13b).
@@ -4335,7 +4336,7 @@ export const setSessionWins = defineWriteAction({
   name: "sessions.setWins",
   summary: "Names the week's wins in a weekly session, for its digest.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     wins: z.array(z.string().trim().min(1).max(200)).max(10),
   }),
   output: z.object({ id: z.uuid() }),
@@ -4401,9 +4402,9 @@ export const recordDecision = defineWriteAction({
   summary: "Records a decision against the key result or goal it affects.",
   input: z
     .object({
-      sessionId: z.uuid(),
-      goalId: z.uuid().optional(),
-      keyResultId: z.uuid().optional(),
+      sessionId: ADDRESS.session,
+      goalId: ADDRESS.goal.optional(),
+      keyResultId: ADDRESS.keyResult.optional(),
       /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
       text: richTextSchema({
         maxCharacters: DECISION_MAX_CHARACTERS,
@@ -4603,7 +4604,7 @@ export const readMonthlyRecord = defineReadAction({
   name: "sessions.monthlyRecord",
   summary:
     "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The shifts as plain text, from their document since 0.4. */
     shifts: z.string().nullable(),
@@ -4999,7 +5000,7 @@ export const readMonthlyRecord = defineReadAction({
 export const decisionsForGoal = defineReadAction({
   name: "decisions.forGoal",
   summary: "Decisions affecting one goal, newest first, for its page.",
-  input: z.object({ goalId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<DecisionOutput[]> {
@@ -5053,7 +5054,7 @@ export const decisionsForGoal = defineReadAction({
 export const decisionsForCycle = defineReadAction({
   name: "decisions.forCycle",
   summary: "Every decision recorded in one cycle, for the cycle workspace.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<DecisionOutput[]> {
@@ -5136,7 +5137,7 @@ async function requireFacilitator(
 export const addStageMinute = defineWriteAction({
   name: "sessions.addMinute",
   summary: "Gives the running stage one more minute.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid(), stageKey: z.string(), added: z.number() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -5199,7 +5200,7 @@ export const setStageNote = defineWriteAction({
   name: "sessions.setStageNote",
   summary: "Writes the facilitator's private note for the running stage.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.session,
     /**
      * Editor JSON, or null to clear the stage's note. Plain text was taken
      * until 0.4 (guided-inputs change 13b).
@@ -5282,7 +5283,7 @@ export const givePulse = defineWriteAction({
   name: "sessions.givePulse",
   summary: "Records one participant's pulse and their one word for the cycle.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     pulse: z.number().int().min(1).max(5),
     // §8.2 asks for one word. A sentence here turns the read of the room into a
     // paragraph nobody scans, so the boundary refuses it by name rather than
@@ -5466,7 +5467,7 @@ export const readRoomPulse = defineReadAction({
   name: "sessions.roomPulse",
   summary:
     "The read of the room for the facilitator, and the caller's own pulse for everybody.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** Null for anybody but the facilitator, and until somebody has spoken. */
     average: z.number().nullable(),
@@ -5616,8 +5617,8 @@ export const scoreKeyResult = defineWriteAction({
   name: "sessions.scoreKeyResult",
   summary: "Grades one key result 0.0 to 1.0 with a one-line reason.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     score: z.number().min(0).max(1),
     // §8.3 asks for a one-line reason. "Facts, not feelings" cannot be
     // enforced; a score nobody explained can be refused.
@@ -5895,7 +5896,7 @@ export const passMic = defineWriteAction({
   name: "sessions.passMic",
   summary: "Hands the mic to one objective's owner, or puts it down.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * Null puts the mic down and ends the round.
      *
@@ -5903,7 +5904,7 @@ export const passMic = defineWriteAction({
      * thing that marks an objective is the mic moving on from it and nothing
      * takes the mic after the last owner.
      */
-    goalId: z.uuid().nullable(),
+    goalId: ADDRESS.goal.nullable(),
   }),
   output: z.object({
     micGoalId: z.uuid().nullable(),
@@ -6070,8 +6071,8 @@ export const setNarrative = defineWriteAction({
   name: "sessions.setNarrative",
   summary: "Writes what the number does not show for one objective.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     body: narrativeBody,
   }),
   output: z.object({ goalId: z.uuid() }),
@@ -6217,7 +6218,7 @@ export const giveKudos = defineWriteAction({
   name: "sessions.giveKudos",
   summary: "Names the effort that deserved to be seen.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     toMemberId: z.uuid(),
     // §8.1: "Specific beats generous." A required line is the only part of that
     // a product can hold.
@@ -6349,7 +6350,7 @@ export const readNarratives = defineReadAction({
   name: "sessions.narratives",
   summary:
     "Stage three's state: who holds the mic, who has spoken, and what was written.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The one objective speaking now, or null before and after the round. */
     micGoalId: z.uuid().nullable(),
@@ -6423,7 +6424,7 @@ export const readNarratives = defineReadAction({
 export const readRecognition = defineReadAction({
   name: "sessions.recognition",
   summary: "The quarterly review's recognition entries, oldest first.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     entries: z.array(
       z.object({
@@ -6621,7 +6622,7 @@ export const addRetroNote = defineWriteAction({
   name: "sessions.addRetroNote",
   summary: "Writes one note into the team retro's worked or did-not column.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     // §8.1's two columns are canon structure. A third would be a different
     // retro, so the enum refuses it at the boundary rather than storing it.
     columnKey: z.enum(RETRO_COLUMNS),
@@ -6697,7 +6698,7 @@ export const addRetroNote = defineWriteAction({
 export const removeRetroNote = defineWriteAction({
   name: "sessions.removeRetroNote",
   summary: "Removes one retro note, with the dots spent on it.",
-  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session, noteId: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -6791,7 +6792,7 @@ export const removeRetroNote = defineWriteAction({
 export const castRetroVote = defineWriteAction({
   name: "sessions.castRetroVote",
   summary: "Spends or withdraws one dot on a retro note.",
-  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session, noteId: z.uuid() }),
   output: z.object({
     noteId: z.uuid(),
     votes: z.number().int(),
@@ -6933,7 +6934,7 @@ export const readRetro = defineReadAction({
   name: "sessions.retro",
   summary:
     "The team retro board: both columns, their notes and the reader's dots.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     columns: z.array(
       z.object({
@@ -7054,7 +7055,7 @@ export const setManagementAnswer = defineWriteAction({
   summary:
     "Records leadership's answer to one of the management retro's four questions.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     // 1 to 4, indexing the canon questions. The text lives in
     // `packages/method` and never in a row: §11 lists the management-retro
     // questions as unchangeable structure.
@@ -7203,7 +7204,7 @@ export const readManagementRetro = defineReadAction({
   name: "sessions.managementRetro",
   summary:
     "The management retro's four questions with what leadership answered.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     questions: z.array(
       z.object({
@@ -7362,8 +7363,8 @@ export const setRootCause = defineWriteAction({
     "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
   input: z
     .object({
-      sessionId: z.uuid(),
-      keyResultId: z.uuid(),
+      sessionId: ADDRESS.session,
+      keyResultId: ADDRESS.keyResult,
       // 1 to 9, indexing §8.4's taxonomy. The text is canon in
       // `packages/method`; §11 lists the root-cause taxonomy among the
       // structures a workspace cannot change.
@@ -7521,7 +7522,7 @@ export const readRootCauses = defineReadAction({
   name: "sessions.rootCauses",
   summary:
     "Every key result this review graded below its root-cause threshold, with its causes.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /**
      * §11's `scoring.rootCauseThreshold` for each kind, so the screen never
@@ -7660,7 +7661,7 @@ export const submitProcessHealth = defineWriteAction({
   name: "sessions.submitProcessHealth",
   summary: "Scores the five process-health statements anonymously.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * All five, together.
      *
@@ -7812,7 +7813,7 @@ export const readProcessHealth = defineReadAction({
   name: "sessions.processHealth",
   summary:
     "The five process-health statements with the room's averages, and the reader's own answers.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     statements: z.array(
       z.object({
@@ -8023,7 +8024,7 @@ async function diagnosticInputsInTx(
 export const recordDiagnostic = defineWriteAction({
   name: "sessions.recordDiagnostic",
   summary: "Reads the closing diagnostic and stores what the room was told.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     verdict: z.enum(DIAGNOSIS_VERDICTS),
     cycleScore: z.number(),
@@ -8175,7 +8176,7 @@ export const readDiagnostic = defineReadAction({
   name: "sessions.diagnostic",
   summary:
     "The closing diagnostic's verdict for this review, stored or still unreadable.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The stored numbers when recorded, else what the room has so far. */
     cycleScore: z.number().nullable(),
@@ -8304,8 +8305,8 @@ export const decideObjective = defineWriteAction({
   summary:
     "Closes one objective with a keep, modify or abandon decision and a one-line why.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     decision: z.enum(GOAL_CLOSE_DECISIONS),
     // Required. §8.8 asks for "one decision and a one-line why", and a decision
     // nobody explained is the default carry-over the section exists to stop.
@@ -8471,7 +8472,7 @@ export const readReset = defineReadAction({
   name: "sessions.reset",
   summary:
     "Stage nine's state: every objective in the review and how it was closed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     objectives: z.array(
       z.object({
@@ -8604,7 +8605,7 @@ export const captureLearning = defineWriteAction({
   summary:
     "Records what the team now knows, optionally carried into the next cycle.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     text: z.string().trim().min(1).max(1000),
     /**
      * §8.9's "mark the ones to carry forward".
@@ -8734,7 +8735,7 @@ export const addReviewAction = defineWriteAction({
   name: "sessions.addAction",
   summary: "Adds an action with an owner and a date.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     what: z.string().trim().min(1).max(500),
     /**
      * Both required, and §8.1 says why in one line: "Every action has a name and
@@ -8820,7 +8821,7 @@ export const completeReviewAction = defineWriteAction({
   name: "sessions.completeAction",
   summary: "Marks one review action done, or not done again.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     actionId: z.uuid(),
     done: z.boolean(),
   }),
@@ -8892,7 +8893,7 @@ export const readForward = defineReadAction({
   name: "sessions.forward",
   summary:
     "Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     learnings: z.array(
       z.object({
@@ -9125,7 +9126,7 @@ export const readMinutes = defineReadAction({
   name: "sessions.minutes",
   summary:
     "The review's minutes: the executive summary and every stage's record.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     title: z.string(),
     heldOn: z.string().nullable(),
@@ -9600,8 +9601,8 @@ export const revealObjectiveScore = defineWriteAction({
   name: "sessions.revealObjectiveScore",
   summary: "Reveals one objective's score to the whole room in a single write.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
   }),
   output: z.object({
     revealed: z.number().int(),
@@ -9894,7 +9895,7 @@ export const readScoringStatus = defineReadAction({
   name: "sessions.scoringStatus",
   summary:
     "Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     objectives: z.array(
       z.object({
@@ -10419,7 +10420,7 @@ export const readStageCompletion = defineReadAction({
   name: "sessions.stageCompletion",
   summary:
     "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The stages this session walks, in §8.1's order: its half, where held apart. */
     stages: z.array(

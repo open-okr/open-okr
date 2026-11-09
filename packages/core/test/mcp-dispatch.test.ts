@@ -255,7 +255,9 @@ describe("what a refusal says, and what it does not", () => {
     // can fix it. Before P5-T16 a read never reached this branch at all,
     // because the read builder did not parse, and the identifier went to the
     // database instead.
-    await expect(run("goals.read", { id: "not-a-uuid" })).resolves.toEqual({
+    // A number, because any short string is an address since 0.7.0 and one
+    // that names nothing is not-found rather than invalid (short-ids.md S4).
+    await expect(run("goals.read", { id: 42 })).resolves.toEqual({
       text: expect.stringContaining("That input is not valid. id:"),
       isError: true,
     });

@@ -43,6 +43,7 @@ import {
   embeddableTextInTx,
   isEmbeddableType,
 } from "../../embeddings/subjects.ts";
+import { isShortId } from "../../ids/short.ts";
 import { OperationError } from "../../operations/errors.ts";
 import type { OperationTx } from "../../operations/operation.ts";
 import { searchWorkspace } from "../../search/service.ts";
@@ -172,9 +173,11 @@ export interface ResolvedAddress {
  * somebody copies out of the browser, the absolute URL they paste from a
  * message, and the `openokr://` address the resource list handed the agent.
  *
- * An identifier that is not a UUID is not an address. Refusing here rather than
- * letting the action's schema refuse it is what keeps a malformed address and a
- * missing entity answering alike.
+ * An identifier that is neither a UUID nor shaped like a short identifier is
+ * not an address. Refusing here rather than letting the action's schema refuse
+ * it is what keeps a malformed address and a missing entity answering alike. A
+ * short identifier is the link "Copy link" gives a person (short-ids.md S6);
+ * `runFetch` turns it into the key before anything reads it.
  */
 export function parseAddress(raw: string): ResolvedAddress | null {
   const trimmed = raw.trim();
@@ -185,7 +188,7 @@ export function parseAddress(raw: string): ResolvedAddress | null {
   if (trimmed.toLowerCase().startsWith("openokr://")) {
     const rest = trimmed.slice("openokr://".length);
     const [slug, id] = splitAddress(rest);
-    if (!slug || !id || !UUID.test(id)) {
+    if (!slug || !id || !(UUID.test(id) || isShortId(id))) {
       return null;
     }
     return { entityType: typeForSlug(slug.toLowerCase()), entityId: id };
@@ -196,7 +199,7 @@ export function parseAddress(raw: string): ResolvedAddress | null {
     return null;
   }
   const [segment, id] = splitAddress(path);
-  if (!segment || !id || !UUID.test(id)) {
+  if (!segment || !id || !(UUID.test(id) || isShortId(id))) {
     return null;
   }
   const page = pageForPath(segment.toLowerCase());
@@ -323,7 +326,10 @@ export async function runFetch(
   input: unknown,
 ): Promise<FetchResult> {
   const parsed = FETCH_INPUT.parse(input);
-  const address = parseAddress(parsed.url);
+  const parsedAddress = parseAddress(parsed.url);
+  const address = parsedAddress
+    ? await keyedAddress(pool, caller, parsedAddress)
+    : null;
   if (!address) {
     // The caller's own words back, because the address they sent is the one
     // thing a refusal can safely name.
@@ -386,6 +392,53 @@ export async function runFetch(
     text,
     structured: null,
   };
+}
+
+/** The kinds whose short identifier `search.jump` turns into a key. */
+const SHORT_LINK_KINDS = new Set<string>([
+  "goal",
+  "key_result",
+  "kpi",
+  "initiative",
+  "task",
+  "document",
+  "session",
+  "cycle",
+]);
+
+/**
+ * The address with its key in it, or null when a short identifier names
+ * nothing this caller may open. Through `search.jump`, the one read that turns
+ * a short identifier into a key under the caller's own access, so the answer
+ * is the jump's, unknown and unseen alike.
+ */
+async function keyedAddress(
+  pool: Pool,
+  caller: ResearchCaller,
+  address: ResolvedAddress,
+): Promise<ResolvedAddress | null> {
+  if (UUID.test(address.entityId)) {
+    return address;
+  }
+  if (!SHORT_LINK_KINDS.has(address.entityType)) {
+    return null;
+  }
+  const found = await callAction(
+    {
+      pool,
+      workspaceId: caller.workspaceId,
+      actor: { kind: "human", userId: caller.userId },
+      channel: "mcp",
+    },
+    "search.jump",
+    {
+      shortId: address.entityId,
+      kinds: [address.entityType as "goal"],
+    },
+  );
+  return found
+    ? { entityType: address.entityType, entityId: found.entityId }
+    : null;
 }
 
 /** Runs whichever of the two the name means. */

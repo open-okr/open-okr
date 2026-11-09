@@ -42,6 +42,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { renderActivity } from "../activities/renderers.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { claimDueBatches } from "../notifications/drain.ts";
 import { roleHolders } from "../notifications/recipients.ts";
 import {
@@ -850,7 +851,7 @@ export const readSubscription = defineReadAction({
     "Whether the signed-in member is watching a subject, why, and how many others are.",
   input: z.object({
     subjectType: z.string().min(1),
-    subjectId: z.uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z.object({
     watching: z.boolean(),
@@ -968,7 +969,7 @@ export const toggleSubscription = defineWriteAction({
   summary: "Subscribes or unsubscribes the signed-in member from a subject.",
   input: z.object({
     subjectType: z.string().min(1),
-    subjectId: z.uuid(),
+    subjectId: subjectAddress(),
     subscribe: z.boolean(),
   }),
   output: z.object({ subscribed: z.boolean() }),

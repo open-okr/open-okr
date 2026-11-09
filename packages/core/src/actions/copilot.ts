@@ -37,6 +37,7 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { readableCitations } from "../copilot/citations.ts";
 import { isEmbeddableType } from "../embeddings/subjects.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import {
@@ -189,7 +190,7 @@ export const ask = defineWriteAction({
     threadId: z.uuid().optional(),
     /** What the conversation is anchored to. Ignored when continuing a thread. */
     subjectType: z.string().trim().min(1).max(40).optional(),
-    subjectId: z.uuid().optional(),
+    subjectId: subjectAddress().optional(),
     question: z.string().trim().min(1).max(4000),
     /**
      * Answer this in the background (P4-T14b-b).
@@ -761,7 +762,7 @@ export const readThreads = defineReadAction({
   summary: "The reader's own copilot conversations, most recent first.",
   input: z.object({
     subjectType: z.string().trim().min(1).max(40).optional(),
-    subjectId: z.uuid().optional(),
+    subjectId: subjectAddress().optional(),
     limit: z.number().int().min(1).max(100).default(20),
   }),
   output: z.array(

@@ -18,6 +18,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { AGGREGATABLE_KINDS } from "../activities/catalogue.ts";
 import { aggregateFeed, type FeedItem, queryFeed } from "../activities/feed.ts";
 import { renderActivity } from "../activities/renderers.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -265,7 +266,7 @@ export const goalFeed = defineReadAction({
   name: "activities.goalFeed",
   summary: "One goal's activity feed, with its key results and check-ins.",
   input: z.object({
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     cursor: z.object({ at: z.string(), id: z.uuid() }).optional(),
   }),
   output: z.array(feedItem),
