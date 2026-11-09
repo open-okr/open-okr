@@ -124,6 +124,11 @@ const PUBLIC_PREFIXES = [
   // state it is in. Found by the first end-to-end request that asked it
   // anything. It says three component states and a time, by design.
   "/api/status",
+  // The metrics a scraper reads (docs/design/metrics-scrape-token.md D5, plan
+  // 0.7.0 B3). Prometheus sends a bearer token and no cookie, so every scrape
+  // was sent to the sign-in page before the route ran. The route decides, and
+  // answers not-found without a valid token or a session with full access.
+  "/api/metrics",
   // The discovery documents are what a client reads *before* it has anything
   // to authenticate with. Gating them behind a session would mean no client
   // could ever find the endpoints it needs to get one.

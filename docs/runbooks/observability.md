@@ -49,9 +49,16 @@ with `full` access in the workspace it has open. Anything else gets a
 not-found, which is the same answer a signed-out visitor gets: the endpoint is
 deliberately not an oracle for whether this instance is measuring itself.
 
-**An API token is not accepted here.** The endpoint reads the browser
-session, and a token from `/account/api-tokens` is checked only on `/api/v1`.
-A request with no session cookie is sent to the sign-in page.
+**A scraper uses the instance's scrape token**, `OPENOKR_METRICS_TOKEN`, sent
+as `Authorization: Bearer <token>`. `./openokr up` generates it into
+`deploy/docker/secrets/app.env` and writes the same value to
+`deploy/docker/secrets/observability-token`; the Helm chart generates it into
+its Secret. Unset means only a signed-in administrator is answered. A token
+from `/account/api-tokens` is not accepted here: it is a member's, for
+`/api/v1`. A wrong or missing token gets the same not-found as anybody else.
+
+To rotate it, change `OPENOKR_METRICS_TOKEN` in `app.env`, write the same
+value to `secrets/observability-token`, and run `./openokr up`.
 
 The body is Prometheus text exposition, `version=0.0.4`.
 
@@ -160,15 +167,13 @@ responses off, set `LOG_LEVEL=debug` and they come back.
 Off unless asked for. `./openokr up` starts three services and none of this.
 
 ```
-# the file Prometheus sends as a bearer token to /api/metrics
-printf '%s' "$TOKEN" > deploy/docker/secrets/observability-token
-
+./openokr up                        # writes secrets/observability-token
 docker compose --profile observability up -d
 open http://localhost:3001          # Grafana, admin/admin on first run
 ```
 
-The `openokr` target reads nothing until `/api/metrics` accepts a token (see "Reading the numbers by
-hand"); the `caddy` target, the proxy's HTTP series, needs none.
+The `openokr` target scrapes with the token `./openokr up` wrote (see "Reading
+the numbers by hand"); the `caddy` target, the proxy's HTTP series, needs none.
 
 Three dashboards are provisioned from files in
 `deploy/docker/observability/dashboards/`, so they are reviewable in a diff

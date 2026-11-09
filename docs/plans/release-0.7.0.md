@@ -192,7 +192,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 |---|---|---|
 | B1 | done | `docs/design/registration-policy.md` §9 |
 | B2 | done | Also closes P1 |
-| B3 | design approved | `docs/design/metrics-scrape-token.md` |
+| B3 | done | `docs/design/metrics-scrape-token.md`; the Compose smoke test with its new step is not run yet |
 | B4 | done | #192 |
 | B5 | done | `docs/design/tenant-lifecycle.md` §10 |
 | B6 | done | |

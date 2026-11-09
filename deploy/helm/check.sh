@@ -201,6 +201,21 @@ for policy in auto open company_domains invite_only; do
   fi
 done
 
+# The metrics scrape token (plan 0.7.0 B3): generated beside the other two
+# secrets, read by the pod, and optional so a release's own Secret without it
+# still starts.
+manifest=$(render)
+if echo "$manifest" | grep -q "metrics-token:"; then
+  pass "the chart generates a metrics scrape token"
+else
+  fail "the chart generates no metrics scrape token"
+fi
+if echo "$manifest" | grep -A6 "name: OPENOKR_METRICS_TOKEN" | grep -q "optional: true"; then
+  pass "the pod reads the metrics token, and starts without it"
+else
+  fail "the pod does not read the metrics token as optional"
+fi
+
 # --- migrations run in the hook, not in the pods -------------------------
 manifest=$(render)
 

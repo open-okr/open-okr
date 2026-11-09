@@ -16,10 +16,11 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # The product's own series. The endpoint needs an instance-administrator
-  # session, so the token below is a bearer for a machine account the
-  # operator creates at /account/api-tokens. Without it Prometheus reads a
-  # not-found, which is the same answer any unauthorised caller gets.
+  # The product's own series. The bearer below is the instance's scrape token,
+  # OPENOKR_METRICS_TOKEN, which `./openokr up` generates and writes to
+  # secrets/observability-token (docs/design/metrics-scrape-token.md). A wrong
+  # or missing token reads a not-found, the answer any unauthorised caller
+  # gets.
   - job_name: openokr
     metrics_path: /api/metrics
     scheme: http

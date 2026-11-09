@@ -37,6 +37,17 @@ describe("parseEnv", () => {
     expect(error.message).toMatch(/NODE_ENV/);
   });
 
+  // docs/design/metrics-scrape-token.md D4, plan 0.7.0 B3.
+  test("refuses a metrics scrape token shorter than 32 characters", () => {
+    expect(() =>
+      parseEnv({ ...VALID, OPENOKR_METRICS_TOKEN: "short-and-guessable" }),
+    ).toThrow(/OPENOKR_METRICS_TOKEN/);
+  });
+
+  test("leaves the metrics scrape token unset by default", () => {
+    expect(parseEnv(VALID).OPENOKR_METRICS_TOKEN).toBeUndefined();
+  });
+
   test("never puts a variable's value in the error message", () => {
     const secret = "postgres://user:hunter2@localhost:5432/db?sslmode=nonsense";
     const error = captureError(() =>

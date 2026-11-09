@@ -91,6 +91,20 @@ const envSchema = z
       z.string().min(16).default(DEVELOPMENT_AUTH_SECRET),
     ),
 
+    /**
+     * The bearer token Prometheus scrapes /api/metrics with
+     * (docs/design/metrics-scrape-token.md, plan 0.7.0 B3). Unset means the
+     * endpoint answers a signed-in session only. Never a default: a default
+     * token is a published password. At least 32 characters, because it is
+     * checked over the network. `./openokr up` and the Helm chart generate it.
+     */
+    OPENOKR_METRICS_TOKEN: optional(
+      z
+        .string()
+        .min(32, "must be at least 32 characters, so it cannot be guessed")
+        .optional(),
+    ),
+
     /** The instance's public origin, used to build callback and passkey origins. */
     BETTER_AUTH_URL: optional(
       z.string().url().default("http://localhost:3000"),

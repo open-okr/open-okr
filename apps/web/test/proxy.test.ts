@@ -83,6 +83,14 @@ describe("proxy", () => {
     }
   });
 
+  // docs/design/metrics-scrape-token.md D5, plan 0.7.0 B3: a scrape carries a
+  // bearer token and no cookie, and the route decides, answering not-found
+  // without a valid token or session.
+  it("lets a metrics scrape reach the route, which decides", () => {
+    const response = proxy(request("/api/metrics"));
+    expect(response.headers.get("location")).toBeNull();
+  });
+
   it("leaves the agent setup instructions reachable, because the agent has no session", () => {
     // docs/design/agent-setup-prompt.md §9.2.
     const response = proxy(request("/agent-setup/prompt.md"));

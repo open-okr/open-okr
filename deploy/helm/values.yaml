@@ -46,12 +46,16 @@ database:
 publicUrl: ""
 
 secrets:
-  # A Secret holding BETTER_AUTH_SECRET and OPENOKR_ENCRYPTION_KEY. When empty,
-  # the chart generates both on first install and reads them back on upgrade,
-  # so an upgrade never rotates a key underneath stored data.
+  # A Secret holding BETTER_AUTH_SECRET, OPENOKR_ENCRYPTION_KEY and, from 0.7.0,
+  # OPENOKR_METRICS_TOKEN. When empty, the chart generates all three on first
+  # install and reads them back on upgrade, so an upgrade never rotates a key
+  # underneath stored data. With your own Secret, add the metrics token key to
+  # let Prometheus scrape /api/metrics; without it the pod still starts, and the
+  # endpoint answers a signed-in administrator only.
   existingSecret: ""
   authSecretKey: "better-auth-secret"
   encryptionKeyKey: "encryption-key"
+  metricsTokenKey: "metrics-token"
 
 # Instance settings. Every one has a working default; these bootstrap an
 # instance and are overridden by anything set later in the product.

@@ -145,6 +145,28 @@ EOF
   log "secrets written to $SECRETS_DIR (mode 600). Back up $APP_ENV."
 }
 
+# The token Prometheus scrapes /api/metrics with (docs/design/metrics-scrape-
+# token.md D6, plan 0.7.0 B3). Written on first run and on any later `up` that
+# finds it missing, so an instance installed before 0.7.0 gets one at its next
+# `up`. The same value goes in app.env, where the server reads it, and in
+# secrets/observability-token, which the Compose observability profile mounts.
+ensure_metrics_token() {
+  [ -f "$APP_ENV" ] || return 0
+  if ! grep -q '^OPENOKR_METRICS_TOKEN=' "$APP_ENV"; then
+    umask 077
+    printf 'OPENOKR_METRICS_TOKEN=%s\n' "$(random_password)$(random_password)" >> "$APP_ENV"
+    chmod 600 "$APP_ENV"
+    log "generated the metrics scrape token in $APP_ENV"
+  fi
+  token="$(grep '^OPENOKR_METRICS_TOKEN=' "$APP_ENV" | cut -d= -f2-)"
+  if [ ! -f "$SECRETS_DIR/observability-token" ] \
+    || [ "$(cat "$SECRETS_DIR/observability-token")" != "$token" ]; then
+    umask 077
+    printf '%s' "$token" > "$SECRETS_DIR/observability-token"
+    chmod 600 "$SECRETS_DIR/observability-token"
+  fi
+}
+
 # Moves an instance created before the split onto the application role
 # (completeness review H-01).
 #
@@ -349,6 +371,7 @@ case "${1:-help}" in
   up)
     generate_secrets
     adopt_app_role
+    ensure_metrics_token
     reconcile_public_url
     # A bare hostname turns on automatic HTTPS; the default stays plain HTTP.
     if [ -n "${OPENOKR_DOMAIN:-}" ]; then

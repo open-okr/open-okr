@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { loadEnv } from "@openokr/config";
 import { ACCESS_LEVELS } from "@openokr/core";
 import { NextResponse } from "next/server";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -10,7 +12,8 @@ import { requireWorkspace } from "../../../lib/workspace";
  *
  * **It serves and never sends.** The numbers leave this process only in the
  * response to somebody who asked for them here, over the instance's own
- * origin, holding an administrator session. Nothing is pushed, no address is
+ * origin, holding an administrator session or, from 0.7.0, the instance's
+ * scrape token (docs/design/metrics-scrape-token.md). Nothing is pushed, no address is
  * configured, and an air-gapped install reaches this endpoint exactly as a
  * connected one does. Exporting measurements off the host is
  * `observability.otlp.endpoint`, which arrives at P7-T06c and is empty.
@@ -28,27 +31,53 @@ import { requireWorkspace } from "../../../lib/workspace";
  */
 export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<NextResponse | Response> {
+/**
+ * Whether the request carries the instance's scrape token
+ * (docs/design/metrics-scrape-token.md D1 to D3, plan 0.7.0 B3).
+ *
+ * Both sides are hashed first, so the two buffers are the same length and the
+ * comparison never returns early on a length difference. Unset means no token
+ * is accepted at all.
+ */
+function carriesScrapeToken(request: Request): boolean {
+  const configured = loadEnv().OPENOKR_METRICS_TOKEN;
+  if (!configured) {
+    return false;
+  }
+  const presented = /^Bearer\s+(.+)$/i.exec(
+    request.headers.get("authorization") ?? "",
+  )?.[1];
+  if (!presented) {
+    return false;
+  }
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return timingSafeEqual(digest(presented), digest(configured));
+}
+
+/** A signed-in member with `full` access, the endpoint's first door. */
+async function hasFullSession(): Promise<boolean> {
+  try {
+    const { workspace } = await requireWorkspace();
+    const level = await resolveAccessLevelFor(
+      workspace.workspaceId,
+      workspace.memberId,
+    );
+    return level >= ACCESS_LEVELS.full;
+  } catch {
+    // `requireWorkspace` redirects a page. A route handler cannot redirect a
+    // scraper usefully, so an unresolved session is simply not found.
+    return false;
+  }
+}
+
+export async function GET(request: Request): Promise<NextResponse | Response> {
   if (!isMetricsEnabled()) {
     // The same not-found as a refusal, on purpose. An operator who has turned
     // metrics off and forgotten reads the setting, not this endpoint.
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
-  let level: number;
-  try {
-    const { workspace } = await requireWorkspace();
-    level = await resolveAccessLevelFor(
-      workspace.workspaceId,
-      workspace.memberId,
-    );
-  } catch {
-    // `requireWorkspace` redirects a page. A route handler cannot redirect a
-    // scraper usefully, so an unresolved session is simply not found.
-    return NextResponse.json({ error: "not found" }, { status: 404 });
-  }
-
-  if (level < ACCESS_LEVELS.full) {
+  if (!carriesScrapeToken(request) && !(await hasFullSession())) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 

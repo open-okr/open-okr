@@ -65,6 +65,14 @@ spec:
                   key: {{ .Values.secrets.authSecretKey }}
             - name: BETTER_AUTH_URL
               value: {{ include "openokr.publicUrl" . | quote }}
+            # Optional, so a release with its own Secret and no metrics key
+            # still starts (plan 0.7.0 B3).
+            - name: OPENOKR_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openokr.secretName" . }}
+                  key: {{ .Values.secrets.metricsTokenKey }}
+                  optional: true
             - name: OPENOKR_INSTANCE_NAME
               value: {{ .Values.instance.name | quote }}
             - name: OPENOKR_DEFAULT_LANGUAGE
