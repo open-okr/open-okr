@@ -63,6 +63,7 @@ export function QuarterlyReview({
   note,
   isFacilitator,
   isRunning,
+  completion,
 }: {
   readonly sessionId: string;
   readonly stages: readonly TimedReviewStage[];
@@ -83,6 +84,13 @@ export function QuarterlyReview({
   readonly note: unknown;
   readonly isFacilitator: boolean;
   readonly isRunning: boolean;
+  /**
+   * Each stage's completion condition, from `sessions.stageCompletion` (plan
+   * 0.7.0, S1): true or false where the stage has one, null where it has
+   * none. Shown on the stages the room has reached, because every stage
+   * ahead is not done yet by definition and saying so eleven times is noise.
+   */
+  readonly completion: Readonly<Record<string, boolean | null>>;
 }) {
   const { t } = useTranslations();
 
@@ -224,15 +232,25 @@ export function QuarterlyReview({
           const width = totalSeconds
             ? (budgetFor(index) / totalSeconds) * 100
             : 100 / stages.length;
-          const done = currentIndex >= 0 && index < currentIndex;
+          const passed = currentIndex >= 0 && index < currentIndex;
           const isCurrent = index === currentIndex;
+          // The same reading as the rail beside it, which carries it in
+          // words; the bar is a picture of the agenda.
+          const leftShort =
+            passed && completion[stageKeys[index] ?? ""] === false;
           return (
             <span
               key={stage.stage}
               style={{ width: `${width}%` }}
               className={[
                 "rounded-full",
-                done ? "bg-ok" : isCurrent ? "bg-brand" : "bg-raised",
+                leftShort
+                  ? "bg-warn"
+                  : passed
+                    ? "bg-ok"
+                    : isCurrent
+                      ? "bg-brand"
+                      : "bg-raised",
               ].join(" ")}
             />
           );
@@ -272,9 +290,18 @@ export function QuarterlyReview({
                   <ul className="flex flex-col gap-0.5">
                     {inAct.map(({ stage, index }) => {
                       const key = stageKeys[index] ?? "";
-                      const done = currentIndex >= 0 && index < currentIndex;
+                      const passed = currentIndex >= 0 && index < currentIndex;
                       const isCurrent = index === currentIndex;
                       const added = addedMinutes[key] ?? 0;
+                      // Only a stage the room has reached is judged. Null is
+                      // a stage with no condition the product can read.
+                      const met =
+                        currentIndex >= 0 && index <= currentIndex
+                          ? (completion[key] ?? null)
+                          : null;
+                      // Passed and short of its condition is not a tick: the
+                      // room moved on, and the rail says what it left.
+                      const ticked = passed && met !== false;
                       return (
                         <li
                           key={stage.stage}
@@ -286,17 +313,38 @@ export function QuarterlyReview({
                           <span
                             className={[
                               "flex h-5 w-5 flex-none items-center justify-center rounded-full text-2xs font-semibold",
-                              done
+                              ticked
                                 ? "bg-ok text-on-ok"
                                 : isCurrent
                                   ? "bg-brand text-on-brand"
-                                  : "bg-raised text-ink-3",
+                                  : passed
+                                    ? "bg-warn-bg text-warn"
+                                    : "bg-raised text-ink-3",
                             ].join(" ")}
                           >
-                            {done ? "✓" : stage.stage}
+                            {ticked ? "✓" : stage.stage}
                           </span>
-                          <span className="flex-1 text-sm text-ink">
-                            {stage.title}
+                          <span className="flex flex-1 flex-col">
+                            <span className="text-sm text-ink">
+                              {stage.title}
+                            </span>
+                            {/* In words, never colour alone (UIUX-PLAN §2). */}
+                            {met === null ? null : (
+                              <span
+                                className={[
+                                  "text-2xs font-semibold",
+                                  met ? "text-ok" : "text-warn",
+                                ].join(" ")}
+                              >
+                                {met
+                                  ? t(
+                                      "session.detail.quarterlyReview.stageDone",
+                                    )
+                                  : t(
+                                      "session.detail.quarterlyReview.stageNotDone",
+                                    )}
+                              </span>
+                            )}
                           </span>
                           <span className="flex-none text-xs tabular-nums text-ink-3">
                             {/* The minutes actually available, so a stage the

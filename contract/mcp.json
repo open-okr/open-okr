@@ -13990,6 +13990,31 @@
       }
     },
     {
+      "name": "sessions.stageCompletion",
+      "description": "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "sessions.roomPulse",
       "description": "The read of the room for the facilitator, and the caller's own pulse for everybody.",
       "inputSchema": {

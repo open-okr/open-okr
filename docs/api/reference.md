@@ -58,7 +58,7 @@ the machine-readable document.
 | [rhythm](#rhythm) | 2 |
 | [roles](#roles) | 5 |
 | [search](#search) | 3 |
-| [sessions](#sessions) | 70 |
+| [sessions](#sessions) | 71 |
 | [settings](#settings) | 7 |
 | [spaces](#spaces) | 13 |
 | [sso](#sso) | 4 |
@@ -600,6 +600,7 @@ the machine-readable document.
 | `sessions.setTrend`<br/>Records the room's trend for one objective in a monthly review. | `POST /api/v1/sessions/setTrend` | writes |
 | `sessions.setWins`<br/>Names the week's wins in a weekly session, for its digest. | `POST /api/v1/sessions/setWins` | writes |
 | `sessions.skip`<br/>Marks a scheduled session as skipped. | `POST /api/v1/sessions/skip` | writes |
+| `sessions.stageCompletion`<br/>Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss. | `GET /api/v1/sessions/stageCompletion` | reads |
 | `sessions.submitProcessHealth`<br/>Scores the five process-health statements anonymously. | `POST /api/v1/sessions/submitProcessHealth` | writes |
 | `sessions.votes`<br/>Votes for one KR in a session. Before reveal: own vote only. After reveal: all. | `GET /api/v1/sessions/votes` | reads |
 

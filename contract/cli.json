@@ -11462,6 +11462,23 @@
       "pages": false
     },
     {
+      "name": "sessions stageCompletion",
+      "action": "sessions.stageCompletion",
+      "method": "GET",
+      "path": "/sessions/stageCompletion",
+      "scope": "read",
+      "summary": "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sessions roomPulse",
       "action": "sessions.roomPulse",
       "method": "GET",

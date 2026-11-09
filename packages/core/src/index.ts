@@ -1152,6 +1152,7 @@ export {
   type SessionStageChangedEvent,
   sessionChannel,
 } from "./sessions/live.ts";
+export type { StageGapReason } from "./sessions/stage-completion.ts";
 export {
   BRAND_SURFACES,
   type BrandPalette,

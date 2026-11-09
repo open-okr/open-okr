@@ -20,7 +20,12 @@
  * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
-import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  OperationError,
+  type StageGapReason,
+} from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -88,6 +93,7 @@ import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
+import { stageGapText } from "./stage-gap.ts";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
@@ -470,6 +476,33 @@ export default async function SessionPage({ params }: SessionPageProps) {
         ),
       )
     : [];
+
+  // Each stage's completion condition (docs/design/sessions.md §4.1, plan
+  // 0.7.0 S1): shown on the rail and beside the advance, never enforced but
+  // for stage two's explanations. Not read before the review opens, because
+  // the rail judges only the stages the room has reached.
+  const stageCompletion =
+    isQuarterly && sessionRow.stageKey !== null
+      ? (
+          (await callAction(context, "sessions.stageCompletion", {
+            sessionId: id,
+          })) as {
+            stages: {
+              stageKey: string;
+              complete: boolean | null;
+              gap: { reason: StageGapReason; count: number } | null;
+              refusesAdvance: boolean;
+            }[];
+          }
+        ).stages
+      : [];
+  const currentCompletion = stageCompletion.find(
+    (entry) => entry.stageKey === sessionRow.stageKey,
+  );
+  const currentGap =
+    currentCompletion?.complete === false && currentCompletion.gap !== null
+      ? stageGapText(currentCompletion.gap, t)
+      : null;
 
   // The monthly review's whole record in one read (METHOD.md §7.5, P4-T09).
   // Loaded for a scheduled session as well, so a facilitator can see what the
@@ -917,14 +950,29 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
           {!isOnLastStage && !isMonthly ? (
-            <AdvanceControl sessionId={id} stageKey={sessionRow.stageKey} />
+            <AdvanceControl
+              sessionId={id}
+              stageKey={sessionRow.stageKey}
+              missing={currentGap}
+              refuses={currentCompletion?.refusesAdvance ?? false}
+            />
           ) : (
             <form
               action={async () => {
                 "use server";
                 await closeSessionAction(id);
               }}
+              className="flex flex-col gap-1.5"
             >
+              {/* The last stage's gap, said the same way the advance says
+                  it (plan 0.7.0, S1). Closing is not refused for it. */}
+              {currentGap === null ? null : (
+                <p className="max-w-prose text-xs text-ink-2">
+                  {t("session.detail.advanceControl.notDoneYet", {
+                    missing: currentGap,
+                  })}
+                </p>
+              )}
               <Button type="submit" variant="primary">
                 {t("session.detail.closeSession")}
               </Button>
@@ -967,6 +1015,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           note={sessionRow.notes[sessionRow.stageKey ?? ""] ?? null}
           isFacilitator={isFacilitator}
           isRunning={isRunning}
+          completion={Object.fromEntries(
+            stageCompletion.map((entry) => [entry.stageKey, entry.complete]),
+          )}
         />
       ) : null}
 

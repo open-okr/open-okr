@@ -75,6 +75,7 @@ import {
   portfolioVerdictOf,
   progressSignal,
   REVIEW_PARTS,
+  REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
   type ReviewPart,
   type ReviewStageKey,
@@ -150,6 +151,21 @@ import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
+import {
+  actionsCondition,
+  learningsCondition,
+  managementCondition,
+  narrativesCondition,
+  pulseCondition,
+  recognitionCondition,
+  resetCondition,
+  rootCauseCondition,
+  STAGE_GAP_REASONS,
+  type StageCondition,
+  scoringCondition,
+  stageGapSentence,
+  surveyCondition,
+} from "../sessions/stage-completion.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { wallClock } from "./wall-clock.ts";
@@ -5359,6 +5375,55 @@ function countWords(
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
 }
 
+/**
+ * The people a review's room is waiting for: every active member of its
+ * space, the same list `sessions.participants` reads. Stage one counts its
+ * pulses against it and stage eight its surveys (plan 0.7.0, S1).
+ */
+async function reviewParticipantIdsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string | null,
+): Promise<{ memberId: string }[]> {
+  if (!spaceId) {
+    return [];
+  }
+  return tx
+    .select({ memberId: spaceMembers.memberId })
+    .from(spaceMembers)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.id, spaceMembers.memberId))
+    .where(
+      activeOnly(
+        spaceMembers,
+        eq(spaceMembers.workspaceId, workspaceId),
+        eq(spaceMembers.spaceId, spaceId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    );
+}
+
+/** Every pulse and word given in one review, with whose they are. */
+async function pulseRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      memberId: sessionParticipants.memberId,
+      pulse: sessionParticipants.pulse,
+      word: sessionParticipants.word,
+    })
+    .from(sessionParticipants)
+    .where(
+      activeOnly(
+        sessionParticipants,
+        eq(sessionParticipants.workspaceId, workspaceId),
+        eq(sessionParticipants.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readRoomPulse = defineReadAction({
   name: "sessions.roomPulse",
   summary:
@@ -5410,45 +5475,24 @@ export const readRoomPulse = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            memberId: sessionParticipants.memberId,
-            pulse: sessionParticipants.pulse,
-            word: sessionParticipants.word,
-          })
-          .from(sessionParticipants)
-          .where(
-            activeOnly(
-              sessionParticipants,
-              eq(sessionParticipants.workspaceId, context.workspaceId),
-              eq(sessionParticipants.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await pulseRowsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         const spoken = rows.filter(
           (row): row is typeof row & { pulse: number } => row.pulse !== null,
         );
         const mineRow = rows.find((row) => row.memberId === memberId);
 
-        // How many the room is waiting for. Every active member of the space,
-        // which is the same list `sessions.participants` reads.
-        const expectedRows = session.spaceId
-          ? await tx
-              .select({ memberId: spaceMembers.memberId })
-              .from(spaceMembers)
-              .innerJoin(
-                workspaceMembers,
-                eq(workspaceMembers.id, spaceMembers.memberId),
-              )
-              .where(
-                activeOnly(
-                  spaceMembers,
-                  eq(spaceMembers.workspaceId, context.workspaceId),
-                  eq(spaceMembers.spaceId, session.spaceId),
-                  eq(workspaceMembers.status, "active"),
-                ),
-              )
-          : [];
+        // How many the room is waiting for: the same list stage one's
+        // completion condition reads (plan 0.7.0, S1).
+        const expectedRows = await reviewParticipantIdsInTx(
+          tx,
+          context.workspaceId,
+          session.spaceId,
+        );
 
         const isFacilitator = session.facilitatorId === memberId;
         const { thresholds } = resolveRhythm(
@@ -6225,6 +6269,44 @@ export const giveKudos = defineWriteAction({
   }),
 });
 
+/**
+ * Stage three's rows: every objective the review covers, with its champion
+ * and whatever the room recorded for it. Read by the stage and by the rail's
+ * completion condition, so both count the same objectives.
+ */
+async function narrativeRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { id: string; spaceId: string | null; cycleId: string | null },
+) {
+  const champions = alias(workspaceMembers, "champions");
+  const authors = alias(workspaceMembers, "authors");
+  return tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      championName: champions.name,
+      spokenAt: reviewNarratives.spokenAt,
+      body: reviewNarratives.body,
+      authorName: authors.name,
+    })
+    .from(goals)
+    .leftJoin(champions, eq(champions.id, goals.championId))
+    .leftJoin(
+      reviewNarratives,
+      and(
+        eq(reviewNarratives.goalId, goals.id),
+        eq(reviewNarratives.sessionId, session.id),
+        isNull(reviewNarratives.deletedAt),
+      ),
+    )
+    .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
+    .where(
+      activeOnly(goals, ...reviewObjectiveConditions(workspaceId, session)),
+    )
+    .orderBy(goals.position, goals.createdAt);
+}
+
 export const readNarratives = defineReadAction({
   name: "sessions.narratives",
   summary:
@@ -6272,36 +6354,7 @@ export const readNarratives = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const champions = alias(workspaceMembers, "champions");
-        const authors = alias(workspaceMembers, "authors");
-
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            championName: champions.name,
-            spokenAt: reviewNarratives.spokenAt,
-            body: reviewNarratives.body,
-            authorName: authors.name,
-          })
-          .from(goals)
-          .leftJoin(champions, eq(champions.id, goals.championId))
-          .leftJoin(
-            reviewNarratives,
-            and(
-              eq(reviewNarratives.goalId, goals.id),
-              eq(reviewNarratives.sessionId, input.sessionId),
-              isNull(reviewNarratives.deletedAt),
-            ),
-          )
-          .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
-          .where(
-            activeOnly(
-              goals,
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt);
+        const rows = await narrativeRowsInTx(tx, context.workspaceId, session);
 
         const objectives = rows.map((row) => ({
           goalId: row.goalId,
@@ -6321,7 +6374,8 @@ export const readNarratives = defineReadAction({
           objectives,
           spoken,
           total: objectives.length,
-          complete: objectives.length > 0 && spoken === objectives.length,
+          // The rail's own answer for stage three (plan 0.7.0, S1).
+          complete: narrativesCondition(objectives).complete,
         };
       },
     );
@@ -7064,6 +7118,49 @@ export const setManagementAnswer = defineWriteAction({
   }),
 });
 
+/**
+ * §8.7's four questions with what leadership answered. Read by the stage,
+ * which only leadership may open, and by the rail's completion condition,
+ * which counts the answers and returns none of them.
+ */
+async function managementQuestionsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const answerers = alias(workspaceMembers, "answerers");
+  const rows = await tx
+    .select({
+      questionKey: managementAnswers.questionKey,
+      bodyDocument: managementAnswers.bodyDocument,
+      answeredByName: answerers.name,
+    })
+    .from(managementAnswers)
+    .innerJoin(answerers, eq(answerers.id, managementAnswers.answeredById))
+    .where(
+      activeOnly(
+        managementAnswers,
+        eq(managementAnswers.workspaceId, workspaceId),
+        eq(managementAnswers.sessionId, sessionId),
+      ),
+    );
+  const byKey = new Map(rows.map((row) => [row.questionKey, row]));
+
+  // Driven by the canon list, not by the rows: all four questions are
+  // always asked, and an unanswered one is a gap the stage can see rather
+  // than a question that quietly disappeared.
+  return MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
+    const answer = byKey.get(index + 1);
+    return {
+      questionKey: index + 1,
+      question,
+      body: answer ? plainTextOfStored(answer.bodyDocument) : null,
+      bodyDocument: answer?.bodyDocument ?? null,
+      answeredByName: answer?.answeredByName ?? null,
+    };
+  });
+}
+
 export const readManagementRetro = defineReadAction({
   name: "sessions.managementRetro",
   summary:
@@ -7108,40 +7205,11 @@ export const readManagementRetro = defineReadAction({
           input.sessionId,
         );
 
-        const answerers = alias(workspaceMembers, "answerers");
-        const rows = await tx
-          .select({
-            questionKey: managementAnswers.questionKey,
-            bodyDocument: managementAnswers.bodyDocument,
-            answeredByName: answerers.name,
-          })
-          .from(managementAnswers)
-          .innerJoin(
-            answerers,
-            eq(answerers.id, managementAnswers.answeredById),
-          )
-          .where(
-            activeOnly(
-              managementAnswers,
-              eq(managementAnswers.workspaceId, context.workspaceId),
-              eq(managementAnswers.sessionId, input.sessionId),
-            ),
-          );
-        const byKey = new Map(rows.map((row) => [row.questionKey, row]));
-
-        // Driven by the canon list, not by the rows: all four questions are
-        // always asked, and an unanswered one is a gap the stage can see rather
-        // than a question that quietly disappeared.
-        const questions = MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
-          const answer = byKey.get(index + 1);
-          return {
-            questionKey: index + 1,
-            question,
-            body: answer ? plainTextOfStored(answer.bodyDocument) : null,
-            bodyDocument: answer?.bodyDocument ?? null,
-            answeredByName: answer?.answeredByName ?? null,
-          };
-        });
+        const questions = await managementQuestionsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const answered = questions.filter(
           (entry) => entry.body !== null,
         ).length;
@@ -7149,7 +7217,8 @@ export const readManagementRetro = defineReadAction({
         return {
           questions,
           answered,
-          complete: answered === questions.length,
+          // The rail's own answer for stage six (plan 0.7.0, S1).
+          complete: managementCondition(answered, questions.length).complete,
         };
       },
     );
@@ -7172,6 +7241,22 @@ export const readManagementRetro = defineReadAction({
  * why it missed what it promised.
  */
 async function missedKeyResultsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  thresholds: ResolvedThresholds,
+) {
+  return (await rootCauseScopeInTx(tx, workspaceId, sessionId, thresholds))
+    .missed;
+}
+
+/**
+ * How many key results the review graded, and the ones below their
+ * threshold. The count is stage seven's "nothing scored is not nothing
+ * missed" (plan 0.7.0, S1): an empty miss list means nothing to name only
+ * once something has been graded.
+ */
+async function rootCauseScopeInTx(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
@@ -7201,9 +7286,36 @@ async function missedKeyResultsInTx(
       ),
     )
     .orderBy(goals.position, keyResults.position);
-  return graded.filter((row) =>
-    needsRootCause(Number(row.score), row.kind, thresholds),
-  );
+  return {
+    graded: graded.length,
+    missed: graded.filter((row) =>
+      needsRootCause(Number(row.score), row.kind, thresholds),
+    ),
+  };
+}
+
+/** The causes named in one review, by key result. */
+async function namedRootCausesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const named = await tx
+    .select({
+      keyResultId: rootCauses.keyResultId,
+      causeKey: rootCauses.causeKey,
+      secondaryCauseKey: rootCauses.secondaryCauseKey,
+      detail: rootCauses.detail,
+    })
+    .from(rootCauses)
+    .where(
+      activeOnly(
+        rootCauses,
+        eq(rootCauses.workspaceId, workspaceId),
+        eq(rootCauses.sessionId, sessionId),
+      ),
+    );
+  return new Map(named.map((row) => [row.keyResultId, row]));
 }
 
 export const setRootCause = defineWriteAction({
@@ -7433,7 +7545,7 @@ export const readRootCauses = defineReadAction({
           context.workspaceId,
           session.cycleId,
         );
-        const missed = await missedKeyResultsInTx(
+        const { graded, missed } = await rootCauseScopeInTx(
           tx,
           context.workspaceId,
           input.sessionId,
@@ -7441,22 +7553,11 @@ export const readRootCauses = defineReadAction({
         );
         const required = practice["review.rootCauses"] !== "optional";
 
-        const named = await tx
-          .select({
-            keyResultId: rootCauses.keyResultId,
-            causeKey: rootCauses.causeKey,
-            secondaryCauseKey: rootCauses.secondaryCauseKey,
-            detail: rootCauses.detail,
-          })
-          .from(rootCauses)
-          .where(
-            activeOnly(
-              rootCauses,
-              eq(rootCauses.workspaceId, context.workspaceId),
-              eq(rootCauses.sessionId, input.sessionId),
-            ),
-          );
-        const byKeyResult = new Map(named.map((row) => [row.keyResultId, row]));
+        const byKeyResult = await namedRootCausesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         const keyResultRows = missed.map((entry) => {
           const cause = byKeyResult.get(entry.keyResultId);
@@ -7486,8 +7587,10 @@ export const readRootCauses = defineReadAction({
           thresholds: thresholds["scoring.rootCauseThreshold"],
           keyResults: keyResultRows,
           named: withCause,
-          complete:
-            keyResultRows.length > 0 && withCause === keyResultRows.length,
+          // The rail's own answer for stage seven (plan 0.7.0, S1). It asked
+          // for at least one miss until then, so a review where everything
+          // graded cleared its line read as unfinished here and nowhere else.
+          complete: rootCauseCondition(graded, keyResultRows).complete,
           required,
         };
       },
@@ -7645,6 +7748,28 @@ export const submitProcessHealth = defineWriteAction({
   }),
 });
 
+/** Every process-health answer in one review, keyed by its salted respondent. */
+async function processHealthRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      statementKey: processHealthResponses.statementKey,
+      score: processHealthResponses.score,
+      respondentHash: processHealthResponses.respondentHash,
+    })
+    .from(processHealthResponses)
+    .where(
+      activeOnly(
+        processHealthResponses,
+        eq(processHealthResponses.workspaceId, workspaceId),
+        eq(processHealthResponses.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readProcessHealth = defineReadAction({
   name: "sessions.processHealth",
   summary:
@@ -7694,20 +7819,11 @@ export const readProcessHealth = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            statementKey: processHealthResponses.statementKey,
-            score: processHealthResponses.score,
-            respondentHash: processHealthResponses.respondentHash,
-          })
-          .from(processHealthResponses)
-          .where(
-            activeOnly(
-              processHealthResponses,
-              eq(processHealthResponses.workspaceId, context.workspaceId),
-              eq(processHealthResponses.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await processHealthRowsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         // The reader's own hash, recomputed rather than stored anywhere. With no
         // salt yet nobody has answered, so there is nothing of theirs to find.
@@ -8271,6 +8387,48 @@ export const decideObjective = defineWriteAction({
   }),
 });
 
+/**
+ * Stage nine's rows: every objective the review covers, and the decision the
+ * room recorded for each. Read by the stage and by the rail's completion
+ * condition, so both count the same objectives.
+ */
+async function resetRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { id: string; spaceId: string | null; cycleId: string | null },
+) {
+  const rows = await tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      kind: goals.kind,
+    })
+    .from(goals)
+    .where(
+      activeOnly(goals, ...reviewObjectiveConditions(workspaceId, session)),
+    )
+    .orderBy(goals.position, goals.createdAt);
+
+  const decisions = await tx
+    .select({
+      goalId: reviewDecisions.goalId,
+      decision: reviewDecisions.decision,
+      why: reviewDecisions.why,
+    })
+    .from(reviewDecisions)
+    .where(
+      activeOnly(
+        reviewDecisions,
+        eq(reviewDecisions.workspaceId, workspaceId),
+        eq(reviewDecisions.sessionId, session.id),
+      ),
+    );
+  return {
+    rows,
+    byGoal: new Map(decisions.map((row) => [row.goalId, row])),
+  };
+}
+
 export const readReset = defineReadAction({
   name: "sessions.reset",
   summary:
@@ -8321,36 +8479,11 @@ export const readReset = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            kind: goals.kind,
-          })
-          .from(goals)
-          .where(
-            activeOnly(
-              goals,
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt);
-
-        const decisions = await tx
-          .select({
-            goalId: reviewDecisions.goalId,
-            decision: reviewDecisions.decision,
-            why: reviewDecisions.why,
-          })
-          .from(reviewDecisions)
-          .where(
-            activeOnly(
-              reviewDecisions,
-              eq(reviewDecisions.workspaceId, context.workspaceId),
-              eq(reviewDecisions.sessionId, input.sessionId),
-            ),
-          );
-        const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
+        const { rows, byGoal } = await resetRowsInTx(
+          tx,
+          context.workspaceId,
+          session,
+        );
 
         // The grades from the review half (§8, P9-T20b-a).
         const { review } = await reviewHalvesInTx(
@@ -8415,7 +8548,8 @@ export const readReset = defineReadAction({
           objectives,
           decided: decidedCount,
           total: objectives.length,
-          complete: objectives.length > 0 && decidedCount === objectives.length,
+          // The rail's own answer for stage nine (plan 0.7.0, S1).
+          complete: resetCondition(objectives).complete,
         };
       },
     );
@@ -9656,6 +9790,68 @@ const scoringKeyResult = z.object({
     .nullable(),
 });
 
+/**
+ * Every key result a review grades, with its evidence: the same objectives
+ * the stage's own close judges, so a company review lists every key result it
+ * then asks about. Read by stage two and by the rail's completion condition.
+ */
+async function scoringRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { spaceId: string | null; cycleId: string | null },
+) {
+  return tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      goalPosition: goals.position,
+      goalAddedMidCycleAt: goals.addedMidCycleAt,
+      keyResultId: keyResults.id,
+      title: keyResults.title,
+      weight: keyResults.weight,
+      baseline: keyResults.baselineValue,
+      target: keyResults.targetValue,
+      current: keyResults.currentValue,
+      unit: keyResults.unit,
+      position: keyResults.position,
+      kind: goals.kind,
+    })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        isNull(goals.deletedAt),
+        ...reviewObjectiveConditions(workspaceId, session),
+      ),
+    )
+    .orderBy(goals.position, goals.createdAt, keyResults.position);
+}
+
+/** The grades one review recorded, whether or not they are revealed yet. */
+async function reviewGradesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      keyResultId: reviewScores.keyResultId,
+      score: reviewScores.score,
+      reason: reviewScores.reason,
+      revealedAt: reviewScores.revealedAt,
+    })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readScoringStatus = defineReadAction({
   name: "sessions.scoringStatus",
   summary:
@@ -9750,51 +9946,12 @@ export const readScoringStatus = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            goalPosition: goals.position,
-            goalAddedMidCycleAt: goals.addedMidCycleAt,
-            keyResultId: keyResults.id,
-            title: keyResults.title,
-            weight: keyResults.weight,
-            baseline: keyResults.baselineValue,
-            target: keyResults.targetValue,
-            current: keyResults.currentValue,
-            unit: keyResults.unit,
-            position: keyResults.position,
-            kind: goals.kind,
-          })
-          .from(keyResults)
-          .innerJoin(goals, eq(goals.id, keyResults.goalId))
-          .where(
-            activeOnly(
-              keyResults,
-              eq(keyResults.workspaceId, context.workspaceId),
-              isNull(goals.deletedAt),
-              // The same objectives the stage's own close judges, so a
-              // company review lists every key result it then asks about.
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt, keyResults.position);
-
-        const graded = await tx
-          .select({
-            keyResultId: reviewScores.keyResultId,
-            score: reviewScores.score,
-            reason: reviewScores.reason,
-            revealedAt: reviewScores.revealedAt,
-          })
-          .from(reviewScores)
-          .where(
-            activeOnly(
-              reviewScores,
-              eq(reviewScores.workspaceId, context.workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await scoringRowsInTx(tx, context.workspaceId, session);
+        const graded = await reviewGradesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const byKeyResult = new Map(
           graded.map((row) => [
             row.keyResultId,
@@ -10031,11 +10188,292 @@ export const readScoringStatus = defineReadAction({
                   scored: committedScores.length,
                 },
           tooSafe: tooSafePattern(revealed, thresholds) ? TOO_SAFE_TEXT : null,
-          complete:
-            objectives.length > 0 &&
-            objectives.every((entry) => entry.scored === entry.total),
+          // The rail's own answer for stage two (plan 0.7.0, S1).
+          complete: scoringCondition(
+            objectives.flatMap((entry) => entry.keyResults),
+          ).complete,
           adjustment: practice["scoring.adjustment"],
         };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Each stage's completion condition, shown and not enforced
+// (docs/design/sessions.md §4.1, plan 0.7.0 S1)
+// ---------------------------------------------------------------------------
+
+type ReviewSessionRow = Awaited<ReturnType<typeof requireSessionAccess>>;
+
+/**
+ * One stage's condition, or null where the stage has none the product can
+ * read from what it stores.
+ *
+ * Every branch reads the rows its own stage read loads, through the same
+ * helper, and decides through the same pure function in
+ * `sessions/stage-completion.ts`. Two places deciding whether a stage is done
+ * would be two answers on one screen.
+ */
+async function stageConditionInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: ReviewSessionRow,
+  stageKey: ReviewStageKey,
+): Promise<StageCondition | null> {
+  switch (stageKey) {
+    case "open": {
+      const participants = await reviewParticipantIdsInTx(
+        tx,
+        workspaceId,
+        session.spaceId,
+      );
+      return pulseCondition(
+        participants.map((row) => row.memberId),
+        await pulseRowsInTx(tx, workspaceId, session.id),
+      );
+    }
+    case "score": {
+      const rows = await scoringRowsInTx(tx, workspaceId, session);
+      const grades = new Map(
+        (await reviewGradesInTx(tx, workspaceId, session.id)).map((row) => [
+          row.keyResultId,
+          row,
+        ]),
+      );
+      return scoringCondition(
+        rows.map((row) => {
+          const grade = grades.get(row.keyResultId);
+          return {
+            score: grade ? Number(grade.score) : null,
+            reason: grade?.reason ?? null,
+          };
+        }),
+      );
+    }
+    case "narratives":
+      return narrativesCondition(
+        await narrativeRowsInTx(tx, workspaceId, session),
+      );
+    case "recognition": {
+      const [row] = await tx
+        .select({ count: count() })
+        .from(kudos)
+        .where(
+          activeOnly(
+            kudos,
+            eq(kudos.workspaceId, workspaceId),
+            eq(kudos.sessionId, session.id),
+          ),
+        );
+      return recognitionCondition(Number(row?.count ?? 0));
+    }
+    case "team_retro":
+      // "Writing phase complete, dot voting complete" has nothing behind it:
+      // the board stores notes and dots, and nothing records when writing or
+      // voting ended. A rule made up here would be practice nobody decided.
+      return null;
+    case "management_retro": {
+      // The count, never the answers. The stage itself is leadership's, and
+      // the activity feed already tells the space each time one is recorded.
+      const questions = await managementQuestionsInTx(
+        tx,
+        workspaceId,
+        session.id,
+      );
+      return managementCondition(
+        questions.filter((entry) => entry.body !== null).length,
+        questions.length,
+      );
+    }
+    case "root_cause": {
+      // The rules the review's cycle is read by, as `sessions.rootCauses`
+      // reads them: §11's threshold for this workspace, never a literal.
+      const { thresholds, practice } = await cycleRulesInTx(
+        tx,
+        workspaceId,
+        session.cycleId,
+      );
+      // METHOD.md §12: where root causes are optional a miss "may be left
+      // without one", so there is nothing for the stage to be short of.
+      if (practice["review.rootCauses"] === "optional") {
+        return null;
+      }
+      const { graded, missed } = await rootCauseScopeInTx(
+        tx,
+        workspaceId,
+        session.id,
+        thresholds,
+      );
+      const named = await namedRootCausesInTx(tx, workspaceId, session.id);
+      return rootCauseCondition(
+        graded,
+        missed.map((row) => ({
+          causeKey: named.get(row.keyResultId)?.causeKey ?? null,
+        })),
+      );
+    }
+    case "process_health": {
+      const participants = await reviewParticipantIdsInTx(
+        tx,
+        workspaceId,
+        session.spaceId,
+      );
+      const respondents = new Set(
+        (await processHealthRowsInTx(tx, workspaceId, session.id)).map(
+          (row) => row.respondentHash,
+        ),
+      );
+      // Matched through the per-review salt, the way the survey recognises a
+      // second submission. Only the number leaves this function: who has not
+      // answered is the attribution §8.5 keeps out of every read.
+      const salt = session.processHealthSalt;
+      const notSubmitted = participants.filter(
+        (row) =>
+          salt === null || !respondents.has(respondentHash(salt, row.memberId)),
+      ).length;
+      return surveyCondition(notSubmitted);
+    }
+    case "keep_modify_abandon": {
+      const { rows, byGoal } = await resetRowsInTx(tx, workspaceId, session);
+      return resetCondition(
+        rows.map((row) => ({
+          decision: byGoal.get(row.goalId)?.decision ?? null,
+        })),
+      );
+    }
+    case "learnings": {
+      const [row] = await tx
+        .select({ count: count() })
+        .from(learnings)
+        .where(
+          activeOnly(
+            learnings,
+            eq(learnings.workspaceId, workspaceId),
+            eq(learnings.sessionId, session.id),
+          ),
+        );
+      return learningsCondition(Number(row?.count ?? 0));
+    }
+    case "actions": {
+      const owners = alias(workspaceMembers, "completion_action_owners");
+      const rows = await tx
+        .select({ status: owners.status, deletedAt: owners.deletedAt })
+        .from(reviewActions)
+        .leftJoin(owners, eq(owners.id, reviewActions.ownerId))
+        .where(
+          activeOnly(
+            reviewActions,
+            eq(reviewActions.workspaceId, workspaceId),
+            eq(reviewActions.sessionId, session.id),
+          ),
+        );
+      return actionsCondition(
+        rows.map((row) => ({
+          ownerActive: row.status === "active" && row.deletedAt === null,
+        })),
+      );
+    }
+  }
+}
+
+export const readStageCompletion = defineReadAction({
+  name: "sessions.stageCompletion",
+  summary:
+    "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
+  input: z.object({ sessionId: z.uuid() }),
+  output: z.object({
+    /** The stages this session walks, in §8.1's order: its half, where held apart. */
+    stages: z.array(
+      z.object({
+        stageKey: z.enum(REVIEW_STAGE_KEYS),
+        /**
+         * Null where the stage has no condition the product can read from
+         * what it stores. Today that is the team retro, and stage seven where
+         * the workspace leaves root causes optional.
+         */
+        complete: z.boolean().nullable(),
+        /** What is missing, in one English sentence. Null unless incomplete. */
+        missing: z.string().nullable(),
+        /** The same as data, so a screen can say it in its reader's language. */
+        gap: z
+          .object({
+            reason: z.enum(STAGE_GAP_REASONS),
+            count: z.number().int(),
+          })
+          .nullable(),
+        /**
+         * Whether `sessions.advanceStage` refuses to leave this stage as it
+         * stands. Only stage two, while a committed key result below its
+         * promise has no explanation (METHOD.md §8.3). Every other gap is
+         * shown and the facilitator may move on.
+         */
+        refusesAdvance: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+        if (session.kind !== "quarterly") {
+          throw new OperationError(
+            "not_found",
+            "Stage completion belongs to a quarterly review.",
+          );
+        }
+
+        const stages = [];
+        for (const stageKey of reviewStageKeysFor(session.reviewPart)) {
+          const condition = await stageConditionInTx(
+            tx,
+            context.workspaceId,
+            session,
+            stageKey,
+          );
+          // The one refusal, asked of the function the advance itself asks,
+          // so the screen cannot promise a move the action then refuses.
+          const refusesAdvance =
+            stageKey === "score" &&
+            (
+              await unexplainedCommittedMissesInTx(
+                tx,
+                context.workspaceId,
+                session,
+              )
+            ).length > 0;
+          stages.push({
+            stageKey,
+            complete: condition?.complete ?? null,
+            missing:
+              condition?.gap == null
+                ? null
+                : stageGapSentence(
+                    condition.gap,
+                    MANAGEMENT_RETRO_QUESTIONS.length,
+                  ),
+            gap: condition?.gap ?? null,
+            refusesAdvance,
+          });
+        }
+        return { stages };
       },
     );
   },

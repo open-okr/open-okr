@@ -446,6 +446,7 @@ import {
   readScoringStatus,
   readSession,
   readSessionLowScores,
+  readStageCompletion,
   readStreak,
   reassignSessionBlocker,
   recordDecision,
@@ -987,6 +988,8 @@ export const ACTION_MAP = {
   "sessions.forward": readForward,
   "sessions.minutes": readMinutes,
   "sessions.scoringStatus": readScoringStatus,
+  // Each stage's completion condition, shown and not enforced (plan 0.7.0, S1).
+  "sessions.stageCompletion": readStageCompletion,
   "sessions.roomPulse": readRoomPulse,
   "sessions.setStageNote": setStageNote,
 

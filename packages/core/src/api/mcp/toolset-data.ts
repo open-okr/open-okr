@@ -263,6 +263,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "sessions.forward",
     "sessions.minutes",
     "sessions.scoringStatus",
+    "sessions.stageCompletion",
     "sessions.setTrend",
     "sessions.setShifts",
     "sessions.recordDecision",

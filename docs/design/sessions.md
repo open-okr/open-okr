@@ -301,6 +301,57 @@ publishes them to the session's server-sent event stream
 | 10 | Learnings | Reset | 5 | At least one learning captured |
 | 11 | Decisions and actions | Reset | 5 | Every action has a name and a date |
 
+**As built at release 0.7.0 (S1): shown, not enforced.** Akmal decided on
+9 November 2026 that each condition is computed and shown, and that an
+incomplete stage never refuses the advance. METHOD.md §8.1 says the facilitator
+"lands it and moves", and makes only stage 2 a gate (§8.3), so stage 2 keeps
+its refusal in `sessions.advanceStage` and nothing else refuses.
+
+`sessions.stageCompletion { sessionId }` answers, at view access, for every
+stage the session walks (its own half where the review is held apart): `complete`
+true, false, or null where there is no condition to read; `missing`, one English
+sentence; `gap`, the same as a reason and a count for a screen to say in its own
+language; and `refusesAdvance`, true only on stage 2 while a committed miss has
+no explanation, asked of the same function the advance asks. The conditions are
+pure functions in `packages/core/src/sessions/stage-completion.ts`, and the stage
+reads' own `complete` fields call the same ones, so a panel's chip and the rail
+cannot disagree.
+
+| # | What is read | When it is not done |
+|---|---|---|
+| 1 | Each active member of the space has a pulse and a word | "3 participants have not given a pulse and a word." |
+| 2 | Each key result in the review's scope has a grade with its reason. Evidence is the key result's own figures, not recorded by the room, so it is not part of the stored check. No key results at all is not done | "2 key results have no score and reason yet." |
+| 3 | Each objective is spoken for (the mic moving on marks it). No objectives is not done | "1 objective has not been spoken for." |
+| 4 | At least one recognition | "Nobody has been recognised yet." |
+| 5 | **No condition.** Nothing records when writing or voting ended | |
+| 6 | All four questions answered. The count is shown to the whole room, never the answers: the activity feed already announces each one recorded | "3 of the 4 management questions have no answer yet." |
+| 7 | Each key result below its §11 root-cause threshold, read through the cycle's rules, has a cause. Nothing graded yet is not done; graded with nothing below the line is done. **No condition** where the workspace leaves root causes optional (METHOD.md §12) | "2 key results below their threshold have no cause." |
+| 8 | Each active member of the space has submitted, matched through the review's salt. Only the number leaves the read | "3 participants have not scored the process yet." |
+| 9 | Each objective has a decision. No objectives is not done | "1 objective has no decision yet." |
+| 10 | At least one learning | "No learning has been captured yet." |
+| 11 | Each action's owner is still an active member. Both columns are required, so a stored action always has a date and an owner; an owner suspended since is the gap `sessions.addAction` refuses at the boundary. No actions is done | "1 action has an owner who is no longer an active member." |
+
+The stage-7 read `sessions.rootCauses` changed with it: its `complete` asked for
+at least one miss, so a review where everything graded cleared its line read as
+unfinished there and nowhere else.
+
+On S-24 the rail marks each stage the room has reached "Done" or "Not done" in
+words, and a stage passed while not done keeps its number instead of a tick.
+Beside the advance, an incomplete stage says what is missing and the control
+reads "Move on anyway"; on stage 2 while the gate holds it keeps "Continue to
+next step" and says scoring does not close until each committed miss has its
+line. The last stage says the same beside "Close session", and closing is not
+refused for it.
+
+Given / When / Then:
+- Given stage 1 with one of three members' pulses in, when the facilitator
+  advances, then the session moves to stage 2.
+- Given stage 2 with an ungraded committed key result, when the room reads the
+  completion, then stage 2 refuses the advance, and grading it with a line
+  lifts the refusal while the aspirational ones are still ungraded.
+- Given a team retro, when the completion is read, then stage 5 has no
+  condition.
+
 ### 4.2 Stage 1: Open and check-in (SS8.2)
 
 | Element | Behaviour |
