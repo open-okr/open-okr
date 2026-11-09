@@ -184,11 +184,22 @@ else
 fi
 
 if render --set instance.registration=sometimes 2>&1 \
-  | grep -q "auto, open or invite_only"; then
+  | grep -q "auto, open, company_domains or invite_only"; then
   pass "refuses an unrecognised registration policy"
 else
   fail "accepted an unrecognised registration policy"
 fi
+
+# The application accepts every policy Admin > General offers, so the chart
+# must not refuse one of them. It refused company_domains until 0.7.0.
+for policy in auto open company_domains invite_only; do
+  if render --set "instance.registration=$policy" 2>&1 \
+    | grep -A1 "name: OPENOKR_REGISTRATION" | grep -q "value: \"$policy\""; then
+    pass "accepts the $policy registration policy"
+  else
+    fail "refused the $policy registration policy"
+  fi
+done
 
 # --- migrations run in the hook, not in the pods -------------------------
 manifest=$(render)

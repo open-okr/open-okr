@@ -69,7 +69,7 @@ and run `./openokr up`. On Kubernetes they are values in the chart:
 | `OPENOKR_CLOUD` | `cloud.enabled` |
 | `OPENOKR_CLOUD_PLANS` | `cloud.plans` |
 | `OPENOKR_CLOUD_DEFAULT_PLAN` | `cloud.defaultPlan` |
-| `OPENOKR_REGISTRATION` | `instance.registration`, which the chart accepts as `auto`, `open` or `invite_only` and refuses as `company_domains` |
+| `OPENOKR_REGISTRATION` | `instance.registration`: `auto`, `open`, `company_domains` or `invite_only` |
 | `OPENOKR_INSTANCE_NAME`, `OPENOKR_SOURCE_URL`, `OPENOKR_TERMS_URL`, `OPENOKR_PRIVACY_URL`, `OPENOKR_SUPPORT_EMAIL` | `instance.name`, `instance.sourceUrl`, `instance.termsUrl`, `instance.privacyUrl`, `instance.supportEmail` |
 | Anything secret, such as the Stripe keys | A Secret named in `extraEnvFrom`, never a value |
 

@@ -59,7 +59,6 @@ instance:
   name: "OpenOKR"
   language: "en"
   telemetry: false
-  # auto | open | invite_only
   # auto | open | company_domains | invite_only. A choice saved on Admin >
   # General wins over this.
   registration: "auto"

@@ -60,8 +60,8 @@ missing variable is a worse way to learn this than a template that says so.
 {{- fail "\n\nmail.transport is 'smtp' but mail.host is empty.\n\nSet mail.host, or leave the transport as 'console', which writes mail to the log and needs no server.\n" -}}
 {{- end -}}
 
-{{- if not (has .Values.instance.registration (list "auto" "open" "invite_only")) -}}
-{{- fail "\n\ninstance.registration must be auto, open or invite_only.\n" -}}
+{{- if not (has .Values.instance.registration (list "auto" "open" "company_domains" "invite_only")) -}}
+{{- fail "\n\ninstance.registration must be auto, open, company_domains or invite_only.\n" -}}
 {{- end -}}
 
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}
