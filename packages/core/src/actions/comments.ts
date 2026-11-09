@@ -25,6 +25,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getParentAccessScoped } from "../access/reads.ts";
+import { reconcileTextAttachments } from "../attachments/text.ts";
 import {
   addReaction,
   createComment,
@@ -305,6 +306,15 @@ export const createCommentAction = defineWriteAction({
         authorMemberId,
         body: input.body,
       });
+      // Before anybody is told: a file the author may not share refuses the
+      // whole write, and no comment is left behind (§11 D7).
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: authorMemberId,
+        subjectType: "comment",
+        subjectId: result.id,
+        body: input.body,
+      });
       await notifyCommentInTx(tx, {
         workspaceId,
         subjectType: input.subjectType,
@@ -330,7 +340,7 @@ export const createCommentAction = defineWriteAction({
           action: "comments.create",
           targetType: "comment",
           targetId: result.id,
-          payload: { subjectType: input.subjectType },
+          payload: { subjectType: input.subjectType, ...files },
         },
       };
     },
@@ -385,7 +395,7 @@ export const importCommentAction = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       await assertLegacyKeyFree(
         tx,
         workspaceId,
@@ -441,6 +451,14 @@ export const importCommentAction = defineWriteAction({
         editedAt,
         legacy: { type: input.legacy.type, id: input.legacy.id },
       });
+      // Asked of whoever runs the import, who uploaded what it brought in.
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        subjectType: "comment",
+        subjectId: result.id,
+        body: input.body,
+      });
 
       return {
         result: { id: result.id },
@@ -465,6 +483,7 @@ export const importCommentAction = defineWriteAction({
             subjectType: input.subjectType,
             legacyType: input.legacy.type,
             legacyId: input.legacy.id,
+            ...files,
           },
         },
       };
@@ -503,7 +522,7 @@ export const replaceImportedBodyAction = defineWriteAction({
   output: z.object({ replaced: z.boolean() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       const [comment] = await tx
         .select({
           id: comments.id,
@@ -546,6 +565,15 @@ export const replaceImportedBodyAction = defineWriteAction({
             eq(comments.workspaceId, workspaceId),
           ),
         );
+      // The images the rewrite put in become the comment's files, so every
+      // reader of the task opens them and not only whoever ran the import.
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        subjectType: "comment",
+        subjectId: comment.id,
+        body: input.body,
+      });
 
       return {
         result: { replaced: true },
@@ -562,7 +590,7 @@ export const replaceImportedBodyAction = defineWriteAction({
           action: "comments.replaceImportedBody",
           targetType: "comment",
           targetId: comment.id,
-          payload: { legacyId: comment.legacyId },
+          payload: { legacyId: comment.legacyId, ...files },
         },
       };
     },
@@ -616,6 +644,13 @@ export const updateCommentAction = defineWriteAction({
         commentId: input.commentId,
         body: input.body,
       });
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: comment.authorMemberId,
+        subjectType: "comment",
+        subjectId: input.commentId,
+        body: input.body,
+      });
       // Somebody mentioned in the edit is told, once; everybody else already
       // heard about this comment when it was posted (H-13). `updateComment`
       // has subscribed them.
@@ -651,7 +686,7 @@ export const updateCommentAction = defineWriteAction({
           action: "comments.update",
           targetType: "comment",
           targetId: input.commentId,
-          payload: {},
+          payload: { ...files },
         },
       };
     },

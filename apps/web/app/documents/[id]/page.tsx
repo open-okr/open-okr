@@ -8,6 +8,7 @@ import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { FILE_LINKS, richTextHtml } from "../../../lib/rich-text-html.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -162,6 +163,7 @@ export default async function DocumentPage({
             <DocumentEditor
               title={document.title}
               body={document.body}
+              html={richTextHtml(document.body, FILE_LINKS)}
               state={document.state}
               canEdit={canEdit}
               onSave={updateDocumentAction.bind(

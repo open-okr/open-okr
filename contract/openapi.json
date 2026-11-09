@@ -28758,6 +28758,13 @@
                           },
                           "hasThumbnail": {
                             "type": "boolean"
+                          },
+                          "origin": {
+                            "type": "string",
+                            "enum": [
+                              "panel",
+                              "text"
+                            ]
                           }
                         },
                         "required": [
@@ -28768,7 +28775,8 @@
                           "filesize",
                           "position",
                           "status",
-                          "hasThumbnail"
+                          "hasThumbnail",
+                          "origin"
                         ],
                         "additionalProperties": false
                       }

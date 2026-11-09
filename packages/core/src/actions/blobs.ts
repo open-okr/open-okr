@@ -18,7 +18,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
-import { getAccessScoped } from "../access/reads.ts";
+import { canOpenBlob } from "../attachments/access.ts";
 import {
   claimBlob,
   discardOrphanedBlob,
@@ -42,7 +42,6 @@ import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_ORPHAN_BLOB_MINUTES } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
-import { readableThroughAttachment } from "./documents.ts";
 
 /** The workspace's own byte ceiling, resolved from its settings. */
 async function readQuotaBytes(
@@ -365,28 +364,21 @@ export const getBlobForDownload = defineReadAction({
         throw new OperationError("not_found", "No such file.");
       }
 
-      try {
-        await getAccessScoped(tx, {
-          workspaceId: context.workspaceId,
-          memberId: member.id,
-          resourceType: "blob",
-          resourceId: input.blobId,
-          requires: ACCESS_LEVELS.view,
-        });
-      } catch (error) {
-        // Not the uploader's own file, but perhaps one hung on something this
-        // reader reads, which the attachment list already shows them.
-        if (
-          !(error instanceof OperationError) ||
-          !(await readableThroughAttachment(
-            tx as OperationTx,
-            context.workspaceId,
-            member.id,
-            input.blobId,
-          ))
-        ) {
-          throw error;
-        }
+      // The uploader's own file, or one hung on something this reader reads,
+      // which the attachment list already shows them. The same rule a comment
+      // or a document asks before its text shares a file (§11 D7).
+      if (
+        !(await canOpenBlob(
+          tx as OperationTx,
+          context.workspaceId,
+          member.id,
+          input.blobId,
+        ))
+      ) {
+        throw new OperationError(
+          "not_found",
+          "No such blob, or you do not have access to it.",
+        );
       }
 
       const [row] = await tx

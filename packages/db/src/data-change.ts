@@ -51,6 +51,13 @@ export interface DataChangeBatchResult {
   /** Rows this batch actually changed, for the ledger and the log — not
    * the same as "rows considered", when some considered rows are skipped. */
   readonly rowsChanged: number;
+  /**
+   * Rows this batch looked at and deliberately left, for a script whose
+   * skips an operator should hear about (0033 is the first). Reported for
+   * this run only and not kept in the ledger, like the session's own count
+   * of rows changed.
+   */
+  readonly rowsSkipped?: number;
 }
 
 export interface DataChangeScript {
@@ -167,6 +174,8 @@ export interface DataChangeOutcome {
   readonly name: string;
   readonly batches: number;
   readonly rowsChanged: number;
+  /** Present only when a batch reported skipping something. */
+  readonly rowsSkipped?: number;
 }
 
 /**
@@ -254,6 +263,7 @@ export async function runDataChanges(
       // not a total that keeps climbing across unrelated invocations.
       let sessionBatches = 0;
       let sessionRowsChanged = 0;
+      let sessionRowsSkipped = 0;
 
       for (;;) {
         await client.query("begin");
@@ -264,6 +274,7 @@ export async function runDataChanges(
           rowsChanged += result.rowsChanged;
           sessionBatches += 1;
           sessionRowsChanged += result.rowsChanged;
+          sessionRowsSkipped += result.rowsSkipped ?? 0;
           cursor = result.done ? cursor : (result.cursor ?? cursor);
           await client.query(
             `update _data_changes
@@ -290,6 +301,7 @@ export async function runDataChanges(
         name: script.name,
         batches: sessionBatches,
         rowsChanged: sessionRowsChanged,
+        ...(sessionRowsSkipped > 0 ? { rowsSkipped: sessionRowsSkipped } : {}),
       });
     }
     return outcomes;

@@ -53,6 +53,12 @@ export interface AttachmentRow {
   readonly status: "pending" | "ok" | "scanning" | "quarantined";
   /** An image whose upload stored a thumbnail. */
   readonly hasThumbnail: boolean;
+  /**
+   * `text` when the subject's own text names the file. It comes off by
+   * editing the text, so the panel offers no detach for it
+   * (rich-text-editor.md §11 D10).
+   */
+  readonly origin: "panel" | "text";
 }
 
 /** The chip for a file that cannot be opened yet, and what it says. */
@@ -182,13 +188,18 @@ export function Attachments({
                     {explains ? (
                       <span className="text-xs text-ink-3">{t(explains)}</span>
                     ) : null}
+                    {file.origin === "text" ? (
+                      <span className="text-xs text-ink-3">
+                        {t("attachments.inTheText")}
+                      </span>
+                    ) : null}
                   </span>
                   {held ? (
                     <Chip tone={held.tone} dot>
                       {t(held.label)}
                     </Chip>
                   ) : null}
-                  {canEdit ? (
+                  {canEdit && file.origin === "panel" ? (
                     // Refused with `aria-disabled`, not `disabled`, so the button
                     // keeps keyboard focus while the detach is sent.
                     <button

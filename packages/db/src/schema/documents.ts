@@ -36,6 +36,10 @@ export type DocumentState = (typeof DOCUMENT_STATES)[number];
 /**
  * Wider than the document list, because §4.9 says files go on any subject and a
  * task is as likely to carry one as a goal.
+ *
+ * `comment` arrived at migration 0155 (rich-text-editor.md §11 D11). A file
+ * reaches a comment through its text only, so the files panel's own actions
+ * keep a list without it.
  */
 export const ATTACHMENT_SUBJECT_TYPES = [
   "space",
@@ -47,8 +51,18 @@ export const ATTACHMENT_SUBJECT_TYPES = [
   "task",
   "document",
   "check_in",
+  "comment",
 ] as const;
 export type AttachmentSubjectType = (typeof ATTACHMENT_SUBJECT_TYPES)[number];
+
+/**
+ * Who placed an attachment row (migration 0155, rich-text-editor.md §11 D4).
+ * `panel` for a file attached through the files panel, `text` for one a
+ * comment's or a document's text names. A write reconciles its `text` rows
+ * and never touches a `panel` one.
+ */
+export const ATTACHMENT_ORIGINS = ["panel", "text"] as const;
+export type AttachmentOrigin = (typeof ATTACHMENT_ORIGINS)[number];
 
 export const documents = pgTable("documents", {
   id: uuid("id").primaryKey().$defaultFn(newId),
@@ -109,6 +123,9 @@ export const attachments = pgTable("attachments", {
     .notNull()
     .references(() => blobs.id, { onDelete: "cascade" }),
   position: integer("position").notNull().default(0),
+  origin: text("origin", { enum: ATTACHMENT_ORIGINS })
+    .notNull()
+    .default("panel"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

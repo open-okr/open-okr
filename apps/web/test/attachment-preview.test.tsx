@@ -35,6 +35,7 @@ const row = (overrides: Partial<AttachmentRow>): AttachmentRow => ({
   filesize: 2048,
   status: "ok",
   hasThumbnail: true,
+  origin: "panel",
   ...overrides,
 });
 
@@ -150,5 +151,17 @@ describe("the attachment list", () => {
   test("the attach button is there for a member who can edit", () => {
     expect(panel([], true)).toContain('data-testid="attachment-upload"');
     expect(panel([], false)).not.toContain('data-testid="attachment-upload"');
+  });
+
+  // rich-text-editor.md §11 D10: a file the text placed comes off by editing
+  // the text, so the panel says so rather than offering a detach it refuses.
+  test("a file in the text offers no detach and says where it comes off", () => {
+    const one = row({ origin: "text" });
+    const html = panel([one], true);
+    expect(html).not.toContain(`data-testid="detach-${one.id}"`);
+    expect(html).toContain(
+      "In the text. Take it out of the text to remove it.",
+    );
+    expect(panel([row({})], true)).toContain(`data-testid="detach-${one.id}"`);
   });
 });

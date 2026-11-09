@@ -301,8 +301,10 @@ export {
   directorySyncTokens,
 } from "./schema/directory-sync.ts";
 export {
+  ATTACHMENT_ORIGINS,
   ATTACHMENT_SUBJECT_TYPES,
   type Attachment,
+  type AttachmentOrigin,
   type AttachmentSubjectType,
   attachments,
   DOCUMENT_STATES,

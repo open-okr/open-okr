@@ -41,6 +41,7 @@ import { managementAnswerDocument } from "./0029_management_answer_document.ts";
 import { stageNoteDocuments } from "./0030_stage_note_documents.ts";
 import { digestNoteDocument } from "./0031_digest_note_document.ts";
 import { revalidationNoteDocuments } from "./0032_revalidation_note_documents.ts";
+import { attachmentRowsFromText } from "./0033_attachment_rows_from_text.ts";
 
 export function registeredDataChanges(
   encryptionKey: string | undefined,
@@ -88,5 +89,8 @@ export function registeredDataChanges(
     digestNoteDocument,
     // Change 12: the quarterly revalidation's two notes as documents.
     revalidationNoteDocuments,
+    // 0.7.0 R2: attachment rows for files already in comment and document
+    // text, after migration 0155 (rich-text-editor.md §11, Q1).
+    attachmentRowsFromText,
   ];
 }

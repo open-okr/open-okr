@@ -111,6 +111,24 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   `okr login --scopes read,write,destructive` to keep doing these. The
   browser, single sign-on directory sync and the built-in agents are
   unaffected, because they never check a scope.
+- **A file in a comment or a document opens for its readers.** Migration 0155
+  lets an attachment row hang on a comment and records who placed it. From
+  0.7 each write that saves a comment's or a document's text records a row for
+  every file the text names, so everybody who reads the comment or the
+  document can open the file, where before only its uploader could. A write
+  naming somebody else's private file is refused. Text written before 0.7 has
+  no rows until you run the data changes (`./openokr data-change`, or
+  `pnpm db:change`). **What 0033 opens:** for each file in a comment or a
+  document, a row when the file was uploaded by whoever wrote that text, or
+  when the comment came from an import, such as the inline images an import
+  stored, which until now only the person who ran the import could open. Any other file, for instance a colleague's private file named in
+  somebody's comment, is skipped and counted, and stays as closed as it was.
+  `pnpm db:change` prints the count.
+- **A file still uploading is refused.** A rich text write naming an
+  `attachment` that is still `uploading`, or `ready` with no file behind it,
+  is refused with "A file in this text is still uploading. Wait for it to
+  finish, then save." The browser already waited; a script sending its own
+  editor JSON has to send finished files.
 
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 

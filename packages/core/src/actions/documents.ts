@@ -19,7 +19,7 @@
  * for something the reader cannot open is a leak with extra steps.
  */
 import {
-  ATTACHMENT_SUBJECT_TYPES,
+  ATTACHMENT_ORIGINS,
   activeOnly,
   attachments,
   blobs,
@@ -32,11 +32,22 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { and, asc, desc, eq, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { requireAttachmentSubject } from "../attachments/access.ts";
+import {
+  NO_ATTACHMENT_CHANGE,
+  reconcileTextAttachments,
+} from "../attachments/text.ts";
+import {
+  loadReadableDocument,
+  RESOURCE_FOR,
+  readableDocuments,
+  requireDocumentSubject,
+} from "../documents/access.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import { ensureSubscriptionList } from "../notifications/subscriptions.ts";
@@ -51,28 +62,6 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 const richText = richTextSchema();
 
 const subjectType = z.enum(DOCUMENT_SUBJECT_TYPES);
-
-/**
- * Which resource decides whether a document may be read.
- *
- * A key result inherits its goal's context and has no resolver of its own, so a
- * document on one has to be asked about through the goal. Every other subject
- * here resolves directly.
- */
-const RESOURCE_FOR: Readonly<Record<DocumentSubjectType, string>> = {
-  space: "space",
-  goal: "goal",
-  // Resolved through the owning goal below, for the reason `access/reads.ts`
-  // gives: "no such key result" and "not yours to see" must answer alike.
-  key_result: "goal",
-  initiative: "initiative",
-  // Neither has a context of its own: a cycle and a session belong to the
-  // workspace and the space respectively, and both are readable by anybody who
-  // reads those. Checked against the workspace, which every active member
-  // reaches, so the draft rule is what narrows a document on one.
-  cycle: "workspace",
-  session: "workspace",
-};
 
 const documentSummary = z.object({
   id: z.uuid(),
@@ -122,57 +111,25 @@ async function actingMember(
 }
 
 /**
- * Refuses unless this member may read the subject a document hangs off.
- *
- * The key result case resolves its goal first, which is why this takes a
- * transaction rather than being a lookup table.
+ * Every published version's body, whose files keep their rows after the
+ * draft drops them (rich-text-editor.md §11 D6).
  */
-async function requireSubject(
+async function publishedBodies(
   tx: OperationTx,
   workspaceId: string,
-  memberId: string,
-  kind: DocumentSubjectType,
-  subjectId: string,
-  requires: number = ACCESS_LEVELS.view,
-): Promise<void> {
-  const resourceType = RESOURCE_FOR[kind];
-  let resourceId = subjectId;
-
-  if (kind === "key_result") {
-    const rows = await tx.execute<{ goal_id: string }>(
-      sql`select goal_id from key_results
-           where id = ${subjectId}
-             and workspace_id = ${workspaceId}
-             and deleted_at is null
-           limit 1`,
+  documentId: string,
+): Promise<unknown[]> {
+  const rows = await tx
+    .select({ body: documentVersions.body })
+    .from(documentVersions)
+    .where(
+      and(
+        eq(documentVersions.workspaceId, workspaceId),
+        eq(documentVersions.documentId, documentId),
+      ),
     );
-    const goalId = rows.rows[0]?.goal_id;
-    if (!goalId) {
-      throw new OperationError("not_found", "No such key result.");
-    }
-    resourceId = goalId;
-  }
-  if (resourceType === "workspace") {
-    resourceId = workspaceId;
-  }
-
-  await getAccessScoped(tx, {
-    workspaceId,
-    memberId,
-    resourceType,
-    resourceId,
-    requires: requires as never,
-  });
+  return rows.map((row) => row.body);
 }
-
-/**
- * The privacy rule, as a clause rather than as a habit.
- *
- * Every read below composes this. It is one function so that a read written
- * later cannot forget it and quietly return somebody else's draft.
- */
-const readableDocuments = (memberId: string) =>
-  or(eq(documents.state, "published"), eq(documents.authorMemberId, memberId));
 
 export const listDocuments = defineReadAction({
   name: "documents.list",
@@ -193,7 +150,7 @@ export const listDocuments = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        await requireSubject(
+        await requireDocumentSubject(
           tx,
           context.workspaceId,
           memberId,
@@ -274,7 +231,7 @@ export const readDocument = defineReadAction({
       async (rawTx) => {
         const tx = rawTx as OperationTx;
         const memberId = await actingMember(tx, context.workspaceId, userId);
-        const row = await loadReadable(
+        const row = await loadReadableDocument(
           tx,
           context.workspaceId,
           memberId,
@@ -313,72 +270,6 @@ export const readDocument = defineReadAction({
     );
   },
 });
-
-/**
- * One document this member may read, or not-found.
- *
- * The subject check and the draft rule both run. Somebody else's draft answers
- * exactly as a document that never existed, which is what makes a direct
- * identifier probe useless.
- */
-async function loadReadable(
-  tx: OperationTx,
-  workspaceId: string,
-  memberId: string,
-  id: string,
-) {
-  const [row] = await tx
-    .select({
-      id: documents.id,
-      subjectType: documents.subjectType,
-      subjectId: documents.subjectId,
-      title: documents.title,
-      body: documents.body,
-      state: documents.state,
-      publishedAt: documents.publishedAt,
-      authorMemberId: documents.authorMemberId,
-      authorName: workspaceMembers.name,
-      updatedAt: documents.updatedAt,
-      versionCount: sql<number>`(
-        select count(*)::int from document_versions v
-         where v.document_id = ${documents.id}
-      )`,
-    })
-    .from(documents)
-    .innerJoin(
-      workspaceMembers,
-      eq(workspaceMembers.id, documents.authorMemberId),
-    )
-    .where(
-      and(
-        activeOnly(
-          documents,
-          eq(documents.workspaceId, workspaceId),
-          eq(documents.id, id),
-        ),
-        readableDocuments(memberId),
-      ),
-    )
-    .limit(1);
-
-  if (!row) {
-    throw new OperationError("not_found", "No such document.");
-  }
-  await requireSubject(
-    tx,
-    workspaceId,
-    memberId,
-    row.subjectType,
-    row.subjectId,
-  );
-
-  return {
-    ...row,
-    publishedAt: row.publishedAt?.toISOString() ?? null,
-    updatedAt: row.updatedAt.toISOString(),
-    body: row.body ?? null,
-  };
-}
 
 export const readDocumentDifference = defineReadAction({
   name: "documents.difference",
@@ -419,7 +310,7 @@ export const readDocumentDifference = defineReadAction({
         const memberId = await actingMember(tx, context.workspaceId, userId);
         // Through the same reader every other document read uses, so a
         // difference cannot become a way to read somebody else's draft.
-        await loadReadable(tx, context.workspaceId, memberId, input.id);
+        await loadReadableDocument(tx, context.workspaceId, memberId, input.id);
 
         const rows = await tx
           .select({
@@ -492,7 +383,7 @@ export const createDocument = defineWriteAction({
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
     async load({ tx, workspaceId, actor }) {
-      await requireSubject(
+      await requireDocumentSubject(
         tx,
         workspaceId,
         requireMemberId(actor.memberId),
@@ -524,6 +415,17 @@ export const createDocument = defineWriteAction({
         throw new Error("The document insert returned no row.");
       }
 
+      const files =
+        input.body === undefined || input.body === null
+          ? NO_ATTACHMENT_CHANGE
+          : await reconcileTextAttachments(tx, {
+              workspaceId,
+              memberId: requireMemberId(actor.memberId),
+              subjectType: "document",
+              subjectId: row.id,
+              body: input.body,
+            });
+
       return {
         result: { id: row.id },
         // No notification and no feed entry. A draft nobody else can read must
@@ -540,7 +442,7 @@ export const createDocument = defineWriteAction({
           action: "documents.create",
           targetType: "document",
           targetId: row.id,
-          payload: { subjectType: input.subjectType },
+          payload: { subjectType: input.subjectType, ...files },
         },
       };
     },
@@ -571,7 +473,7 @@ export const updateDocument = defineWriteAction({
         input.id,
       );
     },
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx
         .update(documents)
@@ -593,6 +495,18 @@ export const updateDocument = defineWriteAction({
             eq(documents.id, input.id),
           ),
         );
+      // A title alone leaves the text, and so its files, as they were.
+      const files =
+        input.body === undefined
+          ? NO_ATTACHMENT_CHANGE
+          : await reconcileTextAttachments(tx, {
+              workspaceId,
+              memberId: requireMemberId(actor.memberId),
+              subjectType: "document",
+              subjectId: input.id,
+              body: input.body,
+              kept: await publishedBodies(tx, workspaceId, input.id),
+            });
       return {
         result: { id: input.id },
         activity: {
@@ -605,6 +519,7 @@ export const updateDocument = defineWriteAction({
           action: "documents.update",
           targetType: "document",
           targetId: input.id,
+          payload: { ...files },
         },
       };
     },
@@ -656,7 +571,7 @@ async function requireWritable(
   if (!row) {
     throw new OperationError("not_found", "No such document.");
   }
-  await requireSubject(
+  await requireDocumentSubject(
     tx,
     workspaceId,
     memberId,
@@ -1013,7 +928,26 @@ export const restoreDocument = defineWriteAction({
 
 // ── Attachments ───────────────────────────────────────────────────────
 
-const attachmentSubject = z.enum(ATTACHMENT_SUBJECT_TYPES);
+/** §11 D10: a file the text placed comes off by editing the text. */
+const IN_THE_TEXT =
+  "This file is in the text. Take it out of the text instead.";
+
+/**
+ * What the files panel offers, which is the table's list without `comment`
+ * (rich-text-editor.md §11 D11). A file reaches a comment through its text
+ * only; nobody needs a panel to hang a file on somebody else's comment.
+ */
+const attachmentSubject = z.enum([
+  "space",
+  "goal",
+  "key_result",
+  "initiative",
+  "cycle",
+  "session",
+  "task",
+  "document",
+  "check_in",
+]);
 
 export const listAttachments = defineReadAction({
   name: "attachments.list",
@@ -1035,6 +969,11 @@ export const listAttachments = defineReadAction({
       status: z.enum(["pending", "ok", "scanning", "quarantined"]),
       /** An image with a stored preview, served by `blobs.getForDownload`. */
       hasThumbnail: z.boolean(),
+      /**
+       * `text` when the subject's own text names the file, which is where it
+       * comes off; `panel` when somebody attached it here (§11 D4, D10).
+       */
+      origin: z.enum(ATTACHMENT_ORIGINS),
     }),
   ),
   access: ACCESS_LEVELS.view,
@@ -1068,6 +1007,7 @@ export const listAttachments = defineReadAction({
             position: attachments.position,
             status: blobs.status,
             thumbnailKey: blobs.thumbnailKey,
+            origin: attachments.origin,
           })
           .from(attachments)
           .innerJoin(blobs, eq(blobs.id, attachments.blobId))
@@ -1092,116 +1032,6 @@ export const listAttachments = defineReadAction({
     );
   },
 });
-
-/**
- * Refuses unless this member may reach the subject a file is being hung on.
- *
- * Wider than `requireSubject` because attachments go on more things. A task and
- * a document resolve through their own contexts; a check-in through its goal.
- */
-async function requireAttachmentSubject(
-  tx: OperationTx,
-  workspaceId: string,
-  memberId: string,
-  kind: (typeof ATTACHMENT_SUBJECT_TYPES)[number],
-  subjectId: string,
-  requires: number = ACCESS_LEVELS.view,
-): Promise<void> {
-  if (kind === "task") {
-    await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType: "task",
-      resourceId: subjectId,
-      requires: requires as never,
-    });
-    return;
-  }
-  if (kind === "document") {
-    await loadReadable(tx, workspaceId, memberId, subjectId);
-    return;
-  }
-  if (kind === "check_in") {
-    const rows = await tx.execute<{ subject_id: string }>(
-      sql`select subject_id from check_ins
-           where id = ${subjectId}
-             and workspace_id = ${workspaceId}
-             and deleted_at is null
-           limit 1`,
-    );
-    const goalId = rows.rows[0]?.subject_id;
-    if (!goalId) {
-      throw new OperationError("not_found", "No such check-in.");
-    }
-    await getAccessScoped(tx, {
-      workspaceId,
-      memberId,
-      resourceType: "goal",
-      resourceId: goalId,
-      requires: requires as never,
-    });
-    return;
-  }
-  await requireSubject(
-    tx,
-    workspaceId,
-    memberId,
-    kind as DocumentSubjectType,
-    subjectId,
-    requires,
-  );
-}
-
-/**
- * Whether a member reads a file through something it hangs on.
- *
- * A blob's own context binds only its uploader, which is right while it is
- * theirs alone. Attaching it to a goal, a task, a check-in or a document is
- * showing it to whoever reads that subject, and `attachments.list` already
- * lists it to them, so the download has to agree. Found while fixing
- * completeness review M-22: the list showed a colleague a file the download
- * then refused. Checked per attachment through the same subject rule the
- * attachment itself uses, so a file hung on something you cannot read stays
- * closed to you.
- */
-export async function readableThroughAttachment(
-  tx: OperationTx,
-  workspaceId: string,
-  memberId: string,
-  blobId: string,
-): Promise<boolean> {
-  const hangsOn = await tx
-    .select({
-      subjectType: attachments.subjectType,
-      subjectId: attachments.subjectId,
-    })
-    .from(attachments)
-    .where(
-      activeOnly(
-        attachments,
-        eq(attachments.workspaceId, workspaceId),
-        eq(attachments.blobId, blobId),
-      ),
-    );
-  for (const subject of hangsOn) {
-    try {
-      await requireAttachmentSubject(
-        tx,
-        workspaceId,
-        memberId,
-        subject.subjectType as (typeof ATTACHMENT_SUBJECT_TYPES)[number],
-        subject.subjectId,
-        ACCESS_LEVELS.view,
-      );
-      return true;
-    } catch (error) {
-      if (!(error instanceof OperationError)) {
-        throw error;
-      }
-    }
-  }
-  return false;
-}
 
 export const attachFile = defineWriteAction({
   name: "attachments.attach",
@@ -1328,6 +1158,7 @@ export const detachFile = defineWriteAction({
         .select({
           subjectType: attachments.subjectType,
           subjectId: attachments.subjectId,
+          origin: attachments.origin,
         })
         .from(attachments)
         .where(
@@ -1349,7 +1180,12 @@ export const detachFile = defineWriteAction({
         row.subjectId,
         ACCESS_LEVELS.edit,
       );
-      return row;
+      // The text holds it, so taking the row alone would leave the two
+      // disagreeing and the next edit would put it back (§11 D10).
+      if (row.origin === "text") {
+        throw new OperationError("forbidden", IN_THE_TEXT);
+      }
+      return { subjectType: row.subjectType, subjectId: row.subjectId };
     },
     async execute({ tx, workspaceId, loaded }) {
       const now = new Date();

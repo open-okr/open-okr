@@ -96,8 +96,10 @@ Walks the same tree, concatenates text content with single spaces between block 
 
 ```ts
 function extractMentionIds(input: unknown): readonly string[]
-function extractAttachments(input: unknown): readonly { blobId: string; status: "uploading" | "ready" }[]
+function extractAttachments(input: unknown): readonly { blobId: string | undefined; status: "uploading" | "ready" }[]
 ```
+
+`blobId` is undefined for a node still uploading, which has nothing to reference yet.
 
 Decode-safe per TECHNICAL-PLAN §4.10's explicit line: malformed or unparseable input returns `[]`, never throws. This is deliberately looser than `parseRichText` — a caller extracting mentions to notify people, or attachments to reconcile against the `attachments` table, wants "whatever I can find," not a hard failure over one bad node deep in an otherwise fine document.
 
@@ -119,9 +121,9 @@ An `attachment` node is a reference, not a copy: `blobId` names a row P2-T05's b
 3. The caller's own upload function (P2-T05's `prepareBlob`/upload flow, via a prop, not a direct import — `packages/ui` does not reach into `packages/core` for this) resolves to a real `blobId`, and the node's attrs update to `status: "ready"` with that id.
 4. A failed upload removes the node rather than leaving a permanently-broken reference — "deletion on failure," per the task's own build list.
 
-**Submit gating**: before a submit handler is allowed to fire, the editor component checks for any attachment node still `"uploading"` (`hasUploadsInProgress()` on its handle) and refuses (with a visible reason, not a silent no-op) if any are still in flight. This is the literal acceptance line: "given a comment with an upload in flight, when the user submits, then submission waits for the upload or fails loudly, never dropping the attachment silently." The gating lives in the editor component (`packages/ui`), because it is the one place that knows the live upload state; a server-side belt-and-braces check (refusing a write whose extracted attachments include any `"uploading"` status) sits in the shared validator too, since a client is never fully trusted at the write boundary.
+**Submit gating**: before a submit handler is allowed to fire, the editor component checks for any attachment node still `"uploading"` (`hasUploadsInProgress()` on its handle) and refuses (with a visible reason, not a silent no-op) if any are still in flight. This is the literal acceptance line: "given a comment with an upload in flight, when the user submits, then submission waits for the upload or fails loudly, never dropping the attachment silently." The gating lives in the editor component (`packages/ui`), because it is the one place that knows the live upload state. The server check is `filesFinished` in `rich-text/field-schema.ts`, used by `richTextSchema()` and by the comment write's own schema (§11 D1, plan 0.7.0 R1): a write naming a file still `"uploading"`, or `"ready"` with no `blobId`, is refused, since a client is never fully trusted at the write boundary.
 
-Nothing writes an `attachments` join row (P2-T05's table) from this task: that row belongs to the entity the rich text is attached to (a comment, a document), and none of those tables existed then. `extractAttachments` is what a future comment/document action calls, inside its own `Operation`, to insert the join rows atomically with the write — documented here as the contract, not built here as a caller with nothing to call it on.
+The `attachments` row for a file in the text is written by the comment and document writes themselves, through `reconcileTextAttachments` in `packages/core/src/attachments/text.ts`, inside each write's own Operation (§11, plan 0.7.0 R2).
 
 ## 8. Draft autosave
 
@@ -154,12 +156,12 @@ TECHNICAL-PLAN §1's own package table restricts `packages/ui` to depending on `
 
 - Any actual consumer: no `comments`, `documents`, `goals.description` or similar rich-text-bearing table existed yet (all were later phases). The one real integration point then was `workspace_members.bio`/`bio_version`, upgraded from `z.unknown()` (P2-T03's own placeholder) to `parseRichText` against this schema — P2-T03's STATUS.md row named exactly this as the thing it was waiting on.
 - Syntax highlighting in code blocks, text colour, alignment — see §3's exclusion list.
-- A server-side mention-to-notification fan-out, or an attachment-join-row writer. The fan-out arrived with comments (§5); nothing calls `extractAttachments` yet (§7).
+- A server-side mention-to-notification fan-out, or an attachment-join-row writer. The fan-out arrived with comments (§5); the row writer arrived at release 0.7.0 (§11).
 - Email/export rendering surfaces calling `renderRichTextToHtml` — the function is built and tested against synthetic documents; wiring it into the mail adapter or an export job is that job's own task.
 
 ## 11. Attachment rows from the text, and the upload check (release 0.7.0, R1 and R2)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan R2). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, data change 0033, with the upgrade notes saying what it opens. Q2: yes, a separate interface change, added to the plan as its own row. A schema change, so it is designed first (CLAUDE.md). R1 needs no design; it is here because it guards the same write, and D16 says how the two ship.
+Status: proposed 9 November 2026 for release 0.7.0 (plan R2). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, data change 0033, with the upgrade notes saying what it opens. Q2: yes, a separate interface change, added to the plan as its own row. A schema change, so it is designed first (CLAUDE.md). R1 needs no design; it is here because it guards the same write, and D16 says how the two ship. Built: R1, then R2 with migration 0155 and data change 0033. §11.10 lists where the build settled something this section left open.
 
 ### 11.1 What exists
 
@@ -201,7 +203,7 @@ So an attachment in text links nowhere today, and in the one place real data hol
 
 ### 11.3 The migration
 
-The next free number:
+`0155_attachment_origin.sql`:
 
 ```sql
 alter table attachments drop constraint attachments_subject_type_check;
@@ -259,11 +261,11 @@ The spreadsheet importer writes no comments or documents. The FlowyTeam task fil
 | Kind | File | Covers |
 |---|---|---|
 | Unit | `packages/core/test/rich-text-field-schema.test.ts` (existing) | R1: `uploading`, `ready` with no `blobId`, a clean document |
-| Integration | `packages/core/test/attachments-from-text.test.ts` | D5 to D12, row by row |
-| Integration | `packages/core/test/comments.test.ts`, `documents.test.ts` (existing) | The six actions reconcile, and their audit payload |
+| Integration | `packages/core/test/attachments-from-text.test.ts` | D5 to D13 row by row, and the six actions reconcile with their audit payload. One file rather than three, so each decision is read in one place |
 | Integration | `packages/importer/test/flowyteam-files.test.ts` (existing, needs MySQL) | Inline images get `text` rows |
-| Integration | `packages/db/test/data-change.test.ts` (existing) | Q1's change: idempotent, skips and counts |
-| End to end | `e2e/s29-documents.spec.ts` (extend) | A published document's image is a link a second member opens |
+| Integration | `packages/db/test/data-change.test.ts` (existing) | Q1's change: idempotent, skips and counts, and runs as the table owner under the tenant floor |
+| Unit | `apps/web/test/rich-text-file-links.test.tsx`, `attachment-preview.test.tsx` (existing) | D14's link, a reader's document, and the panel offering no detach for a `text` row |
+| End to end | `e2e/s29-documents.spec.ts` (extend) | A published document's image is a link a second member opens. Comes with R4, which is what lets a browser put a file in the text |
 
 ### 11.8 Documents changed in the same change
 
@@ -280,3 +282,18 @@ The spreadsheet importer writes no comments or documents. The FlowyTeam task fil
 - It does not let a person paste a file into a comment from the browser (Q2).
 - It does not reap a claimed blob nobody attached.
 - It does not render an image inline. A ready attachment is a link, as `render.ts` already draws it.
+
+### 11.10 As built
+
+Where the build settled something §11.2 left open. None changes a decision.
+
+| Point | Built as | Why |
+|---|---|---|
+| D6, a file only in a published version | Keeps its row; never adds one. A new row comes only from the body being written | The writer cannot change a version, so a version must never be the reason their write is refused by D7 |
+| D7 and D8, the sentences | Not the writer's to share, missing, deleted or in another workspace: not-found, "A file in this text is not one you can share here." `pending`: forbidden, "A file in this text never finished uploading. Take it out and add it again." | Access is asked first, so a file the writer cannot open answers alike whether or not it exists. A `pending` file the writer can open is their own failed upload, and saying so tells them what to do |
+| D7, the writer | The acting member. For `comments.importComment` and `comments.replaceImportedBody` that is whoever runs the import, who uploaded what it brought in | The rule asks whoever is showing the file to others |
+| D12, where the rules live | `requireAttachmentSubject`, `readableThroughAttachment` and a new `canOpenBlob` moved to `packages/core/src/attachments/access.ts`; the document read rules they need to `packages/core/src/documents/access.ts`. `blobs.getForDownload` asks `canOpenBlob` | One rule for the download and the write, without the action files importing each other |
+| D14, a document | A reader who cannot edit sees the server-rendered text, where a file is a link. An editor keeps the editor | A read-only editor draws every file as a chip with no link |
+| D10, the files panel | A `text` row shows "In the text. Take it out of the text to remove it." and no Detach | A button the server refuses is a dead end |
+| Q1, the batch | One workspace a batch, listed through the scheduler's read-only scan setting and opened through its own tenant setting. The runner gained an optional `rowsSkipped`, reported for the run and printed by `pnpm db:change`, not kept in the ledger | A deployment's admin role may be the table owner, which FORCE ROW LEVEL SECURITY binds. Lifting the floor would lock live tables |
+| Q1, which text | Comments and documents whether deleted or not, and every published version | Rows on a deleted subject open nothing (D9), and `documents.restore` brings them back with the document |

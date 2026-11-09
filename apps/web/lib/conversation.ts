@@ -1,7 +1,7 @@
 import { type ActionCallContext, callAction } from "@openokr/core";
 import type { CommentSubjectType } from "./comment-actions.ts";
 import type { CommentData, ReactionGroupData } from "./comments.tsx";
-import { richTextHtml } from "./rich-text-html.ts";
+import { FILE_LINKS, richTextHtml } from "./rich-text-html.ts";
 
 /** What `SubjectComments` draws: the thread, and the subject's own reactions. */
 interface Conversation {
@@ -60,8 +60,9 @@ export async function readConversation(
       ...comment,
       // Rendered here, so the browser draws formatting it never has to
       // interpret. Null for a body the schema does not accept, which a
-      // comment written before bodies were checked can be.
-      html: richTextHtml(comment.body),
+      // comment written before bodies were checked can be. A file in it is
+      // a link, because the comment's write recorded its row.
+      html: richTextHtml(comment.body, FILE_LINKS),
       reactions: groupsOf(groups),
     });
   }

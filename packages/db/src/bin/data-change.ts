@@ -44,7 +44,8 @@ try {
         : `Ran ${outcomes.length} script(s):\n${outcomes
             .map(
               (outcome) =>
-                `  ${outcome.name}: ${outcome.batches} batch(es), ${outcome.rowsChanged} row(s) changed`,
+                `  ${outcome.name}: ${outcome.batches} batch(es), ${outcome.rowsChanged} row(s) changed` +
+                (outcome.rowsSkipped ? `, ${outcome.rowsSkipped} skipped` : ""),
             )
             .join("\n")}\n`,
     );

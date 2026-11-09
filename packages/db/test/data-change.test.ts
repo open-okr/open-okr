@@ -42,6 +42,7 @@ import { managementAnswerDocument } from "../src/data-changes/0029_management_an
 import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_documents.ts";
 import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
 import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
+import { attachmentRowsFromText } from "../src/data-changes/0033_attachment_rows_from_text.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { registeredDataChanges } from "../src/data-changes/registry.ts";
 import { runMigrations } from "../src/migrate.ts";
@@ -2140,5 +2141,282 @@ describe("0144: the plain prose columns go, but only once every row has its docu
       "select count(*)::int as completed from _data_changes where completed_at is not null",
     );
     expect(rows[0]?.completed).toBe(6);
+  });
+});
+
+describe("0033: attachment rows for the files already in comment and document text", () => {
+  /** A document holding each blob as a ready attachment, in order. */
+  const withFiles = (...blobIds: string[]) =>
+    JSON.stringify({
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "See" },
+            ...blobIds.map((blobId) => ({
+              type: "attachment",
+              attrs: {
+                filename: "picture.png",
+                contentType: "image/png",
+                status: "ready",
+                blobId,
+              },
+            })),
+            // Never a row: nothing to point at.
+            {
+              type: "attachment",
+              attrs: {
+                filename: "half.png",
+                contentType: "image/png",
+                status: "uploading",
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+  const ids = {
+    acme: "6f1d3c2a-9b4e-4c1d-8a7f-2e5b6c7d8e01",
+    other: "6f1d3c2a-9b4e-4c1d-8a7f-2e5b6c7d8e02",
+    ana: "6f1d3c2a-9b4e-4c1d-8a7f-000000000001",
+    carl: "6f1d3c2a-9b4e-4c1d-8a7f-000000000002",
+    runner: "6f1d3c2a-9b4e-4c1d-8a7f-000000000003",
+    placeholder: "6f1d3c2a-9b4e-4c1d-8a7f-000000000004",
+    zed: "6f1d3c2a-9b4e-4c1d-8a7f-000000000005",
+    anaPic: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b1",
+    anaScan: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b2",
+    carlPic: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b3",
+    runnerPic: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b4",
+    anaPending: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b5",
+    anaGone: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b6",
+    zedPic: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b7",
+    anaPanel: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b8",
+    anaOld: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000b9",
+    ownComment: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000c1",
+    carlsInAnas: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000c2",
+    imported: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000c3",
+    unusable: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000c4",
+    document: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000d1",
+    goal: "6f1d3c2a-9b4e-4c1d-8a7f-0000000000e1",
+  };
+
+  /** Two workspaces, each written inside its own tenant setting. */
+  async function seed(db: DataChangeClient): Promise<void> {
+    const inside = (workspaceId: string) =>
+      db.query("select set_config('app.workspace_id', $1, false)", [
+        workspaceId,
+      ]);
+
+    for (const [workspace, slug] of [
+      [ids.acme, "acme"],
+      [ids.other, "other"],
+    ] as const) {
+      await inside(workspace);
+      await db.query(
+        "insert into workspaces (id, name, slug) values ($1, $2, $2)",
+        [workspace, slug],
+      );
+    }
+
+    await inside(ids.other);
+    await db.query(
+      `insert into workspace_members (id, workspace_id, name, kind, status)
+       values ($1, $2, 'Zed', 'human', 'active')`,
+      [ids.zed, ids.other],
+    );
+    await db.query(
+      `insert into blobs (id, workspace_id, filename, content_type, storage_key,
+                          author_member_id, status)
+       values ($1, $2, 'zed.png', 'image/png', 'k/zed', $3, 'ok')`,
+      [ids.zedPic, ids.other, ids.zed],
+    );
+
+    await inside(ids.acme);
+    await db.query(
+      `insert into workspace_members (id, workspace_id, name, kind, status)
+       values ($2, $1, 'Ana', 'human', 'active'),
+              ($3, $1, 'Carl', 'human', 'active'),
+              ($4, $1, 'Runner', 'human', 'active'),
+              ($5, $1, 'Imported author', 'placeholder', 'active')`,
+      [ids.acme, ids.ana, ids.carl, ids.runner, ids.placeholder],
+    );
+    await db.query(
+      `insert into blobs (id, workspace_id, filename, content_type, storage_key,
+                          author_member_id, status, deleted_at)
+       values ($2, $1, 'ana.png', 'image/png', 'k/1', $10, 'ok', null),
+              ($3, $1, 'scan.png', 'image/png', 'k/2', $10, 'scanning', null),
+              ($4, $1, 'carl.png', 'image/png', 'k/3', $11, 'ok', null),
+              ($5, $1, 'inline.png', 'image/png', 'k/4', $12, 'ok', null),
+              ($6, $1, 'half.png', 'image/png', 'k/5', $10, 'pending', null),
+              ($7, $1, 'gone.png', 'image/png', 'k/6', $10, 'ok', now()),
+              ($8, $1, 'panel.png', 'image/png', 'k/7', $10, 'ok', null),
+              ($9, $1, 'old.png', 'image/png', 'k/8', $10, 'ok', null)`,
+      [
+        ids.acme,
+        ids.anaPic,
+        ids.anaScan,
+        ids.carlPic,
+        ids.runnerPic,
+        ids.anaPending,
+        ids.anaGone,
+        ids.anaPanel,
+        ids.anaOld,
+        ids.ana,
+        ids.carl,
+        ids.runner,
+      ],
+    );
+    await db.query(
+      `insert into comments (id, workspace_id, subject_type, subject_id,
+                             author_member_id, body, legacy_type, legacy_id)
+       values ($2, $1, 'goal', $7, $8, $3, null, null),
+              ($4, $1, 'goal', $7, $8, $5, null, null),
+              ($6, $1, 'goal', $7, $9, $10, 'flowyteam', 'task_comments:4'),
+              ($11, $1, 'goal', $7, $8, $12, null, null)`,
+      [
+        ids.acme,
+        ids.ownComment,
+        withFiles(ids.anaPic, ids.anaScan),
+        ids.carlsInAnas,
+        withFiles(ids.carlPic),
+        ids.imported,
+        ids.goal,
+        ids.ana,
+        ids.placeholder,
+        withFiles(ids.runnerPic),
+        ids.unusable,
+        withFiles(ids.anaPending, ids.anaGone, ids.zedPic),
+      ],
+    );
+    await db.query(
+      `insert into documents (id, workspace_id, subject_type, subject_id, title,
+                              body, body_version, state, published_at,
+                              author_member_id)
+       values ($1, $2, 'goal', $3, 'Plan', $4, 1, 'published', now(), $5)`,
+      [
+        ids.document,
+        ids.acme,
+        ids.goal,
+        withFiles(ids.anaPanel, ids.anaPic),
+        ids.ana,
+      ],
+    );
+    await db.query(
+      `insert into document_versions (id, workspace_id, document_id, version,
+                                      title, body, body_version, author_member_id)
+       values (gen_random_uuid(), $1, $2, 1, 'Plan', $3, 1, $4)`,
+      [ids.acme, ids.document, withFiles(ids.anaOld), ids.ana],
+    );
+    // A file already attached through the panel, and named in the text too.
+    await db.query(
+      `insert into attachments (id, workspace_id, subject_type, subject_id,
+                                blob_id, position)
+       values (gen_random_uuid(), $1, 'document', $2, $3, 1)`,
+      [ids.acme, ids.document, ids.anaPanel],
+    );
+    // As a migration connects: no workspace of its own.
+    await db.query("select set_config('app.workspace_id', '', false)");
+  }
+
+  const rowsIn = async (db: DataChangeClient, workspaceId: string) => {
+    await db.query("select set_config('app.workspace_id', $1, false)", [
+      workspaceId,
+    ]);
+    const { rows } = await db.query<{
+      subject_type: string;
+      subject_id: string;
+      blob_id: string;
+      position: number;
+      origin: string;
+    }>(
+      // By workspace as well as under its setting: a superuser connection
+      // sees past the floor.
+      `select subject_type, subject_id, blob_id, position, origin
+         from attachments
+        where workspace_id = $1 and deleted_at is null
+        order by subject_type, subject_id, position`,
+      [workspaceId],
+    );
+    await db.query("select set_config('app.workspace_id', '', false)");
+    return rows;
+  };
+
+  const row = (
+    subjectType: string,
+    subjectId: string,
+    blobId: string,
+    position: number,
+    origin = "text",
+  ) => ({
+    subject_type: subjectType,
+    subject_id: subjectId,
+    blob_id: blobId,
+    position,
+    origin,
+  });
+
+  it("writes a text row for each file its writer or an import put there, skips and counts the rest, and runs again as nothing", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    await seed(client);
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [attachmentRowsFromText],
+    });
+    // Ana's two in her comment, the imported image, the document's file in
+    // its body, and the one only its published version still shows.
+    expect(outcome?.rowsChanged).toBe(5);
+    // Carl's file in Ana's comment, and a pending, a deleted and another
+    // workspace's file. The panel row needed nothing, which is not a skip.
+    expect(outcome?.rowsSkipped).toBe(4);
+
+    expect(await rowsIn(client, ids.acme)).toEqual([
+      row("comment", ids.ownComment, ids.anaPic, 1),
+      row("comment", ids.ownComment, ids.anaScan, 2),
+      row("comment", ids.imported, ids.runnerPic, 1),
+      row("document", ids.document, ids.anaPanel, 1, "panel"),
+      row("document", ids.document, ids.anaPic, 2),
+      row("document", ids.document, ids.anaOld, 3),
+    ]);
+    expect(await rowsIn(client, ids.other)).toEqual([]);
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [attachmentRowsFromText],
+    });
+    expect(again?.rowsChanged).toBe(0);
+    expect(await rowsIn(client, ids.acme)).toHaveLength(6);
+  });
+
+  it("sees every workspace when it runs as the table owner, under the tenant floor", async () => {
+    // FORCE ROW LEVEL SECURITY binds the owner too, and a deployment's admin
+    // role may be the owner rather than a superuser. The script opens each
+    // workspace through its own tenant setting rather than lifting the floor.
+    const wb = await workerDb();
+    const ownerDb = `${scratchDb}_owner`;
+    await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    await wb.admin.query(
+      `create database ${ownerDb} owner ${testDbEnv.ownerRole} ` +
+        `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+    );
+    const owner = new pg.Client(
+      connectionOptions(ownerDb, testDbEnv.ownerRole),
+    );
+    await owner.connect();
+    try {
+      await runMigrations(owner, { dirs: [MIGRATIONS] });
+      await seed(owner);
+
+      const [outcome] = await runDataChanges(owner, {
+        scripts: [attachmentRowsFromText],
+      });
+      expect(outcome?.rowsChanged).toBe(5);
+      expect(outcome?.rowsSkipped).toBe(4);
+      expect(await rowsIn(owner, ids.acme)).toHaveLength(6);
+    } finally {
+      await owner.end();
+      await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    }
   });
 });
