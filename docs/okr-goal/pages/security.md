@@ -142,9 +142,9 @@ There is no emergency override. We chose not to build one, because an override b
 
 ## Found something?
 
-Report it privately through the security route in the GitHub issue chooser, not in a public issue. We will acknowledge it, keep you informed, and credit you if you want to be named.
+Report it privately through GitHub: the Security tab, then "Report a vulnerability". Do not use a public issue. The policy is in [SECURITY.md](../../../SECURITY.md). We acknowledge a report within 3 working days, keep you informed, and credit you if you want to be named.
 
-> **Decision needed:** a security contact address, a response time, and whether there is a bug bounty.
+> **Decision needed:** a security contact address, and whether there is a bug bounty.
 
 ## 14. Final CTA
 

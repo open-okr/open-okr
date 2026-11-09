@@ -52,6 +52,7 @@ import {
   isProviderSignInPath,
   isSSOCallbackPath,
 } from "./sso-enforcement.ts";
+import { ssoLinkAllowed } from "./sso-linking.ts";
 
 /**
  * The paths that establish or recover a local credential (P8-T07a).
@@ -479,6 +480,37 @@ export function createAuth(options: AuthOptions) {
             if (provider) {
               throw new APIError("FORBIDDEN", {
                 message: enforcementMessage(provider),
+              });
+            }
+          },
+        },
+      },
+      account: {
+        create: {
+          /**
+           * Which accounts a single sign-on connection may attach to
+           * (docs/design/sso-account-trust.md).
+           *
+           * Better Auth links a provider sign-in to an existing account with
+           * the same email by itself. A connection belongs to one workspace,
+           * so only that workspace's members, or an account with nothing else
+           * behind it, may be attached. Providers that are not workspace
+           * connections (the password account, passkeys) pass through.
+           */
+          before: async (account) => {
+            const providerId = (account as { providerId?: unknown }).providerId;
+            const userId = (account as { userId?: unknown }).userId;
+            if (typeof providerId !== "string" || typeof userId !== "string") {
+              return;
+            }
+            const workspaceId = workspaceByProvider.get(providerId);
+            if (!workspaceId) {
+              return;
+            }
+            if (!(await ssoLinkAllowed(options.pool, userId, workspaceId))) {
+              throw new APIError("FORBIDDEN", {
+                message:
+                  "This account is not a member of the workspace that owns this sign-in provider.",
               });
             }
           },

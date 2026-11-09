@@ -126,19 +126,89 @@ function isBlockedV4(address: string): boolean {
   return false;
 }
 
+/** Expands an IPv6 literal to its eight hextets, or null when it is not one. */
+function expandV6(address: string): number[] | null {
+  // A zone id ("%eth0") names an interface, not a host.
+  let value = address.toLowerCase().replace(/^\[|\]$/g, "");
+  const zone = value.indexOf("%");
+  if (zone !== -1) value = value.slice(0, zone);
+
+  // A dotted IPv4 tail stands for the last two hextets.
+  const tail = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  if (tail) {
+    const octets = tail.slice(1, 5).map(Number);
+    if (octets.some((octet) => octet > 255)) return null;
+    const [a, b, c, d] = octets as [number, number, number, number];
+    value = `${value.slice(0, tail.index)}${((a << 8) | b).toString(16)}:${((c << 8) | d).toString(16)}`;
+  }
+
+  const halves = value.split("::");
+  if (halves.length > 2) return null;
+  const parse = (text: string): string[] =>
+    text === "" ? [] : text.split(":");
+  const head = parse(halves[0] ?? "");
+  const rest = halves.length === 2 ? parse(halves[1] ?? "") : [];
+  const missing = 8 - head.length - rest.length;
+  if (halves.length === 2 ? missing < 1 : missing !== 0) return null;
+
+  const groups = [
+    ...head,
+    ...Array<string>(halves.length === 2 ? missing : 0).fill("0"),
+    ...rest,
+  ];
+  const hextets = groups.map((group) =>
+    /^[0-9a-f]{1,4}$/.test(group) ? Number.parseInt(group, 16) : Number.NaN,
+  );
+  return hextets.length === 8 && hextets.every((h) => !Number.isNaN(h))
+    ? hextets
+    : null;
+}
+
 function isBlockedV6(address: string): boolean {
-  const value = address.toLowerCase().replace(/^\[|\]$/g, "");
-  if (value === "::" || value === "::1") {
-    return true; // unspecified and loopback
-  }
-  // An IPv4 address wearing an IPv6 hat reaches exactly the same host.
-  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(value);
-  if (mapped?.[1]) {
-    return isBlockedV4(mapped[1]);
-  }
-  if (value.startsWith("fe80")) return true; // link-local
-  if (/^f[cd]/.test(value)) return true; // unique local
-  if (value.startsWith("ff")) return true; // multicast
+  const h = expandV6(address);
+  // Not parseable means something upstream is wrong. Refuse.
+  if (!h) return true;
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = h as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+
+  // Embedded forms reach the same host as the IPv4 address they carry, so the
+  // IPv4 rules decide. The last 32 bits are h6 and h7.
+  const v4 = (high: number, low: number): boolean =>
+    isBlockedV4(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`);
+  const firstFiveZero =
+    h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0;
+
+  if (firstFiveZero && h5 === 0 && h6 === 0 && h7 <= 1) return true; // unspecified and loopback
+  if (firstFiveZero && h5 === 0xffff) return v4(h6, h7); // IPv4-mapped
+  if (firstFiveZero && h5 === 0) return v4(h6, h7); // IPv4-compatible
+  if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0xffff && h5 === 0)
+    return v4(h6, h7); // IPv4-translated
+  if (
+    h0 === 0x64 &&
+    h1 === 0xff9b &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0
+  )
+    return v4(h6, h7); // NAT64
+  if (h0 === 0x64 && h1 === 0xff9b && h2 === 1) return true; // local-use NAT64
+  if (h0 === 0x2002) return v4(h1, h2); // 6to4 carries the IPv4 address in bits 16 to 47
+  if (h0 === 0x2001 && h1 === 0) return true; // Teredo
+  if (h0 === 0x100 && h1 === 0 && h2 === 0 && h3 === 0) return true; // discard-only
+  if (h0 === 0x2001 && h1 === 0xdb8) return true; // documentation
+  if ((h0 & 0xffc0) === 0xfe80) return true; // link-local, fe80::/10
+  if ((h0 & 0xffc0) === 0xfec0) return true; // deprecated site-local, fec0::/10
+  if ((h0 & 0xfe00) === 0xfc00) return true; // unique local, fc00::/7
+  if ((h0 & 0xff00) === 0xff00) return true; // multicast
   return false;
 }
 

@@ -1,4 +1,7 @@
-{{- if .Values.cloud.erasure.schedule }}
+{{- /* `cloud` is absent from values reused from a release older than 0.6 (helm upgrade --reuse-values). */ -}}
+{{- $cloud := .Values.cloud | default dict }}
+{{- $erasure := $cloud.erasure | default dict }}
+{{- if $erasure.schedule }}
 {{- include "openokr.validate" . -}}
 # Erasing closed workspaces once their retention window has passed
 # (docs/design/workspace-erasure.md §7).
@@ -17,7 +20,7 @@ metadata:
     {{- include "openokr.labels" . | nindent 4 }}
     app.kubernetes.io/component: erasure
 spec:
-  schedule: {{ .Values.cloud.erasure.schedule | quote }}
+  schedule: {{ $erasure.schedule | quote }}
   # Two runs at once would wait on each other's advisory lock, and the second
   # would find nothing to do. Forbid says so in the schedule instead.
   concurrencyPolicy: Forbid

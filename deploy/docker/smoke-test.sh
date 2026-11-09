@@ -53,6 +53,14 @@ db_exec() {
 }
 
 # One value from the bundled database, asked as its admin role.
+# A command inside the application container, for the uploaded-files check.
+app_exec() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -p "$PROJECT" exec -T app "$@"
+  else
+    docker-compose -p "$PROJECT" exec -T app "$@"
+  fi
+}
 db_query() { db_exec psql -U openokr -d openokr -tAc "$1"; }
 
 # Waits until the proxy stops answering 502, which is what it says while the
@@ -381,9 +389,21 @@ pass "the instance still works after rotation"
 # shipped path on the instance this script just built: back up, prove the
 # backup would restore, change something, restore, and find the backup's
 # state again with the instance still serving.
+# One known file in the application's storage, so the drill covers uploaded
+# files as well as the database. It is removed after the backup, because a
+# restore that leaves the volume alone would otherwise pass without proving
+# the backup held it.
+blob_path="/app/storage/restore-drill/probe.txt"
+blob_text="restore-drill-$$"
+app_exec sh -c "mkdir -p /app/storage/restore-drill && printf '%s' '$blob_text' > $blob_path" \
+  || fail "could not write a file into the application's storage"
+
 ./openokr backup >/dev/null 2>&1 || fail "the backup failed"
 drill="$(ls -1dt "$OPENOKR_BACKUP_DIR"/*/ | head -1)"
 pass "a backup was taken ($drill)"
+[ -f "${drill}blobs.tar.enc" ] || fail "the backup holds no uploaded files"
+
+app_exec rm -rf /app/storage/restore-drill || fail "could not remove the drill file"
 
 ./openokr verify-backup "$drill" >/dev/null 2>&1 \
   || fail "verify-backup refused the backup it had just taken"
@@ -427,6 +447,10 @@ rows_after="$(db_query "select (select count(*) from workspaces) || ',' || (sele
 [ "$(db_query "select name from workspaces order by created_at limit 1")" = "$name_before" ] \
   || fail "the change made after the backup survived the restore"
 pass "the restore brought back the backup's state and nothing after it"
+
+[ "$(app_exec cat "$blob_path" 2>/dev/null)" = "$blob_text" ] \
+  || fail "the uploaded file was not restored with the same content"
+pass "the restore brought back the uploaded files"
 
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the instance does not serve its admin after the restore"

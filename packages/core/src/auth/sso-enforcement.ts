@@ -1,10 +1,11 @@
 /**
  * Single sign-on enforcement (P8-T07a).
  *
- * A connection that is enforcing claims a set of email domains. Anybody whose
- * address is in one of them signs in through that identity provider and
- * through nothing else: a password, a password reset and a passkey are all
- * refused. That is the point of the setting. The organisation controls the
+ * A connection that is enforcing claims a set of email domains. Any member of
+ * the connection's workspace whose address is in one of them signs in through
+ * that identity provider and through nothing else: a password, a password
+ * reset and a passkey are all refused. An account that is not an active
+ * member of that workspace is not affected, and neither is a sign-up. That is the point of the setting. The organisation controls the
  * account, so removing somebody at the identity provider removes them here,
  * and a local credential that outlives that removal would be the one thing
  * enforcement exists to prevent.
@@ -21,8 +22,13 @@
  * a minute. A cache would buy nothing measurable and would mean an
  * administrator turning enforcement off still watched people be refused.
  */
-import { withSSOLookup } from "@openokr/db";
-import { sql } from "drizzle-orm";
+import {
+  activeOnly,
+  withSSOLookup,
+  withUser,
+  workspaceMembers,
+} from "@openokr/db";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { emailDomain } from "../invitations/tokens.ts";
@@ -47,6 +53,8 @@ export interface EnforcingProvider {
 /** One enforcing connection, as the database holds it. */
 export interface EnforcingConnection {
   readonly providerId: string;
+  /** The workspace the connection belongs to. Enforcement reaches its members only. */
+  readonly workspaceId: string;
   readonly kind: "oidc" | "saml";
   readonly displayName: string;
   readonly domains: readonly string[];
@@ -115,6 +123,7 @@ export async function listEnforcingConnections(
     );
     return rows.map((row) => ({
       providerId: derivedProviderId(row.provider_id, row.workspace_id),
+      workspaceId: row.workspace_id,
       kind: row.kind === "saml" ? ("saml" as const) : ("oidc" as const),
       displayName: row.display_name,
       domains: row.email_domains
@@ -134,7 +143,13 @@ export async function listEnforcingConnections(
   }
 }
 
-/** The provider that claims this address, read from the database. */
+/**
+ * The provider that claims this address, read from the database.
+ *
+ * Enforcement reaches the members of the connection's workspace. An address
+ * with no account has no membership, so nothing claims it and a sign-up is
+ * not refused (docs/design/sso-account-trust.md, rule 5).
+ */
 export async function enforcedProviderForEmail(
   pool: Pool,
   email: string,
@@ -143,7 +158,15 @@ export async function enforcedProviderForEmail(
   if (connections.length === 0) {
     return null;
   }
-  return enforcingProviderFor(email, connections);
+  const { rows } = await pool.query<{ id: string }>(
+    "select id from users where lower(email) = $1",
+    [email.trim().toLowerCase()],
+  );
+  const id = rows[0]?.id;
+  if (!id) {
+    return null;
+  }
+  return enforcedProviderForUserWith(pool, id, connections);
 }
 
 /**
@@ -162,6 +185,18 @@ export async function enforcedProviderForUser(
   if (connections.length === 0) {
     return null;
   }
+  return enforcedProviderForUserWith(pool, userId, connections);
+}
+
+/**
+ * Applies the connections to one account: only those whose workspace the
+ * account is an active member of count.
+ */
+async function enforcedProviderForUserWith(
+  pool: Pool,
+  userId: string,
+  connections: readonly EnforcingConnection[],
+): Promise<EnforcingProvider | null> {
   // `users` is Better Auth's own table and carries no workspace column, so
   // this needs no tenant context.
   const { rows } = await pool.query<{ email: string }>(
@@ -172,7 +207,25 @@ export async function enforcedProviderForUser(
   if (!email) {
     return null;
   }
-  return enforcingProviderFor(email, connections);
+  const memberships = await withUser(drizzle(pool), userId, (tx) =>
+    tx
+      .select({ workspaceId: workspaceMembers.workspaceId })
+      .from(workspaceMembers)
+      .where(
+        activeOnly(
+          workspaceMembers,
+          and(
+            eq(workspaceMembers.userId, userId),
+            eq(workspaceMembers.status, "active"),
+          ),
+        ),
+      ),
+  );
+  const workspaces = new Set(memberships.map((m) => m.workspaceId));
+  return enforcingProviderFor(
+    email,
+    connections.filter((c) => workspaces.has(c.workspaceId)),
+  );
 }
 
 /**

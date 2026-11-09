@@ -46,7 +46,9 @@ export function ConnectionControls({
   const removeRef = useRef<HTMLButtonElement>(null);
 
   // Enforcement only bites while the connection is on and names a domain,
-  // which is the rule `listEnforcingConnections` applies at sign-in.
+  // which is the rule `listEnforcingConnections` applies at sign-in. It then
+  // reaches the members of this workspace on those domains, not every account
+  // on them.
   const enforcedDomains =
     connection.enabled && connection.enforce
       ? connection.emailDomains.trim()
