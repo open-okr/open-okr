@@ -82,7 +82,9 @@ types, the constraints and the reasons.
 | `state` | `text`, `active` / `suspended` / `closed`, default `active` | Section 3 |
 | `plan_key` | `text`, nullable | Null means the free tier. Not a database enum: a plan is a row in a catalogue, and an enum turns adding a plan into a migration. P8-T01b owns the catalogue |
 | `seats` | `integer`, nullable | Null means unlimited. P8-T01b owns the counting |
-| `trial_ends_at` | `timestamptz`, nullable | Null means no trial. A past value is not itself a state; a sweep moves the state |
+| `trial_ends_at` | `timestamptz`, nullable | Null means no trial. A past value is not itself a state; the hourly trial sweep (§11) moves the state and clears it. An operator sets it on S-46 |
+| `suspended_by_trial` | `boolean`, default false | The trial sweep made it read-only because its people do not fit the default plan (§11 T7). Cleared on every lifecycle move. Migration 0158 |
+| `trial_reminded_at` | `timestamptz`, nullable | When the owners and administrators were told the trial ends in seven days (§11 Q2). Cleared whenever the end date moves. Migration 0158 |
 | `region` | `text`, not null | Section 5 |
 | `closed_at` | `timestamptz`, nullable | Set when `state` becomes `closed`. Section 6 |
 | `owner_may_reopen` | `boolean`, not null, default false | True only when the owner closed it while active. `workspace-erasure.md` §3, migration 0148 |
@@ -109,7 +111,7 @@ enforcement point. It **projects onto the one that exists.**
 | Tenant state | `workspaces.state` | What a member sees | Who can set it |
 |---|---|---|---|
 | `active` | `active` | Everything | Provisioning, and an operator lifting a suspension |
-| `suspended` | `read_only` | A banner saying why, and every write refused except member and settings management | An operator (P8-T03), or the trial sweep |
+| `suspended` | `read_only` | A banner saying why, and every write refused except member and settings management | An operator (P8-T03), billing, or the trial sweep when people do not fit the default plan (§11) |
 | `closed` | `frozen` | A banner saying the workspace is closed, and how to export before the retention window ends | An operator, or the workspace owner asking to close |
 
 Two consequences, both deliberate.
@@ -359,7 +361,9 @@ What the export writes while the workspace is frozen, all of it bookkeeping and 
 
 ## 11. The trial sweep (release 0.7.0, P4)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan P4), waiting for "design approved". Tenant lifecycle and a schema change, so it is designed first.
+Status: approved by Akmal on 9 November 2026 ("design approved"), Q1 and Q2 both yes as proposed. Built in three parts: **P4a** (migration 0158, the sweep, T2 to T8, T11, T12) is built; **P4b** (Q1's sign-up trial and T9) and **P4c** (T10's banner and Q2's two emails) follow.
+
+**One correction from building P4a.** T2 said an operator's trial is "recorded on both audit chains like every operator action". The plan and lifecycle actions it sits beside record one row, in the workspace's own audit log, naming the operator and carrying the reason; neither writes the instance chain. The trial does the same. And T2's extension needs the freeze overlay's recovery list, since the workspace it lifts is read-only: `workspace.setTrial` is on it, beside `workspace.setLifecycle`.
 
 ### 11.1 What exists
 

@@ -281,6 +281,35 @@ test("the operator suspends the workspace with a reason, and lifts it again", as
  * guided-inputs §5, F5: a refused lifecycle change left the form as it was
  * and said nothing, which read as a change still on its way.
  */
+/**
+ * A trial on S-46 (docs/design/tenant-lifecycle.md §11 T2, plan 0.7.0 P4):
+ * set to a day, shown as a fact, then removed. Keeps the current plan, so it
+ * needs no catalogue.
+ */
+test("an operator sets a trial's end, sees it, and removes it", async () => {
+  expect(workspaceId, "the list named no workspace").not.toBe("");
+  await goTo(operatorPage, `/operator/${workspaceId}`);
+
+  // By id: other forms on the page have a Reason field too.
+  await operatorPage.locator("#trial-ends").fill("2030-01-31");
+  await operatorPage
+    .locator("#trial-reason")
+    .fill("A month's trial while procurement signs.");
+  await operatorPage.getByRole("button", { name: "Set the trial" }).click();
+  await expect(operatorPage.getByText("Trial saved.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(operatorPage.getByText("Trial ends", { exact: true })).toBeVisible();
+
+  await operatorPage
+    .locator("#trial-reason")
+    .fill("Signed today, so no trial is needed.");
+  await operatorPage.getByRole("button", { name: "Remove the trial" }).click();
+  await expect(
+    operatorPage.getByText("Trial ends", { exact: true }),
+  ).toBeHidden({ timeout: 15_000 });
+});
+
 test("a lifecycle change with no real reason is refused in words, and nothing moves", async () => {
   await goTo(operatorPage, `/operator/${workspaceId}`);
   const moveTo = operatorPage.locator("#lifecycle-state");

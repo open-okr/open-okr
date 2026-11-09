@@ -103,6 +103,9 @@ describe("the run table", () => {
   // `support.sweepExpired` since plan 0.7.0 B2 (docs/design/support-access.md
   // §5): it ends every expired support session on the instance, as the
   // system, and an API caller has no business starting it.
+  // `cloud.sweepTrials` since plan 0.7.0 P4 (tenant-lifecycle.md §11 T4):
+  // it walks every tenant whose trial ended, as the system, like the erasure
+  // reminder.
   // `auth.purgeSignInAttempts` since plan 0.7.0 P10 (docs/design/
   // account-lockout.md D16): sign-in counters belong to no workspace and no
   // member, and letting a caller empty them would be a way to lift a hold.
@@ -114,6 +117,7 @@ describe("the run table", () => {
     "cloud.remindErasure",
     "support.sweepExpired",
     "auth.purgeSignInAttempts",
+    "cloud.sweepTrials",
   ]);
 
   test("names a real action for every run", () => {
@@ -143,6 +147,7 @@ describe("the run table", () => {
       "cloud.remindErasure",
       "support.sweepExpired",
       "auth.purgeSignInAttempts",
+      "cloud.sweepTrials",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -153,6 +158,7 @@ describe("the run table", () => {
       "auth.purgeSignInAttempts",
       "cloud.measureUsage",
       "cloud.remindErasure",
+      "cloud.sweepTrials",
       "outbox.purge",
       "support.sweepExpired",
       "tenancy.adopt",
@@ -176,6 +182,14 @@ describe("the run table", () => {
 
   // Spraying random addresses makes sign-in counter rows, and nothing else
   // removes one nobody comes back to (account-lockout.md D16).
+  test("ends trials past their date for the instance, every hour", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "cloud.sweepTrials",
+    );
+    expect(sweep?.instance).toBe(true);
+    expect(sweep?.cron).toBe("25 * * * *");
+  });
+
   test("purges stale sign-in counters for the instance, once a day", () => {
     const purge = SCHEDULED_RUNS.find(
       (run) => run.action === "auth.purgeSignInAttempts",

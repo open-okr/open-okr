@@ -48,6 +48,12 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // request and the grant stay off this list, so neither reaches a workspace
   // that is not active.
   "support.end",
+  // An operator extending a trial (tenant-lifecycle.md §11 T2, plan 0.7.0 P4).
+  // A trial that ended with too many people leaves the workspace read-only,
+  // and extending it is the operator's way out of that, as reactivating is
+  // for a suspension. It changes the plan and the date, never content.
+  // Approved with the design by Akmal on 9 November 2026.
+  "workspace.setTrial",
 ]);
 
 // `billing.` since docs/design/billing.md: paying again is how a workspace billing made

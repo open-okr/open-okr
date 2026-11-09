@@ -331,7 +331,7 @@ the provider's currency, with **Upgrade**, a monthly or yearly choice and **Mana
 billing**, and says when a payment failed, when a subscription ends, and when a
 downgrade takes effect. If the subscription ended and the people do not fit the
 default plan, it says the workspace is read-only, that nobody was removed, and how to
-get out. See [billing.md](../design/billing.md) §9. A change below the current headcount is refused
+get out; a trial that ended the same way reads the same, and Settle works for either. See [billing.md](../design/billing.md) §9. A change below the current headcount is refused
 naming both numbers, because the product never picks who loses access. With
 `cloud.enabled` false, or no plans in the catalogue, the section is absent from the
 navigation and the route is not-found: P8-T05 asks that no billing surface appears, and a

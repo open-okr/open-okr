@@ -54,6 +54,7 @@ import {
   purgeStaleSignInAttempts,
   remindBeforeErasure,
   sweepExpiredSessions,
+  sweepTrials,
 } from "@openokr/core";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
@@ -125,6 +126,9 @@ export interface ScheduledRun {
     // (docs/design/workspace-erasure.md §12). Nothing with the flag off or
     // with retention at seven days or fewer.
     | "cloud.remindErasure"
+    // Ending every trial past its date (docs/design/tenant-lifecycle.md §11,
+    // plan 0.7.0 P4). Nothing with the cloud flag off.
+    | "cloud.sweepTrials"
     // Ending every support session past its expiry (docs/design/
     // support-access.md §5). Access is refused at expiry without it; this
     // stamps the row and suspends the operator's member (plan 0.7.0, B2).
@@ -261,6 +265,14 @@ const ERASURE_REMINDER_JOB = "cloud.remindErasure";
 const ERASURE_REMINDER_CRON = "50 * * * *";
 
 /**
+ * The trial sweep (tenant-lifecycle.md §11 T4). Hourly, so a trial ends
+ * within the hour of its date wherever the customer is, at a minute no other
+ * cloud job takes.
+ */
+const TRIAL_SWEEP_JOB = "cloud.sweepTrials";
+const TRIAL_SWEEP_CRON = "25 * * * *";
+
+/**
  * Every five minutes. A session ends at its expiry whether or not this runs,
  * because `resolveActor` refuses an expired one at use; what waits for the
  * sweep is the owner's screen saying the session is over. Five minutes is how
@@ -353,6 +365,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: ERASURE_REMINDER_JOB,
     action: "cloud.remindErasure",
     cron: ERASURE_REMINDER_CRON,
+    instance: true,
+  },
+  {
+    job: TRIAL_SWEEP_JOB,
+    action: "cloud.sweepTrials",
+    cron: TRIAL_SWEEP_CRON,
     instance: true,
   },
   {
@@ -510,6 +528,13 @@ async function runInstance(run: ScheduledRun): Promise<void> {
   if (run.action === "cloud.measureUsage") {
     if (await isCloudEnabled(getPool())) {
       await measureAllWorkspaces(getPool());
+    }
+    return;
+  }
+  if (run.action === "cloud.sweepTrials") {
+    const { ended } = await sweepTrials(getPool());
+    if (ended > 0) {
+      log(`cloud.sweepTrials ended ${ended} trial(s)`);
     }
     return;
   }

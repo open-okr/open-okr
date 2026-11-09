@@ -37,5 +37,6 @@ export {
   listTenantsAsOperator,
   readBillingAsOperator,
 } from "./store.ts";
+export { setTrialAsOperator } from "./trials.ts";
 export { measureAllWorkspaces, readUsageAsOperator } from "./usage.ts";
 export { createWorkspaceAsOperator } from "./workspaces.ts";

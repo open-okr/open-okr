@@ -26,6 +26,7 @@
     "cloud:operator": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/cloud-operator.ts",
     "cloud:support-sweep": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-support.ts",
     "cloud:sweep": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-closures.ts",
+    "cloud:trials": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-trials.ts",
     "cloud:usage": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/measure-usage.ts"
   },
   "dependencies": {

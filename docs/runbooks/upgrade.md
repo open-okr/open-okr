@@ -94,6 +94,13 @@ root key, and refuses to finish without it rather than report them sealed.
 
 Notes are added here as 0.7.0 is built, and finished before it is tagged.
 
+- **Trials.** Migration 0158 adds two columns to `tenants`. Nothing changes
+  until an operator sets a trial on a workspace's console page. An hourly
+  job then ends each trial past its date: a live subscription carries on,
+  people who fit the default plan move to it, and a workspace whose people
+  do not fit goes read-only until somebody subscribes or makes them fit.
+  `pnpm cloud:trials` shows what is due; `--write` ends them now.
+
 - **Seats used on the operator console.** Migration 0157 adds `seat_count`
   to the usage snapshot. The console's list now shows seats used, as the
   plan's limit counts them, against the plan's seats, and reads "not

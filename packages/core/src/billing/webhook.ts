@@ -79,6 +79,8 @@ async function settleOntoPlanInTx(
     readonly plan: Plan | null;
     readonly suspendedByBilling: boolean;
     readonly tenantState: string;
+    /** The trial sweep's read-only mode, which a subscription lifts too (T8). */
+    readonly suspendedByTrial?: boolean;
   },
 ): Promise<{ readonly suspendedByBilling: boolean; readonly moved: boolean }> {
   const seats = input.plan?.seats ?? null;
@@ -95,7 +97,10 @@ async function settleOntoPlanInTx(
     return { suspendedByBilling: true, moved: false };
   }
   await applyPlanInTx(tx, { workspaceId: input.workspaceId, plan: input.plan });
-  if (input.suspendedByBilling && input.tenantState === "suspended") {
+  if (
+    (input.suspendedByBilling || input.suspendedByTrial) &&
+    input.tenantState === "suspended"
+  ) {
     await setTenantStateInTx(tx, {
       workspaceId: input.workspaceId,
       state: "active",
@@ -155,7 +160,10 @@ async function applySubscription(
           )
           .limit(1);
         const [tenant] = await tx
-          .select({ state: tenants.state })
+          .select({
+            state: tenants.state,
+            suspendedByTrial: tenants.suspendedByTrial,
+          })
           .from(tenants)
           .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
           .limit(1);
@@ -171,9 +179,19 @@ async function applySubscription(
             plan,
             suspendedByBilling,
             tenantState: tenant.state,
+            suspendedByTrial: tenant.suspendedByTrial,
           });
           suspendedByBilling = settled.suspendedByBilling;
           planName = settled.moved ? (plan?.name ?? null) : null;
+        }
+        // Choosing a plan ends the trial (tenant-lifecycle.md §11 T3): a live
+        // subscription is a choice, so the sweep has nothing left to settle.
+        if (tenant && live) {
+          // openokr:allow-mutation: this operation's own transaction.
+          await tx
+            .update(tenants)
+            .set({ trialEndsAt: null, trialRemindedAt: null })
+            .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)));
         }
 
         const values = {

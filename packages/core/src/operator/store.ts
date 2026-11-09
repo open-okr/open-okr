@@ -35,6 +35,10 @@ export interface OperatorWorkspaceRow {
   readonly closedAt: Date | null;
   /** Set once erasure has claimed it (docs/design/workspace-erasure.md §8). */
   readonly erasingAt: Date | null;
+  /** When its trial ends, if it has one (tenant-lifecycle.md §11, P4). */
+  readonly trialEndsAt: Date | null;
+  /** The trial sweep made it read-only (§11 T7). */
+  readonly suspendedByTrial: boolean;
 }
 
 /** Whether this person holds a live grant. */
@@ -88,6 +92,8 @@ export async function listTenantsAsOperator(
         region: tenants.region,
         closedAt: tenants.closedAt,
         erasingAt: tenants.erasingAt,
+        trialEndsAt: tenants.trialEndsAt,
+        suspendedByTrial: tenants.suspendedByTrial,
       })
       .from(tenants)
       .innerJoin(workspaces, eq(workspaces.id, tenants.workspaceId))

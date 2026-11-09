@@ -1024,6 +1024,7 @@ export {
   revokeOperator,
   setLifecycleAsOperator,
   setPlanAsOperator,
+  setTrialAsOperator,
   setWorkspaceLimitsAsOperator,
   sweepExpiredSessions,
 } from "./operator/index.ts";
@@ -1288,6 +1289,7 @@ export {
   resolveAdmissionLimits,
   seatState,
   setDefaultAdmission,
+  sweepTrials,
   type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";

@@ -233,7 +233,11 @@ describe("what an operator does see", () => {
         "region",
         "seats",
         "slug",
+        // A trial's end and its read-only flag (tenant-lifecycle.md §11,
+        // plan 0.7.0 P4): a date and a yes or no about the plan, no content.
+        "suspendedByTrial",
         "tenantState",
+        "trialEndsAt",
         "workspaceId",
         "workspaceState",
       ].sort(),

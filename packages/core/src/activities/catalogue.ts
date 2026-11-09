@@ -63,6 +63,16 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // limits that are the provider's.
   "workspace.limits_updated": z.object({ keys: z.array(z.string()) }),
   "workspace.erasure_reminded": z.object({ eraseOn: z.string() }),
+  // A trial set, extended or removed by an operator, and a trial's end
+  // (tenant-lifecycle.md §11, plan 0.7.0 P4). The reason is on the audit row.
+  "workspace.trial_set": z.object({
+    endsAt: z.string().nullable(),
+    plan: z.string().nullable(),
+  }),
+  "workspace.trial_ended": z.object({
+    outcome: z.enum(["subscribed", "moved", "suspended"]),
+    plan: z.string().nullable(),
+  }),
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
   }),

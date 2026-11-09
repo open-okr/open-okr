@@ -21,6 +21,8 @@ import { OperatorLimitsForm } from "./limits-form";
 import { setPlan } from "./plan-actions";
 import { OperatorPlanForm } from "./plan-form";
 import { SupportRequest } from "./support-request";
+import { setTrial } from "./trial-actions";
+import { OperatorTrialForm } from "./trial-form";
 
 /**
  * The tab reads the workspace's name, from the list this operator may see;
@@ -381,6 +383,19 @@ export default async function OperatorWorkspacePage({
             label={t("operator.workspace.factRegion")}
             value={tenant.region}
           />
+          {/* Tenant-lifecycle.md §11, plan 0.7.0 P4. */}
+          {tenant.trialEndsAt ? (
+            <Fact
+              label={t("operator.workspace.factTrialEnds")}
+              value={day(tenant.trialEndsAt)}
+            />
+          ) : null}
+          {tenant.tenantState === "suspended" && tenant.suspendedByTrial ? (
+            <Fact
+              label={t("operator.workspace.factReadOnly")}
+              value={t("operator.workspace.readOnlyByTrial")}
+            />
+          ) : null}
           {tenant.closedAt ? (
             <Fact
               label={t("operator.workspace.factClosed")}
@@ -459,6 +474,18 @@ export default async function OperatorWorkspacePage({
             }))}
             workspaceId={tenant.workspaceId}
             workspaceName={tenant.name}
+          />
+
+          {/* Start, extend or remove a trial (tenant-lifecycle.md §11 T2). */}
+          <OperatorTrialForm
+            action={setTrial}
+            endsOn={
+              tenant.trialEndsAt
+                ? tenant.trialEndsAt.toISOString().slice(0, 10)
+                : null
+            }
+            plans={plans.map((plan) => ({ key: plan.key, label: plan.name }))}
+            workspaceId={tenant.workspaceId}
           />
 
           {/* Plan 0.7.0 B10: the storage quota and the agent cost cap are the
