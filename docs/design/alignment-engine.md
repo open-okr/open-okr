@@ -327,8 +327,12 @@ an absent anchor.
 
 ## 9. One-click applicability (plan 0.7.0 A6)
 
-Status: proposed 9 November 2026, waiting for Akmal's "design approved". It is
-on the plan as a schema change, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026. Approved by Akmal on 9 November 2026
+("design approved"), Q1 as proposed: derived, no schema change. **Built.**
+`oneClickApplicable` in `packages/core/src/alignment/applicable.ts`;
+`alignment.read` returns it with the target, and the panel's re-parent button
+follows it. It was on the plan as a schema change, so it was designed first
+(CLAUDE.md).
 
 `docs/design/agents.md` §1.5 lists a `one_click_applicable` boolean on
 `alignment_findings`, "true when the fix is mechanical (re-parent, add
@@ -383,7 +387,7 @@ rows.
 | Kind | File | Covers |
 |---|---|---|
 | Unit | `packages/core/test/alignment-applicable.test.ts` | The function, every kind and state |
-| Integration | `packages/core/test/alignment.test.ts` (existing) | `alignment.read` returns the field and the target |
+| Integration | `packages/core/test/semantic-sweep.test.ts` (existing) | `alignment.read` returns the field and the target, and the target's title only to a reader who can see it. There rather than in `alignment.test.ts`, because only the Coach's review writes a relink and that file has its stand-in |
 | Unit | `apps/web/test/alignment-panel.test.tsx` | The button follows the field |
 | Contract | `pnpm check:contract` | `alignment.read`'s output grows by three fields |
 

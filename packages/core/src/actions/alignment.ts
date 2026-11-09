@@ -30,9 +30,15 @@ import {
 import { ALIGNMENT_BANDS } from "@openokr/method";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
+import {
+  type NotOneClick,
+  notOneClickBecause,
+  oneClickApplicable,
+} from "../alignment/applicable.ts";
 import {
   alignmentInTx,
   blocksPublish,
@@ -44,6 +50,9 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
+
+/** A finding's second goal, joined beside its subject in `alignment.read`. */
+const targetGoals = alias(goals, "target_goals");
 
 async function actingMember(
   tx: OperationTx,
@@ -1231,6 +1240,21 @@ export const readAlignment = defineReadAction({
         source: z.string(),
         subjectGoalId: z.uuid().nullable(),
         subjectGoalTitle: z.string().nullable(),
+        /**
+         * The second goal, for a finding about two: a relink's new parent, or
+         * the other end of a conflict or a dependency. The title is null when
+         * this reader cannot see that goal; the id still says there is one,
+         * as a parent pointer does everywhere else.
+         */
+        targetGoalId: z.uuid().nullable(),
+        targetGoalTitle: z.string().nullable(),
+        /**
+         * One click applies it: an open relink naming both goals (METHOD.md
+         * §5.3, design `alignment-engine.md` §9). Derived from the row, never
+         * stored, and the same answer `alignment.applyFinding` acts on. Whether
+         * this reader may apply it is asked when they do.
+         */
+        oneClickApplicable: z.boolean(),
       }),
     ),
     /** The §5.4 register for this cycle: what depends on whom, and who carries it. */
@@ -1314,6 +1338,8 @@ export const readAlignment = defineReadAction({
             source: alignmentFindings.source,
             subjectGoalId: alignmentFindings.subjectGoalId,
             subjectGoalTitle: goals.title,
+            targetGoalId: alignmentFindings.targetGoalId,
+            targetGoalTitle: targetGoals.title,
           })
           .from(alignmentFindings)
           .leftJoin(
@@ -1321,6 +1347,13 @@ export const readAlignment = defineReadAction({
             and(
               eq(goals.id, alignmentFindings.subjectGoalId),
               isNull(goals.deletedAt),
+            ),
+          )
+          .leftJoin(
+            targetGoals,
+            and(
+              eq(targetGoals.id, alignmentFindings.targetGoalId),
+              isNull(targetGoals.deletedAt),
             ),
           )
           .where(
@@ -1343,6 +1376,9 @@ export const readAlignment = defineReadAction({
         // One statement for the whole set (P7-T01b). A finding names a goal at
         // most once, but a cycle holds ten thousand of them, and asking the
         // getter per row cost two statements each.
+        // The targets are asked in the same statement: a finding is shown by
+        // its subject, and the second goal's title only to a reader who could
+        // open that goal too.
         const allowedFindingGoals = await visibleResourceIds(tx, {
           workspaceId: context.workspaceId,
           memberId,
@@ -1350,19 +1386,30 @@ export const readAlignment = defineReadAction({
           ids: [
             ...new Set(
               rows.flatMap((row) =>
-                row.subjectGoalId ? [row.subjectGoalId] : [],
+                [row.subjectGoalId, row.targetGoalId].filter(
+                  (id): id is string => id !== null,
+                ),
               ),
             ),
           ],
         });
-        const visible = rows.filter(
-          (row) =>
-            (!row.subjectGoalId ||
-              allowedFindingGoals.has(row.subjectGoalId)) &&
-            (row.source !== "engine" ||
-              row.kind !== "structure" ||
-              raisedNow.has(`${row.ruleKey} ${row.subjectGoalId ?? ""}`)),
-        );
+        const visible = rows
+          .filter(
+            (row) =>
+              (!row.subjectGoalId ||
+                allowedFindingGoals.has(row.subjectGoalId)) &&
+              (row.source !== "engine" ||
+                row.kind !== "structure" ||
+                raisedNow.has(`${row.ruleKey} ${row.subjectGoalId ?? ""}`)),
+          )
+          .map((row) => ({
+            ...row,
+            targetGoalTitle:
+              row.targetGoalId && allowedFindingGoals.has(row.targetGoalId)
+                ? row.targetGoalTitle
+                : null,
+            oneClickApplicable: oneClickApplicable(row),
+          }));
 
         // The register, for the goals this reader can see. §5.4's four columns:
         // the key result that depends, the providing team, whether they have
@@ -1574,6 +1621,15 @@ async function requireEitherEnd(
   throw refusal;
 }
 
+/** Why `alignment.applyFinding` refused, in the words a person reads. */
+const NOT_ONE_CLICK: Readonly<Record<NotOneClick, string>> = {
+  not_mechanical:
+    "Only a relink finding has a mechanical fix. A dependency needs a provider named, and a conflict or a gap needs a conversation rather than a click.",
+  decided: "This finding has already been decided.",
+  missing_goal:
+    "A relink names the goal to move and the parent to move it under. This one names only one of them.",
+};
+
 /**
  * Applies a finding whose fix is mechanical (METHOD.md §5.3, P4-T06b-b).
  *
@@ -1625,22 +1681,12 @@ export const applyAlignmentFinding = defineWriteAction({
       if (!row) {
         throw new OperationError("not_found", "No such finding.");
       }
-      if (row.kind !== "relink") {
+      // The same question `alignment.read` answers for every finding it
+      // returns (design §9), so the panel never draws a button this refuses.
+      if (!oneClickApplicable(row)) {
         throw new OperationError(
           "forbidden",
-          "Only a relink finding has a mechanical fix. A dependency needs a provider named, and a conflict or a gap needs a conversation rather than a click.",
-        );
-      }
-      if (row.state !== "open") {
-        throw new OperationError(
-          "forbidden",
-          "This finding has already been decided.",
-        );
-      }
-      if (!row.subjectGoalId || !row.targetGoalId) {
-        throw new OperationError(
-          "forbidden",
-          "A relink names the goal to move and the parent to move it under. This one names only one of them.",
+          NOT_ONE_CLICK[notOneClickBecause(row) ?? "missing_goal"],
         );
       }
 

@@ -97,7 +97,7 @@ either way and only the suggested wording needs a provider.
 | `rule_key` | string, nullable | Resolves to a check or trigger in the method package |
 | `state` | `'open'`, `'applied'`, `'dismissed'` | Dismissing on one side dismisses everywhere |
 | `decided_by_id` | uuid, nullable | |
-| `one_click_applicable` | boolean | True when the fix is mechanical (re-parent, add dependency) |
+| `oneClickApplicable` | boolean, **derived, not a column** | True for an open `relink` naming both goals, the one fix that is mechanical. Not stored: `alignment.read` returns it and `alignment.applyFinding` acts on it, both from one function over the columns above. A dependency needs a provider and a direction, so it is not one click. See [alignment-engine.md §9](alignment-engine.md#9-one-click-applicability-plan-070-a6) |
 
 The `alignment_findings` table from P3-T09 is this table. P4-T06 adds the
 `source = 'coach'` rows. Engine findings are recomputed structurally; coach
