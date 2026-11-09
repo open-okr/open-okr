@@ -33,6 +33,7 @@ import {
   API_VERSION,
   REST_ROUTES,
   type RestRoute,
+  VALIDATE_PARAMETER,
 } from "./surface.ts";
 
 /** A JSON object, as the document is built and compared. */
@@ -201,8 +202,27 @@ function operationFor(route: RestRoute): JsonObject {
     required: true,
     content: { "application/json": { schema: input } },
   };
+  // Referenced rather than repeated, so two hundred writes add one line each
+  // and one definition (plan D4).
+  if (route.validatable) {
+    operation.parameters = [{ $ref: "#/components/parameters/Validate" }];
+  }
   return operation;
 }
+
+/** The dry-run parameter every write built from one operation takes (D4). */
+const VALIDATE_COMPONENT: JsonObject = {
+  name: VALIDATE_PARAMETER,
+  in: "query",
+  required: false,
+  schema: { type: "boolean" },
+  description: [
+    "Check this write without committing it: the same checks, access and",
+    "refusals, then rolled back. Success answers `data` as `{ valid: true,",
+    "input, result }`: the input with its defaults filled in, and what the",
+    "write would have returned. A refusal answers exactly as the write would.",
+  ].join(" "),
+};
 
 /**
  * The whole document.
@@ -246,6 +266,7 @@ export function buildOpenApiDocument(
     servers: [{ url: API_BASE, description: `Version ${API_VERSION}` }],
     security: [{ bearerAuth: [] }],
     components: {
+      parameters: { Validate: VALIDATE_COMPONENT },
       responses: errorResponseComponents(),
       securitySchemes: {
         bearerAuth: {

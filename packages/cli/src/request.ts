@@ -51,13 +51,17 @@ export function urlFor(
   command: CliCommand,
   input: Readonly<Record<string, unknown>>,
   cursor?: string,
+  validate?: boolean,
 ): string {
   let end = base.length;
   while (end > 0 && base.charCodeAt(end - 1) === 47) {
     end -= 1;
   }
   const root = `${base.slice(0, end)}/api/v1${command.path}`;
-  return command.method === "GET" ? `${root}${queryFor(input, cursor)}` : root;
+  if (command.method === "GET") {
+    return `${root}${queryFor(input, cursor)}`;
+  }
+  return validate ? `${root}?validate=true` : root;
 }
 
 /**
@@ -72,11 +76,18 @@ export async function send(
   profile: Profile,
   options: {
     readonly cursor?: string;
+    readonly validate?: boolean;
     readonly fetch?: typeof globalThis.fetch;
   } = {},
 ): Promise<Answer> {
   const call = options.fetch ?? globalThis.fetch;
-  const url = urlFor(profile.url, command, input, options.cursor);
+  const url = urlFor(
+    profile.url,
+    command,
+    input,
+    options.cursor,
+    options.validate,
+  );
 
   const response = await call(url, {
     method: command.method,

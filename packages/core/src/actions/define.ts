@@ -205,6 +205,18 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
+  /**
+   * The write run as a dry run (plan D4): parsed, loaded, authorised and
+   * checked exactly as the handler would, then rolled back. Answers the parsed
+   * input with its defaults filled in and what the write would have returned,
+   * or throws what the write would have thrown. Present only on writes built
+   * from an operation spec, because only those run wholly inside one
+   * transaction.
+   */
+  readonly validate?: (
+    context: ActionCallContext,
+    input: unknown,
+  ) => Promise<{ readonly input: TInput; readonly result: TOutput }>;
   /** The role domain a write is measured on (workspace-roles.md §11). */
   readonly domain?: RoleDomain;
   /**
@@ -340,34 +352,47 @@ export function defineWriteAction<
       : {}),
     async handler(context, rawInput) {
       const input = definition.input.parse(rawInput);
-      const spec = definition.operation(context, input);
-      return runOperation<TOutput, TLoaded>(
-        { pool: context.pool },
-        {
-          ...spec,
-          // The level this action was declared with is the level
-          // `runOperation` actually enforces. Before this line it fell back
-          // to its own `edit` default instead, silently under-enforcing
-          // every write action across Phase 2 that declares `full` (rename,
-          // suspend, restore, convert-to-guest, erase, invitation create and
-          // revoke) — an `edit`-level member could reach all of them. An
-          // `operation()` callback that sets `requires` itself, for a
-          // resource-level rule finer than one flat number, still wins.
-          requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
-          action: definition.name,
-          workspaceId: context.workspaceId,
-          actor: context.actor,
-          ...(definition.domain ? { domain: definition.domain } : {}),
-          // Carried from the call context, so an action reached from chat is
-          // audited with the channel on it without the action knowing there
-          // are channels (P5-T06a). Absent for a browser call.
-          ...(context.channel ? { channel: context.channel } : {}),
-          // Threaded rather than read inside the pipeline, so that a bulk
-          // load is a property of the call and not of a global the next
-          // caller inherits (P6-T01a).
-          ...(context.bulk ? { suppressNotifications: true } : {}),
-        },
-      );
+      return run(context, input, false);
+    },
+    async validate(context, rawInput) {
+      const input = definition.input.parse(rawInput);
+      return { input, result: await run(context, input, true) };
     },
   };
+
+  function run(
+    context: ActionCallContext,
+    input: TInput,
+    dryRun: boolean,
+  ): Promise<TOutput> {
+    const spec = definition.operation(context, input);
+    return runOperation<TOutput, TLoaded>(
+      { pool: context.pool },
+      {
+        ...spec,
+        ...(dryRun ? { dryRun: true } : {}),
+        // The level this action was declared with is the level
+        // `runOperation` actually enforces. Before this line it fell back
+        // to its own `edit` default instead, silently under-enforcing
+        // every write action across Phase 2 that declares `full` (rename,
+        // suspend, restore, convert-to-guest, erase, invitation create and
+        // revoke) — an `edit`-level member could reach all of them. An
+        // `operation()` callback that sets `requires` itself, for a
+        // resource-level rule finer than one flat number, still wins.
+        requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
+        action: definition.name,
+        workspaceId: context.workspaceId,
+        actor: context.actor,
+        ...(definition.domain ? { domain: definition.domain } : {}),
+        // Carried from the call context, so an action reached from chat is
+        // audited with the channel on it without the action knowing there
+        // are channels (P5-T06a). Absent for a browser call.
+        ...(context.channel ? { channel: context.channel } : {}),
+        // Threaded rather than read inside the pipeline, so that a bulk
+        // load is a property of the call and not of a global the next
+        // caller inherits (P6-T01a).
+        ...(context.bulk ? { suppressNotifications: true } : {}),
+      },
+    );
+  }
 }

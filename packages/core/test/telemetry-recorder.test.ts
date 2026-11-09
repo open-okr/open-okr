@@ -107,6 +107,7 @@ describe("the outcome labels", () => {
     // distinguished, because it never leaves the instance and an operator
     // watching a spike needs to know which kind it is.
     expect(OUTCOME.refused).not.toBe(OUTCOME.notFound);
-    expect(new Set(Object.values(OUTCOME)).size).toBe(4);
+    // Five labels since plan D4 added `validated`, a dry run kept nothing of.
+    expect(new Set(Object.values(OUTCOME)).size).toBe(5);
   });
 });

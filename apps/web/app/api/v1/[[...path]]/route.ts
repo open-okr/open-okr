@@ -23,6 +23,7 @@
 
 import { loadEnv } from "@openokr/config";
 import {
+  type ActionCallContext,
   type ActionName,
   API_RATE_LIMIT,
   API_RATE_WINDOW_SECONDS,
@@ -41,6 +42,8 @@ import {
   stampTokenUse,
   statusFor,
   type TokenRejection,
+  validateAction,
+  validateRequested,
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
@@ -203,24 +206,58 @@ async function handle(
   if ("error" in input) {
     return fail(input.error);
   }
+  // A write may be asked to check itself without committing (plan D4). Read
+  // after the scope check, so a validation call needs the scope the write
+  // does: it costs what the write costs, and answers only what the write
+  // would.
+  const validation =
+    method === "POST"
+      ? validateRequested(route, new URL(request.url).searchParams)
+      : ({ kind: "ok", validate: false } as const);
+  if (validation.kind === "error") {
+    return fail(validation.error);
+  }
 
   try {
-    const output = await callAction(
-      {
-        pool,
+    const context: ActionCallContext = {
+      pool,
+      workspaceId: resolved.workspaceId,
+      actor: { kind: "human", userId: resolved.userId },
+      // Named on the audit row of every write, in one place, so a call that
+      // came in over the API is answerable a quarter later.
+      channel: "api",
+      // What the screens already hand every action, so a write that seals
+      // a credential works over the API and the command line too. Without
+      // the ring `sso.updateConnection` and `ai.setWorkspaceCredential`
+      // refused a new secret from here, and without the address a SAML
+      // edit waited for the next reload to reach the plugin's table.
+      ring: getKeyRing(),
+      baseUrl: loadEnv().BETTER_AUTH_URL,
+    };
+    if (validation.validate) {
+      const checked = await validateAction(
+        context,
+        route.action as ActionName,
+        input.value,
+      );
+      await stampTokenUse(pool, {
         workspaceId: resolved.workspaceId,
-        actor: { kind: "human", userId: resolved.userId },
-        // Named on the audit row of every write, in one place, so a call that
-        // came in over the API is answerable a quarter later.
-        channel: "api",
-        // What the screens already hand every action, so a write that seals
-        // a credential works over the API and the command line too. Without
-        // the ring `sso.updateConnection` and `ai.setWorkspaceCredential`
-        // refused a new secret from here, and without the address a SAML
-        // edit waited for the next reload to reach the plugin's table.
-        ring: getKeyRing(),
-        baseUrl: loadEnv().BETTER_AUTH_URL,
-      },
+        tokenId: resolved.tokenId,
+        now,
+      });
+      // `validatable` said this write has a dry run, so null cannot reach
+      // here; answered as the refusal it would be rather than trusted.
+      return checked === null
+        ? fail(
+            apiError(
+              "unsupported_parameter",
+              `${route.action} cannot be checked without committing.`,
+            ),
+          )
+        : json({ data: { valid: true, ...checked } }, 200);
+    }
+    const output = await callAction(
+      context,
       route.action as ActionName,
       // The action parses this with its own schema. Nothing here pre-validates
       // it: a second opinion on the shape is a second thing to disagree with.

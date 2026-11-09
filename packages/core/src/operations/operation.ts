@@ -270,6 +270,15 @@ export interface OperationSpec<TResult, TLoaded = undefined> {
    * import did.
    */
   readonly suppressNotifications?: boolean;
+  /**
+   * Run every step, then roll the transaction back (plan D4).
+   *
+   * What a validation call is: the write's own load, authorisation, checks and
+   * change, so its answer cannot drift from the write's, and nothing of it
+   * kept. Safe because the pipeline does nothing outside its transaction: every
+   * side effect is an outbox row, and the rollback takes those with it.
+   */
+  readonly dryRun?: boolean;
   /** Freshly loaded rows the authorisation and the change both depend on. */
   readonly load?: (context: {
     tx: OperationTx;
@@ -551,6 +560,15 @@ async function appendAudit(
   });
 }
 
+/** Carries a dry run's result out of the transaction it rolled back. */
+class DryRunRollback extends Error {
+  readonly result: unknown;
+  constructor(result: unknown) {
+    super("Rolled back: this operation was a dry run.");
+    this.result = result;
+  }
+}
+
 /**
  * Runs one operation. The only supported way to change anything.
  */
@@ -822,6 +840,11 @@ export async function runOperation<TResult, TLoaded = undefined>(
         });
       }
 
+      if (spec.dryRun) {
+        // Thrown rather than returned, so `withContext` rolls back exactly as
+        // it does for a refusal, and caught below.
+        throw new DryRunRollback(outcome.result);
+      }
       return outcome.result;
     },
   ).then(
@@ -830,6 +853,10 @@ export async function runOperation<TResult, TLoaded = undefined>(
       return result;
     },
     (error: unknown) => {
+      if (error instanceof DryRunRollback) {
+        recordOperation(metrics, spec.action, OUTCOME.validated, startedAt);
+        return error.result as TResult;
+      }
       // A throw out of `withContext` is a rollback: the domain change, the
       // activity row, the audit row and the outbox row all went back
       // together, which is the pipeline's whole promise. Counted as such.

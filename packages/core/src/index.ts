@@ -56,6 +56,7 @@ export {
   actionNames,
   callAction,
   getAction,
+  validateAction,
 } from "./actions/registry.ts";
 export { SEARCH_TEXT_MAX_LENGTH } from "./actions/search.ts";
 export {
@@ -428,6 +429,8 @@ export {
   REST_ROUTES,
   type RestRoute,
   routeAt,
+  VALIDATE_PARAMETER,
+  validateRequested,
 } from "./api/surface.ts";
 export {
   ADDRESS_RATE_LIMIT,

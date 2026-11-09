@@ -1045,7 +1045,51 @@ export async function callAction<K extends ActionName>(
     (action as ActionDefinition).handler(context, input) as Promise<
       ActionOutput<K>
     >;
+  return admitted(context, name, action as ActionDefinition, call);
+}
 
+/**
+ * A write checked without committing (plan D4, TECHNICAL-PLAN §14 "validation
+ * endpoints").
+ *
+ * The write itself, run as a dry run: the same parse, load, authorisation and
+ * checks, then rolled back. So it answers the parsed input with its defaults
+ * filled in and the result the write would have returned, or throws exactly
+ * what the write would have thrown. Through the same door as `callAction`,
+ * admission and measurement included, because it costs what the write costs.
+ *
+ * Null for an action that cannot be run this way: a read, which commits
+ * nothing anyway, and a write whose handler is written by hand rather than
+ * built from one operation, which could do work outside the transaction.
+ */
+export async function validateAction<K extends ActionName>(
+  context: ActionCallContext,
+  name: K,
+  input: unknown,
+): Promise<{
+  readonly input: ActionInput<K>;
+  readonly result: ActionOutput<K>;
+} | null> {
+  const action = ACTION_MAP[name] as ActionDefinition;
+  const validate = action.validate;
+  if (!validate) {
+    return null;
+  }
+  const call = () =>
+    validate(context, input) as Promise<{
+      readonly input: ActionInput<K>;
+      readonly result: ActionOutput<K>;
+    }>;
+  return admitted(context, name, action, call);
+}
+
+/** Admission, then the measured call: the one door every action comes through. */
+async function admitted<T>(
+  context: ActionCallContext,
+  name: ActionName,
+  action: ActionDefinition,
+  call: () => Promise<T>,
+): Promise<T> {
   // Measured here rather than per action, because this is the one door every
   // surface comes through: the web app, the REST projection, the command
   // line, the agent tool catalogue and the chat commands (P7-T06a). An
@@ -1095,12 +1139,12 @@ export async function callAction<K extends ActionName>(
  * Split out at P8-T06a so admission can wrap it without indenting two
  * hundred lines of comment that explain the measurement.
  */
-async function callMeasured<K extends ActionName>(
+async function callMeasured<T>(
   context: ActionCallContext,
-  name: K,
+  name: ActionName,
   action: ActionDefinition,
-  call: () => Promise<ActionOutput<K>>,
-): Promise<ActionOutput<K>> {
+  call: () => Promise<T>,
+): Promise<T> {
   const metrics = context.metrics ?? defaultMetrics();
   if (metrics === NO_METRICS) {
     // The instance is not measuring itself. Skip the timer and the labels

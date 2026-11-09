@@ -336,6 +336,7 @@ export async function run(
   try {
     answer = await send(found.command, parsed.input, resolved.profile, {
       ...(parsed.globals.cursor ? { cursor: parsed.globals.cursor } : {}),
+      ...(parsed.globals.validate ? { validate: true } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),
     });
   } catch (error) {

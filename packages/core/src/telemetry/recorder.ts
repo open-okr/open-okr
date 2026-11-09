@@ -277,6 +277,8 @@ export const OUTCOME = {
   refused: "refused",
   notFound: "not_found",
   error: "error",
+  /** A dry run that passed every check and kept nothing (plan D4). */
+  validated: "validated",
 } as const;
 
 export type Outcome = (typeof OUTCOME)[keyof typeof OUTCOME];

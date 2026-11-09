@@ -314,6 +314,34 @@ Proved in `e2e/s38-device-login.spec.ts`, with the login spawned as a real
 process whose link is read from its own output, approved in a real browser, and
 the next command run from the profile it wrote.
 
+## 7b. Validation calls (plan D4)
+
+TECHNICAL-PLAN §14: "A validate call per resource returns field errors and
+computed defaults without committing." Built at 0.7.0 as a parameter on every
+write rather than a second action per write.
+
+| Decision | Why |
+|---|---|
+| **The write run as a dry run.** `runOperation` takes `dryRun`: it loads, authorises, checks and writes exactly as the write does, then throws inside the transaction so it rolls back, and hands back the result | A separate validator is a second opinion that drifts from the write. This one cannot: it is the write. It is safe because the pipeline does nothing outside its transaction; every side effect is an outbox row, and the rollback takes it |
+| **Only writes built from one operation** (`defineWriteAction`). A read commits nothing anyway, and a hand-written write could act outside one transaction | `ActionDefinition.validate` exists only where this holds; `RestRoute.validatable` and the OpenAPI document say which |
+| **`?validate=true` on the write's own path**, not `/validate` paths or one `actions.validate` action | One parameter, declared once in `components.parameters` and referenced from each write. No new path, and the scope check, rate limit and error shapes are the write's own |
+| **Success is `{ valid: true, input, result }`.** `input` is the parsed input with its defaults filled in; `result` is what the write would have returned | "Computed defaults" from §14. Including the result lets a client preview, for example, the short id a create would get |
+| **A refusal is the write's own refusal**, status and code included, with `fields` on a 422 | A client handles one error shape whether it checked or wrote |
+| **The command line takes `--validate`** on a write and refuses it on a read | The same parameter, set by the tool |
+| **Internal callers use `validateAction`** beside `callAction`, through the same admission and measurement. The counter records the outcome as `validated` | Costs what the write costs, so it is admitted and measured like one |
+| **Not on the agent surface yet.** A tool call has no query string, and adding a flag to every tool's schema would move every entry in `contract/mcp.json`. `goals.checkDraft` stays the agent's way to check an objective | A later row, if agents ask |
+
+Given / When / Then:
+
+- Given a valid `goals.create` body, when it is POSTed with `?validate=true`,
+  then the answer is 200 with `valid`, `input` and `result`, and no goal,
+  activity, audit or outbox row exists afterwards.
+- Given a body naming a cycle that does not exist, when it is checked and
+  when it is written, then both answer the same code and message.
+- Given `?validate=maybe`, then 400 before anything runs.
+- Given a read, when `okr` is given `--validate`, then it is a usage error and
+  nothing is sent.
+
 ## 8. Found while building this
 
 **The proxy gated both self-authenticating surfaces.** `apps/web/proxy.ts`

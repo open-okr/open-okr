@@ -17,6 +17,17 @@
     }
   ],
   "components": {
+    "parameters": {
+      "Validate": {
+        "name": "validate",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "boolean"
+        },
+        "description": "Check this write without committing it: the same checks, access and refusals, then rolled back. Success answers `data` as `{ valid: true, input, result }`: the input with its defaults filled in, and what the write would have returned. A refusal answers exactly as the write would."
+      }
+    },
     "responses": {
       "E400": {
         "description": "`error.code` is `unsupported_parameter`.",
@@ -509,7 +520,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/finishOnboarding": {
@@ -593,7 +609,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/reopenOnboarding": {
@@ -677,7 +698,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/changePlan": {
@@ -1448,7 +1474,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/setLifecycle": {
@@ -1561,7 +1592,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/setState": {
@@ -1670,7 +1706,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/provision": {
@@ -2037,7 +2078,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/readOwnTour": {
@@ -2182,7 +2228,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/exportMine": {
@@ -2450,7 +2501,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/updateMember": {
@@ -2630,7 +2686,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/setAdministrator": {
@@ -2727,7 +2788,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/suspend": {
@@ -2825,7 +2891,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/restore": {
@@ -2923,7 +2994,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/convertToGuest": {
@@ -3017,7 +3093,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/erase": {
@@ -3283,7 +3364,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/directory": {
@@ -4167,7 +4253,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/invitations/createPersonalLink": {
@@ -4324,7 +4415,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/invitations/revokeLink": {
@@ -4417,7 +4513,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/invitations/acceptLink": {
@@ -4509,7 +4610,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/invitations/joinByTrustedDomain": {
@@ -4594,7 +4700,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/listConnections": {
@@ -4864,7 +4975,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/disconnect": {
@@ -4961,7 +5077,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/listIdentities": {
@@ -5188,7 +5309,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/startLink": {
@@ -5293,7 +5419,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/unlinkIdentity": {
@@ -5390,7 +5521,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/send": {
@@ -5524,7 +5660,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/listMessages": {
@@ -5753,7 +5894,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/mySettings": {
@@ -6007,7 +6153,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/templates": {
@@ -6266,7 +6417,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/templateMappings": {
@@ -6477,7 +6633,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/channels/removeTemplateMapping": {
@@ -6563,7 +6724,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/connections/mine": {
@@ -6769,7 +6935,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/connections/list": {
@@ -7036,7 +7207,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/connections/sweepToolCalls": {
@@ -7132,7 +7308,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/connections/toolCalls": {
@@ -7636,7 +7817,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tokens/revoke": {
@@ -7729,7 +7915,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tokens/pendingDevice": {
@@ -7932,7 +8123,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/ask": {
@@ -8059,7 +8255,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/completeRun": {
@@ -8205,7 +8406,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/recordAnswer": {
@@ -8347,7 +8553,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/thread": {
@@ -8946,7 +9157,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/proposals": {
@@ -9179,7 +9395,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/dismissProposal": {
@@ -9268,7 +9489,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/copilot/undoProposal": {
@@ -9357,7 +9583,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/blobs/prepareUpload": {
@@ -9461,7 +9692,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/blobs/reapOrphans": {
@@ -9553,7 +9789,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/blobs/prepareImport": {
@@ -9685,7 +9926,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/blobs/claimUpload": {
@@ -9804,7 +10050,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/blobs/getForDownload": {
@@ -9998,7 +10249,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/notifications/list": {
@@ -10465,7 +10721,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/notifications/snooze": {
@@ -10564,7 +10825,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/notifications/getSettings": {
@@ -10809,7 +11075,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/subscriptions/read": {
@@ -11025,7 +11296,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/subscriptions/importWatcher": {
@@ -11138,7 +11414,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/activities/goalFeed": {
@@ -11928,7 +12209,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workspace/archiveHistory": {
@@ -12224,7 +12510,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/audit/export": {
@@ -12353,7 +12644,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/audit/verify": {
@@ -13091,7 +13387,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/settings/updateWorkspaceBranding": {
@@ -13217,7 +13518,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/settings/updateWorkspaceLimits": {
@@ -13335,7 +13641,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/settings/setWorkspaceBrandingImage": {
@@ -13447,7 +13758,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/settings/resetWorkspaceSettings": {
@@ -13557,7 +13873,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readProviderConfig": {
@@ -13904,7 +14225,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/setWorkspaceCredential": {
@@ -14025,7 +14351,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/recordCredentialCheck": {
@@ -14138,7 +14469,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/removeWorkspaceCredential": {
@@ -14239,7 +14575,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/setPersonalCredential": {
@@ -14360,7 +14701,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/removePersonalCredential": {
@@ -14461,7 +14807,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readOwnCredentialStatus": {
@@ -14663,7 +15014,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readModelCatalog": {
@@ -15078,7 +15434,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/updateCustomModel": {
@@ -15334,7 +15695,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/removeCustomModel": {
@@ -15423,7 +15789,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readTierRouting": {
@@ -15749,7 +16120,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/removeTierPolicy": {
@@ -15846,7 +16222,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readFeatureSettings": {
@@ -16063,7 +16444,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readPrompt": {
@@ -16312,7 +16698,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/restorePrompt": {
@@ -16398,7 +16789,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readBudgets": {
@@ -16683,7 +17079,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/removeBudget": {
@@ -16772,7 +17173,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/ai/readUsageSummary": {
@@ -17082,7 +17488,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sso/listConnections": {
@@ -17503,7 +17914,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sso/setConnectionEnabled": {
@@ -17693,7 +18109,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sso/removeConnection": {
@@ -17780,7 +18201,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/list": {
@@ -18202,7 +18628,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/setAutonomy": {
@@ -18309,7 +18740,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/setEnabled": {
@@ -18406,7 +18842,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/bindScope": {
@@ -18526,7 +18967,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/startRun": {
@@ -18734,7 +19180,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/readRun": {
@@ -18990,7 +19441,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/runChampion": {
@@ -19130,7 +19586,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/runCoach": {
@@ -19249,7 +19710,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/listRuns": {
@@ -19671,7 +20137,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/proposals/bulkDismiss": {
@@ -19767,7 +20238,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/proposals/apply": {
@@ -19871,7 +20347,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/proposals/dismiss": {
@@ -19960,7 +20441,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/list": {
@@ -20411,7 +20897,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/update": {
@@ -20520,7 +21011,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/updateSettings": {
@@ -20670,7 +21166,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/setHolidays": {
@@ -20791,7 +21292,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/holidays": {
@@ -20997,7 +21503,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/setMemberLeave": {
@@ -21116,7 +21627,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/people/leave": {
@@ -21301,7 +21817,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/addMember": {
@@ -21420,7 +21941,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/setMemberRole": {
@@ -21539,7 +22065,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/removeMember": {
@@ -21640,7 +22171,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/join": {
@@ -21738,7 +22274,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/spaces/leave": {
@@ -21827,7 +22368,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/list": {
@@ -22560,7 +23106,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/create": {
@@ -22829,7 +23380,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/update": {
@@ -23103,7 +23659,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/setClosing": {
@@ -23204,7 +23765,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/archive": {
@@ -23293,7 +23859,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/snapshot": {
@@ -23396,7 +23967,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/feedForward": {
@@ -23532,7 +24108,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/close": {
@@ -23714,7 +24295,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/cycles/scorecard": {
@@ -24276,7 +24862,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/roles/create": {
@@ -24413,7 +25004,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/roles/delete": {
@@ -24502,7 +25098,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/roles/assign": {
@@ -24617,7 +25218,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/rhythm/read": {
@@ -24905,7 +25511,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/practice/read": {
@@ -25247,7 +25858,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/practice/applyProfile": {
@@ -25387,7 +26003,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/frame/annualObjectives": {
@@ -25986,7 +26607,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/read": {
@@ -26959,7 +27585,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/distributePack": {
@@ -27046,7 +27677,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/addIssue": {
@@ -27163,7 +27799,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/setIssueImpact": {
@@ -27270,7 +27911,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/addPriority": {
@@ -27381,7 +28027,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/setRevalidation": {
@@ -27486,7 +28137,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/setBaselineHealth": {
@@ -27587,7 +28243,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/setCapacityNotes": {
@@ -27681,7 +28342,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/setFocusKeyResults": {
@@ -27786,7 +28452,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/workflow/publish": {
@@ -27925,7 +28596,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/documents/list": {
@@ -28538,7 +29214,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/documents/update": {
@@ -28636,7 +29317,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/documents/publish": {
@@ -28731,7 +29417,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/documents/delete": {
@@ -28820,7 +29511,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/documents/restore": {
@@ -28909,7 +29605,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/attachments/list": {
@@ -29175,7 +29876,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/attachments/detach": {
@@ -29264,7 +29970,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/search/query": {
@@ -29784,7 +30495,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/exports/mine": {
@@ -30819,7 +31535,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/imports/finishRun": {
@@ -30946,7 +31667,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/board": {
@@ -31934,7 +32660,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/update": {
@@ -32076,7 +32807,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/move": {
@@ -32195,7 +32931,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/assign": {
@@ -32288,7 +33029,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/unassign": {
@@ -32381,7 +33127,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/addChecklistItem": {
@@ -32497,7 +33248,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/setChecklistItem": {
@@ -32600,7 +33356,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/removeChecklistItem": {
@@ -32695,7 +33456,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/delete": {
@@ -32784,7 +33550,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/restore": {
@@ -32873,7 +33644,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/tasks/linkedWork": {
@@ -33578,7 +34354,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/update": {
@@ -33739,7 +34520,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/delete": {
@@ -33828,7 +34614,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/restore": {
@@ -33923,7 +34714,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/linkKeyResult": {
@@ -34016,7 +34812,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/unlinkKeyResult": {
@@ -34109,7 +34910,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/initiatives/capacity": {
@@ -35838,7 +36644,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/update": {
@@ -36024,7 +36835,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/close": {
@@ -36146,7 +36962,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/delete": {
@@ -36235,7 +37056,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/restore": {
@@ -36330,7 +37156,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/reviewDecision": {
@@ -36533,7 +37364,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/stop": {
@@ -36628,7 +37464,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/reassignRole": {
@@ -36742,7 +37583,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/moveToCycle": {
@@ -36848,7 +37694,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/addKeyResult": {
@@ -37039,7 +37890,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/updateKeyResult": {
@@ -37229,7 +38085,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/tree": {
@@ -38194,7 +39055,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/placeKeyResult": {
@@ -38796,7 +39662,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/patch": {
@@ -39432,7 +40303,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/patchKeyResult": {
@@ -40101,7 +40977,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/changeTarget": {
@@ -40727,7 +41608,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/setKind": {
@@ -41333,7 +42219,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/moveToSpace": {
@@ -41928,7 +42819,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/publishDraft": {
@@ -42521,7 +43417,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/approveDraft": {
@@ -43110,7 +44011,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/targetHistory": {
@@ -43820,7 +44726,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/recordValue": {
@@ -43921,7 +44832,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/updateConfidence": {
@@ -44020,7 +44936,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/removeKeyResult": {
@@ -44109,7 +45030,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/linkKpi": {
@@ -44210,7 +45136,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/unlinkKpi": {
@@ -44299,7 +45230,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/keyResultHistory": {
@@ -45840,7 +46776,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/publishCheckIn": {
@@ -45989,7 +46930,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/importCheckIn": {
@@ -46172,7 +47118,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/publishDraftedCheckIn": {
@@ -46321,7 +47272,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/editCheckIn": {
@@ -46455,7 +47411,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/deleteCheckIn": {
@@ -46548,7 +47509,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/acknowledgeCheckIn": {
@@ -46647,7 +47613,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/vote": {
@@ -46742,7 +47713,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/revealVotes": {
@@ -46831,7 +47807,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/readVotes": {
@@ -47051,7 +48032,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/removeDependency": {
@@ -47140,7 +48126,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/addKeyResultDependency": {
@@ -47256,7 +48247,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/confirmDependency": {
@@ -47354,7 +48350,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/setDependencyRiskOwner": {
@@ -47456,7 +48457,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/setDependencyProvider": {
@@ -47566,7 +48572,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/escalateDependency": {
@@ -47661,7 +48672,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/removeKeyResultDependency": {
@@ -47750,7 +48766,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/alignment/read": {
@@ -48941,7 +49962,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/create": {
@@ -49202,7 +50228,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/record": {
@@ -49345,7 +50376,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/grid": {
@@ -49941,7 +50977,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/createTree": {
@@ -50039,7 +51080,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/launchRecovery": {
@@ -50163,7 +51209,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/recordResponse": {
@@ -50278,7 +51329,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/kpis/recoveryDraft": {
@@ -51939,7 +52995,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/alignment/dismissFinding": {
@@ -52028,7 +53089,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/alignment/applyFinding": {
@@ -52129,7 +53195,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/review/inbox": {
@@ -52799,7 +53870,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/comments/importComment": {
@@ -52946,7 +54022,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/comments/replaceImportedBody": {
@@ -53044,7 +54125,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/comments/update": {
@@ -53129,7 +54215,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/comments/delete": {
@@ -53209,7 +54300,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/comments/previewNotify": {
@@ -53416,7 +54512,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/nudges/rules": {
@@ -53733,7 +54834,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/nudges/list": {
@@ -54004,7 +55110,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/nudges/volume": {
@@ -54391,7 +55502,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/reactions/remove": {
@@ -54471,7 +55587,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/create": {
@@ -54599,7 +55720,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/bookCycle": {
@@ -54732,7 +55858,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/open": {
@@ -54821,7 +55952,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/advanceStage": {
@@ -54919,7 +56055,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/skip": {
@@ -55008,7 +56149,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/close": {
@@ -55097,7 +56243,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/read": {
@@ -55958,7 +57109,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/revealVotes": {
@@ -56053,7 +57209,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/confirmConfidence": {
@@ -56160,7 +57321,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/votes": {
@@ -56538,7 +57704,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/setWins": {
@@ -56637,7 +57808,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/lowScores": {
@@ -56902,7 +58078,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/resolveBlocker": {
@@ -56991,7 +58172,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/reassignBlocker": {
@@ -57092,7 +58278,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/blockerStatus": {
@@ -57504,7 +58695,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/goals/checkDraft": {
@@ -58049,7 +59245,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/closeCommitments": {
@@ -58157,7 +59358,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/carriedCommitments": {
@@ -58580,7 +59786,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/postDigest": {
@@ -58685,7 +59896,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/readStreak": {
@@ -59362,7 +60578,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/givePulse": {
@@ -59463,7 +60684,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/scoreKeyResult": {
@@ -59570,7 +60796,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/revealObjectiveScore": {
@@ -59669,7 +60900,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/passMic": {
@@ -59795,7 +61031,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/setNarrative": {
@@ -59895,7 +61136,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/narratives": {
@@ -60152,7 +61398,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/recognition": {
@@ -60390,7 +61641,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/removeRetroNote": {
@@ -60485,7 +61741,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/castRetroVote": {
@@ -60596,7 +61857,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/retro": {
@@ -60848,7 +62114,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/managementRetro": {
@@ -61095,7 +62366,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/rootCauses": {
@@ -61400,7 +62676,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/processHealth": {
@@ -61657,7 +62938,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/diagnostic": {
@@ -62334,7 +63620,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/reset": {
@@ -62608,7 +63899,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/addAction": {
@@ -62714,7 +64010,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/completeAction": {
@@ -62817,7 +64118,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/forward": {
@@ -64277,7 +65583,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/setTrend": {
@@ -64381,7 +65692,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/setShifts": {
@@ -64475,7 +65791,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/recordDecision": {
@@ -64585,7 +65906,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/sessions/monthlyRecord": {

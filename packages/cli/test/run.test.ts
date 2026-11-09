@@ -216,6 +216,28 @@ describe("sending a command", () => {
     expect(JSON.parse(result.out)).toEqual({ id: "g-1" });
   });
 
+  it("asks for a dry run with --validate, and prints what came back (plan D4)", async () => {
+    await withProfile();
+    reply = {
+      status: 200,
+      body: {
+        data: {
+          valid: true,
+          input: { title: "Something" },
+          result: { id: "g-1" },
+        },
+      },
+    };
+    const result = await okr("goals create --title Something --validate");
+
+    expect(result.code).toBe(0);
+    const request = seen[0] as Seen;
+    expect(request.method).toBe("POST");
+    expect(request.url).toBe("/api/v1/goals/create?validate=true");
+    expect(JSON.parse(request.body)).toEqual({ title: "Something" });
+    expect(JSON.parse(result.out)).toMatchObject({ valid: true });
+  });
+
   it("prints the action's own output and nothing around it", async () => {
     await withProfile();
     reply = { status: 200, body: { data: { goals: [{ id: "g-1" }] } } };

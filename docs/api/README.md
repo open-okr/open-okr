@@ -165,6 +165,28 @@ A refusal names what happened rather than leaving the caller to guess:
 | 422 | The input did not validate. The answer names the field |
 | 429 | Rate limited |
 
+### Checking a write without committing it
+
+Add `?validate=true` to a write, or `--validate` to an `okr` command, and the
+instance runs the write's own checks and rolls it back. Nothing is kept.
+
+```sh
+curl -X POST "https://okr.example.com/api/v1/goals/create?validate=true" \
+  -H "authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"title": "Become the platform mid-market teams reach for first", "level": "team"}'
+pnpm okr goals create --title "Win the mid-market" --level team --validate
+```
+
+| The write would | The check answers |
+|---|---|
+| Succeed | 200, with `data` as `{ "valid": true, "input": ..., "result": ... }`: the input with its defaults filled in, and what the write would have returned |
+| Be refused | The same status and error the write would answer, with `fields` on a 422 |
+
+A check needs the scope the write needs and counts against the same rate
+limit, because it does the same work. A few writes are not one database
+operation and cannot be checked this way; they answer 400 and say so. The
+OpenAPI document marks every write that can.
+
 **404 covering both "gone" and "forbidden" is deliberate.** A distinct 403 on a
 protected resource tells an unauthorised caller that the resource exists, which
 is itself a leak.

@@ -23,6 +23,8 @@ export interface Globals {
   readonly token?: string;
   readonly cursor?: string;
   readonly help: boolean;
+  /** Check a write without committing it (plan D4). */
+  readonly validate: boolean;
 }
 
 export type ParsedFlags =
@@ -33,7 +35,14 @@ export type ParsedFlags =
     }
   | { readonly kind: "error"; readonly message: string };
 
-const GLOBAL_NAMES = new Set(["profile", "url", "token", "cursor", "help"]);
+const GLOBAL_NAMES = new Set([
+  "profile",
+  "url",
+  "token",
+  "cursor",
+  "help",
+  "validate",
+]);
 
 /**
  * A value from the command line, or from a file it names.
@@ -139,6 +148,7 @@ export function parseFlags(
   const input: Record<string, unknown> = {};
   const globals: { -readonly [K in keyof Globals]: Globals[K] } = {
     help: false,
+    validate: false,
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -161,6 +171,17 @@ export function parseFlags(
     if (GLOBAL_NAMES.has(name)) {
       if (name === "help") {
         globals.help = true;
+        continue;
+      }
+      if (name === "validate") {
+        // A read commits nothing already, so there is nothing to check.
+        if (command.method !== "POST") {
+          return {
+            kind: "error",
+            message: `--validate checks a write without committing it, and ${command.name} is a read.`,
+          };
+        }
+        globals.validate = true;
         continue;
       }
       const value = inline ?? argv[index + 1];
@@ -244,6 +265,12 @@ export function commandHelp(command: CliCommand): string {
   }
   if (command.pages) {
     lines.push("", "  --cursor <string> the cursor from a previous answer");
+  }
+  if (command.method === "POST") {
+    lines.push(
+      "",
+      "  --validate check it, and see what it would return, without committing it",
+    );
   }
   return lines.join("\n");
 }

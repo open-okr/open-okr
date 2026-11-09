@@ -76,6 +76,8 @@ export interface RestRoute {
   readonly page: PageContract | null;
   /** False when the agent endpoint leaves this action out (mcp-toolsets.md). */
   readonly agentSurface: boolean;
+  /** True when `?validate=true` can check this write without committing (D4). */
+  readonly validatable: boolean;
 }
 
 /** A read is a GET; a write of either kind is a POST. */
@@ -108,6 +110,7 @@ function routeFor(action: ActionDefinition): RestRoute {
     outputSchema: action.output,
     page: action.page ?? null,
     agentSurface: action.agentSurface !== false,
+    validatable: action.validate !== undefined,
   };
 }
 
@@ -223,6 +226,49 @@ export function inputFrom(
   }
 
   return { kind: "ok", input };
+}
+
+/** The query parameter that turns a write into its validation call (D4). */
+export const VALIDATE_PARAMETER = "validate";
+
+/**
+ * Whether a write's query string asks for it to be checked without committing
+ * (plan D4, TECHNICAL-PLAN §14), or a refusal naming why it cannot be.
+ *
+ * Only `validate` is read: a write takes its input from the body, and every
+ * other query parameter on a POST has always been ignored. A value other than
+ * true or false is refused rather than read as either, for the reason
+ * `inputFrom` refuses an unknown parameter.
+ */
+export function validateRequested(
+  route: RestRoute,
+  params: URLSearchParams,
+):
+  | { readonly kind: "ok"; readonly validate: boolean }
+  | { readonly kind: "error"; readonly error: ApiError } {
+  const raw = params.get(VALIDATE_PARAMETER);
+  if (raw === null || raw === "false" || raw === "0") {
+    return { kind: "ok", validate: false };
+  }
+  if (raw !== "true" && raw !== "1") {
+    return {
+      kind: "error",
+      error: apiError(
+        "unsupported_parameter",
+        `${VALIDATE_PARAMETER} is true or false, not "${raw}".`,
+      ),
+    };
+  }
+  if (!route.validatable) {
+    return {
+      kind: "error",
+      error: apiError(
+        "unsupported_parameter",
+        `${route.action} cannot be checked without committing, because it is not one operation.`,
+      ),
+    };
+  }
+  return { kind: "ok", validate: true };
 }
 
 /**
