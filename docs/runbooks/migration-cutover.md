@@ -78,10 +78,11 @@ pnpm okr workspace importArchive --dry-run --archive-base64 @archive.b64 --passp
 Or use the admin cards on `/admin/imports` on the target: upload the `.okr`
 file with its passphrase and the dry-run runs automatically.
 
-**The export is refused while the source is frozen.** `workspace.exportArchive`
-is a write, and a workspace that is not active refuses every write except
-member, settings and billing management, the state change itself and turning
-single sign-on on or off.
+**The export works while the source is frozen, and that is the point.**
+Freezing first is what makes the archive match what the source holds: nobody
+can change anything between the freeze and the export. Taking the archive is
+allowed in a frozen workspace from 0.7.0; on an earlier release it was
+refused, so upgrade the source first.
 
 **Verify:** review the difference report.
 

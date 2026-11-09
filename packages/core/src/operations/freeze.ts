@@ -35,6 +35,13 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // (docs/design/workspace-erasure.md §12). A closed workspace is frozen, and
   // this is the one thing that has to reach it while it is.
   "workspace.remindErasure",
+  // Taking the portability archive (docs/design/tenant-lifecycle.md §10, plan
+  // 0.7.0 B5). It is how a closed customer leaves and how a migration moves,
+  // and both happen while writes are stopped: freezing first is what makes the
+  // archive consistent. It writes only its own bookkeeping, an `export_runs`
+  // row, an activity and the audit row, and changes no workspace content.
+  // Approved by Akmal on 9 November 2026.
+  "workspace.exportArchive",
 ]);
 
 // `billing.` since docs/design/billing.md: paying again is how a workspace billing made

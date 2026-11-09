@@ -91,6 +91,36 @@ describe.each(["read_only", "frozen"] as const)("state = %s", (state) => {
     ).resolves.toBeTruthy();
   });
 
+  // tenant-lifecycle.md §10 (plan 0.7.0 B5): a closed customer's way out and a
+  // migration's export both happen while writes are stopped, on purpose.
+  it("still allows exporting the workspace archive", async () => {
+    await setState(state);
+
+    await expect(
+      callAction(
+        { pool: (await workerDb()).appPool, ...context(OWNER) },
+        "workspace.exportArchive",
+        { includeFiles: false, passphrase: "correct horse battery staple" },
+      ),
+    ).resolves.toMatchObject({ filename: expect.stringMatching(/\.okr$/) });
+  });
+
+  it("still refuses importing an archive into it", async () => {
+    await setState(state);
+
+    await expect(
+      callAction(
+        { pool: (await workerDb()).appPool, ...context(OWNER) },
+        "workspace.importArchive",
+        {
+          archiveBase64: "",
+          passphrase: "correct horse battery staple",
+          dryRun: true,
+        } as never,
+      ),
+    ).rejects.toMatchObject({ code: "forbidden" });
+  });
+
   it("still allows lifting the freeze itself", async () => {
     await setState(state);
 

@@ -182,7 +182,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B2 | done | Also closes P1 |
 | B3 | design approved | `docs/design/metrics-scrape-token.md` |
 | B4 | done | #192 |
-| B5 | design approved | `docs/design/tenant-lifecycle.md` §10 |
+| B5 | done | `docs/design/tenant-lifecycle.md` §10 |
 | B6 | done | |
 | B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
