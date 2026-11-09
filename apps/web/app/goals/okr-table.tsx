@@ -47,6 +47,7 @@ import {
   AddedMidCycle,
   AdditionDraftMark,
   DoneToggle,
+  InlineConfidence,
   InlineDate,
   InlineNumber,
   InlineText,
@@ -1294,13 +1295,23 @@ function KeyResultRow({
               className={`size-1.5 rounded-full ${CONFIDENCE_DOT[band]}`}
             />
           ) : null}
-          {keyResult.confidence === null
-            ? t("okrList.noConfidence")
-            : formatConfidence(
-                keyResult.confidence,
-                coach.practice["confidence.display"],
-                t,
-              )}
+          {canEdit ? (
+            // Set here between check-ins (okr-writing.md §4.2, plan 0.7.0 O4).
+            <InlineConfidence
+              value={keyResult.confidence}
+              label={t("okrList.confidenceOf", { title: keyResult.title })}
+              display={coach.practice["confidence.display"]}
+              onSave={cells.saveConfidence}
+            />
+          ) : keyResult.confidence === null ? (
+            t("okrList.noConfidence")
+          ) : (
+            formatConfidence(
+              keyResult.confidence,
+              coach.practice["confidence.display"],
+              t,
+            )
+          )}
         </span>
 
         <div

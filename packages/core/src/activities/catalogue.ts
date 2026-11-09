@@ -491,6 +491,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     baselineTo: z.number().optional(),
   }),
   "key_result.value_recorded": z.object({ value: z.number() }),
+  // A confidence set outside a check-in (okr-writing.md §4.2, plan 0.7.0 O4),
+  // with where it moved from: null when nobody had set one.
+  "key_result.confidence_updated": z.object({
+    keyResultId: z.uuid(),
+    from: z.number().nullable(),
+    to: z.number(),
+  }),
   "key_result.removed": z.object({ title: z.string() }),
   // A target moved, and whether it eased (P9-T06b). The reason is in the
   // target history, not the feed, where it would be read out of context.

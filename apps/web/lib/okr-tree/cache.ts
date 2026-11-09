@@ -65,6 +65,8 @@ export interface KeyResultFields {
   readonly kind?: OkrGoal["keyResults"][number]["kind"];
   /** A milestone done or a baseline recorded; the node carries `doneAt`. */
   readonly done?: boolean;
+  /** Nought to one, set outside a check-in (plan 0.7.0 O4). */
+  readonly confidence?: number;
 }
 
 function onGoal(

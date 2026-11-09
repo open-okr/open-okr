@@ -2891,6 +2891,7 @@
   "okrList.close": "Close",
   "okrList.collapseAll": "Collapse all",
   "okrList.company": "Company",
+  "okrList.confidenceOf": "Confidence of {title}",
   "okrList.discard": "Discard",
   "okrList.due": "Due",
   "okrList.dueAfterCycle": "Due after the cycle ends on {date}.",

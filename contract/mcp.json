@@ -9406,6 +9406,40 @@
       }
     },
     {
+      "name": "goals.updateConfidence",
+      "description": "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
+          }
+        },
+        "required": [
+          "id",
+          "confidence"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "confidence": 0
+      }
+    },
+    {
       "name": "goals.removeKeyResult",
       "description": "Removes one key result from its goal, which is not the same as closing the goal.",
       "inputSchema": {

@@ -65,6 +65,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "goals.updateKeyResult",
     "goals.tree",
     "goals.recordValue",
+    "goals.updateConfidence",
     "goals.keyResultHistory",
     "goals.due",
     "goals.myStreak",

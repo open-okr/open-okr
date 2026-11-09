@@ -46,6 +46,7 @@ import {
   AddedMidCycle,
   AdditionDraftMark,
   DoneToggle,
+  InlineConfidence,
   InlineDate,
   InlineNumber,
   InlineText,
@@ -810,6 +811,21 @@ function DrawerKeyResult({
                     { baselineValue: keyResult.baselineValue },
                   )
                 }
+              />
+            </dd>
+          </>
+        ) : null}
+        {canEdit ? (
+          // Between check-ins (okr-writing.md §4.2, plan 0.7.0 O4). A reader
+          // who may not edit has it in the progress line above.
+          <>
+            <dt className="text-ink-3">{t("okrDrawer.confidenceLabel")}</dt>
+            <dd>
+              <InlineConfidence
+                value={keyResult.confidence}
+                label={t("okrList.confidenceOf", { title })}
+                display={coach.practice["confidence.display"]}
+                onSave={cells.saveConfidence}
               />
             </dd>
           </>

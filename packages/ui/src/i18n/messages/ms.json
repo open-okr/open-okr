@@ -2891,6 +2891,7 @@
   "okrList.close": "Tutup",
   "okrList.collapseAll": "Lipat semua",
   "okrList.company": "Syarikat",
+  "okrList.confidenceOf": "Keyakinan bagi {title}",
   "okrList.discard": "Buang",
   "okrList.due": "Tarikh akhir",
   "okrList.dueAfterCycle": "Tarikh akhir selepas kitaran tamat pada {date}.",

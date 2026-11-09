@@ -7681,6 +7681,29 @@
       "pages": false
     },
     {
+      "name": "goals updateConfidence",
+      "action": "goals.updateConfidence",
+      "method": "POST",
+      "path": "/goals/updateConfidence",
+      "scope": "write",
+      "summary": "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "confidence",
+          "field": "confidence",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals removeKeyResult",
       "action": "goals.removeKeyResult",
       "method": "POST",

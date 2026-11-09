@@ -288,6 +288,7 @@ import {
   unlinkKeyResultKpi,
   updateGoal,
   updateKeyResult,
+  updateKeyResultConfidence,
 } from "./goals.ts";
 import {
   finishImportRun,
@@ -828,6 +829,7 @@ export const ACTION_MAP = {
   "goals.targetHistory": readTargetHistory,
   "goals.restoreKeyResult": restoreKeyResult,
   "goals.recordValue": recordKeyResultValue,
+  "goals.updateConfidence": updateKeyResultConfidence,
   "goals.removeKeyResult": removeKeyResult,
   "goals.linkKpi": linkKeyResultKpi,
   "goals.unlinkKpi": unlinkKeyResultKpi,

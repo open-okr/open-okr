@@ -407,6 +407,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
+  // Out of ten, the way the list shows it by default; the feed has no
+  // workspace setting to hand.
+  "key_result.confidence_updated": (p) =>
+    `A key result's confidence was set to ${Math.round(Number(p.to ?? 0) * 10)} in 10`,
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
   "key_result.target_changed": (p) =>

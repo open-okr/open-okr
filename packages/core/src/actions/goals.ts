@@ -2658,6 +2658,83 @@ export const recordKeyResultValue = defineWriteAction({
   }),
 });
 
+export const updateKeyResultConfidence = defineWriteAction({
+  name: "goals.updateConfidence",
+  // openokr:policy-exempt: a confidence is the owner's own judgement about a key result, recorded with a check-in or on its own, which no practice setting may refuse.
+  summary:
+    "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
+  input: z.object({
+    id: z.uuid(),
+    /** METHOD.md §3.2's own scale, as a check-in sends it. */
+    confidence: z.number().min(0).max(1),
+  }),
+  output: z.object({ id: z.uuid(), confidence: z.number() }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const memberId = await actingMember(
+        tx,
+        workspaceId,
+        context.actor.userId,
+      );
+      const [owner] = await tx
+        .select({
+          goalId: keyResults.goalId,
+          confidence: keyResults.confidence,
+        })
+        .from(keyResults)
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!owner) {
+        throw new OperationError("not_found", "No such key result.");
+      }
+      // Edit, the access a check-in on this goal needs.
+      await requireGoalAccess(
+        tx,
+        workspaceId,
+        memberId,
+        owner.goalId,
+        ACCESS_LEVELS.edit,
+      );
+
+      // openokr:allow-mutation: the operation's own execute.
+      await tx
+        .update(keyResults)
+        .set({ confidence: String(input.confidence), updatedAt: new Date() })
+        .where(
+          activeOnly(
+            keyResults,
+            eq(keyResults.workspaceId, workspaceId),
+            eq(keyResults.id, input.id),
+          ),
+        );
+
+      const from = owner.confidence === null ? null : Number(owner.confidence);
+      return {
+        result: { id: input.id, confidence: input.confidence },
+        activity: {
+          kind: "key_result.confidence_updated",
+          subjectType: "goal",
+          subjectId: owner.goalId,
+          payload: { keyResultId: input.id, from, to: input.confidence },
+        },
+        audit: {
+          action: "goals.updateConfidence",
+          targetType: "key_result",
+          targetId: input.id,
+          payload: { from, to: input.confidence },
+        },
+      };
+    },
+  }),
+});
+
 export const removeKeyResult = defineWriteAction({
   name: "goals.removeKeyResult",
   // openokr:policy-exempt: removing a key result is a change to an objective that exists, which stays open under every setting (METHOD.md §2.9); access decides who may, at full.
