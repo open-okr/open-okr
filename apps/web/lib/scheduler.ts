@@ -487,9 +487,14 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     return;
   }
   if (run.action === "support.sweepExpired") {
-    const { ended } = await sweepExpiredSessions(getPool());
+    const { ended, failed } = await sweepExpiredSessions(getPool());
     if (ended > 0) {
       log(`support.sweepExpired ended ${ended} support session(s)`);
+    }
+    if (failed > 0) {
+      log(
+        `support.sweepExpired could not end ${failed} expired support session(s); access is refused at expiry regardless`,
+      );
     }
     return;
   }

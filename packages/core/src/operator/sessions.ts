@@ -532,20 +532,35 @@ async function findExpiredSessions(
   );
 }
 
-/** Ends every session whose time is up. Idempotent. */
+/**
+ * Ends every session whose time is up. Idempotent.
+ *
+ * **One session that cannot end does not stop the rest.** Each is ended in
+ * its own Operation, and a refusal is counted rather than thrown: a frozen
+ * workspace refuses `support.end` today, and before 0.7.0 one such session
+ * failed the whole sweep every five minutes (plan B2). Access is refused at
+ * expiry either way; what a failure leaves is the owner's screen out of date.
+ */
 export async function sweepExpiredSessions(
   pool: Pool,
   now: Date = new Date(),
-): Promise<{ readonly ended: number }> {
+): Promise<{ readonly ended: number; readonly failed: number }> {
   const due = await findExpiredSessions(pool, now);
+  let ended = 0;
+  let failed = 0;
   for (const session of due) {
-    await endSupportSession(pool, {
-      workspaceId: session.workspaceId,
-      sessionId: session.id,
-      reason: "expired",
-    });
+    try {
+      await endSupportSession(pool, {
+        workspaceId: session.workspaceId,
+        sessionId: session.id,
+        reason: "expired",
+      });
+      ended += 1;
+    } catch {
+      failed += 1;
+    }
   }
-  return { ended: due.length };
+  return { ended, failed };
 }
 
 /** The live session a workspace's members are entitled to see. */

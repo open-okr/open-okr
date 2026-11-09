@@ -21,12 +21,18 @@ const env = loadEnv();
 const pool = new pg.Pool({ connectionString: env.DATABASE_URL });
 
 try {
-  const { ended } = await sweepExpiredSessions(pool);
+  const { ended, failed } = await sweepExpiredSessions(pool);
   process.stdout.write(
-    ended === 0
+    ended === 0 && failed === 0
       ? "No support session was past its expiry.\n"
       : `Ended ${ended} expired support session(s).\n`,
   );
+  if (failed > 0) {
+    process.stdout.write(
+      `Could not end ${failed}. Access is refused at expiry regardless; a frozen workspace refuses the end until 0.7.0's support design lands.\n`,
+    );
+    process.exitCode = 1;
+  }
 } finally {
   await pool.end();
 }

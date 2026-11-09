@@ -310,6 +310,26 @@ describe("expiry is refused at use, not at the next sweep", () => {
     expect(rows[0].status).toBe("suspended");
   });
 
+  // A session the sweep cannot end must not stop it ending the rest. A frozen
+  // workspace is one today: `support.end` is not on the freeze recovery list,
+  // which the P2 design takes up (plan 0.7.0, B2).
+  it("counts a session it cannot end and carries on rather than throwing", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await grant(id);
+    await expire();
+    await wb.admin.query(
+      "update workspaces set state = 'frozen' where id = $1",
+      [workspaceId],
+    );
+
+    await expect(sweepExpiredSessions(wb.appPool)).resolves.toEqual({
+      ended: 0,
+      failed: 1,
+    });
+  });
+
   it("sweeps nothing twice", async () => {
     const wb = await workerDb();
     await grantOperator();
