@@ -1,6 +1,6 @@
 # Error reporting
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan rows E1 to E4). Waiting for "design approved". A new subsystem that can send data off the host, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan rows E1 to E4). Approved by Akmal on 9 November 2026 ("design approved"), with every recommendation in §9: a hand-written client, the message allow-list, and Sentry's EU region for OKRGoal. A new subsystem that can send data off the host, so it is designed first (CLAUDE.md).
 
 **In one sentence:** the product catches its own unexpected errors and records each one locally, and an operator who sets one address sends them to any tracker that speaks Sentry's protocol: Sentry, self-hosted Sentry, GlitchTip or Bugsink.
 
@@ -68,7 +68,7 @@ Four rows. Each layer works without the ones after it.
 | # | Decision | Why |
 |---|---|---|
 | D11 | **A new port, `ErrorReporter`**, in `packages/adapters/src/ports/errors.ts`: `report(event)` and `flush(timeoutMs)`. Two drivers: `off`, the default, which does nothing, and `sentry`, named for the protocol rather than a vendor. The local floor (D3) happens before the port, so it does not depend on the driver | CLAUDE.md: every runtime-sensitive capability goes through a port. A tracker that speaks a different protocol (Rollbar, Honeybadger) is one more driver file and touches no product code. A port of its own, not part of Telemetry, because Telemetry's labels must be bounded and a report carries identifiers |
-| D12 | **The driver is a small client we write, not Sentry's SDK.** It builds an envelope with one `event` item and POSTs it to `<dsn host>/api/<project>/envelope/` with the `X-Sentry-Auth` header. No new runtime dependency | The SDK is a new runtime dependency, sets up its own OpenTelemetry beside ours, patches globals, and sends Sentry-only data that GlitchTip and Bugsink may ignore or reject. The subset we need is one HTTP POST of three JSON lines. Question Q1 |
+| D12 | **The driver is a small client we write, not Sentry's SDK.** It builds an envelope with one `event` item and POSTs it to `<dsn host>/api/<project>/envelope/` with the `X-Sentry-Auth` header. No new runtime dependency | The SDK is a new runtime dependency, sets up its own OpenTelemetry beside ours, patches globals, and sends Sentry-only data that GlitchTip and Bugsink may ignore or reject. The subset we need is one HTTP POST of three JSON lines. Decided at Q1 |
 | D13 | **The driver calls the platform `fetch` from inside `packages/adapters`**, like the OTLP exporter and the clamd driver: no redirect followed, 3-second timeout, the response body never read past the status. It does not use the outbound guard's private-address refusal | The guard exists for addresses somebody else chose (`guard.ts:454` says so). The DSN is the deployment's own, set in the environment, never by a tenant, and a self-hoster's GlitchTip most likely sits on a private network the guard would refuse |
 
 ### Settings
@@ -113,7 +113,7 @@ Operations, mostly outside this repository. Nothing below names OKRGoal in produ
 
 | Step | Detail |
 |---|---|
-| Sentry project | One project for the cloud, in the region Q3 decides. Staging reports into it with `OPENOKR_ERROR_ENVIRONMENT=staging` |
+| Sentry project | One project for the cloud, in Sentry's EU region (Q3). Staging reports into it with `OPENOKR_ERROR_ENVIRONMENT=staging` |
 | DSN | In OKRGoal's deployment secret, never in the repository |
 | Releases | When a version is deployed, create the Sentry release for it and link its commits, so a commit that names a Sentry issue (`Fixes OKRGOAL-1A2`) resolves it when that release ships. The release field is already the `apps/web` version (D4) |
 | GitHub | Sentry's GitHub integration on `open-okr/open-okr`, with code mappings, so a frame links to its line in the source and an issue can open a GitHub issue |
@@ -185,8 +185,10 @@ No schema change, no migration, no table, so no importer mapping row and no `DAT
 
 ## 9. Questions for Akmal
 
-| # | Question | Recommendation |
-|---|---|---|
-| Q1 | Write the small Sentry-protocol client (D12), or add Sentry's SDK as a runtime dependency? | Write the client. No dependency, no second OpenTelemetry setup, and it sends only what every compatible tracker accepts |
-| Q2 | Messages: the allow-list in D5, never send any message, or send every message? | The allow-list. "Never" loses the most useful line of a `TypeError`. "Every" sends tenant data and opens the prompt-injection route in D6 |
-| Q3 | Which Sentry region for OKRGoal, EU or US? | The region OKRGoal's database is in, so error data does not cross a border the customer data does not |
+Answered 9 November 2026, each as recommended.
+
+| # | Question | Recommendation | Decided |
+|---|---|---|---|
+| Q1 | Write the small Sentry-protocol client (D12), or add Sentry's SDK as a runtime dependency? | Write the client. No dependency, no second OpenTelemetry setup, and it sends only what every compatible tracker accepts | Write the client. No new dependency |
+| Q2 | Messages: the allow-list in D5, never send any message, or send every message? | The allow-list. "Never" loses the most useful line of a `TypeError`. "Every" sends tenant data and opens the prompt-injection route in D6 | The allow-list in D5 |
+| Q3 | Which Sentry region for OKRGoal, EU or US? | The region OKRGoal's database is in, so error data does not cross a border the customer data does not | EU |
