@@ -304,7 +304,7 @@ export const revokeConnectionAsAdmin = defineWriteAction({
               revokedReason: token.memberId === actor.memberId ? null : "admin",
               updatedAt: now,
             })
-            .where(eq(apiTokens.id, input.id));
+            .where(activeOnly(apiTokens, eq(apiTokens.id, input.id)));
           ended = {
             memberId: token.memberId,
             label: token.name,
