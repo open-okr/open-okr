@@ -94,6 +94,11 @@ root key, and refuses to finish without it rather than report them sealed.
 
 Notes are added here as 0.7.0 is built, and finished before it is tagged.
 
+- **Seats used on the operator console.** Migration 0157 adds `seat_count`
+  to the usage snapshot. The console's list now shows seats used, as the
+  plan's limit counts them, against the plan's seats, and reads "not
+  measured" until the next hourly measure or `pnpm cloud:usage`.
+
 - **Registration on a cloud.** The setup wizard no longer saves a
   registration policy. A cloud set up before 0.7.0 still holds the Invitation
   only the wizard saved then, so new customers cannot sign up. Open the

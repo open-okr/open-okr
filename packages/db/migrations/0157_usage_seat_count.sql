@@ -1,0 +1,18 @@
+-- Seats held, on the operator's usage snapshot
+-- (docs/design/operator-console.md §11, plan 0.7.0 P3, approved by Akmal on
+-- 9 November 2026).
+--
+-- The console showed active people against the plan's seats, so a workspace
+-- full of pending invitations looked half empty. `seat_count` is what the
+-- seat limit counts: humans here or invited, plus personal invitations still
+-- waiting. `member_count` stays, meaning active people.
+--
+-- Nullable with no default: null means no release that counts seats has
+-- measured the row yet, and the console says "not measured". A default of 0
+-- would be a wrong number that looks like an answer. The hourly measure fills
+-- every row, so there is no backfill.
+--
+-- Forward-only and additive. The table's policies from 0086 cover the new
+-- column. During a rolling upgrade a replica of the previous release writes
+-- no `seat_count`, so a row may keep its last value for up to an hour.
+alter table operator_workspace_usage add column seat_count integer;

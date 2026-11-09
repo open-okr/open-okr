@@ -268,7 +268,8 @@ statement rather than an error.
 
 **S-46 Operator workspace detail.** One tenant. Header with name, slug,
 state and plan. Panels: metadata (region, created, trial end), usage
-(member count, goal count, check-in count, storage bytes, last activity),
+(member count, seats used as the plan counts them, goal count, check-in count,
+storage bytes, last activity),
 lifecycle actions (suspend, reactivate, close, change plan or seats), the
 support-session history for this workspace, and an extract of the
 workspace's own audit trail. Suspension asks for a reason and the reason

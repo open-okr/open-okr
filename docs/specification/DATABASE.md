@@ -926,9 +926,9 @@ Migration 0083 changed two things about its policies (P8-T02c). The tenant polic
 Built at P8-T03a, migration 0084. An operator is granted on the instance and is a member of no workspace, so there is no `workspace_id`. No soft delete: revocation stamps `revoked_at` and the row is kept for good. Written by `pnpm cloud:operator`.
 
 ### operator_workspace_usage *(cloud only)*
-`workspace_id` to workspaces (and it is the primary key), `member_count`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at?`, `measured_at`.
+`workspace_id` to workspaces (and it is the primary key), `member_count`, `seat_count?`, `goal_count`, `check_in_count`, `storage_bytes`, `last_activity_at?`, `measured_at`.
 
-Built at P8-T03b, migration 0086. A snapshot, refreshed by `pnpm cloud:usage` and replaced rather than appended.
+Built at P8-T03b, migration 0086. `seat_count` (0157, plan 0.7.0 P3) is the seat limit's own count, humans here or invited plus personal invitations still waiting; null until a release that counts seats has measured the row. A snapshot, refreshed by `pnpm cloud:usage` and replaced rather than appended.
 
 **It exists because a view could not do the job.** The P8-T01b design asked for counts an operator reads with no policy on any content table, answered by a named read-only view. `force row level security` applies to the table owner too, and migrations run as the owner rather than as a superuser, so a `security_invoker = off` view and a `security definer` function over one are both filtered and always count zero. Giving the owner BYPASSRLS would disable the floor for every table to make one count work. So the counts are taken one workspace at a time through the ordinary tenant setting, by a job that sees exactly what a member of that workspace would see.
 

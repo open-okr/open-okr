@@ -18,6 +18,7 @@ import {
   isFiltered,
   planFilterValue,
   readWorkspaceFilter,
+  seatsCell,
   TENANT_STATES,
   type TenantStateFilter,
   WORKSPACE_SEARCH_MAX,
@@ -274,7 +275,7 @@ export default async function OperatorWorkspacesPage({
                       {t("operator.workspaces.columnPlan")}
                     </th>
                     <th className="p-3 text-right font-medium text-ink-2">
-                      {t("operator.workspaces.columnMembers")}
+                      {t("operator.workspaces.columnSeats")}
                     </th>
                     <th className="p-3 text-right font-medium text-ink-2">
                       {t("operator.workspaces.columnGoals")}
@@ -324,12 +325,28 @@ export default async function OperatorWorkspacesPage({
                         <td className="p-3 text-ink-2">
                           {tenant.planKey ?? t("operator.workspace.planFree")}
                         </td>
-                        <td className="p-3 text-right tabular-nums">
-                          {rows
-                            ? rows.memberCount
-                            : t("operator.workspaces.notMeasured")}
-                          {tenant.seats === null ? "" : ` / ${tenant.seats}`}
-                        </td>
+                        {/* Seats used, as the limit counts them, against the
+                         * plan's seats (operator-console.md §11, plan 0.7.0
+                         * P3). In the warning tone at or over the limit; the
+                         * numbers say it too, so tone is never the only
+                         * signal. */}
+                        {(() => {
+                          const seats = seatsCell(
+                            rows?.seatCount ?? null,
+                            tenant.seats,
+                          );
+                          return (
+                            <td
+                              className={`p-3 text-right tabular-nums ${
+                                seats.atLimit ? "font-semibold text-warn" : ""
+                              }`}
+                            >
+                              {seats.used ??
+                                t("operator.workspaces.notMeasured")}
+                              {seats.of === null ? "" : ` / ${seats.of}`}
+                            </td>
+                          );
+                        })()}
                         <td className="p-3 text-right tabular-nums">
                           {rows
                             ? rows.goalCount

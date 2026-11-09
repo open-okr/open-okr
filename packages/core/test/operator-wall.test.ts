@@ -331,6 +331,8 @@ describe("per-tenant usage, as a snapshot", () => {
       "lastActivityAt",
       "measuredAt",
       "memberCount",
+      // A count, like the rest (operator-console.md §11 P8, plan 0.7.0 P3).
+      "seatCount",
       "storageBytes",
       "workspaceId",
     ]);

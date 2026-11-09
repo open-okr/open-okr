@@ -263,14 +263,14 @@ The gap costs nothing and the collision would cost somebody an hour.
 | S-48 Support session | Requesting one, and the banner that runs while it is live. Specified in `support-access.md` |
 
 **S-45's search and filters were built at release 0.7.0 (P3), and seats used
-was not.**
+with them, after §11's design.**
 
 | Part | What was built |
 |---|---|
 | Search, state, plan | In the address (`?q=&state=&plan=`), narrowing the list the operator's own read returned. A filtered list is a link to paste into a ticket, and nothing new is read |
 | Plan options | Free (no plan), each catalogue plan by name, and any key a tenant still carries that the catalogue has dropped |
 | Last activity | The snapshot's `last_activity_at`, so it is as of the last measurement like the counts beside it |
-| Seats used | **Not built.** The seat limit counts active and invited humans plus pending personal invitations (`seatState`). The snapshot holds active humans only, and the console reads nothing but the snapshot. It needs a `seat_count` column on `operator_workspace_usage`, which is a schema change and waits for its design. Until then the members column is active people against the plan's seats |
+| Seats used | Built after §11: the snapshot's `seat_count` (migration 0157) against the plan's seats, counted by the limit's own `seatsHeldInTx`, in the warning tone at or over the limit, and "not measured" until the next hourly measure. S-46's usage panel shows members and seats used side by side |
 
 The customer-side billing screen is S-49 and belongs to
 `plans-and-seats.md`, because it is a workspace admin's screen
@@ -317,7 +317,7 @@ Written as the test plan P8-T03 inherits.
 
 ## 11. Seats used on the snapshot (release 0.7.0, P3)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan P3, seats used), waiting for "design approved". A schema change, so it is designed first. The rest of P3 is built (§8).
+Status: approved by Akmal on 9 November 2026 ("design approved") and built at release 0.7.0 (plan P3, seats used), as written. Migration 0157.
 
 ### 11.1 What exists
 

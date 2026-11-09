@@ -108,3 +108,26 @@ export function filterWorkspaces<Row extends FilterableWorkspace>(
     return true;
   });
 }
+
+/**
+ * The seats cell (operator-console.md §11 P4, plan 0.7.0 P3): seats used as
+ * the limit counts them, against the plan's seats where it has a number.
+ *
+ * Null `used` is a snapshot no release that counts seats has measured yet,
+ * which the cell says in words rather than showing a nought. `atLimit` sets
+ * the warning tone; the numbers say it too, so tone is never the only signal.
+ */
+export function seatsCell(
+  used: number | null,
+  seats: number | null,
+): {
+  readonly used: number | null;
+  readonly of: number | null;
+  readonly atLimit: boolean;
+} {
+  return {
+    used,
+    of: seats,
+    atLimit: used !== null && seats !== null && used >= seats,
+  };
+}

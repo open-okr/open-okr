@@ -213,6 +213,11 @@ test("an operator lists the tenants and opens one, and sees counts only", async 
   ).toBeVisible();
   const row = operatorPage.getByRole("link", { name: CUSTOMER_WORKSPACE });
   await expect(row).toBeVisible();
+  // Seats used, as the limit counts them, rather than active people
+  // (operator-console.md §11, plan 0.7.0 P3).
+  await expect(
+    operatorPage.getByRole("columnheader", { name: "Seats used" }),
+  ).toBeVisible();
   workspaceId = ((await row.getAttribute("href")) ?? "").split("/").pop() ?? "";
   expect(workspaceId).toMatch(/^[0-9a-f-]{36}$/);
 
@@ -223,6 +228,21 @@ test("an operator lists the tenants and opens one, and sees counts only", async 
   await expect(
     operatorPage.getByText(/^Counts only\. Nothing a member of this workspace wrote/),
   ).toBeVisible();
+  // Both counts from a measured snapshot: who works here, and what the plan
+  // counts, where an invitation still waiting holds a seat (§11 P4). Written
+  // here rather than waiting for the hourly measure.
+  await pool.query(
+    `insert into operator_workspace_usage (workspace_id, member_count, seat_count)
+     values ($1, 1, 3)
+     on conflict (workspace_id) do update
+       set member_count = 1, seat_count = 3, measured_at = now()`,
+    [workspaceId],
+  );
+  await operatorPage.reload();
+  const seats = operatorPage
+    .getByText("seats used", { exact: true })
+    .locator("..");
+  await expect(seats).toContainText(/^3( \/ \d+)?seats used$/);
 });
 
 test("the operator suspends the workspace with a reason, and lifts it again", async () => {

@@ -218,11 +218,31 @@ export async function seatState(
 ): Promise<SeatState> {
   const tenant = await readTenant(pool, workspaceId);
   const limit = tenant?.seats ?? null;
-  const pending = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
-    pendingInvitationCountInTx(tx, workspaceId),
+  const used = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    seatsHeldInTx(tx, workspaceId),
   );
-  const used = (await countSeats(pool, workspaceId)) + pending;
   return { limit, used, full: limit !== null && used >= limit };
+}
+
+/**
+ * Who holds a seat, from inside a transaction: the humans here or on their
+ * way, plus the personal invitations still waiting (plans-and-seats.md §2).
+ *
+ * **The one definition** (operator-console.md §11 P2, plan 0.7.0 P3). The
+ * seat state, the seat check and the operator's usage snapshot all count with
+ * it, so the console and the limit cannot disagree about who holds a seat.
+ * `arriving` is the address being admitted now, whose own invitation is the
+ * seat they are about to take.
+ */
+export async function seatsHeldInTx(
+  tx: AnyTx,
+  workspaceId: string,
+  arriving?: string,
+): Promise<number> {
+  return (
+    (await seatsInUseInTx(tx, workspaceId)) +
+    (await pendingInvitationCountInTx(tx, workspaceId, arriving))
+  );
 }
 
 /**
@@ -406,22 +426,10 @@ async function seatCheckInTx(
     return { limit: null, used: 0 };
   }
 
-  const [row] = await tx
-    .select({ n: count() })
-    .from(workspaceMembers)
-    .where(
-      activeOnly(
-        workspaceMembers,
-        and(
-          eq(workspaceMembers.workspaceId, workspaceId),
-          eq(workspaceMembers.kind, "human"),
-          inArray(workspaceMembers.status, [...SEAT_STATUSES]),
-        ),
-      ),
-    );
-
-  const pending = await pendingInvitationCountInTx(tx, workspaceId, arriving);
-  return { limit: tenant.seats, used: (row?.n ?? 0) + pending };
+  return {
+    limit: tenant.seats,
+    used: await seatsHeldInTx(tx, workspaceId, arriving),
+  };
 }
 
 /**

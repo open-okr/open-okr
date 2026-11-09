@@ -35,10 +35,18 @@ import {
 import { and, count, eq, max, sum } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { seatsHeldInTx } from "../tenancy/plans.ts";
 
 export interface UsageSnapshot {
   readonly workspaceId: string;
   readonly memberCount: number;
+  /**
+   * Seats held, as the plan's limit counts them: humans here or invited, and
+   * personal invitations still waiting (operator-console.md §11, plan 0.7.0
+   * P3). Null in a row no release that counts seats has measured, which the
+   * console says rather than showing a nought that looks like an answer.
+   */
+  readonly seatCount: number | null;
   readonly goalCount: number;
   readonly checkInCount: number;
   readonly storageBytes: number;
@@ -108,9 +116,14 @@ async function measureOne(
       .from(activities)
       .where(eq(activities.workspaceId, workspaceId));
 
+    // The limit's own count, so the console and the limit cannot disagree.
+    // It names the workspace, as every count here does.
+    const seatCount = await seatsHeldInTx(tx, workspaceId);
+
     return {
       workspaceId,
       memberCount: members?.n ?? 0,
+      seatCount,
       goalCount: goalRows?.n ?? 0,
       checkInCount: checkInRows?.n ?? 0,
       // `sum` is numeric and the driver hands it back as a string, and null
@@ -201,6 +214,7 @@ export async function readUsageAsOperator(
       .select({
         workspaceId: operatorWorkspaceUsage.workspaceId,
         memberCount: operatorWorkspaceUsage.memberCount,
+        seatCount: operatorWorkspaceUsage.seatCount,
         goalCount: operatorWorkspaceUsage.goalCount,
         checkInCount: operatorWorkspaceUsage.checkInCount,
         storageBytes: operatorWorkspaceUsage.storageBytes,

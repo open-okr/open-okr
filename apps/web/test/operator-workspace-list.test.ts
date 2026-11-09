@@ -4,6 +4,7 @@ import {
   isFiltered,
   planFilterValue,
   readWorkspaceFilter,
+  seatsCell,
 } from "../lib/operator-workspace-list.ts";
 
 /**
@@ -142,5 +143,25 @@ describe("filterWorkspaces", () => {
         ),
       ),
     ).toEqual(["a"]);
+  });
+});
+
+/** Seats used (operator-console.md §11, plan 0.7.0 P3). */
+describe("the seats cell", () => {
+  it("shows seats used against the plan's seats", () => {
+    expect(seatsCell(6, 10)).toEqual({ used: 6, of: 10, atLimit: false });
+  });
+
+  it("is at the limit when every seat is held, or more", () => {
+    expect(seatsCell(10, 10).atLimit).toBe(true);
+    expect(seatsCell(11, 10).atLimit).toBe(true);
+  });
+
+  it("says nothing was measured rather than showing a nought", () => {
+    expect(seatsCell(null, 10)).toEqual({ used: null, of: 10, atLimit: false });
+  });
+
+  it("has no limit to reach on an unlimited plan", () => {
+    expect(seatsCell(40, null)).toEqual({ used: 40, of: null, atLimit: false });
   });
 });
