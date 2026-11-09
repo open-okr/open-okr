@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { excerptRichText } from "../src/rich-text/excerpt.ts";
+import { excerptRichText, plainTextBlocks } from "../src/rich-text/excerpt.ts";
 import {
   extractAttachments,
   extractMentionIds,
@@ -322,6 +322,27 @@ describe("parseRichText: rejects what is not on the allow-list", () => {
   });
 });
 
+/** One linked phrase, for the surfaces that treat a link their own way. */
+const linked = (href: string) =>
+  parseRichText(
+    {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            {
+              type: "text",
+              text: "the goal",
+              marks: [{ type: "link", attrs: { href } }],
+            },
+          ],
+        },
+      ],
+    },
+    RICH_TEXT_SCHEMA_VERSION,
+  );
+
 describe("renderRichTextToHtml: a sanitising allow-list, not a passthrough", () => {
   test("escapes text content instead of injecting it raw", () => {
     const doc = parseRichText(
@@ -399,6 +420,99 @@ describe("renderRichTextToHtml: a sanitising allow-list, not a passthrough", () 
     });
     expect(html).not.toContain("<a");
     expect(html).toContain("draft.png");
+  });
+
+  // A surface that cannot follow every link the allow-list takes, such as a
+  // mail, which cannot follow a relative one (plan 0.7.0, R3).
+  test("a surface may narrow the links it keeps, and keeps the words of one it drops", () => {
+    expect(
+      renderRichTextToHtml(linked("/goals/g1"), {
+        resolveLinkHref: () => undefined,
+      }),
+    ).toBe("<p>the goal</p>");
+    expect(
+      renderRichTextToHtml(linked("/goals/g1"), {
+        resolveLinkHref: (href) => `https://okr.example.test${href}`,
+      }),
+    ).toBe(
+      '<p><a href="https://okr.example.test/goals/g1" rel="noopener noreferrer">the goal</a></p>',
+    );
+  });
+
+  test("a surface can never widen them: what it hands back passes the allow-list again", () => {
+    const html = renderRichTextToHtml(linked("https://okr.example.test"), {
+      resolveLinkHref: () => "javascript:alert(1)",
+    });
+    expect(html).toBe("<p>the goal</p>");
+  });
+});
+
+describe("plainTextBlocks", () => {
+  test("is the document as a text part reads it: a block per paragraph, list items on their own lines", () => {
+    const doc = parseRichText(
+      {
+        type: "doc",
+        content: [
+          {
+            type: "paragraph",
+            content: [
+              { type: "text", text: "One" },
+              { type: "hardBreak" },
+              { type: "text", text: "two" },
+            ],
+          },
+          {
+            type: "bulletList",
+            content: [
+              {
+                type: "listItem",
+                content: [
+                  {
+                    type: "paragraph",
+                    content: [{ type: "text", text: "Outer" }],
+                  },
+                  {
+                    type: "bulletList",
+                    content: [
+                      {
+                        type: "listItem",
+                        content: [
+                          {
+                            type: "paragraph",
+                            content: [{ type: "text", text: "Inner" }],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+          { type: "paragraph" },
+          {
+            type: "codeBlock",
+            content: [{ type: "text", text: "pnpm test\npnpm build" }],
+          },
+        ],
+      },
+      RICH_TEXT_SCHEMA_VERSION,
+    );
+    expect(plainTextBlocks(doc)).toEqual([
+      "One\ntwo",
+      "- Outer\n  - Inner",
+      "pnpm test\npnpm build",
+    ]);
+  });
+
+  test("names a link's address only where the caller says it can be followed", () => {
+    const doc = linked("/goals/g1");
+    expect(plainTextBlocks(doc)).toEqual(["the goal"]);
+    expect(
+      plainTextBlocks(doc, {
+        linkHref: (href) => `https://okr.example.test${href}`,
+      }),
+    ).toEqual(["the goal (https://okr.example.test/goals/g1)"]);
   });
 });
 

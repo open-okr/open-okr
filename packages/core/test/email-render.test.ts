@@ -75,6 +75,28 @@ const everyBlock: EmailBlock[] = [
     ],
   },
   { kind: "list", title: "Wins", items: ["Completion reached 64%"] },
+  {
+    kind: "richText",
+    document: {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [
+            { type: "text", text: "Read " },
+            {
+              type: "text",
+              text: "the brief",
+              marks: [
+                { type: "link", attrs: { href: `${BASE}/documents/d1` } },
+              ],
+            },
+            { type: "text", text: " first." },
+          ],
+        },
+      ],
+    },
+  },
 ];
 
 describe("the email layout", () => {
@@ -98,6 +120,7 @@ describe("the email layout", () => {
       `${BASE}/goals/g1`,
       `${BASE}/check-in`,
       `${BASE}/account/channels`,
+      `${BASE}/documents/d1`,
     ]) {
       expect(html, href).toContain(`href="${href}"`);
       expect(text, href).toContain(href);
@@ -109,6 +132,7 @@ describe("the email layout", () => {
       "checkin.overdue · step 2",
       "5 On track, 1 Off track",
       "- Completion reached 64%",
+      `Read the brief (${BASE}/documents/d1) first.`,
     ]) {
       expect(text, line).toContain(line);
     }
@@ -152,6 +176,195 @@ describe("the email layout", () => {
     expect(html).toContain('<html lang="ms">');
     expect(html).toContain('name="color-scheme" content="light dark"');
     expect(html).toContain("prefers-color-scheme:dark");
+  });
+});
+
+/**
+ * Editor JSON in a mail (plan 0.7.0, R3; email-templates.md §3). Rendered
+ * through the one rich text module, with its allow-list, in both parts:
+ * CLAUDE.md asks for the sanitising renderer at every surface, email
+ * included, and a mail is where an imported document is least watched.
+ */
+describe("the richText block", () => {
+  const text = (value: string, marks?: unknown[]) =>
+    marks
+      ? { type: "text", text: value, marks }
+      : { type: "text", text: value };
+  const doc = (...content: unknown[]) => ({ type: "doc", content });
+  const paragraph = (...content: unknown[]) => ({
+    type: "paragraph",
+    content,
+  });
+  const link = (href: string) => [{ type: "link", attrs: { href } }];
+  const rendered = (document: unknown) =>
+    renderEmail(frame(), [{ kind: "richText", document }]);
+  // What the card holds, without the header and the footer around it.
+  const card = (html: string) =>
+    html.slice(
+      html.indexOf('class="em-card"'),
+      html.indexOf("padding:14px 4px 0"),
+    );
+
+  it("keeps the document's structure in the HTML, from the allow-list's own tags", () => {
+    const { html } = rendered(
+      doc(
+        { type: "heading", attrs: { level: 2 }, content: [text("Plan")] },
+        paragraph(text("Ship "), text("Monday", [{ type: "bold" }]), text(".")),
+        {
+          type: "bulletList",
+          content: [
+            { type: "listItem", content: [paragraph(text("Pricing"))] },
+            { type: "listItem", content: [paragraph(text("Onboarding"))] },
+          ],
+        },
+      ),
+    );
+    expect(card(html)).toContain("<h2>Plan</h2>");
+    expect(card(html)).toContain("<p>Ship <strong>Monday</strong>.</p>");
+    expect(card(html)).toContain(
+      "<ul><li><p>Pricing</p></li><li><p>Onboarding</p></li></ul>",
+    );
+  });
+
+  it("reads as plain text in the text part: a line per paragraph, a dash per item, a number per step", () => {
+    const { text: part } = rendered(
+      doc(
+        { type: "heading", attrs: { level: 2 }, content: [text("Plan")] },
+        paragraph(text("Ship "), text("Monday", [{ type: "bold" }]), text(".")),
+        {
+          type: "bulletList",
+          content: [
+            { type: "listItem", content: [paragraph(text("Pricing"))] },
+            { type: "listItem", content: [paragraph(text("Onboarding"))] },
+          ],
+        },
+        {
+          type: "orderedList",
+          content: [
+            { type: "listItem", content: [paragraph(text("Draft"))] },
+            { type: "listItem", content: [paragraph(text("Publish"))] },
+          ],
+        },
+        {
+          type: "blockquote",
+          content: [paragraph(text("Done is better than perfect."))],
+        },
+      ),
+    );
+    expect(part).toContain(
+      [
+        "Plan",
+        "",
+        "Ship Monday.",
+        "",
+        "- Pricing",
+        "- Onboarding",
+        "",
+        "1. Draft",
+        "2. Publish",
+        "",
+        "> Done is better than perfect.",
+      ].join("\n"),
+    );
+    expect(part).not.toContain("<");
+  });
+
+  it("never lets a script typed into the document reach the HTML as markup", () => {
+    const { html, text: part } = rendered(
+      doc(paragraph(text("<script>alert(1)</script><img src=x onerror=1>"))),
+    );
+    expect(html).not.toContain("<script>");
+    expect(html).not.toContain("<img");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+    // The plain part carries the characters as written, which is harmless.
+    expect(part).toContain("<script>alert(1)</script>");
+  });
+
+  it("never carries an unsafe link, in either part, and keeps the words", () => {
+    for (const href of [
+      "javascript:alert(1)",
+      "JavaScript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "vbscript:msgbox(1)",
+    ]) {
+      const { html, text: part } = rendered(
+        doc(paragraph(text("Click me", link(href)))),
+      );
+      expect(card(html), href).toContain("Click me");
+      expect(card(html), href).not.toContain("<a ");
+      expect(html.toLowerCase(), href).not.toContain(href.toLowerCase());
+      expect(html.toLowerCase(), href).not.toMatch(
+        /javascript:|vbscript:|data:text/,
+      );
+      expect(part, href).toContain("Click me");
+      expect(part.toLowerCase(), href).not.toContain(href.toLowerCase());
+    }
+  });
+
+  it("leaves out a relative link, which goes nowhere from a mail client", () => {
+    const { html, text: part } = rendered(
+      doc(paragraph(text("the goal", link("/goals/g1")))),
+    );
+    expect(card(html)).toContain("<p>the goal</p>");
+    expect(card(html)).not.toContain("href=");
+    expect(part).not.toContain("/goals/g1");
+  });
+
+  it("keeps an absolute web or mail link, and names it in the text part", () => {
+    const { html, text: part } = rendered(
+      doc(
+        paragraph(
+          text("Ask ", undefined),
+          text("Mei", link("mailto:mei@example.com")),
+          text(" or read "),
+          text("the notes", link(`${BASE}/documents/d1`)),
+        ),
+      ),
+    );
+    expect(card(html)).toContain(
+      '<a href="mailto:mei@example.com" rel="noopener noreferrer">Mei</a>',
+    );
+    expect(card(html)).toContain(`href="${BASE}/documents/d1"`);
+    expect(part).toContain(
+      `Ask Mei (mailto:mei@example.com) or read the notes (${BASE}/documents/d1)`,
+    );
+  });
+
+  it("says a mention as @name, in both parts", () => {
+    const { html, text: part } = rendered(
+      doc(
+        paragraph(
+          { type: "mention", attrs: { id: "m-1", label: "Priya" } },
+          text(" can you take this?"),
+        ),
+      ),
+    );
+    expect(card(html)).toContain("@Priya");
+    expect(part).toContain("@Priya can you take this?");
+  });
+
+  it("renders a document off the allow-list as escaped text, never as its markup", () => {
+    const { html, text: part } = rendered(
+      doc(
+        { type: "script", content: [text("alert(1)")] },
+        {
+          type: "paragraph",
+          attrs: { onclick: "alert(2)" },
+          content: [text("Hello")],
+        },
+      ),
+    );
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("onclick");
+    expect(card(html)).toContain("alert(1) Hello");
+    expect(part).toContain("alert(1) Hello");
+  });
+
+  it("says nothing for a value that is not a document at all", () => {
+    for (const value of [null, "<b>hi</b>", 42, { type: "doc" }]) {
+      const { html } = rendered(value);
+      expect(html, String(value)).not.toContain("<b>hi</b>");
+    }
   });
 });
 
