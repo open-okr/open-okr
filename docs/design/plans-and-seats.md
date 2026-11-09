@@ -144,7 +144,7 @@ turns adding a plan into a migration.
 | `aiCredits` | AI credits a month on the provider's own key. Absent means the workspace brings its own ([ai-credits.md](ai-credits.md)) |
 | `aiTopUps` | Whether this plan can buy more credits |
 | `prices` | A payment provider's price identifiers, and no amounts ([billing.md](billing.md)) |
-| `limits` | The `cloud.limits.*` values from `tenant-limits.md`, if a plan ever varies them. Absent means the instance default |
+| `limits` | `actionsPerMinute` and `concurrentActions`, each optional, replacing the instance's `cloud.limits.*` for this plan's workspaces (built at 0.7.0, P5, Akmal's yes of 10 November 2026). Absent means the instance default; zero is unlimited; the instance floors apply. The outbox rate stays instance-wide, because the relay reads one rate for every workspace in one query. `planLimitsFor` reads it, and the web host caches it a minute per workspace |
 
 **Where the catalogue lives is an instance setting, not a table.** It is
 operator configuration for one deployment, it changes rarely, and it has

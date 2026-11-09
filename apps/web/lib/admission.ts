@@ -1,5 +1,6 @@
 import {
   type Admission,
+  planLimitsFor,
   resolveAdmissionLimits,
   setDefaultAdmission,
 } from "@openokr/core";
@@ -57,9 +58,40 @@ export async function installAdmission(): Promise<void> {
   const admission: Admission = {
     ...limits,
     counters: getCache(),
+    limitsFor: cachedPlanLimits,
   };
   setDefaultAdmission(admission);
   // Validated with the other two by `resolveAdmissionLimits`, so a number
   // below the floor has already stopped the boot with a sentence.
   globals.openokrOutboxRowsPerMinute = limits.outboxRowsPerMinute ?? 0;
+}
+
+/** How long a workspace's plan limits are trusted before they are read again. */
+const PLAN_LIMITS_SECONDS = 60;
+
+const planLimits = new Map<
+  string,
+  {
+    readonly at: number;
+    readonly limits: Awaited<ReturnType<typeof planLimitsFor>>;
+  }
+>();
+
+/**
+ * A workspace's plan limits (plan 0.7.0 P5), read at most once a minute per
+ * workspace, so admission still costs no database read per action. A plan
+ * change reaches admission within the minute. A read that fails leaves the
+ * instance's limits in force rather than refusing the action.
+ */
+async function cachedPlanLimits(
+  workspaceId: string,
+): Promise<Awaited<ReturnType<typeof planLimitsFor>>> {
+  const now = Date.now();
+  const held = planLimits.get(workspaceId);
+  if (held && now - held.at < PLAN_LIMITS_SECONDS * 1000) {
+    return held.limits;
+  }
+  const limits = await planLimitsFor(getPool(), workspaceId).catch(() => null);
+  planLimits.set(workspaceId, { at: now, limits });
+  return limits;
 }

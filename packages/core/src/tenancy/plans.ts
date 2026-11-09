@@ -48,6 +48,7 @@ import {
 } from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 import { listMembershipsForUser } from "../workspaces/memberships.ts";
+import { MIN_ACTIONS_PER_MINUTE, MIN_CONCURRENT_ACTIONS } from "./admission.ts";
 import { isCloudEnabled } from "./settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
@@ -87,9 +88,60 @@ const planSchema = z.object({
       year: z.string().trim().min(1).optional(),
     })
     .optional(),
+  /**
+   * This plan's own tenant limits, where it varies them (plan 0.7.0 P5,
+   * approved by Akmal on 10 November 2026; plans-and-seats.md §4,
+   * tenant-limits.md §9). Each one absent is the instance's
+   * `cloud.limits.*`; zero is unlimited, as there. The floors are the
+   * instance settings' own, so a plan cannot set a number that is an outage.
+   * The outbox rate stays instance-wide: the relay reads one rate for every
+   * workspace in one query.
+   */
+  limits: z
+    .object({
+      actionsPerMinute: z
+        .number()
+        .int()
+        .min(0)
+        .refine((value) => value === 0 || value >= MIN_ACTIONS_PER_MINUTE, {
+          message: `Zero, or ${MIN_ACTIONS_PER_MINUTE} or more.`,
+        })
+        .optional(),
+      concurrentActions: z
+        .number()
+        .int()
+        .min(0)
+        .refine((value) => value === 0 || value >= MIN_CONCURRENT_ACTIONS, {
+          message: `Zero, or ${MIN_CONCURRENT_ACTIONS} or more.`,
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type Plan = z.infer<typeof planSchema>;
+
+/**
+ * The admission limits a workspace's plan sets, or null where its plan sets
+ * none (P5). The one function tenant-limits.md §9 said making limits per-plan
+ * would take: the tenant's plan, read once, and its `limits` if any. Null too
+ * for a workspace with no tenant row or no plan, which is every self-hosted
+ * instance and every group.
+ */
+export async function planLimitsFor(
+  pool: Pool,
+  workspaceId: string,
+): Promise<{
+  readonly actionsPerMinute?: number;
+  readonly concurrentActions?: number;
+} | null> {
+  const tenant = await readTenant(pool, workspaceId);
+  if (!tenant?.planKey) {
+    return null;
+  }
+  const plan = await planByKey(pool, tenant.planKey);
+  return plan?.limits ?? null;
+}
 
 const plansSchema = z.array(planSchema);
 

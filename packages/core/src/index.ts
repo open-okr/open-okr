@@ -1333,6 +1333,7 @@ export {
   hasPlanScreen,
   isCloudEnabled,
   listSeatHolders,
+  planLimitsFor,
   readClosureSchedule,
   readCreditSummary,
   readHostedAccess,

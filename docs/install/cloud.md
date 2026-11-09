@@ -100,6 +100,15 @@ list such as `[{"key":"team","name":"Team","seats":20,"aiCredits":2000}]`
 a new workspace has no plan and no seat limit, so to limit a free plan, list it
 in the catalogue and name it here.
 
+**A plan can carry its own limits.** Add `"limits": {"actionsPerMinute": 1200,
+"concurrentActions": 8}` to a plan, and its workspaces are admitted by those
+numbers instead of `OPENOKR_CLOUD_ACTIONS_PER_MINUTE` and
+`OPENOKR_CLOUD_CONCURRENT_ACTIONS`. Either may be left out to use the instance's,
+zero is unlimited, and the floors are the instance settings' own (60 actions a
+minute, 2 at once), so a catalogue with a lower number is refused whole. A plan
+change reaches admission within a minute. The outbox rate stays one number for
+the instance.
+
 **Offering a trial.** Set `OPENOKR_CLOUD_TRIAL_DAYS` and `OPENOKR_CLOUD_TRIAL_PLAN`
 (a catalogue key) and a workspace somebody signs up for starts on that plan for
 that many days. Both must be set, or nobody starts a trial. An operator can

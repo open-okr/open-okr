@@ -294,3 +294,35 @@ describe("through callAction, which is the door this protects", () => {
     expect(error.retryAfterSeconds).toBe(23);
   });
 });
+
+describe("a plan's own limits (plan 0.7.0 P5)", () => {
+  it("uses the plan's number for its workspace, and the instance's for another", async () => {
+    const c = counters({});
+    const planned: Admission = {
+      ...admission({ actionsPerMinute: 600, concurrentActions: 0 }, c),
+      limitsFor: async (workspaceId) =>
+        workspaceId === "workspace-on-a-plan"
+          ? { actionsPerMinute: 120 }
+          : null,
+    };
+
+    await admit(planned, "workspace-on-a-plan");
+    await admit(planned, "workspace-1");
+
+    expect(c.calls).toEqual([
+      "rateLimit admission:rate:workspace-on-a-plan 120 60",
+      "rateLimit admission:rate:workspace-1 600 60",
+    ]);
+  });
+
+  it("lets a plan lift a limit to unlimited with zero, at no round trip", async () => {
+    const c = counters({});
+    const planned: Admission = {
+      ...admission({ actionsPerMinute: 600, concurrentActions: 4 }, c),
+      limitsFor: async () => ({ actionsPerMinute: 0, concurrentActions: 0 }),
+    };
+    const release = await admit(planned, "workspace-1");
+    await release();
+    expect(c.calls).toEqual([]);
+  });
+});

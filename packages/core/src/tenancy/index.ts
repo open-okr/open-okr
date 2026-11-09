@@ -51,6 +51,7 @@ export {
   listSeatHolders,
   type Plan,
   planByKey,
+  planLimitsFor,
   readOwnPlan,
   readOwnUsage,
   readPlans,

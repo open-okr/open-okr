@@ -258,7 +258,7 @@ Written as the test plan P8-T06 inherits.
 | # | Question | Why it is not answered here |
 |---|---|---|
 | 1 | The actual numbers for each limit | They depend on the instance size a real cloud runs, which nobody has measured because no cloud exists. P7-T02's twenty concurrent members is a per-machine figure, not a per-tenant one. The settings exist so the numbers are operations rather than design |
-| 2 | Whether limits vary by plan | That is PLAN.md §10 #1 territory and it is a human's call. The design holds the limits at instance scope, so making them per-plan later means reading the tenant's plan in one function rather than reshaping anything |
+| 2 | Whether limits vary by plan | **Answered yes by Akmal on 10 November 2026 and built at 0.7.0 (P5)**: a plan's `limits` replaces the two admission numbers for its workspaces, read in one function, `planLimitsFor`, as this row foresaw ([plans-and-seats](plans-and-seats.md) §4) |
 | 3 | ~~The pool `max` default~~ **Answered at P8-T06b** | `OPENOKR_DB_POOL_MAX`, default twenty, which is P7-T02's measured figure rather than a round number: twenty concurrent members held every §13.1 budget and twenty-five put the drag on the line. It does change behaviour on every existing deployment, upward, from the ten `pg` picks by itself |
 | 4 | ~~Whether the relay's round-robin read should ship before Phase 8~~ **Answered by events** | It did not ship in Phase 7's tail. It shipped at P8-T06b with the partition key decided there, and it runs on every deployment rather than behind the cloud flag |
 | 5 | A public status surface and per-tenant backup verification | Both are in P8-T06's deliverables and neither is a limit. They need their own design, and it is not written here because this document is about contention |
@@ -298,7 +298,7 @@ Status: approved by Akmal on 9 November 2026 ("design approved") and built at re
 
 ### 10.3 Open questions
 
-None new. §9's first two stay open: the numbers a real cloud runs, and whether a limit varies by plan.
+None new. §9's first stays open: the numbers a real cloud runs. The second, whether a limit varies by plan, was answered yes and built at 0.7.0 (P5).
 
 ### 10.4 Acceptance criteria
 

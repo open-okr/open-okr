@@ -76,6 +76,16 @@ export interface AdmissionLimits {
 
 export interface Admission extends AdmissionLimits {
   readonly counters: AdmissionCounters;
+  /**
+   * A workspace's own limits where its plan sets them (plan 0.7.0 P5). Each
+   * one it names replaces the instance's for that workspace. The host caches
+   * it, so admission costs no database read per action.
+   */
+  readonly limitsFor?: (
+    workspaceId: string,
+  ) => Promise<Partial<
+    Pick<AdmissionLimits, "actionsPerMinute" | "concurrentActions">
+  > | null>;
 }
 
 /**
@@ -197,7 +207,14 @@ export async function admit(
   workspaceId: string,
   onRefusal?: (reason: string) => void,
 ): Promise<AdmissionRelease> {
-  const { actionsPerMinute, concurrentActions, counters } = admission;
+  // The plan's own numbers where it sets them (P5), else the instance's.
+  const own = admission.limitsFor
+    ? await admission.limitsFor(workspaceId)
+    : null;
+  const actionsPerMinute = own?.actionsPerMinute ?? admission.actionsPerMinute;
+  const concurrentActions =
+    own?.concurrentActions ?? admission.concurrentActions;
+  const { counters } = admission;
 
   // **The self-hosted path, and the common one.** Two comparisons against
   // zero and no round trip at all. §7: there is no second code path, and a
