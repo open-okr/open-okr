@@ -1,6 +1,6 @@
 # A token for scraping the metrics endpoint
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan B3), waiting for "design approved". A new credential, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan B3). Approved by Akmal on 9 November 2026 ("design approved"). A new credential, so it is designed first (CLAUDE.md).
 
 ## 0. What exists
 

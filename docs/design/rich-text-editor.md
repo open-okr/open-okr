@@ -159,7 +159,7 @@ TECHNICAL-PLAN §1's own package table restricts `packages/ui` to depending on `
 
 ## 11. Attachment rows from the text, and the upload check (release 0.7.0, R1 and R2)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan R2), waiting for "design approved". A schema change, so it is designed first (CLAUDE.md). R1 needs no design; it is here because it guards the same write, and D16 says how the two ship.
+Status: proposed 9 November 2026 for release 0.7.0 (plan R2). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, data change 0033, with the upgrade notes saying what it opens. Q2: yes, a separate interface change, added to the plan as its own row. A schema change, so it is designed first (CLAUDE.md). R1 needs no design; it is here because it guards the same write, and D16 says how the two ship.
 
 ### 11.1 What exists
 

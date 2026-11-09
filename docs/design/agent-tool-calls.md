@@ -1,6 +1,6 @@
 # A record of every tool call an external agent makes
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan A2), waiting for "design approved". A schema change, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan A2). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, with the reason marked in code. Q2: 90 days. Q3: yes, AI-NATIVE-PLAN §7 and §8.1 change to match in the same change. A schema change, so it is designed first (CLAUDE.md).
 
 A new document rather than a section of [agent-surface.md](agent-surface.md), which is already long. That document's §5.2 and AI-NATIVE-PLAN §7 and §8.1 are where the record is promised.
 

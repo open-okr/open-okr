@@ -1,6 +1,6 @@
 # Irreversible acts need the destructive scope
 
-Status: **proposed, waiting for "design approved"**. From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, finding 12) and the OKR practitioner's recommendation in its §10.2 Q12.
+Status: **Approved by Akmal on 9 November 2026 ("design approved").** Q1: yes. Q2: the close dialog asks for a one-line reason and leaves it optional; the API is unchanged. **Q3: `people.convertToGuest`, `workspace.setState` and `sessions.close` move to destructive too.** From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, finding 12) and the OKR practitioner's recommendation in its §10.2 Q12.
 
 **Checked again 9 November 2026 for release 0.7.0 (plan O6).** Every statement was read against the code on `release-0.7.0`. What changed:
 

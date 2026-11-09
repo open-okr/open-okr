@@ -119,6 +119,7 @@ The review found 47 such statements in the specification and design pages. Sever
 | R1 | The server refuses a write while an attachment is still uploading | `rich-text-editor.md` §7 | `parseRichText` accepts an `uploading` attachment and no action checks it | None |
 | R2 | A comment or document write records its attachment rows | `rich-text-editor.md` §4 and §7 | `extractAttachments` has no caller outside its test. Attachment rows are written only by `attachments.attach` | Design first: schema. The `attachments.subject_type` check has no `comment`; documents alone would need no migration |
 | R3 | A `richText` email block | `email-templates.md` §3 | No such block; the renderer has eleven others | None |
+| R4 | Paste or drop a file into a comment or a document | `rich-text-editor.md` §11 Q2, added 9 November 2026 | `uploadFile` is passed to the editor only on `/dev/rich-text`, so no screen can attach a file in the text | None |
 
 ### 4.6 Platform, tenancy and operations
 
@@ -177,11 +178,11 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 
 | Row | Status | Note |
 |---|---|---|
-| B1 | design written | `docs/design/registration-policy.md` §9, with Q2 for you |
+| B1 | design approved | `docs/design/registration-policy.md` §9 |
 | B2 | done | Also closes P1 |
-| B3 | design written | `docs/design/metrics-scrape-token.md` |
+| B3 | design approved | `docs/design/metrics-scrape-token.md` |
 | B4 | done | #192 |
-| B5 | design written | `docs/design/tenant-lifecycle.md` §10 |
+| B5 | design approved | `docs/design/tenant-lifecycle.md` §10 |
 | B6 | done | |
 | B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
@@ -190,10 +191,10 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B11 | done | |
 | M1 to M4 | done | One change |
 | Section 3 | done | Stale text, one change |
-| A1 to A13 | to do | A1 and A6 design first. A2 design written: `docs/design/agent-tool-calls.md`, Q1 to Q3 for you. A4 design written: `docs/design/agent-connections-admin.md`, Q1 and Q2. A3 done |
-| O1 to O6 | to do | O2 and O5 design first. O6 design rechecked: `docs/design/irreversible-scope.md`, its Q1 to Q3 |
+| A1 to A13 | to do | A1 and A6 design first. A2 design approved: `docs/design/agent-tool-calls.md`. A4 design approved, with agent API tokens: `docs/design/agent-connections-admin.md`. A3 done |
+| O1 to O6 | to do | O2 and O5 design first. O6 design approved, with three more actions: `docs/design/irreversible-scope.md` |
 | S1 to S3 | to do | S2 done |
 | U1 to U3 | to do | U3 design first |
-| R1 to R3 | to do | R1 and R2 design written together: `docs/design/rich-text-editor.md` §11, Q1 and Q2. R1 needs no approval and ships first. R1 done |
-| P1 to P10 | to do | P1 done with B2. P2 design written: `docs/design/support-access.md` §10, Q1 and Q2. P10 design written: `docs/design/account-lockout.md`, Q1 and Q2. P4 and P7 design first. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet |
+| R1 to R4 | to do | R2 design approved: `docs/design/rich-text-editor.md` §11. R4 added from its Q2. R1 done |
+| P1 to P10 | to do | P1 done with B2. P2 design approved: `docs/design/support-access.md` §10. P10 design approved, with an email when a hold begins: `docs/design/account-lockout.md`. P4 and P7 design first. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet |
 | D1 to D5 | to do | D4 only needs no design |

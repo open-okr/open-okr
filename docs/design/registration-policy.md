@@ -127,7 +127,7 @@ The sign-up page under Company email addresses shows a line under the email fiel
 
 ## 9. The wizard's saved policy, and registration on a cloud (release 0.7.0, B1)
 
-Status: proposed 9 November 2026, waiting for "design approved".
+Status: Approved by Akmal on 9 November 2026 ("design approved"). Q2: D16 as written; a stored `invite_only` from the wizard is kept, and the upgrade notes tell operators to check the card.
 
 ### 9.1 What is wrong
 

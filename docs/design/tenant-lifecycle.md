@@ -313,7 +313,7 @@ Written as the test plan P8-T02 inherits.
 
 ## 10. A frozen workspace can export its archive (release 0.7.0, B5)
 
-Status: proposed 9 November 2026, waiting for "design approved".
+Status: Approved by Akmal on 9 November 2026 ("design approved").
 
 ### 10.1 What is wrong
 

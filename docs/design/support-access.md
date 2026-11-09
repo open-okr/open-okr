@@ -253,7 +253,7 @@ Written as the test plan P8-T04 inherits.
 
 ## 10. Inbox items for the request and the end (release 0.7.0, P2)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan P2), waiting for "design approved". It widens a check constraint, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan P2). Approved by Akmal on 9 November 2026 ("design approved"). Q1: agreed, D12 as written. Q2: refuse, with the freeze sentence. It widens a check constraint, so it is designed first (CLAUDE.md).
 
 §6 promises two inbox items: one when support asks, one when a session ends. Neither is written.
 

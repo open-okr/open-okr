@@ -1,6 +1,6 @@
 # Agent connections, seen by an administrator
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan A4), waiting for "design approved". An administrator would see and end other members' grants, which is a change to access, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan A4). Approved by Akmal on 9 November 2026 ("design approved"). **Q1: yes**, the member is told in their inbox (`connection_ended`, its reason widened in the same migration as support-access.md §10). **Q2: in this release**: agent API tokens (`mcp` audience) are listed and can be ended on the same screen, with the reason column `api_tokens` needs. An administrator would see and end other members' grants, which is a change to access, so it is designed first (CLAUDE.md).
 
 AI-NATIVE-PLAN §4 puts a "Connections" card in the AI console: "MCP clients and grants with last-used and audit links, revoke". UIUX-PLAN S-37 lists it. Today each member sees only their own, on purpose, and the reason is written down.
 

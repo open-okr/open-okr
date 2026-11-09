@@ -1,6 +1,6 @@
 # Account lockout with backoff
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan P10), waiting for "design approved". It changes how sign-in is refused and adds a table, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026 for release 0.7.0 (plan P10). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, D2 as written. **Q2: yes, the account holder is emailed when a hold begins** (Akmal approved the new message kind), which this design adds to its build. It changes how sign-in is refused and adds a table, so it is designed first (CLAUDE.md).
 
 PLAN §6 and TECHNICAL-PLAN §8.2 promise "lockout with backoff and an audit entry". Today there is a limit per caller address, held in each process's memory, and nothing per account for passwords.
 
