@@ -4197,6 +4197,7 @@
   "triggers.qualityTooManyObjectives": "Terlalu banyak objektif",
   "triggers.qualityTrendingOff": "Unjuran tidak mencapai sasaran",
   "triggers.sessionDueSoon": "Sesi esok",
+  "triggers.sessionLeftOpen": "Sesi masih terbuka",
   "triggers.sessionMissed": "Sesi terlepas",
   "triggers.sessionOpen": "Sesi bermula",
   "triggers.streakAtRisk": "Rentetan berisiko",

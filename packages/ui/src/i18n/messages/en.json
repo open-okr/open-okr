@@ -4197,6 +4197,7 @@
   "triggers.qualityTooManyObjectives": "Too many objectives",
   "triggers.qualityTrendingOff": "Forecast misses the target",
   "triggers.sessionDueSoon": "Session tomorrow",
+  "triggers.sessionLeftOpen": "Session still open",
   "triggers.sessionMissed": "Session missed",
   "triggers.sessionOpen": "Session starting",
   "triggers.streakAtRisk": "Streak at risk",

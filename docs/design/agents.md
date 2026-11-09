@@ -183,6 +183,7 @@ the build.
 | `session.due_soon` | 1 day before weekly session | Coordinator + space | No | Yes |
 | `session.open` | Scheduled start | Space | No | Yes |
 | `session.missed` | 1 day after missed session | Coordinator, then sponsor | Yes | Yes |
+| `session.left_open` | A weekly session still running past its §11 length, for one day (plan 0.7.0 A13) | Facilitator | No | Yes |
 | `streak.at_risk` | Week would break streak | Coordinator | No | Yes |
 | `digest.weekly` | After session closes | Space + leadership | No | Yes |
 | `digest.daily` | Member's local morning | Opted-in members | No | Yes |
@@ -646,12 +647,14 @@ writes no proposal.
 Akmal approved it on 9 November 2026 as proposals into the review queue, so the
 Champion's autonomy stays `propose` and it moves no session itself. Its weekly
 cadence already sends three lifecycle messages; two of them now carry the
-change they ask for.
+change they ask for, and a fourth, `session.left_open`, approved the same night
+as a new message, carries the close.
 
 | Message | Window | Proposal | Payload |
 |---|---|---|---|
 | `session.open` | Scheduled start to a day after it, session still `scheduled` | `sessions.open` | `{ id }` |
 | `session.missed` | The day after that, still `scheduled` | `sessions.skip` | `{ id }` |
+| `session.left_open` | `running` past §11's `sessions.weeklyMinutes` upper bound, for one day (`sessionLeftOpen`) | `sessions.close` | `{ id }` |
 | `session.due_soon` | The day before | None: opening early is not what the room booked | |
 
 | Piece | Where |
@@ -668,10 +671,12 @@ too: the facilitator, or the space's coordinator where the session names none.
 That recipient is who decides the proposal, because a session has no access
 context of its own (§11.2's first row).
 
-**Closing is not built.** No §6.4 message is about a session left running, and
-without a message a session proposal falls to workspace administrators. Adding
-one is a new proactive message kind, which is a human's decision. The question
-is recorded in the plan's build log and in `sessions.md` §2.1.
+**Closing, added the same night.** Akmal approved `session.left_open` as a new
+proactive message on 9 November 2026. It goes to the facilitator, so the close
+proposal it carries is theirs to decide, and `sessions.close` settles a pending
+one when the session is closed by hand, as open and skip do. `sessions.close`
+is destructive (O6), so a token applying it needs the destructive scope once
+`docs/design/token-scope-ceiling.md` is built; the review inbox is unaffected.
 
 ### 13.1 Acceptance criteria
 

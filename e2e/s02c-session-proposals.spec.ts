@@ -41,8 +41,10 @@ let pool: pg.Pool;
 const suffix = Math.random().toString(36).slice(2, 8);
 const DUE_TITLE = `A13 weekly check-in ${suffix}`;
 const MISSED_TITLE = `A13 missed check-in ${suffix}`;
+const LEFT_OPEN_TITLE = `A13 check-in left open ${suffix}`;
 let dueSessionId = "";
 let missedSessionId = "";
+let leftOpenSessionId = "";
 
 /** A weekly session in the first space, run by the instance's founder. */
 async function weeklySession(title: string, hoursAgo: number): Promise<string> {
@@ -142,4 +144,29 @@ test("applying the skip proposal marks the missed session skipped", async () => 
   await expect(card).toHaveCount(0, { timeout: 20_000 });
 
   expect(await stateOf(missedSessionId)).toBe("skipped");
+});
+
+test("a session left running past its length is proposed closed, and applying it closes it", async () => {
+  // Opened 45 minutes ago and still running: past §11's thirty minutes.
+  leftOpenSessionId = await weeklySession(LEFT_OPEN_TITLE, 0.75);
+  await pool.query(
+    "update okr_sessions set state = 'running', started_at = now() - interval '45 minutes' where id = $1",
+    [leftOpenSessionId],
+  );
+
+  await goTo(page, "/admin/agents");
+  await page.getByRole("button", { name: "Session lifecycle" }).click();
+  const card = page
+    .locator('[id^="proposal-"]')
+    .filter({ hasText: `Close the session "${LEFT_OPEN_TITLE}"` });
+  await expect(async () => {
+    await goTo(page, "/review");
+    await expect(card).toBeVisible({ timeout: 5_000 });
+  }).toPass({ timeout: 30_000 });
+  // Proposed, not done.
+  expect(await stateOf(leftOpenSessionId)).toBe("running");
+
+  await card.getByRole("button", { name: "Apply" }).click();
+  await expect(card).toHaveCount(0, { timeout: 20_000 });
+  expect(await stateOf(leftOpenSessionId)).toBe("closed");
 });

@@ -315,6 +315,87 @@ describe("the day after a session nobody opened, the Champion proposes skipping 
   });
 });
 
+describe("a weekly session left running past its length, the Champion proposes closing it", () => {
+  /** A session the room opened at `startedAt` and never closed. */
+  const running = async (
+    startedAt: string,
+    kind: "weekly" | "monthly" = "weekly",
+  ) => {
+    const session = await schedule(startedAt, kind);
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update okr_sessions set state = 'running', started_at = $2 where id = $1",
+      [session.id, startedAt],
+    );
+    return session;
+  };
+
+  it("attaches a close proposal to the facilitator's session.left_open, past §11's thirty minutes and not before", async () => {
+    const session = await running("2026-09-07T09:00:00Z");
+    await runWeekly(new Date("2026-09-07T09:20:00Z"));
+    expect(await proposals()).toEqual([]);
+
+    await runWeekly(new Date("2026-09-07T09:45:00Z"));
+    const [proposal] = await proposals();
+    expect(proposal).toMatchObject({
+      action: "sessions.close",
+      payload: { id: session.id },
+      status: "pending",
+      ai_generated: false,
+    });
+    const leftOpen = (await sessionNudges()).filter(
+      (row) => row.rule_key === "session.left_open",
+    );
+    expect(leftOpen).toHaveLength(1);
+    expect(leftOpen[0]?.recipient_member_id).toBe(ownerMemberId);
+    expect(leftOpen[0]?.proposal_id).toBe(proposal?.id);
+    // Proposed, not done: the Champion changes no session itself.
+    expect(await stateOf(session.id)).toBe("running");
+  });
+
+  it("closes the session as the facilitator when they apply it", async () => {
+    const session = await running("2026-09-07T09:00:00Z");
+    await runWeekly(new Date("2026-09-07T09:45:00Z"));
+    const [proposal] = await proposals();
+
+    await call("proposals.apply", { id: proposal?.id });
+
+    expect(await stateOf(session.id)).toBe("closed");
+    const [decided] = await proposals();
+    expect([decided?.status, decided?.decided_by_member_id]).toEqual([
+      "applied",
+      ownerMemberId,
+    ]);
+  });
+
+  it("is settled when the facilitator closes the session by hand", async () => {
+    const session = await running("2026-09-07T09:00:00Z");
+    await runWeekly(new Date("2026-09-07T09:45:00Z"));
+
+    await call("sessions.close", { id: session.id });
+
+    const [settled] = await proposals();
+    expect([settled?.status, settled?.decided_by_member_id]).toEqual([
+      "dismissed",
+      ownerMemberId,
+    ]);
+    expect(await inboxProposals()).toEqual([]);
+  });
+
+  it("says nothing two days on, nor about a monthly review that runs long", async () => {
+    await running("2026-09-07T09:00:00Z");
+    await runWeekly(new Date("2026-09-09T10:00:00Z"));
+    await running("2026-09-14T09:00:00Z", "monthly");
+    await runWeekly(new Date("2026-09-14T11:00:00Z"));
+    expect(await proposals()).toEqual([]);
+    expect(
+      (await sessionNudges()).filter(
+        (row) => row.rule_key === "session.left_open",
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe("what the Champion's own settings decide", () => {
   it("commits nothing in sandbox mode", async () => {
     const session = await schedule("2026-09-07T09:00:00Z");

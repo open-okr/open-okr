@@ -1900,6 +1900,15 @@ export const closeSession = defineWriteAction({
         })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
+      // The same settling as `sessions.open` and `sessions.skip` (plan 0.7.0
+      // A13): closed by hand, a pending close proposal is decided.
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
+
       return {
         result: { id: input.id },
         activity: {
@@ -1912,6 +1921,9 @@ export const closeSession = defineWriteAction({
           action: "sessions.close",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },

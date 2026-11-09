@@ -79,7 +79,7 @@ that person, through the action's own access check.
 |---|---|---|---|
 | From the scheduled start until a day after it, still `scheduled` | `session.open` | `sessions.open` | The facilitator, or the space's coordinator where the session names none |
 | The day after that, still `scheduled` | `session.missed` | `sessions.skip` | The same person |
-| A running session left open | None | **None. Not built** | |
+| Still `running` past §11's `sessions.weeklyMinutes` upper bound, for one day | `session.left_open` (new, approved 9 November 2026) | `sessions.close` | The same person |
 
 Every number is already in `packages/method`: both windows are
 `sessionLifecycleStage`'s, which reads §11's `cadence.dueSoonLeadDays` and
@@ -95,17 +95,11 @@ Every number is already in `packages/method`: both windows are
 | Least privilege | The Champion reads sessions only in spaces it is bound to (`agentSeesSession`), at `view`. It needs no write grant, because it writes nothing to the session |
 | No provider needed | The proposal carries the session's id and nothing else, and is marked not AI-generated |
 
-**Why closing is not proposed.** A session left running has no message in the
-§6.4 catalogue: `session.open` and `session.missed` are about a session nobody
-opened, and `digest.weekly` comes after the close. A proposal to close needs a
-message to carry it to the facilitator, because a session has no access
-context of its own, so a proposal no nudge carries falls to workspace
-administrators (`mayDecideProposal`). A new message kind is a decision
-CLAUDE.md keeps for a human, and A13's approval covered the autonomy, not a new
-message. The open question is in the plan's build log: a `session.left_open`
-trigger, to the facilitator, once a running session passes its §11 length
-(`sessions.weeklyMinutes` upper bound for a weekly one), carrying
-`sessions.close`.
+**Closing.** A session left running had no message in the §6.4 catalogue, and a
+proposal no nudge carries falls to workspace administrators. Akmal approved
+`session.left_open` as a new message the same night, to the facilitator, once a
+running weekly session passes its §11 length (`sessionLeftOpen` in
+`packages/method`), for one day as `missed` is. It carries `sessions.close`.
 
 Given / When / Then:
 - Given a weekly session whose start passed half an hour ago, when the
@@ -124,6 +118,12 @@ Given / When / Then:
   no nudge and no state change remain.
 - Given a monthly review at its hour, when the cadence runs, then
   `session.open` is sent and nothing is proposed.
+- Given a weekly session opened 45 minutes ago and still running, when the
+  cadence runs, then its facilitator's `session.left_open` carries one pending
+  `sessions.close` proposal, and the session is still running; at 20 minutes,
+  or two days on, nothing is sent.
+- Given that proposal, when the session is closed by hand, then the proposal is
+  recorded as dismissed by whoever closed it.
 
 ### 2.2 Stage 1: Confidence round
 

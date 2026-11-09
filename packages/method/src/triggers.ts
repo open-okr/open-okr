@@ -158,6 +158,15 @@ const RHYTHM_ROWS = [
     escalates: true,
   },
   {
+    // Plan 0.7.0 A13, approved 9 November 2026 as a new proactive message:
+    // the one that carries the Champion's proposal to close a session.
+    key: "session.left_open",
+    title: "Session still open",
+    fires: "A weekly session runs past its length",
+    recipient: "Facilitator",
+    escalates: false,
+  },
+  {
     key: "streak.at_risk",
     title: "Streak at risk",
     fires: "Week would break streak",

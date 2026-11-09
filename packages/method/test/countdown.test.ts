@@ -5,6 +5,7 @@ import {
   planningOpensDue,
   publicationCountdownMilestone,
   reviewPreparationDue,
+  sessionLeftOpen,
   sessionLifecycleStage,
 } from "../src/countdown.ts";
 import { resolveThresholds } from "../src/thresholds.ts";
@@ -115,6 +116,35 @@ describe("day one and the unscored close", () => {
     expect(cycleClosingDue(3, "closed")).toBe(false);
     // Before the end date there is nothing to close.
     expect(cycleClosingDue(-1, "active")).toBe(false);
+  });
+});
+
+describe("a weekly session left open (plan 0.7.0 A13, §11 sessions.weeklyMinutes)", () => {
+  it("is left open past the length's upper bound, for one day", () => {
+    expect(sessionLeftOpen(30, "weekly", "running", thresholds)).toBeNull();
+    expect(sessionLeftOpen(31, "weekly", "running", thresholds)).toBe(
+      "left_open",
+    );
+    expect(sessionLeftOpen(30 + 24 * 60, "weekly", "running", thresholds)).toBe(
+      "left_open",
+    );
+    expect(
+      sessionLeftOpen(31 + 24 * 60, "weekly", "running", thresholds),
+    ).toBeNull();
+  });
+
+  it("follows the workspace's own length", () => {
+    const longer = resolveThresholds({
+      "sessions.weeklyMinutes": { low: 20, high: 45 },
+    });
+    expect(sessionLeftOpen(40, "weekly", "running", longer)).toBeNull();
+    expect(sessionLeftOpen(46, "weekly", "running", longer)).toBe("left_open");
+  });
+
+  it("is never said of a review, or of a session not running", () => {
+    expect(sessionLeftOpen(120, "monthly", "running", thresholds)).toBeNull();
+    expect(sessionLeftOpen(120, "weekly", "closed", thresholds)).toBeNull();
+    expect(sessionLeftOpen(120, "weekly", "scheduled", thresholds)).toBeNull();
   });
 });
 

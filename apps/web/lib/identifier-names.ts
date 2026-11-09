@@ -49,6 +49,7 @@ export const TRIGGER_NAME_KEYS: Readonly<Record<string, string>> = {
   "session.due_soon": "triggers.sessionDueSoon",
   "session.open": "triggers.sessionOpen",
   "session.missed": "triggers.sessionMissed",
+  "session.left_open": "triggers.sessionLeftOpen",
   "streak.at_risk": "triggers.streakAtRisk",
   "digest.weekly": "triggers.digestWeekly",
   "digest.daily": "triggers.digestDaily",

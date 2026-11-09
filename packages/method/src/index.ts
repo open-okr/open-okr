@@ -55,6 +55,7 @@ export {
   publicationCountdownMilestone,
   reviewPreparationDue,
   type SessionLifecycleStage,
+  sessionLeftOpen,
   sessionLifecycleStage,
 } from "./countdown.ts";
 export {

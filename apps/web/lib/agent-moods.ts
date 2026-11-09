@@ -39,6 +39,8 @@ const TRIGGER_MOODS = {
   "session.due_soon": "idle",
   "session.open": "happy",
   "session.missed": "sad",
+  // A proposal to weigh, not a lapse (plan 0.7.0 A13).
+  "session.left_open": "thinking",
   "streak.at_risk": "surprised",
   "digest.weekly": "happy",
   "digest.daily": "idle",

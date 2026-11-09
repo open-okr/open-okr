@@ -35,6 +35,7 @@ import {
   publicationCountdownMilestone,
   type ResolvedThresholds,
   reviewPreparationDue,
+  sessionLeftOpen,
   sessionLifecycleStage,
   type TriggerKey,
 } from "@openokr/method";
@@ -134,9 +135,10 @@ async function spaceCoordinator(
  * scheduled hour, and the one that says nobody opened it. Which of the three,
  * or none, is `sessionLifecycleStage`'s answer.
  *
- * **Since plan 0.7.0 A13 two of them carry a proposal** on a weekly session:
- * `session.open` offers `sessions.open` and `session.missed` offers
- * `sessions.skip` (`sessions/lifecycle-proposals.ts`). The proposal is written
+ * **Since plan 0.7.0 A13 three of them carry a proposal** on a weekly session:
+ * `session.open` offers `sessions.open`, `session.missed` offers
+ * `sessions.skip`, and `session.left_open`, a running session past its §11
+ * length, offers `sessions.close` (`sessions/lifecycle-proposals.ts`). The proposal is written
  * only on an agent's run, which is the only caller that passes a run id, and
  * never again once somebody has decided one for that session.
  *
@@ -172,6 +174,7 @@ export async function dueSessionNudges(
       state: okrSessions.state,
       facilitatorId: okrSessions.facilitatorId,
       kind: okrSessions.kind,
+      startedAt: okrSessions.startedAt,
     })
     .from(okrSessions)
     .where(
@@ -185,7 +188,19 @@ export async function dueSessionNudges(
   const staged = rows.flatMap((session) => {
     const hours =
       (session.scheduledFor.getTime() - input.now.getTime()) / MS_PER_HOUR;
-    const stage = sessionLifecycleStage(hours, session.state, input.thresholds);
+    // A running weekly session past its length is the fourth (plan 0.7.0
+    // A13): `session.left_open`, which carries the proposal to close it.
+    const minutesRunning = session.startedAt
+      ? (input.now.getTime() - session.startedAt.getTime()) / 60_000
+      : 0;
+    const stage =
+      sessionLifecycleStage(hours, session.state, input.thresholds) ??
+      sessionLeftOpen(
+        minutesRunning,
+        session.kind,
+        session.state,
+        input.thresholds,
+      );
     return stage ? [{ session, stage }] : [];
   });
   // Read once for the sessions that are due, not once per session.

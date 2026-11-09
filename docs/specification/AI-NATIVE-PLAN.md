@@ -286,6 +286,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `session.due_soon` | 1 day before the weekly session | Coordinator and space |
 | `session.open` | At the scheduled start | Space |
 | `session.missed` | 1 day after a missed session | Coordinator, then sponsor |
+| `session.left_open` | A weekly session still running past its §11 length (`sessions.weeklyMinutes`, upper bound), for one day; carries the Champion's proposal to close it (plan 0.7.0 A13) | Facilitator, or the space's coordinator where the session names none |
 | `streak.at_risk` | The week would break the streak | Coordinator |
 | `digest.weekly` | After the session closes | Space and leadership |
 | `digest.daily` | The member's local morning | Everyone opted in |

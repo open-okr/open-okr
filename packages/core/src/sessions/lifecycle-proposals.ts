@@ -32,8 +32,14 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 /** The two actions the Champion proposes on a session, as registry keys. */
 export const OPEN_SESSION_ACTION = "sessions.open";
 export const SKIP_SESSION_ACTION = "sessions.skip";
+/** Carried by `session.left_open` (plan 0.7.0 A13, approved 9 November). */
+export const CLOSE_SESSION_ACTION = "sessions.close";
 
-const LIFECYCLE_ACTIONS = [OPEN_SESSION_ACTION, SKIP_SESSION_ACTION];
+const LIFECYCLE_ACTIONS = [
+  OPEN_SESSION_ACTION,
+  SKIP_SESSION_ACTION,
+  CLOSE_SESSION_ACTION,
+];
 
 /**
  * The change a lifecycle message offers, or null.
@@ -44,7 +50,11 @@ const LIFECYCLE_ACTIONS = [OPEN_SESSION_ACTION, SKIP_SESSION_ACTION];
 export function sessionProposalFor(
   stage: SessionLifecycleStage,
   kind: string,
-): typeof OPEN_SESSION_ACTION | typeof SKIP_SESSION_ACTION | null {
+):
+  | typeof OPEN_SESSION_ACTION
+  | typeof SKIP_SESSION_ACTION
+  | typeof CLOSE_SESSION_ACTION
+  | null {
   if (kind !== "weekly") {
     return null;
   }
@@ -53,6 +63,9 @@ export function sessionProposalFor(
   }
   if (stage === "missed") {
     return SKIP_SESSION_ACTION;
+  }
+  if (stage === "left_open") {
+    return CLOSE_SESSION_ACTION;
   }
   return null;
 }

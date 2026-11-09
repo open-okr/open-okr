@@ -207,6 +207,11 @@ export function proposalHeadline(
       ? `Open the session "${subjectTitle}"`
       : "Open the session";
   }
+  if (action === "sessions.close") {
+    return subjectTitle
+      ? `Close the session "${subjectTitle}"`
+      : "Close the session";
+  }
   if (action === "sessions.skip") {
     return subjectTitle
       ? `Mark the session "${subjectTitle}" as skipped`
