@@ -238,4 +238,12 @@ Readings the build had to make, and what it measured. Each is within a decision 
 | F6 | **Frames:** only a path under `_next/static/` ending in `.js`, with no `..`, is looked up, and the map must be inside the static directory. At most sixteen parsed maps are kept. The function name stays the stack's own, because a map names the identifier at a position, which in a call frame is the function being called | The frame's file is the browser's to say, so it is untrusted |
 | F7 | **"Copy details"** is on the root `error.tsx`, on every section boundary through `SegmentError`, and on `global-error.tsx` with inline styles. Its labels are fixed English, because the bug template reads them; the button's own words are in both catalogues. The version was already in the browser's scripts, through the method link `rule-preview.tsx` builds, so naming it here discloses nothing new | D21 |
 
+### E4
+
+| # | Reading | Result |
+|---|---|---|
+| G1 | **Bugsink, checked by hand on 9 November 2026**: `bugsink/bugsink` 2.6.3 with SQLite in one container, a project made in its shell, and two identical `TypeError`s sent through `reportError` and `createErrorReporter` from a script, with no build | Both POSTs answered 2xx. One issue holding both events, grouped by our fingerprint; frames with file, function, line and in-app; release `0.7.0`, the environment, the transaction and every tag as sent. Recorded in `docs/runbooks/observability.md` |
+| G2 | **GlitchTip is not checked yet.** It needs Postgres, Valkey, a web and a worker container, more than this row's machine had to spare. The procedure is in the runbook's "Checking one yourself" | Before 0.7.0 ships |
+| G3 | **OKRGoal's Sentry project, releases, alerts and GitHub link** are outside the repository (§4) | Akmal's |
+
 **D18, measured as far as a build allows.** `productionBrowserSourceMaps` is on. The build of 9 November 2026, without browser maps, has 3.7 MB of browser JavaScript in `apps/web/.next/static` (3.9 MB in all). The server's maps ran at 3.9 times their JavaScript, so the browser maps are expected to add about 15 MB to the image. Measuring it needs a build, which this row did not run: `du -sh apps/web/.next/static` after the next `pnpm build`, against 3.9 MB, is the number to record here.

@@ -236,6 +236,29 @@ does not arrive is counted in `openokr_error_reports_dropped_total`.
 Bugsink's API. Text a person typed into the product never reaches the tracker,
 so nobody can plant instructions there for it.
 
+### Which trackers have been checked
+
+Each was given two identical forced errors through the product's own
+classifier, scrub and driver, and checked for one issue holding both events,
+with the class, the message, readable frames and the tags.
+
+| Tracker | Version | Checked | Result |
+|---|---|---|---|
+| Bugsink | 2.6.3 (`bugsink/bugsink`, SQLite) | 9 November 2026 | One issue, two events, grouped by the product's fingerprint. Frames with file, function, line and in-app; release, environment, transaction and every tag as sent |
+| GlitchTip | Not yet | Before 0.7.0 ships | |
+| Sentry (sentry.io, EU) | Not yet | When OKRGoal's project exists | |
+
+**Checking one yourself.** Start the tracker, make a project, copy its DSN,
+set `OPENOKR_ERROR_DSN` and restart. Then open the instance signed in, open
+the browser's console and run
+`setTimeout(() => { throw new TypeError("tracker check") })`. Within a few
+seconds the tracker shows a `TypeError` with source `browser`; its message
+reads `TypeError (message withheld)`, because a browser's message is never
+sent. In the log, `docker compose logs app | grep '"source":"browser"'`
+shows the same report. If nothing arrives, look at
+`openokr_error_reports_dropped_total`: `send_failed` means the instance cannot
+reach the tracker or the tracker refused the envelope.
+
 ## One error the log leaves out
 
 "The destination stream closed early" is not logged unless `LOG_LEVEL` is
