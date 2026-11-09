@@ -219,6 +219,7 @@ const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
 const OUTBOX_PURGE_JOB = "outbox.purge";
 const OUTBOX_PURGE_CRON = "0 4 * * *";
 
+
 /** Hourly, so a flag turned on today shows in the console within the hour. */
 const TENANCY_ADOPT_JOB = "tenancy.adopt";
 const TENANCY_ADOPT_CRON = "10 * * * *";
@@ -562,6 +563,19 @@ async function runOne(
   if (run.action === "agents.runCoach") {
     await callAction(context, "agents.runCoach", {});
     return;
+  }
+  // **Each sweep names its own action.** The message log sweep had no branch
+  // here, so its daily run fell through to the line below and ran the
+  // Champion instead: message log retention never ran, and the Champion ran
+  // an extra time each night (found building plan 0.7.0 A2, recorded as B12).
+  if (run.action === "channels.sweepMessageLog") {
+    await callAction(context, "channels.sweepMessageLog", {});
+    return;
+  }
+  if (run.action !== "agents.runChampion") {
+    // A run added to SCHEDULED_RUNS without a branch here would otherwise
+    // run the Champion, as the message log sweep did. Fail loudly instead.
+    throw new Error(`No branch dispatches the scheduled run ${run.job}.`);
   }
   await callAction(context, "agents.runChampion", {
     ...(run.cadence ? { cadence: run.cadence } : {}),
