@@ -4190,6 +4190,7 @@
   "triggers.qualityNoNotDoing": "Tiada senarai tidak dilakukan",
   "triggers.qualityOrphanGoal": "Matlamat tiada induk",
   "triggers.qualityProcessHealthLow": "Kesihatan proses rendah",
+  "triggers.qualityReviewRequested": "Coach telah menyemak matlamat anda",
   "triggers.qualitySandbaggingClose": "Skor penutupan kelihatan terlalu selamat",
   "triggers.qualitySandbaggingDraft": "Sasaran draf kelihatan terlalu selamat",
   "triggers.qualitySilo": "Jabatan tiada kebergantungan bersama",

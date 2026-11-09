@@ -25,6 +25,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getParentAccessScoped } from "../access/reads.ts";
+import { coachMentionOutboxInTx } from "../agents/coach-mention.ts";
 import { reconcileTextAttachments } from "../attachments/text.ts";
 import {
   addReaction,
@@ -322,8 +323,19 @@ export const createCommentAction = defineWriteAction({
         authorMemberId,
         mentionIds: result.subscribedMemberIds,
       });
+      // A mention of the Coach on a goal asks for its review (plan 0.7.0
+      // A8). Enqueued here so it commits with the comment; the relay runs it.
+      const outbox = await coachMentionOutboxInTx(tx as WorkspaceTx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        commentId: result.id,
+        authorMemberId,
+        mentionIds: result.subscribedMemberIds,
+      });
       return {
         result: { id: result.id },
+        ...(outbox.length > 0 ? { outbox } : {}),
         activity: {
           kind: "comment.created" as const,
           subjectType: "comment",
@@ -668,8 +680,19 @@ export const updateCommentAction = defineWriteAction({
           onlyMentions: true,
         });
       }
+      // An edit that newly mentions the Coach asks as a new comment would.
+      const outbox = await coachMentionOutboxInTx(tx as WorkspaceTx, {
+        workspaceId,
+        subjectType: comment.subjectType,
+        subjectId: comment.subjectId,
+        commentId: input.commentId,
+        authorMemberId: comment.authorMemberId,
+        mentionIds: added,
+        edited: true,
+      });
       return {
         result: {},
+        ...(outbox.length > 0 ? { outbox } : {}),
         activity: {
           kind: "comment.updated" as const,
           subjectType: "comment",

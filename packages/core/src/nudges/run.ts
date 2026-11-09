@@ -22,6 +22,7 @@ import {
   DELEGATED_TRIGGERS,
   deferralFor,
   leaveOn,
+  type ResolvedThresholds,
   type SuppressionReason,
   standInFor,
 } from "@openokr/method";
@@ -394,6 +395,75 @@ export async function runDueNudgesInTx(
     );
   }
 
+  const { ids, decided, delivery } = await recordAndDeliverInTx(tx, {
+    workspaceId,
+    at,
+    timeZone,
+    thresholds,
+    due,
+    ...(input.runId ? { runId: input.runId } : {}),
+    ...(input.baseUrl ? { baseUrl: input.baseUrl } : {}),
+    ...(input.instanceName ? { instanceName: input.instanceName } : {}),
+  });
+
+  const sent = ids.filter((written) => written.sent).length;
+  return {
+    recorded: sent,
+    suppressed: ids.length - sent,
+    delivered: delivery.delivered,
+    toChannel: delivery.toChannel,
+    staleFlipped,
+    diverged,
+    reviewed,
+    // Distinct rows, not linked nudges: two nudges pointing at one already
+    // pending proposal proposed nothing new, and counting them twice would
+    // report activity the run did not cause.
+    proposed: new Set(ids.map((written) => written.proposalId).filter(Boolean))
+      .size,
+    ruleKeys: [
+      ...new Set(
+        decided
+          .filter((entry) => entry.suppressedReason === null)
+          .map((entry) => entry.nudge.ruleKey),
+      ),
+    ],
+  };
+}
+
+/**
+ * Everything after the readers: leave, the active filter, the reconnect
+ * notice, suppression, the rows, and delivery (P4-T05b's one path).
+ *
+ * Exported since plan 0.7.0 A8, because the Coach's reply to a mention is one
+ * nudge raised by a comment rather than by a clock, and it has to be held by
+ * the same deduplication, ceiling, quiet hours, snooze and leave as every
+ * other message rather than by a second copy of them.
+ */
+export async function recordAndDeliverInTx(
+  tx: WorkspaceTx,
+  input: {
+    readonly workspaceId: string;
+    readonly at: Date;
+    readonly timeZone: string;
+    readonly thresholds: ResolvedThresholds;
+    readonly due: readonly DueNudge[];
+    readonly runId?: string;
+    readonly baseUrl?: string;
+    readonly instanceName?: string;
+  },
+): Promise<{
+  readonly ids: readonly {
+    readonly id: string;
+    readonly sent: boolean;
+    readonly proposalId: string | null;
+  }[];
+  readonly decided: readonly {
+    readonly nudge: DueNudge;
+    readonly suppressedReason: SuppressionReason | null;
+  }[];
+  readonly delivery: { readonly delivered: number; readonly toChannel: number };
+}> {
+  const { workspaceId, at, timeZone, thresholds, due } = input;
   // Somebody on leave is nudged about nothing (§7.4, P9-T19b-b). The check-in
   // on a goal they champion and the acknowledgement they would owe go to
   // whoever stands in for them; everything else is recorded and held.
@@ -506,28 +576,7 @@ export async function runDueNudgesInTx(
     ...(input.instanceName ? { instanceName: input.instanceName } : {}),
   });
 
-  const sent = ids.filter((written) => written.sent).length;
-  return {
-    recorded: sent,
-    suppressed: ids.length - sent,
-    delivered: delivery.delivered,
-    toChannel: delivery.toChannel,
-    staleFlipped,
-    diverged,
-    reviewed,
-    // Distinct rows, not linked nudges: two nudges pointing at one already
-    // pending proposal proposed nothing new, and counting them twice would
-    // report activity the run did not cause.
-    proposed: new Set(ids.map((written) => written.proposalId).filter(Boolean))
-      .size,
-    ruleKeys: [
-      ...new Set(
-        decided
-          .filter((entry) => entry.suppressedReason === null)
-          .map((entry) => entry.nudge.ruleKey),
-      ),
-    ],
-  };
+  return { ids, decided, delivery };
 }
 
 /**

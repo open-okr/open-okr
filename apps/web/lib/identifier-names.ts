@@ -81,6 +81,7 @@ export const TRIGGER_NAME_KEYS: Readonly<Record<string, string>> = {
   "quality.divergence": "triggers.qualityDivergence",
   "quality.trending_off": "triggers.qualityTrendingOff",
   "quality.process_health_low": "triggers.qualityProcessHealthLow",
+  "quality.review_requested": "triggers.qualityReviewRequested",
 };
 
 /** The AI assists that have a switch on the AI console. */

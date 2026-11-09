@@ -75,6 +75,8 @@ const TRIGGER_MOODS = {
   "quality.divergence": "surprised",
   "quality.trending_off": "sad",
   "quality.process_health_low": "sad",
+  // Somebody asked, and it answered (plan 0.7.0 A8).
+  "quality.review_requested": "happy",
 } as const satisfies Record<TriggerKey, AgentMood>;
 
 /** The trigger keys that have a mood. Exported for the test, not for rendering. */

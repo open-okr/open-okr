@@ -400,6 +400,16 @@ const QUALITY_ROWS = [
     recipient: "Sponsor",
     deterministic: true,
   },
+  {
+    // Plan 0.7.0 A8, approved 9 November 2026 as a new proactive message
+    // (AI-NATIVE-PLAN §6.5, "Conversation"). The review it carries is the §4
+    // checks themselves, so it needs no provider.
+    key: "quality.review_requested",
+    title: "The Coach reviewed your goal",
+    fires: "A member mentions the Coach in a comment on a goal",
+    recipient: "The member who asked, with the review in the goal's thread",
+    deterministic: true,
+  },
 ] as const;
 
 const QUALITY = QUALITY_ROWS.map((entry) => ({

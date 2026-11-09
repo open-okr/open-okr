@@ -3725,6 +3725,45 @@
       "pages": false
     },
     {
+      "name": "agents answerMention",
+      "action": "agents.answerMention",
+      "method": "POST",
+      "path": "/agents/answerMention",
+      "scope": "write",
+      "summary": "The Coach reviews the goal a comment mentioned it on, and replies in that thread.",
+      "flags": [
+        {
+          "name": "comment-id",
+          "field": "commentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents mentionable",
+      "action": "agents.mentionable",
+      "method": "GET",
+      "path": "/agents/mentionable",
+      "scope": "read",
+      "summary": "The agents a comment can mention and get an answer from: the Coach, while it is on.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "agents listRuns",
       "action": "agents.listRuns",
       "method": "GET",

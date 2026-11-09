@@ -4190,6 +4190,7 @@
   "triggers.qualityNoNotDoing": "No not-doing list",
   "triggers.qualityOrphanGoal": "Goal has no parent",
   "triggers.qualityProcessHealthLow": "Process health low",
+  "triggers.qualityReviewRequested": "The Coach reviewed your goal",
   "triggers.qualitySandbaggingClose": "Closing scores look too safe",
   "triggers.qualitySandbaggingDraft": "Draft targets look too safe",
   "triggers.qualitySilo": "Department has no shared dependency",

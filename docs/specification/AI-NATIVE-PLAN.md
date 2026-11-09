@@ -323,6 +323,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `quality.divergence` | Reported health disagrees with the data within the divergence window | Champion and reviewer |
 | `quality.trending_off` | The forecast misses the target | Champion |
 | `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's improvement action |
+| `quality.review_requested` | A member mentions the Coach in a comment on a goal (§6.5, "Conversation"; plan 0.7.0 A8) | The member who asked. The review itself is the Coach's reply in that thread |
 
 ### 6.5 Agent definition and runs
 
@@ -332,7 +333,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 - **Runs.** A durable state machine: planning, running, then completed, failed or cancelled, with a task list. The planning phase decomposes the work. The execution phase pops one task per job, runs a bounded tool loop, appends a human-readable log, and reschedules itself until done. Runs resume across restarts, and every tool call carries the run identifier. Built at completeness review M-11 for a run started with its task list already decomposed: `agents.startRun` queues the first step through the outbox in the transaction that writes the run, the relay hands each step to the executor in `packages/agents`, and each step queues the next. A step names its task index, so a redelivered row is skipped rather than taken twice. A custom agent has no deterministic form: at every step the host resolves the agent's tier (default `deep`) through its one provider choke point, and a run with no provider, or whose egress level lets nothing reach it, ends cancelled with the reason in its log. A read task runs as the agent in every mode rather than becoming a proposal. **Not built, and waiting on a decision:** the planning phase itself, meaning which registry actions a custom agent's planner may choose from and what it is shown of its bound resources.
 - **Write policy.** `sandbox` returns simulated results and commits nothing. `propose` (the default) turns every write into a proposal envelope queued to the review inbox, where a human applies or dismisses in bulk. `scoped_direct` commits immediately within the agent's bindings, still fully audited.
 - **Cost.** Every step meters under the agent. Per-agent and per-workspace caps halt a run mid-flight with a clear log line.
-- **Conversation.** An agent is addressable. Mention the Coach on a goal and it reviews that goal and replies in the thread.
+- **Conversation.** An agent is addressable. Mention the Coach on a goal and it reviews that goal and replies in the thread. Built at plan 0.7.0 A8: the comment enqueues the request in its own transaction, the relay has the Coach review the goal through its own bindings against METHOD.md §4.1 and §4.2 with no provider, the reply is a comment answering the one that asked, every point citing its check, and the person who asked gets one `quality.review_requested` nudge under the ordinary suppression rules. A goal the Coach cannot see gets no reply. The words are the method's; no model phrases them yet ([agents.md](../design/agents.md) §14).
 
 ## 7. Schema
 

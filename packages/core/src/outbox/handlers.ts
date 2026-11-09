@@ -32,6 +32,11 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import {
+  COACH_MENTION_TOPIC,
+  parseCoachMentionJob,
+} from "../agents/coach-mention.ts";
+import { runCoachMention } from "../agents/coach-mention-run.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
 import {
   AGENT_RUN_STEP_TOPIC,
@@ -865,6 +870,33 @@ const continueAgentRun: OutboxHandler = async (delivery, deps) => {
 };
 
 /**
+ * The Coach answers a mention on a goal (plan 0.7.0 A8).
+ *
+ * **Safe to run twice**: the action refuses a second answer to one comment, and
+ * that refusal, like every other one, is a skip with its reason rather than a
+ * retry. Nothing about it needs a provider.
+ */
+const answerCoachMention: OutboxHandler = async (delivery, deps) => {
+  const job = parseCoachMentionJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a workspace, a comment and a goal, so the Coach has nothing to answer.`,
+    );
+  }
+  const outcome = await runCoachMention(
+    {
+      pool: deps.pool,
+      ...(deps.baseUrl ? { baseUrl: deps.baseUrl } : {}),
+      ...(deps.instanceName ? { instanceName: deps.instanceName } : {}),
+    },
+    job,
+  );
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
+/**
  * Stops the subscription of a workspace that closed (workspace-erasure.md §3).
  *
  * **Safe to run twice**: the provider is asked to end at the period's end, and
@@ -1127,6 +1159,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // written this topic since P2-T17 and nothing read it, so a run started
   // through `agents.startRun` sat at its first task forever.
   [AGENT_RUN_STEP_TOPIC]: continueAgentRun,
+  // The Coach's reply to a mention on a goal (plan 0.7.0 A8).
+  [COACH_MENTION_TOPIC]: answerCoachMention,
   // The virus scan (completeness review M-24). Written by a claim only when a
   // scanner is configured, so an instance without one never sees this topic.
   [BLOB_SCAN_TOPIC]: scanBlob,

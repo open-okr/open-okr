@@ -164,6 +164,7 @@ import {
   revealConfidenceVotes,
   startCheckIn,
 } from "./check-ins.ts";
+import { answerCoachMention, mentionableAgents } from "./coach-mention.ts";
 import {
   addReactionAction,
   createCommentAction,
@@ -704,6 +705,8 @@ export const ACTION_MAP = {
   "agents.cancelRun": cancelAgentRun,
   "agents.runChampion": runChampion,
   "agents.runCoach": runCoach,
+  "agents.answerMention": answerCoachMention,
+  "agents.mentionable": mentionableAgents,
   "agents.listRuns": listAgentRuns,
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
