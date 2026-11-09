@@ -4,6 +4,7 @@ import { Field } from "@base-ui-components/react/field";
 import { NumberField } from "@base-ui-components/react/number-field";
 import type { FocusEvent, KeyboardEvent, ReactNode, Ref } from "react";
 import { useRef, useState } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { formatMeasure } from "../lib/format-measure.ts";
@@ -80,9 +81,13 @@ export function NumberInput({
   onBlur,
   onKeyDown,
   invalid,
-  error,
+  error: givenError,
   "aria-describedby": describedBy,
 }: NumberInputProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields`
+  // says what the server refused about this field (guided-inputs §4.2).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t, locale } = useTranslations();
   const suffix = unit?.trim() || null;
   // Base UI holds the number itself, so a reset starts it again from its

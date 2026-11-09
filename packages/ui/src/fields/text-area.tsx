@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { useFormReset } from "./form-reset.ts";
@@ -45,7 +46,7 @@ export function TextArea({
   label,
   hideLabel,
   description,
-  error,
+  error: givenError,
   className,
   inputClassName,
   id,
@@ -56,6 +57,12 @@ export function TextArea({
   ref,
   ...area
 }: TextAreaProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields`
+  // says what the server refused about this field (guided-inputs §4.2).
+  const refused = useRefusedField(
+    typeof area.name === "string" ? area.name : undefined,
+  );
+  const error = givenError ?? refused ?? null;
   const { t } = useTranslations();
   const generated = useId();
   const areaId = id ?? generated;

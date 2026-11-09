@@ -14,9 +14,11 @@
  * the cycle workspace uses: a space that cannot be archived because it still
  * holds an open cycle is a normal outcome and the reason is worth reading.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { refusedByField } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_SPACE_ERROR, type SpaceWriteState } from "./write-state.ts";
 
@@ -37,10 +39,13 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // A schema's refusal too, which used to reach the error page: a name
+    // longer than a space takes is the person's to fix (plan U1b).
+    const refused = refusedByField(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   for (const path of paths) {
     revalidatePath(path);

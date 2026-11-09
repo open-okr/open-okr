@@ -176,3 +176,26 @@ export function refusedState(
     ...(Object.keys(fields).length > 0 ? { fields } : {}),
   };
 }
+
+/**
+ * What a form wrapped in `RefusedFields` gets back for a refused save
+ * (guided-inputs §4.2, plan U1b): every field the refusal names, which the
+ * kit fields inside show under themselves and the provider says under the
+ * form when no field claims one, and the sentence only when it names none.
+ * Null when the error was not a refusal.
+ */
+export function refusedByField(
+  error: unknown,
+  t: Translate,
+): {
+  readonly error: string | null;
+  readonly fields?: Readonly<Record<string, string>>;
+} | null {
+  const refusal = refusalFields(error, t);
+  if (refusal === null) {
+    return null;
+  }
+  return Object.keys(refusal.fields).length === 0
+    ? { error: refusal.message }
+    : { error: null, fields: refusal.fields };
+}

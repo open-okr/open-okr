@@ -1,6 +1,7 @@
 "use client";
 
 import { type ComponentProps, type ReactNode, useId } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { cn } from "../lib/cn.ts";
 
 /**
@@ -38,7 +39,7 @@ export function SelectInput({
   label,
   hideLabel,
   description,
-  error,
+  error: givenError,
   className,
   inputClassName,
   id,
@@ -46,6 +47,12 @@ export function SelectInput({
   "aria-describedby": describedBy,
   ...select
 }: SelectInputProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields`
+  // says what the server refused about this field (guided-inputs §4.2).
+  const refused = useRefusedField(
+    typeof select.name === "string" ? select.name : undefined,
+  );
+  const error = givenError ?? refused ?? null;
   const generated = useId();
   const selectId = id ?? generated;
   const ids = {

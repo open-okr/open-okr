@@ -1,6 +1,11 @@
 import { OperationError, trustedEmailDomainsSchema } from "@openokr/core";
 import { describe, expect, it } from "vitest";
-import { refusalFields, refusalOf, refusedState } from "../lib/refusal.ts";
+import {
+  refusalFields,
+  refusalOf,
+  refusedByField,
+  refusedState,
+} from "../lib/refusal.ts";
 
 /**
  * What a form says when a save is refused (guided-inputs §5, F5).
@@ -176,5 +181,40 @@ describe("what a form gets back", () => {
 
   it("throws nothing away for a failure: the caller throws it on", () => {
     expect(refusedState(new Error("gone"), t, ["reason"])).toBe(null);
+  });
+});
+
+describe("what a form wrapped in RefusedFields gets back (plan U1b)", () => {
+  it("hands every named field down, and no sentence, since the provider says any no field claims", () => {
+    expect(
+      refusedByField(
+        zodError([
+          {
+            code: "too_big",
+            origin: "string",
+            maximum: 80,
+            path: ["name"],
+            message: "Too big: expected string to have <=80 characters",
+          },
+        ]),
+        t,
+      ),
+    ).toEqual({ error: null, fields: { name: 'fields.tooLong:{"max":80}' } });
+  });
+
+  it("keeps the sentence for a refusal about the whole save", () => {
+    expect(
+      refusedByField(
+        new OperationError(
+          "forbidden",
+          "This space still holds an open cycle.",
+        ),
+        t,
+      ),
+    ).toEqual({ error: "This space still holds an open cycle." });
+  });
+
+  it("is nothing for a failure", () => {
+    expect(refusedByField(new Error("gone"), t)).toBe(null);
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { RefusedFields } from "@openokr/ui";
 import { useActionState } from "react";
 import { NO_SPACE_ERROR, type SpaceWriteState } from "./write-state.ts";
 
@@ -31,7 +32,8 @@ export function SpaceForm({
   const [state, formAction, pending] = useActionState(action, NO_SPACE_ERROR);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
-      {children}
+      {/* Each field shows what the server refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       {state.error ? (
         <p
           role="alert"

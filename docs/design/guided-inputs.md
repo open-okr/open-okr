@@ -114,6 +114,13 @@ The plan said Base UI `Form` would take the map. It did not need to: every kit f
 
 Converted in U1a, the forms §5 F5 named and the ones already returning a refusal: the operator's lifecycle, plan, trial, limits and new workspace forms, the site message, the support request, Admin > General's limits card, and a new workspace of one's own. Early checks those actions made themselves (a missing reason, a date, whole seats) now land on their field too. Left for U1b, by area: the person form on a profile, whose fields are drawn by the server page outside the form's state; the AI console; and the forms that still show one sentence (goals, key results, KPIs, initiatives, tasks, cycles, spaces). Billing and agent connections refuse whole actions, not fields, and keep the sentence.
 
+**As built at 0.7.0, part two (plan U1b).** Most screens draw their fields on the server inside a small client wrapper that holds the action's state (`SpaceForm`, the cycle's `ActionForm`, the person form), so the wrapper cannot pass `error` to each field. `RefusedFields` in `packages/ui/src/forms/refused-fields.tsx` closes that gap: the wrapper puts `state.fields` in it, and every kit field inside (`TextInput`, `TextArea`, `NumberInput`, `SelectInput`, `DateInput`, `EntityPicker`, and `EmailInput` and `UrlInput` through `TextInput`) reads its own message by `name` unless it was given one. Each field claims its name while mounted, and a refused field no mounted control claims is said under the form, so no message is lost. The action returns `refusedByField(error, t)`: the fields when the refusal names any, the sentence when it names none. It also catches a schema refusal, which these actions used to send to the error page.
+
+| Area | State |
+|---|---|
+| Spaces: create, rename and mission, archive, members, settings, holidays | Done (U1b, first area) |
+| Cycle workspace, goals and key results, KPIs, initiatives, tasks, documents, sessions, people, admin, account | To do, area by area, with the same three steps: the action returns `refusedByField`, its state type gains `fields`, its wrapper puts them in `RefusedFields` |
+
 ### 4.3 TextInput and TextArea
 
 - One skin per density.

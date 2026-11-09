@@ -8,6 +8,8 @@
 export interface SpaceWriteState {
   /** A refusal in words, or null. Never a stack trace. */
   readonly error: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   /** The id a create produced, so the form can link at what it just made. */
   readonly createdId?: string;
   /**

@@ -2,6 +2,7 @@
 
 import { Field } from "@base-ui-components/react/field";
 import { type ComponentProps, type ReactNode, useState } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 
@@ -53,7 +54,7 @@ export function TextInput({
   label,
   hideLabel,
   description,
-  error,
+  error: givenError,
   check,
   trailing,
   className,
@@ -63,6 +64,10 @@ export function TextInput({
   onChange,
   ...input
 }: TextInputProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields`
+  // says what the server refused about this field (guided-inputs §4.2).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t } = useTranslations();
   const [length, setLength] = useState(
     () => String(input.value ?? input.defaultValue ?? "").length,
