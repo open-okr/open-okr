@@ -5,12 +5,16 @@ import type { OkrKind } from "@openokr/method";
 import { Button, SelectInput, TextInput, useTranslations } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
+import { sentenceUnlessDrawn } from "../../lib/drawn-refusal.ts";
 import { focusOnMount } from "../../lib/focus-on-mount.ts";
 import { addObjective } from "./editor-actions.ts";
 import {
   RestrictedWriting,
   type WritingRefusal,
 } from "./restricted-writing.tsx";
+
+/** The fields this form draws, which show their own refusal. */
+const NEW_OBJECTIVE_DRAWN = ["title", "kind", "reason"] as const;
 
 /**
  * Starting an objective from the top of the screen (S-13).
@@ -73,6 +77,8 @@ export function NewObjectiveButton({
   const [kind, setKind] = useState<OkrKind>(defaultKind);
   const [reason, setReason] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // A refused title, kind or reason, shown under it (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
   const needsReason = askReason === "required" && reason.trim() === "";
 
   const save = () => {
@@ -81,6 +87,7 @@ export function NewObjectiveButton({
       return;
     }
     setProblem(null);
+    setRefused({});
     start(async () => {
       const created = await addObjective({
         cycleId,
@@ -90,7 +97,8 @@ export function NewObjectiveButton({
         ...(askReason && reason.trim() !== "" ? { reason: reason.trim() } : {}),
       });
       if (created.error) {
-        setProblem(created.error);
+        setRefused(created.fields ?? {});
+        setProblem(sentenceUnlessDrawn(created, NEW_OBJECTIVE_DRAWN));
         return;
       }
       setTitle("");
@@ -122,6 +130,7 @@ export function NewObjectiveButton({
             hideLabel
             value={kind}
             disabled={pending}
+            error={refused.kind}
             onChange={(event) => setKind(event.target.value as OkrKind)}
             inputClassName="w-auto px-1.5 text-xs"
           >
@@ -139,6 +148,7 @@ export function NewObjectiveButton({
           maxLength={500}
           placeholder={t("goals.editor.objectivePlaceholder")}
           disabled={pending}
+          error={refused.title}
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
@@ -184,6 +194,7 @@ export function NewObjectiveButton({
           maxLength={500}
           placeholder={t("midCycle.whyNowPlaceholder")}
           disabled={pending}
+          error={refused.reason}
           onChange={(event) => setReason(event.target.value)}
           className="w-full min-w-0"
           inputClassName="px-2 text-xs"

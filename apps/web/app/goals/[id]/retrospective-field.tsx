@@ -15,9 +15,15 @@
  * an empty field, which the close action refuses in words, as it did the
  * empty textarea this replaced.
  */
-import { Button, Chip, RichTextEditor, useTranslations } from "@openokr/ui";
+import {
+  Button,
+  Chip,
+  RichTextEditor,
+  useRefusedField,
+  useTranslations,
+} from "@openokr/ui";
 import { Sparkles } from "lucide-react";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { draftRetrospectiveAction } from "./assist-actions.ts";
 
 export function RetrospectiveField({
@@ -40,13 +46,23 @@ export function RetrospectiveField({
   // field makes a new one holding it.
   const [drafts, setDrafts] = useState(0);
 
+  // What the close form's action refused about the retrospective, from the
+  // `ActionForm` around it, shown under the field (guided-inputs §4.2).
+  const refused = useRefusedField("retrospective");
+  const errorId = `${useId()}-error`;
+
   return (
     <>
-      <fieldset className="m-0 flex flex-col gap-1 border-0 p-0">
+      <fieldset
+        className="m-0 flex flex-col gap-1 border-0 p-0"
+        aria-describedby={refused ? errorId : undefined}
+      >
         <legend className="sr-only">
           {t("goals.detail.theRetrospective")}
         </legend>
-        <div className="rounded-control border border-line bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line">
+        <div
+          className={`rounded-control border bg-surface px-2.5 py-1.5 text-sm focus-within:border-brand focus-within:ring-2 focus-within:ring-brand-line ${refused ? "border-bad-dot" : "border-line"}`}
+        >
           <RichTextEditor
             key={drafts}
             autoFocus={drafts > 0}
@@ -64,6 +80,11 @@ export function RetrospectiveField({
             value={JSON.stringify(written)}
           />
         )}
+        {refused ? (
+          <p id={errorId} role="alert" className="text-xs font-medium text-bad">
+            {refused}
+          </p>
+        ) : null}
       </fieldset>
       {offered ? (
         <div

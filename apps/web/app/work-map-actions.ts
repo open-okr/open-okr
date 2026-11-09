@@ -8,10 +8,11 @@
  * alignment canvas and the cycle workspace's gates. That set is what P3-T10's
  * acceptance criterion means by "update live in both the list and the canvas".
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../lib/auth";
 import { formNumber } from "../lib/form-number";
+import { refusedByField } from "../lib/refusal";
 import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
 import { NO_ERROR, type WriteState } from "./cycle/write-state.ts";
@@ -29,12 +30,18 @@ export async function recordFromMap(
   const typed = String(formData.get("value") ?? "").trim();
   if (typed === "") {
     const { t } = await getTranslations();
-    return { error: t("quickCheckIn.typeAValueFirst") };
+    return {
+      error: null,
+      fields: { value: t("quickCheckIn.typeAValueFirst") },
+    };
   }
   const value = formNumber(formData, "value");
   if (!Number.isFinite(value)) {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.valueHasToBeANumber") };
+    return {
+      error: null,
+      fields: { value: t("cycle.actions.valueHasToBeANumber") },
+    };
   }
 
   const { session, workspace } = await requireWorkspace();
@@ -49,10 +56,12 @@ export async function recordFromMap(
       { id: keyResultId, value },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // Under the value when the refusal is about it (guided-inputs §4.2).
+    const refused = refusedByField(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
 
   revalidatePath("/");

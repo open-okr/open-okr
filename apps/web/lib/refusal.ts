@@ -95,18 +95,27 @@ function issueMessage(issue: Issue, t: Translate | undefined): string | null {
  * Given the translator, Zod's own wording for a common refusal (too long,
  * required, not an address) comes from the catalogue in the reader's
  * language; a sentence a schema wrote itself is kept as written.
+ *
+ * `renamed` maps an input path to the form field it was typed in, where the
+ * two differ (plan U1b): a close form's `retrospective` is the action's
+ * `retrospectiveBody`, and a check-in's one value is `values.0.value`.
  */
 export function refusalFields(
   error: unknown,
   t?: Translate,
+  renamed?: Readonly<Record<string, string>>,
 ): {
   readonly message: string;
   readonly fields: Readonly<Record<string, string>>;
 } | null {
+  const named = (path: string) => renamed?.[path] ?? path;
   if (error instanceof OperationError) {
     return {
       message: error.message,
-      fields: error.field === undefined ? {} : { [error.field]: error.message },
+      fields:
+        error.field === undefined
+          ? {}
+          : { [named(error.field)]: error.message },
     };
   }
   if (
@@ -123,7 +132,7 @@ export function refusalFields(
         continue;
       }
       message ??= text;
-      const path = Array.isArray(raw.path) ? raw.path.join(".") : "";
+      const path = Array.isArray(raw.path) ? named(raw.path.join(".")) : "";
       if (path !== "" && fields[path] === undefined) {
         fields[path] = text;
       }
@@ -153,17 +162,18 @@ function formLevelMessage(
  * named field's message for the form to show under that field, and the
  * sentence for the whole form only when none of `drawn`, the fields this form
  * shows, took it. Null when the error was not a refusal, which the caller
- * throws on to the error page.
+ * throws on to the error page. `renamed` is `refusalFields`'s.
  */
 export function refusedState(
   error: unknown,
   t: Translate,
   drawn: readonly string[],
+  renamed?: Readonly<Record<string, string>>,
 ): {
   readonly error?: string;
   readonly fields?: Readonly<Record<string, string>>;
 } | null {
-  const refusal = refusalFields(error, t);
+  const refusal = refusalFields(error, t, renamed);
   if (refusal === null) {
     return null;
   }
@@ -182,16 +192,17 @@ export function refusedState(
  * (guided-inputs §4.2, plan U1b): every field the refusal names, which the
  * kit fields inside show under themselves and the provider says under the
  * form when no field claims one, and the sentence only when it names none.
- * Null when the error was not a refusal.
+ * Null when the error was not a refusal. `renamed` is `refusalFields`'s.
  */
 export function refusedByField(
   error: unknown,
   t: Translate,
+  renamed?: Readonly<Record<string, string>>,
 ): {
   readonly error: string | null;
   readonly fields?: Readonly<Record<string, string>>;
 } | null {
-  const refusal = refusalFields(error, t);
+  const refusal = refusalFields(error, t, renamed);
   if (refusal === null) {
     return null;
   }

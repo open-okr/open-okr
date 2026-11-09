@@ -7,20 +7,35 @@
  * (docs/design/guided-inputs.md §4.7), so what was written bold stays bold.
  * Storage is always editor JSON, never Markdown.
  */
-import {
-  callAction,
-  isBlankText,
-  OperationError,
-  richTextFromPlainText,
-} from "@openokr/core";
+import { callAction, isBlankText, richTextFromPlainText } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { formNumber } from "../../../lib/form-number";
+import {
+  refusalFields,
+  refusedByField,
+  refusedState,
+} from "../../../lib/refusal";
 import { readRichTextField } from "../../../lib/rich-text-form.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
+
+/** The translator `getTranslations` hands an action. */
+type Translate = Awaited<ReturnType<typeof getTranslations>>["t"];
+
+/**
+ * What a refused write says, or null for a failure, which goes on to the
+ * error page. By default each field the refusal names is shown under it
+ * (guided-inputs §4.2): the forms here are `ActionForm`s.
+ */
+type Answer = (error: unknown, t: Translate) => WriteState | null;
+
+const byField: Answer = (error, t) => refusedByField(error, t);
+
+/** The fields `KeyResultUpdate` draws, by the names it gives them. */
+const UPDATE_DRAWN = ["value", "confidence", "status", "note"] as const;
 
 async function run(
   goalId: string,
@@ -29,6 +44,7 @@ async function run(
     workspaceId: string;
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
+  answer: Answer = byField,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -38,10 +54,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = answer(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath(`/goals/${goalId}`);
   revalidatePath("/cycle");
@@ -64,7 +81,10 @@ export async function editGoal(
 
   if (title === "") {
     const { t } = await getTranslations();
-    return { error: t("goals.detail.actions.objectiveNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("goals.detail.actions.objectiveNeedsATitle") },
+    };
   }
 
   return run(id, (context) =>
@@ -90,29 +110,37 @@ export async function closeGoal(
     // person reads it beside the field they left empty.
     const { t } = await getTranslations();
     return {
-      error:
-        retrospective.state === "malformed"
-          ? t("goals.detail.actions.retrospectiveUnreadable")
-          : t("goals.detail.actions.closingNeedsARetrospective"),
+      error: null,
+      fields: {
+        retrospective:
+          retrospective.state === "malformed"
+            ? t("goals.detail.actions.retrospectiveUnreadable")
+            : t("goals.detail.actions.closingNeedsARetrospective"),
+      },
     };
   }
 
-  return run(id, (context) =>
-    callAction(context, "goals.close", {
-      id,
-      successStatus: String(formData.get("successStatus") ?? "achieved") as
-        | "achieved"
-        | "missed",
-      closeDecision: String(formData.get("closeDecision") ?? "keep") as
-        | "achieved"
-        | "keep"
-        | "modify"
-        | "defer"
-        | "abandon",
-      closeReason:
-        String(formData.get("closeReason") ?? "").trim() || undefined,
-      retrospectiveBody: retrospective.document,
-    }),
+  return run(
+    id,
+    (context) =>
+      callAction(context, "goals.close", {
+        id,
+        successStatus: String(formData.get("successStatus") ?? "achieved") as
+          | "achieved"
+          | "missed",
+        closeDecision: String(formData.get("closeDecision") ?? "keep") as
+          | "achieved"
+          | "keep"
+          | "modify"
+          | "defer"
+          | "abandon",
+        closeReason:
+          String(formData.get("closeReason") ?? "").trim() || undefined,
+        retrospectiveBody: retrospective.document,
+      }),
+    // The form calls the action's `retrospectiveBody` the retrospective.
+    (error, t) =>
+      refusedByField(error, t, { retrospectiveBody: "retrospective" }),
   );
 }
 
@@ -170,50 +198,82 @@ export async function updateKeyResult(input: {
 }): Promise<WriteState> {
   const { t } = await getTranslations();
   if (input.value !== undefined && !Number.isFinite(input.value)) {
-    return { error: t("cycle.actions.valueHasToBeANumber") };
+    return {
+      error: null,
+      fields: { value: t("cycle.actions.valueHasToBeANumber") },
+    };
   }
+  // The row draws its own fields, so a refusal names only the ones it shows,
+  // by the names it gives them, and says the rest as its sentence.
+  const answer: Answer = (error, translate) => {
+    const refused = refusedState(error, translate, UPDATE_DRAWN, {
+      "values.0.value": "value",
+      "values.0.confidence": "confidence",
+      narrative: "note",
+    });
+    return refused === null
+      ? null
+      : {
+          error: refused.error ?? null,
+          ...(refused.fields ? { fields: refused.fields } : {}),
+        };
+  };
   if (input.confidence === undefined) {
     if (input.value === undefined) {
       return NO_ERROR;
     }
     const value = input.value;
-    return run(input.goalId, async (context) => {
-      await callAction(context, "goals.recordValue", {
-        id: input.keyResultId,
-        value,
-      });
-    });
+    return run(
+      input.goalId,
+      async (context) => {
+        await callAction(context, "goals.recordValue", {
+          id: input.keyResultId,
+          value,
+        });
+      },
+      answer,
+    );
   }
   if (!input.status) {
-    return { error: t("goals.detail.actions.chooseAStatus") };
+    return {
+      error: null,
+      fields: { status: t("goals.detail.actions.chooseAStatus") },
+    };
   }
   if (isBlankText(input.note ?? "")) {
-    return { error: t("goals.detail.actions.confidenceNeedsALine") };
+    return {
+      error: null,
+      fields: { note: t("goals.detail.actions.confidenceNeedsALine") },
+    };
   }
   const status = input.status;
   const confidence = input.confidence;
-  return run(input.goalId, async (context) => {
-    const { checkIns } = await callAction(context, "goals.checkIns", {
-      goalId: input.goalId,
-      includeDrafts: false,
-    });
-    await callAction(context, "goals.publishDraftedCheckIn", {
-      goalId: input.goalId,
-      status,
-      confidence: checkIns[0]?.confidence ?? confidence,
-      narrative: richTextFromPlainText(input.note ?? ""),
-      values: [
-        {
-          keyResultId: input.keyResultId,
-          confidence,
-          ...(input.value === undefined ? {} : { value: input.value }),
-        },
-      ],
-    });
-    // A check-in moves an obligation and the walker as well as the goal.
-    revalidatePath("/review");
-    revalidatePath("/check-in");
-  });
+  return run(
+    input.goalId,
+    async (context) => {
+      const { checkIns } = await callAction(context, "goals.checkIns", {
+        goalId: input.goalId,
+        includeDrafts: false,
+      });
+      await callAction(context, "goals.publishDraftedCheckIn", {
+        goalId: input.goalId,
+        status,
+        confidence: checkIns[0]?.confidence ?? confidence,
+        narrative: richTextFromPlainText(input.note ?? ""),
+        values: [
+          {
+            keyResultId: input.keyResultId,
+            confidence,
+            ...(input.value === undefined ? {} : { value: input.value }),
+          },
+        ],
+      });
+      // A check-in moves an obligation and the walker as well as the goal.
+      revalidatePath("/review");
+      revalidatePath("/check-in");
+    },
+    answer,
+  );
 }
 
 /**
@@ -263,7 +323,14 @@ export async function applyRewrite(
   keyResultId: string,
   title: string,
 ): Promise<WriteState> {
-  return run(goalId, (context) =>
-    callAction(context, "goals.updateKeyResult", { id: keyResultId, title }),
+  return run(
+    goalId,
+    (context) =>
+      callAction(context, "goals.updateKeyResult", { id: keyResultId, title }),
+    // The coach strip draws no field, so whatever is refused is its sentence.
+    (error, t) => {
+      const refusal = refusalFields(error, t);
+      return refusal === null ? null : { error: refusal.message };
+    },
   );
 }

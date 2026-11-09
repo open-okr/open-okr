@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { NewObjectiveButton } = await import("../app/goals/new-objective.tsx");
+const { addObjective } = await import("../app/goals/editor-actions.ts");
 
 let root: Root;
 let container: HTMLDivElement;
@@ -95,5 +96,30 @@ describe("the new objective field", () => {
     expect(inputs()).toHaveLength(0);
     await render({ initiallyOpen: true });
     expect(inputs().length).toBeGreaterThan(0);
+  });
+
+  // The action keeps its sentence beside the fields, because the OKR table's
+  // add row shows only the sentence (plan U1b). This form draws the reason,
+  // so the refusal stands under it and is not said a second time.
+  test("shows a refused reason under the reason, once", async () => {
+    vi.mocked(addObjective).mockResolvedValue({
+      error: "Say why it starts now.",
+      fields: { reason: "Say why it starts now." },
+      id: null,
+    });
+    await render({ initiallyOpen: true });
+    const [title, reason] = inputs();
+    await keystroke(title as HTMLInputElement, "Make renewals boring");
+    await keystroke(reason as HTMLInputElement, "Because");
+    const save = [...container.querySelectorAll("button")].find(
+      (button) => button.textContent === "Save",
+    );
+    await act(async () => save?.click());
+    const alerts = [...container.querySelectorAll('[role="alert"]')];
+    expect(alerts.map((one) => one.textContent)).toEqual([
+      "Say why it starts now.",
+    ]);
+    expect(reason?.getAttribute("aria-invalid")).toBe("true");
+    expect(title?.getAttribute("aria-invalid")).toBeNull();
   });
 });

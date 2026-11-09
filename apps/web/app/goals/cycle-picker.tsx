@@ -57,6 +57,8 @@ export function CyclePicker({
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // A refused name, cadence or date, shown under it (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
   const [form, setForm] = useState({
     name: "",
     cadence: "quarterly" as CycleCadence,
@@ -71,14 +73,16 @@ export function CyclePicker({
 
   const create = () => {
     setProblem(null);
+    setRefused({});
     start(async () => {
       const result = await addCycle({
         on: form.on,
         cadence: form.cadence,
         ...(form.name.trim() ? { name: form.name.trim() } : {}),
       });
-      if (result.error) {
+      if (result.error || result.fields) {
         setProblem(result.error);
+        setRefused(result.fields ?? {});
         return;
       }
       setCreating(false);
@@ -186,6 +190,7 @@ export function CyclePicker({
                 label={t("goals.editor.cycleName")}
                 maxLength={120}
                 value={form.name}
+                error={refused.name}
                 placeholder={t("goals.editor.cycleNameHint")}
                 onChange={(event) =>
                   setForm((value) => ({ ...value, name: event.target.value }))
@@ -195,6 +200,7 @@ export function CyclePicker({
               <SelectInput
                 label={t("goals.editor.cycleCadence")}
                 value={form.cadence}
+                error={refused.cadence}
                 onChange={(event) =>
                   setForm((value) => ({
                     ...value,
@@ -219,6 +225,7 @@ export function CyclePicker({
               <DateInput
                 label={t("goals.editor.cycleOn")}
                 value={form.on}
+                error={refused.on}
                 onValueChange={(next) =>
                   setForm((value) => ({ ...value, on: next ?? "" }))
                 }

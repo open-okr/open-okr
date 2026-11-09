@@ -218,3 +218,64 @@ describe("what a form wrapped in RefusedFields gets back (plan U1b)", () => {
     expect(refusedByField(new Error("gone"), t)).toBe(null);
   });
 });
+
+describe("a refused path the form names differently (plan U1b)", () => {
+  const renamed = {
+    retrospectiveBody: "retrospective",
+    "values.0.value": "value",
+  };
+
+  it("lands on the field the person typed it in, for a schema and an operation alike", () => {
+    expect(
+      refusedByField(
+        zodError([
+          {
+            code: "custom",
+            path: ["values", 0, "value"],
+            message: "Not a number.",
+          },
+        ]),
+        t,
+        renamed,
+      ),
+    ).toEqual({ error: null, fields: { value: "Not a number." } });
+    expect(
+      refusedByField(
+        new OperationError(
+          "forbidden",
+          "Say what happened.",
+          undefined,
+          "retrospectiveBody",
+        ),
+        t,
+        renamed,
+      ),
+    ).toEqual({ error: null, fields: { retrospective: "Say what happened." } });
+  });
+
+  it("counts as drawn under its form name, so the sentence is not said twice", () => {
+    expect(
+      refusedState(
+        new OperationError(
+          "forbidden",
+          "Not a number.",
+          undefined,
+          "values.0.value",
+        ),
+        t,
+        ["value"],
+        renamed,
+      ),
+    ).toEqual({ fields: { value: "Not a number." } });
+  });
+
+  it("leaves a path with no other name as it is", () => {
+    expect(
+      refusalFields(
+        new OperationError("forbidden", "Too long.", undefined, "title"),
+        t,
+        renamed,
+      ),
+    ).toEqual({ message: "Too long.", fields: { title: "Too long." } });
+  });
+});
