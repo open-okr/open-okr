@@ -122,6 +122,40 @@ describe("exporting a workspace", () => {
     expect(leaked).toEqual([]);
   });
 
+  it("carries a webhook without its secret, turned off (outbound-webhooks.md W14)", async () => {
+    const created = await callAction(
+      {
+        pool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+        ring,
+        checkOutboundUrl: async () => ({ ok: true as const }),
+      },
+      "webhooks.create",
+      {
+        name: "Receiver",
+        url: "https://hooks.example/in",
+        events: ["objective.created"],
+      },
+    );
+    const opened = readArchiveWith((await exported()).bytes);
+    const hooks = opened.records.flatMap((record) =>
+      record.r === "row" && record.t === "webhooks" ? [record.d] : [],
+    );
+    expect(hooks).toHaveLength(1);
+    expect(hooks[0]).toMatchObject({
+      id: created.id,
+      url: "https://hooks.example/in",
+      enabled: false,
+      off_reason: "imported",
+      secret_ciphertext: null,
+      secret_data_key: null,
+      secret_key_id: null,
+      previous_secret_ciphertext: null,
+    });
+    expect(JSON.stringify(opened.records)).not.toContain(created.secret);
+  });
+
   it("counts in the manifest what the archive actually holds", async () => {
     const opened = readArchiveWith((await exported()).bytes);
 

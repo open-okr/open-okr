@@ -79,6 +79,7 @@ function plausibleInput(name: string): Record<string, unknown> {
     "imports.proposeMapping": { entity: "goals", headers: ["title"] },
     "kpis.suggest": { description: "activation rate" },
     "sessions.managementRetro": { sessionId: uuid },
+    "webhooks.deliveries": { id: uuid },
   };
   return byName[name] ?? {};
 }

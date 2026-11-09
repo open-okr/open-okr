@@ -625,6 +625,16 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "copilot.proposalApplied": () => "Applied a copilot proposal",
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
+  "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
+  "webhook.secret_rotated": (p) =>
+    `Rotated the signing secret of the webhook "${asString(p.name)}"`,
+  "webhook.removed": (p) => `Removed the webhook "${asString(p.name)}"`,
+  "webhook.tested": (p) => `Sent a test to the webhook "${asString(p.name)}"`,
+  "webhook.redelivered": (p) =>
+    `Sent ${asString(p.event, "an event")} again to the webhook "${asString(p.name)}"`,
+  "webhook.turned_off": (p) =>
+    `The webhook "${asString(p.name)}" turned off after ${asCount(p.failures)} failed deliveries in a row`,
   "channel.connected": (p) => `Connected ${p.provider}`,
   "channel.disconnected": (p) => `Disconnected ${p.provider}`,
   "channel.identity_linked": (p) => `Linked their ${p.provider} account`,

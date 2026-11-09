@@ -68,6 +68,7 @@ import {
   OUTCOME,
   type Outcome,
 } from "../telemetry/recorder.ts";
+import { enqueueWebhookDeliveries } from "../webhooks/enqueue.ts";
 import { OperationError } from "./errors.ts";
 import { isRecoveryAction } from "./freeze.ts";
 
@@ -716,6 +717,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
             outcome.activity.subjectType,
             outcome.activity.subjectId,
           ));
+        const activityAt = new Date();
         const [insertedActivity] = await tx
           .insert(activities)
           .values({
@@ -728,7 +730,7 @@ export async function runOperation<TResult, TLoaded = undefined>(
             subjectId: outcome.activity.subjectId,
             spaceId: outcome.activity.spaceId ?? null,
             contextId: contextId ?? null,
-            at: new Date(),
+            at: activityAt,
           })
           .returning({ id: activities.id });
 
@@ -781,6 +783,28 @@ export async function runOperation<TResult, TLoaded = undefined>(
               actorMemberId: actor.memberId,
             }),
           );
+        }
+
+        /**
+         * The webhooks waiting for this event (docs/design/outbound-webhooks.md
+         * W8), one outbox row each, here for the reason the feed's event above
+         * is: an enqueue every write has to remember is one the next write
+         * forgets. An unmapped kind costs nothing and a workspace with no hooks
+         * costs one indexed lookup.
+         *
+         * **Not for an import**, for the reason the feed event is not: a run
+         * writes thousands of rows about work that already happened, and a
+         * receiver flooded with a quarter of somebody else's history would
+         * read it as this quarter's news.
+         */
+        if (!spec.suppressNotifications) {
+          await enqueueWebhookDeliveries(tx, {
+            workspaceId: spec.workspaceId,
+            kind: outcome.activity.kind,
+            subjectId: outcome.activity.subjectId,
+            payload: activityPayload,
+            at: activityAt,
+          });
         }
 
         if (outcome.activity.notify && !spec.suppressNotifications) {

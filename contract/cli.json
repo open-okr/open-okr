@@ -1160,6 +1160,195 @@
       "pages": false
     },
     {
+      "name": "webhooks list",
+      "action": "webhooks.list",
+      "method": "GET",
+      "path": "/webhooks/list",
+      "scope": "read",
+      "summary": "Every webhook in this workspace: its address, events, owner and state, and how its last delivery went. Never a secret.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "webhooks create",
+      "action": "webhooks.create",
+      "method": "POST",
+      "path": "/webhooks/create",
+      "scope": "write",
+      "summary": "Adds a webhook: an HTTPS address, the events it receives and, optionally, one space it is limited to. Answers with the signing secret, once.",
+      "flags": [
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "url",
+          "field": "url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "events",
+          "field": "events",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks update",
+      "action": "webhooks.update",
+      "method": "POST",
+      "path": "/webhooks/update",
+      "scope": "write",
+      "summary": "Changes a webhook's name, address, events or space, turns it on or off, or makes the caller its owner when its owner can no longer act.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "url",
+          "field": "url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "events",
+          "field": "events",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "take-ownership",
+          "field": "takeOwnership",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks rotateSecret",
+      "action": "webhooks.rotateSecret",
+      "method": "POST",
+      "path": "/webhooks/rotateSecret",
+      "scope": "write",
+      "summary": "Gives a webhook a new signing secret, answered once. The old one keeps signing beside it for a day, so the receiver can change over without losing a delivery.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks remove",
+      "action": "webhooks.remove",
+      "method": "POST",
+      "path": "/webhooks/remove",
+      "scope": "destructive",
+      "summary": "Removes a webhook. Nothing more is sent to it, including deliveries already waiting.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks test",
+      "action": "webhooks.test",
+      "method": "POST",
+      "path": "/webhooks/test",
+      "scope": "write",
+      "summary": "Sends a signed `ping` event with an empty body to a webhook, so its receiver can be checked. The result is in its deliveries.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks deliveries",
+      "action": "webhooks.deliveries",
+      "method": "GET",
+      "path": "/webhooks/deliveries",
+      "scope": "read",
+      "summary": "A webhook's delivery attempts from the last 30 days, newest first: the event, the subject, the status, how long it took and the attempt. Never a body.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "page",
+          "field": "page",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks redeliver",
+      "action": "webhooks.redeliver",
+      "method": "POST",
+      "path": "/webhooks/redeliver",
+      "scope": "write",
+      "summary": "Sends a failed delivery's event again. The subject is read afresh, as the owner sees it now, and the event keeps its id.",
+      "flags": [
+        {
+          "name": "delivery-id",
+          "field": "deliveryId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "connections toolCalls",
       "action": "connections.toolCalls",
       "method": "GET",

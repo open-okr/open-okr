@@ -48,6 +48,7 @@ import {
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
 import { getInstanceName } from "../../../../lib/instance-name";
+import { checkOutboundUrl } from "../../../../lib/outbound";
 import { getPool } from "../../../../lib/pool";
 import { getKeyRing } from "../../../../lib/secrets";
 
@@ -237,6 +238,9 @@ async function handle(
       // edit waited for the next reload to reach the plugin's table.
       ring: getKeyRing(),
       baseUrl: loadEnv().BETTER_AUTH_URL,
+      // A webhook's address is checked by the outbound guard before it is
+      // stored, here as on the admin screen (outbound-webhooks.md W7).
+      checkOutboundUrl,
     };
     if (validation.validate) {
       const checked = await validateAction(

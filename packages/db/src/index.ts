@@ -594,6 +594,12 @@ export {
   tenants,
 } from "./schema/tenants.ts";
 export {
+  WEBHOOK_DELIVERY_OUTCOMES,
+  WEBHOOK_OFF_REASONS,
+  webhookDeliveries,
+  webhooks,
+} from "./schema/webhooks.ts";
+export {
   type WhatsAppTemplateMapping,
   whatsappTemplateMappings,
 } from "./schema/whatsapp-mappings.ts";

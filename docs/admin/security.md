@@ -139,7 +139,7 @@ is hashed, so the original is never stored.
 
 | Stored | How |
 |---|---|
-| AI provider keys, chat channel credentials, SSO client secrets, the mail password | Sealed under the root key |
+| AI provider keys, chat channel credentials, SSO client secrets, the mail password, webhook signing secrets | Sealed under the root key |
 | The access, refresh and ID tokens an OIDC provider issues when somebody signs in | Sealed under the root key. Opened only on the server, when a sign-in or a token refresh needs them |
 | Session tokens, API tokens, agent access tokens, directory sync tokens, invitation links | Hashed |
 | Passwords | Hashed by the sign-in library |

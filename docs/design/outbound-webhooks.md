@@ -1,6 +1,6 @@
 # Outbound webhooks
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan D5), waiting for "design approved". A new subsystem with two new tables and a new way data leaves the workspace, so it is designed first (CLAUDE.md).
+Status: approved 10 November 2026 for release 0.7.0 (plan D5), with Q1 to Q3 answered as proposed. A new subsystem with two new tables and a new way data leaves the workspace, so it was designed first (CLAUDE.md). §8 records where the build settled what this page left open.
 
 Authority: TECHNICAL-PLAN §14 ("Webhooks. Outbound, signed per hook, validated against the outbound-request rules, delivering the same summary shapes, with delivery logs"), §11's outbound-request row, and §13.2 ("Every resource declares a summary shape").
 
@@ -65,11 +65,13 @@ All of it works with AI off; nothing here uses AI.
 
 ## 4. Questions for Akmal
 
-**Q1. A hook to a private address on a self-hosted instance?** The outbound guard refuses private ranges, so an air-gapped install cannot send to its own intranet. Proposed: **an instance setting `webhooks.allowPrivateTargets`**, off by default, environment `OPENOKR_WEBHOOKS_ALLOW_PRIVATE`, not shown on a managed cloud, where it is always off. The metadata ranges stay blocked either way.
+All three answered as proposed on 10 November 2026.
 
-**Q2. The 0.7.0 event catalogue in §2: enough, too much?** Proposed: **as listed**, the events an integration most asks for (a goal changed, a check-in landed, a KPI moved, a cycle turned). Everything else waits for somebody to ask.
+**Q1. A hook to a private address on a self-hosted instance?** The outbound guard refuses private ranges, so an air-gapped install cannot send to its own intranet. **Decided: an instance setting `webhooks.allowPrivateTargets`**, off by default, environment `OPENOKR_WEBHOOKS_ALLOW_PRIVATE`, never honoured with the cloud flag on. The metadata ranges stay blocked either way.
 
-**Q3. Keep hooks off the agent surface (W12)?** Proposed: **yes, off**. Turning them on would let an agent build its own way out, which CLAUDE.md lists as an autonomy decision.
+**Q2. The 0.7.0 event catalogue in §2: enough, too much?** **Decided: as listed**, the events an integration most asks for (a goal changed, a check-in landed, a KPI moved, a cycle turned). Everything else waits for somebody to ask.
+
+**Q3. Keep hooks off the agent surface (W12)?** **Decided: yes, off**. Turning them on would let an agent build its own way out, which CLAUDE.md lists as an autonomy decision.
 
 ## 5. Acceptance criteria
 
@@ -91,7 +93,9 @@ All of it works with AI off; nothing here uses AI.
 | Unit | `packages/core/test/webhook-events.test.ts` | Every catalogue event maps from a registered activity kind, and every mapped kind has an event |
 | Integration | `packages/core/test/webhooks.test.ts` | Create, the secret shown once, the outbox rows per subscribed hook, withheld, paused owner, turned off after failures, redeliver, purge |
 | Integration | `packages/core/test/webhook-delivery.test.ts` | The handler through a fake `outboundFetch`: 2xx, 5xx, refusal, the headers |
-| Integration | `packages/db/test/rls.test.ts` (existing) | Both tables behind the tenant floor |
+| Integration | `packages/core/test/tenant-fuzz.test.ts` (existing) | Both tables behind the tenant floor. It finds every table with a `workspace_id` itself |
+| Integration | `packages/core/test/rotate.test.ts`, `portability-archive.test.ts` (existing) | `pnpm keys:rotate` re-wraps both secrets; an archive carries a hook without them, off |
+| Unit | `packages/adapters/test/outbound-guard.test.ts` (existing) | The guard's POST, its truncated read, and private targets allowed with the metadata ranges still refused |
 | Contract | `pnpm check:contract` | The eight actions in REST and the command line, none in `contract/mcp.json` |
 | Browser | `e2e/s36s-webhooks.spec.ts` | Create a hook pointed at a local receiver the spec runs (the server started with `OPENOKR_WEBHOOKS_ALLOW_PRIVATE=1`, Q1), see the secret once, send a test, see the delivery |
 
@@ -101,3 +105,20 @@ All of it works with AI off; nothing here uses AI.
 - No per-field filters or payload templates.
 - No hook for an agent or for a single member's own events.
 - No delivery body kept for replay; a redelivery reads the subject again.
+
+## 8. Settled while building
+
+What the sections above left open, and the two places the build reads a decision more narrowly than its sentence. None of them changes a decision.
+
+| # | What | Settled as | Why |
+|---|---|---|---|
+| B1 | W7 "HTTPS only" against Q1's intranet receiver | HTTPS, and plain `http` too only where `webhooks.allowPrivateTargets` is on | An intranet receiver usually has no certificate, and the spec in §6 runs one. With the setting off, which is every cloud, an `http` address is refused under the address field |
+| B2 | W11 "the `workspace` role domain at its admin level" | `full` on the workspace, the level the admin layout and the channel connections ask | No read action takes a role domain, and the screen is gated at `full` already. One level for all eight actions keeps REST and the screen agreeing |
+| B3 | `key_result.checked_in` | One event per key result in the check-in's snapshot, the record of what it reported | A check-in is written against its objective and covers each key result. `check_in.published` now carries the check-in's id so the pipeline can read the snapshot |
+| B4 | The decisions some kinds need | From the activity's own payload, never a read: `initiative.updated` and `task.updated` now carry the new `status` where it moved, and `cycle.updated` the `fields` that moved | A completion and a phase change are told apart without a query, so an unmapped write still pays nothing |
+| B5 | An import | Writes no delivery row, as it fans out no notification | A run writes a quarter of somebody else's history, and a receiver would read it as this quarter's news |
+| B6 | A hook limited to one space | Gets events whose subject is in that space: a company objective and a cycle belong to none, so it never gets those. Decided when the row would be enqueued | No row queues for a hook that would only skip it |
+| B7 | `ping` | Sent to a hook that is off or paused, never to one without a secret | A test is how an administrator checks a receiver before turning the hook back on, and it carries no workspace data |
+| B8 | Redeliver | Only a `failed` or `refused` attempt, only while the hook is on, with the event's own id | A receiver drops a duplicate by `webhook-id`, and a delivered event does not need sending twice |
+| B9 | Activity rows | Every `webhook.*` kind is private to the feed (`PRIVATE_ACTIVITY_KINDS`) | A hook is an administrator's configuration; the audit row is its record, with the host and never the address, which can carry a receiver's own token |
+| B10 | The address check before saving | The host passes the guard's `checkUrl` to the action as `checkOutboundUrl`, as it passes the key ring | `packages/core` may not import `packages/adapters`. A host that passes none cannot save a hook rather than storing an unchecked address |

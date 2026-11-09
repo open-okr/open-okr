@@ -47,6 +47,22 @@ export interface OutboundOptions {
   /** How many bytes may be read before the body is abandoned. */
   readonly maxBytes?: number;
   readonly headers?: Readonly<Record<string, string>>;
+  /** GET unless told otherwise. A webhook is a POST with a JSON body. */
+  readonly method?: "GET" | "POST";
+  readonly body?: string;
+  /**
+   * Read at most `maxBytes` of the answer and keep going, rather than refusing
+   * a longer one. For a caller that discards the body anyway: a webhook
+   * receiver that answers 200 with a large page has still taken the delivery.
+   */
+  readonly truncate?: boolean;
+  /**
+   * Lets the address be inside the network: private ranges, loopback and
+   * `localhost` (docs/design/outbound-webhooks.md Q1). The cloud metadata
+   * addresses and names stay refused whatever this says, because the one
+   * thing no deployment means to send a request to is its own credentials.
+   */
+  readonly allowPrivate?: boolean;
   /**
    * Lets a test drive the guard without a network or a resolver.
    *
@@ -80,12 +96,12 @@ const DEFAULT_MAX_BYTES = 256 * 1024;
  * The literal check is not the real defence, since a name can point anywhere;
  * it is here so an obvious mistake is refused before a resolver is even asked.
  */
-const BLOCKED_HOSTNAMES = new Set([
-  "localhost",
+const METADATA_HOSTNAMES = new Set([
   "metadata",
   "metadata.google.internal",
   "instance-data",
 ]);
+const BLOCKED_HOSTNAMES = new Set(["localhost", ...METADATA_HOSTNAMES]);
 
 /**
  * Whether this address is one a server must never be talked into reaching.
@@ -124,6 +140,75 @@ function isBlockedV4(address: string): boolean {
   if (a === 198 && (b === 18 || b === 19)) return true; // benchmarking
   if (a >= 224) return true; // multicast, and reserved above it
   return false;
+}
+
+/**
+ * Whether this address is a cloud metadata service, which stays refused even
+ * where private addresses are allowed (outbound-webhooks.md Q1).
+ *
+ * IPv4 link-local holds the common one, `169.254.169.254`, and every other
+ * provider's on the same block; Alibaba's sits in carrier-grade NAT space; and
+ * AWS has an IPv6 one inside the unique-local block. IPv6 link-local goes with
+ * them, because nothing on it is a webhook receiver. An address that does not
+ * parse is refused, as it is everywhere here.
+ */
+function isMetadataAddress(address: string): boolean {
+  const version = isIP(address);
+  if (version === 4) {
+    return isMetadataV4(address);
+  }
+  if (version !== 6) {
+    return true;
+  }
+  const h = expandV6(address);
+  if (!h) return true;
+  const [h0, h1, h2, h3, h4, h5, h6, h7] = h as [
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+    number,
+  ];
+  const v4 = (high: number, low: number): boolean =>
+    isMetadataV4(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`);
+  const firstFiveZero =
+    h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0;
+  if (firstFiveZero && (h5 === 0xffff || h5 === 0)) return v4(h6, h7);
+  if (
+    h0 === 0x64 &&
+    h1 === 0xff9b &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0
+  )
+    return v4(h6, h7); // NAT64
+  if (h0 === 0x2002) return v4(h1, h2); // 6to4
+  if ((h0 & 0xffc0) === 0xfe80) return true; // link-local
+  // AWS's IPv6 instance metadata service, fd00:ec2::254.
+  return (
+    h0 === 0xfd00 &&
+    h1 === 0x0ec2 &&
+    h2 === 0 &&
+    h3 === 0 &&
+    h4 === 0 &&
+    h5 === 0 &&
+    h6 === 0 &&
+    h7 === 0x254
+  );
+}
+
+function isMetadataV4(address: string): boolean {
+  const parts = address.split(".").map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return true;
+  }
+  const [a, b, c, d] = parts as [number, number, number, number];
+  if (a === 169 && b === 254) return true; // link-local, every big cloud's
+  return a === 100 && b === 100 && c === 100 && d === 200; // Alibaba Cloud
 }
 
 /** Expands an IPv6 literal to its eight hextets, or null when it is not one. */
@@ -237,7 +322,7 @@ export interface CheckedUrl {
  */
 export async function checkUrl(
   candidate: string,
-  options: Pick<OutboundOptions, "resolve"> = {},
+  options: Pick<OutboundOptions, "resolve" | "allowPrivate"> = {},
 ): Promise<
   | { readonly ok: true; readonly checked: CheckedUrl }
   | {
@@ -262,7 +347,9 @@ export async function checkUrl(
   }
 
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (BLOCKED_HOSTNAMES.has(host)) {
+  const allowPrivate = options.allowPrivate === true;
+  const refused = allowPrivate ? isMetadataAddress : isBlockedAddress;
+  if ((allowPrivate ? METADATA_HOSTNAMES : BLOCKED_HOSTNAMES).has(host)) {
     return {
       ok: false,
       refusal: "host_not_allowed",
@@ -273,7 +360,7 @@ export async function checkUrl(
   // A literal address skips the resolver entirely: there is nothing to resolve
   // and asking would only give a name server a say it should not have.
   if (isIP(host) !== 0) {
-    if (isBlockedAddress(host)) {
+    if (refused(host)) {
       return {
         ok: false,
         refusal: "address_not_allowed",
@@ -296,7 +383,7 @@ export async function checkUrl(
   // **Every address, not the first one.** A name with one public and one
   // private answer is the whole trick, and a check that stops at the first
   // allowed address lets the connection pick the other one.
-  const blocked = addresses.find((address) => isBlockedAddress(address));
+  const blocked = addresses.find((address) => refused(address));
   if (blocked) {
     return {
       ok: false,
@@ -332,6 +419,8 @@ export async function outboundFetch(
 
   try {
     const response = await doFetch(checked.checked.url, {
+      method: options.method ?? "GET",
+      ...(options.body === undefined ? {} : { body: options.body }),
       // **No redirect is followed, ever.** One hop is enough to reach anything
       // the checks above refused, and re-checking each hop would still lose to
       // a name that answers differently the second time.
@@ -352,7 +441,11 @@ export async function outboundFetch(
     }
 
     const declared = response.headers.get("content-length");
-    if (declared && Number.parseInt(declared, 10) > maxBytes) {
+    if (
+      !options.truncate &&
+      declared &&
+      Number.parseInt(declared, 10) > maxBytes
+    ) {
       return {
         ok: false,
         refusal: "too_large",
@@ -362,7 +455,11 @@ export async function outboundFetch(
 
     // Read with a cap rather than trusting the declared length, which a hostile
     // server is free to understate or omit.
-    const body = await readCapped(response, maxBytes);
+    const body = await readCapped(
+      response,
+      maxBytes,
+      options.truncate === true,
+    );
     if (body === null) {
       return {
         ok: false,
@@ -395,15 +492,24 @@ export async function outboundFetch(
   }
 }
 
-/** The body, or null when it runs past the cap. */
+/**
+ * The body, or null when it runs past the cap. With `truncate`, the first
+ * `maxBytes` of it instead, and the rest is never read.
+ */
 async function readCapped(
   response: Response,
   maxBytes: number,
+  truncate = false,
 ): Promise<string | null> {
   const reader = response.body?.getReader();
   if (!reader) {
     const text = await response.text();
-    return Buffer.byteLength(text) > maxBytes ? null : text;
+    if (Buffer.byteLength(text) <= maxBytes) {
+      return text;
+    }
+    return truncate
+      ? Buffer.from(text).subarray(0, maxBytes).toString("utf8")
+      : null;
   }
 
   const chunks: Uint8Array[] = [];
@@ -418,7 +524,11 @@ async function readCapped(
       // Cancelled rather than read to the end: the point of a cap is not to
       // read a gigabyte and then decide against it.
       await reader.cancel().catch(() => undefined);
-      return null;
+      if (!truncate) {
+        return null;
+      }
+      chunks.push(value.subarray(0, value.length - (total - maxBytes)));
+      break;
     }
     chunks.push(value);
   }

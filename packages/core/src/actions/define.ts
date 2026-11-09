@@ -210,6 +210,22 @@ export interface ActionCallContext {
    * every self-hosted instance, and each billing action refuses in words.
    */
   readonly billing?: BillingGateway;
+  /**
+   * Checks an address before it is stored as somewhere this server will
+   * send to: a webhook's URL (docs/design/outbound-webhooks.md W7).
+   *
+   * Structural, like `storage` and `billing` above and for the same reason:
+   * the outbound guard lives in `packages/adapters`, which this package may
+   * not import, so the host passes its `checkUrl`. Absent, a webhook cannot
+   * be saved, and the action says so rather than storing an address nobody
+   * checked.
+   */
+  readonly checkOutboundUrl?: (
+    url: string,
+    options: { readonly allowPrivate: boolean },
+  ) => Promise<
+    { readonly ok: true } | { readonly ok: false; readonly detail: string }
+  >;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {

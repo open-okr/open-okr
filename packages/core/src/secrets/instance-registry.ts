@@ -446,6 +446,19 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "With the cloud flag on, whether a workspace administrator's AI base URL may name an address inside the network. Off is right for a public cloud. A group running its own model turns it on, trusting every workspace's administrators.",
   },
+  // Outbound webhooks (docs/design/outbound-webhooks.md Q1, approved 10
+  // November 2026). Off, because the guard's whole job is to refuse a private
+  // address, and a self-hosted group posting to its own intranet says so on
+  // purpose. Never honoured with the cloud flag on, where an administrator is
+  // not the operator. The metadata ranges stay refused either way.
+  {
+    key: "webhooks.allowPrivateTargets",
+    kind: "boolean",
+    fallback: false,
+    environment: "OPENOKR_WEBHOOKS_ALLOW_PRIVATE",
+    summary:
+      "Whether a webhook may post to an address inside the network, and over plain http there. Off. Ignored with the cloud flag on. Cloud metadata addresses are refused either way.",
+  },
   {
     key: "ai.deployment.tierModels",
     kind: "string",

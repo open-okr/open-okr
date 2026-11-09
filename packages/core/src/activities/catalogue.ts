@@ -327,7 +327,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     inheritedFrom: z.string().optional(),
   }),
   "cycle.resolved": z.object({ name: z.string() }),
-  "cycle.updated": z.object({ name: z.string() }),
+  // The fields that moved, so a webhook can tell a phase change from a rename
+  // (outbound-webhooks.md §2). Absent on rows written before 0.7.0.
+  "cycle.updated": z.object({
+    name: z.string(),
+    fields: z.array(z.string()).optional(),
+  }),
   // A cycle moved to closing, by its end date passing or by its facilitator,
   // and a facilitator taking that back (okr-core-domain.md §10, plan 0.7.0 O2).
   "cycle.closing_started": z.object({
@@ -446,7 +451,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // "deleted Rebuild the activation flow" has to keep reading as a sentence
   // after the initiative is gone.
   "initiative.created": z.object({ title: z.string(), spaceId: z.uuid() }),
-  "initiative.updated": z.object({ fields: z.array(z.string()) }),
+  // The new status where it moved, so `initiative.completed` needs no read
+  // (outbound-webhooks.md §2).
+  "initiative.updated": z.object({
+    fields: z.array(z.string()),
+    status: z.string().optional(),
+  }),
   "initiative.deleted": z.object({ title: z.string() }),
   "initiative.restored": z.object({ title: z.string() }),
   // The key result, because the feed entry a reader wants is "this work is now
@@ -494,7 +504,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // Tasks (P5-T11). The title travels on create and delete for the reason a
   // goal's does: a feed line has to read as a sentence after the row is gone.
   "task.created": z.object({ title: z.string(), assigned: z.number().int() }),
-  "task.updated": z.object({ fields: z.array(z.string()) }),
+  // The new status where it moved, as `task.moved` carries it, so a task
+  // marked done from its own form completes it for a webhook too.
+  "task.updated": z.object({
+    fields: z.array(z.string()),
+    status: z.string().optional(),
+  }),
   "task.moved": z.object({ status: z.string() }),
   "task.assigned": z.object({ memberId: z.uuid() }),
   "task.unassigned": z.object({ memberId: z.uuid() }),
@@ -556,6 +571,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "check_in.published": z.object({
     status: z.enum(["on_track", "caution", "off_track"]),
     valuesWritten: z.number().int(),
+    // Which check-in, so a webhook can report each key result it covered
+    // (outbound-webhooks.md §2). Absent on rows written before 0.7.0.
+    checkInId: z.uuid().optional(),
   }),
   "check_in.edited": z.object({}),
   "check_in.deleted": z.object({ rolledBack: z.boolean() }),
@@ -789,6 +807,22 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "copilot.proposalApplied": z.object({ action: z.string() }),
   "copilot.proposalDismissed": z.object({ action: z.string() }),
   "copilot.proposalUndone": z.object({ action: z.string() }),
+  // Outbound webhooks (outbound-webhooks.md, plan 0.7.0 D5). The name, never
+  // the address, which can carry a receiver's own token, and never a secret.
+  "webhook.created": z.object({ name: z.string() }),
+  "webhook.updated": z.object({
+    name: z.string(),
+    fields: z.array(z.string()),
+  }),
+  "webhook.secret_rotated": z.object({ name: z.string() }),
+  "webhook.removed": z.object({ name: z.string() }),
+  "webhook.tested": z.object({ name: z.string() }),
+  "webhook.redelivered": z.object({ name: z.string(), event: z.string() }),
+  // Turned off by the system after a run of failures (W9).
+  "webhook.turned_off": z.object({
+    name: z.string(),
+    failures: z.number().int(),
+  }),
 } as const satisfies Record<string, z.ZodType>;
 
 export type ActivityKind = keyof typeof ACTIVITY_PAYLOAD_SCHEMAS;
@@ -832,6 +866,16 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "connection.ended_by_admin",
   // Housekeeping with no reader on the feed (plan 0.7.0 A2).
   "connection.tool_calls_swept",
+  // A webhook is an administrator's configuration of where workspace events
+  // go (outbound-webhooks.md W11). The audit row is the record, and the feed
+  // is where the workspace reads about its OKRs.
+  "webhook.created",
+  "webhook.updated",
+  "webhook.secret_rotated",
+  "webhook.removed",
+  "webhook.tested",
+  "webhook.redelivered",
+  "webhook.turned_off",
 ]);
 
 /**

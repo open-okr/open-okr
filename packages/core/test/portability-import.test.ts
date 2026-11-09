@@ -620,6 +620,47 @@ describe("what a move keeps", () => {
     expect(rows[0]?.tiers).toEqual(["balanced", "fast"]);
   });
 
+  it("moves a webhook with its events, off and without a secret (outbound-webhooks.md W14)", async () => {
+    await callAction(
+      {
+        pool,
+        workspaceId: sourceWorkspaceId,
+        actor: { kind: "human", userId: OWNER_A },
+        ring: parseKeyRing({ current: newRootKey() }),
+        checkOutboundUrl: async () => ({ ok: true as const }),
+      },
+      "webhooks.create",
+      {
+        name: "Receiver",
+        url: "https://hooks.example/in",
+        events: ["objective.created", "kpi.recorded"],
+      },
+    );
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.webhooks).toBeUndefined();
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      events: string[];
+      enabled: boolean;
+      off_reason: string | null;
+      secret_ciphertext: string | null;
+    }>(
+      "select events, enabled, off_reason, secret_ciphertext from webhooks where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(rows).toEqual([
+      {
+        events: ["objective.created", "kpi.recorded"],
+        enabled: false,
+        off_reason: "imported",
+        secret_ciphertext: null,
+      },
+    ]);
+  });
+
   it("moves a row in every exported table with an array column", async () => {
     // The two above are the tests that move one. A third such table fails
     // here, so whoever adds it adds a row to move as well.
@@ -633,7 +674,7 @@ describe("what a move keeps", () => {
       rows
         .map((row) => row.table_name)
         .filter((table) => EXPORTED_TABLES.includes(table)),
-    ).toEqual(["ai_models", "annual_frame_revisions"]);
+    ).toEqual(["ai_models", "annual_frame_revisions", "webhooks"]);
   });
 
   it("writes an array literal Postgres reads back as it was", async () => {

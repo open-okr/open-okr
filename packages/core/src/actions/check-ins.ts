@@ -287,6 +287,7 @@ export const publishDraftedCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId: draft.checkInId,
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
@@ -378,6 +379,7 @@ export const publishCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId: input.id,
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
@@ -1273,6 +1275,7 @@ export const importCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId,
           },
         },
         audit: {

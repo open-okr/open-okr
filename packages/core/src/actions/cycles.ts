@@ -863,7 +863,7 @@ export const updateCycle = defineWriteAction({
           kind: "cycle.updated",
           subjectType: "cycle",
           subjectId: updated.id,
-          payload: { name: updated.name },
+          payload: { name: updated.name, fields: Object.keys(patch) },
         },
         audit: {
           action: "cycles.update",

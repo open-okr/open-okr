@@ -106,6 +106,16 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   not null on all seven tables and refuses to run while a row is still empty,
   naming the table. `./openokr status` lists 0034 until it is complete.
 
+- **Outbound webhooks.** Migration 0164 adds `webhooks` and
+  `webhook_deliveries`. Nothing is sent until an administrator adds a hook,
+  so an upgrade changes nothing a receiver sees. A hook's signing secret is
+  sealed under the root key like a channel credential, and
+  `./openokr rotate-key` re-wraps it. A hook may not post inside the network
+  unless `OPENOKR_WEBHOOKS_ALLOW_PRIVATE=true` is set on a self-hosted
+  instance; it is ignored with the cloud flag on, and the cloud metadata
+  addresses are refused either way. A workspace archive taken from 0.7.0
+  carries each hook off and without its secret.
+
 - **Ended cycles move to Closing.** Within the hour after the upgrade, every
   cycle whose last day has passed and that nobody has closed moves to
   Closing, with an audit row each; the cycle's sponsor or facilitator may

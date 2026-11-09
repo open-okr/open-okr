@@ -143,6 +143,31 @@ export async function exportWorkspace(
       }
     }
 
+    // **A webhook travels without its secrets and off** (outbound-webhooks.md
+    // W14). A secret is sealed under this instance's root key and never
+    // leaves it, and an archive loaded elsewhere must not start posting to
+    // somebody's address by itself. The receiving administrator rotates the
+    // secret and turns the hook on.
+    for (const record of rows) {
+      if (record.r !== "row" || record.t !== "webhooks") {
+        continue;
+      }
+      Object.assign(record.d, {
+        enabled: false,
+        off_reason: "imported",
+        turned_off_at: null,
+        consecutive_failures: 0,
+        secret_ciphertext: null,
+        secret_data_key: null,
+        secret_key_id: null,
+        previous_secret_ciphertext: null,
+        previous_secret_data_key: null,
+        previous_secret_key_id: null,
+        previous_secret_expires_at: null,
+        secret_rotated_at: null,
+      });
+    }
+
     const blobRows = rows.filter(
       (record) => record.r === "row" && record.t === "blobs",
     );

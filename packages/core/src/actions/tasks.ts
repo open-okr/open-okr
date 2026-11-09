@@ -1018,7 +1018,10 @@ export const updateTask = defineWriteAction({
           kind: "task.updated",
           subjectType: "task",
           subjectId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: {
+            fields: Object.keys(input).filter((key) => key !== "id"),
+            ...(input.status === undefined ? {} : { status: input.status }),
+          },
         },
         audit: {
           action: "tasks.update",

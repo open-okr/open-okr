@@ -717,7 +717,10 @@ export const updateInitiative = defineWriteAction({
           kind: "initiative.updated",
           subjectType: "initiative",
           subjectId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: {
+            fields: Object.keys(input).filter((key) => key !== "id"),
+            ...(input.status === undefined ? {} : { status: input.status }),
+          },
         },
         audit: {
           action: "initiatives.update",

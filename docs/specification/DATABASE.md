@@ -655,6 +655,16 @@ A nudge row is the delivery queue as well as the record. `sent_at is null` with 
 ### nudge_rules
 `rule_key`, `enabled bool`, `channel_override?`, `escalation_ladder jsonb?`, `quiet_mode_exempt bool`.
 
+### webhooks *(migration 0164, plan 0.7.0 D5)*
+`name`, `url`, `events text[]` (public event names from `packages/core/src/webhooks/events.ts`, never an activity kind), `space_id?` to spaces (the one space it is limited to), `owner_member_id` to workspace_members (whose access each delivery reads with; a suspended or removed owner pauses it), `created_by_member_id` to workspace_members (who is emailed when it turns itself off), `enabled bool`, `off_reason?` (`manual` / `failures` / `imported`), `secret_ciphertext?`, `secret_data_key?`, `secret_key_id?`, `previous_secret_ciphertext?`, `previous_secret_data_key?`, `previous_secret_key_id?`, `previous_secret_expires_at?`, `secret_rotated_at?`, `consecutive_failures int`, `turned_off_at?`.
+
+An outbound webhook, an administrator's. Every write that records a mapped activity inserts one `webhooks.deliver` outbox row per hook that is on, whose owner is active and whose events include the event, in the write's own transaction; `webhooks_live_idx`, partial on `deleted_at is null and enabled`, is the one lookup a mapped write pays. The signing secret is envelope-encrypted in the three columns every sealed credential uses, so `pnpm keys:rotate` re-wraps it, and the previous one signs beside it for a day after a rotation. Four checks: each sealed secret is whole, a hook that is on has a secret, and `off_reason` is set exactly when it is off. A workspace archive carries the row without either secret and off, `off_reason = 'imported'`. Design: `docs/design/outbound-webhooks.md`.
+
+### webhook_deliveries *(migration 0164, plan 0.7.0 D5, hard delete)*
+`webhook_id` to webhooks, `event`, `event_id` (the `webhook-id` header, the same on every attempt of one event), `subject_type?`, `subject_id?`, `check_in_id?` (the check-in a `key_result.checked_in` came from), `occurred_at`, `attempt int`, `outcome` (`delivered` / `failed` / `refused` / `withheld`), `status_code?`, `duration_ms?`, `reason?` (in the product's own words, at most 300 characters), `attempted_at`.
+
+One row per attempt, and never a request or response body or a response header: the body is workspace content and the answer is whatever the receiver says. A redelivery reads the subject again. Indexed on `(workspace_id, webhook_id, attempted_at desc)` for a hook's log and `(workspace_id, attempted_at)` for the daily purge, which removes rows older than 30 days. No `deleted_at`, as the migration's marker says.
+
 ## 15. AI, agents and external agent access (domain L)
 
 | Table | Key columns |

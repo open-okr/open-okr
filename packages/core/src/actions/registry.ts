@@ -533,6 +533,16 @@ import {
   updateTask,
 } from "./tasks.ts";
 import { finishOwnTour, readOwnTour } from "./tour.ts";
+import {
+  createWebhook,
+  listWebhookDeliveries,
+  listWebhooks,
+  redeliverWebhook,
+  removeWebhook,
+  rotateWebhookSecret,
+  testWebhook,
+  updateWebhook,
+} from "./webhooks.ts";
 import { decomposeKeyResult, summariseThread } from "./work-assists.ts";
 import {
   changeWorkspacePlan,
@@ -609,6 +619,15 @@ export const ACTION_MAP = {
   "connections.revokeAsAdmin": revokeConnectionAsAdmin,
   // Plan 0.7.0 A2: the tool call record's retention, run daily.
   "connections.sweepToolCalls": sweepToolCalls,
+  // Plan 0.7.0 D5: outbound webhooks, an administrator's, never an agent's.
+  "webhooks.list": listWebhooks,
+  "webhooks.create": createWebhook,
+  "webhooks.update": updateWebhook,
+  "webhooks.rotateSecret": rotateWebhookSecret,
+  "webhooks.remove": removeWebhook,
+  "webhooks.test": testWebhook,
+  "webhooks.deliveries": listWebhookDeliveries,
+  "webhooks.redeliver": redeliverWebhook,
   // Plan 0.7.0 A2: a member's own agent calls, and the admin totals.
   "connections.toolCalls": listOwnToolCalls,
   "ai.readToolCallSummary": readToolCallSummary,
