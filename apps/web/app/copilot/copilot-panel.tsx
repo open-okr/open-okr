@@ -409,7 +409,7 @@ export function CopilotPanel({
       id: "copilot",
       keys: "⌘J",
       description: t("copilot.copilotPanel.askTheCopilot"),
-      group: "Global",
+      group: "global",
     },
     () => setOpen((was) => !was),
     { key: "j", mod: true, allowInInputs: true },

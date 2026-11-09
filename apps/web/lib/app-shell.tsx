@@ -20,7 +20,6 @@ import {
   Sidebar,
   type SidebarGroup,
   Topbar,
-  TopbarSearch,
   UnsavedChangesProvider,
 } from "@openokr/ui";
 import { Ellipsis } from "lucide-react";
@@ -60,6 +59,7 @@ import { SidebarToggle } from "./sidebar-toggle.tsx";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
+import { TopbarSearchField } from "./topbar-search.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
 import {
@@ -387,7 +387,7 @@ export async function AppShellLayout({
           topbar={
             <Topbar
               breadcrumb={workspace.name}
-              search={<TopbarSearch />}
+              search={<TopbarSearchField />}
               // UIUX-PLAN §3's `+ New`: a menu of what this member may
               // create, the same on every screen (lib/new-menu.tsx). Somebody
               // who cannot write is not offered it.

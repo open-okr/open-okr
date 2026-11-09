@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { ThemeProvider, TranslationsProvider } from "@openokr/ui";
+import {
+  KeyboardRegistryProvider,
+  ShortcutOverlay,
+  ThemeProvider,
+  TranslationsProvider,
+} from "@openokr/ui";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -226,31 +231,45 @@ describe("the palette, driven by the keyboard alone", () => {
     await act(async () => {
       root.render(
         <TranslationsProvider locale="en">
-          <ThemeProvider>
-            <CommandPalette
-              canCreateObjective
-              semantic={semantic}
-              destinations={[
-                {
-                  id: "review",
-                  label: "Review",
-                  href: "/review",
-                  area: "page",
-                },
-                {
-                  id: "admin-general",
-                  label: "General",
-                  href: "/admin/general",
-                  area: "admin",
-                },
-              ]}
-            />
-          </ThemeProvider>
+          <KeyboardRegistryProvider>
+            <ThemeProvider>
+              <CommandPalette
+                canCreateObjective
+                semantic={semantic}
+                destinations={[
+                  {
+                    id: "review",
+                    label: "Review",
+                    href: "/review",
+                    area: "page",
+                  },
+                  {
+                    id: "admin-general",
+                    label: "General",
+                    href: "/admin/general",
+                    area: "admin",
+                  },
+                ]}
+              />
+              <ShortcutOverlay />
+            </ThemeProvider>
+          </KeyboardRegistryProvider>
         </TranslationsProvider>,
       );
     });
     await press(window, { key: "k", ctrlKey: true });
   };
+
+  test("⌘K is listed in the `?` overlay, beside every other key (plan 0.7.0, U2)", async () => {
+    // Closed again, so the `?` reaches the page rather than the palette's box.
+    await press(window, { key: "k", ctrlKey: true });
+    await press(window, { key: "?", shiftKey: true });
+    const overlay = [
+      ...host.ownerDocument.querySelectorAll('[role="dialog"]'),
+    ].find((one) => one.textContent?.includes("Keyboard shortcuts"));
+    // The words only: the overlay draws ⌘ as an icon.
+    expect(overlay?.textContent).toContain("Open the command palette");
+  });
 
   const unmount = async () => {
     await act(async () => root.unmount());

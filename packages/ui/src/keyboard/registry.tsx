@@ -8,14 +8,14 @@
  * never hand-maintained, so a screen cannot register a key without it
  * also being documented.
  *
- * Deliberately not wired to any specific key here: `⌘K` (the palette,
- * S-32), `⌘J` (Ask AI, S-39), `c` (create), and the list/detail keys
- * (`j`/`k`/`x`/`e`/`⌘⏎`/`[`/`]`) all name a screen or a feature that does
- * not exist yet. Wiring the key without a real destination would be a
- * dead button — the same thing §4's "AI degradation" rule refuses for a
- * missing provider, generalised to a missing feature. Only `?` (this
- * overlay itself) is registered by the shell, because it is the one
- * shortcut this task actually builds a destination for.
+ * No key is wired here. Each is registered by what it acts on, so a key is
+ * live, and listed, only where its destination is on screen (plan 0.7.0,
+ * U2): `?` by the overlay, `⌘K` by the palette, `⌘J` by the copilot, `/` by
+ * the topbar's search, `c` by `+ New`, `j`/`k`/`x`/`e` by a `KeyboardList`,
+ * `[` and `]` by a detail screen with neighbours, and `⌘⏎` by a settings
+ * screen whose forms bind it. A key with no real destination would be a dead
+ * button, the same thing §4's "AI degradation" rule refuses for a missing
+ * provider.
  */
 import {
   createContext,
@@ -26,15 +26,23 @@ import {
   useState,
 } from "react";
 
+/**
+ * The overlay's sections, in the order it shows them: §4's own grouping,
+ * "Global", "Lists" and "Detail", and "Forms" for `⌘⏎`, which a settings
+ * screen binds with no list in sight. An id rather than words, so the
+ * overlay can name each in the reader's language.
+ */
+export const SHORTCUT_GROUPS = ["global", "lists", "detail", "forms"] as const;
+
+export type ShortcutGroup = (typeof SHORTCUT_GROUPS)[number];
+
 export interface Shortcut {
   readonly id: string;
   /** Display form, e.g. "⌘K", "j", "?". Not parsed — matching happens in
    * `use-keyboard-shortcut.ts` against a normalised key combo instead. */
   readonly keys: string;
   readonly description: string;
-  /** Groups the overlay's sections (§3's own grouping: "Global", "Lists",
-   * "Detail"). */
-  readonly group: string;
+  readonly group: ShortcutGroup;
 }
 
 interface KeyboardRegistryValue {

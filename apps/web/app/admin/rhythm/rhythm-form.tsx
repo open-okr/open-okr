@@ -786,7 +786,7 @@ export function RhythmForm({
       id: "form.save",
       keys: "⌘⏎",
       description: t("admin.rhythm.rhythmForm.saveTheCardShortcut"),
-      group: "Detail",
+      group: "forms",
     });
     return () => unregister("form.save");
   }, [register, unregister, t]);
