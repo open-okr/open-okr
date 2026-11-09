@@ -97,6 +97,7 @@ const OWN_CHECK = new Set([
   "goals.stop",
   "goals.unlinkKpi",
   "goals.update",
+  "goals.updateConfidence",
   "goals.updateKeyResult",
   "goals.vote",
   "initiatives.update",
