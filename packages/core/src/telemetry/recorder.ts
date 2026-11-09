@@ -216,6 +216,14 @@ export const METRIC = {
    */
   agentToolCallRecordFailures: "openokr_agent_tool_call_record_failures_total",
 
+  /**
+   * Password attempts refused by a sign-in hold, by which counter held them,
+   * `pair` or `account` (account-lockout.md D13, plan 0.7.0 P10). Pair holds
+   * are counted here rather than audited, because they are mostly somebody's
+   * own typing and one row each would be unbounded.
+   */
+  signInHeldTotal: "openokr_sign_in_held_total",
+
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",
   /**

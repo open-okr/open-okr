@@ -64,6 +64,46 @@ export async function resetPasswordMail(
   return { subject: t("reset.subject", { instance }), html, text };
 }
 
+/**
+ * Somebody is trying this account's password (docs/design/account-lockout.md
+ * Q2, approved by Akmal on 9 November 2026). Sent once, when a run of wrong
+ * passwords from unfamiliar networks begins an account hold. The button goes
+ * to the page that asks for a reset link, because a link in this mail that
+ * itself reset the password would be a credential sent to somebody who did
+ * not ask for one.
+ */
+export async function signInHeldMail(
+  to: string,
+  resetUrl: string,
+): Promise<AccountMail> {
+  const { instance, locale, t } = await mailContext();
+  const host = new URL(resetUrl).host;
+  const { html, text } = renderEmail(
+    {
+      lang: locale,
+      brand: { name: instance },
+      preheader: t("held.preheader"),
+      footer: [t("held.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("held.eyebrow") },
+      { kind: "heading", text: t("held.heading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("held.bodyBefore"),
+          { bold: to },
+          t("held.bodyAfter", { instance }),
+        ],
+      },
+      { kind: "action", label: t("held.action"), href: resetUrl },
+      { kind: "notice", parts: [t("held.notice")] },
+    ],
+  );
+  return { subject: t("held.subject", { instance }), html, text };
+}
+
 export async function verifyEmailMail(
   to: string,
   url: string,

@@ -1,4 +1,4 @@
-import { recordInstanceAuditEvent } from "@openokr/core";
+import { callerAddress, recordInstanceAuditEvent } from "@openokr/core";
 import { getCurrentAuth, getPool } from "../../../../lib/auth";
 
 /**
@@ -32,18 +32,24 @@ import { getCurrentAuth, getPool } from "../../../../lib/auth";
  * where, and from where, without putting a permanent, hash-chained,
  * undeletable copy of someone's email address into place over an address
  * that might not even be theirs.
+ *
+ * **Only the limiter's own 429** (docs/design/account-lockout.md D13). A
+ * sign-in hold answers 429 as well, from a hook, and records one row when an
+ * account hold begins rather than one per refusal. The limiter's answer is
+ * the only one carrying `X-Retry-After`. The address is the one the limiter
+ * counted, through `callerAddress()`: the first entry of a forwarded chain is
+ * whatever the caller chose to send.
  */
 async function withLockoutAudit(request: Request): Promise<Response> {
   const response = await (await getCurrentAuth()).handler(request);
 
-  if (response.status === 429) {
-    const address =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      "unknown";
+  if (response.status === 429 && response.headers.has("x-retry-after")) {
     await recordInstanceAuditEvent(getPool(), {
       action: "auth.rate_limited",
-      payload: { path: new URL(request.url).pathname, address },
+      payload: {
+        path: new URL(request.url).pathname,
+        address: callerAddress(request.headers),
+      },
     }).catch(() => {
       // A failed audit write must never turn an already-issued 429 into a
       // 500: the caller has already been refused, and this record is

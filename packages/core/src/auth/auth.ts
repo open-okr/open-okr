@@ -24,6 +24,7 @@ import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
+import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
 import {
   cookieHeaderFrom,
   inviteTokenFromCookies,
@@ -33,6 +34,7 @@ import { domainIsTrusted } from "../invitations/trusted-domain.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
 import { readSetupState } from "../setup/state.ts";
+import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import { browserTimezoneFromCookies } from "../workspaces/browser-timezone.ts";
 import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
@@ -41,7 +43,8 @@ import {
   processOnlyKeyRing,
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
-import { CALLER_ADDRESS_HEADERS } from "./caller-address.ts";
+import { CALLER_ADDRESS_HEADERS, callerAddress } from "./caller-address.ts";
+import { clearSignInAttempts, recordPasswordAttempt } from "./lockout.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
@@ -63,15 +66,77 @@ import { ssoLinkAllowed } from "./sso-linking.ts";
  *
  * Sign-up is on the list because an account created locally on an enforced
  * domain would be exactly the credential enforcement exists to prevent, and
- * the two reset paths are because a reset link is a way to set a password on
- * an account that had none.
+ * the reset path is because a reset link is a way to set a password on an
+ * account that had none. Better Auth 1.7 has no `/forget-password` any more,
+ * so the list no longer names it (account-lockout.md D11).
  */
 const CREDENTIAL_PATHS = new Set([
   "/sign-in/email",
   "/sign-up/email",
-  "/forget-password",
   "/request-password-reset",
 ]);
+
+/**
+ * The answer to a held attempt (account-lockout.md D12). The same words for
+ * every address, so a hold says nothing about who has an account. The
+ * seconds travel in the body as well as the header, because the browser
+ * client hands a page the body and not the headers.
+ */
+function heldRefusal(retryAfterSeconds: number): APIError {
+  const minutes = Math.ceil(retryAfterSeconds / 60);
+  return new APIError(
+    "TOO_MANY_REQUESTS",
+    {
+      message: `Too many attempts for this address. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}, or reset your password.`,
+      code: "SIGN_IN_HELD",
+      retryAfterSeconds,
+    },
+    { "Retry-After": String(retryAfterSeconds) },
+  );
+}
+
+/**
+ * The audit row and the account holder's email when a run's first account
+ * hold begins (account-lockout.md D13 and Q2).
+ *
+ * Only for an address that has an account, and never awaited by the attempt
+ * that set it off: the reply to that attempt must take the same time whether
+ * or not the account exists. The row names the user by id, never by address.
+ */
+async function announceAccountHold(
+  pool: Pool,
+  input: {
+    readonly email: string;
+    readonly failures: number;
+    readonly holdSeconds: number;
+    readonly baseUrl: string;
+    readonly send: AuthOptions["sendSignInHeldNotice"];
+  },
+): Promise<void> {
+  const { rows } = await pool.query<{ id: string; email: string }>(
+    "select id, email from users where lower(email) = $1 limit 1",
+    [input.email.trim().toLowerCase()],
+  );
+  const user = rows[0];
+  if (!user) {
+    return;
+  }
+  await recordInstanceAuditEvent(pool, {
+    action: "auth.sign_in_held",
+    payload: {
+      userId: user.id,
+      failures: input.failures,
+      holdSeconds: input.holdSeconds,
+    },
+  });
+  // openokr:allow-side-effect: the same arrangement as the reset mail.
+  // Better Auth owns this request and there is no domain write, so there is
+  // no outbox row to attach the mail to.
+  await input.send?.({
+    to: user.email,
+    resetUrl: new URL("/forgot-password", input.baseUrl).toString(),
+  });
+}
 
 /**
  * Accepts the invitation a freshly created account arrived with (P6-G06b).
@@ -150,6 +215,23 @@ export interface AuthOptions {
    * something else turn it off to stay independent of each other.
    */
   readonly rateLimit?: { readonly enabled: boolean };
+  /**
+   * Holding password sign-in after too many failures (docs/design/
+   * account-lockout.md, plan 0.7.0 P10). On by default, tests included, like
+   * the limiter above. A test about something else that makes many wrong
+   * attempts turns it off.
+   */
+  readonly lockout?: { readonly enabled: boolean };
+  /**
+   * Tells the account holder that somebody is trying their password, when a
+   * run's first account hold begins (account-lockout.md, Q2, approved by
+   * Akmal on 9 November 2026). Absent means no mail, which is the right
+   * pairing for a console transport: the audit row still records it.
+   */
+  readonly sendSignInHeldNotice?: (message: {
+    to: string;
+    resetUrl: string;
+  }) => Promise<void>;
   /**
    * Whether a sign-in must wait for a verified address (P8-T02b).
    *
@@ -315,6 +397,7 @@ export function createAuth(options: AuthOptions) {
     schema: authSchema,
   });
   const keyRing = options.keyRing ?? processOnlyKeyRing();
+  const lockoutEnabled = options.lockout?.enabled ?? true;
 
   return betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
@@ -344,6 +427,17 @@ export function createAuth(options: AuthOptions) {
         // sent in response to a request, not as a consequence of a domain
         // write.
         await sendResetPassword({ to: user.email, url });
+      },
+      // A completed reset ends any hold on the account at once
+      // (account-lockout.md D7). No caller is marked as known: whoever opens
+      // a reset link has proved the mailbox, not the network.
+      onPasswordReset: async ({ user }) => {
+        if (lockoutEnabled) {
+          await clearSignInAttempts(options.pool, {
+            secret: options.secret,
+            email: user.email,
+          });
+        }
       },
     },
 
@@ -413,7 +507,10 @@ export function createAuth(options: AuthOptions) {
           window: SIGN_IN_WINDOW_SECONDS,
           max: SIGN_IN_ATTEMPTS,
         },
-        "/forget-password": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+        // The path Better Auth 1.7 really serves. The rule used to name
+        // `/forget-password`, which no longer exists, so Better Auth's own
+        // default of 3 applied rather than this 5 (account-lockout.md D11).
+        "/request-password-reset": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
       },
     },
 
@@ -443,6 +540,66 @@ export function createAuth(options: AuthOptions) {
         if (provider) {
           throw new APIError("FORBIDDEN", {
             message: enforcementMessage(provider),
+          });
+        }
+
+        // **The hold** (account-lockout.md D6). After enforcement, so an
+        // enforced account is refused for that reason and never counted.
+        // Only a password is counted: a passkey, single sign-on, a reset
+        // request and a sign-up are the ways round a hold (D8).
+        if (!lockoutEnabled || hookContext.path !== "/sign-in/email") {
+          return;
+        }
+        const verdict = await recordPasswordAttempt(options.pool, {
+          secret: options.secret,
+          email,
+          callerAddress: callerAddress(hookContext.headers ?? new Headers()),
+        });
+        if (verdict.held) {
+          defaultMetrics().count(METRIC.signInHeldTotal, {
+            scope: verdict.scope,
+          });
+          throw heldRefusal(verdict.retryAfterSeconds);
+        }
+        if (verdict.accountHoldBegan) {
+          void announceAccountHold(options.pool, {
+            email,
+            ...verdict.accountHoldBegan,
+            baseUrl: options.baseUrl,
+            send: options.sendSignInHeldNotice,
+          }).catch((error: unknown) => {
+            process.stderr.write(
+              `auth: could not record a sign-in hold: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          });
+        }
+      }),
+
+      /**
+       * A matched password forgives the count (account-lockout.md D7), even
+       * when no session follows yet: a second factor still to come, or an
+       * address still to confirm, which Better Auth says only after the
+       * password matched. The session hook below covers every other factor.
+       */
+      after: createAuthMiddleware(async (hookContext) => {
+        if (!lockoutEnabled || hookContext.path !== "/sign-in/email") {
+          return;
+        }
+        const email = (hookContext.body as { email?: unknown } | undefined)
+          ?.email;
+        if (typeof email !== "string" || email === "") {
+          return;
+        }
+        const returned = hookContext.context.returned;
+        const matched =
+          returned instanceof Error
+            ? (returned as { body?: { code?: unknown } }).body?.code ===
+              "EMAIL_NOT_VERIFIED"
+            : true;
+        if (matched) {
+          await clearSignInAttempts(options.pool, {
+            secret: options.secret,
+            email,
           });
         }
       }),
@@ -481,6 +638,41 @@ export function createAuth(options: AuthOptions) {
               throw new APIError("FORBIDDEN", {
                 message: enforcementMessage(provider),
               });
+            }
+          },
+          /**
+           * **A session by any factor clears the account's counts**
+           * (account-lockout.md D7), and marks the caller's address as known
+           * for 30 days, so the account counter never holds that desk (D4).
+           *
+           * A session made with no request behind it marks nothing. A failure
+           * here never undoes the sign-in: the worst it leaves is a count
+           * that a later success or a quiet day clears.
+           */
+          after: async (session, hookContext) => {
+            if (!lockoutEnabled) {
+              return;
+            }
+            try {
+              const { rows } = await options.pool.query<{ email: string }>(
+                "select email from users where id = $1",
+                [session.userId],
+              );
+              const email = rows[0]?.email;
+              if (!email) {
+                return;
+              }
+              await clearSignInAttempts(options.pool, {
+                secret: options.secret,
+                email,
+                ...(hookContext?.headers
+                  ? { callerAddress: callerAddress(hookContext.headers) }
+                  : {}),
+              });
+            } catch (error) {
+              process.stderr.write(
+                `auth: could not clear sign-in counts: ${error instanceof Error ? error.message : String(error)}\n`,
+              );
             }
           },
         },

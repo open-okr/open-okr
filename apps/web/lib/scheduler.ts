@@ -51,6 +51,7 @@ import {
   METRIC,
   measureAllWorkspaces,
   outboxRetentionDays,
+  purgeStaleSignInAttempts,
   remindBeforeErasure,
   sweepExpiredSessions,
 } from "@openokr/core";
@@ -113,6 +114,8 @@ export interface ScheduledRun {
     // Instance housekeeping, run once rather than per workspace: settled
     // outbox rows have no tenant to scope to (completeness review M-19).
     | "outbox.purge"
+    // Sign-in counters nobody touched for 30 days (account-lockout.md D16).
+    | "auth.purgeSignInAttempts"
     // Instance housekeeping too, and each does nothing with the cloud flag off:
     // giving workspaces from before the flag a tenant record, and refreshing the
     // usage figures the console and the plan screen read.
@@ -222,6 +225,15 @@ const OUTBOX_PURGE_JOB = "outbox.purge";
 const OUTBOX_PURGE_CRON = "0 4 * * *";
 
 /**
+ * The sign-in counters' purge (account-lockout.md D16, plan 0.7.0 P10).
+ * Daily at 04:30 UTC, after the tool call sweep, for the reason housekeeping
+ * takes turns. Spraying random addresses makes rows; thirty days without a
+ * touch removes them.
+ */
+const SIGN_IN_PURGE_JOB = "auth.purgeSignInAttempts";
+const SIGN_IN_PURGE_CRON = "30 4 * * *";
+
+/**
  * The agent tool call record's retention (agent-tool-calls.md D12, plan 0.7.0
  * A2). Daily at 04:20 UTC, twenty minutes after the outbox purge, for the
  * reason housekeeping takes turns. Per workspace, because the window is each
@@ -329,6 +341,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: OUTBOX_PURGE_JOB,
     action: "outbox.purge",
     cron: OUTBOX_PURGE_CRON,
+    instance: true,
+  },
+  {
+    job: SIGN_IN_PURGE_JOB,
+    action: "auth.purgeSignInAttempts",
+    cron: SIGN_IN_PURGE_CRON,
     instance: true,
   },
   {
@@ -511,6 +529,13 @@ async function runInstance(run: ScheduledRun): Promise<void> {
       log(
         `support.sweepExpired could not end ${failed} expired support session(s); access is refused at expiry regardless`,
       );
+    }
+    return;
+  }
+  if (run.action === "auth.purgeSignInAttempts") {
+    const purged = await purgeStaleSignInAttempts(getPool());
+    if (purged > 0) {
+      log(`auth.purgeSignInAttempts removed ${purged} sign-in counter(s)`);
     }
     return;
   }

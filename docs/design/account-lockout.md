@@ -1,6 +1,6 @@
 # Account lockout with backoff
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan P10). Approved by Akmal on 9 November 2026 ("design approved"). Q1: yes, D2 as written. **Q2: yes, the account holder is emailed when a hold begins** (Akmal approved the new message kind), which this design adds to its build. It changes how sign-in is refused and adds a table, so it is designed first (CLAUDE.md).
+Status: approved by Akmal on 9 November 2026 ("design approved") for release 0.7.0 (plan P10). **The hold is built (P10a)**: the table, both counters, every clearing path, the answer, the page, the audit row, the email, the metric, the purge and the reset rule's path. D9's explicit second-factor options, its audit row and D10's shared address limiter follow as P10b. Q1: yes, D2 as written. **Q2: yes, the account holder is emailed when a hold begins** (Akmal approved the new message kind), which this design adds to its build. It changes how sign-in is refused and adds a table, so it is designed first (CLAUDE.md).
 
 PLAN §6 and TECHNICAL-PLAN §8.2 promise "lockout with backoff and an audit entry". Today there is a limit per caller address, held in each process's memory, and nothing per account for passwords.
 
@@ -31,20 +31,20 @@ Better Auth paths below are in the installed 1.7.14, under `node_modules/better-
 | D4 | **A known address is never held by the account counter**, only by its own pair. Known: this address signed in to this account successfully in the last 30 days | The attacker who trips the account counter cannot hold the person at their usual desk |
 | D5 | **Keyed hashes, never addresses.** Both keys are HMAC-SHA-256 under a key derived from `BETTER_AUTH_SECRET`: the trimmed, lower-cased email address, and the caller address from `callerAddress()`. Counted the same whether or not an account exists | A hold then says nothing about who has an account. A copy of the table names nobody. Rotating the secret forgets every count, which errs towards letting people in |
 | D6 | **Counted first, forgiven on success.** A Better Auth plugin's `hooks.before` on `/sign-in/email`, after SSO enforcement, runs one upsert that adds a failure to both rows unless held and returns the hold. A held attempt is refused there | A burst of 50 parallel guesses is counted before any password is checked, so at most 5 are checked |
-| D7 | **What clears both counters for an account**: a session created for its user by any factor (`databaseHooks.session.create.after`, which also stamps the pair as known); a completed reset (`onPasswordReset`); an `EMAIL_NOT_VERIFIED` answer, which Better Auth gives only after the password matched. Time ends a hold. There is no manual unlock | The longest wait is 15 minutes and a reset clears it at once. A workspace admin may not touch an instance-level account anyway |
+| D7 | **What clears both counters for an account**: a session created for its user by any factor (`databaseHooks.session.create.after`, which also stamps the pair as known); a completed reset (`onPasswordReset`); a password that matched with no session yet, which is a second factor still to come or an `EMAIL_NOT_VERIFIED` answer (`hooks.after` on `/sign-in/email`; added in the build, because a person with a second factor would otherwise be held by five right passwords). Addresses already known stay known: signing in from a phone must not make the desk a stranger. Time ends a hold. There is no manual unlock | The longest wait is 15 minutes and a reset clears it at once. A workspace admin may not touch an instance-level account anyway |
 | D8 | **Never counted and never held**: passkeys, single sign-on, reset requests and sign-up | A passkey assertion cannot be guessed and the identity provider runs its own lockout. These are the ways round a hold, so a hold must not close them. The address limiter still covers their endpoints |
 | D9 | **The second factor keeps Better Auth's lock**, now set explicitly: `accountLockout: { enabled: true, maxFailedAttempts: 10, durationSeconds: 900 }` | Only somebody who already knows the password reaches it. Explicit, so an upgrade that changes the default shows in a diff |
 | D10 | **Replicas share everything through Postgres.** The counters are one row each, changed by one atomic statement. The address limiter moves to `rateLimit.customStorage` built on the Postgres cache port, passed in by `apps/web/lib/auth.ts`. Server calls to `auth.api` skip the router, so this costs a query only on real sign-in traffic | Postgres is the only required service. No in-process state is left to disagree |
 | D11 | **The reset rule is fixed** to `/request-password-reset`, 5 a minute, and the dead `/forget-password` entry leaves `CREDENTIAL_PATHS` | The code meant 5 and has been getting 3 |
 | D12 | **The answer to a held attempt**: 429, `Retry-After` in seconds, code `SIGN_IN_HELD`, "Too many attempts for this address. Try again in N minutes, or reset your password." The page shows the minutes and links to the reset page | UIUX-PLAN S-35 asks for clear lockout messaging. Same words for every address |
-| D13 | **Audit, bounded.** `auth.sign_in_held` on the instance chain when an account hold begins on an address that has an account: `{ userId, failures, holdSeconds }`. `auth.second_factor_locked { userId }` when Better Auth's lock begins. Pair holds are counted by `openokr_sign_in_held_total{scope}` instead. The route wrapper keeps `auth.rate_limited` for the address limiter's own 429 (the only one carrying `X-Retry-After`) and reads the address through `callerAddress()` | The instance chain appends under one lock (`instance-chain.ts`). One row per hold per real account is bounded; one per refusal, or per random address sprayed, is not |
+| D13 | **Audit, bounded.** `auth.sign_in_held` on the instance chain when a run's first account hold begins (the twentieth failure in a row) on an address that has an account: `{ userId, failures, holdSeconds }`. Later holds in the same run write nothing, so a guesser who keeps going writes one row, not one every fifteen minutes. Written without awaiting, so the attempt that set it off takes the same time whether or not the account exists. `auth.second_factor_locked { userId }` when Better Auth's lock begins. Pair holds are counted by `openokr_sign_in_held_total{scope}` instead. The route wrapper keeps `auth.rate_limited` for the address limiter's own 429 (the only one carrying `X-Retry-After`) and reads the address through `callerAddress()` | The instance chain appends under one lock (`instance-chain.ts`). One row per hold per real account is bounded; one per refusal, or per random address sprayed, is not |
 | D14 | **Not a setting.** The numbers are constants in `packages/core/src/auth/lockout.ts`, like the limiter's today. `createAuth` takes `lockout?: { enabled }` for tests, like `rateLimit` | A security floor nobody should have to choose. Nothing in §4.14 to default |
 | D15 | **Written outside the Operation pipeline**, like Better Auth's own rows, with an `openokr:allow-mutation` comment saying so | A sign-in attempt has no workspace and no actor, which the pipeline needs |
 | D16 | **A daily purge** on the scheduler host, beside `outbox.purge`, deletes rows nobody touched for 30 days | Spraying random addresses makes rows. Thirty days is the known-address window |
 
 ## 2. The table
 
-Migration `0151_sign_in_attempts.sql` (the next free number today), forward-only, additive.
+Migration `0154_sign_in_attempts.sql` (0151 was the next free number when this was written; 0151 to 0153 went to P2, A4 and A2 first), forward-only, additive.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -72,6 +72,8 @@ Primary key `(account_key, caller_key)`. Marked `openokr:not-tenant-scoped` and 
 
 **Q2, for you.** Should the account holder get an email when an account hold begins ("somebody is trying your password")? It is a new kind of message, so it is yours to decide. **Proposed: not in 0.7.0.** The audit row and the metric carry it, and with the console mail transport the notice would only reach the server log.
 
+**Decided 9 November 2026: yes.** Built as `signInHeldMail` in `apps/web/lib/account-mail.ts`, in the instance's language, sent once per run with the audit row. Its button goes to `/forgot-password`, the page that asks for a reset link, never to a reset itself.
+
 ## 4. Acceptance criteria
 
 - Given an account, when one address sends five wrong passwords, then the sixth attempt within a minute gets 429 with `Retry-After` and code `SIGN_IN_HELD`, and its password is not checked.
@@ -93,11 +95,12 @@ Primary key `(account_key, caller_key)`. Marked `openokr:not-tenant-scoped` and 
 |---|---|---|
 | Unit | `packages/core/test/lockout-curve.test.ts` | The curve, the cap, the 24-hour reset, the two thresholds |
 | Integration | `packages/core/test/sign-in-lockout.test.ts` | Pair and account holds, known address, unknown address answers alike, every clearing path, passkey and SSO never held, the parallel burst |
-| Integration | `packages/core/test/auth-rate-limit-shared.test.ts` | Two `createAuth` instances on one database share the address count; the reset rule's path |
-| Integration | `packages/core/test/second-factor-lock.test.ts` | The explicit options, and one audit row when the lock begins |
+| Integration | `packages/core/test/auth-rate-limit-shared.test.ts` (P10b) | Two `createAuth` instances on one database share the address count. The reset rule's path is in `auth.test.ts` (P10a) |
+| Integration | `packages/core/test/second-factor-lock.test.ts` (P10b) | The explicit options, and one audit row when the lock begins |
 | Unit | `apps/web/test/auth-route.test.ts` (existing) | `auth.rate_limited` only for the limiter's 429, address through `callerAddress()` |
 | Integration | `packages/db` migration suite and `pnpm db:lint` | Markers, primary key, purge index |
-| End to end | `e2e/s35-sign-in-hold.spec.ts` | Five wrong passwords, the sixth shows the wait and the reset link |
+| Unit | `apps/web/test/account-mail.test.ts` (existing), `apps/web/test/scheduler.test.ts` (existing) | The email, and the daily purge registered as an instance job |
+| End to end | `e2e/s35e-sign-in-hold.spec.ts` | Five wrong passwords, the sixth shows the wait and the reset link |
 
 ## 6. Documents changed in the same change
 

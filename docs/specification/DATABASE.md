@@ -39,6 +39,12 @@ Additional conventions:
 | `two_factors` | `user_id`, `secret`, `backup_codes`, `verified`, `failed_verification_count`, `locked_until?` | The TOTP secret and backup codes, both encrypted by Better Auth with the instance secret before they reach the table |
 | `sso_providers` | `provider_id` unique, `issuer`, `domain`, `oidc_config?`, `saml_config?`, `user_id?`, `organization_id?` | The single sign-on plugin's own table (migration 0097), derived from `sso_connections` (§4), which is the authority. Nothing in the product reads it to answer a question |
 
+**Sign-in counters.** One more table belongs to sign-in and is global for the same reason, though Better Auth does not own it:
+
+| Table | Key columns | Notes |
+|---|---|---|
+| `sign_in_attempts` | `account_key`, `caller_key` (empty on the account row), `failures`, `last_failure_at?`, `held_until?`, `last_success_at?`, `created_at`, `updated_at`; primary key `(account_key, caller_key)` | Failed password sign-ins, so too many hold the next attempt for a while (migration 0154, [account-lockout](../design/account-lockout.md)). Both keys are HMACs under a key derived from `BETTER_AUTH_SECRET`, so a copy names nobody, and a row is written whether or not the account exists. Hard delete: a success or a reset clears an account's counts and a daily purge removes rows untouched for 30 days. Written outside the Operation pipeline, like Better Auth's own rows |
+
 **Infrastructure tables.** Three tables serve the platform rather than the domain, and each carries an explicit marker in its migration explaining why it steps outside a convention:
 
 | Table | Key columns | Tenancy | Notes |

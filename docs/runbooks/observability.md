@@ -104,6 +104,7 @@ capacity gauge.
 | `openokr_pool_connections` | state (active, idle, waiting) |
 | `openokr_concurrent_actions` | none |
 | `openokr_admission_refusals_total` | reason (rate, concurrency) |
+| `openokr_sign_in_held_total` | scope (pair, account). A password attempt refused by a sign-in hold. A steady `account` rate is somebody guessing one account from many networks |
 
 ### The four readings that are taken at scrape time
 

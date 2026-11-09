@@ -40,6 +40,21 @@ const en = {
   "verify.footer":
     "Did not sign up? Ignore this email and no account is created.",
 
+  // A run of wrong passwords began an account hold (account-lockout.md Q2).
+  "held.subject": "Somebody is trying to sign in to your {instance} account",
+  "held.preheader":
+    "Password sign-in is paused for networks you have not used lately.",
+  "held.eyebrow": "Account security",
+  "held.heading": "Somebody is trying your password",
+  "held.bodyBefore": "Many wrong passwords have been tried for ",
+  "held.bodyAfter":
+    " from networks you have not signed in from lately, so {instance} is pausing password sign-in from them a few minutes at a time. Where you usually sign in is not affected.",
+  "held.action": "Choose a new password",
+  "held.notice":
+    "If this was you, wait a few minutes or choose a new password. If it was not, a new password and a second sign-in factor keep the account yours.",
+  "held.footer":
+    "Sent by {instance} at {host} because many wrong passwords were tried for this account. Sent once for each run of attempts.",
+
   "invite.subject": "You have been invited to {workspace}",
   "invite.preheader": "Join to see your team's OKRs.",
   "invite.preheaderBy": "{inviter} added you. Join to see your team's OKRs.",
@@ -142,6 +157,20 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verify.bodyAfter": " untuk melengkapkan akaun {instance} anda.",
   "verify.action": "Sahkan e-mel",
   "verify.footer": "Tidak mendaftar? Abaikan e-mel ini dan tiada akaun dibuat.",
+
+  "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
+  "held.preheader":
+    "Log masuk dengan kata laluan dijeda bagi rangkaian yang jarang anda gunakan.",
+  "held.eyebrow": "Keselamatan akaun",
+  "held.heading": "Seseorang sedang mencuba kata laluan anda",
+  "held.bodyBefore": "Banyak kata laluan salah telah dicuba untuk ",
+  "held.bodyAfter":
+    " dari rangkaian yang tidak anda gunakan kebelakangan ini, jadi {instance} menjeda log masuk dengan kata laluan dari rangkaian itu beberapa minit pada satu masa. Tempat anda biasa log masuk tidak terjejas.",
+  "held.action": "Pilih kata laluan baharu",
+  "held.notice":
+    "Jika ini anda, tunggu beberapa minit atau pilih kata laluan baharu. Jika bukan, kata laluan baharu dan faktor log masuk kedua memastikan akaun ini kekal milik anda.",
+  "held.footer":
+    "Dihantar oleh {instance} di {host} kerana banyak kata laluan salah telah dicuba untuk akaun ini. Dihantar sekali bagi setiap siri percubaan.",
 
   "invite.subject": "Anda dijemput ke {workspace}",
   "invite.preheader": "Sertai untuk melihat OKR pasukan anda.",
