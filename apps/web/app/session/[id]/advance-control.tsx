@@ -16,7 +16,14 @@ import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
  *
  * The gate itself is unchanged. What changes is that its own words arrive.
  */
-export function AdvanceControl({ sessionId }: { readonly sessionId: string }) {
+export function AdvanceControl({
+  sessionId,
+  stageKey,
+}: {
+  readonly sessionId: string;
+  /** The stage on screen, so a stale advance is refused (plan 0.7.0, S2). */
+  readonly stageKey: string | null;
+}) {
   const { t } = useTranslations();
   const [state, submit, pending] = useActionState<CommitmentState, FormData>(
     advanceStageWithReason,
@@ -25,6 +32,9 @@ export function AdvanceControl({ sessionId }: { readonly sessionId: string }) {
   return (
     <form action={submit} aria-busy={pending} className="flex flex-col gap-1.5">
       <input type="hidden" name="sessionId" value={sessionId} />
+      {stageKey === null ? null : (
+        <input type="hidden" name="fromStageKey" value={stageKey} />
+      )}
       <Button type="submit" variant="primary" disabled={pending}>
         {pending
           ? t("session.detail.advanceControl.continuing")

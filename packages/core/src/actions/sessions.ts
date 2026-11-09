@@ -1145,7 +1145,16 @@ export const advanceStage = defineWriteAction({
   name: "sessions.advanceStage",
   summary:
     "Advances a running session to its next stage, recording elapsed time.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({
+    id: z.uuid(),
+    /**
+     * The stage the caller is looking at (docs/design/sessions.md §5). When
+     * given and the session has already left it, the advance is refused, so
+     * two people pressing continue on the same stage move it once, not twice.
+     * Optional for a caller with no screen, such as the command line.
+     */
+    fromStageKey: z.string().min(1).max(60).optional(),
+  }),
   output: z.object({ id: z.uuid(), realtimeChannel: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1164,6 +1173,19 @@ export const advanceStage = defineWriteAction({
 
       if (session.state !== "running") {
         throw new OperationError("not_found", "Session is not running.");
+      }
+
+      // A stale advance (plan 0.7.0, S2). Conflict rather than not-found: the
+      // session is there and the caller may see it, only not where they
+      // thought, and the screen reloads to where it is.
+      if (
+        input.fromStageKey !== undefined &&
+        input.fromStageKey !== session.stageKey
+      ) {
+        throw new OperationError(
+          "conflict",
+          "The session has already moved on from that stage. Here is where it is now.",
+        );
       }
 
       let nextStageKey: string | null = null;

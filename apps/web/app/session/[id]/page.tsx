@@ -917,7 +917,7 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
           {!isOnLastStage && !isMonthly ? (
-            <AdvanceControl sessionId={id} />
+            <AdvanceControl sessionId={id} stageKey={sessionRow.stageKey} />
           ) : (
             <form
               action={async () => {

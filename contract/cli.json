@@ -9595,6 +9595,12 @@
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "from-stage-key",
+          "field": "fromStageKey",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

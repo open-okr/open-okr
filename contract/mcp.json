@@ -11681,6 +11681,11 @@
             "type": "string",
             "format": "uuid",
             "description": "The session's id, from sessions.mine."
+          },
+          "fromStageKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
           }
         },
         "required": [

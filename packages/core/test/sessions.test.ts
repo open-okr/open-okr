@@ -184,6 +184,37 @@ describe("sessions.advanceStage", () => {
     expect((read as { stageKey: string }).stageKey).toBe("diagnose");
   });
 
+  // docs/design/sessions.md §5: a participant's stale advance is refused.
+  // Two people pressing "continue" on the same stage moved the session two
+  // stages, because the action took only the session (plan 0.7.0, S2).
+  it("refuses an advance from a stage the session has already left", async () => {
+    const wb = await workerDb();
+    const session = await createSession();
+    const sessionId = (session as { id: string }).id;
+    await callAction({ pool: wb.appPool, ...context() }, "sessions.open", {
+      id: sessionId,
+    });
+
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.advanceStage",
+      { id: sessionId, fromStageKey: "confidence" },
+    );
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "sessions.advanceStage", {
+        id: sessionId,
+        fromStageKey: "confidence",
+      }),
+    ).rejects.toMatchObject({ code: "conflict" });
+
+    const read = await callAction(
+      { pool: wb.appPool, ...context() },
+      "sessions.read",
+      { id: sessionId },
+    );
+    expect((read as { stageKey: string }).stageKey).toBe("diagnose");
+  });
+
   it("records elapsed time for the completed stage", async () => {
     const wb = await workerDb();
     const session = await createSession();

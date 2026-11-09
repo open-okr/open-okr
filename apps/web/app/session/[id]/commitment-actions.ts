@@ -179,12 +179,19 @@ export async function advanceStageWithReason(
   form: FormData,
 ): Promise<CommitmentState> {
   const sessionId = String(form.get("sessionId") ?? "");
+  const fromStageKey = String(form.get("fromStageKey") ?? "");
   try {
     await callAction(await context(), "sessions.advanceStage", {
       id: sessionId,
+      ...(fromStageKey === "" ? {} : { fromStageKey }),
     });
   } catch (error) {
     if (error instanceof OperationError) {
+      // A stale advance: somebody else moved the session on. The page
+      // reloads to where it is now, with the sentence saying why.
+      if (error.code === "conflict") {
+        revalidatePath(`/session/${sessionId}`);
+      }
       return { error: error.message };
     }
     throw error;
