@@ -4257,6 +4257,9 @@ export const setShifts = defineWriteAction({
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
+          // The activity names the space; the content is the session's shared
+          // record, so that is what retrieval embeds (plan A10).
+          embed: { entityType: "session", entityId: input.sessionId },
           payload: { sessionId: input.sessionId },
         },
         audit: {
@@ -4324,6 +4327,8 @@ export const setSessionWins = defineWriteAction({
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
+          // As the shifts above: the wins are part of the shared record.
+          embed: { entityType: "session", entityId: input.sessionId },
           payload: { count: input.wins.length },
         },
         audit: {

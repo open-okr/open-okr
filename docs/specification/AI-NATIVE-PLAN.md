@@ -391,6 +391,8 @@ Any external agent drives OpenOKR as the authenticated user.
 
 pgvector with no new service. An outbox-driven worker chunks and embeds goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts on write, keyed by content hash. Retrieval is always access-filtered through the same layer as reads, with hybrid ranking against full text. Local embeddings keep retrieval air-gap safe. Chunks are passed as cited, untrusted data. Where pgvector is unavailable, semantic features degrade to full text and everything still works.
 
+**As built at 0.7.0 (plan A10).** A document is embedded once it is published, never as a draft. A session is embedded as its shared record: its title, the wins it named and the shifts it agreed, never the facilitator's per-stage notes, which are private by design. KPIs are embedded too, by title and description, and like their search rows every member reads them. "Cycle artifacts" are the learnings and next-cycle drafts; a cycle itself is a period with a name and no prose, so it is not embedded. Rows written before 0.7.0 are embedded on their next write, as nothing reindexes the past.
+
 ## 10. Evaluation, quality and degradation
 
 - **Evaluation harness.** Golden fixtures per capability against a deterministic mock provider, asserting schema validity, tool selection, latency and the absence of personal data in prompts. An optional live smoke test on a cheap model, never blocking CI.

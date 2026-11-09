@@ -23,6 +23,12 @@
  * nothing. The plan's "cycle artifacts" is the learnings and the next-cycle
  * drafts, which are here.
  *
+ * **Documents, KPIs and sessions joined in 0.7.0 (plan A10).** A published
+ * document is the longest prose the product holds, and a KPI's description says
+ * what the measure is for. A session's shared record is its title, the wins it
+ * named and the shifts it agreed; the facilitator's per-stage notes are private
+ * by design (`okr_sessions.notes`) and are never read here.
+ *
  * **Nothing here decides whether the text changed.** The worker re-reads the
  * content and hashes it, and `EmbeddingService.index()` skips a chunk whose hash
  * is unchanged. That is what makes a duplicate enqueue cheap and what the
@@ -34,11 +40,14 @@ import {
   blockers,
   checkIns,
   comments,
+  documents,
   goals,
   keyResults,
+  kpis,
   kudos,
   learnings,
   nextCycleDrafts,
+  okrSessions,
   retroNotes,
   reviewNarratives,
 } from "@openokr/db";
@@ -64,6 +73,13 @@ const EMBEDDABLE_SUBJECTS = [
   // A comment's activity already names the comment rather than what it hangs
   // off, so it is automatic like the rest of this list.
   "comment",
+  // Every document activity names the document. A draft is read as nothing,
+  // so drafting one enqueues a job that embeds nothing.
+  "document",
+  // Every KPI activity after its creation names the KPI; `kpis.create` names
+  // it explicitly, because its activity names the workspace. Recording a value
+  // changes no text, and the worker's hash check makes that job a no-op.
+  "kpi",
 ] as const;
 
 export type EmbeddableSubject = (typeof EMBEDDABLE_SUBJECTS)[number];
@@ -89,6 +105,9 @@ const EMBEDDABLE_TYPES = [
   "kudos",
   "learning",
   "next_cycle_draft",
+  // Opted in by the writes of its wins and its shifts, whose activities name
+  // the space.
+  "session",
 ] as const;
 
 export type EmbeddableType = (typeof EMBEDDABLE_TYPES)[number];
@@ -316,6 +335,88 @@ export async function embeddableTextInTx(
           .limit(1),
       );
       return row?.text.trim() || null;
+    }
+    case "document": {
+      const row = one(
+        await tx
+          .select({ title: documents.title, body: documents.body })
+          .from(documents)
+          .where(
+            activeOnly(
+              documents,
+              eq(documents.workspaceId, workspaceId),
+              eq(documents.id, entityId),
+              // A draft is its author's alone (P5-T12), so embedding one would
+              // put unpublished text into a shared index.
+              eq(documents.state, "published"),
+            ),
+          )
+          .limit(1),
+      );
+      if (!row) {
+        return null;
+      }
+      return (
+        join(
+          row.title,
+          row.body === null ? null : excerptRichText(row.body as never, 8000),
+        ) || null
+      );
+    }
+    case "kpi": {
+      const row = one(
+        await tx
+          .select({ title: kpis.title, description: kpis.description })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, workspaceId),
+              eq(kpis.id, entityId),
+            ),
+          )
+          .limit(1),
+      );
+      if (!row) {
+        return null;
+      }
+      return (
+        join(
+          row.title,
+          row.description === null
+            ? null
+            : excerptRichText(row.description as never, 8000),
+        ) || null
+      );
+    }
+    case "session": {
+      const row = one(
+        await tx
+          .select({
+            title: okrSessions.title,
+            wins: okrSessions.wins,
+            shifts: okrSessions.shiftsDocument,
+          })
+          .from(okrSessions)
+          .where(
+            activeOnly(
+              okrSessions,
+              eq(okrSessions.workspaceId, workspaceId),
+              eq(okrSessions.id, entityId),
+            ),
+          )
+          .limit(1),
+      );
+      if (!row) {
+        return null;
+      }
+      // Only the shared record. A session with no wins and no shifts has
+      // nothing but its title, which answers no question, so it embeds nothing.
+      const record = join(
+        row.wins.join("\n"),
+        row.shifts === null ? null : excerptRichText(row.shifts as never, 8000),
+      );
+      return record ? join(row.title, record) : null;
     }
     default: {
       // Exhaustive over `EmbeddableType`, so adding a type without teaching this

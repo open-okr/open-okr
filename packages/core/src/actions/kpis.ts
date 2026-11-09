@@ -496,6 +496,10 @@ export const createKpi = defineWriteAction({
           kind: "kpi.created" as const,
           subjectType: "workspace" as const,
           subjectId: workspaceId,
+          // The activity names the workspace, where the feed shows it. The
+          // content is the KPI, so that is what retrieval embeds and search
+          // indexes (plan A10); later KPI activities name the KPI themselves.
+          embed: { entityType: "kpi", entityId: id },
           payload: { title: input.title, frequency: input.frequency },
         },
         audit: {
