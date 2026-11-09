@@ -1632,7 +1632,10 @@
               "mentioned",
               "role",
               "review",
-              "check_in"
+              "check_in",
+              "support_request",
+              "support_ended",
+              "connection_ended"
             ],
             "description": "One line on why, where the workspace asks for one."
           },
@@ -1798,7 +1801,10 @@
                 "mentioned",
                 "role",
                 "review",
-                "check_in"
+                "check_in",
+                "support_request",
+                "support_ended",
+                "connection_ended"
               ]
             },
             "additionalProperties": {

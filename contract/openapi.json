@@ -9430,7 +9430,10 @@
                               "mentioned",
                               "role",
                               "review",
-                              "check_in"
+                              "check_in",
+                              "support_request",
+                              "support_ended",
+                              "connection_ended"
                             ]
                           },
                           "channel": {
@@ -9573,7 +9576,10 @@
                 "mentioned",
                 "role",
                 "review",
-                "check_in"
+                "check_in",
+                "support_request",
+                "support_ended",
+                "connection_ended"
               ]
             }
           },
@@ -10175,7 +10181,10 @@
                         "mentioned",
                         "role",
                         "review",
-                        "check_in"
+                        "check_in",
+                        "support_request",
+                        "support_ended",
+                        "connection_ended"
                       ]
                     },
                     "additionalProperties": {
@@ -10230,7 +10239,10 @@
                                 "mentioned",
                                 "role",
                                 "review",
-                                "check_in"
+                                "check_in",
+                                "support_request",
+                                "support_ended",
+                                "connection_ended"
                               ]
                             },
                             {
@@ -10505,7 +10517,10 @@
                       "mentioned",
                       "role",
                       "review",
-                      "check_in"
+                      "check_in",
+                      "support_request",
+                      "support_ended",
+                      "connection_ended"
                     ]
                   }
                 },

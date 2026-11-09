@@ -321,6 +321,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "settings.readWorkspaceSettings",
     "settings.readForMember",
     "settings.updateWorkspaceGeneral",
+    "settings.updateWorkspaceLimits",
     "settings.updateWorkspaceBranding",
     "settings.setWorkspaceBrandingImage",
     "settings.resetWorkspaceSettings",
