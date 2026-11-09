@@ -21,7 +21,6 @@
 
 import {
   activeOnly,
-  activities,
   checkIns,
   cycles,
   GOAL_DRAFT_STATES,
@@ -44,7 +43,7 @@ import {
   keyResultDraft,
   objectiveDraft,
 } from "@openokr/method";
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -61,6 +60,7 @@ import {
 } from "../goals/service.ts";
 import { weightSchema } from "../goals/weight.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { requireUnchanged } from "../operations/unchanged.ts";
 import {
   midCycleInTx,
   policyDecisionInTx,
@@ -878,79 +878,6 @@ export const readCreationPolicy = defineReadAction({
   },
 });
 
-/** Who last changed a goal or one of its key results, for a conflict. */
-async function lastChange(
-  tx: OperationTx,
-  workspaceId: string,
-  goalId: string,
-): Promise<{ changedBy: string | null; changedAt: string | null }> {
-  const [row] = await tx
-    .select({ at: activities.at, name: workspaceMembers.name })
-    .from(activities)
-    .leftJoin(
-      workspaceMembers,
-      eq(workspaceMembers.id, activities.actorMemberId),
-    )
-    .where(
-      and(
-        eq(activities.workspaceId, workspaceId),
-        eq(activities.subjectType, "goal"),
-        eq(activities.subjectId, goalId),
-      ),
-    )
-    .orderBy(desc(activities.at))
-    .limit(1);
-  return {
-    changedBy: row?.name ?? null,
-    changedAt: row?.at ? new Date(row.at).toISOString() : null,
-  };
-}
-
-/** Boolean for a milestone's done (P9-T12b), compared as it is. */
-type Comparable = string | number | boolean | null;
-
-/** Equal as the screen means it: numbers by value, blank text as nothing. */
-function sameField(read: Comparable, stored: Comparable): boolean {
-  if (typeof read === "number" || typeof stored === "number") {
-    return Number(read) === Number(stored);
-  }
-  const blank = (value: Comparable) =>
-    typeof value === "string" && value.trim() === "" ? null : value;
-  return blank(read) === blank(stored);
-}
-
-/**
- * Refuses when any field the caller changes has moved since it read it.
- *
- * Only the fields being changed are compared. Somebody else renaming the
- * objective does not stop this caller moving its weight, which is the point
- * of comparing values rather than a row version.
- */
-async function requireUnchanged(
-  tx: OperationTx,
-  workspaceId: string,
-  goalId: string,
-  read: Readonly<Record<string, Comparable>>,
-  stored: Readonly<Record<string, Comparable>>,
-): Promise<void> {
-  const moved = Object.keys(read).filter(
-    (key) => !sameField(read[key] ?? null, stored[key] ?? null),
-  );
-  if (moved.length === 0) {
-    return;
-  }
-  const { changedBy, changedAt } = await lastChange(tx, workspaceId, goalId);
-  const current = Object.fromEntries(moved.map((key) => [key, stored[key]]));
-  const now = moved
-    .map((key) => `${key} is now ${JSON.stringify(stored[key])}`)
-    .join(", ");
-  throw new OperationError(
-    "conflict",
-    `${changedBy ?? "Somebody"} changed this since you read it: ${now}. Nothing was saved; keep yours by sending it again with the current value.`,
-    { current, changedBy, changedAt },
-  );
-}
-
 const goalFields = z.object({
   title: z.string().trim().min(1).max(500),
   contributionStatement: z.string().trim().max(1000).nullable(),
@@ -1049,20 +976,20 @@ export const patchGoal = defineWriteAction({
       if (!row) {
         throw new OperationError("not_found", "No such goal.");
       }
-      await requireUnchanged(
-        tx,
+      await requireUnchanged(tx, {
         workspaceId,
-        input.id,
-        Object.fromEntries(
+        subjectType: "goal",
+        subjectId: input.id,
+        read: Object.fromEntries(
           Object.keys(input.set).map((key) => [key, input.read[key] ?? null]),
         ),
-        {
+        stored: {
           title: row.title,
           contributionStatement: row.contributionStatement,
           weight: asNumber(row.weight),
           championId: row.championId,
         },
-      );
+      });
 
       const patch: Record<string, unknown> = {};
       if (input.set.title !== undefined) {
@@ -1195,14 +1122,14 @@ export const patchKeyResult = defineWriteAction({
           "key result owner",
         );
       }
-      await requireUnchanged(
-        tx,
+      await requireUnchanged(tx, {
         workspaceId,
-        row.goalId,
-        Object.fromEntries(
+        subjectType: "goal",
+        subjectId: row.goalId,
+        read: Object.fromEntries(
           Object.keys(input.set).map((key) => [key, input.read[key] ?? null]),
         ),
-        {
+        stored: {
           title: row.title,
           unit: row.unit,
           baselineValue: asNumber(row.baselineValue),
@@ -1212,7 +1139,7 @@ export const patchKeyResult = defineWriteAction({
           kind: row.kind,
           done: row.doneAt !== null,
         },
-      );
+      });
       if (input.set.kind !== undefined && input.set.kind !== row.kind) {
         await requirePolicy(
           tx,
