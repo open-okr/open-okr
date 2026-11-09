@@ -45,6 +45,7 @@ import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { PreviousNext } from "../../../lib/previous-next.tsx";
 import { ReviewerIsChampionNote } from "../../../lib/reviewer-is-champion-note.tsx";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
@@ -308,6 +309,22 @@ export default async function GoalPage({
       ).checkIns[0]?.status ?? null)
     : null;
 
+  // The objectives either side of this one in its cycle, in the list's own
+  // order, for the links and the `[` and `]` keys (plan 0.7.0, U2). Every
+  // one the reader may see, closed ones included, since this one may be.
+  const inCycle = goal.cycleId
+    ? (
+        await callAction(context, "goals.list", {
+          cycleId: goal.cycleId,
+          includeClosed: true,
+          limit: 500,
+        })
+      ).goals
+    : [];
+  const at = inCycle.findIndex((one) => one.id === id);
+  const before = at > 0 ? inCycle[at - 1] : undefined;
+  const after = at >= 0 ? inCycle[at + 1] : undefined;
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -322,6 +339,24 @@ export default async function GoalPage({
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col">
+              <PreviousNext
+                previous={
+                  before
+                    ? {
+                        href: `/goals/${before.id}`,
+                        label: t("goals.detail.previous"),
+                      }
+                    : null
+                }
+                next={
+                  after
+                    ? {
+                        href: `/goals/${after.id}`,
+                        label: t("goals.detail.next"),
+                      }
+                    : null
+                }
+              />
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
                 {goal.reviewer

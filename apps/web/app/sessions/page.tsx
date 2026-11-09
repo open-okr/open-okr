@@ -1,5 +1,12 @@
 import { callAction } from "@openokr/core";
-import { buttonVariants, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import {
+  buttonVariants,
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  KeyboardList,
+} from "@openokr/ui";
 import Link from "next/link";
 import { getPool } from "../../lib/auth";
 import { nameOf, SESSION_KIND_NAME_KEYS } from "../../lib/identifier-names.ts";
@@ -201,13 +208,14 @@ export default async function SessionsPage({
           </CardBody>
         </Card>
       ) : (
-        <>
+        // `j` and `k` walk every session in the three groups (U2).
+        <KeyboardList className="flex flex-col gap-4.5">
           <Group label={t("common.inProgress")} rows={running} />
           <Group label={t("sessions.ahead")} rows={ahead} />
           {includeFinished ? (
             <Group label={t("sessions.finished")} rows={over} />
           ) : null}
-        </>
+        </KeyboardList>
       )}
 
       {/* The scheduler this page's empty state used to send people looking
@@ -237,7 +245,11 @@ function Group({
       </h2>
       <div className="flex flex-col gap-1.5">
         {rows.map((row) => (
-          <SessionRow key={row.id} row={row} />
+          // A wrapper, so the keys land on the row's link rather than take
+          // the link itself out of the tab order.
+          <div key={row.id} data-keyboard-row>
+            <SessionRow row={row} />
+          </div>
         ))}
       </div>
     </section>

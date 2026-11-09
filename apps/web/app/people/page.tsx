@@ -1,5 +1,12 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { Card, CardBody, CardHeader, Chip, SearchInput } from "@openokr/ui";
+import {
+  Card,
+  CardBody,
+  CardHeader,
+  Chip,
+  KeyboardList,
+  SearchInput,
+} from "@openokr/ui";
 import Link from "next/link";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { pageTitle } from "../../lib/page-title.ts";
@@ -165,48 +172,51 @@ export default async function PeoplePage({
                     : t("people.noMembersInThis")}
                 </p>
               ) : (
-                <ul className="flex flex-col gap-1">
-                  {filtered.map((member) => (
-                    <li key={member.id}>
-                      <Link
-                        href={`/people/${member.id}`}
-                        className="flex items-center justify-between gap-3 rounded-md px-3 py-2 hover:bg-bg-2"
-                      >
-                        <span className="flex flex-col">
-                          <span className="font-medium text-ink">
-                            {member.name}
+                // `j` and `k` walk the people found (plan 0.7.0, U2).
+                <KeyboardList>
+                  <ul className="flex flex-col gap-1">
+                    {filtered.map((member) => (
+                      <li key={member.id} data-keyboard-row>
+                        <Link
+                          href={`/people/${member.id}`}
+                          className="flex items-center justify-between gap-3 rounded-md px-3 py-2 hover:bg-bg-2"
+                        >
+                          <span className="flex flex-col">
+                            <span className="font-medium text-ink">
+                              {member.name}
+                            </span>
+                            {member.title ? (
+                              <span className="text-sm text-ink-3">
+                                {member.title}
+                              </span>
+                            ) : null}
                           </span>
-                          {member.title ? (
-                            <span className="text-sm text-ink-3">
-                              {member.title}
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="flex items-center gap-2">
-                          {member.timezone ? (
-                            <span className="text-xs text-ink-4">
-                              {member.timezone}
-                            </span>
-                          ) : null}
-                          {member.kind === "agent" ? (
-                            <Chip tone="neutral">{t("common.agent")}</Chip>
-                          ) : null}
-                          {member.kind === "guest" ? (
-                            <Chip tone="neutral">{t("common.guest")}</Chip>
-                          ) : null}
-                          {member.kind === "placeholder" ? (
-                            <Chip tone="neutral">
-                              {t("common.placeholder")}
-                            </Chip>
-                          ) : null}
-                          {isAdmin && member.status === "suspended" ? (
-                            <Chip tone="warn">{t("common.suspended")}</Chip>
-                          ) : null}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                          <span className="flex items-center gap-2">
+                            {member.timezone ? (
+                              <span className="text-xs text-ink-4">
+                                {member.timezone}
+                              </span>
+                            ) : null}
+                            {member.kind === "agent" ? (
+                              <Chip tone="neutral">{t("common.agent")}</Chip>
+                            ) : null}
+                            {member.kind === "guest" ? (
+                              <Chip tone="neutral">{t("common.guest")}</Chip>
+                            ) : null}
+                            {member.kind === "placeholder" ? (
+                              <Chip tone="neutral">
+                                {t("common.placeholder")}
+                              </Chip>
+                            ) : null}
+                            {isAdmin && member.status === "suspended" ? (
+                              <Chip tone="warn">{t("common.suspended")}</Chip>
+                            ) : null}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </KeyboardList>
               )}
             </>
           ) : /* Org chart */

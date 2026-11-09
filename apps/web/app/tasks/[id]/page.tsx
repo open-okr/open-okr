@@ -15,6 +15,7 @@ import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { PreviousNext } from "../../../lib/previous-next.tsx";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -118,6 +119,18 @@ export default async function TaskPage({
   });
   const conversation = await readConversation(context, "task", id);
 
+  // The tasks either side of this one on its space's board, column by column
+  // in the board's own order, which the link above leads back to: the links
+  // and the `[` and `]` keys (plan 0.7.0, U2).
+  const board = await callAction(context, "tasks.board", {
+    spaceId: task.spaceId,
+    limit: 200,
+  });
+  const onBoard = board.columns.flatMap((column) => column.cards);
+  const at = onBoard.findIndex((one) => one.id === id);
+  const before = at > 0 ? onBoard[at - 1] : undefined;
+  const after = at >= 0 ? onBoard[at + 1] : undefined;
+
   const assigned = new Set(task.assignees.map((one) => one.id));
   const statusOptions = STATUS_OPTIONS.map((one) => ({
     value: one.value,
@@ -130,12 +143,32 @@ export default async function TaskPage({
         <Card>
           <CardHeader className="justify-between">
             <div className="flex min-w-0 flex-col gap-0.5">
-              <Link
-                href={`/board?space=${task.spaceId}`}
-                className="text-xs text-ink-3 hover:text-brand-text"
-              >
-                {task.spaceName}
-              </Link>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <Link
+                  href={`/board?space=${task.spaceId}`}
+                  className="text-xs text-ink-3 hover:text-brand-text"
+                >
+                  {task.spaceName}
+                </Link>
+                <PreviousNext
+                  previous={
+                    before
+                      ? {
+                          href: `/tasks/${before.id}`,
+                          label: t("tasks.detail.previous"),
+                        }
+                      : null
+                  }
+                  next={
+                    after
+                      ? {
+                          href: `/tasks/${after.id}`,
+                          label: t("tasks.detail.next"),
+                        }
+                      : null
+                  }
+                />
+              </div>
               <h1 className="text-lg font-bold text-ink">{task.title}</h1>
             </div>
             {canEdit ? (
@@ -263,7 +296,9 @@ export default async function TaskPage({
                     </span>
                     {canEdit ? (
                       <RailButton
-                        label={t("tasks.detail.unassignName", {
+                        // Starts with the word the button shows, so a voice
+                        // command that says what it sees reaches it.
+                        label={t("tasks.detail.removeName", {
                           name: one.name,
                         })}
                         text={t("common.remove")}

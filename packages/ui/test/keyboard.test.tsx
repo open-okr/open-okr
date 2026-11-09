@@ -314,6 +314,33 @@ describe("KeyboardList", () => {
     expect(focused()).toBe("One");
   });
 
+  test("lands on the control a row marks, not on a title field before it", async () => {
+    render(
+      <TranslationsProvider locale="en">
+        <KeyboardRegistryProvider>
+          <KeyboardList edit>
+            {["One", "Two"].map((name) => (
+              <div key={name} data-keyboard-row>
+                <span data-keyboard-edit>
+                  <input aria-label={`Title of ${name}`} defaultValue={name} />
+                </span>
+                <a href={`/${name}`} data-keyboard-focus>
+                  Open {name}
+                </a>
+              </div>
+            ))}
+          </KeyboardList>
+        </KeyboardRegistryProvider>
+      </TranslationsProvider>,
+    );
+    // The title field comes first in each row; landing in it would take the
+    // next j as a letter (plan 0.7.0, U2, the OKRs list).
+    await userEvent.keyboard("jj");
+    expect(focused()).toBe("Open Two");
+    await userEvent.keyboard("e");
+    expect(document.activeElement).toBe(screen.getByLabelText("Title of Two"));
+  });
+
   test("starts from the row a pointer put the focus in", async () => {
     renderList();
     screen.getByText("Two").focus();

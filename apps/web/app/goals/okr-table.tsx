@@ -13,6 +13,7 @@ import {
   Button,
   Chip,
   formatConfidence,
+  KeyboardList,
   Spinner,
   TextInput,
   Tooltip,
@@ -631,114 +632,122 @@ function LiveOkrTable({
           </div>
         ) : null}
 
-        {goals.map((goal, goalIndex) => {
-          const open = !collapsed.includes(goal.id);
-          // The whole card takes a dragged objective, not only its head.
-          const objectiveMover = moverFor(
-            goals,
-            goalIndex,
-            null,
-            t("okrList.moveObjective", { title: goal.title }),
-          );
-          return (
-            <section
-              key={goal.id}
-              aria-label={goal.title}
-              className="relative rounded-xl border border-line bg-surface"
-              {...moverHandlers(objectiveMover)}
-            >
-              <DropLine at={hint?.id === goal.id ? hint.after : null} gap />
-              <ObjectiveRow
-                goal={goal}
-                open={open}
-                onToggle={() => toggle(goal.id)}
-                okr={okr}
-                canEdit={canEdit}
-                canAdminister={canAdminister}
-                busy={pending}
-                saving={savingIds.has(goal.id)}
-                progressMax={progressMax}
-                members={members}
-                coach={coach}
-                spaces={spaces}
-                viewerId={tree.viewerId}
-                mover={objectiveMover}
-                onDelete={() => okr.mutate({ kind: "deleteGoal", id: goal.id })}
-                onOpen={() => drawer.open(goal.id)}
-                onCheckIn={() => drawer.open(goal.id, { tab: "check-in" })}
-              />
-              {open ? (
-                <>
-                  {goal.keyResults.length > 0 ? (
-                    // The column names over the rows, so "5 in 10" reads as
-                    // a confidence. On a phone only the count stays.
-                    <div
-                      className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
-                    >
-                      <span>
-                        {t("okrList.keyResultsBand", {
-                          count: goal.keyResults.length,
-                        })}
-                      </span>
-                      <span>{t("goals.editor.columnValue")}</span>
-                      <span>{t("goals.editor.columnProgress")}</span>
-                      <span>{t("okrDrawer.confidenceLabel")}</span>
-                      <span />
-                    </div>
-                  ) : null}
-                  {goal.keyResults.map((keyResult, keyResultIndex) => (
-                    <KeyResultRow
-                      key={keyResult.id}
-                      dropAt={hint?.id === keyResult.id ? hint.after : null}
-                      mover={moverFor(
-                        goal.keyResults,
-                        keyResultIndex,
-                        goal.id,
-                        t("okrList.moveKeyResult", { title: keyResult.title }),
-                      )}
-                      keyResult={keyResult}
-                      units={units}
-                      cycle={tree.cycle}
-                      onOpen={() =>
-                        drawer.open(goal.id, { keyResultId: keyResult.id })
-                      }
-                      okr={okr}
-                      canEdit={canEdit}
-                      canAdminister={canAdminister}
-                      saving={savingIds.has(keyResult.id)}
-                      progressMax={progressMax}
-                      members={members}
-                      coach={coach}
-                    />
-                  ))}
-                  {canEdit ? (
-                    <AddRow
-                      label={t("goals.editor.addKeyResult")}
-                      placeholder={t("goals.editor.keyResultPlaceholder")}
-                      disabled={pending}
-                      indented
-                      // An objective just added opens with one key result
-                      // draft under it (design §4.3).
-                      initiallyOpen={draftUnder === goal.id}
-                      askReason={askReason}
-                      onAdd={(title, reason) =>
-                        add(() =>
-                          addKeyResult({
-                            goalId: goal.id,
-                            title,
-                            ownerId: goal.champion.id,
-                            dueOn: tree.cycle.endsOn,
-                            ...(reason ? { reason } : {}),
+        {/* `j` and `k` walk every objective and key result in order, `e`
+         * puts the caret in the row's title (plan 0.7.0, U2). */}
+        <KeyboardList edit={canEdit} className="flex flex-col gap-3">
+          {goals.map((goal, goalIndex) => {
+            const open = !collapsed.includes(goal.id);
+            // The whole card takes a dragged objective, not only its head.
+            const objectiveMover = moverFor(
+              goals,
+              goalIndex,
+              null,
+              t("okrList.moveObjective", { title: goal.title }),
+            );
+            return (
+              <section
+                key={goal.id}
+                aria-label={goal.title}
+                className="relative rounded-xl border border-line bg-surface"
+                {...moverHandlers(objectiveMover)}
+              >
+                <DropLine at={hint?.id === goal.id ? hint.after : null} gap />
+                <ObjectiveRow
+                  goal={goal}
+                  open={open}
+                  onToggle={() => toggle(goal.id)}
+                  okr={okr}
+                  canEdit={canEdit}
+                  canAdminister={canAdminister}
+                  busy={pending}
+                  saving={savingIds.has(goal.id)}
+                  progressMax={progressMax}
+                  members={members}
+                  coach={coach}
+                  spaces={spaces}
+                  viewerId={tree.viewerId}
+                  mover={objectiveMover}
+                  onDelete={() =>
+                    okr.mutate({ kind: "deleteGoal", id: goal.id })
+                  }
+                  onOpen={() => drawer.open(goal.id)}
+                  onCheckIn={() => drawer.open(goal.id, { tab: "check-in" })}
+                />
+                {open ? (
+                  <>
+                    {goal.keyResults.length > 0 ? (
+                      // The column names over the rows, so "5 in 10" reads as
+                      // a confidence. On a phone only the count stays.
+                      <div
+                        className={`grid gap-x-3.5 border-y border-line bg-bg py-1.5 pr-3.5 pl-3 text-[11.5px] font-semibold text-ink-3 md:pl-[42px] [&>span:not(:first-child)]:hidden md:[&>span:not(:first-child)]:block ${KEY_RESULT_GRID}`}
+                      >
+                        <span>
+                          {t("okrList.keyResultsBand", {
+                            count: goal.keyResults.length,
+                          })}
+                        </span>
+                        <span>{t("goals.editor.columnValue")}</span>
+                        <span>{t("goals.editor.columnProgress")}</span>
+                        <span>{t("okrDrawer.confidenceLabel")}</span>
+                        <span />
+                      </div>
+                    ) : null}
+                    {goal.keyResults.map((keyResult, keyResultIndex) => (
+                      <KeyResultRow
+                        key={keyResult.id}
+                        dropAt={hint?.id === keyResult.id ? hint.after : null}
+                        mover={moverFor(
+                          goal.keyResults,
+                          keyResultIndex,
+                          goal.id,
+                          t("okrList.moveKeyResult", {
+                            title: keyResult.title,
                           }),
-                        )
-                      }
-                    />
-                  ) : null}
-                </>
-              ) : null}
-            </section>
-          );
-        })}
+                        )}
+                        keyResult={keyResult}
+                        units={units}
+                        cycle={tree.cycle}
+                        onOpen={() =>
+                          drawer.open(goal.id, { keyResultId: keyResult.id })
+                        }
+                        okr={okr}
+                        canEdit={canEdit}
+                        canAdminister={canAdminister}
+                        saving={savingIds.has(keyResult.id)}
+                        progressMax={progressMax}
+                        members={members}
+                        coach={coach}
+                      />
+                    ))}
+                    {canEdit ? (
+                      <AddRow
+                        label={t("goals.editor.addKeyResult")}
+                        placeholder={t("goals.editor.keyResultPlaceholder")}
+                        disabled={pending}
+                        indented
+                        // An objective just added opens with one key result
+                        // draft under it (design §4.3).
+                        initiallyOpen={draftUnder === goal.id}
+                        askReason={askReason}
+                        onAdd={(title, reason) =>
+                          add(() =>
+                            addKeyResult({
+                              goalId: goal.id,
+                              title,
+                              ownerId: goal.champion.id,
+                              dueOn: tree.cycle.endsOn,
+                              ...(reason ? { reason } : {}),
+                            }),
+                          )
+                        }
+                      />
+                    ) : null}
+                  </>
+                ) : null}
+              </section>
+            );
+          })}
+        </KeyboardList>
 
         {canEdit ? (
           <div className="overflow-hidden rounded-lg border border-dashed border-line-2 bg-surface [&>*]:border-b-0">
@@ -867,22 +876,27 @@ function ObjectiveRow({
           then the progress across the card. The grip sat on the card's own
           border and the chevron where a key result has its grip, which made
           the two rows' left edges disagree (Goals, 2 November 2026). */}
-      <div className="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5">
+      <div
+        data-keyboard-row
+        className="group relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 gap-y-1.5 py-3 pr-3.5 pl-3 md:grid-cols-[1.5rem_minmax(0,1fr)_auto] md:pl-2.5"
+      >
         <span className="hidden h-6 items-center justify-center md:flex">
           {mover ? <Grip id={goal.id} mover={mover} /> : null}
         </span>
 
-        <InlineText
-          value={goal.title}
-          label={t("goals.editor.objectiveTitle")}
-          wrap
-          maxLength={500}
-          readOnly={!canEdit}
-          bold
-          textClass="text-[14.5px] leading-snug font-bold tracking-[-0.1px]"
-          onDraft={cells.onDraft}
-          onSave={cells.saveTitle}
-        />
+        <span data-keyboard-edit className="contents">
+          <InlineText
+            value={goal.title}
+            label={t("goals.editor.objectiveTitle")}
+            wrap
+            maxLength={500}
+            readOnly={!canEdit}
+            bold
+            textClass="text-[14.5px] leading-snug font-bold tracking-[-0.1px]"
+            onDraft={cells.onDraft}
+            onSave={cells.saveTitle}
+          />
+        </span>
 
         <div
           className="col-start-2 row-start-1 flex items-center gap-1 md:col-start-3"
@@ -1109,6 +1123,7 @@ function KeyResultRow({
           phone: the title with the menu beside it, the value and the
           confidence under it, then the progress across. */}
       <div
+        data-keyboard-row
         className={`group relative grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1.5 border-b border-line py-2.5 pr-3.5 pl-3 hover:bg-bg md:pl-2.5 ${KEY_RESULT_GRID}`}
         {...moverHandlers(mover)}
       >
@@ -1120,16 +1135,18 @@ function KeyResultRow({
             {mover ? <Grip id={keyResult.id} mover={mover} /> : null}
           </span>
           <div className="flex min-w-0 flex-col gap-0.5">
-            <InlineText
-              value={keyResult.title}
-              label={t("goals.editor.keyResultTitle")}
-              wrap
-              maxLength={500}
-              readOnly={!canEdit}
-              textClass="text-[13px] leading-snug font-medium"
-              onDraft={cells.onDraft}
-              onSave={(title) => patch({ title }, { title: keyResult.title })}
-            />
+            <span data-keyboard-edit className="contents">
+              <InlineText
+                value={keyResult.title}
+                label={t("goals.editor.keyResultTitle")}
+                wrap
+                maxLength={500}
+                readOnly={!canEdit}
+                textClass="text-[13px] leading-snug font-medium"
+                onDraft={cells.onDraft}
+                onSave={(title) => patch({ title }, { title: keyResult.title })}
+              />
+            </span>
             <VerdictChips verdicts={cells.verdicts} />
             <div data-text-first className={`text-[11.5px] ${META}`}>
               <span>
@@ -1510,6 +1527,9 @@ function RowActions({
       ) : null}
       <Tooltip label={openLabel}>
         <a
+          // Where `j` and `k` land in the row, rather than the grip or the
+          // title field, which would take the next `j` as typing (U2).
+          data-keyboard-focus
           href={href}
           onClick={(event) => {
             if (

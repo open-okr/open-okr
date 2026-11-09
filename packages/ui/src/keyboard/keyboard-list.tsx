@@ -11,8 +11,9 @@ import { useKeyboardShortcut } from "./use-keyboard-shortcut.ts";
  *
  * **Marked rather than rendered here.** A row is any element inside with
  * `data-keyboard-row`, its edit control the element marked
- * `data-keyboard-edit` (or the first field inside it) and its choice the one
- * marked `data-keyboard-select`, which is pressed. So a list the server draws
+ * `data-keyboard-edit` (or the first field inside it), its choice the one
+ * marked `data-keyboard-select`, which is pressed, and where `j` and `k` land
+ * the one marked `data-keyboard-focus` (or its first control). So a list the server draws
  * takes the keys without becoming a client component, and the list keeps its
  * own markup.
  *
@@ -78,7 +79,7 @@ export function KeyboardList({
         return;
       }
       last.current = to;
-      const target = row.querySelector<HTMLElement>(FOCUSABLE);
+      const target = landing(row);
       if (target) {
         target.focus();
       } else {
@@ -126,6 +127,26 @@ export function KeyboardList({
       {edit ? <EditKey within={within} /> : null}
       {children}
     </div>
+  );
+}
+
+/**
+ * Where `j` and `k` put the focus in a row: the control marked
+ * `data-keyboard-focus`, or else its first link or control, whichever is
+ * drawn. A row whose first control is a text field marks another, so the
+ * next `j` is not typed into the field.
+ */
+function landing(row: HTMLElement): HTMLElement | null {
+  const candidates = [
+    ...row.querySelectorAll<HTMLElement>("[data-keyboard-focus]"),
+    ...row.querySelectorAll<HTMLElement>(FOCUSABLE),
+  ];
+  // Drawn first: a control hidden on a phone takes no focus. Where nothing
+  // reports a box, as in a test's document, the first candidate stands.
+  return (
+    candidates.find((element) => element.getClientRects().length > 0) ??
+    candidates[0] ??
+    null
   );
 }
 

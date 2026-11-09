@@ -1,6 +1,12 @@
 "use client";
 
-import { Chip, guardPress, Spinner, useTranslations } from "@openokr/ui";
+import {
+  Chip,
+  guardPress,
+  KeyboardList,
+  Spinner,
+  useTranslations,
+} from "@openokr/ui";
 import { GripVertical, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -427,7 +433,9 @@ export function Board({
         </>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {/* `j` and `k` walk the cards column by column, in reading order
+       * (plan 0.7.0, U2). Picking a card up stays on its own handle. */}
+      <KeyboardList className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {shown.map((column) => (
           <section
             key={column.status}
@@ -497,7 +505,7 @@ export function Board({
             </ul>
           </section>
         ))}
-      </div>
+      </KeyboardList>
     </div>
   );
 }
@@ -534,6 +542,7 @@ function Card({
   return (
     <li
       data-testid="board-card"
+      data-keyboard-row
       draggable={canEdit}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
@@ -569,6 +578,8 @@ function Card({
             </button>
           ) : null}
           <Link
+            // Where `j` and `k` land, rather than the move handle (U2).
+            data-keyboard-focus
             href={`/tasks/${card.id}`}
             className="text-sm text-ink hover:text-brand-text"
           >
