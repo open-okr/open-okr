@@ -1,6 +1,6 @@
 # The standard input and output transport for local agents
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan A1), waiting for "design approved". It is a way in for an agent, so it is designed first (security).
+Status: approved 10 November 2026 and built in 0.7.0 (plan A1). It is a way in for an agent, so it was designed first (security).
 
 Authority: AI-NATIVE-PLAN §8.1 ("standard input and output for local or air-gapped desktop agents"); `agent-surface.md` §5.1, whose correction at completeness review M-12 says the transport "is still owed, for a desktop agent that speaks only that".
 
@@ -38,8 +38,16 @@ So every check an agent meets already lives behind the HTTP endpoint. What is mi
 | Kind | File | Covers |
 |---|---|---|
 | Unit | `packages/cli/test/mcp-bridge.test.ts` | Line framing, pass-through, the missing token, the network error, no logging |
-| Integration | `packages/core/test/mcp-stdio.test.ts` | The bridge against the real dispatch with an agent token: initialize, tools/list, a refused scope |
+| Browser | `e2e/s41b-mcp-stdio.spec.ts` | The bridge as its own process against a running instance, with an agent token minted on the tokens screen: initialize, then tools/list. Chosen over a core integration test, because `packages/cli` imports nothing from core and the endpoint's own refusals are tested where they are made |
 
 ## 4. Question for Akmal
 
 None: the design adds no authority and no secret beyond the agent token the product already mints.
+
+## 5. As built
+
+| Piece | Where |
+|---|---|
+| The bridge | `packages/cli/src/mcp-bridge.ts`, `runMcpBridge`: one POST per line, the session and protocol version the server gives sent back, an event-stream answer read as well as JSON |
+| The command | `okr mcp [--profile name]` in `packages/cli/src/run.ts`; it refuses a profile with no agent token before reading anything |
+| Storing the token | `okr login --url <instance> --mcp-token <token>` keeps it as `mcpToken` beside the profile's REST token |

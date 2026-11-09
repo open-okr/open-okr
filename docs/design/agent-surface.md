@@ -184,9 +184,10 @@ was not accepted anywhere, so a local agent had no way in that did not need a
 browser. It is now an API token minted for the `mcp` audience on
 `/account/api-tokens`, and the Streamable HTTP endpoint accepts it as a bearer
 beside the OAuth access token. Most local agents speak HTTP with a configured
-header, so this is the path they use today. The standard input and output
-transport itself is still owed, as P5-T09b's row records, for a desktop agent
-that speaks only that.
+header, so this is the path they use today. For a desktop agent that speaks
+only standard input and output, `okr mcp` bridges it to this endpoint with the
+same agent token (plan 0.7.0 A1, [agent-stdio](agent-stdio.md)): every check
+stays on the server.
 
 | | OAuth grant | Agent token |
 |---|---|---|

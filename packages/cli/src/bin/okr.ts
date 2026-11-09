@@ -9,6 +9,9 @@
 import { run } from "../run.ts";
 
 const result = await run(process.argv.slice(2), {
+  // `okr mcp` streams a desktop agent's messages both ways.
+  stdin: process.stdin,
+  stdout: process.stdout,
   // A device login prints a link and then waits, so it cannot hold its output
   // until the end. On stderr, which keeps it out of a pipe.
   say: (line) =>

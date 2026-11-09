@@ -119,6 +119,20 @@ importer's and the scheduler's actions are not agent tools at all; they stay on
 | Where you see it | **Connected apps** in the avatar menu, on the page headed Connected agents | **API tokens** in the avatar menu, with when it was last used |
 | Permissions | Yours, narrowed by its scopes | The same |
 
+### A desktop agent that speaks standard input and output
+
+Some local agents start a command and talk to it over its standard input and
+output instead of HTTP. `okr mcp` is that command: it passes each message to
+the agent endpoint with your agent token and writes the answer back.
+
+```sh
+pnpm okr login --url https://okr.example.com --mcp-token okr_mcp_...
+pnpm okr mcp
+```
+
+Point the agent's configuration at `okr mcp` as its command. Every check,
+scope and record is the endpoint's, exactly as over HTTP.
+
 **An agent token opens the agent endpoint and nothing else.** A REST token is
 refused there, and an agent token is refused at `/api/v1`. The endpoint does
 not assign a session to an agent-token connection; the protocol allows that,
