@@ -27,7 +27,11 @@ a hold ends on its own.
   attempt counts in `openokr_sign_in_held_total`
   ([observability](../runbooks/observability.md)).
 - **The second factor** keeps its own lock: ten wrong codes in a row lock that
-  account's second factor for 15 minutes.
+  account's second factor for 15 minutes, and `auth.second_factor_locked` on
+  the instance audit chain records when it begins.
+- **Per network**: ten sign-in attempts a minute from one network address,
+  and five reset requests. The count is kept in the database, so every
+  replica shares it. A refusal writes `auth.rate_limited`.
 - The answer is the same whether or not an account exists, so a hold tells
   nobody who has one. The counts are kept as keyed hashes, never as addresses.
 

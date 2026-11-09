@@ -44,8 +44,14 @@ import {
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
 import { CALLER_ADDRESS_HEADERS, callerAddress } from "./caller-address.ts";
+import {
+  type AuthLimiterStorage,
+  inProcessLimiter,
+  routedByPath,
+} from "./limiter-storage.ts";
 import { clearSignInAttempts, recordPasswordAttempt } from "./lockout.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
+import { withSecondFactorLockAudit } from "./second-factor-lock.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
 import {
@@ -216,6 +222,13 @@ export interface AuthOptions {
    */
   readonly rateLimit?: { readonly enabled: boolean };
   /**
+   * Where the address limiter keeps its count (account-lockout.md D10).
+   * The web app passes the Postgres cache, so every replica shares one count.
+   * Absent keeps Better Auth's in-process count, which is what a test or a
+   * one-process command wants.
+   */
+  readonly rateLimitStorage?: AuthLimiterStorage;
+  /**
    * Holding password sign-in after too many failures (docs/design/
    * account-lockout.md, plan 0.7.0 P10). On by default, tests included, like
    * the limiter above. A test about something else that makes many wrong
@@ -314,6 +327,28 @@ export interface AuthOptions {
 const SIGN_IN_ATTEMPTS = 10;
 const SIGN_IN_WINDOW_SECONDS = 60;
 
+/**
+ * The paths with a limit of their own. Every other auth path gets 100 a
+ * minute. These are also the paths whose count every replica shares when a
+ * storage is passed (account-lockout.md D10).
+ */
+const LIMIT_RULES = {
+  "/sign-in/email": { window: SIGN_IN_WINDOW_SECONDS, max: SIGN_IN_ATTEMPTS },
+  "/sign-up/email": { window: SIGN_IN_WINDOW_SECONDS, max: SIGN_IN_ATTEMPTS },
+  "/two-factor/verify-totp": {
+    window: SIGN_IN_WINDOW_SECONDS,
+    max: SIGN_IN_ATTEMPTS,
+  },
+  "/two-factor/verify-backup-code": {
+    window: SIGN_IN_WINDOW_SECONDS,
+    max: SIGN_IN_ATTEMPTS,
+  },
+  // The path Better Auth 1.7 really serves. The rule used to name
+  // `/forget-password`, which no longer exists, so Better Auth's own default
+  // of 3 applied rather than this 5 (account-lockout.md D11).
+  "/request-password-reset": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+} as const;
+
 export function createAuth(options: AuthOptions) {
   const database = drizzle(options.pool, { schema: authSchema });
   const origin = new URL(options.baseUrl);
@@ -401,9 +436,18 @@ export function createAuth(options: AuthOptions) {
 
   return betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
-      withSealedAccountTokens(
-        withHashedSessionTokens(adapterFactory(betterAuthOptions)),
-        keyRing,
+      withSecondFactorLockAudit(
+        withSealedAccountTokens(
+          withHashedSessionTokens(adapterFactory(betterAuthOptions)),
+          keyRing,
+        ),
+        // The moment a second factor locks (account-lockout.md D13). Its
+        // own row, because the lock is Better Auth's and nothing else sees it.
+        (userId) =>
+          recordInstanceAuditEvent(options.pool, {
+            action: "auth.second_factor_locked",
+            payload: { userId },
+          }),
       ),
 
     secret: options.secret,
@@ -490,28 +534,20 @@ export function createAuth(options: AuthOptions) {
       enabled: options.rateLimit?.enabled ?? true,
       window: SIGN_IN_WINDOW_SECONDS,
       max: 100,
-      customRules: {
-        "/sign-in/email": {
-          window: SIGN_IN_WINDOW_SECONDS,
-          max: SIGN_IN_ATTEMPTS,
-        },
-        "/sign-up/email": {
-          window: SIGN_IN_WINDOW_SECONDS,
-          max: SIGN_IN_ATTEMPTS,
-        },
-        "/two-factor/verify-totp": {
-          window: SIGN_IN_WINDOW_SECONDS,
-          max: SIGN_IN_ATTEMPTS,
-        },
-        "/two-factor/verify-backup-code": {
-          window: SIGN_IN_WINDOW_SECONDS,
-          max: SIGN_IN_ATTEMPTS,
-        },
-        // The path Better Auth 1.7 really serves. The rule used to name
-        // `/forget-password`, which no longer exists, so Better Auth's own
-        // default of 3 applied rather than this 5 (account-lockout.md D11).
-        "/request-password-reset": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
-      },
+      // One count for every replica on the paths with a rule of their own,
+      // when the caller has somewhere to keep it (account-lockout.md D10).
+      // Everything else, a session check above all, stays in the process, so
+      // reading a session never costs a query.
+      ...(options.rateLimitStorage
+        ? {
+            customStorage: routedByPath(
+              new Set(Object.keys(LIMIT_RULES)),
+              options.rateLimitStorage,
+              inProcessLimiter(),
+            ),
+          }
+        : {}),
+      customRules: LIMIT_RULES,
     },
 
     hooks: {
@@ -921,6 +957,15 @@ export function createAuth(options: AuthOptions) {
       // encrypted with the instance secret before they reach the database.
       twoFactor({
         issuer: instanceNameOr(options.instanceName),
+        // Better Auth's own defaults, written down (account-lockout.md D9):
+        // ten wrong codes in a row, across challenges and factors, lock the
+        // second factor for 15 minutes. Explicit, so an upgrade that changes
+        // a default shows in a diff rather than in production.
+        accountLockout: {
+          enabled: true,
+          maxFailedAttempts: 10,
+          durationSeconds: 900,
+        },
       }),
       // Passkeys, bound to this origin.
       passkey({

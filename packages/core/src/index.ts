@@ -477,6 +477,7 @@ export {
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export { callerAddress } from "./auth/caller-address.ts";
+export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
 export {
   syncAllSamlProviders,
