@@ -96,7 +96,8 @@ test("mentioning the Coach in the goal's thread gets its review back in that thr
 
   const composer = thread.getByRole("textbox", { name: "Your comment" });
   await composer.click();
-  await composer.pressSequentially("@OKR Co");
+  // One word: the editor ends a mention's search at a space.
+  await composer.pressSequentially("@Coach");
   // The `@` offers the Coach now that it answers (and never the Champion).
   await page.getByRole("button", { name: "OKR Coach" }).click();
   await composer.pressSequentially(" could you review this?");
