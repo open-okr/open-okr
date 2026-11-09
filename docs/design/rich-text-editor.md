@@ -156,3 +156,127 @@ TECHNICAL-PLAN §1's own package table restricts `packages/ui` to depending on `
 - Syntax highlighting in code blocks, text colour, alignment — see §3's exclusion list.
 - A server-side mention-to-notification fan-out, or an attachment-join-row writer. The fan-out arrived with comments (§5); nothing calls `extractAttachments` yet (§7).
 - Email/export rendering surfaces calling `renderRichTextToHtml` — the function is built and tested against synthetic documents; wiring it into the mail adapter or an export job is that job's own task.
+
+## 11. Attachment rows from the text, and the upload check (release 0.7.0, R1 and R2)
+
+Status: proposed 9 November 2026 for release 0.7.0 (plan R2), waiting for "design approved". A schema change, so it is designed first (CLAUDE.md). R1 needs no design; it is here because it guards the same write, and D16 says how the two ship.
+
+### 11.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The node | `packages/core/src/rich-text/schema.ts:84-90` | `attachment` with a filename, a content type, `uploading` or `ready`, and a `blobId` that is optional whatever the status |
+| Extraction | `rich-text/extract.ts` | `extractAttachments` is decode-safe and has no caller outside its test and the barrel export (`index.ts:1055`) |
+| The write boundary | `rich-text/field-schema.ts` `richTextSchema()`; `actions/comments.ts:50-56` and `actions/people.ts:85` keep their own | All three accept an `uploading` node. §7 says a server check "sits in the shared validator too". It does not |
+| The read path | `apps/web/lib/rich-text-html.ts:18-28` | Validates, then renders with no resolvers, so an attachment is its filename with no link (`render.ts:104-117`) |
+| Attachment rows | `actions/documents.ts:1206-1316` `attachments.attach`, `1318-1383` `attachments.detach` | The only writer. The files panel on goals, tasks, spaces, initiatives and the cycle calls it |
+| The subject check | `packages/db/migrations/0066_documents.sql:104-109`; `ATTACHMENT_SUBJECT_TYPES` in `packages/db/src/schema/documents.ts:40-50` | Nine subjects, no `comment` |
+| Who may download | `actions/blobs.ts:331-445` `blobs.getForDownload`; `documents.ts:1167-1204` `readableThroughAttachment` | The uploader, or whoever reads a subject the blob hangs on through a live row. A blob named in text with no row is the uploader's alone |
+| The editor | `packages/ui/src/rich-text/editor.tsx:229-243, 300-340` | Inserts an `uploading` node and makes it `ready` when `uploadFile` resolves. No screen passes `uploadFile`; only `/dev/rich-text` does |
+| The importer | `packages/importer/src/flowyteam/mappers/files.ts:336-467` | Stores each inline comment image as a blob, uploaded by whoever runs the import, then rewrites the body through `comments.replaceImportedBody` (`comments.ts:485-562`). No row, so only that person can open those images |
+| The orphan reap | `blobs.ts:468-554`, `blobs/provisioning.ts:285-310` | Removes blobs still `pending`, prepared and never claimed, past `orphanBlobMinutes`. A claimed blob is never reaped |
+
+So an attachment in text links nowhere today, and in the one place real data holds such nodes, imported comments, colleagues cannot open the picture.
+
+### 11.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **R1:** the write boundary refuses an attachment that is `uploading`, or `ready` with no `blobId`: "A file in this text is still uploading. Wait for it to finish, then save." One refinement in `field-schema.ts`, used by `richTextSchema()`; comments and the bio move onto it | §7's promise, made true at the one boundary every rich text write crosses |
+| D2 | R1 is not in `parseRichText` | The read path calls it (`rich-text-html.ts:21`). A stricter parser would hide a stored document that was valid when written |
+| D3 | **R2:** six writes reconcile the subject's text rows inside their own Operation: `comments.create`, `comments.update`, `comments.importComment`, `comments.replaceImportedBody`, `documents.create`, `documents.update`. One helper, `reconcileTextAttachments`, in `packages/core/src/attachments/` | The six cannot differ. Mentions already work this way (`reconcileMentions` in `comments/service.ts`) |
+| D4 | A row the text placed has `origin = 'text'`; a panel row has `panel`. The reconcile touches only `text` rows | A file attached through the panel is not in the text, and a reconcile that could not tell the two apart would remove it at the next edit |
+| D5 | In the text with no live row: insert, as `text`, after the highest position, in order of appearance. In the text with a live row of either origin: nothing. A live `text` row no longer in the text: soft delete. A `panel` row: never touched | Soft delete is the default. Putting the file back later writes a new row, which the partial unique index allows |
+| D6 | For a document, "in the text" is the current body **or any published version's body** | Versions are kept and read (`documents.difference`), and a picture in version 1 must still open after version 2 dropped it. A file only ever in an unpublished draft goes when the draft drops it |
+| D7 | Before inserting, the writer must be able to open the blob, by `blobs.getForDownload`'s rule: their own upload, or one readable through a live row they reach. Otherwise the write is refused with not-found: "A file in this text is not one you can share here." | Without it, another member's blob id in a comment would publish their private file to every reader. `attachments.attach` asks the same (`documents.ts:1226-1233`) |
+| D8 | A blob that is `pending`, deleted or not in this workspace refuses the write. `scanning` and `quarantined` are accepted, as the panel accepts them; the download refuses both until cleared | `pending` means the bytes were never claimed and the reap takes it within a day, so a row would point at nothing |
+| D9 | Deleting a comment or a document leaves its rows. Access through a deleted subject fails, so its files close with it, and `documents.restore` brings them back | The rule the document delete already keeps: "the delete takes the document alone" |
+| D10 | `attachments.detach` refuses a `text` row: "This file is in the text. Take it out of the text instead." | Otherwise the panel and the text disagree, and the next edit puts the row back |
+| D11 | `comment` joins the table's check and `ATTACHMENT_SUBJECT_TYPES`, **not** the inputs of `attachments.attach` and `attachments.list`, which keep a list of their own | A file reaches a comment through its text only. Nobody needs a panel to hang a file on somebody else's comment |
+| D12 | `requireAttachmentSubject` gains `comment`, resolved by `SUBJECT_RESOLVERS.comment` (`access/reads.ts:524`), the walk a reaction on a comment takes | So `readableThroughAttachment` lets a reader of the comment open its file |
+| D13 | Each of the six actions' audit payload gains `attachmentsAdded` and `attachmentsRemoved`, blob ids only. No new activity kind | The comment's own activity is the feed line. The trail still says which files a write shared |
+| D14 | Comments and documents render a `ready` attachment as a link to `/api/blobs/<blobId>`, which decides access. `richTextHtml` takes the resolver. Email keeps the filename | Without the link the rows change nothing a person sees. A mail reader is not signed in |
+| D15 | The orphan reap does not change | `storeUpload` prepares, writes and claims before the node turns `ready`, so a blob in a `ready` node is never `pending` |
+| D16 | **R1 ships first, alone; R2 follows on top of it once approved; both in 0.7.0** | R1 needs no design and covers every rich text field. With it in place every stored node is `ready` with a `blobId`, so the reconcile never meets half an upload |
+
+### 11.3 The migration
+
+The next free number:
+
+```sql
+alter table attachments drop constraint attachments_subject_type_check;
+alter table attachments add constraint attachments_subject_type_check
+  check (subject_type in ('space', 'goal', 'key_result', 'initiative', 'cycle',
+    'session', 'task', 'document', 'check_in', 'comment'));
+alter table attachments
+  add column origin text not null default 'panel'
+  check (origin in ('panel', 'text'));
+```
+
+- Forward-only and additive. Nothing is renamed or removed, so one release is enough; expand-then-contract governs removals.
+- A constant default changes only the catalogue in Postgres 11 and later, with no table rewrite. Every existing row is a panel row, which is what each one is.
+- No new policy: `attachments` has carried `workspace_id` and its policy since 0066.
+- During a rolling upgrade an old pod writes rows without `origin` and gets `panel`, which is right. An old pod serving a download that meets a `comment` row fails that download, because its subject check knows no `comment`. That is a file nobody but its uploader could open before. Nothing is written wrong.
+- The workspace archive carries the column and the value. An older instance already refuses a newer archive (`portability/archive.ts:262`).
+
+### 11.4 What happens to a blob named by text
+
+| Case | After this change |
+|---|---|
+| Named in text, writer can open it, claimed | A `text` row. Every reader of the comment or document opens it |
+| Named in text, another member's private file | The write is refused (D7) |
+| Named in text, `pending` or gone | The write is refused (D8) |
+| Uploaded in the editor, taken out before posting | Claimed, no row, the uploader's alone, counted against the quota, never reaped. As today |
+| Imported inline image | A `text` row, written by `comments.replaceImportedBody` |
+| Imported before 0.7.0 | Q1 |
+
+Reaping a claimed blob with no row is out of scope. Avatars, logos, favicons, exports and archives hold blobs without an attachment row, so "no row" does not mean "unused".
+
+The spreadsheet importer writes no comments or documents. The FlowyTeam task files keep going through `attachments.attach` as `panel` rows.
+
+### 11.5 Open questions
+
+**Q1.** Workspaces imported before 0.7.0 hold comments whose images only the importer's runner can open. Data change `0033_attachment_rows_from_text` would insert `text` rows for each `ready` node whose blob is live in the same workspace and either was uploaded by the body's author or sits in an imported comment (one with a legacy key). Anything else is skipped and counted. It is SQL over `jsonb_path_query`, because `packages/db` cannot import `extractAttachments`. It touches stored data and changes who can open existing files, which is why it is yours. **Proposed: yes, through `pnpm db:change`, with the upgrade notes saying what it opens.**
+
+**Q2.** No screen lets a person paste or drop a file into a comment or a document: `uploadFile` is passed only on `/dev/rich-text`. Wiring it into the comment composer and the document editor is the change that makes R1 and R2 reachable from a browser. **Proposed: a separate interface change after R2, added to the plan as its own row.**
+
+### 11.6 Acceptance criteria
+
+- Given a comment body holding a `ready` node for a file Ana uploaded, when Ana posts it, then one live row (`comment`, its id, the blob, `text`) exists, and Ben, who reads the goal, opens the file from the comment.
+- Given that comment, when Ana edits the image out, then the row is soft-deleted and Ben's download is not-found.
+- Given an edit that changes only words, when it saves, then the rows are unchanged.
+- Given Carl's private file, when Ana posts a comment naming its blob, then the write is refused with not-found and no comment exists.
+- Given any rich text field holding an `uploading` node, when it is saved through any surface, then it is refused with R1's sentence and nothing is written.
+- Given a `ready` node whose blob is `pending`, when it is saved, then it is refused.
+- Given a document published as version 1 with an image, when its draft drops the image, then the row stays and version 1's image opens. Given an image only in an unpublished draft, when it is dropped, then its row is soft-deleted.
+- Given a file attached to a document through the panel, when the document's body is edited, then the panel row is untouched.
+- Given a `text` row, when `attachments.detach` names it, then it is refused.
+- Given a FlowyTeam import with an inline image, when the files domain runs, then the comment has a `text` row and every reader of the task opens the picture.
+- Given a deleted comment that held an image, when Ben asks for the file, then it is refused.
+
+### 11.7 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Unit | `packages/core/test/rich-text-field-schema.test.ts` (existing) | R1: `uploading`, `ready` with no `blobId`, a clean document |
+| Integration | `packages/core/test/attachments-from-text.test.ts` | D5 to D12, row by row |
+| Integration | `packages/core/test/comments.test.ts`, `documents.test.ts` (existing) | The six actions reconcile, and their audit payload |
+| Integration | `packages/importer/test/flowyteam-files.test.ts` (existing, needs MySQL) | Inline images get `text` rows |
+| Integration | `packages/db/test/data-change.test.ts` (existing) | Q1's change: idempotent, skips and counts |
+| End to end | `e2e/s29-documents.spec.ts` (extend) | A published document's image is a link a second member opens |
+
+### 11.8 Documents changed in the same change
+
+- This document: §4 (`ExtractedAttachment.blobId` may be undefined), §7 (where the server check lives, and who writes the rows) and §10.
+- TECHNICAL-PLAN §4.9: the `attachments` row gains `origin` and `comment`.
+- TECHNICAL-PLAN §7.2: the inline-image row says the comment now carries a `text` row.
+- DATABASE.md: the `attachments` row.
+- `contract/*.json` regenerated: `attachments.list` returns `origin`.
+- The upgrade notes for 0.7.0: Q1's change, and R1's refusal for any client that sends an `uploading` node.
+
+### 11.9 What this does not do
+
+- It does not reconcile files in other rich text fields, such as a goal's description or a check-in note. Those still render a filename only.
+- It does not let a person paste a file into a comment from the browser (Q2).
+- It does not reap a claimed blob nobody attached.
+- It does not render an image inline. A ready attachment is a link, as `render.ts` already draws it.

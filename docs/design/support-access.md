@@ -250,3 +250,93 @@ Written as the test plan P8-T04 inherits.
 | 3 | The default duration | 4 hours, chosen here. It is the kind of number a real support organisation revises after a month of use |
 | 4 | Whether the account-recovery case really never needs content | Section 1 asserts it does not, on the grounds that accounts are not content. Worth testing against a real support ticket before P8-T04 rather than after |
 | 5 | Whether the operator's own reason text should be visible to every member or only the granting owner | Written here as the owner sees it on the request and every member sees the banner without it. The reason may name an internal ticket |
+
+## 10. Inbox items for the request and the end (release 0.7.0, P2)
+
+Status: proposed 9 November 2026 for release 0.7.0 (plan P2), waiting for "design approved". It widens a check constraint, so it is designed first (CLAUDE.md).
+
+§6 promises two inbox items: one when support asks, one when a session ends. Neither is written.
+
+### 10.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The request | `packages/core/src/operator/sessions.ts:100-165` | Inserts the `operator_sessions` row under the operator's own key (`:144-156`). **Not an Operation**, by its own comment (`:92-99`): no activity, no audit row, no outbox row. The operator console's rule, "every operator action is recorded twice" (`operator-console.md` §6), is not met |
+| The end | `sessions.ts:418-497` | An Operation, `support.end`: stamps the row, suspends the guest, writes the `support.ended` activity and audit row. Called for `refused` (`apps/web/app/admin/support/grant-decision.tsx:35-40`), `revoked` (`apps/web/lib/support-banner.tsx:38-42`) and `expired` (the sweep). Nothing calls it with `finished` |
+| The sweep (B2) | `sessions.ts:536-549`; `apps/web/lib/scheduler.ts:240-248`, `:489-495` | Every five minutes, ends each expired session through `support.end` as the `system` actor. One loop with no `try`, so one failure stops the rest, against the scheduler's own rule (`scheduler.ts:27`) |
+| The freeze overlay | `packages/core/src/operations/operation.ts:582-603`; `operations/freeze.ts:20-38` | Refuses every write in a `read_only` or `frozen` workspace unless the action is on the recovery list. **`support.end` is not**, so in a suspended workspace the owner's revoke fails silently and the sweep throws on that session |
+| Who may answer | `grant-decision.tsx:29` | `requireAccessLevel(full)`: `full` on the workspace context. This settles §9 question 2 in code |
+| Who that is, as a list | `packages/core/src/people/lifecycle.ts:90-126` | `workspaceAdministratorIds`: active human members whose resolved level on the workspace context is `full`. Guests are excluded, so the operator's own guest is never one |
+| The operator actor | `operation.ts:420-433` | `{ kind: "operator", userId }` resolves to no member and `full`, and the audit row carries `actor_operator_user_id`. Used by `operator/lifecycle.ts:81` |
+| The reasons | `packages/db/src/schema/notifications.ts:4-11`; `packages/db/migrations/0023_check_ins.sql:176-192` | Six values, enforced by `notifications_reason_check` and `subscriptions_reason_check` |
+| Writing rows inside an Operation | `packages/core/src/notifications/create.ts` | `notifyRecipients(tx, ...)` inserts the rows and one `inbox.added` outbox row each, in the caller's transaction. Routed by `settings.routing[reason]`, else the member's primary channel (`:132`), and batched into the member's window |
+| What a row says | `apps/web/app/inbox/subject-link.ts:55-73`; `packages/core/src/notifications/digest.ts:197-204`; DATABASE.md §14 | A row written inside `execute` has no activity id, because the pipeline writes the activity after `execute` returns. Its line in the inbox and the mailed digest comes from its **reason** alone |
+
+### 10.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **Two new reasons, `support_request` and `support_ended`** | §10.1's last row: the reason is the only thing that can tell a request from an end. Two reasons also let an administrator route requests to email and ends to the inbox only |
+| D2 | **One migration widens both checks to eight values**, drop then add, as 0023 did for these and 0131 did for `nudges`. Forward-only and additive: no row changes. `subscriptions` is widened only so the one enum in the schema matches both tables; nothing writes a `support_*` subscription | Expand only. During a rolling upgrade the old release shows the raw reason word, because the inbox falls back to it (`subject-link.ts`) and no action output is parsed at run time. Nothing refuses |
+| D3 | **Recipients: `workspaceAdministratorIds`**, the members who can answer. Not every member, who sees the banner while a session is live. Not only the built-in Owner role, which would miss a founder holding `full` through a binding | The set that receives the question is the set that may answer it, by the same rule |
+| D4 | **The request becomes an Operation, `support.request`**, with the operator actor, after the `isLiveOperator` check it has today. One transaction: the `operator_sessions` row, a `support.requested` activity (on the feed, like `support.granted`, without the reason), an audit row naming the operator with the reason, the administrators' rows and their outbox rows. Then an instance audit row, `operator.support_requested`, as `operator/workspaces.ts:72` writes `operator.workspace_created` | Every write through the pipeline. Closes the missing record too: a request is the moment an outsider asked |
+| D5 | **The end writes its rows inside `support.end`**, for a session that was granted, to every administrator except the member who ended it. A refusal writes none | Somebody was inside, so everybody who answers for the workspace hears. After a refusal nobody entered, and the request's own row already links to the answer |
+| D6 | **The sweep is the path most end rows take.** It already ends through `support.end`, so the rows ride its transaction, to every administrator, since the `system` actor is nobody | No second producer. Access ended at its expiry anyway (§5); the row arrives within five minutes |
+| D7 | **`support.end` joins the freeze recovery list.** `support.request` and `support.grant` stay off it, so a request into a suspended workspace is now refused | Ending somebody's access is recovery. A request that can never be granted is worse than a refusal (`sessions.ts:114-118`). See Q2 |
+| D8 | **The sweep ends each session in its own `try`** and reports what failed | One stuck session must not keep the others open on the owner's screen |
+| D9 | **The rows' subject is `support_session` with the session id.** `subjectPath` maps it to `/admin/support`. The inbox groups a session's request and end under one heading, "Support access" | One place to answer and to read the outcome |
+| D10 | **The reason text is never in an inbox line, the feed or a mail.** It is on Admin, Support and in the audit row | §9 question 5: it may name an internal ticket, and mail leaves the instance |
+| D11 | **No grant or refuse buttons in the inbox.** The row links to Admin, Support, which holds the level and hours choice. Admin, Support gives each ended session a "What was done" link to `/admin/audit?actorMemberId=<guest>` | One place decides. The audit filter already exists, and the guest is one member across every session (§4) |
+| D12 | **No nudge.** No `nudges` row, no rule key, no Coach or Champion. The rows follow each member's routing like the other six reasons, which by default means the inbox and a batched email | It is a notice that one person's action caused, sent once, not an agent's proactive message. See Q1 |
+
+### 10.3 What the rows say
+
+| Reason | Inbox line and digest line | Chip |
+|---|---|---|
+| `support_request` | "Support asked to enter this workspace. Answer it on Admin, Support." | Support request |
+| `support_ended` | "A support session in this workspace ended. See how, and what was done, on Admin, Support." | Support ended |
+
+The `support.ended` feed renderer changes from the stored key to words: "the time ran out", "revoked by a member", "finished by support", "refused".
+
+**Q1, for you.** D12 sends these through each administrator's routing, so by default they also reach email in the batch window (30 minutes). I do not count that as a new proactive message kind: no agent sends it, it has no rule key or escalation, and it fires once per thing a person did. If you do count it, the alternative is to route both reasons to the inbox only by default. **Proposed: D12 as written.**
+
+**Q2, for you.** D7 changes one thing an operator can do today: ask to enter a suspended or closed workspace. The grant is already refused there, so such a request can only be refused or left. **Proposed: refuse it, with the freeze sentence.**
+
+### 10.4 Acceptance criteria
+
+- Given a workspace with two members at `full` and one at `edit`, when an operator requests a session, then each `full` member has one unread `support_request` row linking to `/admin/support`, the `edit` member has none, and the session row, the activity, the workspace audit row naming the operator, one instance audit row and two `inbox.added` outbox rows exist.
+- Given the notification insert fails, when an operator requests a session, then no session row exists.
+- Given a granted session past its expiry, when the sweep runs, then the session ends and each `full` member has a `support_ended` row.
+- Given a granted session, when member A revokes it from the banner, then every other `full` member gets a `support_ended` row and A does not.
+- Given a pending request, when an administrator refuses it, then no `support_ended` row is written.
+- Given a `read_only` workspace with an expired session, when the sweep runs, then the session ends and its rows are written.
+- Given two expired sessions where ending the first fails, when the sweep runs, then the second still ends.
+- Given a `read_only` workspace, when an operator requests a session, then it is refused and nothing is written.
+- Given any `support_*` row, then neither its inbox line, the feed nor the digest mail contains the request's reason.
+- Given a member's channels page, then both reasons are listed with a routing choice.
+
+### 10.5 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/support-sessions.test.ts` (existing) | Recipients, atomicity, the operator audit rows, end rows per ending, no row on refusal, the reason kept out; rows from the sweep, a `read_only` workspace, one failure not stopping the rest |
+| Integration | `packages/db` migration suite | Both checks accept the two values and still refuse an unknown one |
+| Unit | `apps/web/test/inbox-links.test.ts` (existing) | `support_session` maps to `/admin/support` |
+| Unit | `apps/web/test/inbox-fallback.test.ts` (existing) | Both lines and chips |
+| Unit | `apps/web/test/scheduler.test.ts` (existing) | The sweep reports a failed session and carries on |
+| End to end | `e2e/s48-support-access.spec.ts` (existing) | The request appears in the owner's inbox and links to Admin, Support |
+
+### 10.6 Documents changed in the same change
+
+- This document's §6: the request carries no duration, and the inbox links rather than offering grant and refuse.
+- DATABASE.md §13 and §14: the reasons on `subscriptions` and `notifications`. TECHNICAL-PLAN §4.11 needs nothing: it names the column, not the values.
+- UIUX-PLAN S-03 (the two chips) and S-48 (the inbox row points at Admin, Support, and the "What was done" link). S-48's operator side also lists "the duration and the level being asked for", which the request form has never had; corrected while there.
+- `contract/` and `docs/api/reference.md`, regenerated: the inbox's reason enum grows.
+- The English and Malay message files, and a changeset.
+
+### 10.7 What this does not do
+
+- No `finished` ending. An operator still cannot end their own session.
+- No limit on how often an operator may ask again after a refusal. Every request is now recorded, which is the check on it.
+- No mail outside the member's routing, and no chat message beyond what routing already sends.
+- A row stays in the inbox of somebody who later loses `full`. Its link then answers not-found, as the rest of admin does.

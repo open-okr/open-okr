@@ -639,3 +639,12 @@ endpoint and the agent endpoint all read it.
 **then** the call is denied by the permission layer, the denial is audited with
 the channel named, and the agent receives a clear error rather than a partial
 result.
+
+## The tool-call record (release 0.7.0, plan A2)
+
+Proposed 9 November 2026 in [agent-tool-calls.md](agent-tool-calls.md), waiting
+for "design approved". It is a document of its own because this one is long.
+Until it is built, §5.2's "every call writes a tool-call row and an audit event"
+is not true: only a write leaves a record, its audit row. Once it is built, every
+call writes a tool-call row, and a write or a scope refusal also writes an audit
+event.

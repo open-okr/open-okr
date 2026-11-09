@@ -190,10 +190,10 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B11 | done | |
 | M1 to M4 | done | One change |
 | Section 3 | done | Stale text, one change |
-| A1 to A13 | to do | A1, A2, A4 and A6 design first |
-| O1 to O6 | to do | O2, O5 and O6 design first |
+| A1 to A13 | to do | A1 and A6 design first. A2 design written: `docs/design/agent-tool-calls.md`, Q1 to Q3 for you. A4 design written: `docs/design/agent-connections-admin.md`, Q1 and Q2 |
+| O1 to O6 | to do | O2 and O5 design first. O6 design rechecked: `docs/design/irreversible-scope.md`, its Q1 to Q3 |
 | S1 to S3 | to do | |
 | U1 to U3 | to do | U3 design first |
-| R1 to R3 | to do | R2 design first |
-| P1 to P10 | to do | P1 done with B2; P2, P4, P7 and P10 design first |
+| R1 to R3 | to do | R1 and R2 design written together: `docs/design/rich-text-editor.md` §11, Q1 and Q2. R1 needs no approval and ships first |
+| P1 to P10 | to do | P1 done with B2. P2 design written: `docs/design/support-access.md` §10, Q1 and Q2. P10 design written: `docs/design/account-lockout.md`, Q1 and Q2. P4 and P7 design first |
 | D1 to D5 | to do | D4 only needs no design |
