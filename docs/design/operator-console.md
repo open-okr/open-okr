@@ -262,6 +262,16 @@ The gap costs nothing and the collision would cost somebody an hour.
 | S-47 Operator instance | Feature flags and site messages, each with its window and its target |
 | S-48 Support session | Requesting one, and the banner that runs while it is live. Specified in `support-access.md` |
 
+**S-45's search and filters were built at release 0.7.0 (P3), and seats used
+was not.**
+
+| Part | What was built |
+|---|---|
+| Search, state, plan | In the address (`?q=&state=&plan=`), narrowing the list the operator's own read returned. A filtered list is a link to paste into a ticket, and nothing new is read |
+| Plan options | Free (no plan), each catalogue plan by name, and any key a tenant still carries that the catalogue has dropped |
+| Last activity | The snapshot's `last_activity_at`, so it is as of the last measurement like the counts beside it |
+| Seats used | **Not built.** The seat limit counts active and invited humans plus pending personal invitations (`seatState`). The snapshot holds active humans only, and the console reads nothing but the snapshot. It needs a `seat_count` column on `operator_workspace_usage`, which is a schema change and waits for its design. Until then the members column is active people against the plan's seats |
+
 The customer-side billing screen is S-49 and belongs to
 `plans-and-seats.md`, because it is a workspace admin's screen
 rather than an operator's.
