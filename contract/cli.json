@@ -4822,6 +4822,12 @@
           "field": "reason",
           "type": "string",
           "required": false
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false

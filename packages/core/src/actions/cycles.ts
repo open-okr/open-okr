@@ -1361,11 +1361,45 @@ export const setAnnualFrame = defineWriteAction({
      * frame still being drafted, and for a new year.
      */
     reason: z.string().trim().min(1).max(500).optional(),
+    /**
+     * The cycle this write is made from (docs/design/okr-core-domain.md §3.1,
+     * plan 0.7.0 O1). An annual cycle may write the frame, and so may a call
+     * made from no cycle at all. A quarterly cycle may not: the frame is its
+     * reference, and its phase 3 revalidates the frame without rewriting it
+     * (METHOD.md §2.1).
+     */
+    cycleId: z.uuid().optional(),
   }),
   output: frameOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      if (input.cycleId) {
+        const [acting] = await tx
+          .select({ mode: cycles.mode })
+          // openokr:allow-raw-read: a cycle carries no access context of its
+          // own and is read by workspace, which `full` on this action has
+          // already granted; the tenant floor scopes it.
+          .from(cycles)
+          .where(
+            activeOnly(
+              cycles,
+              eq(cycles.id, input.cycleId),
+              eq(cycles.workspaceId, workspaceId),
+            ),
+          )
+          .limit(1);
+        if (!acting) {
+          throw new OperationError("not_found", "That cycle was not found.");
+        }
+        if (acting.mode !== "annual") {
+          throw new OperationError(
+            "forbidden",
+            "The annual frame is reference during a quarterly cycle. Change it from the annual cycle; this cycle's phase 3 revalidates it.",
+          );
+        }
+      }
+
       const [current] = await tx
         .select({
           id: annualFrames.id,

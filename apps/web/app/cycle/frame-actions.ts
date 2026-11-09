@@ -61,6 +61,9 @@ export async function setFrame(
   // Asked only once the frame is agreed (METHOD.md §2.1, P9-T13-c-c); an
   // empty field sends nothing, and the action says when one was needed.
   const reason = String(form.get("reason") ?? "").trim();
+  // The cycle the form was drawn in, so a quarterly cycle is refused by the
+  // server as well as by the screen (plan 0.7.0 O1).
+  const cycleId = String(form.get("cycleId") ?? "").trim();
 
   try {
     await callAction(
@@ -80,6 +83,7 @@ export async function setFrame(
         notDoing,
         strategies,
         ...(reason === "" ? {} : { reason }),
+        ...(cycleId === "" ? {} : { cycleId }),
       },
     );
   } catch (error) {

@@ -5722,6 +5722,11 @@
             "minLength": 1,
             "maxLength": 500,
             "description": "One line on why, where the workspace asks for one."
+          },
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
           }
         },
         "required": [

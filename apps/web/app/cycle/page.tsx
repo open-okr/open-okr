@@ -711,7 +711,11 @@ export default async function CyclePage({
           ) : null}
 
           {viewing === 0 ? (
-            <AnnualFrame frame={frame} canEdit={canPublish} />
+            <AnnualFrame
+              frame={frame}
+              canEdit={canPublish}
+              cycle={{ id: cycle.id, mode: workflow.mode }}
+            />
           ) : null}
 
           {viewing === 0 ? (

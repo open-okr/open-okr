@@ -102,7 +102,7 @@ cycle revalidates it and never rewrites it.
 | Rule | Enforcement |
 |---|---|
 | At most one frame per workspace is current | Partial unique index on `(workspace_id) where superseded_at is null` |
-| A quarterly cycle cannot write frame fields | The frame's update action requires the acting cycle to be `mode = 'annual'`, or no cycle at all |
+| A quarterly cycle cannot write frame fields | `frame.set` takes the cycle it acts from, `cycleId`, and refuses a quarterly one; an annual cycle or no cycle at all may write. The cycle screen sends the cycle it is drawn in, and a quarterly cycle's phase 0 shows the frame read-only with a link to the annual cycle (plan 0.7.0 O1) |
 | 2 to 5 annual strategies | `quality.annualStrategyBounds` in the §11 registry. Below 2 or above 5 holds Phase 0 completion |
 | The not-doing list is text, not a relation | METHOD.md §2.1 lists it as part of the frame. Rich text, one field |
 
