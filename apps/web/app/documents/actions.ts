@@ -8,13 +8,10 @@
  * draft: that is a clause in the query, and this file could not widen it if it
  * tried.
  */
-import {
-  callAction,
-  OperationError,
-  type RichTextDocument,
-} from "@openokr/core";
+import { callAction, type RichTextDocument } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusedByField, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
@@ -28,6 +25,17 @@ const SUBJECTS = [
   "session",
 ] as const;
 
+/**
+ * What a refused write says (guided-inputs §4.2): under the title for the
+ * new document form, one sentence for the editor's save and publish, which
+ * write the whole document. A schema's refusal too, which used to reach the
+ * error page.
+ */
+type Answer = (
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+) => WriteState | null;
+
 async function run(
   fn: (context: {
     pool: ReturnType<typeof getPool>;
@@ -35,6 +43,7 @@ async function run(
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
   paths: readonly string[],
+  answer: Answer = refusedSentence,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -44,10 +53,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = answer(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   for (const path of paths) {
     revalidatePath(path);
@@ -79,7 +89,10 @@ export async function createDocumentAction(
     return { error: t("documents.actions.documentHangsOffSomething") };
   }
   if (title === "") {
-    return { error: t("documents.actions.documentNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("documents.actions.documentNeedsATitle") },
+    };
   }
 
   return run(
@@ -90,6 +103,7 @@ export async function createDocumentAction(
         title,
       }),
     pathsFor(subjectType, subjectId),
+    refusedByField,
   );
 }
 
