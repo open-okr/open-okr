@@ -14,6 +14,7 @@ import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
+import { reviewMinutesFor } from "../../lib/cycle-review-minutes.ts";
 import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { pageTitle } from "../../lib/page-title.ts";
@@ -243,6 +244,29 @@ export default async function CyclePage({
   const reviewPractice = reviewRules
     ? (reviewRules.practice as unknown as ResolvedPractice)
     : null;
+
+  // A closed cycle links to its review minutes (sessions.md §9). Read from the
+  // sessions of every space the reader can see, as phase 6 reads its cadence,
+  // so the link never points at a review the reader could not open.
+  const reviewMinutes =
+    viewing === 7 && workflow.closure
+      ? reviewMinutesFor(
+          workflow.cycleId,
+          (
+            await Promise.all(
+              (
+                await callAction(context, "spaces.list", {})
+              ).map(async (space) =>
+                (
+                  await callAction(context, "sessions.list", {
+                    spaceId: space.id,
+                  })
+                ).map((one) => ({ ...one, spaceName: space.name })),
+              ),
+            )
+          ).flat(),
+        )
+      : [];
 
   const cadenceSpaces =
     viewing === 6 ? await callAction(context, "spaces.list", {}) : [];
@@ -759,6 +783,7 @@ export default async function CyclePage({
               cycleId={workflow.cycleId}
               cycleName={workflow.name}
               closure={workflow.closure}
+              reviewMinutes={reviewMinutes}
               // The same evaluation `cycles.close` refuses on, so the control
               // is disabled for exactly the reasons the server would give.
               waitingFor={[

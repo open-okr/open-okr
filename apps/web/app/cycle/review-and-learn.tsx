@@ -1,6 +1,8 @@
 import type { ResolvedThresholds, ScoreColoursPractice } from "@openokr/method";
 import { scoreBand, scoreBandsIn } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
+import { dayLabel } from "../../lib/day-label.ts";
 import { groupRows } from "../../lib/group-rows.ts";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
@@ -26,6 +28,11 @@ import { closeCycle } from "./frame-actions.ts";
  * button on the scorecard, and nothing set a cycle to closed. Now the close
  * records the result and feeds the next cycle together, and once closed this
  * card shows both: the verdict, and what the next cycle received.
+ *
+ * **A closed cycle links to its review minutes** (sessions.md §9, release
+ * 0.7.0 S3), one per review held, from `lib/cycle-review-minutes.ts`. The
+ * session page was the only way in, which meant knowing the space that held
+ * the review before you could read what it decided.
  */
 
 export interface ScoredKeyResult {
@@ -49,6 +56,14 @@ export interface Closure {
   readonly packNote: boolean;
 }
 
+/** One review whose minutes a closed cycle links to. */
+interface ReviewMinutes {
+  readonly sessionId: string;
+  readonly title: string;
+  readonly spaceName: string;
+  readonly heldOn: string;
+}
+
 /** The band names in the order §3.3 states them, worst last. */
 function bandWord(band: string, t: (key: string) => string): string {
   switch (band) {
@@ -70,6 +85,7 @@ export async function ReviewAndLearn({
   cycleId,
   cycleName,
   closure,
+  reviewMinutes,
   waitingFor,
   canEdit,
   thresholds,
@@ -80,6 +96,8 @@ export async function ReviewAndLearn({
   readonly cycleName: string;
   /** Null while the cycle is open. */
   readonly closure: Closure | null;
+  /** The reviews held for this cycle, read only once it is closed. */
+  readonly reviewMinutes: readonly ReviewMinutes[];
   /**
    * What phase 7 still needs before the cycle can close, in the rail's own
    * words. Empty when it is complete. The server refuses on the same
@@ -100,7 +118,7 @@ export async function ReviewAndLearn({
   /** Which colours the bands are read in (§12 "Score colours"). */
   readonly practice: ScoreColoursPractice;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const scored = keyResults.filter((one) => one.score !== null);
   const average =
@@ -357,6 +375,39 @@ export async function ReviewAndLearn({
                 {t("cycle.reviewAndLearn.close.nextNotCreated")}
               </p>
             )}
+            <div className="flex flex-col gap-1 border-t border-line pt-3">
+              <h4 className="text-xs font-semibold text-ink-2">
+                {t("cycle.reviewAndLearn.close.minutes")}
+              </h4>
+              {reviewMinutes.length === 0 ? (
+                // Said rather than left out: a closed cycle with no minutes
+                // is a fact somebody looking for them needs to know.
+                <p className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.close.noMinutes")}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {reviewMinutes.map((review) => (
+                    <li key={review.sessionId} className="text-sm">
+                      <Link
+                        className="text-brand-text hover:underline"
+                        href={`/session/${review.sessionId}/minutes`}
+                      >
+                        {t("cycle.reviewAndLearn.close.minutesOf", {
+                          title: review.title,
+                          space: review.spaceName,
+                        })}
+                      </Link>
+                      <span className="ml-2 text-xs text-ink-3">
+                        {t("cycle.reviewAndLearn.close.heldOn", {
+                          date: dayLabel(review.heldOn, locale),
+                        })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardBody>
         </Card>
       ) : canEdit ? (

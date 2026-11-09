@@ -849,6 +849,18 @@ Minutes contain:
 Exportable as a Markdown document (`/session/[id]/minutes/export`) and a PDF
 (`/session/[id]/minutes/pdf`). A link from the closed cycle to its minutes.
 
+The link was built at release 0.7.0 (S3). Phase 7 of a closed cycle lists one
+link per review held for it, in every space the reader can see, oldest first
+(`apps/web/lib/cycle-review-minutes.ts`):
+
+| Case | Link |
+|---|---|
+| One session holds the whole review | That session's minutes |
+| The review and the retrospective are held apart | One link, to the review half. Either half's minutes are the whole review's |
+| Only the retrospective is visible | The retrospective's minutes |
+| A review booked and never started, or skipped | No link: its minutes would be empty |
+| No review held in a space the reader can see | A sentence saying there are no minutes, rather than nothing |
+
 ## 10. Acceptance criteria
 
 **Weekly session (P4-T07):**
