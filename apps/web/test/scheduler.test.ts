@@ -100,12 +100,16 @@ describe("the run table", () => {
   // them, has no member to act as, and a tenant should not be able to start it.
   // `cloud.remindErasure` since docs/design/workspace-erasure.md §12, for the
   // same reason: it walks every closed workspace, as the system.
+  // `support.sweepExpired` since plan 0.7.0 B2 (docs/design/support-access.md
+  // §5): it ends every expired support session on the instance, as the
+  // system, and an API caller has no business starting it.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
     "tenancy.adopt",
     "cloud.measureUsage",
     "cloud.remindErasure",
+    "support.sweepExpired",
   ]);
 
   test("names a real action for every run", () => {
@@ -133,6 +137,7 @@ describe("the run table", () => {
       "tenancy.adopt",
       "cloud.measureUsage",
       "cloud.remindErasure",
+      "support.sweepExpired",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -143,11 +148,24 @@ describe("the run table", () => {
       "cloud.measureUsage",
       "cloud.remindErasure",
       "outbox.purge",
+      "support.sweepExpired",
       "tenancy.adopt",
     ]);
     for (const run of off) {
       expect(run.cron, run.job).toBeTruthy();
     }
+  });
+
+  // `sweepExpiredSessions` was written at P8-T04 and nothing called it, so an
+  // expired support session kept an empty `ended_at` and the owner's screen
+  // went on saying somebody was inside (plan 0.7.0, B2). Access was refused at
+  // expiry all along; this is the tidying the design asks for.
+  test("sweeps expired support sessions for the instance, every few minutes", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "support.sweepExpired",
+    );
+    expect(sweep?.instance).toBe(true);
+    expect(sweep?.cron).toBe("*/5 * * * *");
   });
 
   test("gives every Champion run one of §6.2's four cadences", () => {

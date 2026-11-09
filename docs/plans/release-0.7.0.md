@@ -178,7 +178,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Row | Status | Note |
 |---|---|---|
 | B1 | to do | Design first |
-| B2 | to do | Also closes P1 |
+| B2 | done | Also closes P1 |
 | B3 | to do | Design first |
 | B4 | done | #192 |
 | B5 | to do | Design first |
@@ -195,5 +195,5 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S1 to S3 | to do | |
 | U1 to U3 | to do | U3 design first |
 | R1 to R3 | to do | R2 design first |
-| P1 to P10 | to do | P2, P4, P7 and P10 design first; P1 is B2 |
+| P1 to P10 | to do | P1 done with B2; P2, P4, P7 and P10 design first |
 | D1 to D5 | to do | D4 only needs no design |

@@ -90,11 +90,13 @@ An instance runs these on a clock, all on by default:
 | Orphaned uploads | 03:20 UTC | Removes uploads that were prepared and never attached |
 | Message log retention | 03:40 UTC | Deletes channel message records older than the workspace's setting, when it has one |
 | Cloud housekeeping | Hourly, at :10, :40 and :50 | With the cloud flag on: adopts workspaces into the operator console, refreshes the usage snapshot and sends erasure reminders. Nothing without the flag |
+| Support session expiry | Every 5 minutes | Ends each support session past its time box: stamps when it ended, suspends the support member and records it in the audit trail. Access is refused at expiry either way; this is what tells the owner's screen the session is over |
 | Outbox purge | 04:00 UTC | Deletes delivered and given-up outbox rows older than `outbox.retentionDays`, 30 by default, 0 to keep them. A delivered invitation loses its token and address the moment it is sent |
 
 `OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,
 and then `pnpm cadence:sweep` and `pnpm audit:chain` are the manual equivalents
-of the two that matter most. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox
+of the two that matter most, and `pnpm cloud:support-sweep` ends expired
+support sessions. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox
 window from the environment.
 
 ## If something is wrong now

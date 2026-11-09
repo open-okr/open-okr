@@ -52,6 +52,7 @@ import {
   measureAllWorkspaces,
   outboxRetentionDays,
   remindBeforeErasure,
+  sweepExpiredSessions,
 } from "@openokr/core";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
@@ -119,6 +120,10 @@ export interface ScheduledRun {
     // (docs/design/workspace-erasure.md §12). Nothing with the flag off or
     // with retention at seven days or fewer.
     | "cloud.remindErasure"
+    // Ending every support session past its expiry (docs/design/
+    // support-access.md §5). Access is refused at expiry without it; this
+    // stamps the row and suspends the operator's member (plan 0.7.0, B2).
+    | "support.sweepExpired"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -232,6 +237,16 @@ const CLOUD_USAGE_CRON = "40 * * * *";
 const ERASURE_REMINDER_JOB = "cloud.remindErasure";
 const ERASURE_REMINDER_CRON = "50 * * * *";
 
+/**
+ * Every five minutes. A session ends at its expiry whether or not this runs,
+ * because `resolveActor` refuses an expired one at use; what waits for the
+ * sweep is the owner's screen saying the session is over. Five minutes is how
+ * long that screen may be wrong, and the pass costs one indexed query when
+ * nothing is due.
+ */
+const SUPPORT_SWEEP_JOB = "support.sweepExpired";
+const SUPPORT_SWEEP_CRON = "*/5 * * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -304,6 +319,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: ERASURE_REMINDER_JOB,
     action: "cloud.remindErasure",
     cron: ERASURE_REMINDER_CRON,
+    instance: true,
+  },
+  {
+    job: SUPPORT_SWEEP_JOB,
+    action: "support.sweepExpired",
+    cron: SUPPORT_SWEEP_CRON,
     instance: true,
   },
 ];
@@ -462,6 +483,13 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     const reminded = await remindBeforeErasure(getPool());
     if (reminded > 0) {
       log(`cloud.remindErasure reminded ${reminded} workspace(s)`);
+    }
+    return;
+  }
+  if (run.action === "support.sweepExpired") {
+    const { ended } = await sweepExpiredSessions(getPool());
+    if (ended > 0) {
+      log(`support.sweepExpired ended ${ended} support session(s)`);
     }
     return;
   }
