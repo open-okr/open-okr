@@ -19,7 +19,10 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { useCallback, useState, useTransition } from "react";
-import { type ExportResult, exportWorkspaceArchive } from "./actions.ts";
+import {
+  type ExportResult,
+  exportWorkspaceArchive,
+} from "../imports/actions.ts";
 
 export function ExportCard() {
   const { t } = useTranslations();

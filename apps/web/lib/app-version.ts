@@ -18,3 +18,12 @@ export function methodDocumentUrl(section?: string): string {
   const anchor = section ? `#${section}` : "";
   return `https://github.com/open-okr/open-okr/blob/v${RUNNING_VERSION}/docs/specification/METHOD.md${anchor}`;
 }
+
+/**
+ * A page of the documentation as this release shipped it, for a screen that
+ * sends a reader to a procedure (the Backups screen's restore guides, plan
+ * 0.7.0 U3). The tag, for the reason `methodDocumentUrl` gives.
+ */
+export function docsUrl(path: string): string {
+  return `https://github.com/open-okr/open-okr/blob/v${RUNNING_VERSION}/${path}`;
+}

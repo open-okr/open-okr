@@ -2181,6 +2181,16 @@
       "pages": false
     },
     {
+      "name": "workspace archiveHistory",
+      "action": "workspace.archiveHistory",
+      "method": "GET",
+      "path": "/workspace/archiveHistory",
+      "scope": "read",
+      "summary": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "workspace importArchive",
       "action": "workspace.importArchive",
       "method": "POST",

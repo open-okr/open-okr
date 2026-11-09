@@ -2093,6 +2093,21 @@
       }
     },
     {
+      "name": "workspace.archiveHistory",
+      "description": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "workspace.importArchive",
       "description": "Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import.",
       "inputSchema": {

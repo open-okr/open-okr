@@ -64,6 +64,16 @@ export async function WorkspaceStateBanner({
                 })
               : t("workspaceState.closedKept", { closed: day(hold.closedAt) })}
           </span>
+          {/* The archive is how a closed customer leaves with their data,
+              and it still works here (backups-screen.md U7, plan 0.7.0 U3). */}
+          {canRecover ? (
+            <Link
+              href="/admin/backups"
+              className="text-xs font-semibold text-brand-text hover:underline"
+            >
+              {t("workspaceState.takeAnArchive")}
+            </Link>
+          ) : null}
           {canRecover && hold.ownerMayReopen ? (
             <Link
               href="/admin/general"

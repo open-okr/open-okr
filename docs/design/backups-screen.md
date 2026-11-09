@@ -1,6 +1,6 @@
 # Backups in workspace admin
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan U3), waiting for "design approved". It decides what a workspace administrator may see and do about backups that hold other workspaces, so it is designed first.
+Status: approved by Akmal on 9 November 2026 ("design approved"), Q1 as proposed (no instance backup record in 0.7.0), and built at release 0.7.0 (plan U3). The restore card links `docs/runbooks/migration-cutover.md`, the cutover runbook's real name.
 
 Authority: REQUIREMENTS §4 Pillar F ("backups" in Admin) and §7's reliability line ("per-workspace logical restore through the portability engine"); UIUX-PLAN S-36 ("backups, import wizards and workspace export"); `backup-verification.md`; `tenant-lifecycle.md` §6 and §10.
 

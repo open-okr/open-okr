@@ -12,6 +12,7 @@ import {
   Compass,
   Gauge,
   Hammer,
+  HardDrive,
   Home,
   Inbox,
   KeyRound,
@@ -124,6 +125,8 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // items is. Not a bin: nothing on the screen is thrown away.
   "admin-deleted": <ArchiveRestore className="size-full" />,
   "admin-imports": <Upload className="size-full" />,
+  // A disk: a copy kept somewhere safe (plan 0.7.0 U3).
+  "admin-backups": <HardDrive className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
   // The general agent's own face rather than a Lucide robot, in the row's
   // text colour like every icon here. Idle, so it blinks and glances on its

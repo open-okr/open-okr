@@ -317,6 +317,8 @@ export async function exportWorkspaceArchive(
       "workspace.exportArchive",
       { includeFiles, passphrase },
     );
+    // The Backups screen lists every archive taken (backups-screen.md U3).
+    revalidatePath("/admin/backups");
     return {
       ok: true,
       value: {

@@ -526,6 +526,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-backups",
+        label: "Backups",
+        href: "/admin/backups",
+        section: "admin",
+        // The workspace archive is the whole workspace, which is why taking
+        // one needs `full` (docs/design/backups-screen.md U1, plan 0.7.0 U3).
+        // Every instance has it: an archive needs no cloud and no provider.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-ai",
         label: "AI",
         href: "/admin/ai",

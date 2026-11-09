@@ -375,7 +375,7 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
-import { exportArchive, importArchive } from "./portability.ts";
+import { archiveHistory, exportArchive, importArchive } from "./portability.ts";
 import {
   applyPracticeProfile,
   readPractice,
@@ -635,6 +635,7 @@ export const ACTION_MAP = {
   "activities.workspaceFeed": workspaceFeed,
   // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
   "workspace.exportArchive": exportArchive,
+  "workspace.archiveHistory": archiveHistory,
   // P6-T05b. An archive into another instance (§7.3).
   "workspace.importArchive": importArchive,
   // P8-T10. The audit trail, filtered out as a file, and the chain checked.

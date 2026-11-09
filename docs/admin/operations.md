@@ -67,6 +67,12 @@ list until the rotation finishes, so nothing becomes unreadable mid-way.
 
 ## Taking the whole workspace out
 
+A workspace administrator takes an archive on **Admin, Backups**, which also
+lists every archive anybody has taken of the workspace, says how a copy is
+restored into a new, empty workspace, and says where this server's own
+backups come from. It shows no instance backup: each holds every workspace
+on the server.
+
 An administrator can export a workspace as one checksummed archive holding
 every row and every uploaded file, and import it into another instance. That is
 the exit, and it is part of the product rather than a support request.

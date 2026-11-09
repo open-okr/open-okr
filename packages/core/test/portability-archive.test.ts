@@ -400,3 +400,74 @@ describe("workspace.exportArchive", () => {
 function readArchiveWith(bytes: Buffer) {
   return readArchive(bytes, { passphrase: PASSPHRASE });
 }
+
+/**
+ * The archives taken (docs/design/backups-screen.md U3, plan 0.7.0 U3): every
+ * administrator's, newest first, so somebody taking the whole workspace is
+ * something the others can see without searching the audit log.
+ */
+describe("workspace.archiveHistory", () => {
+  const context = (userId = OWNER) => ({
+    pool,
+    workspaceId,
+    actor: { kind: "human" as const, userId },
+    ring,
+  });
+
+  it("lists every archive taken, newest first, with who, when, the file and its rows", async () => {
+    const first = await callAction(context(), "workspace.exportArchive", {
+      includeFiles: false,
+      passphrase: PASSPHRASE,
+    });
+    const second = await callAction(context(), "workspace.exportArchive", {
+      includeFiles: false,
+      passphrase: PASSPHRASE,
+    });
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update export_runs set created_at = created_at - interval '1 hour' where id = $1",
+      [first.runId],
+    );
+
+    const history = await callAction(context(), "workspace.archiveHistory", {});
+
+    expect(history.archives.map((row) => row.id)).toEqual([
+      second.runId,
+      first.runId,
+    ]);
+    expect(history.archives[0]).toMatchObject({
+      filename: second.filename,
+      takenByName: "Archive Owner",
+    });
+    expect(history.archives[0]?.rows).toBeGreaterThan(0);
+  });
+
+  it("leaves out list exports, which are not copies of the workspace", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into export_runs (id, workspace_id, kind, list, format, state, filename, requested_by_id)
+       select gen_random_uuid(), $1, 'list', 'goals', 'csv', 'ready', 'goals.csv', id
+         from workspace_members where workspace_id = $1 and user_id = $2`,
+      [workspaceId, OWNER],
+    );
+    const history = await callAction(context(), "workspace.archiveHistory", {});
+    expect(history.archives).toEqual([]);
+  });
+
+  it("is refused below full access", async () => {
+    const wb = await workerDb();
+    const VIEWER = "44444444-4444-4444-8444-444444444444";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, 'Viewer', 'viewer@example.com')",
+      [VIEWER],
+    );
+    await wb.admin.query(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, $2, 'Viewer', 'active')`,
+      [workspaceId, VIEWER],
+    );
+    await expect(
+      callAction(context(VIEWER), "workspace.archiveHistory", {}),
+    ).rejects.toThrow();
+  });
+});
