@@ -271,10 +271,13 @@ export const revokeConnectionAsAdmin = defineWriteAction({
             scopes: grant.scopes,
           };
         } else {
-          // openokr:allow-mutation: the Operation's own transaction.
           const [token] = await tx
-            .update(apiTokens)
-            .set({ revokedAt: now, revokedReason: "admin", updatedAt: now })
+            .select({
+              memberId: apiTokens.memberId,
+              name: apiTokens.name,
+              scopes: apiTokens.scopes,
+            })
+            .from(apiTokens)
             .where(
               activeOnly(
                 apiTokens,
@@ -284,17 +287,24 @@ export const revokeConnectionAsAdmin = defineWriteAction({
                 isNull(apiTokens.revokedAt),
               ),
             )
-            .returning({
-              memberId: apiTokens.memberId,
-              name: apiTokens.name,
-              scopes: apiTokens.scopes,
-            });
+            .limit(1);
           if (!token) {
             throw new OperationError(
               "not_found",
               "No such agent token, or it is already ended.",
             );
           }
+          // As for a grant (D5): an administrator ending their own token
+          // keeps the owner's own wording, which is no reason at all.
+          // openokr:allow-mutation: the Operation's own transaction.
+          await tx
+            .update(apiTokens)
+            .set({
+              revokedAt: now,
+              revokedReason: token.memberId === actor.memberId ? null : "admin",
+              updatedAt: now,
+            })
+            .where(eq(apiTokens.id, input.id));
           ended = {
             memberId: token.memberId,
             label: token.name,
