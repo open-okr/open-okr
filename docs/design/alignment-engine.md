@@ -324,3 +324,126 @@ reappear.
 **Given** a workspace with no goals in the cycle, **when** the score is
 computed, **then** there is no score and no findings, rather than a penalty for
 an absent anchor.
+
+## 9. One-click applicability (plan 0.7.0 A6)
+
+Status: proposed 9 November 2026, waiting for Akmal's "design approved". It is
+on the plan as a schema change, so it is designed first (CLAUDE.md).
+
+`docs/design/agents.md` §1.5 lists a `one_click_applicable` boolean on
+`alignment_findings`, "true when the fix is mechanical (re-parent, add
+dependency)". METHOD.md §5.3: "Where the fix is mechanical (relink,
+dependency), the finding offers a one-click proposal for a person to accept."
+
+### 9.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The apply | `alignment.applyFinding`, `packages/core/src/actions/alignment.ts` | Since P4-T06b-b. Accepts a `relink` only, open, naming both the goal to move and its new parent, with edit access to both. Re-parents through `goals.update` |
+| Why a dependency is not applied | The same action's header | A `dependency` finding says two goals should be linked; §5.4's register needs a provider named and a direction chosen, which is a decision, not a click. A `conflict` or a `gap` has nothing to apply |
+| The button | `apps/web/app/goals/alignment-panel.tsx` | Drawn when `finding.kind === "relink"` |
+| What a reader is told | `alignment.read` | Each finding's kind, reason, state and subject. **Not** the target goal, and not whether it can be applied |
+
+So the rule already lives in two places that can disagree: a relink written
+without its target draws a button the action then refuses. And an external
+agent, which reads `alignment.read`, cannot tell which findings it may offer to
+apply.
+
+### 9.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **Derived, not stored.** One pure function, `oneClickApplicable({ kind, state, subjectGoalId, targetGoalId })`, in `packages/core/src/alignment/`: true for an open `relink` naming both goals. The action, the read and the panel all ask it | Every input is a column the row already has. A stored copy has to be written by every writer of the table (the structural engine, the semantic sweep, the divergence sweep, dismissals, applies) and backfilled for every existing row, and the day one writer forgets, the column and the action disagree. `nudges/quality.ts` refuses a second stored copy of an answer for the same reason |
+| D2 | **`alignment.read` returns it**, as `oneClickApplicable`, with `targetGoalId` and `targetGoalTitle` beside the subject, so a reader sees what the click would do | The panel and an agent then ask the same question of the same answer |
+| D3 | **A dependency stays unapplied**, as the action already decides | METHOD.md names "dependency" among mechanical fixes, but a dependency needs a provider and a direction (§5.4). Offering a click that then asks two questions is not one click. Changing that is a METHOD.md decision, not this row's |
+| D4 | **`agents.md` §1.5's row changes** from a stored boolean to the derived field, with this section linked. No migration, no data change, nothing in TECHNICAL-PLAN §4 or DATABASE.md | The design doc is where the column was proposed, and the change is the design's own |
+
+### 9.3 Question for Akmal
+
+**Q1.** The plan row asks for a column. D1 proposes deriving the answer
+instead, because every input is already on the row and a stored copy can go
+stale. **Proposed: derived (D1), no schema change.** The alternative is the
+column, with every writer setting it and a data change to backfill existing
+rows.
+
+### 9.4 Acceptance criteria
+
+- **Given** an open relink naming its goal and its new parent, **when** the
+  findings are read, **then** it says `oneClickApplicable: true` and names the
+  target, and the panel offers the re-parent button.
+- **Given** a relink with no target, **when** the findings are read, **then** it
+  says `false` and the panel offers no button; **when** an agent applies it
+  anyway, **then** it is refused, as today.
+- **Given** a conflict, a gap, a dependency or a divergence, **then** it says
+  `false`.
+- **Given** an applied or dismissed relink, **then** it says `false`.
+
+### 9.5 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Unit | `packages/core/test/alignment-applicable.test.ts` | The function, every kind and state |
+| Integration | `packages/core/test/alignment.test.ts` (existing) | `alignment.read` returns the field and the target |
+| Unit | `apps/web/test/alignment-panel.test.tsx` | The button follows the field |
+| Contract | `pnpm check:contract` | `alignment.read`'s output grows by three fields |
+
+## 10. The stored score (plan 0.7.0 D2)
+
+Status: proposed 9 November 2026, waiting for Akmal's "design approved". A new
+table, so it is designed first (CLAUDE.md).
+
+TECHNICAL-PLAN §4.5 specifies `alignment_scores`: "the METHOD.md §5.2 score,
+recomputed on structural change". DATABASE.md records it as not built:
+`alignment.read` computes the score when it is asked.
+
+### 10.1 What exists
+
+| Piece | Where | Today |
+|---|---|---|
+| The recompute | `recomputeAlignment`, `packages/core/src/alignment/service.ts` | Runs inside every structural write (§7), computes the whole result, reconciles the findings, and **drops the score** |
+| The read | `alignment.read` | Loads the graph and computes again, every time |
+| The Work Map | `apps/web/app/work-map-screen.tsx` | The home screen calls `alignment.read` on every load for two things, the score and its band, so the busiest page pays for the whole graph. §13.1 allows the computation 2 seconds at 10,000 goals |
+
+### 10.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D1 | **One row per scope per cycle, the latest only**: `workspace_id`, `cycle_id`, `scope` (`workspace` / `space`), `scope_id?`, `score smallint?`, `breakdown jsonb` (below company, aligned, standing alone with a reason, unaligned), `computed_at`. Unique on `(workspace_id, cycle_id, scope, scope_id)` with nulls not distinct | TECHNICAL-PLAN §4.5's columns. A null score is §5.2's "no score" for a cycle with nothing below company level |
+| D2 | **Written by `recomputeAlignment`, in the writing transaction**, an upsert beside the findings reconcile | It already holds the answer. The score and the findings then commit together and can never disagree |
+| D3 | **The band is not stored.** It is read from the score and the workspace's §11 alignment bands when the row is read | A workspace that moves its bands would otherwise read yesterday's band until somebody re-parents a goal |
+| D4 | **A new read, `alignment.score { cycleId, scope?, spaceId? }`**, returning the score, the band, the breakdown and `computedAt`, at view access on the scope. The Work Map uses it | One row instead of the graph on the busiest screen. `alignment.read` keeps computing, because it lists every unaligned goal by name, which a number cannot |
+| D5 | **Backfilled once by data change 0034**, every cycle's workspace scope and each space scope with goals, through `recomputeAlignment` | Then a missing row means exactly "no score yet", which is what a new cycle with no goals is, and no reader needs a fallback that computes |
+| D6 | **Tenant scoped, hard delete.** `workspace_id` with a tenant policy in the same migration; marked `openokr:hard-delete`, because a projection that a recompute replaces is not a record | As `search_documents` is. TECHNICAL-PLAN §7.2 gains a `No legacy source, derived` row |
+| D7 | **A test holds the stored and the computed answer equal** after every write in the alignment suite | The one way a projection goes wrong is quietly, and this is where it would |
+
+### 10.3 Questions for Akmal
+
+**Q1.** D1 keeps the latest score only. Keeping one row per change instead would
+give a trend line ("alignment rose from 62 to 88 over planning") at the cost of a
+growing table. **Proposed: latest only.** A trend can come later from the
+activity log, which already records each structural change.
+
+### 10.4 Acceptance criteria
+
+- **Given** a cycle with four goals below company level, three aligned, **when**
+  a fourth is re-parented, **then** the stored workspace score reads 100 in the
+  same transaction, and `alignment.read` computes 100.
+- **Given** a workspace that moves its alignment bands, **when** the score is
+  read, **then** the band follows the new bands with no recompute.
+- **Given** an instance upgraded with cycles already planned, **when** data
+  change 0034 has run, **then** every cycle with goals has a workspace row and
+  a row for each space with goals.
+- **Given** a member who cannot see a space, **when** they ask for its score,
+  **then** it is not found.
+- **Given** the Work Map, **when** it loads, **then** it reads one row and calls
+  no graph computation.
+
+### 10.5 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/alignment-scores.test.ts` | The upsert on every §7 trigger, stored equals computed, the band from current thresholds, access |
+| Integration | `packages/db/test/data-change.test.ts` | 0034 backfills, and a second run changes nothing |
+| Integration | `packages/db` migration suite, `pnpm db:lint` | Tenant policy, hard-delete marker, the unique index |
+| Unit | `apps/web/test/work-map.test.tsx` | The Work Map reads `alignment.score` |
+| Performance | `pnpm perf:budgets` | A new §13.1 row for the stored read, which should be a few milliseconds |
