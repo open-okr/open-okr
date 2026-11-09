@@ -19830,7 +19830,12 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Validate"
+          }
+        ]
       }
     },
     "/agents/mentionable": {
