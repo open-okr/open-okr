@@ -197,7 +197,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B5 | done | `docs/design/tenant-lifecycle.md` §10 |
 | B6 | done | |
 | B7 | done | |
-| B8 | yours | Turn on private vulnerability reporting |
+| B8 | done | Turned on 9 November 2026 with Akmal's go-ahead: the repository's API now answers `enabled: true`. Batch 3, A6 and D2 approved the same day, every question as proposed; S1 decided as show-not-block |
 | B9 | done | The script became `packages/core/test/cutover-runbook.test.ts`, which CI runs. It found the runbook's "must match the dry run exactly" could never hold: the real import skips rows the target already has. The runbook now states the exact rule, created plus skipped per table |
 | B10 | done | |
 | B11 | done | |
