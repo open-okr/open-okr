@@ -98,7 +98,7 @@ only and cannot be overridden.
 
 ## Phase 4: Real import
 
-Run the import for real. The report MUST match the dry run exactly.
+Run the import for real. Its report must account for every row the dry run counted.
 
 ```sh
 pnpm okr workspace importArchive --dry-run false --archive-base64 @archive.b64 --passphrase "$PASSPHRASE" --url https://target.example.com --token $TARGET_TOKEN
@@ -106,8 +106,22 @@ pnpm okr workspace importArchive --dry-run false --archive-base64 @archive.b64 -
 
 Or click "Confirm import" on the admin card after reviewing the dry-run.
 
-**Verify:** compare the real report against the dry-run report. Created,
-merged, skipped and blob counts MUST be identical.
+**Verify:** compare the real report against the dry-run report, table by
+table.
+
+| Check | Must hold |
+|---|---|
+| Each table's `created` plus `skipped` in the real report | Equals that table's `created` in the dry run |
+| `merged` | Identical |
+| `blobs` | Identical |
+
+The dry run counts every row it would write as created. The real import skips
+the rows the target already has, such as its own workspace row, rhythm
+settings and roles, so those move from created to skipped. A total that does
+not add up is the one to stop on.
+
+This whole sequence, from the freeze to the rollback, runs as an automated test
+on every change: `packages/core/test/cutover-runbook.test.ts`.
 
 ## Phase 5: Reconcile
 

@@ -323,7 +323,7 @@ Status: Approved by Akmal on 9 November 2026 ("design approved").
 |---|---|
 | This document, §6 step 2, and acceptance criterion 4 in §8 | A closed workspace's admins can still build the portability archive, and the banner links to it |
 | `docs/runbooks/migration-cutover.md` | Phase 1 freezes the source, phase 3 exports it. Freezing first is what makes the archive consistent. The runbook carries a warning today that the export is refused |
-| `deploy/docker/cutover-rehearsal.sh` (plan B9) | The same order |
+| `packages/core/test/cutover-runbook.test.ts` (plan B9, which replaced `deploy/docker/cutover-rehearsal.sh`) | The same order |
 
 ### 10.2 Decision
 

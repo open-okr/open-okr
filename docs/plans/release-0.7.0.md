@@ -186,7 +186,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B6 | done | |
 | B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
-| B9 | to do | After B5: becomes an integration test of the cutover runbook, because the script can only pass once a frozen workspace may export |
+| B9 | done | The script became `packages/core/test/cutover-runbook.test.ts`, which CI runs. It found the runbook's "must match the dry run exactly" could never hold: the real import skips rows the target already has. The runbook now states the exact rule, created plus skipped per table |
 | B10 | done | |
 | B11 | done | |
 | M1 to M4 | done | One change |
