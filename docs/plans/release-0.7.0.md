@@ -26,7 +26,7 @@ Recommendation: fix the nine code bugs in 0.7.0, and finish B8 now, because it n
 | B7 | **The console-mail banner on Admin, General is wrong in production.** It says the log holds the recipient, the subject and the body, and that password-reset links are sitting in the log, and the line under it repeats that a reset link is in the log. In production the driver masks the address and withholds the body | `packages/ui/src/i18n/messages/en.json` and `ms.json`, `admin.general.consoleMail.what` and `.fix`; `packages/adapters/src/drivers/mail/console.ts` | Say what each environment logs: in production the masked recipient and the subject, never the body; on a developer's machine, everything | S | None |
 | B8 | **The security policy sends reporters to a route that is turned off.** `SECURITY.md`, added in #192 and already live on `main`, says to report through GitHub private vulnerability reporting. That is still off on the repository (the API answers `enabled: false`), so a reporter who follows the policy finds no "Report a vulnerability" button | The repository's settings, not the code | You turn on private vulnerability reporting: Settings, Code security, Private vulnerability reporting, or `gh api -X PUT repos/open-okr/open-okr/private-vulnerability-reporting`. Nothing else changes | S | Your action only |
 | B9 | **The cutover rehearsal cannot run, and hides why.** `deploy/docker/cutover-rehearsal.sh` calls `exportWorkspace` with a key ring and no passphrase, so the export throws before it writes anything. `2>/dev/null \|\| true` discards the error, and the script stops at "no archive produced" with no reason. The import half is stale the same way (`readArchive(keyRing, ...)`), and every step discards its errors. Nothing runs the script: no CI job and no runbook names it | `deploy/docker/cutover-rehearsal.sh` | Export and import through the current passphrase API, stop discarding errors, and fail when the archive is empty. Then name the script in `docs/runbooks/migration-cutover.md` as the rehearsal to run before a cutover, so it gets used and stays current | S | Run the script |
-| B10 | **Five workspace settings have no screen and no action that writes them**: `storageQuotaBytes`, `exportInlineRowLimit`, `importRowLimit`, `messageLogRetentionDays`, `agentRunCostCapUsd`. Only a value already stored is honoured | `packages/core/src/settings/registry.ts`, `packages/core/src/actions/settings.ts` | Your choice per setting. My recommendation: the storage quota and the agent cost cap are a provider's levers on a cloud, so they belong on the operator console or in the plan catalogue; the export, import and message-log limits belong on an admin card for a self-hosted workspace | M | Needs your decision |
+| B10 | **Five workspace settings have no screen and no action that writes them**: `storageQuotaBytes`, `exportInlineRowLimit`, `importRowLimit`, `messageLogRetentionDays`, `agentRunCostCapUsd`. Only a value already stored is honoured | `packages/core/src/settings/registry.ts`, `packages/core/src/actions/settings.ts` | Your choice per setting. My recommendation: the storage quota and the agent cost cap are a provider's levers on a cloud, so they belong on the operator console or in the plan catalogue; the export, import and message-log limits belong on an admin card for a self-hosted workspace. **Decided 9 November:** on a self-hosted instance all five are on a workspace admin card; on a cloud, the storage quota and the agent cost cap move to the operator console and the other three stay on the admin card | M | Decided |
 | B11 | **Northwind step NW-P-04 reads one day short.** The input pack is distributed on 26 November for a 1 December offsite. The product counts two working days strictly between the dates against a default of three, so Phase 1 reads as incomplete, while the step says it is complete | `docs/scenarios/northwind-year/00-before-the-year.md`, `packages/core/src/demo/year/steps.ts:32`, the seed at `packages/core/src/demo/year/q1-plan.ts:583` | Move the distribution to 25 November in the scenario, `steps.ts` and the seed together | S | None |
 
 ### 1.1 Fixed since this plan was written
@@ -39,6 +39,8 @@ Recommendation: fix the nine code bugs in 0.7.0, and finish B8 now, because it n
 ## 2. Decisions on METHOD.md
 
 METHOD.md was not edited by the review. Each row needs your decision, because a change to METHOD.md is always yours.
+
+**Decided 9 November 2026:** M2 and M4 approved as recommended. M1 and M3 change only code.
 
 | # | Disagreement | Recommendation | Changes METHOD.md |
 |---|---|---|---|
@@ -73,15 +75,15 @@ The review found 47 such statements in the specification and design pages. Sever
 | A2 | A record of every tool call an external agent makes | `agent-surface.md` §5.2; AI-NATIVE-PLAN §7 and §8; TECHNICAL-PLAN §4.12; DATABASE.md (`ai_tool_calls`, marked not built) | Writes leave an audit row tagged `mcp`. Reads, `search`, `fetch` and refusals leave nothing. Tool calls are not metered either: `ai_usage_events` accepts `mcp` as a source, but rows are written only for AI provider calls, and the agent endpoint makes none | Design first: schema |
 | A3 | A scope refusal at the agent endpoint is audited | `agent-surface.md` §5.3 and Acceptance | `dispatchTool` returns the refusal and writes nothing. `e2e/s41-mcp-transport.spec.ts` says in its header that the denial is audited, but asserts nothing about it | None |
 | A4 | An admin-wide list of agent connections and grants | AI-NATIVE-PLAN §4; UIUX-PLAN S-37 | Each member sees only their own, at `/account/connections`, on purpose: the page says a screen that could show somebody else's could be aimed at a colleague | Design first: access, since an admin would see and revoke other members' grants |
-| A5 | A `quality.conflict` message to both champions | `agents.md` §3.2 and §9 | The semantic sweep writes a finding; nothing turns it into a nudge | Adds a proactive message: your approval |
+| A5 | A `quality.conflict` message to both champions | `agents.md` §3.2 and §9 | The semantic sweep writes a finding; nothing turns it into a nudge | Adds a proactive message: approved 9 November |
 | A6 | A `one_click_applicable` column on alignment findings | `agents.md` §1.5 | No such column | Design first: schema |
 | A7 | Agent instructions that change with the cycle phase, versioned like prompts | `agents.md` §8 | Each agent has two free-text instruction fields, planning and execution, the same in every phase and not versioned. The Coach and the Champion are seeded with fixed text, and no action edits it after `agents.create`. Versioned prompts exist in `ai_prompts`, but per AI feature, not per agent | None |
-| A8 | Mention the Coach on a goal and it reviews the goal and replies | AI-NATIVE-PLAN §6.5 | Nothing reacts to a mention of an agent | Adds a proactive message: your approval |
+| A8 | Mention the Coach on a goal and it reviews the goal and replies | AI-NATIVE-PLAN §6.5 | Nothing reacts to a mention of an agent | Adds a proactive message: approved 9 November |
 | A9 | An evaluation set that gates prompt changes, with results on the usage card | AI-NATIVE-PLAN §4 and §10 | Per-drafter tests against a mock model; no evaluation set and no gate | None |
 | A10 | Retrieval embeds documents, sessions and cycle artifacts | AI-NATIVE-PLAN §9 | Goals, key results, check-ins, blockers and comments are embedded, and review narratives, retro notes, kudos, learnings and next-cycle drafts when they opt in. Documents, sessions, cycles and KPIs are listed as embeddable but nothing embeds them. The search palette's full-text index already covers documents and sessions | None |
 | A11 | Live agent run streams | PLAN §7 | Live streams exist for the board (which also carries presence), the feed, the inbox, sessions and copilot threads, not for agent runs | None |
 | A12 | A CI job that boots with AI off and proves every P0 flow passes and every AI affordance is hidden | PLAN §9; AI-NATIVE-PLAN §10 | The browser suite runs with AI off by default and some specs check the off state; no dedicated job | None |
-| A13 | The Champion opens, closes and skips sessions | `sessions.md` §2.1 | These are member actions at edit access; no agent calls them | Raises agent autonomy: your approval |
+| A13 | The Champion opens, closes and skips sessions | `sessions.md` §2.1 | These are member actions at edit access; no agent calls them | Raises agent autonomy: approved 9 November, as proposals into the review queue |
 
 ### 4.2 OKRs and cycles
 
@@ -166,3 +168,32 @@ The review removed eight claims from user-facing pages because the code does not
 4. Your decisions on M2 and M4, then M1 to M4 in one change, and the stale text in section 3.
 5. B10, once you have chosen where each setting goes.
 6. Section 4. I would start with the items a hosted service needs most: P10 (account lockout), A3 (audited scope refusals), P2 (support inbox items, which needs a schema design first) and P3 (operator console filters).
+
+## 7. Build log
+
+Built on branch `release-0.7.0`, one commit per row, with the row's id in the commit subject. Started 9 November 2026. Not pushed, so no CI verdict yet.
+
+Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, an action only you can take.
+
+| Row | Status | Note |
+|---|---|---|
+| B1 | to do | Design first |
+| B2 | to do | Also closes P1 |
+| B3 | to do | Design first |
+| B4 | done | #192 |
+| B5 | to do | Design first |
+| B6 | to do | |
+| B7 | to do | |
+| B8 | yours | Turn on private vulnerability reporting |
+| B9 | to do | |
+| B10 | to do | |
+| B11 | to do | |
+| M1 to M4 | to do | One change |
+| Section 3 | to do | Stale text, one change |
+| A1 to A13 | to do | A1, A2, A4 and A6 design first |
+| O1 to O6 | to do | O2, O5 and O6 design first |
+| S1 to S3 | to do | |
+| U1 to U3 | to do | U3 design first |
+| R1 to R3 | to do | R2 design first |
+| P1 to P10 | to do | P2, P4, P7 and P10 design first; P1 is B2 |
+| D1 to D5 | to do | D4 only needs no design |
