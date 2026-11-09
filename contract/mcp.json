@@ -106,10 +106,10 @@
           "state"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -380,10 +380,10 @@
           "memberId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -432,10 +432,10 @@
           "memberId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -5183,10 +5183,10 @@
           "cycleId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -11784,10 +11784,10 @@
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {

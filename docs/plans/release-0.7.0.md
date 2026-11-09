@@ -192,7 +192,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | M1 to M4 | done | One change |
 | Section 3 | done | Stale text, one change |
 | A1 to A13 | to do | A1 and A6 design first. A2 design approved: `docs/design/agent-tool-calls.md`. A4 design approved, with agent API tokens: `docs/design/agent-connections-admin.md`. A3 done |
-| O1 to O6 | to do | O2 and O5 design first. O6 design approved, with three more actions: `docs/design/irreversible-scope.md` |
+| O1 to O6 | to do | O2 and O5 design first. O6 design approved, with three more actions: `docs/design/irreversible-scope.md`. O6 done; its Q2 needed nothing, because the goal close form already asks an optional reason |
 | S1 to S3 | to do | S2 done. S3 done |
 | U1 to U3 | to do | U3 design first |
 | R1 to R4 | to do | R2 design approved: `docs/design/rich-text-editor.md` §11. R4 added from its Q2. R1 done |

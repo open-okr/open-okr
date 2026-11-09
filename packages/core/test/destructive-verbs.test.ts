@@ -32,4 +32,21 @@ describe("tools that remove things", () => {
     expect(erase?.annotations.destructiveHint).toBe(true);
     expect(erase?.scope).toBe("destructive");
   });
+
+  // docs/design/irreversible-scope.md, approved 9 November 2026 with Akmal's
+  // Q3 answer (plan 0.7.0 O6). None of these verbs is a removing verb, so
+  // each is pinned by name: closing a cycle or a session fixes a result for
+  // good, suspending or converting a person shuts them out, and freezing stops
+  // every write in the workspace.
+  it.each([
+    "cycles.close",
+    "sessions.close",
+    "people.suspend",
+    "people.convertToGuest",
+    "workspace.setState",
+  ])("include %s, which a default token must not do to a workspace", (name) => {
+    const tool = MCP_TOOLS.find((one) => one.name === name);
+    expect(tool?.annotations.destructiveHint).toBe(true);
+    expect(tool?.scope).toBe("destructive");
+  });
 });

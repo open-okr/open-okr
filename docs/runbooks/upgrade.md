@@ -101,6 +101,15 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   wizard before 0.7.0", and a choice there replaces it. A self-hosted
   instance is unaffected, except that `OPENOKR_REGISTRATION` now works after
   setup where nothing else was saved.
+- **Five actions need the destructive scope.** `cycles.close`,
+  `sessions.close`, `people.suspend`, `people.convertToGuest` and
+  `workspace.setState` were plain writes; each now needs a token or agent
+  connection holding `destructive`. A script whose token has read and write is
+  refused with `insufficient_scope`, naming the scope. The command line asks
+  for read and write when nobody says, so log in with
+  `okr login --scopes read,write,destructive` to keep doing these. The
+  browser, single sign-on directory sync and the built-in agents are
+  unaffected, because they never check a scope.
 
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 

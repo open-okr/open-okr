@@ -202,7 +202,7 @@
       "action": "workspace.setState",
       "method": "POST",
       "path": "/workspace/setState",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Set the workspace to active, read-only or frozen.",
       "flags": [
         {
@@ -449,7 +449,7 @@
       "action": "people.suspend",
       "method": "POST",
       "path": "/people/suspend",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Suspend a member, removing every access they had.",
       "flags": [
         {
@@ -483,7 +483,7 @@
       "action": "people.convertToGuest",
       "method": "POST",
       "path": "/people/convertToGuest",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Convert a member to a guest, stripping their prior bindings.",
       "flags": [
         {
@@ -4367,7 +4367,7 @@
       "action": "cycles.close",
       "method": "POST",
       "path": "/cycles/close",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
       "flags": [
         {
@@ -9668,7 +9668,7 @@
       "action": "sessions.close",
       "method": "POST",
       "path": "/sessions/close",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Closes a running session.",
       "flags": [
         {

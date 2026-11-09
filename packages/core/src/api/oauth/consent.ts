@@ -266,7 +266,8 @@ export function redirectWith(
 export const SCOPE_DESCRIPTIONS: Readonly<Record<string, string>> = {
   read: "Read anything you can read",
   write: "Create and change things you can change",
-  destructive: "Delete and archive things you can delete",
+  destructive:
+    "Delete and archive things, close cycles and sessions for good, suspend people or make them guests, and freeze the workspace",
 };
 
 export type ApprovalOutcome =

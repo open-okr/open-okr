@@ -1941,8 +1941,9 @@ export const feedForwardCycle = defineWriteAction({
  *
  * `full`, the same as publishing: closing is the other end of the act that
  * publication starts, and it fixes the result the scorecard will show for good.
- * Not destructive in the registry's sense, because nothing a person can see is
- * removed.
+ * Destructive in the registry's sense since 0.7.0 (irreversible-scope.md):
+ * nothing a person can see is removed, but the result is fixed for the whole
+ * workspace and cannot be undone, so a default token may not do it.
  */
 export const closeCycle = defineWriteAction({
   name: "cycles.close",
@@ -1960,6 +1961,9 @@ export const closeCycle = defineWriteAction({
       .nullable(),
   }),
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it fixes every space's result for good.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));

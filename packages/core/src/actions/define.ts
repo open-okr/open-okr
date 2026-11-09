@@ -29,7 +29,12 @@ import type { KeyRing } from "../secrets/key-ring.ts";
 import type { MetricRecorder } from "../telemetry/recorder.ts";
 import type { Admission } from "../tenancy/admission.ts";
 
-/** Read, write, or write that removes something a person can see. */
+/**
+ * Read, write, or destructive: a write that removes something a person can
+ * see, fixes a result for the whole workspace that cannot be undone, shuts a
+ * person out of the workspace, or stops its writes (irreversible-scope.md,
+ * plan 0.7.0 O6). A default token never carries the destructive scope.
+ */
 export type SafetyClass = "read" | "write" | "destructive";
 
 /**

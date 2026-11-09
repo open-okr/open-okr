@@ -27,7 +27,7 @@ hashed at rest, scoped, and it records when it was last used.
 | Token property | Detail |
 |---|---|
 | Audience | **REST** for `/api/v1`, or **AI agent** for the agent endpoint. Each is refused at the other's door |
-| Scopes | `read`, `write` and `destructive`. The form starts with `read` alone, and destructive is never granted by default |
+| Scopes | `read`, `write` and `destructive`. The form starts with `read` alone, and destructive is never granted by default. Destructive covers what removes something a person can see, and, from 0.7.0, closing a cycle or a session, suspending a member, making a member a guest and changing the workspace's state |
 | Expiry | Set in days when you create it, or left empty for none |
 | Revocation | Immediate. The next request fails |
 | Membership | Revalidated on every request. Suspending the member kills the token |

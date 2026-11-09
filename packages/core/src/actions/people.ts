@@ -412,6 +412,9 @@ export const suspendMember = defineWriteAction({
   input: z.object({ memberId: z.uuid() }),
   output: statusChangeOutput,
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it shuts a person out of the workspace.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       refuseIfLastOwner(
@@ -665,6 +668,9 @@ export const convertToGuest = defineWriteAction({
   input: z.object({ memberId: z.uuid() }),
   output: z.object({ id: z.uuid(), kind: z.literal("guest") }),
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it takes a member's access to most of the workspace.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       refuseIfLastOwner(

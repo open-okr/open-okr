@@ -1571,8 +1571,8 @@
         "tags": [
           "workspace"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -2737,8 +2737,8 @@
         "tags": [
           "people"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -2933,8 +2933,8 @@
         "tags": [
           "people"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -22702,8 +22702,8 @@
         "tags": [
           "cycles"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",
@@ -53624,8 +53624,8 @@
         "tags": [
           "sessions"
         ],
-        "x-openokr-scope": "write",
-        "x-openokr-safety": "write",
+        "x-openokr-scope": "destructive",
+        "x-openokr-safety": "destructive",
         "responses": {
           "200": {
             "description": "The action's own output, under `data`.",

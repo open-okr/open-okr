@@ -244,7 +244,7 @@ the machine-readable document.
 | Action | Method and path | Class |
 |---|---|---|
 | `cycles.archive`<br/>Archives a cycle. Its goals and scores stay readable. | `POST /api/v1/cycles/archive` | destroys |
-| `cycles.close`<br/>Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action. | `POST /api/v1/cycles/close` | writes |
+| `cycles.close`<br/>Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action. | `POST /api/v1/cycles/close` | destroys |
 | `cycles.create`<br/>Creates a named cycle for the period containing a chosen date. | `POST /api/v1/cycles/create` | writes |
 | `cycles.current`<br/>The cycle to show: the one containing today, else the soonest ahead, else the most recent behind. | `GET /api/v1/cycles/current` | reads |
 | `cycles.ensureCurrent`<br/>Creates the cycle containing today if the workspace has none. Idempotent. | `POST /api/v1/cycles/ensureCurrent` | writes |
@@ -443,7 +443,7 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `people.convertToGuest`<br/>Convert a member to a guest, stripping their prior bindings. | `POST /api/v1/people/convertToGuest` | writes |
+| `people.convertToGuest`<br/>Convert a member to a guest, stripping their prior bindings. | `POST /api/v1/people/convertToGuest` | destroys |
 | `people.directory`<br/>Every active member of the workspace. | `GET /api/v1/people/directory` | reads |
 | `people.erase`<br/>Anonymise a member: their history stays attributable to a placeholder identity, and their personal data is exported first. | `POST /api/v1/people/erase` | destroys |
 | `people.exportMine`<br/>Everything this workspace holds about the signed-in member, as one document. | `GET /api/v1/people/exportMine` | reads |
@@ -458,7 +458,7 @@ the machine-readable document.
 | `people.setAdministrator`<br/>Makes a member an administrator with full access to the workspace, or returns them to the standard level. | `POST /api/v1/people/setAdministrator` | writes |
 | `people.setLeave`<br/>Sets the signed-in member's own leave, each span with the delegate who stands in. | `POST /api/v1/people/setLeave` | writes |
 | `people.setMemberLeave`<br/>Sets another member's leave, each span with the delegate who stands in. For an administrator. | `POST /api/v1/people/setMemberLeave` | writes |
-| `people.suspend`<br/>Suspend a member, removing every access they had. | `POST /api/v1/people/suspend` | writes |
+| `people.suspend`<br/>Suspend a member, removing every access they had. | `POST /api/v1/people/suspend` | destroys |
 | `people.updateMember`<br/>Update another member's name, title or manager (org fields). | `POST /api/v1/people/updateMember` | writes |
 | `people.updateOwnProfile`<br/>Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours. | `POST /api/v1/people/updateOwnProfile` | writes |
 
@@ -533,7 +533,7 @@ the machine-readable document.
 | `sessions.carriedCommitments`<br/>Commitments set by earlier sessions in this session's space and not yet closed. | `GET /api/v1/sessions/carriedCommitments` | reads |
 | `sessions.castRetroVote`<br/>Spends or withdraws one dot on a retro note. | `POST /api/v1/sessions/castRetroVote` | writes |
 | `sessions.castVote`<br/>A private confidence vote on one key result within a session. Upserts: a second vote replaces the first. | `POST /api/v1/sessions/castVote` | writes |
-| `sessions.close`<br/>Closes a running session. | `POST /api/v1/sessions/close` | writes |
+| `sessions.close`<br/>Closes a running session. | `POST /api/v1/sessions/close` | destroys |
 | `sessions.closeCommitments`<br/>Closes last week's commitments with a delivered/not-delivered verdict. | `POST /api/v1/sessions/closeCommitments` | writes |
 | `sessions.clusterRetro`<br/>Groups one review's retro notes into themes, before the dot vote, without writing anything. | `GET /api/v1/sessions/clusterRetro` | reads |
 | `sessions.completeAction`<br/>Marks one review action done, or not done again. | `POST /api/v1/sessions/completeAction` | writes |
@@ -700,4 +700,4 @@ the machine-readable document.
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |
 | `workspace.reopenOnboarding`<br/>Offer the workspace's own setup again, keeping every answer it already holds. | `POST /api/v1/workspace/reopenOnboarding` | writes |
 | `workspace.setLifecycle`<br/>Close a cloud workspace, typing its address to confirm. Suspending and reopening are the provider's. | `POST /api/v1/workspace/setLifecycle` | destroys |
-| `workspace.setState`<br/>Set the workspace to active, read-only or frozen. | `POST /api/v1/workspace/setState` | writes |
+| `workspace.setState`<br/>Set the workspace to active, read-only or frozen. | `POST /api/v1/workspace/setState` | destroys |

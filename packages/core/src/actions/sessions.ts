@@ -1579,6 +1579,9 @@ export const closeSession = defineWriteAction({
   input: z.object({ id: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it fixes the meeting's record for good: there is no reopen.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
