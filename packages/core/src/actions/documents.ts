@@ -48,6 +48,7 @@ import {
   readableDocuments,
   requireDocumentSubject,
 } from "../documents/access.ts";
+import { freshShortId } from "../ids/short.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import { ensureSubscriptionList } from "../notifications/subscriptions.ts";
@@ -399,6 +400,7 @@ export const createDocument = defineWriteAction({
         .insert(documents)
         .values({
           workspaceId,
+          shortId: await freshShortId(tx, "document", workspaceId),
           subjectType: input.subjectType,
           subjectId: input.subjectId,
           title: input.title.trim(),

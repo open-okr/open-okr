@@ -94,6 +94,18 @@ root key, and refuses to finish without it rather than report them sealed.
 
 Notes are added here as 0.7.0 is built, and finished before it is tagged.
 
+- **A short identifier on every goal, key result, cycle, initiative, task,
+  document and session.** Migration 0163 adds a nullable `short_id` and a
+  unique index to each of the seven tables, the ten-character address KPIs
+  already have. Every write from 0.7.0 fills it. Rows written before the
+  upgrade, and any a 0.6 replica writes while a rolling upgrade is under way,
+  have none until you run the data changes (`./openokr data-change`, or
+  `pnpm db:change`): **data change 0034** fills them a thousand rows at a
+  batch and is safe to stop and run again. Nothing on screen waits for it.
+  **Run it before you upgrade to 0.8.0**, whose migration makes the column
+  not null on all seven tables and refuses to run while a row is still empty,
+  naming the table. `./openokr status` lists 0034 until it is complete.
+
 - **Ended cycles move to Closing.** Within the hour after the upgrade, every
   cycle whose last day has passed and that nobody has closed moves to
   Closing, with an audit row each; the cycle's sponsor or facilitator may

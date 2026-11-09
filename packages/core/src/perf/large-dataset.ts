@@ -40,7 +40,10 @@
  * measuring reads and plans, and it is not a substitute for the fixtures a
  * behaviour test builds through the pipeline.
  */
-import { newId } from "@openokr/db";
+// Every row a short identifier, as every write gives one (short-ids.md S2).
+// Drawn without the per-row check a write makes: two of a million colliding
+// is about one chance in a million, and the unique index would say so.
+import { newId, newShortId } from "@openokr/db";
 import type pg from "pg";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import {
@@ -766,6 +769,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "short_id", type: "text" },
       { name: "name", type: "text" },
       { name: "starts_on", type: "date" },
       { name: "ends_on", type: "date" },
@@ -784,6 +788,7 @@ export async function buildLargeDataset(
       return [
         id,
         workspaceId,
+        newShortId(),
         `Quarter ${extraCycles - index}`,
         new Date(startsAt).toISOString().slice(0, 10),
         new Date(endsAt).toISOString().slice(0, 10),
@@ -823,6 +828,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "short_id", type: "text" },
       { name: "title", type: "text" },
       { name: "cycle_id", type: "uuid" },
       { name: "parent_goal_id", type: "uuid" },
@@ -853,6 +859,7 @@ export async function buildLargeDataset(
       return [
         id,
         workspaceId,
+        newShortId(),
         `Objective ${index + 1}`,
         cycleIds[index % cycleIds.length] as string,
         parentGoalIdFor(index, cycleIds.length, goalIds),
@@ -963,6 +970,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "short_id", type: "text" },
       { name: "goal_id", type: "uuid" },
       { name: "title", type: "text" },
       { name: "direction", type: "text" },
@@ -986,6 +994,7 @@ export async function buildLargeDataset(
       return [
         id,
         workspaceId,
+        newShortId(),
         goalIds[index % counts.goals] as string,
         `Key result ${index + 1}`,
         pick(DIRECTIONS, random),
@@ -1013,6 +1022,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "short_id", type: "text" },
       { name: "space_id", type: "uuid" },
       { name: "title", type: "text" },
       { name: "owner_id", type: "uuid" },
@@ -1031,6 +1041,7 @@ export async function buildLargeDataset(
       return [
         id,
         workspaceId,
+        newShortId(),
         spaceIds[index % spaceIds.length] as string,
         `Initiative ${index + 1}`,
         memberIds[index % memberIds.length] as string,
@@ -1056,6 +1067,7 @@ export async function buildLargeDataset(
     [
       { name: "id", type: "uuid" },
       { name: "workspace_id", type: "uuid" },
+      { name: "short_id", type: "text" },
       { name: "space_id", type: "uuid" },
       { name: "initiative_id", type: "uuid" },
       { name: "key_result_id", type: "uuid" },
@@ -1072,6 +1084,7 @@ export async function buildLargeDataset(
       return [
         newId(when),
         workspaceId,
+        newShortId(),
         spaceIds[index % spaceIds.length] as string,
         counts.initiatives > 0
           ? (initiativeIds[index % counts.initiatives] as string)

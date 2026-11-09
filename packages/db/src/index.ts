@@ -18,7 +18,13 @@ export {
   type GrantOptions,
   grantAppPrivileges,
 } from "./grants.ts";
-export { idTimestamp, newId } from "./id.ts";
+export {
+  idTimestamp,
+  newId,
+  newShortId,
+  SHORT_ID_ALPHABET,
+  SHORT_ID_LENGTH,
+} from "./id.ts";
 export {
   type MigrationClient,
   MigrationError,

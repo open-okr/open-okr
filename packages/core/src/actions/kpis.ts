@@ -55,6 +55,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { freshShortId } from "../ids/short.ts";
 import {
   assertLegacyKeyFree,
   legacyColumns,
@@ -313,16 +314,6 @@ async function actingMember(
   return member.id;
 }
 
-/** A short identifier for a URL. Random, per workspace, never sequential. */
-function shortId(): string {
-  const alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
-  let out = "";
-  for (let index = 0; index < 10; index += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return out;
-}
-
 export const createKpiCategory = defineWriteAction({
   name: "kpis.createCategory",
   domain: "kpi",
@@ -440,7 +431,7 @@ export const createKpi = defineWriteAction({
       const rule = ruleWrite(input, null);
 
       const id = newId();
-      const short = shortId();
+      const short = await freshShortId(tx, "kpi", workspaceId);
       // openokr:allow-mutation: same transaction.
       await tx.insert(kpis).values({
         id,

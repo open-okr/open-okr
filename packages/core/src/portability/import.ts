@@ -21,6 +21,12 @@ import { enqueueOutbox, type WorkspaceTx } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { generateStorageKey } from "../blobs/provisioning.ts";
 import { EMBED_TOPIC, isEmbeddableSubject } from "../embeddings/subjects.ts";
+import {
+  type AddressKind,
+  freshShortId,
+  isShortId,
+  SHORT_ID_TABLES,
+} from "../ids/short.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { INDEX_TOPIC } from "../search/subjects.ts";
@@ -513,6 +519,47 @@ function remapRow(
   return result;
 }
 
+// ── Short identifiers ─────────────────────────────────────────────────────
+
+/** The kind of thing each table with a short identifier holds. */
+const SHORT_ID_KIND_OF: ReadonlyMap<string, AddressKind> = new Map(
+  Object.entries(SHORT_ID_TABLES).map(([kind, table]) => [
+    table,
+    kind as AddressKind,
+  ]),
+);
+
+/**
+ * The short identifier a moved row arrives with (docs/design/short-ids.md S8).
+ *
+ * **Kept where it can be**, so a link somebody shared before the move still
+ * opens the same thing after it. A fresh one where it cannot: the target
+ * workspace already gives that address to something else, which the unique
+ * index would otherwise refuse and the insert below would count as skipped,
+ * losing the row over its address. A fresh one too where the archive has
+ * none, because it came from a release before 0.7.0, or has something that is
+ * not a short identifier at all: an archive is a file anybody could edit.
+ */
+async function arrivingShortId(
+  tx: WorkspaceTx<Record<string, never>>,
+  workspaceId: string,
+  kind: AddressKind,
+  archived: unknown,
+): Promise<string> {
+  if (typeof archived === "string" && isShortId(archived)) {
+    const taken = await tx.execute(
+      sql`select 1 from ${sql.identifier(SHORT_ID_TABLES[kind])}
+           where workspace_id = ${workspaceId}
+             and short_id = ${archived}
+           limit 1`,
+    );
+    if (taken.rows.length === 0) {
+      return archived;
+    }
+  }
+  return freshShortId(tx, kind, workspaceId);
+}
+
 // ── The import ────────────────────────────────────────────────────────────
 
 /**
@@ -610,6 +657,16 @@ export async function importWorkspace(
         leftOut,
       );
       const remappedId = String(remapped.id);
+
+      const shortIdKind = SHORT_ID_KIND_OF.get(table);
+      if (shortIdKind && targetColumns.has("short_id")) {
+        remapped.short_id = await arrivingShortId(
+          tx,
+          workspaceId,
+          shortIdKind,
+          remapped.short_id,
+        );
+      }
 
       // Collect deferred column values for the second pass
       for (const [column, value] of Object.entries(raw)) {

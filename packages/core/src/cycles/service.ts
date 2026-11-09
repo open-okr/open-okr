@@ -21,6 +21,7 @@ import {
 } from "@openokr/db";
 import { levelsInUse } from "@openokr/method";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { freshShortId } from "../ids/short.ts";
 import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -162,6 +163,7 @@ export async function ensureCurrentCycleInTx<
     .values({
       id: newId(),
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "cycle", input.workspaceId),
       name: period.name,
       mode: period.mode,
       cadence: period.cadence,
@@ -318,6 +320,7 @@ export async function createCycleInTx<
     .values({
       id: newId(),
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "cycle", input.workspaceId),
       name: input.name?.trim() || input.period.name,
       mode: input.period.mode,
       cadence: input.cadence,

@@ -19,7 +19,7 @@ Unless a table says otherwise, every table has:
 
 Additional conventions:
 
-- **`short_id`** is specified for externally addressable aggregates: cycles, goals, key results, KPIs, initiatives, tasks, documents and sessions. A random base58 string unique per workspace, used in URLs, the REST API, agent tools, the command line and chat commands. Internal keys are never exposed, and an unknown public identifier returns not-found. **Only `kpis` carries one today**; the other aggregates are addressed by their `id`, and `search.jump` answers null for anything but a KPI.
+- **`short_id`** is on every externally addressable aggregate: cycles, goals, key results, KPIs, initiatives, tasks, documents and sessions. Ten base58 characters from `newShortId()` (`packages/db/src/id.ts`), unique on `(workspace_id, short_id)`, used in URLs, the REST API, agent tools, the command line and chat commands. Internal keys are never exposed, and an unknown public identifier returns not-found. `kpis` has carried one since 0026, not null and unique among live rows. The other seven since 0163 (docs/design/short-ids.md): **nullable in 0.7.0** so a rolling upgrade from 0.6 can still insert, filled by every write and by data change 0034 for rows written before, and **not null from 0.8.0**. Their index is not partial, so a deleted row keeps its address.
 - **`legacy_id` and `legacy_type`** on importable tables, unique on `(workspace_id, legacy_type, legacy_id)` so an import is idempotent.
 - **Rich columns** are editor JSON stored as `jsonb` with a `version` integer beside them. Never Markdown as storage.
 - **Enumerated values** are TypeScript string unions stored as text with a check constraint.
@@ -254,8 +254,8 @@ One row per revision of an **agreed** frame within its year, written by `frame.s
 ### annual_strategies
 `frame_id` to annual_frames, `text`, `note?`, `position`.
 
-### cycles *(importable)*
-`name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb` (the levels the cycle began with, written from the practice when it is created and moved by a practice change only while it has not started, P9-T07a-c), `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
+### cycles *(short_id, importable)*
+`short_id?` (0163), `name`, `mode` (`annual` / `quarterly`), `cadence` (`annual` / `semiannual` / `quarterly` / `monthly`), `starts_on`, `ends_on`, `status` (`planning` / `active` / `closing` / `closed`), `phase smallint` (0 to 7), `frame_id?` to annual_frames, `previous_cycle_id?` to cycles, `sponsor_id?` and `facilitator_id?` to workspace_members, `session_dates jsonb`, `publication_deadline date?`, `pack_distributed_at?`, `published_at?`, `company_published_at?`, `levels jsonb` (the levels the cycle began with, written from the practice when it is created and moved by a practice change only while it has not started, P9-T07a-c), `contributing_units text?`, `first_cycle bool`, `settings jsonb`, `legacy_id?`, `legacy_type?`.
 
 `practice_snapshot jsonb?` (0121, P9-T14b, METHOD.md §12) holds the practice settings and every threshold in force when the cycle closed, resolved, so a band or a cap moved later does not rewrite its verdicts. Null while open, and on a cycle closed before the column existed, which reads today's canon.
 
@@ -302,8 +302,8 @@ Since guided-inputs change 12 (migration 0143) each note is editor JSON in its `
 
 ## 7. Goals, key results and check-ins (domain D)
 
-### goals *(importable)*
-`title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `kind` (`committed` / `aspirational`, default `aspirational`; 0113, P9-T11b-a, METHOD.md §2.8), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id?` to workspace_members (optional since 0111, P9-T04: the practice decides whether a goal needs one), `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `standalone_reason?` (0123, P9-T16a, METHOD.md §5.2: why a goal with no parent stands alone; counts as aligned, and cleared when a parent is set), `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed` / `abandoned`, the last since 0122, P9-T15b-a: a stop, METHOD.md §3.5), `close_decision?` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a, METHOD.md §2.9: when it was started after the team publication window into a published set; null is the plan), `draft_state?` (`draft` / `awaiting_approval`; 0117, P9-T13-b-b: an addition waiting for its owner to publish it or its reviewer to approve it; null follows its cycle), `carried_from_goal_id?` to goals (0137, P9-T20e-b, METHOD.md §8.9: the objective a keep or modify pre-filled this draft from; unique per cycle, deleted drafts included), `position`.
+### goals *(short_id, importable)*
+`short_id?` (0163), `title`, `description` (rich), `cycle_id?` to cycles, `timeframe jsonb?`, `level` (`company` / `department` / `team` / `individual`), `kind` (`committed` / `aspirational`, default `aspirational`; 0113, P9-T11b-a, METHOD.md §2.8), `owner_kind` (`workspace` / `space` / `member`), `space_id?` to spaces, `member_id?` to workspace_members, `champion_id` to workspace_members, `reviewer_id?` to workspace_members (optional since 0111, P9-T04: the practice decides whether a goal needs one), `parent_goal_id?` to goals, `parent_key_result_id?` to key_results, `strategy_id?` to annual_strategies, `weight numeric`, `check_in_frequency`, `next_check_in_at`, `last_check_in_id?` to check_ins, `contribution_statement?`, `standalone_reason?` (0123, P9-T16a, METHOD.md §5.2: why a goal with no parent stands alone; counts as aligned, and cleared when a parent is set), `closed_at?`, `closed_by_id?`, `success_status?` (`achieved` / `missed` / `abandoned`, the last since 0122, P9-T15b-a: a stop, METHOD.md §3.5), `close_decision?` (`achieved` / `keep` / `modify` / `defer` / `abandon`; achieved and defer since 0136, P9-T20e-a), `close_reason?`, `progress_pct numeric`, `health`, `quality_score smallint?`, `quality_flags jsonb`, `ai_generated bool` (written for the first time by P4-T15a: an objective a reader kept from an assist's draft says so, and one they typed says so too), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a, METHOD.md §2.9: when it was started after the team publication window into a published set; null is the plan), `draft_state?` (`draft` / `awaiting_approval`; 0117, P9-T13-b-b: an addition waiting for its owner to publish it or its reviewer to approve it; null follows its cycle), `carried_from_goal_id?` to goals (0137, P9-T20e-b, METHOD.md §8.9: the objective a keep or modify pre-filled this draft from; unique per cycle, deleted drafts included), `position`.
 
 A waiting draft has no `next_check_in_at`: its rhythm starts when it goes live. `added_mid_cycle_at` and `draft_state` were left out of this page when 0115 arrived and were added at P9-T13-b-b.
 
@@ -311,8 +311,8 @@ At most one of `parent_goal_id` and `parent_key_result_id` is set. Cycles in the
 
 `strategy_id` (0076, P6-G14b) is the §2.1 annual strategy an objective serves, and is independent of the two parent pointers: a strategy is what an annual objective is *for*, a parent is what a quarterly one hangs *under*, and an objective can honestly have both. Null for every quarterly objective, and `on delete set null` because replacing a frame supersedes its strategies and an objective that pointed at a superseded one is still a real objective.
 
-### key_results *(importable)*
-`goal_id` to goals, `title`, `unit`, `kind` (`metric` / `maintain` / `milestone` / `baseline`, default `metric`; 0114, P9-T12b), `done_at?`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a), `baseline_value numeric`, `target_value numeric?` (null until somebody sets it; 0116, P9-T13-b-a), `current_value numeric`, `due_on date?`, `owner_id?` to workspace_members, `weight numeric`, `kpi_id?` to kpis, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `score_computed numeric?`, `score_reason?`, `carry_forward bool`, `quality_flags jsonb`, `position`.
+### key_results *(short_id, importable)*
+`short_id?` (0163), `goal_id` to goals, `title`, `unit`, `kind` (`metric` / `maintain` / `milestone` / `baseline`, default `metric`; 0114, P9-T12b), `done_at?`, `direction` (`increase` / `reduce` / `maintain` / `move`), `indicator_type` (`leading` / `lagging`), `added_mid_cycle_at timestamptz?` (0115, P9-T13-a), `baseline_value numeric`, `target_value numeric?` (null until somebody sets it; 0116, P9-T13-b-a), `current_value numeric`, `due_on date?`, `owner_id?` to workspace_members, `weight numeric`, `kpi_id?` to kpis, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric`, `confidence numeric?`, `forecast jsonb?`, `score numeric?`, `score_computed numeric?`, `score_reason?`, `carry_forward bool`, `quality_flags jsonb`, `position`.
 
 `score` is what the review decided at the close; `score_computed` is what METHOD.md §2.10 computed then, and `score_reason` why the two differ, null where they agree (0120, P9-T14a). Data change 0018 copied `score` into `score_computed` for every key result scored before adjusting existed.
 
@@ -405,8 +405,8 @@ Points configuration and entries. `scorecard_settings` is one row per workspace 
 
 ## 10. The rhythm (domain G)
 
-### okr_sessions
-`kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts_document jsonb?`, `shifts_document_version?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to okr_sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review, `mic_goal_id?` to goals and `process_health_salt?` (both §11 below).
+### okr_sessions *(short_id)*
+`short_id?` (0163), `kind` (`planning` / `weekly` / `monthly` / `quarterly`), `space_id?` to spaces, `cycle_id?` to cycles, `title`, `scheduled_for`, `started_at?`, `ended_at?`, `facilitator_id` to workspace_members, `stage_key?`, `stage_started_at?`, `elapsed jsonb`, `notes jsonb`, `state` (`scheduled` / `running` / `closed` / `skipped`), `digest_id?` to digests, `shifts_document jsonb?`, `shifts_document_version?`, `added_minutes jsonb`, `wins jsonb` (the week's wins a weekly session named, in order, default empty; 0130, P9-T19a-d-c), `review_part?` (`review` / `retrospective`; null is the whole review in one session) and `review_session_id?` to okr_sessions (the review session a retrospective reads its scores from), both 0133, P9-T20b-a, checked so only a quarterly session has a part and only a retrospective names a review, `mic_goal_id?` to goals and `process_health_salt?` (both §11 below).
 
 The table is `okr_sessions`; `sessions` is Better Auth's sign-in table (§1). The actions and the columns that point here say `session`.
 
@@ -502,10 +502,10 @@ Every table references `session_id` to okr_sessions (nullable on `learnings` onl
 
 ## 12. The work (domain I)
 
-### initiatives *(importable, built at P5-T10a)*
-`space_id` to spaces, `title`, `description` (rich) with `description_version`, `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`, default `planned`), `confidence numeric(3,2)?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric(5,2)`, `position`.
+### initiatives *(short_id, importable, built at P5-T10a)*
+`short_id?` (0163), `space_id` to spaces, `title`, `description` (rich) with `description_version`, `owner_id` to workspace_members, `starts_on?`, `ends_on?`, `status` (`planned` / `active` / `done` / `dropped`, default `planned`), `confidence numeric(3,2)?`, `capacity?` (`fits` / `tight` / `exceeds`), `progress_pct numeric(5,2)`, `position`.
 
-No `short_id` yet: TECHNICAL-PLAN §4.9 does not ask for one and nothing addresses an initiative by a short code until the palette at P5-T13. `capacity` is nullable and null means nobody has judged it, which publish gate five reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks at P5-T11 and holds its default of zero until then; no input schema accepts one, which is the work-layer design's answer to W2.
+`short_id` arrived with 0163, nullable until 0.8.0 (see the conventions above). `capacity` is nullable and null means nobody has judged it, which publish gate five reads differently from `fits`. `progress_pct` is derived from the initiative's own tasks at P5-T11 and holds its default of zero until then; no input schema accepts one, which is the work-layer design's answer to W2.
 
 A check constraint refuses a window that ends before it starts. There is no `cycle_id`: an initiative reaches a cycle through the key results it serves, which is the only relationship METHOD.md §5.5 describes, and a column would be a second answer that disagrees the first time one initiative serves two cycles.
 
@@ -514,10 +514,10 @@ Each initiative owns an access context (`resourceType: "initiative"`): `workspac
 ### initiative_key_results *(built at P5-T10a)*
 `initiative_id` to initiatives, `key_result_id` to key_results. Unique on `(workspace_id, initiative_id, key_result_id)` while live, so recording the same link twice is one link; a soft-deleted link is revived rather than duplicated.
 
-### tasks *(importable, built at P5-T11)*
-`space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich) with `description_version`, `status` (`backlog` / `todo` / `in_progress` / `done`, default `backlog`), `due_on?`, `position`, `ordering_state jsonb`.
+### tasks *(short_id, importable, built at P5-T11)*
+`short_id?` (0163), `space_id` to spaces, `initiative_id?` to initiatives, `key_result_id?` to key_results, `title`, `description` (rich) with `description_version`, `status` (`backlog` / `todo` / `in_progress` / `done`, default `backlog`), `due_on?`, `position`, `ordering_state jsonb`.
 
-No `short_id` yet, for the reason `initiatives` has none: nothing addresses a task by a short code until the palette at P5-T13. Both links are optional and independent, which is the work-layer design's answer to W1: a task may serve a key result with no initiative behind it.
+Both links are optional and independent, which is the work-layer design's answer to W1: a task may serve a key result with no initiative behind it.
 
 `position` is `double precision` and sparse, spaced by 1024 (`TASK_POSITION_SPACING` in `packages/core`). A move reads its two new neighbours with three `limit 1` queries and writes the midpoint, so a drag touches one row. An advisory lock over the space's column serialises concurrent drags, rather than whichever board the drag happened on, because three boards read one set of rows. `ordering_state` records the spacing and the last renumber, so a reader can tell a fresh column from one dragged a hundred times without reading every row.
 
@@ -535,10 +535,8 @@ Each task owns an access context (`resourceType: "task"`): `workspace_standard` 
 
 The two legacy columns and their unique partial index arrived at P6-T04a, the third and last importable table written before there was an importer to write them. A line of text is not a natural key: two sub-tasks on one task can read "Call the supplier" and mean different calls, so matching on the title would silently collapse them.
 
-### documents *(built at P5-T12)*
-`subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich) with `body_version`, `state` (`draft` / `published`, default `draft`), `published_at?`, `author_member_id` to workspace_members.
-
-No `short_id` yet, for the reason `initiatives` and `tasks` have none: nothing addresses a document by a short code until the palette at P5-T13.
+### documents *(short_id, built at P5-T12)*
+`short_id?` (0163), `subject_type` (`space` / `goal` / `key_result` / `initiative` / `cycle` / `session`), `subject_id`, `title`, `body` (rich) with `body_version`, `state` (`draft` / `published`, default `draft`), `published_at?`, `author_member_id` to workspace_members.
 
 **A draft is visible to its author and to nobody else, and the query is what makes it so.** Every read composes `(state = 'published' or author_member_id = $me)`, so there is no code path that returns a draft to somebody else, including a direct identifier probe: that answers not-found, indistinguishable from a document that never existed. A filter in a component is a filter one careless read forgets.
 

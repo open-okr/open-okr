@@ -138,6 +138,7 @@ import {
   readRhythmRow,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { freshShortId } from "../ids/short.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
@@ -806,6 +807,7 @@ export const createSession = defineWriteAction({
       await tx.insert(sessions).values({
         id,
         workspaceId,
+        shortId: await freshShortId(tx, "session", workspaceId),
         spaceId: input.spaceId,
         cycleId: input.cycleId ?? null,
         kind: input.kind,

@@ -19,7 +19,7 @@ import {
   timestamp,
   uuid,
 } from "drizzle-orm/pg-core";
-import { newId } from "../id.ts";
+import { newId, newShortId } from "../id.ts";
 import { cycles } from "./cycles.ts";
 import { spaces } from "./spaces.ts";
 import { workspaceMembers, workspaces } from "./workspaces.ts";
@@ -48,6 +48,11 @@ export const sessions = pgTable("okr_sessions", {
   workspaceId: uuid("workspace_id")
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
+  /**
+   * The public address (TECHNICAL-PLAN §3, migration 0163). Nullable until
+   * 0.8.0 for a rolling upgrade (docs/design/short-ids.md S3).
+   */
+  shortId: text("short_id").$defaultFn(newShortId),
   spaceId: uuid("space_id").references(() => spaces.id, {
     onDelete: "cascade",
   }),

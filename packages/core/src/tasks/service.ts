@@ -55,6 +55,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { freshShortId } from "../ids/short.ts";
 import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import {
   ensureSubscriptionList,
@@ -168,6 +169,7 @@ export async function createTaskInTx<
     .values({
       id: taskId,
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "task", input.workspaceId),
       spaceId: input.spaceId,
       initiativeId: input.initiativeId ?? null,
       keyResultId: input.keyResultId ?? null,

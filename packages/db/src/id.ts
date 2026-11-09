@@ -14,7 +14,7 @@
  * row arriving without an id is a bug worth failing on rather than papering
  * over with a random key.
  */
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomInt } from "node:crypto";
 
 /**
  * A new time-ordered UUID.
@@ -62,4 +62,37 @@ export function newId(atMilliseconds: number = Date.now()): string {
 /** The millisecond a v7 id was generated at. Used by tests and diagnostics. */
 export function idTimestamp(id: string): number {
   return Number.parseInt(id.replace(/-/g, "").slice(0, 12), 16);
+}
+
+/**
+ * The characters a short identifier is drawn from: base58, the digits and
+ * letters without `0`, `O`, `I` and `l`, which read alike. The alphabet KPI
+ * links have carried since migration 0026, so every short link has one shape.
+ */
+export const SHORT_ID_ALPHABET =
+  "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
+
+/** How long a short identifier is: 58^10, about 4 × 10^17 per workspace. */
+export const SHORT_ID_LENGTH = 10;
+
+/**
+ * A new short identifier (TECHNICAL-PLAN §3, docs/design/short-ids.md S2).
+ *
+ * **One generator, here beside `newId`.** The write path, the KPI create, the
+ * performance dataset and data change 0034 all need one, and the data change
+ * lives in this package, which cannot import `packages/core`. Two copies of
+ * the alphabet would be how a backfilled row stops looking like a written one,
+ * the reason `newId` is single too. `packages/core/src/ids/short.ts` adds the
+ * collision retry a write uses.
+ *
+ * `randomInt` rather than `Math.random`: an identifier is not a secret, since
+ * access is checked on every read, but a predictable generator is no reason
+ * to keep. `randomInt` draws without the modulo bias a byte would carry.
+ */
+export function newShortId(): string {
+  let out = "";
+  for (let index = 0; index < SHORT_ID_LENGTH; index += 1) {
+    out += SHORT_ID_ALPHABET[randomInt(SHORT_ID_ALPHABET.length)];
+  }
+  return out;
 }

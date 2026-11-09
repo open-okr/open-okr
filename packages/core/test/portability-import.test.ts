@@ -919,6 +919,85 @@ describe("what a move keeps", () => {
       provider_workspace_id: targetWorkspaceId,
     });
   });
+
+  it("keeps each goal's short id, and gives a fresh one where the target already uses it (short-ids.md S8)", async () => {
+    const source = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    const cycle = await source<{ id: string }>("cycles.create", {
+      on: "2030-02-15",
+      mode: "quarterly",
+    });
+    const goal = (title: string) =>
+      source<{ id: string }>("goals.create", {
+        title,
+        cycleId: cycle.id,
+        level: "company",
+        ownerKind: "workspace",
+        weight: 1,
+      });
+    const kept = await goal("Win the mid-market");
+    const clashing = await goal("Keep every customer");
+
+    const wb = await workerDb();
+    const shortIdOf = async (id: string) =>
+      (
+        await wb.admin.query<{ short_id: string }>(
+          "select short_id from goals where id = $1",
+          [id],
+        )
+      ).rows[0]?.short_id as string;
+    const keptShortId = await shortIdOf(kept.id);
+    const clashingShortId = await shortIdOf(clashing.id);
+    // The target already gives that address to a goal of its own.
+    const inTarget = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: targetWorkspaceId,
+          actor: { kind: "human", userId: OWNER_B },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    const targetCycle = await inTarget<{ id: string }>("cycles.current", {
+      mode: "quarterly",
+    });
+    const target = await inTarget<{ id: string }>("goals.create", {
+      title: "Already here",
+      cycleId: targetCycle.id,
+      level: "company",
+      ownerKind: "workspace",
+      weight: 1,
+    });
+    await wb.admin.query("update goals set short_id = $1 where id = $2", [
+      clashingShortId,
+      target.id,
+    ]);
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.goals ?? 0).toBe(0);
+
+    const { rows } = await wb.admin.query<{ title: string; short_id: string }>(
+      `select title, short_id from goals
+        where workspace_id = $1 and title in ($2, $3)`,
+      [targetWorkspaceId, "Win the mid-market", "Keep every customer"],
+    );
+    const moved = new Map(rows.map((row) => [row.title, row.short_id]));
+    expect(moved.get("Win the mid-market")).toBe(keptShortId);
+    expect(moved.get("Keep every customer")).toMatch(
+      /^[1-9a-km-zA-HJ-NP-Z]{10}$/,
+    );
+    expect(moved.get("Keep every customer")).not.toBe(clashingShortId);
+  });
 });
 
 describe("search after a move (completeness review M-31)", () => {
