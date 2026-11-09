@@ -61,10 +61,9 @@ test.afterAll(async () => {
   });
   if ((await restore.count()) > 0) {
     await restore.getByRole("button", { name: "Restore the built-in" }).click();
-    await expect(restore.getByRole("status")).toHaveText(
-      "Back to the built-in prompt.",
-      { timeout: 15_000 },
-    );
+    // The form is drawn only while a stored version exists, so a restore
+    // that worked takes it away, status line and all.
+    await expect(restore).toHaveCount(0, { timeout: 15_000 });
   }
   await context?.close();
 });
