@@ -107,6 +107,7 @@ export {
   PgBossJobQueue,
   type PgBossJobQueueOptions,
 } from "./drivers/jobs/pg-boss.ts";
+export { consoleMailRevealsContent } from "./drivers/mail/console.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {

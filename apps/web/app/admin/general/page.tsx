@@ -1,3 +1,4 @@
+import { consoleMailRevealsContent } from "@openokr/adapters";
 import {
   ACCESS_LEVELS,
   callAction,
@@ -126,7 +127,9 @@ export default async function GeneralSettingsPage() {
         tenantFloorBypassed={floor === "bypassed"}
         schedulerFailed={schedulerState() === "failed"}
       />
-      {mail.transport === "console" ? <ConsoleMailNotice /> : null}
+      {mail.transport === "console" ? (
+        <ConsoleMailNotice revealsContent={consoleMailRevealsContent()} />
+      ) : null}
       <GeneralSettingsForm settings={read.settings} zones={listTimezones()} />
       {instanceName ? (
         <InstanceNameCard

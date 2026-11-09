@@ -183,7 +183,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B4 | done | #192 |
 | B5 | to do | Design first |
 | B6 | done | |
-| B7 | to do | |
+| B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
 | B9 | to do | |
 | B10 | to do | |

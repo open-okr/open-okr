@@ -31,6 +31,19 @@ export interface ConsoleMailerOptions {
   readonly revealContent?: boolean;
 }
 
+/**
+ * Whether this driver prints whole messages, by default, in this environment.
+ *
+ * Exported because Admin, General describes the log to an operator, and a
+ * second copy of this rule there is how the banner came to say the body was
+ * logged in production after the driver stopped logging it (plan 0.7.0, B7).
+ */
+export function consoleMailRevealsContent(
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): boolean {
+  return environment.NODE_ENV !== "production";
+}
+
 /** `ada@example.com` as `a***@example.com`: which domain, not who. */
 function maskAddress(address: string): string {
   const at = address.lastIndexOf("@");
@@ -50,8 +63,7 @@ export class ConsoleMailer implements Mailer {
   constructor(options: ConsoleMailerOptions = {}) {
     this.#write =
       options.write ?? ((line) => process.stdout.write(`${line}\n`));
-    this.#reveal =
-      options.revealContent ?? process.env.NODE_ENV !== "production";
+    this.#reveal = options.revealContent ?? consoleMailRevealsContent();
   }
 
   async verify(): Promise<MailVerifyResult> {
