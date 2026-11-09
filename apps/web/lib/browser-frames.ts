@@ -3,8 +3,8 @@
  * error-reporting.md D18, plan 0.7.0 E3).
  *
  * A browser's stack names compiled chunks, `_next/static/chunks/0a1b.js:1:2345`.
- * The build writes a source map beside each chunk, and Node's own `SourceMap`
- * reads it, so every tracker gets readable frames with no upload step per
+ * The build writes a source map beside each chunk, named in the chunk's last
+ * line, and Node's own `SourceMap` reads it, so every tracker gets readable frames with no upload step per
  * release and no dependency. What a map reveals is the public repository.
  *
  * **The file name in a frame is the browser's to say, so it is untrusted.**
@@ -16,9 +16,9 @@
  * because a parsed map costs several times its size in memory (E1 measured
  * the server's at a gigabyte for all of them).
  */
-import { readFile } from "node:fs/promises";
+import { open, readFile } from "node:fs/promises";
 import { SourceMap, type SourceMapping } from "node:module";
-import { join, resolve, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { type ErrorFrame, scrubFile } from "@openokr/core";
 
 /** Where the build's static output is: standalone, then a checkout. */
@@ -63,6 +63,35 @@ function chunkOf(file: string): string | null {
   return relative;
 }
 
+/** How far from a chunk's end its `sourceMappingURL` comment is looked for. */
+const TAIL_BYTES = 512;
+
+/**
+ * The map a chunk names in its closing `//# sourceMappingURL=` comment, as a
+ * path beside it, or null. Turbopack names a chunk's map by its own hash
+ * rather than `<chunk>.map`, so the comment is the only way to find it. Only a
+ * plain file name ending in `.map` is taken: never a URL, a data URI or a
+ * path that leaves the chunk's directory.
+ */
+async function namedMap(chunkPath: string): Promise<string | null> {
+  const file = await open(chunkPath, "r");
+  try {
+    const { size } = await file.stat();
+    const length = Math.min(size, TAIL_BYTES);
+    const buffer = Buffer.alloc(length);
+    await file.read(buffer, 0, length, size - length);
+    const named = /\/\/# sourceMappingURL=([^\s]+)\s*$/.exec(
+      buffer.toString("utf8"),
+    )?.[1];
+    if (!named || !/^[\w.-]+\.map$/.test(named)) {
+      return null;
+    }
+    return join(dirname(chunkPath), named);
+  } finally {
+    await file.close();
+  }
+}
+
 async function mapFor(
   relative: string,
   roots: readonly string[],
@@ -77,15 +106,25 @@ async function mapFor(
   }
   let found: SourceMap | null = null;
   for (const root of roots) {
-    const path = resolve(join(root, `${relative}.map`));
-    if (!path.startsWith(root + sep)) {
+    const chunk = resolve(join(root, relative));
+    if (!chunk.startsWith(root + sep)) {
       continue;
     }
-    try {
-      found = new SourceMap(JSON.parse(await readFile(path, "utf8")));
+    // The map the chunk names first, then the `<chunk>.map` convention.
+    const named = await namedMap(chunk).catch(() => null);
+    for (const path of [named, `${chunk}.map`]) {
+      if (path === null || !resolve(path).startsWith(root + sep)) {
+        continue;
+      }
+      try {
+        found = new SourceMap(JSON.parse(await readFile(path, "utf8")));
+        break;
+      } catch {
+        // Not here, not readable, or not a map: the frame stays compiled.
+      }
+    }
+    if (found) {
       break;
-    } catch {
-      // Not here, not readable, or not a map: the frame stays compiled.
     }
   }
   maps.set(relative, found);

@@ -93,10 +93,12 @@ test("a page's error reaches the tracker through our own server, frames resolved
       .map((script) => script.src)
       .find((src) => src.includes("/_next/static/chunks/"));
     const error = new TypeError("e2e probe: Cannot read properties of null");
+    // Columns past the chunk's opening wrapper, which maps to nothing: a
+    // real error is thrown inside a module, and so is this one.
     error.stack = [
       `TypeError: ${error.message}`,
-      `    at probe (${chunk ?? "missing"}:1:120)`,
-      `    at ${chunk ?? "missing"}:1:40`,
+      `    at probe (${chunk ?? "missing"}:1:600)`,
+      `    at ${chunk ?? "missing"}:1:2000`,
     ].join("\n");
     window.dispatchEvent(new ErrorEvent("error", { error, message: error.message }));
   });
