@@ -1,6 +1,6 @@
 # A token's scopes are a ceiling for every write it causes
 
-Status: proposed 9 November 2026 for release 0.7.0, waiting for "design approved". Akmal asked for the fix the same night; it changes access, so it is designed first (CLAUDE.md).
+Status: approved 10 November 2026 and built in 0.7.0. Akmal asked for the fix on 9 November; it changes access, so it was designed first (CLAUDE.md).
 
 Authority: TECHNICAL-PLAN §14 ("scoped bearer tokens"), `api-contract.md` §4 and §5 (`insufficient_scope`), `agent-surface.md` §5.3 (a scope refusal is audited), the A13 build report that found the gap.
 
@@ -45,7 +45,7 @@ The browser is not affected: a signed-in person has no scopes, only their access
 
 | Kind | File | Covers |
 |---|---|---|
-| Unit | `packages/core/test/scope-ceiling.test.ts` | The ceiling: a nested write inside a `write` scope, a nested destructive refused, no ceiling without scopes, nested twice |
+| Unit | `packages/core/test/scope-ceiling.test.ts` | The ceiling through `proposals.apply` and `proposals.bulkApply`: a nested destructive refused with nothing changed, a nested write applied, a destructive token, no ceiling without scopes, the outer action held too |
 | Integration | `packages/core/test/proposal-decisions.test.ts` (existing) | Apply and bulk apply with a scoped context |
 | Integration | `packages/core/test/copilot-proposals.test.ts` and `alignment.test.ts` (existing) | The other two callers |
 | Route | `apps/web/test/rest-action-context.test.ts` (existing) | REST sets `scopes` on the context; `insufficient_scope` comes back for the nested refusal |
@@ -53,3 +53,13 @@ The browser is not affected: a signed-in person has no scopes, only their access
 ## 4. Question for Akmal
 
 None. The change only refuses what a token was never granted; every path that works today without a token is unchanged.
+
+## 5. As built
+
+| Piece | Where |
+|---|---|
+| The store, `currentCeiling`, `withCeiling` and `ScopeCeilingRefused` | `packages/core/src/actions/scope-ceiling.ts` |
+| The check before any action runs, and the scope set for what it causes | `holdToCeiling` and `withScopes` in `packages/core/src/actions/registry.ts`, in `callAction` and `validateAction` |
+| `ActionCallContext.scopes` | `packages/core/src/actions/define.ts`; set by `apps/web/app/api/v1/[[...path]]/route.ts` and `packages/core/src/api/mcp/dispatch.ts` |
+| `insufficient_scope` | `errorFor` in `packages/core/src/api/errors.ts` |
+| The agent endpoint's record | `dispatchTool` catches the refusal and records it with `auditScopeRefusal`, naming the nested action (C5) |

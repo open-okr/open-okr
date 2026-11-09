@@ -71,6 +71,13 @@ export interface ActionCallContext {
   readonly pool: Pool;
   readonly workspaceId: string;
   readonly actor: ActorInput;
+  /**
+   * The calling token's scopes, set by REST and the agent endpoint and by
+   * nothing else (token-scope-ceiling.md C3). Every action the call causes,
+   * nested ones included, must fit within them. Absent means no token: the
+   * browser, the scheduler, the relay, chat and the importer, as before.
+   */
+  readonly scopes?: readonly string[];
   readonly ring?: KeyRing;
   /**
    * Reads and removes a file's bytes, when the host has a storage port to

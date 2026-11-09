@@ -90,6 +90,9 @@ it("gives an action the key ring and the instance's address, as the screens do",
   expect(context.ring).toBe(RING);
   expect(context.baseUrl).toBe(ISSUER);
   expect(context.channel).toBe("api");
+  // The token's scopes, as a ceiling for anything the action causes
+  // (token-scope-ceiling.md).
+  expect(context.scopes).toEqual(["read", "write", "destructive"]);
 });
 
 /** POSTs to one write's path, with an optional query string. */

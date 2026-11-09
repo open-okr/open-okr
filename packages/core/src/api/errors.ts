@@ -20,6 +20,7 @@
  */
 
 import { ZodError } from "zod";
+import { ScopeCeilingRefused } from "../actions/scope-ceiling.ts";
 import { SSOConnectionRejected } from "../auth/sso.ts";
 import { OperationError } from "../operations/errors.ts";
 import { DryRunUnavailable } from "../operations/operation.ts";
@@ -144,6 +145,11 @@ export function errorFor(thrown: unknown): ApiError {
     return thrown.details === undefined
       ? base
       : { ...base, details: thrown.details };
+  }
+  if (thrown instanceof ScopeCeilingRefused) {
+    // An action the call caused that the token's scopes do not reach
+    // (token-scope-ceiling.md C4). The same code as the surface's own check.
+    return apiError("insufficient_scope", thrown.message);
   }
   if (thrown instanceof DryRunUnavailable) {
     // A validation call that reached a write it cannot roll back (plan D4).

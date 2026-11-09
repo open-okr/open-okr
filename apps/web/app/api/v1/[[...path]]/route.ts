@@ -226,6 +226,10 @@ async function handle(
       // Named on the audit row of every write, in one place, so a call that
       // came in over the API is answerable a quarter later.
       channel: "api",
+      // A ceiling for every action this call causes, nested ones included
+      // (token-scope-ceiling.md): applying a proposal cannot run what the
+      // token was never granted.
+      scopes: resolved.scopes,
       // What the screens already hand every action, so a write that seals
       // a credential works over the API and the command line too. Without
       // the ring `sso.updateConnection` and `ai.setWorkspaceCredential`

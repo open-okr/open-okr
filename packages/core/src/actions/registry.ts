@@ -405,6 +405,11 @@ import {
   listRoles,
   setRolePermission,
 } from "./roles.ts";
+import {
+  currentCeiling,
+  ScopeCeilingRefused,
+  withCeiling,
+} from "./scope-ceiling.ts";
 import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
@@ -1074,6 +1079,7 @@ async function admitAndCall<K extends ActionName>(
   input: ActionInput<K>,
 ): Promise<ActionOutput<K>> {
   const action = ACTION_MAP[name];
+  holdToCeiling(context, name, action as ActionDefinition);
   // A write reached from inside a dry run must be one too (plan D4). A write
   // built from one operation inherits it; any other could commit on its own
   // connection, so the check is refused rather than the write let through.
@@ -1090,7 +1096,35 @@ async function admitAndCall<K extends ActionName>(
     (action as ActionDefinition).handler(context, input) as Promise<
       ActionOutput<K>
     >;
-  return admitted(context, name, action as ActionDefinition, call);
+  return withScopes(context, () =>
+    admitted(context, name, action as ActionDefinition, call),
+  );
+}
+
+/**
+ * The token's ceiling, checked before anything runs (token-scope-ceiling.md
+ * C1, C2): the call's own scopes where it brings them, otherwise the ceiling
+ * of the call that started this one. No token, no ceiling.
+ */
+function holdToCeiling(
+  context: ActionCallContext,
+  name: string,
+  action: ActionDefinition,
+): void {
+  const ceiling = context.scopes ?? currentCeiling();
+  if (ceiling && !ceiling.includes(action.safety)) {
+    throw new ScopeCeilingRefused(name, action.safety, ceiling);
+  }
+}
+
+/** Runs `fn` under the call's scopes, when it brings any and none is set. */
+function withScopes<T>(
+  context: ActionCallContext,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return context.scopes && !currentCeiling()
+    ? withCeiling(context.scopes, fn)
+    : fn();
 }
 
 /**
@@ -1120,12 +1154,13 @@ export async function validateAction<K extends ActionName>(
   if (!validate) {
     return null;
   }
+  holdToCeiling(context, name, action);
   const call = () =>
     validate(context, input) as Promise<{
       readonly input: ActionInput<K>;
       readonly result: ActionOutput<K>;
     }>;
-  return admitted(context, name, action, call);
+  return withScopes(context, () => admitted(context, name, action, call));
 }
 
 /** Admission, then the measured call: the one door every action comes through. */

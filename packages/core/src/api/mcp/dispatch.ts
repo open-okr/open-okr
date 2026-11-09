@@ -18,12 +18,14 @@
  * needs. What it never carries is anything about the shape of a workspace the
  * caller cannot see: a not-found stays not-found.
  */
+
 import { aiToolCalls, type ToolCallOutcome, withWorkspace } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { ZodError } from "zod";
 import { ACCESS_LEVELS } from "../../access/levels.ts";
 import { type ActionName, callAction } from "../../actions/registry.ts";
+import { ScopeCeilingRefused } from "../../actions/scope-ceiling.ts";
 import { OperationError } from "../../operations/errors.ts";
 import { runOperation } from "../../operations/operation.ts";
 import { richTextFromPlainText } from "../../rich-text/from-text.ts";
@@ -373,6 +375,9 @@ async function runTool(
         // Recorded on every audit row this call writes, so "an agent did this"
         // is answerable a quarter later.
         channel: "mcp",
+        // The connection's scopes, as a ceiling for every action the tool
+        // causes (token-scope-ceiling.md).
+        scopes: principal.scopes,
         ...(ring ? { ring } : {}),
       },
       name as ActionName,
@@ -384,6 +389,20 @@ async function runTool(
       tool: known,
     };
   } catch (error) {
+    if (error instanceof ScopeCeilingRefused) {
+      // An action the tool caused that the connection's scopes do not reach,
+      // recorded as a scope refusal at the door is (A3, design C5), naming
+      // the nested action.
+      await auditScopeRefusal(pool, principal, error.action, error.needs, {
+        targetIds: targetIdsOf(input),
+        durationMs: Math.round(performance.now() - startedAt),
+      });
+      return {
+        result: refusal(error.message),
+        outcome: "refused_scope",
+        tool: known,
+      };
+    }
     if (error instanceof ZodError) {
       // **An input the schema refuses is a refusal, and it names the fields.**
       // Until P5-T16 a read never got here, because the read builder did not
