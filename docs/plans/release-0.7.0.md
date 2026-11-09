@@ -147,6 +147,17 @@ The review found 47 such statements in the specification and design pages. Sever
 | D4 | A validate call per resource, returning field errors and computed defaults | TECHNICAL-PLAN §14 | `goals.checkDraft` checks an unsaved objective, for external agents only: the web Draft Coach does not call it. `imports.previewTable` is the import dry run. No per-resource validate call | None |
 | D5 | Outbound webhooks, signed per hook, with delivery logs | TECHNICAL-PLAN §14 | Only inbound channel and billing webhooks | Design first: new subsystem |
 
+### 4.8 Error reporting
+
+Added 9 November 2026 at Akmal's request, to ship with 0.7.0. Not found by the review: PLAN §9 asks for observability with self-hostable backends, and no page promised error reporting. Design: [`docs/design/error-reporting.md`](../design/error-reporting.md).
+
+| # | Item | Today | Change | Size | Gate |
+|---|---|---|---|---|---|
+| E1 | Capture unexpected errors, scrub them, and record each locally | Errors exist only as unstructured log lines. `onRequestError` is not exported, the relay's dead letter is one `stderr` line, nothing groups or counts them by kind | `onRequestError`, the relay, job, agent and process hooks; `classifyError` and the scrub in `packages/core`; one JSON line and `openokr_errors_total{source}`. Nothing leaves the host | M | Design first: new subsystem |
+| E2 | Send reports to any tracker that speaks Sentry's protocol | No reporter | The `ErrorReporter` port, an `off` driver and a hand-written `sentry` driver; `OPENOKR_ERROR_DSN` and `OPENOKR_ERROR_ENVIRONMENT`, empty and `production`; the air-gap row `errors-off-by-default` | M | Design first. Q1 decides whether a dependency is added |
+| E3 | Browser errors | The error pages show a digest and report nothing | `/api/client-errors`, signed in and rate-limited; frames resolved on the server from source maps; "Copy details" on the error page and the bug template | M | Design first. Q2 |
+| E4 | OKRGoal's tracker, the runbook, and a check against GlitchTip and Bugsink | None | The runbook section; the check by hand before release; OKRGoal's Sentry project, releases, alerts and GitHub link, outside the repository | S | Yours in part: Q3, and OKRGoal's Sentry account |
+
 ## 5. Claims removed from user pages
 
 The review removed eight claims from user-facing pages because the code does not do them. Most need nothing built:
@@ -200,3 +211,4 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | R1 to R4 | to do | R2 design approved: `docs/design/rich-text-editor.md` §11. R4 added from its Q2. R1 done |
 | P1 to P10 | to do | P1 done with B2. P2 done: `docs/design/support-access.md` §10, migration 0151, which also carries A4's `connection_ended`. P10 design approved, with an email when a hold begins: `docs/design/account-lockout.md`. P4 design written: `docs/design/tenant-lifecycle.md` §11, Q1 and Q2. P6 and P7 design written together: `docs/design/tenant-limits.md` §10. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet. P3 done except seats used, design written: `docs/design/operator-console.md` §11 |
 | D1 to D5 | to do | D4 only needs no design |
+| E1 to E4 | design written | `docs/design/error-reporting.md`, Q1 to Q3 |
