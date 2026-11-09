@@ -14,17 +14,28 @@ export class OperationError extends Error {
    * which say everything they can in their sentence.
    */
   readonly details?: Readonly<Record<string, unknown>>;
+  /**
+   * The input field this refusal is about, as its path in the action's input
+   * (guided-inputs §4.2, plan U1): `title`, or `keyResults.0.targetValue`.
+   * Absent when the refusal is about the whole write. A form shows the
+   * message under that field; REST answers it in `fields`.
+   */
+  readonly field?: string;
 
   constructor(
     code: "forbidden" | "not_found" | "conflict",
     message: string,
     details?: Readonly<Record<string, unknown>>,
+    field?: string,
   ) {
     super(message);
     this.name = "OperationError";
     this.code = code;
     if (details !== undefined) {
       this.details = details;
+    }
+    if (field !== undefined) {
+      this.field = field;
     }
   }
 }

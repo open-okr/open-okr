@@ -5,7 +5,8 @@ import { isKnownTimezone, localDateTimeInstant } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedState } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 
 /**
  * Writing a site message, on S-47 (P8-T03c), as a server action.
@@ -21,6 +22,8 @@ import { refusalOf } from "../../../lib/refusal";
  */
 export interface SiteMessageState {
   readonly error?: string;
+  /** A refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   readonly done?: boolean;
 }
 
@@ -61,11 +64,14 @@ export async function publishSiteMessage(
       dismissible: formData.get("dismissible") !== null,
     });
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, (await getTranslations()).t, [
+      "body",
+      "level",
+    ]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal };
+    return refused;
   }
   revalidatePath("/operator/instance");
   return { done: true };

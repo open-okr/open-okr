@@ -198,6 +198,24 @@ describe("the error enumeration", () => {
     expect(statusFor(mapped.code)).toBe(404);
   });
 
+  it("names the field an operation refusal is about, and keeps its code (plan U1)", () => {
+    const mapped = errorFor(
+      new OperationError(
+        "conflict",
+        "Another objective in this cycle has that title.",
+        undefined,
+        "title",
+      ),
+    );
+    expect(mapped.code).toBe("conflict");
+    expect(mapped.fields).toEqual({
+      title: "Another objective in this cycle has that title.",
+    });
+    expect(errorFor(new OperationError("forbidden", "No.")).fields).toBe(
+      undefined,
+    );
+  });
+
   it("describes nothing about an error it does not recognise", () => {
     const mapped = errorFor(
       new Error('duplicate key value violates unique constraint "goals_pkey"'),

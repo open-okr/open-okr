@@ -82,6 +82,7 @@ export function LimitsCard({
               <NumberInput
                 label={t("admin.general.limits.storageQuota")}
                 name="storageQuotaGigabytes"
+                error={state.fields?.storageQuotaGigabytes}
                 defaultValue={gigabytes}
                 min={0.01}
                 step={0.01}
@@ -93,6 +94,7 @@ export function LimitsCard({
               <NumberInput
                 label={t("admin.general.limits.agentCostCap")}
                 name="agentRunCostCapUsd"
+                error={state.fields?.agentRunCostCapUsd}
                 defaultValue={limits.agentRunCostCapUsd}
                 min={0}
                 step={0.01}
@@ -107,6 +109,7 @@ export function LimitsCard({
             <NumberInput
               label={t("admin.general.limits.exportRows")}
               name="exportInlineRowLimit"
+              error={state.fields?.exportInlineRowLimit}
               defaultValue={limits.exportInlineRowLimit}
               min={1}
               step={1}
@@ -117,6 +120,7 @@ export function LimitsCard({
             <NumberInput
               label={t("admin.general.limits.importRows")}
               name="importRowLimit"
+              error={state.fields?.importRowLimit}
               defaultValue={limits.importRowLimit}
               min={1}
               step={1}
@@ -127,6 +131,7 @@ export function LimitsCard({
             <NumberInput
               label={t("admin.general.limits.messageLogDays")}
               name="messageLogRetentionDays"
+              error={state.fields?.messageLogRetentionDays}
               defaultValue={limits.messageLogRetentionDays}
               min={0}
               step={1}
@@ -137,6 +142,7 @@ export function LimitsCard({
             <NumberInput
               label={t("admin.general.limits.agentCallDays")}
               name="agentToolCallRetentionDays"
+              error={state.fields?.agentToolCallRetentionDays}
               defaultValue={limits.agentToolCallRetentionDays}
               min={0}
               step={1}

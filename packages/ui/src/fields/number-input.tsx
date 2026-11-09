@@ -42,6 +42,8 @@ export interface NumberInputProps {
    */
   readonly invalid?: boolean;
   readonly "aria-describedby"?: string;
+  /** A refusal from the server about this field, shown under it (§4.2). */
+  readonly error?: string | null;
 }
 
 /**
@@ -78,6 +80,7 @@ export function NumberInput({
   onBlur,
   onKeyDown,
   invalid,
+  error,
   "aria-describedby": describedBy,
 }: NumberInputProps) {
   const { t, locale } = useTranslations();
@@ -93,7 +96,7 @@ export function NumberInput({
       ref={root}
       name={name}
       disabled={disabled}
-      invalid={invalid ? true : undefined}
+      invalid={invalid || error ? true : undefined}
       className={cn("flex flex-col gap-1", className)}
     >
       {hideLabel ? null : (
@@ -160,6 +163,15 @@ export function NumberInput({
         </Field.Description>
       ) : null}
       <Field.Error role="alert" className="text-xs font-medium text-bad" />
+      {error ? (
+        <Field.Error
+          match
+          role="alert"
+          className="text-xs font-medium text-bad"
+        >
+          {error}
+        </Field.Error>
+      ) : null}
     </Field.Root>
   );
 }

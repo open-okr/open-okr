@@ -101,6 +101,19 @@ Today a refused write goes one of three ways. Its error is swallowed (the operat
 - Every server action returns `{ ok: false, fieldErrors, message }` when a write is refused.
 - Base UI `Form` takes that map and shows each message under its own field.
 
+**As built at 0.7.0, part one (plan U1a).**
+
+| Piece | Where | What it does |
+|---|---|---|
+| `OperationError.field` | `packages/core/src/operations/errors.ts` | A refusal may name the input path it is about. REST answers it in `fields` and keeps the code |
+| `refusalFields(error, t)` | `apps/web/lib/refusal.ts` | `{ message, fields }` from a schema refusal (every field, the first message each) or an `OperationError` (its one field). Zod's own wording for too long, required, out of range, not an address or not a link comes from the catalogue (`fields.tooLong`, `fields.required`, `fields.atMost`, `fields.atLeast`, `fields.email.invalid`, `fields.url.invalid`); a sentence a schema wrote is kept |
+| `refusedState(error, t, drawn)` | the same | What a server action returns: `fields` for the fields the form draws, and `error` for the whole form only when no drawn field took the message, so nothing is said twice |
+| `error` on `NumberInput` | `packages/ui/src/fields/number-input.tsx` | The text, select, date and other fields already had it |
+
+The plan said Base UI `Form` would take the map. It did not need to: every kit field already takes `error`, so each form passes `state.fields?.<name>` to its own field.
+
+Converted in U1a, the forms §5 F5 named and the ones already returning a refusal: the operator's lifecycle, plan, trial, limits and new workspace forms, the site message, the support request, Admin > General's limits card, and a new workspace of one's own. Early checks those actions made themselves (a missing reason, a date, whole seats) now land on their field too. Left for U1b, by area: the person form on a profile, whose fields are drawn by the server page outside the form's state; the AI console; and the forms that still show one sentence (goals, key results, KPIs, initiatives, tasks, cycles, spaces). Billing and agent connections refuse whole actions, not fields, and keep the sentence.
+
 ### 4.3 TextInput and TextArea
 
 - One skin per density.

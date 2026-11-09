@@ -35,6 +35,7 @@ export function NewOwnWorkspaceForm({
           id="own-workspace-name"
           maxLength={200}
           name="name"
+          error={state?.fields?.name}
           required
         />
       </div>

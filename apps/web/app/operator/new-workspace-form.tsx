@@ -66,6 +66,7 @@ export function NewWorkspaceForm({
               id="new-workspace-name"
               maxLength={200}
               name="name"
+              error={state?.fields?.name}
               required
             />
           </div>
@@ -74,6 +75,7 @@ export function NewWorkspaceForm({
               label={t("operator.newWorkspace.owner")}
               id="new-workspace-owner"
               name="ownerEmail"
+              error={state?.fields?.ownerEmail}
               required
             />
           </div>

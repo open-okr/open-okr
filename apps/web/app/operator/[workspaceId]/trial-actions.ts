@@ -4,7 +4,7 @@ import { setTrialAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedState } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -16,6 +16,8 @@ import { getTranslations } from "../../../lib/translations";
  */
 export interface OperatorTrialState {
   readonly error?: string;
+  /** A refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   readonly done?: boolean;
 }
 
@@ -30,16 +32,16 @@ export async function setTrial(
   const remove = formData.get("remove") !== null;
   const reason = String(formData.get("reason") ?? "").trim();
   if (reason === "") {
-    return { error: t("operator.trial.needsReason") };
+    return { fields: { reason: t("operator.trial.needsReason") } };
   }
   if (!remove && endsOn === "") {
-    return { error: t("operator.trial.needsDate") };
+    return { fields: { endsOn: t("operator.trial.needsDate") } };
   }
   // The end of the chosen day in UTC, so a trial "until the 30th" runs the
   // whole of the 30th wherever the customer is.
   const endsAt = remove ? null : new Date(`${endsOn}T23:59:59Z`);
   if (endsAt !== null && Number.isNaN(endsAt.getTime())) {
-    return { error: t("operator.trial.needsDate") };
+    return { fields: { endsOn: t("operator.trial.needsDate") } };
   }
   try {
     await setTrialAsOperator(getPool(), {
@@ -50,11 +52,11 @@ export async function setTrial(
       reason,
     });
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, t, ["planKey", "endsOn", "reason"]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal };
+    return refused;
   }
   revalidatePath(`/operator/${workspaceId}`);
   revalidatePath("/operator");

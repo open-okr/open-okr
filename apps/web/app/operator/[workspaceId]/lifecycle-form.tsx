@@ -110,6 +110,7 @@ export function LifecycleForm({
             name="reason"
             placeholder={t("operator.lifecycle.reasonPlaceholder")}
             required
+            error={state?.fields?.reason}
           />
         </div>
 

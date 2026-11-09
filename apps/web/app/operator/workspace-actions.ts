@@ -4,7 +4,7 @@ import { createWorkspaceAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../lib/operator";
 import { getPool } from "../../lib/pool";
-import { refusalOf } from "../../lib/refusal";
+import { refusedState } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 
 /**
@@ -16,6 +16,8 @@ import { getTranslations } from "../../lib/translations";
  */
 export interface NewWorkspaceState {
   readonly error?: string;
+  /** A refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   readonly done?: string;
 }
 
@@ -38,10 +40,10 @@ export async function createWorkspace(
         : t("operator.newWorkspace.createdInvited", { email: ownerEmail }),
     };
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, t, ["name", "ownerEmail"]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal };
+    return refused;
   }
 }

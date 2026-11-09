@@ -59,6 +59,7 @@ export function OperatorLimitsForm({
             label={t("operator.limits.storageQuota")}
             id="limits-storage"
             name="storageQuotaGigabytes"
+            error={state?.fields?.storageQuotaGigabytes}
             defaultValue={
               Math.round((storageQuotaBytes / GIGABYTE) * 100) / 100
             }
@@ -71,6 +72,7 @@ export function OperatorLimitsForm({
             label={t("operator.limits.agentCostCap")}
             id="limits-cost-cap"
             name="agentRunCostCapUsd"
+            error={state?.fields?.agentRunCostCapUsd}
             defaultValue={agentRunCostCapUsd}
             min={0}
             step={0.01}
@@ -83,6 +85,7 @@ export function OperatorLimitsForm({
           id="limits-reason"
           maxLength={500}
           name="reason"
+          error={state?.fields?.reason}
           placeholder={t("operator.limits.reasonPlaceholder")}
           required
           rows={2}

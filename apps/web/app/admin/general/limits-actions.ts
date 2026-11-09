@@ -12,7 +12,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedState } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { GeneralState } from "./general-state.ts";
@@ -78,11 +78,28 @@ export async function submitLimits(
       posted as never,
     );
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, t, [
+      "storageQuotaBytes",
+      "exportInlineRowLimit",
+      "importRowLimit",
+      "messageLogRetentionDays",
+      "agentRunCostCapUsd",
+      "agentToolCallRetentionDays",
+    ]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal, saved: null };
+    // The form asks for gigabytes and the setting stores bytes, so a refusal
+    // of the stored value is shown under the field that was typed.
+    const { storageQuotaBytes, ...fields } = refused.fields ?? {};
+    return {
+      error: refused.error ?? null,
+      saved: null,
+      fields:
+        storageQuotaBytes === undefined
+          ? fields
+          : { ...fields, storageQuotaGigabytes: storageQuotaBytes },
+    };
   }
   revalidatePath("/admin/general");
   return { error: null, saved: t("admin.general.limits.saved") };

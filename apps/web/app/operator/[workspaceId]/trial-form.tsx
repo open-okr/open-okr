@@ -78,6 +78,7 @@ export function OperatorTrialForm({
             defaultValue=""
             id="trial-plan"
             name="planKey"
+            error={state?.fields?.planKey}
           >
             <option value="">{t("operator.trial.keepPlan")}</option>
             {plans.map((plan) => (
@@ -90,6 +91,7 @@ export function OperatorTrialForm({
             label={t("operator.trial.endsOn")}
             id="trial-ends"
             name="endsOn"
+            error={state?.fields?.endsOn}
             defaultValue={endsOn}
             inputClassName="w-40"
           />
@@ -99,6 +101,7 @@ export function OperatorTrialForm({
           id="trial-reason"
           maxLength={500}
           name="reason"
+          error={state?.fields?.reason}
           placeholder={t("operator.trial.reasonPlaceholder")}
           required
           rows={2}

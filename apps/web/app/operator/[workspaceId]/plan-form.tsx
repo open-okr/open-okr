@@ -81,6 +81,7 @@ export function OperatorPlanForm({
               defaultValue={current ?? ""}
               id="plan-key"
               name="planKey"
+              error={state?.fields?.planKey}
             >
               <option value="">{t("admin.plan.free")}</option>
               {plans.map((plan) => (
@@ -96,6 +97,7 @@ export function OperatorPlanForm({
               id="plan-seats"
               min={1}
               name="seats"
+              error={state?.fields?.seats}
               step={1}
               description={t("operator.plan.seatsHint")}
               inputClassName="w-28"
@@ -108,6 +110,7 @@ export function OperatorPlanForm({
             id="plan-reason"
             maxLength={500}
             name="reason"
+            error={state?.fields?.reason}
             placeholder={t("operator.plan.reasonPlaceholder")}
             required
             rows={2}

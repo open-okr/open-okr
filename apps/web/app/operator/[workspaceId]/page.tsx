@@ -178,10 +178,13 @@ export default async function OperatorWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>;
-  searchParams?: Promise<{ refused?: string }>;
+  searchParams?: Promise<{ refused?: string; refusedOn?: string }>;
 }) {
   const { workspaceId } = await params;
-  const refused = (await searchParams)?.refused ?? null;
+  const query = await searchParams;
+  const refused = query?.refused ?? null;
+  // Which field the refusal was about, so it shows under that field (U1).
+  const refusedOnReason = query?.refusedOn === "reason";
   const operator = await requireOperator();
   const pool = getPool();
 
@@ -430,6 +433,7 @@ export default async function OperatorWorkspacePage({
               pending={pending}
               workspaceId={workspaceId}
               refused={refused}
+              refusedOnReason={refusedOnReason}
             />
           </section>
 
