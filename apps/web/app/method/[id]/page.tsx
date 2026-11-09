@@ -7,6 +7,7 @@ import {
   methodSectionAnchor,
   OBJECTIVE_CHECKS,
   type QualityCheck,
+  type QualityExample,
   TRIGGER_CATALOGUE,
   type Trigger,
 } from "@openokr/method";
@@ -147,36 +148,7 @@ export default async function RulePage({
         </CardBody>
       </Card>
 
-      {examples.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("method.detail.weakAndStrongMethod")}
-            </h2>
-          </CardHeader>
-          <CardBody className="flex flex-col gap-3">
-            {examples.map((pair) => (
-              <div key={pair.weak} className="flex flex-col gap-2">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
-                      {t("common.weak")}
-                    </p>
-                    <p className="text-sm text-ink">{pair.weak}</p>
-                  </div>
-                  <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
-                    <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
-                      {t("common.strong")}
-                    </p>
-                    <p className="text-sm text-ink">{pair.strong}</p>
-                  </div>
-                </div>
-                <p className="text-xs text-ink-3">{pair.why}</p>
-              </div>
-            ))}
-          </CardBody>
-        </Card>
-      ) : null}
+      <ExamplePairs examples={examples} />
 
       <Card>
         <CardBody>
@@ -192,6 +164,54 @@ export default async function RulePage({
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/**
+ * METHOD.md §4.6's weak and strong pairs for one rule, or nothing.
+ *
+ * On a trigger's page as well as a check's since 0.7.0 (plan M1): the
+ * committed-objective pair belongs to `quality.committed_floor`, which is a
+ * rule rather than one of the twenty-six checks.
+ */
+async function ExamplePairs({
+  examples,
+}: {
+  readonly examples: readonly QualityExample[];
+}) {
+  if (examples.length === 0) {
+    return null;
+  }
+  const { t } = await getTranslations();
+  return (
+    <Card>
+      <CardHeader>
+        <h2 className="text-sm font-bold text-ink">
+          {t("method.detail.weakAndStrongMethod")}
+        </h2>
+      </CardHeader>
+      <CardBody className="flex flex-col gap-3">
+        {examples.map((pair) => (
+          <div key={pair.weak} className="flex flex-col gap-2">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <div className="rounded-md border border-bad/40 bg-bad-bg p-2">
+                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-bad">
+                  {t("common.weak")}
+                </p>
+                <p className="text-sm text-ink">{pair.weak}</p>
+              </div>
+              <div className="rounded-md border border-ok/40 bg-ok-bg p-2">
+                <p className="text-[0.65rem] font-bold uppercase tracking-wide text-ok">
+                  {t("common.strong")}
+                </p>
+                <p className="text-sm text-ink">{pair.strong}</p>
+              </div>
+            </div>
+            <p className="text-xs text-ink-3">{pair.why}</p>
+          </div>
+        ))}
+      </CardBody>
+    </Card>
   );
 }
 
@@ -264,6 +284,8 @@ async function TriggerPage({ trigger }: { readonly trigger: Trigger }) {
           </p>
         </CardBody>
       </Card>
+
+      <ExamplePairs examples={examplesFor(trigger.key)} />
 
       <Card>
         <CardBody>

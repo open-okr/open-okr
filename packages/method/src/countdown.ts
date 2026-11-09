@@ -25,7 +25,7 @@ const DAYS_PER_WEEK = 7;
 /**
  * Whether planning opens today for a cycle starting this many days out.
  *
- * §11: six weeks before an annual cycle starts, three before a quarterly.
+ * §11: six weeks before an annual cycle starts, four before a quarterly.
  * Exact rather than "at or within", because the caller runs once a local day
  * and a window would fire every day from six weeks out to day one. §6.4 calls
  * this one message, and one message is what it is.

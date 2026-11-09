@@ -684,9 +684,9 @@ A recovery OKR is committed: it restores a level the business already relies on.
   - The drivers are found by walking the unhealthy KPI's subtree breadth-first. A leading child is a candidate directly; a lagging child is descended through until its nearest leading descendants are found.
   - A driver already at or past its target is skipped.
 
-The draft is available for one-click launch the moment the KPI turns unhealthy. The coach proposes it after two consecutive unhealthy periods, or at once when the KPI falls from healthy to unhealthy in a single period.
+The draft is available for one-click launch the moment the KPI turns unhealthy. The OKR Champion proposes it after two consecutive unhealthy periods, or at once when the KPI falls from healthy to unhealthy in a single period.
 
-While a recovery OKR is active, the KPI shows its real band and the recovery's progress side by side. When the real reading re-enters the healthy band, the coach proposes closing the recovery OKR. *Source:* whatmatters: "Once it's holding steady, you can demote it to a KPI".
+While a recovery OKR is active, the KPI shows its real band and the recovery's progress side by side. When the real reading re-enters the healthy band, the OKR Champion proposes closing the recovery OKR. *Source:* whatmatters: "Once it's holding steady, you can demote it to a KPI".
 
 ### 6.6 Recovery board
 
@@ -710,7 +710,7 @@ A KPI may be calculated from a formula over other KPIs rather than entered. Sour
 
 Book all of them for the whole cycle before the cycle starts. Calendars fill fast, and "set and forget" kills OKR programmes. *Source:* Wodtke's "Set & Forget".
 
-Every two weeks and monthly are valid check-in frequencies (§11). The streak and the escalation ladders follow whichever is chosen. *Source:* Lamorte: "The sweet spot is bi-weekly check-ins"; Doerr and Wodtke: weekly.
+Daily, every two weeks and monthly are also valid check-in frequencies (§11). The streak and the escalation ladders follow whichever is chosen. *Source:* Lamorte: "The sweet spot is bi-weekly check-ins"; Doerr and Wodtke: weekly.
 
 A check-in may be posted on any day. One posted earlier than the cadence tolerance (§11) before its due date is an extra update: it moves health and progress, and the due date, its nudge and the blocker clock stay where they were, so the period is still owed. *Source:* OpenOKR default, decided after the OKRGoal UX review of October 2026.
 
@@ -1006,7 +1006,7 @@ Every numeric value the product enforces, computes with or fires on is a paramet
 
 | Parameter | Canon default |
 |---|---|
-| Check-in frequency | Weekly. Every two weeks and monthly are also valid |
+| Check-in frequency | Weekly. Daily, every two weeks and monthly are also valid |
 | Check-in anchor day | Monday |
 | Cadence tolerance | 1 day either side of the due date without double-advancing |
 | Staleness grace | 3 days past the due date, after which the goal reads outdated |

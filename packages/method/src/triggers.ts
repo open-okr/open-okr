@@ -209,7 +209,7 @@ const RHYTHM_ROWS = [
   {
     key: "cycle.planning_opens",
     title: "Planning opens",
-    fires: "6w (annual) or 3w (quarterly) before start",
+    fires: "6w (annual) or 4w (quarterly) before start",
     recipient: "Sponsor + facilitator",
     escalates: false,
   },

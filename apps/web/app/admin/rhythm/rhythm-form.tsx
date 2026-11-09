@@ -37,6 +37,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import { checkInFrequencyOptions } from "./check-in-options.ts";
 import { resetGroup, saveRhythm } from "./rhythm-actions.ts";
 import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
 
@@ -820,7 +821,7 @@ export function RhythmForm({
               className="flex-1 flex-row items-center justify-between gap-3"
               inputClassName="w-auto"
             >
-              {["daily", "weekly", "biweekly", "monthly", "quarterly"].map(
+              {checkInFrequencyOptions(rhythm.defaultCheckInFrequency).map(
                 (option) => (
                   <option key={option} value={option}>
                     {option}
