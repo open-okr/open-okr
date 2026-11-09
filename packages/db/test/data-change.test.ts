@@ -14,6 +14,7 @@ import {
   type DataChangeClient,
   DataChangeError,
   type DataChangeScript,
+  dataChangeStatus,
   runDataChanges,
 } from "../src/data-change.ts";
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
@@ -42,6 +43,7 @@ import { stageNoteDocuments } from "../src/data-changes/0030_stage_note_document
 import { digestNoteDocument } from "../src/data-changes/0031_digest_note_document.ts";
 import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
+import { registeredDataChanges } from "../src/data-changes/registry.ts";
 import { runMigrations } from "../src/migrate.ts";
 
 /** Every migration file, in order. */
@@ -384,6 +386,63 @@ describe("runDataChanges", () => {
     await expect(
       runDataChanges(client, { scripts: [a, b] }),
     ).rejects.toBeInstanceOf(DataChangeError);
+  });
+});
+
+// PLAN §5.1: data changes run on the administrator's schedule, and `status`
+// reports what is pending. Nothing reported it until 0.7.0 (plan P9).
+describe("dataChangeStatus", () => {
+  const second: DataChangeScript = {
+    ...countingScript({ n: 0 }),
+    name: "0002_counting_again",
+  };
+
+  it("reports every script as not yet run on a database that never ran one, and writes nothing", async () => {
+    const status = await dataChangeStatus(client, [
+      countingScript({ n: 0 }),
+      second,
+    ]);
+    expect(status.map((one) => [one.name, one.state])).toEqual([
+      ["0001_counting", "not yet run"],
+      ["0002_counting_again", "not yet run"],
+    ]);
+    // Read-only: the ledger is not created by asking about it.
+    const ledger = await client.query(
+      "select to_regclass('_data_changes') as found",
+    );
+    expect(ledger.rows[0]?.found).toBeNull();
+  });
+
+  // `./openokr data-change` on a fresh install runs every registered script
+  // against today's schema. One that expects a column a later migration
+  // dropped, and does not name that migration as `retiredBy`, would stop
+  // every install there, so the whole registry is run here.
+  it("runs every registered script to completion on a fresh database", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    const scripts = registeredDataChanges(undefined);
+    await runDataChanges(client, { scripts });
+    const status = await dataChangeStatus(client, scripts);
+    expect(status.filter((one) => one.state !== "complete")).toEqual([]);
+  }, 120_000);
+
+  it("tells a completed script from one that started and stopped", async () => {
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await runDataChanges(client, { scripts: [countingScript({ n: 0 })] });
+    await client.query(
+      "insert into _data_changes (name, checksum, cursor, batches) values ($1, 'x', '2', 1)",
+      [second.name],
+    );
+
+    const status = await dataChangeStatus(client, [
+      second,
+      countingScript({ n: 0 }),
+    ]);
+    expect(status.map((one) => [one.name, one.state])).toEqual([
+      ["0001_counting", "complete"],
+      ["0002_counting_again", "in progress"],
+    ]);
   });
 });
 

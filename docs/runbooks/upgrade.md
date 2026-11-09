@@ -76,10 +76,14 @@ it.
 
 ## Backfills never hold up a boot
 
-Schema migrations run on start. Data changes run separately through
-`pnpm db:change`, on your schedule: it runs every script not yet complete and
-names what it ran, or says nothing was left. An upgrade is never held open by
-a long backfill.
+Schema migrations run on start. Data changes run separately, on your
+schedule: `./openokr data-change` on Docker Compose, or `pnpm db:change` from
+a checkout. Either runs every script not yet complete and names what it ran,
+or says nothing was left. An upgrade is never held open by a long backfill.
+
+`./openokr status` names the data changes not yet complete, and
+`pnpm db:change --status` does the same from a checkout. Both only read, so
+they are safe to run while a data change is going.
 
 Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
 seals identity-provider tokens stored before they were encrypted needs the

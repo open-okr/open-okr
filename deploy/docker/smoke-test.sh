@@ -178,6 +178,21 @@ else
   fail "the operator command does not run inside the image"
 fi
 
+# The data changes too (PLAN §5.1, plan 0.7.0 P9). `status` reads the ledger
+# inside the image and names what has not run; on a fresh instance that is every
+# script. `data-change` runs them all, after which `status` says so.
+if ./openokr status 2>&1 | grep -q "Data changes: .* not complete"; then
+  pass "status names the data changes not yet run"
+else
+  fail "status does not report the data changes"
+fi
+./openokr data-change >/dev/null 2>&1 || fail "the data changes did not run inside the image"
+if ./openokr status 2>&1 | grep -q "Data changes: all .* complete"; then
+  pass "the data changes run inside the image, and status then says so"
+else
+  fail "status still names pending data changes after they ran"
+fi
+
 # The erasure command too (docs/design/workspace-erasure.md §7), for the same
 # reason. A dry run on an instance that is not a cloud: being told so is the proof
 # it loaded, connected as the owner role and found it may delete audit rows.

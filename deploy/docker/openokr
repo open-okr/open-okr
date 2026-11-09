@@ -2,7 +2,8 @@
 # The OpenOKR lifecycle helper (P1-T09, backup/restore P6-T06, verify P8-T06d).
 #
 #   ./openokr up              start, generating every secret on first run
-#   ./openokr status          what is running, and whether it is healthy
+#   ./openokr status          what is running, whether it is healthy, and which data changes are pending
+#   ./openokr data-change     run the data changes an upgrade brought, batched and resumable
 #   ./openokr logs            follow the application log
 #   ./openokr upgrade         pull, restart, re-run migrations, report
 #   ./openokr rotate-key      re-wrap stored secrets under a new root key
@@ -387,6 +388,22 @@ case "${1:-help}" in
 
   status)
     compose ps
+    # Which data changes have not run (PLAN §5.1). Read-only: it takes no
+    # lock, so it is safe while a run is going. Skipped quietly when the
+    # application is not up, because `compose ps` above already says so.
+    if compose exec -T app true >/dev/null 2>&1; then
+      compose exec -T app node --experimental-strip-types --no-warnings \
+        /app/migrator/packages/db/src/bin/data-change.ts --status \
+        || log "could not read the data-change ledger"
+    fi
+    ;;
+
+  data-change)
+    # The data changes an upgrade brought (docs/runbooks/upgrade.md), run in
+    # the application container with the owner role from app.env. Batched and
+    # resumable: stopping it loses nothing, and running it again finishes it.
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/db/src/bin/data-change.ts
     ;;
 
   logs)

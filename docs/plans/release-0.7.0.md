@@ -195,5 +195,5 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S1 to S3 | to do | |
 | U1 to U3 | to do | U3 design first |
 | R1 to R3 | to do | R1 and R2 design written together: `docs/design/rich-text-editor.md` §11, Q1 and Q2. R1 needs no approval and ships first |
-| P1 to P10 | to do | P1 done with B2. P2 design written: `docs/design/support-access.md` §10, Q1 and Q2. P10 design written: `docs/design/account-lockout.md`, Q1 and Q2. P4 and P7 design first. P8 done |
+| P1 to P10 | to do | P1 done with B2. P2 design written: `docs/design/support-access.md` §10, Q1 and Q2. P10 design written: `docs/design/account-lockout.md`, Q1 and Q2. P4 and P7 design first. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet |
 | D1 to D5 | to do | D4 only needs no design |
