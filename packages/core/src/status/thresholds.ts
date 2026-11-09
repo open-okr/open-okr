@@ -22,7 +22,7 @@ import {
 } from "../secrets/instance-registry.ts";
 import { readSetting, resolveSetting } from "../secrets/instance-settings.ts";
 
-export interface StatusThresholdPair {
+interface StatusThresholdPair {
   /** Seconds of lag at or above which the component reports degraded. */
   readonly degraded: number;
   /** Seconds of lag at or above which it reports unavailable. */
