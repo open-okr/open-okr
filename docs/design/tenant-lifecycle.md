@@ -116,7 +116,8 @@ Two consequences, both deliberate.
 
 **The freeze overlay's recovery list is what a suspended workspace keeps.**
 That list is `workspace.setState`, `workspace.setLifecycle`,
-`sso.setConnectionEnabled`, `workspace.remindErasure`, and everything under
+`sso.setConnectionEnabled`, `workspace.remindErasure`,
+`workspace.exportArchive` (from 0.7.0, §10, once approved), and everything under
 `people.`, `settings.` and `billing.`. A suspended customer can still remove a
 member and still fix their billing email. That is the right list for a
 suspension, and it is the list that already exists, so no new one is
@@ -309,3 +310,50 @@ Written as the test plan P8-T02 inherits.
 | 3 | The closure retention number a real cloud would run | The default is 0 and that is safe. The number is a business and legal decision: OKRGoal's is 30, because Terms §12.3 says so. Any other provider chooses its own |
 | 4 | Whether a closed workspace's members keep read access, or only its admins | Written here as all members. An argument exists for admins only, and it is a policy question |
 | 5 | The region list | Written here as a free string resolved from an instance setting. An enum would mean a migration every time the cloud opens a region |
+
+## 10. A frozen workspace can export its archive (release 0.7.0, B5)
+
+Status: proposed 9 November 2026, waiting for "design approved".
+
+### 10.1 What is wrong
+
+`workspace.exportArchive` is a write action, and it is not on the recovery list in `packages/core/src/operations/freeze.ts`. So a workspace that is `read_only` or `frozen` refuses it. Three places expect the opposite:
+
+| Where | What it expects |
+|---|---|
+| This document, §6 step 2, and acceptance criterion 4 in §8 | A closed workspace's admins can still build the portability archive, and the banner links to it |
+| `docs/runbooks/migration-cutover.md` | Phase 1 freezes the source, phase 3 exports it. Freezing first is what makes the archive consistent. The runbook carries a warning today that the export is refused |
+| `deploy/docker/cutover-rehearsal.sh` (plan B9) | The same order |
+
+### 10.2 Decision
+
+| # | Decision | Why |
+|---|---|---|
+| L1 | **Add `workspace.exportArchive` to `RECOVERY_ACTIONS`** | Exporting is how a closed customer leaves (§6) and how a migration moves (the runbook). Both happen while writes are stopped, on purpose |
+| L2 | Nothing else joins the list. List exports (`exports.*`) and the archive import stay refused while frozen | A closed customer is offered the archive (§6 step 2). Importing into a frozen workspace would be writing to it |
+| L3 | The action's own access check is unchanged: `full` access, and the archive belongs to whoever asked for it | The freeze overlay decides whether the state allows it; `can()` still decides who |
+
+What the export writes while the workspace is frozen, all of it bookkeeping and none of it workspace content:
+
+| Row | Why it is safe in a frozen workspace |
+|---|---|
+| `export_runs`, one row, `ready` | It records that an archive was taken. It changes no goal, member or setting |
+| `activities`, `export.taken` | The workspace's own record that somebody took everything out. Members should see that during a freeze too |
+| `audit_events`, `workspace.exportArchive` | The audit trail is append-only and is written for every recovery action already |
+
+### 10.3 Acceptance criteria
+
+- Given a workspace frozen with `workspace.setState`, when an admin with `full` access calls `workspace.exportArchive`, then it returns the archive and writes one `export_runs` row, one activity and one audit row.
+- Given a tenant closed by an operator, when an admin of that workspace exports, then it succeeds, as §8 criterion 4 already says.
+- Given the same frozen workspace, when the admin calls `workspace.importArchive` or a list export, then it is refused with the frozen message.
+- Given a frozen workspace, when a member below `full` access exports, then it is refused as not-found, as today.
+
+### 10.4 Tests and documents
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/freeze.test.ts` (existing) | The recovery list holds `workspace.exportArchive` and nothing else new |
+| Integration | `packages/core/test/cutover-runbook.test.ts` (new, plan B9) | Freeze, export, dry run, import, compare, unfreeze, through the actions the runbook calls |
+
+`docs/runbooks/migration-cutover.md` loses its warning. This section's list of recovery actions (§3) gains the export.
+

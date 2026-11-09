@@ -124,3 +124,75 @@ The sign-up page under Company email addresses shows a line under the email fiel
 - It does not add a filter by domain to the `/join` offer list, which today relies on row-level security alone (found in testing; a separate, small change).
 - It does not let an admin create a workspace for somebody else (`workspace.provision` stays refused to members, by design).
 - It does not verify that a company address is real. Without mail, an address is unconfirmed; it still only ever reaches a workspace of its own.
+
+## 9. The wizard's saved policy, and registration on a cloud (release 0.7.0, B1)
+
+Status: proposed 9 November 2026, waiting for "design approved".
+
+### 9.1 What is wrong
+
+| Where | What happens |
+|---|---|
+| `apps/web/app/setup/account/actions.ts:96` | Finishing the wizard always passes `closeRegistration: true` |
+| `packages/core/src/setup/complete.ts:82-86` | That saves `registration.policy = invite_only`, source `wizard` |
+| `policyInForce` in `registration.ts` | A saved row beats `OPENOKR_REGISTRATION` and beats the cloud's open default (D7, D5) |
+
+Two consequences, one cause:
+
+1. **A cloud closes behind its first account.** Setups 1 and 2 (OKRGoal, a provider's own cloud) expect anyone to sign up and start a workspace. After the wizard, nobody can. The Registration card is hidden on a cloud (D5), so no screen can reopen it, and no operator screen has a control either.
+2. **On a self-hosted instance the variable stops working after setup.** An instance deployed with `OPENOKR_REGISTRATION=company_domains` takes company addresses until the wizard finishes, then silently becomes invitation only. D7 promises the variable holds until somebody saves a choice on General.
+
+The write is also redundant. Since P1-T09 the computed default already says "open until claimed, invitation only after", so a self-hosted instance with nothing saved closes behind its first account without any row.
+
+### 9.2 Decisions
+
+| # | Decision | Why |
+|---|---|---|
+| D11 | **The wizard writes no registration policy, on any instance.** `closeRegistration` is removed from `completeSetup` and its caller | The computed default closes a self-hosted instance after the claim, the cloud default keeps a cloud open, and the variable keeps working on both. One rule instead of a row that overrides it |
+| D12 | **A Registration card on the operator's instance screen (S-47)**, shown only on a cloud. The same three choices as D2, and the same source line as §4 | On a cloud the policy is the operator's (D5). Today nothing can set it but the database |
+| D13 | Only a cloud operator may change it there, re-checked in the server action with `requireOperator`, as the site message form does | An operator action, not a member's |
+| D14 | Saved with source `operator`. `system_settings.source` is plain text (migration 0007), so **no migration** | Says who chose it, without a new column |
+| D15 | Every change writes `instance.registration_changed` to the instance audit chain with `from`, `to` and `operatorUserId`. No workspace row: the policy belongs to no workspace | The operator console's own rule (`operator-console.md` §6), minus the workspace half, which has no workspace |
+| D16 | **A row the wizard saved before this release is left alone.** No data change rewrites it. On a cloud the operator changes it from D12; on a self-hosted instance an admin changes it on General as today | The plan's recommendation: nothing stored is rewritten by an upgrade. See Q2 for the alternative |
+
+**Q2, for you.** D16 leaves every existing cloud closed until its operator opens it from the new card, and every existing self-hosted instance still ignoring its variable. The alternative is to read a row whose source is `wizard` as "not chosen", so existing clouds reopen and existing variables start working on upgrade, with no row rewritten. That is the documented behaviour, but it changes who can sign up on an instance the moment it upgrades, without anybody choosing it. **Proposed: D16 as written, and the upgrade notes tell an operator to check the card.**
+
+### 9.3 The card on S-47
+
+```
+Registration                                          Operator → Instance
+Who may create an account on this cloud.
+
+( ) Invitation only
+(•) Company email addresses
+( ) Anyone
+
+The default: open on a cloud. (or: Chosen by an operator. / Saved by the setup
+wizard before 0.7.0. / From the deployment's environment variable.)
+[Save]
+```
+
+### 9.4 Acceptance criteria
+
+- Given a fresh self-hosted instance, when the wizard finishes, then no `registration.policy` row exists and a second sign-up with no invitation is refused.
+- Given a fresh self-hosted instance with `OPENOKR_REGISTRATION=company_domains`, when the wizard finishes and `ana@acme.com` signs up with no invitation, then she is admitted with a workspace of her own.
+- Given a fresh cloud instance, when the wizard finishes and a stranger signs up, then they are admitted.
+- Given a cloud with a stored `invite_only` from the wizard, when an operator chooses Anyone on S-47 and saves, then the row is `open` with source `operator`, one `instance.registration_changed` instance audit event names the operator, and a stranger can sign up.
+- Given a signed-in member who is not an operator, when they post the S-47 registration action, then nothing changes.
+- Given a self-hosted instance, when an operator opens S-47, then there is no Registration card (S-47 is cloud only, `operator-console.md` §7).
+
+### 9.5 Tests
+
+| Kind | File | Covers |
+|---|---|---|
+| Integration | `packages/core/test/setup-complete.test.ts` (existing or new) | The wizard writes no policy |
+| Integration | `packages/core/test/registration-policy.test.ts` | The variable after a claim; the operator save, its source and its audit event |
+| Unit | `apps/web/test/operator-registration.test.ts` | The action refuses a non-operator and posts the choice |
+| End to end | `e2e/s47-operator-instance.spec.ts` (extend) | The card saves and the source line changes |
+
+### 9.6 Documents changed in the same change
+
+- `docs/install/setups.md` and `docs/install/cloud.md`: who opens registration on a cloud, and where.
+- `docs/admin/settings.md`: the `registration.policy` row says the wizard no longer saves it.
+- UIUX-PLAN S-47: the card.
+- The upgrade notes for 0.7.0: an existing cloud keeps the wizard's `invite_only` until its operator changes it.

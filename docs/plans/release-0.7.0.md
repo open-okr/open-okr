@@ -177,11 +177,11 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 
 | Row | Status | Note |
 |---|---|---|
-| B1 | to do | Design first |
+| B1 | design written | `docs/design/registration-policy.md` §9, with Q2 for you |
 | B2 | done | Also closes P1 |
-| B3 | to do | Design first |
+| B3 | design written | `docs/design/metrics-scrape-token.md` |
 | B4 | done | #192 |
-| B5 | to do | Design first |
+| B5 | design written | `docs/design/tenant-lifecycle.md` §10 |
 | B6 | done | |
 | B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
