@@ -254,7 +254,12 @@ export async function recomputeAlignmentFor(
   touched: readonly { cycleId: string | null; spaceId: string | null }[],
 ): Promise<void> {
   const done = new Set<string>();
-  for (const goal of touched) {
+  // Cycle by cycle in one order, so two writes that touch the same two cycles
+  // take `recomputeAlignment`'s per-cycle locks the same way round.
+  const ordered = [...touched].sort((a, b) =>
+    (a.cycleId ?? "").localeCompare(b.cycleId ?? ""),
+  );
+  for (const goal of ordered) {
     if (!goal.cycleId) {
       // A goal on a timeframe rather than a cycle is outside every alignment
       // scope, because §2 scopes the score to one cycle.

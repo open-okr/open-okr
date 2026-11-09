@@ -402,6 +402,17 @@ export async function recomputeAlignment(
     readonly keepStored?: boolean;
   } = {},
 ): Promise<AlignmentResult> {
+  // **One recompute per cycle at a time** (found by the e2e run of 9 November
+  // 2026: ten concurrent deletes in one cycle deadlocked, SQLSTATE 40P01).
+  // Every structural write recomputes its cycle's findings and score, and two
+  // of them updating the same rows in different orders wait on each other.
+  // Held to the end of the transaction, re-entrant within it, the same
+  // two-key form the board's reorder lock takes.
+  await tx.execute(sql`
+    select pg_advisory_xact_lock(
+      hashtext(${`alignment:${input.workspaceId}`}),
+      hashtext(${input.cycleId})
+    )`);
   const { result } = await alignmentInTx(tx, input);
 
   const scopeId = input.scope.kind === "space" ? input.scope.spaceId : null;
