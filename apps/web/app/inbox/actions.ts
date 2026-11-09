@@ -17,11 +17,26 @@
  * row, and the sidebar badge counts differently. `/` too, because the overview
  * links to the inbox and shows the same count.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusedSentence } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
+
+/**
+ * A refusal as the row's sentence: every write here is one button with no
+ * field to put a message under. A schema's refusal too, which used to reach
+ * the error page (plan U1b).
+ */
+async function refused(error: unknown): Promise<WriteState> {
+  const state = refusedSentence(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
 
 function revalidateInbox(): void {
   revalidatePath("/inbox");
@@ -45,10 +60,7 @@ export async function markRead(
       { notificationId },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidateInbox();
   return NO_ERROR;
@@ -72,10 +84,7 @@ export async function snooze(
       { notificationId, untilMinutes },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidateInbox();
   return NO_ERROR;
@@ -108,10 +117,7 @@ export async function mute(
       { subjectType, subjectId, subscribe },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidateInbox();
   return NO_ERROR;

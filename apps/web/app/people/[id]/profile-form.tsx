@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  RefusedFields,
   RichTextField,
   SelectInput,
   TimeRangeInput,
@@ -66,52 +67,57 @@ export function ProfileForm({
         <form action={action} className="flex flex-col gap-2">
           <input type="hidden" name="memberId" value={memberId} />
 
-          <TimezoneSelect
-            label={t("common.timezone")}
-            name="timezone"
-            zones={zones}
-            defaultValue={timezone}
-          />
+          {/* Each field shows what was refused about it (U1b). */}
+          <RefusedFields fields={state?.fields}>
+            <TimezoneSelect
+              label={t("common.timezone")}
+              name="timezone"
+              zones={zones}
+              defaultValue={timezone}
+            />
 
-          <SelectInput
-            label={t("common.primaryChannel")}
-            name="primaryChannel"
-            defaultValue={primaryChannel ?? "app"}
-          >
-            <option value="app">{t("people.detail.profileForm.inApp")}</option>
-            <option value="email">
-              {t("people.detail.profileForm.email")}
-            </option>
-            <option value="slack">
-              {t("people.detail.profileForm.slack")}
-            </option>
-            <option value="teams">
-              {t("people.detail.profileForm.teams")}
-            </option>
-            <option value="whatsapp">
-              {t("people.detail.profileForm.whatsapp")}
-            </option>
-            <option value="telegram">
-              {t("people.detail.profileForm.telegram")}
-            </option>
-          </SelectInput>
+            <SelectInput
+              label={t("common.primaryChannel")}
+              name="primaryChannel"
+              defaultValue={primaryChannel ?? "app"}
+            >
+              <option value="app">
+                {t("people.detail.profileForm.inApp")}
+              </option>
+              <option value="email">
+                {t("people.detail.profileForm.email")}
+              </option>
+              <option value="slack">
+                {t("people.detail.profileForm.slack")}
+              </option>
+              <option value="teams">
+                {t("people.detail.profileForm.teams")}
+              </option>
+              <option value="whatsapp">
+                {t("people.detail.profileForm.whatsapp")}
+              </option>
+              <option value="telegram">
+                {t("people.detail.profileForm.telegram")}
+              </option>
+            </SelectInput>
 
-          <RichTextField
-            label={t("people.detail.bio")}
-            name="bio"
-            content={bio ?? null}
-            placeholder={t("people.detail.profileForm.aFewLinesAbout")}
-            description={t("people.detail.profileForm.emptyTheBioTo")}
-          />
+            <RichTextField
+              label={t("people.detail.bio")}
+              name="bio"
+              content={bio ?? null}
+              placeholder={t("people.detail.profileForm.aFewLinesAbout")}
+              description={t("people.detail.profileForm.emptyTheBioTo")}
+            />
 
-          <TimeRangeInput
-            label={t("people.detail.profileForm.quietHoursLeaveEmpty")}
-            startLabel={t("people.detail.profileForm.quietStart")}
-            endLabel={t("people.detail.profileForm.quietEnd")}
-            startName="quietStart"
-            endName="quietEnd"
-            defaultValue={quietHours ?? null}
-          />
+            <TimeRangeInput
+              label={t("people.detail.profileForm.quietHoursLeaveEmpty")}
+              startLabel={t("people.detail.profileForm.quietStart")}
+              endLabel={t("people.detail.profileForm.quietEnd")}
+              startName="quietStart"
+              endName="quietEnd"
+              defaultValue={quietHours ?? null}
+            />
+          </RefusedFields>
 
           <div className="flex items-center gap-3 pt-1">
             <Button type="submit" variant="primary" disabled={pending}>
@@ -122,7 +128,7 @@ export function ProfileForm({
             {state?.ok === true ? (
               <span className="text-xs text-good">{state.message}</span>
             ) : null}
-            {state?.ok === false ? (
+            {state?.ok === false && !state.fields ? (
               <span className="text-xs text-bad" role="alert">
                 {state.message}
               </span>

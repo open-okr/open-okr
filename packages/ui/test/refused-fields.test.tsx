@@ -1,6 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
+import { ConfidenceInput } from "../src/fields/confidence-input.tsx";
 import { TextInput } from "../src/fields/text-input.tsx";
+import { TimeInput } from "../src/fields/time-input.tsx";
 import { RefusedFields } from "../src/forms/refused-fields.tsx";
 import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 import { RichTextField } from "../src/rich-text/rich-text-field.tsx";
@@ -47,6 +49,46 @@ describe("RefusedFields", () => {
   test("says nothing when nothing was refused", () => {
     form(undefined);
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  // A check-in and a vote ask for a confidence, whose number box is unnamed
+  // and whose hidden input carries the name (plan U1b).
+  test("puts a confidence's message under the confidence", () => {
+    render(
+      <TranslationsProvider locale="en">
+        <form>
+          <RefusedFields fields={{ confidence: "Say how confident you are." }}>
+            <ConfidenceInput label="Confidence" name="confidence" />
+          </RefusedFields>
+        </form>
+      </TranslationsProvider>,
+    );
+    expect(screen.getAllByRole("alert").map((one) => one.textContent)).toEqual([
+      "Say how confident you are.",
+    ]);
+    expect(
+      // Labelled with its scale, "Confidence (in 10)".
+      screen.getByLabelText(/^Confidence/).getAttribute("aria-invalid"),
+    ).toBe("true");
+  });
+
+  // Booking a cycle's weekly sessions asks for a time (plan U1b).
+  test("puts a time's message under the time", () => {
+    render(
+      <TranslationsProvider locale="en">
+        <form>
+          <RefusedFields fields={{ time: "Not a time of day." }}>
+            <TimeInput label="At" name="time" />
+          </RefusedFields>
+        </form>
+      </TranslationsProvider>,
+    );
+    expect(screen.getAllByRole("alert").map((one) => one.textContent)).toEqual([
+      "Not a time of day.",
+    ]);
+    expect(screen.getByLabelText("At").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
   });
 
   // The cycle's forms write prose through the compact editor, so a refusal

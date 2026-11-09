@@ -7,6 +7,8 @@
 export interface ScheduleState {
   /** A refusal in words, or null. Never a stack trace. */
   readonly error: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   /** What was booked, in words, or null before anything was tried. */
   readonly notice: string | null;
   /** What the cycle still lacks after booking: only weeks already gone. */

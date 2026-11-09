@@ -8,16 +8,46 @@
  * editor replaces the textarea when the goal surfaces land at P3-T10; what it
  * cannot replace is the refusal, which stays on the server.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getPool } from "../../lib/auth";
 import { formNumber } from "../../lib/form-number";
+import { refusedByField } from "../../lib/refusal";
 import { readRichTextField } from "../../lib/rich-text-form";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
+
+/** The form's own check, said under the one field it is about (§4.2). */
+const on = (field: string, message: string): WriteState => ({
+  error: null,
+  fields: { [field]: message },
+});
+
+/**
+ * Whether a write went through: neither a sentence nor a field refused.
+ * A refusal under a field has no sentence, so `error === null` alone would
+ * read it as done.
+ */
+const accepted = (state: WriteState): boolean =>
+  state.error === null && state.fields === undefined;
+
+/**
+ * The composer's key result rows, as the action's `values` list names them,
+ * so a refused value or confidence stands under that key result's own box.
+ */
+function valueFields(
+  values: readonly { readonly keyResultId: string }[],
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    values.flatMap((entry, index) => [
+      [`values.${index}.value`, `value:${entry.keyResultId}`],
+      [`values.${index}.confidence`, `confidence:${entry.keyResultId}`],
+    ]),
+  );
+}
 
 async function run(
   fn: (context: {
@@ -25,6 +55,8 @@ async function run(
     workspaceId: string;
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
+  /** The action's input path to the form's field, where the two differ. */
+  renamed?: Readonly<Record<string, string>>,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -34,10 +66,13 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // Under the field it names (guided-inputs §4.2), and a schema's refusal
+    // too, which used to reach the error page.
+    const refused = refusedByField(error, (await getTranslations()).t, renamed);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath("/check-in");
   revalidatePath("/cycle");
@@ -107,12 +142,12 @@ export async function publishCheckIn(
     // The same refusal the action makes, said before the round trip so it lands
     // beside the empty field.
     const { t } = await getTranslations();
-    return {
-      error:
-        narrative.state === "malformed"
-          ? t("checkIn.actions.narrativeUnreadable")
-          : t("checkIn.actions.needsANarrative"),
-    };
+    return on(
+      "narrative",
+      narrative.state === "malformed"
+        ? t("checkIn.actions.narrativeUnreadable")
+        : t("checkIn.actions.needsANarrative"),
+    );
   }
 
   // An emptied confidence posts nothing (guided-inputs §4.8), and
@@ -121,29 +156,29 @@ export async function publishCheckIn(
   const confidence = formNumber(formData, "confidence");
   if (!Number.isFinite(confidence)) {
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.confidenceNeeded") };
+    return on("confidence", t("checkIn.actions.confidenceNeeded"));
   }
 
-  const published = await run((context) =>
-    callAction(context, "goals.publishCheckIn", {
-      id,
-      status: String(formData.get("status") ?? "on_track") as
-        | "on_track"
-        | "caution"
-        | "off_track",
-      confidence,
-      narrative: narrative.document,
-      values: composerValues(formData),
-    }),
+  const values = composerValues(formData);
+  const published = await run(
+    (context) =>
+      callAction(context, "goals.publishCheckIn", {
+        id,
+        status: String(formData.get("status") ?? "on_track") as
+          | "on_track"
+          | "caution"
+          | "off_track",
+        confidence,
+        narrative: narrative.document,
+        values,
+      }),
+    valueFields(values),
   );
   // An extra update returns to the goal without `update=1`, so the page does
   // not open a fresh empty draft the moment this one is published. Only a
   // check-in page for one goal, so the field cannot send anybody elsewhere.
   const then = String(formData.get("then") ?? "");
-  if (
-    published.error === null &&
-    /^\/check-in\?goal=[0-9a-f-]{36}$/.test(then)
-  ) {
+  if (accepted(published) && /^\/check-in\?goal=[0-9a-f-]{36}$/.test(then)) {
     redirect(then);
   }
   return published;
@@ -159,26 +194,29 @@ export async function editCheckIn(
   const narrative = readRichTextField(formData, "narrative");
   if (narrative.state === "malformed") {
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.narrativeUnreadable") };
+    return on("narrative", t("checkIn.actions.narrativeUnreadable"));
   }
 
   // Emptied, the confidence is not sent and stays as it was, as the
   // narrative does; `Number("")` would have recorded 0.
   const confidence = formNumber(formData, "confidence");
 
-  return run((context) =>
-    callAction(context, "goals.editCheckIn", {
-      id,
-      status: String(formData.get("status") ?? "on_track") as
-        | "on_track"
-        | "caution"
-        | "off_track",
-      ...(Number.isFinite(confidence) ? { confidence } : {}),
-      ...(narrative.state === "document"
-        ? { narrative: narrative.document }
-        : {}),
-      values: composerValues(formData),
-    }),
+  const values = composerValues(formData);
+  return run(
+    (context) =>
+      callAction(context, "goals.editCheckIn", {
+        id,
+        status: String(formData.get("status") ?? "on_track") as
+          | "on_track"
+          | "caution"
+          | "off_track",
+        ...(Number.isFinite(confidence) ? { confidence } : {}),
+        ...(narrative.state === "document"
+          ? { narrative: narrative.document }
+          : {}),
+        values,
+      }),
+    valueFields(values),
   );
 }
 
@@ -209,7 +247,7 @@ export async function castVote(
   const confidence = formNumber(formData, "confidence");
   if (!Number.isFinite(confidence)) {
     const { t } = await getTranslations();
-    return { error: t("checkIn.actions.confidenceNeeded") };
+    return on("confidence", t("checkIn.actions.confidenceNeeded"));
   }
   return run((context) =>
     callAction(context, "goals.vote", { keyResultId, confidence }),
@@ -245,19 +283,22 @@ export async function raiseBlockerFromCheckIn(
   const { t } = await getTranslations();
 
   if (keyResultId === "") {
-    return { error: t("session.detail.actions.nameTheKeyResultBlocked") };
+    return on(
+      "keyResultId",
+      t("session.detail.actions.nameTheKeyResultBlocked"),
+    );
   }
   // Checked against §7.3's taxonomy rather than cast: a select's value
   // arrives as a string like any other.
   const known = BLOCKER_TYPE_DEFINITIONS.find((one) => one.type === type);
   if (!known) {
-    return { error: t("session.detail.actions.chooseTheBlockerKind") };
+    return on("type", t("session.detail.actions.chooseTheBlockerKind"));
   }
   if (ownerId === "") {
-    return { error: t("session.detail.actions.somebodyOwnsClearingIt") };
+    return on("ownerId", t("session.detail.actions.somebodyOwnsClearingIt"));
   }
   if (nextAction === "") {
-    return { error: t("session.detail.actions.writeTheNextAction") };
+    return on("nextAction", t("session.detail.actions.writeTheNextAction"));
   }
 
   const raised = await run((context) =>
@@ -268,7 +309,7 @@ export async function raiseBlockerFromCheckIn(
       nextAction,
     }),
   );
-  return raised.error === null
+  return accepted(raised)
     ? { error: null, notice: t("checkIn.blocker.raised") }
     : raised;
 }

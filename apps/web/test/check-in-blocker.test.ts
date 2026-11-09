@@ -79,14 +79,52 @@ describe("raising a blocker from a check-in", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/check-in");
   });
 
-  it("names the empty field instead of sending it", async () => {
+  it("names the empty field instead of sending it, under that field (plan U1b)", async () => {
     const state = await raiseBlockerFromCheckIn(
       { error: null },
       form({ keyResultId: KEY_RESULT, type: "not-a-type", ownerId: OWNER }),
     );
-    expect(state.error).toBe(
-      translate(CATALOGUES.en, "session.detail.actions.chooseTheBlockerKind"),
-    );
+    expect(state).toEqual({
+      error: null,
+      fields: {
+        type: translate(
+          CATALOGUES.en,
+          "session.detail.actions.chooseTheBlockerKind",
+        ),
+      },
+    });
     expect(callAction).not.toHaveBeenCalled();
+  });
+
+  it("says nothing was raised when the action refuses a field", async () => {
+    callAction.mockRejectedValue(
+      Object.assign(new Error("[]"), {
+        name: "ZodError",
+        issues: [
+          {
+            code: "too_big",
+            origin: "string",
+            maximum: 500,
+            path: ["nextAction"],
+            message: "Too big: expected string to have <=500 characters",
+          },
+        ],
+      }),
+    );
+    const state = await raiseBlockerFromCheckIn(
+      { error: null },
+      form({
+        keyResultId: KEY_RESULT,
+        type: "dependency",
+        ownerId: OWNER,
+        nextAction: "Ask",
+      }),
+    );
+    expect(state).toEqual({
+      error: null,
+      fields: {
+        nextAction: translate(CATALOGUES.en, "fields.tooLong", { max: 500 }),
+      },
+    });
   });
 });

@@ -12,9 +12,10 @@
  *
  * Refusals come back as sentences, the shape every other screen uses.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { refusedByField } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_SCHEDULE, type ScheduleState } from "./schedule-state.ts";
@@ -31,11 +32,17 @@ async function context() {
 const text = (formData: FormData, name: string): string =>
   String(formData.get(name) ?? "").trim();
 
-function refused(error: unknown): ScheduleState {
-  if (error instanceof OperationError) {
-    return { ...NO_SCHEDULE, error: error.message };
+/**
+ * A refusal under the field it names, or as the form's sentence
+ * (guided-inputs §4.2). A schema's refusal too, such as a time that is not
+ * one, which used to reach the error page.
+ */
+async function refused(error: unknown): Promise<ScheduleState> {
+  const state = refusedByField(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
   }
-  throw error;
+  return { ...NO_SCHEDULE, ...state };
 }
 
 function revalidate(): void {

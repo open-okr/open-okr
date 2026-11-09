@@ -7,6 +7,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  RefusedFields,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -92,59 +93,62 @@ function LastWeek({
   return (
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
-      {carried.map((one) => (
-        <div
-          key={one.id}
-          className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-2 text-sm first:border-0 first:pt-0"
-        >
-          <span className="min-w-0 text-ink">
-            {one.text}
-            <span className="ml-1.5 text-xs text-ink-3">
-              {t("session.detail.commitments.weekOf", {
-                ownerName: one.ownerName,
-                weekStart: one.weekStart,
-                keyResultTitle: one.keyResultTitle
-                  ? ` · ${one.keyResultTitle}`
-                  : "",
-              })}
+      {/* A refused line on why stands under its commitment (U1b). */}
+      <RefusedFields fields={state.fields}>
+        {carried.map((one) => (
+          <div
+            key={one.id}
+            className="flex flex-wrap items-center justify-between gap-2.5 border-t border-line pt-2 text-sm first:border-0 first:pt-0"
+          >
+            <span className="min-w-0 text-ink">
+              {one.text}
+              <span className="ml-1.5 text-xs text-ink-3">
+                {t("session.detail.commitments.weekOf", {
+                  ownerName: one.ownerName,
+                  weekStart: one.weekStart,
+                  keyResultTitle: one.keyResultTitle
+                    ? ` · ${one.keyResultTitle}`
+                    : "",
+                })}
+              </span>
             </span>
-          </span>
-          {/* One group per commitment. They shared one name, which made
+            {/* One group per commitment. They shared one name, which made
               every row one radio group, so a press could answer only one
               commitment (P9-T19a-d-c). */}
-          <span className="flex flex-none items-center gap-3 text-xs text-ink-2">
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name={`verdict:${one.id}`}
-                value="yes"
-                className="size-3.5"
-              />
-              {t("session.detail.commitments.delivered")}
-            </label>
-            <label className="flex items-center gap-1.5">
-              <input
-                type="radio"
-                name={`verdict:${one.id}`}
-                value="no"
-                className="size-3.5"
-              />
-              {t("session.detail.commitments.notDelivered")}
-            </label>
-          </span>
-          {/* §7.2 step 3: "with a line on why where it helps". */}
-          <TextInput
-            label={t("session.detail.commitments.whyFor", {
-              text: one.text,
-            })}
-            hideLabel
-            name={`note:${one.id}`}
-            placeholder={t("session.detail.commitments.aLineOnWhy")}
-            maxLength={300}
-            inputClassName="h-6.5 text-xs"
-          />
-        </div>
-      ))}
+            <span className="flex flex-none items-center gap-3 text-xs text-ink-2">
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name={`verdict:${one.id}`}
+                  value="yes"
+                  className="size-3.5"
+                />
+                {t("session.detail.commitments.delivered")}
+              </label>
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="radio"
+                  name={`verdict:${one.id}`}
+                  value="no"
+                  className="size-3.5"
+                />
+                {t("session.detail.commitments.notDelivered")}
+              </label>
+            </span>
+            {/* §7.2 step 3: "with a line on why where it helps". */}
+            <TextInput
+              label={t("session.detail.commitments.whyFor", {
+                text: one.text,
+              })}
+              hideLabel
+              name={`note:${one.id}`}
+              placeholder={t("session.detail.commitments.aLineOnWhy")}
+              maxLength={300}
+              inputClassName="h-6.5 text-xs"
+            />
+          </div>
+        ))}
+      </RefusedFields>
       <p className="text-xs text-ink-4">
         {t("session.detail.commitments.leaveOneUnansweredAnd")}
       </p>
@@ -212,43 +216,46 @@ function ThisWeek({
 
       <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
         <input type="hidden" name="sessionId" value={sessionId} />
-        {Array.from({ length: rows }, (_, index) => index).map((index) => (
-          <div key={index} className="flex flex-wrap gap-2">
-            <TextInput
-              label={t("session.detail.commitments.whatWillMoveByNextWeek", {
-                number: index + 1,
-              })}
-              hideLabel
-              name="text"
-              placeholder={t(
-                "session.detail.commitments.whatWillMoveByNextWeek",
-                { number: index + 1 },
-              )}
-              maxLength={500}
-              className="w-80"
-            />
-            <EntityPicker
-              label={t("common.owner")}
-              hideLabel
-              name="ownerId"
-              placeholder={t("session.detail.commitments.whoOwnsIt")}
-              options={peopleOptions(owners)}
-              className="w-48"
-            />
-            <EntityPicker
-              label={t("common.keyResult")}
-              hideLabel
-              name="keyResultId"
-              defaultValue={null}
-              noneLabel={t("session.detail.commitments.noKeyResult")}
-              options={keyResults.map((keyResult) => ({
-                id: keyResult.id,
-                label: keyResult.label,
-              }))}
-              className="w-64"
-            />
-          </div>
-        ))}
+        {/* A refused row is said under the rows, which share their names. */}
+        <RefusedFields fields={state.fields}>
+          {Array.from({ length: rows }, (_, index) => index).map((index) => (
+            <div key={index} className="flex flex-wrap gap-2">
+              <TextInput
+                label={t("session.detail.commitments.whatWillMoveByNextWeek", {
+                  number: index + 1,
+                })}
+                hideLabel
+                name="text"
+                placeholder={t(
+                  "session.detail.commitments.whatWillMoveByNextWeek",
+                  { number: index + 1 },
+                )}
+                maxLength={500}
+                className="w-80"
+              />
+              <EntityPicker
+                label={t("common.owner")}
+                hideLabel
+                name="ownerId"
+                placeholder={t("session.detail.commitments.whoOwnsIt")}
+                options={peopleOptions(owners)}
+                className="w-48"
+              />
+              <EntityPicker
+                label={t("common.keyResult")}
+                hideLabel
+                name="keyResultId"
+                defaultValue={null}
+                noneLabel={t("session.detail.commitments.noKeyResult")}
+                options={keyResults.map((keyResult) => ({
+                  id: keyResult.id,
+                  label: keyResult.label,
+                }))}
+                className="w-64"
+              />
+            </div>
+          ))}
+        </RefusedFields>
         <Button
           type="submit"
           variant="primary"
@@ -291,20 +298,22 @@ function Wins({
   return (
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
-      {lines.map((win, index) => (
-        <TextInput
-          label={t("session.detail.commitments.winNumber", {
-            number: index + 1,
-          })}
-          hideLabel
-          // biome-ignore lint/suspicious/noArrayIndexKey: a line's position is its identity in a list written whole.
-          key={index}
-          name="win"
-          defaultValue={win}
-          placeholder={t("session.detail.commitments.aWin")}
-          maxLength={200}
-        />
-      ))}
+      <RefusedFields fields={state.fields}>
+        {lines.map((win, index) => (
+          <TextInput
+            label={t("session.detail.commitments.winNumber", {
+              number: index + 1,
+            })}
+            hideLabel
+            // biome-ignore lint/suspicious/noArrayIndexKey: a line's position is its identity in a list written whole.
+            key={index}
+            name="win"
+            defaultValue={win}
+            placeholder={t("session.detail.commitments.aWin")}
+            maxLength={200}
+          />
+        ))}
+      </RefusedFields>
       <Button
         type="submit"
         variant="default"

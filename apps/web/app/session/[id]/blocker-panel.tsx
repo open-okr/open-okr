@@ -8,6 +8,7 @@ import {
   CardHeader,
   Chip,
   EntityPicker,
+  RefusedFields,
   SelectInput,
   TextInput,
   useTranslations,
@@ -140,24 +141,27 @@ function OneBlocker({
             className="flex items-center gap-1.5"
           >
             <input type="hidden" name="blockerId" value={blocker.id} />
-            <EntityPicker
-              label={
-                blocker.keyResultTitle === null
-                  ? t("session.detail.blockerPanel.reassignThisBlocker")
-                  : t("session.detail.blockerPanel.reassignTitle", {
-                      title: blocker.keyResultTitle,
-                    })
-              }
-              hideLabel
-              name="ownerId"
-              placeholder={t("session.detail.blockerPanel.moveItTo")}
-              options={peopleOptions(owners)}
-              className="w-48"
-              inputClassName="text-xs"
-            />
-            <Button type="submit" size="sm" disabled={moving}>
-              {t("common.reassign")}
-            </Button>
+            {/* The new owner shows what was refused about it (U1b). */}
+            <RefusedFields fields={moveState.fields}>
+              <EntityPicker
+                label={
+                  blocker.keyResultTitle === null
+                    ? t("session.detail.blockerPanel.reassignThisBlocker")
+                    : t("session.detail.blockerPanel.reassignTitle", {
+                        title: blocker.keyResultTitle,
+                      })
+                }
+                hideLabel
+                name="ownerId"
+                placeholder={t("session.detail.blockerPanel.moveItTo")}
+                options={peopleOptions(owners)}
+                className="w-48"
+                inputClassName="text-xs"
+              />
+              <Button type="submit" size="sm" disabled={moving}>
+                {t("common.reassign")}
+              </Button>
+            </RefusedFields>
           </form>
         </div>
       )}
@@ -182,49 +186,54 @@ function Raise({
   return (
     <form action={submit} aria-busy={pending} className="flex flex-col gap-2">
       <input type="hidden" name="sessionId" value={sessionId} />
-      <div className="flex flex-wrap gap-2">
-        <EntityPicker
-          label={t("common.keyResult")}
-          hideLabel
-          name="keyResultId"
-          placeholder={t("session.detail.blockerPanel.whichKeyResult")}
-          options={keyResults.map((keyResult) => ({
-            id: keyResult.id,
-            label: keyResult.label,
-          }))}
-          className="w-64"
-        />
-        <SelectInput
-          label={t("session.detail.blockerPanel.blockerType")}
-          hideLabel
-          name="type"
-          defaultValue=""
-          className="w-48"
-        >
-          <option value="">{t("session.detail.blockerPanel.whatKind")}</option>
-          {BLOCKER_TYPE_DEFINITIONS.map((one) => (
-            <option key={one.type} value={one.type}>
-              {one.label}
+      {/* Each field shows what was refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>
+        <div className="flex flex-wrap gap-2">
+          <EntityPicker
+            label={t("common.keyResult")}
+            hideLabel
+            name="keyResultId"
+            placeholder={t("session.detail.blockerPanel.whichKeyResult")}
+            options={keyResults.map((keyResult) => ({
+              id: keyResult.id,
+              label: keyResult.label,
+            }))}
+            className="w-64"
+          />
+          <SelectInput
+            label={t("session.detail.blockerPanel.blockerType")}
+            hideLabel
+            name="type"
+            defaultValue=""
+            className="w-48"
+          >
+            <option value="">
+              {t("session.detail.blockerPanel.whatKind")}
             </option>
-          ))}
-        </SelectInput>
-        <EntityPicker
-          label={t("common.owner")}
+            {BLOCKER_TYPE_DEFINITIONS.map((one) => (
+              <option key={one.type} value={one.type}>
+                {one.label}
+              </option>
+            ))}
+          </SelectInput>
+          <EntityPicker
+            label={t("common.owner")}
+            hideLabel
+            name="ownerId"
+            placeholder={t("session.detail.blockerPanel.whoOwnsClearingIt")}
+            options={peopleOptions(owners)}
+            className="w-48"
+          />
+        </div>
+        <TextInput
+          label={t("session.detail.blockerPanel.theNextActionAnd")}
           hideLabel
-          name="ownerId"
-          placeholder={t("session.detail.blockerPanel.whoOwnsClearingIt")}
-          options={peopleOptions(owners)}
-          className="w-48"
+          name="nextAction"
+          placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
+          maxLength={500}
+          className="w-full max-w-prose"
         />
-      </div>
-      <TextInput
-        label={t("session.detail.blockerPanel.theNextActionAnd")}
-        hideLabel
-        name="nextAction"
-        placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
-        maxLength={500}
-        className="w-full max-w-prose"
-      />
+      </RefusedFields>
       <Button
         type="submit"
         variant="primary"

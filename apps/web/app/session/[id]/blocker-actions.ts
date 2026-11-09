@@ -11,14 +11,34 @@
  * second half of what the gap audit recorded as B-10.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { BLOCKER_TYPE_DEFINITIONS } from "@openokr/method";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedByField, refusedSentence } from "../../../lib/refusal";
 import { readRichTextField } from "../../../lib/rich-text-form.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
+
+/**
+ * A refused write under the field it names, which each of these forms wraps
+ * in `RefusedFields`, or as the form's sentence (guided-inputs §4.2). A
+ * schema's refusal too, which used to reach the error page.
+ */
+async function refused(error: unknown): Promise<CommitmentState> {
+  const state = refusedByField(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
+
+/** The form's own check, said under the one field it is about. */
+const on = (field: string, message: string): CommitmentState => ({
+  error: null,
+  fields: { [field]: message },
+});
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -55,20 +75,23 @@ export async function raiseBlockerAction(
   // Named one at a time rather than "fill in every field", because a form
   // with four controls should say which one is empty.
   if (keyResultId === "") {
-    return { error: t("session.detail.actions.nameTheKeyResultBlocked") };
+    return on(
+      "keyResultId",
+      t("session.detail.actions.nameTheKeyResultBlocked"),
+    );
   }
   // Checked against §6.2's taxonomy rather than cast. A select is not a
   // guarantee: the value arrives in a form body like any other string, and
   // `sessions.createBlocker` takes the enum.
   const known = BLOCKER_TYPE_DEFINITIONS.find((one) => one.type === type);
   if (!known) {
-    return { error: t("session.detail.actions.chooseTheBlockerKind") };
+    return on("type", t("session.detail.actions.chooseTheBlockerKind"));
   }
   if (ownerId === "") {
-    return { error: t("session.detail.actions.somebodyOwnsClearingIt") };
+    return on("ownerId", t("session.detail.actions.somebodyOwnsClearingIt"));
   }
   if (nextAction === "") {
-    return { error: t("session.detail.actions.writeTheNextAction") };
+    return on("nextAction", t("session.detail.actions.writeTheNextAction"));
   }
 
   try {
@@ -80,10 +103,7 @@ export async function raiseBlockerAction(
       nextAction,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath(sessionPath(form));
   return NO_ERROR;
@@ -98,10 +118,12 @@ export async function resolveBlockerAction(
       id: String(form.get("blockerId") ?? ""),
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // One button and no field, so whatever is refused is its sentence.
+    const state = refusedSentence(error, (await getTranslations()).t);
+    if (state === null) {
+      throw error;
     }
-    throw error;
+    return state;
   }
   revalidatePath(sessionPath(form));
   return NO_ERROR;
@@ -114,7 +136,7 @@ export async function reassignBlockerAction(
   const ownerId = String(form.get("ownerId") ?? "");
   if (ownerId === "") {
     const { t } = await getTranslations();
-    return { error: t("session.detail.actions.chooseWhoItMovesTo") };
+    return on("ownerId", t("session.detail.actions.chooseWhoItMovesTo"));
   }
   try {
     await callAction(await context(), "sessions.reassignBlocker", {
@@ -122,10 +144,7 @@ export async function reassignBlockerAction(
       ownerId,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath(sessionPath(form));
   return NO_ERROR;
@@ -154,12 +173,12 @@ export async function setCoordinatorNoteAction(
   // control that looks as though it does.
   if (note.state !== "document") {
     const { t } = await getTranslations();
-    return {
-      error:
-        note.state === "malformed"
-          ? t("session.detail.actions.noteUnreadable")
-          : t("session.detail.actions.writeTheNoteFirst"),
-    };
+    return on(
+      "note",
+      note.state === "malformed"
+        ? t("session.detail.actions.noteUnreadable")
+        : t("session.detail.actions.writeTheNoteFirst"),
+    );
   }
   try {
     await callAction(await context(), "sessions.setCoordinatorNote", {
@@ -167,10 +186,7 @@ export async function setCoordinatorNoteAction(
       note: note.document,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath(`/session/${sessionId}`);
   return NO_ERROR;
@@ -191,10 +207,10 @@ export async function setNextActionAction(
   const nextAction = String(form.get("nextAction") ?? "").trim();
   const { t } = await getTranslations();
   if (nextAction === "") {
-    return { error: t("session.detail.actions.writeTheNextAction") };
+    return on("nextAction", t("session.detail.actions.writeTheNextAction"));
   }
   if (ownerId === "") {
-    return { error: t("session.detail.actions.somebodyOwnsTheNextAction") };
+    return on("ownerId", t("session.detail.actions.somebodyOwnsTheNextAction"));
   }
   try {
     await callAction(await context(), "sessions.setNextAction", {
@@ -204,10 +220,7 @@ export async function setNextActionAction(
       ownerId,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath(sessionPath(form));
   return NO_ERROR;
