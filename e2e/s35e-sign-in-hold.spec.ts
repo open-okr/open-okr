@@ -29,7 +29,9 @@ test("the sixth wrong password from one address shows the wait and a reset link"
   const signIn = page
     .getByRole("button", { name: "Sign in", exact: true })
     .first();
-  const alert = page.getByRole("alert");
+  // The form's own alert. Next.js keeps a route announcer with the same
+  // role on every page, so an unscoped one matches two.
+  const alert = page.getByRole("main").getByRole("alert");
   // Each attempt waits for its own answer: the alert from the one before reads
   // the same, so waiting on the text alone could pass early.
   const attempt = async (guess: string) => {
