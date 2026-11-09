@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@openokr/ui";
+import { Button, RefusedFields } from "@openokr/ui";
 import { useActionState } from "react";
 import { type KeyResult, NOTHING_YET } from "./key-state.ts";
 
@@ -35,7 +35,8 @@ export function KeyForm({
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
-      {children}
+      {/* The key shows what was refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       <Button
         type="submit"
         variant={variant}

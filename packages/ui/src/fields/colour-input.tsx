@@ -3,6 +3,7 @@
 import { Field } from "@base-ui-components/react/field";
 import { isHexColour } from "@openokr/formats";
 import { type ReactNode, useEffect, useRef, useState } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { useFormReset } from "./form-reset.ts";
@@ -27,7 +28,7 @@ export function ColourInput({
   id,
   defaultValue,
   description,
-  error,
+  error: givenError,
   check,
   trailing,
   placeholder = "#336699",
@@ -59,6 +60,10 @@ export function ColourInput({
   readonly onValueChange?: (hex: string | null) => void;
   readonly className?: string;
 }) {
+  // Without a message passed in, the nearest `RefusedFields` says what the
+  // server refused about this field (guided-inputs §4.2, plan U1b).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t } = useTranslations();
   const [value, setValue] = useState(defaultValue ?? "");
   const [left, setLeft] = useState(false);

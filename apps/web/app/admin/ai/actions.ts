@@ -32,7 +32,7 @@ import { hostOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { testWorkspaceKey } from "../../../lib/ai-key-test";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedByField } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -59,19 +59,42 @@ async function context() {
   };
 }
 
-async function reason(error: unknown): Promise<string> {
-  // A schema's own sentence, not the JSON of every issue (F5): a base URL or
-  // a model id refused by its rule says why.
-  const refused = refusalOf(error);
-  if (refused !== null) {
-    return refused;
-  }
-  if (error instanceof Error) {
-    return error.message;
-  }
+/**
+ * What a refused write says on the AI console (guided-inputs §4.2, plan
+ * U1b): under each field it names, which `AIForm` hands to the page's fields
+ * by name, and the sentence only when it names none. A schema's own sentence,
+ * not the JSON of every issue (F5): a base URL or a model id refused by its
+ * rule says why, under that box. `renamed` maps the action's input path to
+ * the form's field where the two differ.
+ */
+async function refused(
+  error: unknown,
+  renamed?: Readonly<Record<string, string>>,
+): Promise<FormResult> {
   const { t } = await getTranslations();
-  return t("admin.agents.proposalQueue.somethingWentWrong");
+  const state = refusedByField(error, t, renamed);
+  if (state !== null) {
+    return state.fields
+      ? { ok: false, message: "", fields: state.fields }
+      : { ok: false, message: state.error ?? "" };
+  }
+  // Not a refusal, but this console has always said what went wrong rather
+  // than opening the error page, such as a host that holds no key ring.
+  return {
+    ok: false,
+    message:
+      error instanceof Error
+        ? error.message
+        : t("admin.agents.proposalQueue.somethingWentWrong"),
+  };
 }
+
+/** The form's own check, said under the one field it is about. */
+const on = (field: string, message: string): FormResult => ({
+  ok: false,
+  message: "",
+  fields: { [field]: message },
+});
 
 function done(message: string): FormResult {
   revalidatePath("/admin/ai");
@@ -94,7 +117,7 @@ export async function saveProvider(
       baseUrl: baseUrlRaw === "" ? null : baseUrlRaw,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.rhythm.actions.saved"));
 }
@@ -119,7 +142,7 @@ export async function saveWorkspaceKey(
       apiKey,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   // A stored key is tested at once (UAT BUG-026), so the chip says whether it
   // works rather than "unverified" for ever.
@@ -147,7 +170,7 @@ async function checkWorkspaceKey(provider: Provider): Promise<FormResult> {
       status: outcome,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return outcome === "verified"
     ? done(t("admin.ai.actions.keyVerified"))
@@ -165,7 +188,7 @@ export async function removeWorkspaceKey(
       provider,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.removed"));
 }
@@ -194,7 +217,7 @@ export async function rotateKeys(
       }),
     );
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
 }
 
@@ -225,7 +248,7 @@ export async function addModel(
       tiers: form.getAll("tiers").map((value) => String(value) as Tier),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.added"));
 }
@@ -240,7 +263,7 @@ export async function removeModel(
       id: String(form.get("id") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.removed"));
 }
@@ -255,7 +278,7 @@ export async function saveTier(
   // The model chosen says its provider (guided-inputs §4.10).
   const model = tierModelFrom(String(form.get("model") ?? ""));
   if (model === null) {
-    return { ok: false, message: t("admin.ai.actions.whichModel") };
+    return on("model", t("admin.ai.actions.whichModel"));
   }
   try {
     await callAction(await context(), "ai.setTierPolicy", {
@@ -268,7 +291,8 @@ export async function saveTier(
       maxTokens: maxTokens === "" ? null : Number(maxTokens),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    // One picker chose both the provider and the model.
+    return refused(error, { provider: "model", modelId: "model" });
   }
   return done(t("admin.ai.actions.routed"));
 }
@@ -283,7 +307,7 @@ export async function clearTier(
       tier: String(form.get("tier") ?? "") as Tier,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.backToTheSeededDefault"));
 }
@@ -303,7 +327,7 @@ export async function saveFeature(
       tierOverride: tier === "" ? null : (tier as Tier),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.rhythm.actions.saved"));
 }
@@ -330,7 +354,7 @@ export async function savePrompt(
       t("admin.ai.actions.savedAsVersion", { version: updated.version }),
     );
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
 }
 
@@ -344,7 +368,7 @@ export async function restoreDefaultPrompt(
       promptKey: String(form.get("promptKey") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.backToTheBuiltInPrompt"));
 }
@@ -378,14 +402,14 @@ export async function savePrivacy(
 ): Promise<FormResult> {
   const { t } = await getTranslations();
   const allowedHosts = hostsFrom(String(form.get("allowedHosts") ?? ""));
-  const refused = allowedHosts.find(
+  const notAHost = allowedHosts.find(
     (host) => !aiEgressAllowListSchema.safeParse([host]).success,
   );
-  if (refused !== undefined) {
-    return {
-      ok: false,
-      message: t("admin.ai.privacy.notAHost", { host: refused }),
-    };
+  if (notAHost !== undefined) {
+    return on(
+      "allowedHosts",
+      t("admin.ai.privacy.notAHost", { host: notAHost }),
+    );
   }
   const level = String(form.get("contextEgress") ?? "");
   try {
@@ -400,7 +424,16 @@ export async function savePrivacy(
       allowedHosts,
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    // Every host is one line of the one box.
+    return refused(
+      error,
+      Object.fromEntries(
+        allowedHosts.map((_, index) => [
+          `allowedHosts.${index}`,
+          "allowedHosts",
+        ]),
+      ),
+    );
   }
   return done(t("admin.rhythm.actions.saved"));
 }
@@ -414,7 +447,7 @@ export async function saveBudget(
   // or an agent, which also says the scope (guided-inputs §4.10).
   const owner = budgetOwnerFrom(String(form.get("owner") ?? ""));
   if (owner === null) {
-    return { ok: false, message: t("admin.ai.actions.whoseBudget") };
+    return on("owner", t("admin.ai.actions.whoseBudget"));
   }
   try {
     await callAction(await context(), "ai.setBudget", {
@@ -425,7 +458,8 @@ export async function saveBudget(
       limitValue: Number(form.get("limitValue") ?? 0),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    // One picker said both whose budget it is and what kind of owner.
+    return refused(error, { scope: "owner", scopeRef: "owner" });
   }
   return done(t("admin.ai.actions.set"));
 }
@@ -440,7 +474,7 @@ export async function removeBudget(
       id: String(form.get("id") ?? ""),
     });
   } catch (error) {
-    return { ok: false, message: await reason(error) };
+    return refused(error);
   }
   return done(t("admin.ai.actions.removed"));
 }

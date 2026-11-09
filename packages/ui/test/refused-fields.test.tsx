@@ -1,8 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, test } from "vitest";
+import { ColourInput } from "../src/fields/colour-input.tsx";
 import { ConfidenceInput } from "../src/fields/confidence-input.tsx";
 import { TextInput } from "../src/fields/text-input.tsx";
 import { TimeInput } from "../src/fields/time-input.tsx";
+import { TimezoneSelect } from "../src/fields/timezone-select.tsx";
+import { TokenInput } from "../src/fields/token-input.tsx";
 import { RefusedFields } from "../src/forms/refused-fields.tsx";
 import { TranslationsProvider } from "../src/i18n/use-translations.tsx";
 import { RichTextField } from "../src/rich-text/rich-text-field.tsx";
@@ -70,6 +73,54 @@ describe("RefusedFields", () => {
       // Labelled with its scale, "Confidence (in 10)".
       screen.getByLabelText(/^Confidence/).getAttribute("aria-invalid"),
     ).toBe("true");
+  });
+
+  // Admin > General and the profile draw a timezone and a domain list
+  // (plan U1b).
+  // The branding page's colour (plan U1b).
+  test("puts a colour's message under the colour", () => {
+    render(
+      <TranslationsProvider locale="en">
+        <form>
+          <RefusedFields fields={{ primaryColor: "Reads as red." }}>
+            <ColourInput label="Primary colour" name="primaryColor" />
+          </RefusedFields>
+        </form>
+      </TranslationsProvider>,
+    );
+    expect(screen.getAllByRole("alert").map((one) => one.textContent)).toEqual([
+      "Reads as red.",
+    ]);
+  });
+
+  test("puts a timezone's and a list's message under each", () => {
+    render(
+      <TranslationsProvider locale="en">
+        <form>
+          <RefusedFields
+            fields={{
+              timezone: "Not a timezone this server knows.",
+              trustedEmailDomains: "gmail.com is a free mail provider.",
+            }}
+          >
+            <TimezoneSelect
+              label="Timezone"
+              name="timezone"
+              zones={["Asia/Jakarta", "Europe/London"]}
+            />
+            <TokenInput
+              label="Trusted domains"
+              name="trustedEmailDomains"
+              rule="domain"
+            />
+          </RefusedFields>
+        </form>
+      </TranslationsProvider>,
+    );
+    expect(screen.getAllByRole("alert").map((one) => one.textContent)).toEqual([
+      "Not a timezone this server knows.",
+      "gmail.com is a free mail provider.",
+    ]);
   });
 
   // Booking a cycle's weekly sessions asks for a time (plan U1b).

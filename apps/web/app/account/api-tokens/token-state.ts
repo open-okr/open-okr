@@ -13,6 +13,11 @@ export interface TokenResult {
   readonly token: string | null;
   readonly message: string;
   /**
+   * A refused field's message, shown under it (guided-inputs §4.2). The
+   * message is empty when there is one.
+   */
+  readonly fields?: Readonly<Record<string, string>>;
+  /**
    * Which door the minted token opens, so an agent token can be shown already
    * inside the configuration an agent reads (completeness review M-12).
    */

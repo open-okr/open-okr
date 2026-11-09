@@ -73,7 +73,10 @@ describe("the rhythm and thresholds card", () => {
   test("the refusal is returned rather than swallowed", () => {
     // This is the whole of what the previous save did with an OperationError:
     // `return;`. An impossible value and a successful save looked identical.
-    expect(actions).toContain("return { error: error.message, saved: null }");
+    // A schema's refusal is returned too since plan U1b, as `key: message`
+    // so it lands under its parameter like the action's own.
+    expect(actions).toContain("return { error: refused, saved: null }");
+    expect(actions).toContain("return `${group}.${name}: ${message}`");
   });
 
   test("the refusal comes to the reader, and names its own field", () => {

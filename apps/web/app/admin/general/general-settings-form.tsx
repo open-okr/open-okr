@@ -91,6 +91,7 @@ export function GeneralSettingsForm({
             <TimezoneSelect
               label={t("common.timezone")}
               name="timezone"
+              error={state.fields?.timezone}
               zones={zones}
               defaultValue={
                 typeof settings.timezone === "string" ? settings.timezone : null
@@ -105,6 +106,7 @@ export function GeneralSettingsForm({
             id="language"
             label={t("admin.general.generalSettingsForm.language")}
             name="language"
+            error={state.fields?.language}
             defaultValue={String(settings.language ?? "en")}
             className="max-w-sm"
           >
@@ -130,6 +132,7 @@ export function GeneralSettingsForm({
               "admin.general.generalSettingsForm.trustedEmailDomainsComma",
             )}
             name="trustedEmailDomains"
+            error={state.fields?.trustedEmailDomains}
             rule="domain"
             defaultValue={trustedEmailDomains}
             description={t(

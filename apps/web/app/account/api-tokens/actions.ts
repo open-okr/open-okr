@@ -3,6 +3,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { TokenResult } from "./token-state.ts";
@@ -46,10 +47,12 @@ export async function createToken(
   const days = String(form.get("expiresInDays") ?? "").trim();
 
   if (name === "") {
+    // Under the name (guided-inputs §4.2, plan U1b).
     return {
       ok: false,
       token: null,
-      message: t("account.apiTokens.actions.giveTheTokenAName"),
+      message: "",
+      fields: { name: t("account.apiTokens.actions.giveTheTokenAName") },
     };
   }
   if (scopes.length === 0) {
@@ -78,6 +81,14 @@ export async function createToken(
           : t("admin.invitations.inviteForm.copyThisNowIt"),
     };
   } catch (error) {
+    // Under the name or the expiry when it is about one of them, and a
+    // schema's refusal as its own sentence rather than its JSON (plan U1b).
+    const refused = refusedByField(error, t);
+    if (refused !== null) {
+      return refused.fields
+        ? { ok: false, token: null, message: "", fields: refused.fields }
+        : { ok: false, token: null, message: refused.error ?? "" };
+    }
     return {
       ok: false,
       token: null,
