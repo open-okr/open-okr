@@ -150,6 +150,24 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     summary:
       "The plan a new workspace starts on, as a key from the catalogue. Empty means a new workspace has no plan and no seat limit. A key the catalogue does not hold reads as empty, so a typo cannot refuse a sign-up.",
   },
+  // A trial a sign-up starts by itself (docs/design/tenant-lifecycle.md §11
+  // Q1, plan 0.7.0 P4b). Both must name something, or nobody starts one.
+  {
+    key: "cloud.trialDays",
+    kind: "number",
+    fallback: 0,
+    environment: "OPENOKR_CLOUD_TRIAL_DAYS",
+    summary:
+      "How many days a trial runs for a workspace somebody signs up for. Zero means sign-ups start no trial; an operator can still set one on a workspace.",
+  },
+  {
+    key: "cloud.trialPlan",
+    kind: "string",
+    fallback: "",
+    environment: "OPENOKR_CLOUD_TRIAL_PLAN",
+    summary:
+      "The catalogue plan a sign-up's trial runs on. Empty, or a key the catalogue does not hold, means no trial, so a typo starts nobody on a plan that does not exist.",
+  },
   {
     key: "cloud.creditValueUsd",
     kind: "number",

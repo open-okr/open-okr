@@ -53,6 +53,8 @@ import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
 const CLOUD_DEFAULT_PLAN_KEY = "cloud.defaultPlan";
+const CLOUD_TRIAL_DAYS_KEY = "cloud.trialDays";
+const CLOUD_TRIAL_PLAN_KEY = "cloud.trialPlan";
 const FREE_WORKSPACES_KEY = "cloud.limits.freeWorkspacesPerPerson";
 
 /**
@@ -314,6 +316,37 @@ export async function resolveDefaultPlan(pool: Pool): Promise<Plan | null> {
 }
 
 /**
+ * The trial a sign-up starts by itself, or null (docs/design/
+ * tenant-lifecycle.md §11 Q1, plan 0.7.0 P4b): both `cloud.trialDays` above
+ * zero and `cloud.trialPlan` naming a catalogue plan. Either unset, or a key
+ * the catalogue does not hold, is no trial, as `cloud.defaultPlan` reads.
+ */
+export async function resolveSignupTrial(
+  pool: Pool,
+): Promise<{ readonly plan: Plan; readonly days: number } | null> {
+  const read = async (key: string) => {
+    const definition = getInstanceSetting(key);
+    const stored = await readSetting(pool, key);
+    return (
+      stored ??
+      (definition ? environmentValue(definition, process.env) : undefined) ??
+      definition?.fallback
+    );
+  };
+  const days = Number(await read(CLOUD_TRIAL_DAYS_KEY));
+  const key = await read(CLOUD_TRIAL_PLAN_KEY);
+  if (
+    !(Number.isInteger(days) && days > 0) ||
+    typeof key !== "string" ||
+    key.trim() === ""
+  ) {
+    return null;
+  }
+  const plan = (await readPlans(pool)).find((one) => one.key === key.trim());
+  return plan ? { plan, days } : null;
+}
+
+/**
  * How many free workspaces one person may own (docs/design/hosting-profiles.md §3).
  *
  * Each one is worth AI credits, so without this a free plan is as much AI as
@@ -360,7 +393,10 @@ export async function requireFreeWorkspaceRoom(
             workspaceMembers,
             eq(workspaceMembers.id, memberId),
             eq(workspaceRoles.builtinKey, PROTECTED_ROLE_KEY),
-            eq(tenants.planKey, plan.key),
+            // A trial lands on the default plan when it ends, so it counts
+            // now; otherwise each new trial is a way past the limit
+            // (tenant-lifecycle.md §11 T9).
+            or(eq(tenants.planKey, plan.key), isNotNull(tenants.trialEndsAt)),
           ),
         )
         .limit(1),

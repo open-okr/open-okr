@@ -56,6 +56,7 @@ export {
   readPlans,
   requireFreeWorkspaceRoom,
   resolveDefaultPlan,
+  resolveSignupTrial,
   seatState,
   seatsInUseInTx,
 } from "./plans.ts";
@@ -70,4 +71,4 @@ export {
 } from "./settings.ts";
 export { readTenant, seedTenantInTx } from "./store.ts";
 export { sweepClosedTenants } from "./sweep.ts";
-export { dueTrials, sweepTrials } from "./trials.ts";
+export { dueTrials, startTrialInTx, sweepTrials } from "./trials.ts";

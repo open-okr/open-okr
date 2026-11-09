@@ -40,6 +40,36 @@ import {
 } from "./plans.ts";
 import { isCloudEnabled } from "./settings.ts";
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Starts a sign-up's own trial on a workspace's tenant row (tenant-lifecycle.md
+ * §11 Q1, plan 0.7.0 P4b): the trial's plan, and the day it ends. On the
+ * caller's transaction, which is the provisioning Operation's.
+ */
+export async function startTrialInTx(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly plan: Plan;
+    readonly days: number;
+    readonly now?: Date;
+  },
+): Promise<void> {
+  await applyPlanInTx(tx, { workspaceId: input.workspaceId, plan: input.plan });
+  const now = input.now ?? new Date();
+  // openokr:allow-mutation: the provisioning Operation's own transaction,
+  // beside the tenant row it has just seeded.
+  await tx
+    .update(tenants)
+    .set({
+      trialEndsAt: new Date(now.getTime() + input.days * DAY_MS),
+      trialRemindedAt: null,
+      updatedAt: now,
+    })
+    .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)));
+}
+
 /** What a trial ending did to its workspace. */
 type TrialOutcome = "subscribed" | "moved" | "suspended";
 

@@ -361,7 +361,7 @@ What the export writes while the workspace is frozen, all of it bookkeeping and 
 
 ## 11. The trial sweep (release 0.7.0, P4)
 
-Status: approved by Akmal on 9 November 2026 ("design approved"), Q1 and Q2 both yes as proposed. Built in three parts: **P4a** (migration 0158, the sweep, T2 to T8, T11, T12) is built; **P4b** (Q1's sign-up trial and T9) and **P4c** (T10's banner and Q2's two emails) follow.
+Status: approved by Akmal on 9 November 2026 ("design approved"), Q1 and Q2 both yes as proposed. Built in three parts: **P4a** (migration 0158, the sweep, T2 to T8, T11, T12) and **P4b** (Q1's sign-up trial, `cloud.trialDays` and `cloud.trialPlan`, and T9) are built; **P4c** (T10's banner and Q2's two emails) follows.
 
 **One correction from building P4a.** T2 said an operator's trial is "recorded on both audit chains like every operator action". The plan and lifecycle actions it sits beside record one row, in the workspace's own audit log, naming the operator and carrying the reason; neither writes the instance chain. The trial does the same. And T2's extension needs the freeze overlay's recovery list, since the workspace it lifts is read-only: `workspace.setTrial` is on it, beside `workspace.setLifecycle`.
 

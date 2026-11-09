@@ -100,6 +100,15 @@ list such as `[{"key":"team","name":"Team","seats":20,"aiCredits":2000}]`
 a new workspace has no plan and no seat limit, so to limit a free plan, list it
 in the catalogue and name it here.
 
+**Offering a trial.** Set `OPENOKR_CLOUD_TRIAL_DAYS` and `OPENOKR_CLOUD_TRIAL_PLAN`
+(a catalogue key) and a workspace somebody signs up for starts on that plan for
+that many days. Both must be set, or nobody starts a trial. An operator can
+also start, extend or remove a trial on any workspace's console page. When a
+trial ends, people who fit the default plan move to it; a workspace whose
+people do not fit goes read-only, with nobody removed, until somebody
+subscribes or makes them fit. A workspace on a trial counts as one of its
+owner's free workspaces.
+
 **An operator creates a workspace** on the console's first page, naming who will own
 it. With an account they own it straight away, and without one they get an invitation.
 The operator does not become a member. A signed-in person can also start their own,

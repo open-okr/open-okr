@@ -10,6 +10,7 @@ import { setTrialAsOperator } from "../src/operator/trials.ts";
 import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { CLOUD_ENABLED_KEY, readTenant } from "../src/tenancy/index.ts";
+import { requireFreeWorkspaceRoom } from "../src/tenancy/plans.ts";
 import { sweepTrials } from "../src/tenancy/trials.ts";
 import { createWorkspace } from "../src/workspaces/provisioning.ts";
 
@@ -339,5 +340,75 @@ describe("choosing a plan ends the trial", () => {
       reason: "Signed the annual contract.",
     });
     expect((await tenant())?.trialEndsAt).toBeNull();
+  });
+});
+
+/**
+ * A trial a sign-up starts by itself (tenant-lifecycle.md §11 Q1, approved
+ * yes, plan 0.7.0 P4b): only when the provider names both a length and a
+ * plan the catalogue holds.
+ */
+describe("a sign-up's own trial", () => {
+  const SIGNER = "trial-signer";
+
+  const signUp = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $1, $2) on conflict do nothing",
+      [SIGNER, `${SIGNER}@example.com`],
+    );
+    const created = await createWorkspace(wb.appPool, {
+      user: { id: SIGNER, name: "Signer" },
+    });
+    return readTenant(wb.appPool, created.workspaceId);
+  };
+
+  it("starts on the trial plan, ending the configured number of days from now", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "cloud.trialDays", value: 14 },
+      { key: "cloud.trialPlan", value: "team" },
+    ]);
+    const signed = await signUp();
+    expect(signed).toMatchObject({ planKey: "team", seats: 50 });
+    const days = ((signed?.trialEndsAt?.getTime() ?? 0) - Date.now()) / DAY;
+    expect(days).toBeGreaterThan(13.9);
+    expect(days).toBeLessThan(14.1);
+  });
+
+  it("starts no trial unless both settings name something", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "cloud.trialDays", value: 14 },
+    ]);
+    expect(await signUp()).toMatchObject({
+      planKey: "free",
+      trialEndsAt: null,
+    });
+  });
+
+  it("reads a plan the catalogue does not hold as no trial", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "cloud.trialDays", value: 14 },
+      { key: "cloud.trialPlan", value: "enterprise" },
+    ]);
+    expect(await signUp()).toMatchObject({
+      planKey: "free",
+      trialEndsAt: null,
+    });
+  });
+
+  it("counts a workspace on a trial as one of its owner's free workspaces", async () => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "cloud.trialDays", value: 14 },
+      { key: "cloud.trialPlan", value: "team" },
+      { key: "cloud.limits.freeWorkspacesPerPerson", value: 1 },
+    ]);
+    await signUp();
+    await expect(requireFreeWorkspaceRoom(wb.appPool, SIGNER)).rejects.toThrow(
+      /free workspace/,
+    );
   });
 });
