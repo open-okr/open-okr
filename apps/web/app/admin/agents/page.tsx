@@ -1,4 +1,4 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, agentRunVersion, callAction } from "@openokr/core";
 import { AGENT_AUTONOMIES } from "@openokr/db";
 import {
   AgentFace,
@@ -19,6 +19,7 @@ import { AgentPolicy } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
 import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
+import { AgentRunsLive } from "./runs-live.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminAgents");
 
@@ -171,6 +172,20 @@ export default async function AgentsPage() {
         </h1>
         <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
       </div>
+
+      {/* The runs below move as they run (A11). Each run's version, so an
+          event for a state already on the page is skipped. */}
+      <AgentRunsLive
+        versions={Object.fromEntries(
+          runs.map((run) => [
+            run.id,
+            agentRunVersion({
+              status: run.status,
+              logLength: run.log.length,
+            }),
+          ]),
+        )}
+      />
 
       <RunControls drafting={drafting} />
 

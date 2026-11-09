@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import { agentRunChangedEvent } from "../agents/live.ts";
 import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
@@ -94,6 +95,24 @@ describe("realtime topics", () => {
         "workspace:w1:session:s1",
         "session.stageChanged",
         { sessionId: "s1", stage: "scoring" },
+      ],
+    ]);
+  });
+
+  it("publishes an agent run's change on the workspace's run channel (A11)", async () => {
+    const { published, deps } = recorder();
+    const message = agentRunChangedEvent({
+      workspaceId: "w1",
+      runId: "r1",
+      status: "running",
+      logLength: 2,
+    });
+    await dispatchOutbox(delivery(message.topic, { ...message.payload }), deps);
+    expect(published).toEqual([
+      [
+        "workspace:w1:agent-runs",
+        "agentRun.changed",
+        { workspaceId: "w1", runId: "r1", version: 2 },
       ],
     ]);
   });

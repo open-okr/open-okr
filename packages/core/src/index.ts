@@ -144,6 +144,14 @@ export type {
   TrendPoint,
 } from "./agents/drafter.ts";
 export {
+  AGENT_RUN_CHANGED_TOPIC,
+  type AgentRunChangedEvent,
+  type AgentRunChangedMessage,
+  agentRunChangedEvent,
+  agentRunsChannel,
+  agentRunVersion,
+} from "./agents/live.ts";
+export {
   AGENT_RUN_STEP_TOPIC,
   type AgentRunStepJob,
   type AgentRunStepOutcome,

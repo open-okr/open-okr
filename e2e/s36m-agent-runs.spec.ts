@@ -117,6 +117,75 @@ test("a run started over the API is carried by the relay, and stops with its rea
 });
 
 /**
+ * Live agent run streams (PLAN.md §7, release 0.7.0 A11).
+ *
+ * Given the agents screen is open, when a run is started over the API and the
+ * relay carries it to its end, then the run appears and its stop is shown
+ * without the reader navigating. The marker on `window` is what proves no
+ * navigation: a reload would have cleared it, and `router.refresh()` does not.
+ */
+test("the agents screen shows a run start and stop without a reload", async () => {
+  const listed = await api.get("/api/v1/spaces/list", { headers: authed() });
+  const spaceId = ((await listed.json()).data as { id: string }[])[0]
+    ?.id as string;
+  const created = await api.post("/api/v1/agents/create", {
+    headers: authed(),
+    data: { name: "E2E live runner" },
+  });
+  expect(created.status()).toBe(200);
+  const agentId = (await created.json()).data.id as string;
+  await api.post("/api/v1/agents/bindScope", {
+    headers: authed(),
+    data: { agentId, resourceType: "space", resourceId: spaceId, level: 70 },
+  });
+
+  // Listening before the run starts, or both its events could pass a page
+  // that has not opened its stream yet.
+  const listening = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/agents/live") && response.status() === 200,
+  );
+  await goTo(page, "/admin/agents");
+  await listening;
+  await page.evaluate(() => {
+    (window as unknown as { stayed?: boolean }).stayed = true;
+  });
+  const run = page
+    .getByRole("listitem")
+    .filter({ hasText: "E2E live runner" })
+    .filter({ hasText: "Steps done" });
+  await expect(run).toHaveCount(0);
+
+  const started = await api.post("/api/v1/agents/startRun", {
+    headers: authed(),
+    data: {
+      agentId,
+      trigger: "e2e-live",
+      tasks: [
+        {
+          action: "spaces.update",
+          input: { id: spaceId, name: "Renamed live" },
+          subjectType: "space",
+          subjectId: spaceId,
+        },
+      ],
+    },
+  });
+  expect(started.status()).toBe(200);
+
+  // No goTo from here: the stream is the only thing that can move the page.
+  await expect(run.getByText("cancelled", { exact: true })).toBeVisible({
+    timeout: 45_000,
+  });
+  await expect(run).toContainText("no AI provider is configured");
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { stayed?: boolean }).stayed,
+    ),
+  ).toBe(true);
+});
+
+/**
  * guided-inputs §4.10: a scope names a goal by finding it, where its id was
  * pasted from the goal's own page. Goals are searched rather than listed,
  * since a workspace can hold tens of thousands. Bound to this file's own

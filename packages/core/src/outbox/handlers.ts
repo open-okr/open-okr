@@ -38,6 +38,7 @@ import {
 } from "../agents/coach-mention.ts";
 import { runCoachMention } from "../agents/coach-mention-run.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import { AGENT_RUN_CHANGED_TOPIC } from "../agents/live.ts";
 import {
   AGENT_RUN_STEP_TOPIC,
   type AgentRunStepJob,
@@ -1146,6 +1147,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // and no kind: each scope route decides whether to forward, and the server
   // render that follows applies the filter and can().
   "feed.added": publishEvent,
+  // Every open agents screen is told one run moved (release 0.7.0 A11). The
+  // run's id and version, never a log line: the screen re-reads.
+  [AGENT_RUN_CHANGED_TOPIC]: publishEvent,
   "content.index": indexContent,
   // The large-export path (P5-T15). The row names a run; the worker rebuilds
   // the list as the member who asked, writes the file to storage and marks the
