@@ -73,7 +73,7 @@ export function WatchControl({
       <div className="flex items-center gap-2">
         <Button
           type="button"
-          variant={state.watching ? "default" : "ai"}
+          variant={state.watching ? "default" : "secondary"}
           size="sm"
           pending={pending}
           data-testid="watch-control"

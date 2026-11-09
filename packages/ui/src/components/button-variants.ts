@@ -41,6 +41,13 @@ export const buttonVariants = cva(
           "border-brand-line bg-surface text-brand-text shadow-control",
           "hover:border-brand-strong hover:-translate-y-px hover:shadow-brand",
         ],
+        // The same look for a control that is not AI (plan 0.7.0 A12): `ai`
+        // marks the button as an AI affordance, which the AI-off leg counts,
+        // so a brand-text button that is not one, such as Watch, takes this.
+        secondary: [
+          "border-brand-line bg-surface text-brand-text shadow-control",
+          "hover:border-brand-strong hover:-translate-y-px hover:shadow-brand",
+        ],
         ghost: "border-transparent bg-transparent text-ink-2 hover:bg-raised",
       },
       size: {
