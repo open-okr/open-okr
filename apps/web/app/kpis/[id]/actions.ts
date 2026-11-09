@@ -7,10 +7,11 @@
  * file parses: the engine takes a tree and there is no second representation
  * for the two to disagree about.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { assistContext } from "../../../lib/assists";
 import { getPool } from "../../../lib/auth";
+import { refusedSentence } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
@@ -64,10 +65,14 @@ export async function setFormula(
       { kpiId, formula, on: today },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // The builder picks sources rather than typing a field, so whatever is
+    // refused is its sentence; a schema's too, which used to reach the error
+    // page (plan U1b).
+    const refused = refusedSentence(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath(`/kpis/${kpiId}`);
   revalidatePath("/kpis");

@@ -3,12 +3,26 @@
 /**
  * Naming a driver tree (S-18, METHOD.md §6.3, P3-T14).
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
+
+/**
+ * A refused write under the field it names, or as the form's sentence
+ * (guided-inputs §4.2). A schema's refusal too, which used to reach the
+ * error page. Anything else goes on to the error page.
+ */
+async function refused(error: unknown): Promise<WriteState> {
+  const state = refusedByField(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
 
 export async function addDriver(
   _previous: WriteState,
@@ -24,7 +38,14 @@ export async function addDriver(
   const treeId = String(formData.get("treeId") ?? "").trim();
   if (title === "" || parentKpiId === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.trees.actions.driverNeedsATitleAndParent") };
+    const message = t("kpis.trees.actions.driverNeedsATitleAndParent");
+    // Under the title when that is what is missing. The parent is the KPI
+    // the panel was opened under, a hidden field, so the panel says that
+    // one under the form.
+    return {
+      error: null,
+      fields: { [title === "" ? "title" : "parentKpiId"]: message },
+    };
   }
   const target = Number(targetRaw);
 
@@ -65,10 +86,7 @@ export async function addDriver(
       });
     }
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/kpis/trees");
   revalidatePath("/kpis");
@@ -83,7 +101,10 @@ export async function fileIntoTree(
   const treeId = String(formData.get("treeId") ?? "").trim();
   if (kpiId === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.trees.actions.pickAKpiToFile") };
+    return {
+      error: null,
+      fields: { kpiId: t("kpis.trees.actions.pickAKpiToFile") },
+    };
   }
   const { session, workspace } = await requireWorkspace();
   try {
@@ -97,10 +118,7 @@ export async function fileIntoTree(
       { kpiId, treeId: treeId === "" ? null : treeId },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/kpis/trees");
   return NO_ERROR;
@@ -113,7 +131,10 @@ export async function addTree(
   const name = String(formData.get("name") ?? "").trim();
   if (name === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.trees.actions.treeNeedsAName") };
+    return {
+      error: null,
+      fields: { name: t("kpis.trees.actions.treeNeedsAName") },
+    };
   }
   const { session, workspace } = await requireWorkspace();
   try {
@@ -127,10 +148,7 @@ export async function addTree(
       { name },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/kpis/trees");
   return NO_ERROR;

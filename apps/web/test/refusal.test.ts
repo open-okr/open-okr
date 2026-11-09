@@ -4,6 +4,7 @@ import {
   refusalFields,
   refusalOf,
   refusedByField,
+  refusedSentence,
   refusedState,
 } from "../lib/refusal.ts";
 
@@ -216,6 +217,29 @@ describe("what a form wrapped in RefusedFields gets back (plan U1b)", () => {
 
   it("is nothing for a failure", () => {
     expect(refusedByField(new Error("gone"), t)).toBe(null);
+  });
+});
+
+describe("a refusal for a control with no field (plan U1b)", () => {
+  it("is the sentence, a schema's in the catalogue's words", () => {
+    expect(
+      refusedSentence(
+        zodError([
+          {
+            code: "too_big",
+            origin: "number",
+            maximum: 100,
+            path: ["actualValue"],
+            message: "Too big: expected number to be <=100",
+          },
+        ]),
+        t,
+      ),
+    ).toEqual({ error: 'fields.atMost:{"max":100}' });
+    expect(
+      refusedSentence(new OperationError("forbidden", "Closed."), t),
+    ).toEqual({ error: "Closed." });
+    expect(refusedSentence(new Error("gone"), t)).toBe(null);
   });
 });
 

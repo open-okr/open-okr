@@ -188,6 +188,20 @@ export function refusedState(
 }
 
 /**
+ * A refused save as one sentence, for a control that draws no field to put a
+ * message under: a grid cell, a button, a builder (plan U1b). A schema's
+ * refusal is its first message, from the catalogue where Zod's own wording
+ * would name the schema. Null when the error was not a refusal.
+ */
+export function refusedSentence(
+  error: unknown,
+  t: Translate,
+): { readonly error: string } | null {
+  const refusal = refusalFields(error, t);
+  return refusal === null ? null : { error: refusal.message };
+}
+
+/**
  * What a form wrapped in `RefusedFields` gets back for a refused save
  * (guided-inputs §4.2, plan U1b): every field the refusal names, which the
  * kit fields inside show under themselves and the provider says under the
