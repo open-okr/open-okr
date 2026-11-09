@@ -5,6 +5,7 @@ import {
   resolvePractice,
 } from "@openokr/method";
 import {
+  KeyboardRegistryProvider,
   QueryClient,
   QueryClientProvider,
   ToastProvider,
@@ -143,27 +144,30 @@ async function render(options: {
     root.render(
       <QueryClientProvider client={client}>
         <TranslationsProvider locale="en">
-          <ToastProvider>
-            <OkrTable
-              initialTree={tree(options.keyResult)}
-              initialAt={Date.now()}
-              scope="all"
-              filters={{ includeClosed: false }}
-              spaces={[]}
-              cycleId="c"
-              level="team"
-              canEdit={options.canEdit ?? true}
-              canAdminister={options.canEdit ?? true}
-              progressMax={100}
-              members={[PRIYA, MEI]}
-              refusal={null}
-              coach={{
-                thresholds: canonThresholds(),
-                practice: options.practice ?? defaultPractice(),
-              }}
-              empty={<p>Nothing matches</p>}
-            />
-          </ToastProvider>
+          {/* The list registers its keys, as the app shell provides (U2). */}
+          <KeyboardRegistryProvider>
+            <ToastProvider>
+              <OkrTable
+                initialTree={tree(options.keyResult)}
+                initialAt={Date.now()}
+                scope="all"
+                filters={{ includeClosed: false }}
+                spaces={[]}
+                cycleId="c"
+                level="team"
+                canEdit={options.canEdit ?? true}
+                canAdminister={options.canEdit ?? true}
+                progressMax={100}
+                members={[PRIYA, MEI]}
+                refusal={null}
+                coach={{
+                  thresholds: canonThresholds(),
+                  practice: options.practice ?? defaultPractice(),
+                }}
+                empty={<p>Nothing matches</p>}
+              />
+            </ToastProvider>
+          </KeyboardRegistryProvider>
         </TranslationsProvider>
       </QueryClientProvider>,
     );
