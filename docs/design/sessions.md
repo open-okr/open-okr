@@ -68,6 +68,63 @@ scheduled -> skipped (when the Champion marks it missed)
 Transitions are facilitator-driven. The Champion opens and closes by default.
 A coordinator can override.
 
+**As built at 0.7.0 (A13): the Champion proposes, a person applies.** Akmal
+approved this on 9 November 2026 as proposals into the review queue. The
+Champion never changes a session's state. It attaches the change to the
+lifecycle message it already sends, and the person that message reaches applies
+or dismisses it on S-02. Applying runs `sessions.open` or `sessions.skip` as
+that person, through the action's own access check.
+
+| When | Message (§6.4, unchanged) | Proposal | Who decides |
+|---|---|---|---|
+| From the scheduled start until a day after it, still `scheduled` | `session.open` | `sessions.open` | The facilitator, or the space's coordinator where the session names none |
+| The day after that, still `scheduled` | `session.missed` | `sessions.skip` | The same person |
+| A running session left open | None | **None. Not built** | |
+
+Every number is already in `packages/method`: both windows are
+`sessionLifecycleStage`'s, which reads §11's `cadence.dueSoonLeadDays` and
+§6.4's "1 day after". The Champion's weekly cadence reads them every hour
+(`schedule.ts`, `:30`). Nothing new is configured.
+
+| Rule | Why |
+|---|---|
+| Weekly sessions only | This section is the weekly state machine. A monthly or quarterly review keeps its three messages and carries no proposal: opening one is the facilitator's, and skipping a review is not a decision the Champion offers |
+| One proposal per session per action, ever | The windows are a day wide and the cadence runs hourly, while the proposal path refuses only a second *pending* one. A dismissal is a decision about that session's step, so it is not asked again (`decidedSessionProposalsInTx`) |
+| The other proposal is settled when the session leaves `scheduled` | Opened or skipped, by hand or by applying a proposal, any other pending open or skip proposal on it is recorded as dismissed by whoever moved it, and the audit row names them (`settledProposalIds`). The same settling `kpis.recordResponse` does |
+| Sandbox commits nothing | The run is the Champion's ordinary run, so sandbox mode counts the proposal and rolls it back with every nudge |
+| Least privilege | The Champion reads sessions only in spaces it is bound to (`agentSeesSession`), at `view`. It needs no write grant, because it writes nothing to the session |
+| No provider needed | The proposal carries the session's id and nothing else, and is marked not AI-generated |
+
+**Why closing is not proposed.** A session left running has no message in the
+§6.4 catalogue: `session.open` and `session.missed` are about a session nobody
+opened, and `digest.weekly` comes after the close. A proposal to close needs a
+message to carry it to the facilitator, because a session has no access
+context of its own, so a proposal no nudge carries falls to workspace
+administrators (`mayDecideProposal`). A new message kind is a decision
+CLAUDE.md keeps for a human, and A13's approval covered the autonomy, not a new
+message. The open question is in the plan's build log: a `session.left_open`
+trigger, to the facilitator, once a running session passes its §11 length
+(`sessions.weeklyMinutes` upper bound for a weekly one), carrying
+`sessions.close`.
+
+Given / When / Then:
+- Given a weekly session whose start passed half an hour ago, when the
+  Champion's weekly cadence runs, then its facilitator's `session.open` carries
+  one pending, not AI-generated `sessions.open` proposal, the session is still
+  `scheduled`, and a second run in the window adds none.
+- Given that proposal, when the facilitator applies it, then the session is
+  `running`, the audit row names them, and the proposal is applied with them as
+  its decider.
+- Given that proposal dismissed, when the cadence runs again in the window,
+  then nothing new is proposed.
+- Given a weekly session nobody opened the day before, when the cadence runs,
+  then `session.missed` carries a `sessions.skip` proposal, and applying it
+  skips the session and settles the open proposal as dismissed.
+- Given the Champion in sandbox mode, when the cadence runs, then no proposal,
+  no nudge and no state change remain.
+- Given a monthly review at its hour, when the cadence runs, then
+  `session.open` is sent and nothing is proposed.
+
 ### 2.2 Stage 1: Confidence round
 
 Every key result in the space's active cycle gets a confidence from 0.0 to 1.0.

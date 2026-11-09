@@ -721,6 +721,7 @@ export const reviewInbox = defineReadAction({
             createdAt: proposedChanges.createdAt,
             goalTitle: goals.title,
             kpiTitle: kpis.title,
+            sessionTitle: okrSessions.title,
           })
           .from(proposedChanges)
           .leftJoin(
@@ -737,6 +738,15 @@ export const reviewInbox = defineReadAction({
               eq(proposedChanges.subjectType, "kpi"),
               eq(kpis.id, proposedChanges.subjectId),
               isNull(kpis.deletedAt),
+            ),
+          )
+          // A session the Champion proposes to open or skip (plan 0.7.0 A13).
+          .leftJoin(
+            okrSessions,
+            and(
+              eq(proposedChanges.subjectType, "session"),
+              eq(okrSessions.id, proposedChanges.subjectId),
+              isNull(okrSessions.deletedAt),
             ),
           )
           .where(
@@ -782,7 +792,7 @@ export const reviewInbox = defineReadAction({
             group: acknowledgementGroup(age, escalateAfter),
             title: proposalHeadline(
               row.action,
-              row.goalTitle ?? row.kpiTitle ?? null,
+              row.goalTitle ?? row.kpiTitle ?? row.sessionTitle ?? null,
             ),
             meta: `Agent proposal · ${publishedAgo(age)}`,
             dueLabel: acknowledgementDueLabel(age, escalateAfter),

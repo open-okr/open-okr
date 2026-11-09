@@ -5,12 +5,13 @@
  * opens and closes a session; the per-cycle run counts down to a publication
  * deadline and prepares a review.
  *
- * **Both are readers only.** Nothing here opens a session, closes a cycle or
- * writes a proposal. The Champion's autonomy is propose-and-approve, and the
- * only thing these produce is a nudge row carrying a rule key. §6.2's "opens
- * and closes the weekly session" in the sense of changing a session's state is
- * the facilitator's action in P4-T07a's own screen; what the agent does is say
- * that it is time, and say it once.
+ * **Both are readers only.** Nothing here opens a session or closes a cycle.
+ * The Champion's autonomy is propose-and-approve, and what these produce is a
+ * nudge row carrying a rule key. Since plan 0.7.0 A13 a weekly session's
+ * opening and missed messages also carry the change they ask for, as a
+ * proposal the recipient applies or dismisses in the review inbox; the run's
+ * own row writer records it. Changing the session's state is still a person's
+ * action, whether pressed on P4-T07a's screen or applied from the inbox.
  *
  * **Which day fires is not decided here.** Every threshold comes from
  * `packages/method/src/countdown.ts`, which takes a day count and a §11
@@ -45,6 +46,11 @@ import {
   parseLocalDate,
 } from "../cycles/generation.ts";
 import { OperationError } from "../operations/errors.ts";
+import {
+  decidedSessionProposalsInTx,
+  sessionProposalFor,
+  sessionProposalKey,
+} from "../sessions/lifecycle-proposals.ts";
 import { resolveCoordinator } from "../spaces/roles.ts";
 import type { DueNudge } from "./service.ts";
 import { urgentFor } from "./sweep.ts";
@@ -128,6 +134,12 @@ async function spaceCoordinator(
  * scheduled hour, and the one that says nobody opened it. Which of the three,
  * or none, is `sessionLifecycleStage`'s answer.
  *
+ * **Since plan 0.7.0 A13 two of them carry a proposal** on a weekly session:
+ * `session.open` offers `sessions.open` and `session.missed` offers
+ * `sessions.skip` (`sessions/lifecycle-proposals.ts`). The proposal is written
+ * only on an agent's run, which is the only caller that passes a run id, and
+ * never again once somebody has decided one for that session.
+ *
  * Every session kind, not only the weekly one. A monthly review or a quarterly
  * that nobody opened is the same lapse for the same reason, and §6.4's three
  * keys are named for the ritual rather than for its cadence.
@@ -159,6 +171,7 @@ export async function dueSessionNudges(
       scheduledFor: okrSessions.scheduledFor,
       state: okrSessions.state,
       facilitatorId: okrSessions.facilitatorId,
+      kind: okrSessions.kind,
     })
     .from(okrSessions)
     .where(
@@ -169,22 +182,30 @@ export async function dueSessionNudges(
       ),
     );
 
-  const due: DueNudge[] = [];
-  for (const session of rows) {
+  const staged = rows.flatMap((session) => {
     const hours =
       (session.scheduledFor.getTime() - input.now.getTime()) / MS_PER_HOUR;
     const stage = sessionLifecycleStage(hours, session.state, input.thresholds);
-    if (!stage) {
-      continue;
-    }
+    return stage ? [{ session, stage }] : [];
+  });
+  // Read once for the sessions that are due, not once per session.
+  const decided = await decidedSessionProposalsInTx(
+    tx,
+    input.workspaceId,
+    staged.map(({ session }) => session.id),
+  );
+
+  const due: DueNudge[] = [];
+  for (const { session, stage } of staged) {
     const recipient =
       session.facilitatorId ??
       (session.spaceId ? await spaceCoordinator(tx, session.spaceId) : null);
     if (!recipient) {
       continue;
     }
-    due.push(
-      nudge({
+    const action = sessionProposalFor(stage, session.kind);
+    due.push({
+      ...nudge({
         ruleKey: `session.${stage}`,
         subjectType: "session",
         subjectId: session.id,
@@ -199,7 +220,19 @@ export async function dueSessionNudges(
           recipient === session.facilitatorId,
         ),
       }),
-    );
+      // The payload is the session's id and nothing else, so applying it
+      // opens or skips the session as it stands then, as the person who
+      // applies it, through the action's own checks.
+      ...(action && !decided.has(sessionProposalKey(action, session.id))
+        ? {
+            proposal: {
+              action,
+              payload: { id: session.id },
+              aiGenerated: false,
+            },
+          }
+        : {}),
+    });
   }
   return due;
 }

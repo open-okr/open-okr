@@ -149,6 +149,7 @@ import {
 } from "../rich-text/schema.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
+import { settleSessionProposalsInTx } from "../sessions/lifecycle-proposals.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
 import {
@@ -1120,6 +1121,15 @@ export const openSession = defineWriteAction({
         })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
+      // The Champion's open and skip proposals on this session are answered
+      // now, whichever way it was opened (plan 0.7.0 A13).
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
+
       return {
         result: { id: input.id },
         /**
@@ -1153,6 +1163,9 @@ export const openSession = defineWriteAction({
           action: "sessions.open",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },
@@ -1549,6 +1562,14 @@ export const skipSession = defineWriteAction({
         .set({ state: "skipped", updatedAt: now })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
+      // The same settling as `sessions.open` (plan 0.7.0 A13).
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
+
       // Reset streak on skip (§7.4: a skipped week breaks it). Only the weekly
       // check-in's own skip: a skipped monthly review is not a skipped week
       // (completeness review M-04).
@@ -1585,6 +1606,9 @@ export const skipSession = defineWriteAction({
           action: "sessions.skip",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },

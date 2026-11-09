@@ -154,7 +154,8 @@ reads `access_bindings` back to assert the absence.
 
 Default: `propose` for recovery OKRs, check-in drafts, and any data write.
 Nudges and digests are notifications, not proposals (they do not write domain
-data).
+data). Since plan 0.7.0 A13 that includes opening and skipping a weekly
+session: §13.
 
 ## 3. The trigger catalogue
 
@@ -637,3 +638,42 @@ Given the Coach turned off, when the run is called, then it is refused.
 
 Given any Coach run with no provider configured, then its cost is zero and it
 writes no proposal.
+
+## 13. As built at 0.7.0 (A13): the Champion proposes opening and skipping sessions
+
+`sessions.md` §2.1 says the Champion opens and closes the weekly session.
+Akmal approved it on 9 November 2026 as proposals into the review queue, so the
+Champion's autonomy stays `propose` and it moves no session itself. Its weekly
+cadence already sends three lifecycle messages; two of them now carry the
+change they ask for.
+
+| Message | Window | Proposal | Payload |
+|---|---|---|---|
+| `session.open` | Scheduled start to a day after it, session still `scheduled` | `sessions.open` | `{ id }` |
+| `session.missed` | The day after that, still `scheduled` | `sessions.skip` | `{ id }` |
+| `session.due_soon` | The day before | None: opening early is not what the room booked | |
+
+| Piece | Where |
+|---|---|
+| Which message carries which proposal, weekly sessions only | `sessionProposalFor` in `packages/core/src/sessions/lifecycle-proposals.ts` |
+| Attaching it to the message | `dueSessionNudges` in `nudges/rituals.ts`, recorded by the ordinary `recordNudgesInTx` with the run's id |
+| Not asking again after a decision | `decidedSessionProposalsInTx`: one proposal per session per action, whatever became of it |
+| Settling the other one | `settleSessionProposalsInTx`, called by `sessions.open` and `sessions.skip`; the one being applied is left to `proposals.apply` |
+| The inbox row | `proposalHeadline`: "Open the session ..." and "Mark the session ... as skipped", with the session's title joined in `review.inbox` |
+
+**No new message, rule key, threshold or setting.** The windows are
+`sessionLifecycleStage`'s, unchanged since P4-T05b. The recipient is unchanged
+too: the facilitator, or the space's coordinator where the session names none.
+That recipient is who decides the proposal, because a session has no access
+context of its own (§11.2's first row).
+
+**Closing is not built.** No §6.4 message is about a session left running, and
+without a message a session proposal falls to workspace administrators. Adding
+one is a new proactive message kind, which is a human's decision. The question
+is recorded in the plan's build log and in `sessions.md` §2.1.
+
+### 13.1 Acceptance criteria
+
+The Given / When / Then list is `sessions.md` §2.1's. The tests are
+`packages/core/test/champion-session-proposals.test.ts` and
+`e2e/s02c-session-proposals.spec.ts`.
