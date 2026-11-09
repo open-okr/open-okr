@@ -97,6 +97,9 @@ const en = {
   "digest.reason.review": "To review",
   "digest.reason.invited": "Invitation",
   "digest.reason.role": "Role change",
+  "digest.reason.support_request": "Support request",
+  "digest.reason.support_ended": "Support ended",
+  "digest.reason.connection_ended": "Connection ended",
 
   "nudge.badge": "AGENT",
   "nudge.coach": "OKR Coach",
@@ -198,6 +201,9 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "digest.reason.review": "Untuk disemak",
   "digest.reason.invited": "Jemputan",
   "digest.reason.role": "Perubahan peranan",
+  "digest.reason.support_request": "Permintaan sokongan",
+  "digest.reason.support_ended": "Sokongan tamat",
+  "digest.reason.connection_ended": "Sambungan ditamatkan",
 
   "nudge.badge": "EJEN",
   "nudge.coach": "OKR Coach",

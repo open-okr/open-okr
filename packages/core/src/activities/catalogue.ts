@@ -56,6 +56,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     level: z.number(),
   }),
   "support.ended": z.object({ reason: z.string() }),
+  // Plan 0.7.0 P2: an operator asked. On the feed like the grant, without the
+  // reason, which may name an internal ticket (support-access.md §10 D10).
+  "support.requested": z.object({}),
   // Plan 0.7.0 B10: the limits card, or a cloud operator setting the two
   // limits that are the provider's.
   "workspace.limits_updated": z.object({ keys: z.array(z.string()) }),

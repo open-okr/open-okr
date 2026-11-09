@@ -50,6 +50,9 @@ const REASON_LABELS: Readonly<Record<string, string>> = {
   invited: "account.channels.reasonInvited",
   joined: "account.channels.reasonJoined",
   role: "account.channels.reasonRole",
+  support_request: "account.channels.reasonSupportRequest",
+  support_ended: "account.channels.reasonSupportEnded",
+  connection_ended: "account.channels.reasonConnectionEnded",
 };
 
 const CHOICES = [

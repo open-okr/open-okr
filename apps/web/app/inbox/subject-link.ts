@@ -35,6 +35,8 @@ const NAME_KEYS: Readonly<Record<string, string>> = {
   check_in: "inbox.subject.checkIn",
   member: "inbox.subject.member",
   workspace: "inbox.subject.workspace",
+  support_session: "inbox.subject.supportSession",
+  agent_connection: "inbox.subject.agentConnection",
 };
 
 /** The key for a subject type's heading, or null for a type with no word. */
@@ -61,6 +63,9 @@ export const REASON_FALLBACK_KEYS: Readonly<Record<string, string>> = {
   mentioned: "inbox.fallback.mentioned",
   joined: "inbox.fallback.joined",
   role: "inbox.fallback.role",
+  support_request: "inbox.fallback.supportRequest",
+  support_ended: "inbox.fallback.supportEnded",
+  connection_ended: "inbox.fallback.connectionEnded",
 };
 
 export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
@@ -70,4 +75,7 @@ export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
   role: "inbox.reason.role",
   review: "inbox.reason.review",
   check_in: "inbox.reason.checkIn",
+  support_request: "inbox.reason.supportRequest",
+  support_ended: "inbox.reason.supportEnded",
+  connection_ended: "inbox.reason.connectionEnded",
 };

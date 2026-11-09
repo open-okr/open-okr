@@ -19,6 +19,14 @@ const asCount = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
 /** §8.8's five decisions as a feed line says them (P9-T20e-a). */
+/** How a support session ended, in words (support-access.md §10.3). */
+const SUPPORT_END_WORDS: Readonly<Record<string, string>> = {
+  expired: "the time ran out",
+  revoked: "revoked by a member",
+  finished: "finished by support",
+  refused: "refused",
+};
+
 const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
   achieved: "nothing left to carry",
   keep: "a decision to keep it",
@@ -38,7 +46,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "support.granted": (p) =>
     `Support access granted for ${asCount(p.hours)} hours`,
-  "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
+  "support.ended": (p) =>
+    `Support access ended: ${SUPPORT_END_WORDS[asString(p.reason)] ?? asString(p.reason)}`,
+  "support.requested": () => "Support asked to enter this workspace",
   "workspace.limits_updated": () => "Workspace limits changed",
   "workspace.erasure_reminded": (p) =>
     `The owners and administrators were reminded that the workspace is deleted on ${asString(p.eraseOn).slice(0, 10)}`,

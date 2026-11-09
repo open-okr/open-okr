@@ -201,6 +201,14 @@ const REASON_SUMMARIES: Readonly<Record<string, string>> = {
   role: "Your role changed.",
   review: "A check-in is waiting on your review.",
   check_in: "A reminder is waiting for you.",
+  // Plan 0.7.0. Never the request's reason, which may name an internal
+  // ticket and mail leaves the instance (support-access.md §10 D10).
+  support_request:
+    "Support asked to enter this workspace. Answer it on Admin, Support.",
+  support_ended:
+    "A support session in this workspace ended. See how, and what was done, on Admin, Support.",
+  connection_ended:
+    "An administrator ended one of your agent connections. Your Connections page says which.",
 };
 
 /**

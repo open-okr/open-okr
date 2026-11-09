@@ -34,6 +34,11 @@ const REASON_WORDS: Record<string, string> = {
   role: "watchControl.becauseRole",
   review: "watchControl.becauseReview",
   check_in: "watchControl.becauseCheckIn",
+  // Plan 0.7.0. Inbox reasons rather than subscriptions: nothing subscribes a
+  // member with them, but every reason the table stores has its words here.
+  support_request: "watchControl.becauseSupport",
+  support_ended: "watchControl.becauseSupport",
+  connection_ended: "watchControl.becauseConnection",
 };
 
 /** A reason a member should think twice about switching off. */

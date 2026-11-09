@@ -42,6 +42,12 @@ const RECOVERY_ACTIONS: ReadonlySet<string> = new Set([
   // row, an activity and the audit row, and changes no workspace content.
   // Approved by Akmal on 9 November 2026.
   "workspace.exportArchive",
+  // Ending a support session (support-access.md §10 D7, plan 0.7.0 P2).
+  // Ending somebody's access is recovery: in a suspended workspace the
+  // owner's revoke failed silently and the expiry sweep threw on it. The
+  // request and the grant stay off this list, so neither reaches a workspace
+  // that is not active.
+  "support.end",
 ]);
 
 // `billing.` since docs/design/billing.md: paying again is how a workspace billing made

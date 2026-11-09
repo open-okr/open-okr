@@ -93,6 +93,9 @@ const REASON_WORDS: Readonly<Record<string, MailWordKey>> = {
   review: "digest.reason.review",
   invited: "digest.reason.invited",
   role: "digest.reason.role",
+  support_request: "digest.reason.support_request",
+  support_ended: "digest.reason.support_ended",
+  connection_ended: "digest.reason.connection_ended",
 };
 
 /** One digest line as a row: its reason as a chip, who did it, where to go. */
