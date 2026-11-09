@@ -13686,9 +13686,9 @@
         ]
       }
     },
-    "/workspace/archiveHistory": {
+    "/workspace/listArchives": {
       "get": {
-        "operationId": "workspace.archiveHistory",
+        "operationId": "workspace.listArchives",
         "summary": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
         "tags": [
           "workspace"

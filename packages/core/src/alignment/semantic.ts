@@ -22,7 +22,7 @@
  * vanish.
  */
 import { activeOnly, goals, keyResults, spaces } from "@openokr/db";
-import { eq, isNull } from "drizzle-orm";
+import { asc, eq, isNull } from "drizzle-orm";
 import type { AgentDrafter, ReviewableGoal } from "../agents/drafter.ts";
 import { type AgentScope, agentSeesGoal } from "../agents/scope.ts";
 import type { OperationTx } from "../operations/operation.ts";
@@ -83,7 +83,10 @@ export async function sweepSemanticInTx(
         isNull(goals.closedAt),
         input.scope ? agentSeesGoal(input.scope) : undefined,
       ),
-    );
+    )
+    // The model answers by position in this list, so the list has one order.
+    // Without it Postgres returns heap order, which an update to a goal moves.
+    .orderBy(asc(goals.createdAt), asc(goals.id));
 
   // One goal cannot conflict with itself, and a review of one goal is what the
   // Draft Coach already does inline as somebody types.

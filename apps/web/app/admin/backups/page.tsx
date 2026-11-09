@@ -35,7 +35,7 @@ export default async function BackupsPage() {
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const [history, cloud, supportEmail] = await Promise.all([
-    callAction(context, "workspace.archiveHistory", {}),
+    callAction(context, "workspace.listArchives", {}),
     isCloudEnabled(pool),
     resolveSupportEmail(pool),
   ]);

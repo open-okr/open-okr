@@ -2098,7 +2098,7 @@
       }
     },
     {
-      "name": "workspace.archiveHistory",
+      "name": "workspace.listArchives",
       "description": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
       "inputSchema": {
         "type": "object",
@@ -4310,7 +4310,8 @@
                   "null"
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -5252,7 +5253,8 @@
                   }
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -6593,7 +6595,8 @@
                   "null"
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -7486,7 +7489,8 @@
                   "null"
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -8123,7 +8127,8 @@
                   "null"
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -9451,7 +9456,8 @@
                 "boolean",
                 "null"
               ]
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -9559,7 +9565,8 @@
                 "boolean",
                 "null"
               ]
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -11756,7 +11763,8 @@
                   "null"
                 ]
               }
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [

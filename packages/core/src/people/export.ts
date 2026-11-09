@@ -371,6 +371,21 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     column: "to_member_id",
     label: "Kudos you received",
   },
+  {
+    // Plan 0.7.0 D5 (docs/design/outbound-webhooks.md W1).
+    table: "webhooks",
+    column: "owner_member_id",
+    skip: "structural",
+    because:
+      "Being named a hook's owner is a role: whose access decides what it delivers. The hook belongs to the workspace.",
+  },
+  {
+    table: "webhooks",
+    column: "created_by_member_id",
+    skip: "workspace_record",
+    because:
+      "A workspace's outbound hook, set up by an administrator for the workspace, holding a sealed signing secret. Not personal data.",
+  },
 ];
 
 /** One table's rows, as the export carries them. Internal, like SkipReason. */

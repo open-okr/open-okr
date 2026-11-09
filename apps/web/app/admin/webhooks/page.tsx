@@ -25,6 +25,13 @@ import {
   updateWebhookAction,
   webhookCommandAction,
 } from "./actions.ts";
+import {
+  eventLabel,
+  groupLabel,
+  offReasonLabel,
+  outcomeLabel,
+  stateLabel,
+} from "./labels";
 import { WebhookForm } from "./webhook-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminWebhooks");
@@ -67,7 +74,7 @@ function EventsField({
         {WEBHOOK_EVENT_GROUPS.map((group) => (
           <fieldset key={group.key} className="flex flex-col gap-1">
             <legend className="text-xs font-semibold text-ink-3">
-              {t(`admin.webhooks.group.${group.key}`)}
+              {groupLabel(t, group.key)}
             </legend>
             {group.events.map((event) => (
               <label
@@ -81,7 +88,7 @@ function EventsField({
                   defaultChecked={checked.includes(event)}
                   className="size-4"
                 />
-                {t(`admin.webhooks.event.${event}`)}
+                {eventLabel(t, event)}
               </label>
             ))}
           </fieldset>
@@ -178,8 +185,8 @@ export default async function AdminWebhooksPage({
     name: space.name,
   }));
 
-  const stateLabel = (hook: (typeof webhooks)[number]) =>
-    t(`admin.webhooks.state.${hook.state}`);
+  const stateOf = (hook: (typeof webhooks)[number]) =>
+    stateLabel(t, hook.state);
   const offWhy = (hook: (typeof webhooks)[number]) =>
     hook.state === "paused"
       ? t("admin.webhooks.pausedWhy", { owner: hook.owner.name })
@@ -188,7 +195,7 @@ export default async function AdminWebhooksPage({
             count: FAILURES_BEFORE_OFF,
           })
         : hook.offReason
-          ? t(`admin.webhooks.offReason.${hook.offReason}`)
+          ? offReasonLabel(t, hook.offReason)
           : null;
 
   return (
@@ -207,7 +214,7 @@ export default async function AdminWebhooksPage({
                 <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold text-ink">
                   {selected.name}
                   <Chip tone={STATE_TONE[selected.state]}>
-                    {stateLabel(selected)}
+                    {stateOf(selected)}
                   </Chip>
                 </h1>
                 <p className="text-xs text-ink-3">
@@ -305,7 +312,7 @@ export default async function AdminWebhooksPage({
                     >
                       <span className="flex flex-wrap items-center gap-2 text-sm text-ink">
                         <span className="font-medium">
-                          {t(`admin.webhooks.event.${item.event}`)}
+                          {eventLabel(t, item.event)}
                         </span>
                         <Chip
                           tone={
@@ -316,7 +323,7 @@ export default async function AdminWebhooksPage({
                                 : "bad"
                           }
                         >
-                          {t(`admin.webhooks.outcome.${item.outcome}`)}
+                          {outcomeLabel(t, item.outcome)}
                           {item.statusCode === null
                             ? ""
                             : ` ${item.statusCode}`}
@@ -434,7 +441,7 @@ export default async function AdminWebhooksPage({
                           {hook.name}
                         </Link>
                         <Chip tone={STATE_TONE[hook.state]}>
-                          {stateLabel(hook)}
+                          {stateOf(hook)}
                         </Chip>
                         <span className="text-xs font-normal text-ink-3">
                           {hook.host}
@@ -443,21 +450,25 @@ export default async function AdminWebhooksPage({
                       <span className="flex flex-wrap gap-1">
                         {hook.events.map((event) => (
                           <Chip key={event} tone="neutral">
-                            {t(`admin.webhooks.event.${event}`)}
+                            {eventLabel(t, event)}
                           </Chip>
                         ))}
                       </span>
-                      <span className="text-xs text-ink-3">
-                        {t("admin.webhooks.owner", { name: hook.owner.name })}
-                        {" · "}
-                        {hook.lastDelivery
-                          ? t("admin.webhooks.lastDelivery", {
-                              outcome: t(
-                                `admin.webhooks.outcome.${hook.lastDelivery.outcome}`,
-                              ),
-                              when: when(hook.lastDelivery.at),
-                            })
-                          : t("admin.webhooks.noDelivery")}
+                      <span className="flex flex-wrap gap-x-3 text-xs text-ink-3">
+                        <span>
+                          {t("admin.webhooks.owner", { name: hook.owner.name })}
+                        </span>
+                        <span>
+                          {hook.lastDelivery
+                            ? t("admin.webhooks.lastDelivery", {
+                                outcome: outcomeLabel(
+                                  t,
+                                  hook.lastDelivery.outcome,
+                                ),
+                                when: when(hook.lastDelivery.at),
+                              })
+                            : t("admin.webhooks.noDelivery")}
+                        </span>
                       </span>
                       {offWhy(hook) ? (
                         <span className="text-xs text-ink-2">

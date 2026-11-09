@@ -440,7 +440,7 @@ function readArchiveWith(bytes: Buffer) {
  * administrator's, newest first, so somebody taking the whole workspace is
  * something the others can see without searching the audit log.
  */
-describe("workspace.archiveHistory", () => {
+describe("workspace.listArchives", () => {
   const context = (userId = OWNER) => ({
     pool,
     workspaceId,
@@ -463,7 +463,7 @@ describe("workspace.archiveHistory", () => {
       [first.runId],
     );
 
-    const history = await callAction(context(), "workspace.archiveHistory", {});
+    const history = await callAction(context(), "workspace.listArchives", {});
 
     expect(history.archives.map((row) => row.id)).toEqual([
       second.runId,
@@ -484,7 +484,7 @@ describe("workspace.archiveHistory", () => {
          from workspace_members where workspace_id = $1 and user_id = $2`,
       [workspaceId, OWNER],
     );
-    const history = await callAction(context(), "workspace.archiveHistory", {});
+    const history = await callAction(context(), "workspace.listArchives", {});
     expect(history.archives).toEqual([]);
   });
 
@@ -501,7 +501,7 @@ describe("workspace.archiveHistory", () => {
       [workspaceId, VIEWER],
     );
     await expect(
-      callAction(context(VIEWER), "workspace.archiveHistory", {}),
+      callAction(context(VIEWER), "workspace.listArchives", {}),
     ).rejects.toThrow();
   });
 });

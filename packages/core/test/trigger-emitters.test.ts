@@ -25,6 +25,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     "emitted by dueSessionNudges in nudges/rituals.ts, which builds the key from sessionLifecycleStage's answer",
   "session.missed":
     "emitted by dueSessionNudges in nudges/rituals.ts, which builds the key from sessionLifecycleStage's answer",
+  "session.left_open":
+    "emitted by dueSessionNudges in nudges/rituals.ts, which builds the key from sessionLeftOpen's answer (plan 0.7.0 A13)",
   "quality.draft_failing":
     "not a nudge row: §6.4 addresses it to the author, inline, and the Draft Coach shows it as they type",
   "quality.gate_blocked":

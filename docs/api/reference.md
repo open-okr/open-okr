@@ -720,12 +720,12 @@ the machine-readable document.
 
 | Action | Method and path | Class |
 |---|---|---|
-| `workspace.archiveHistory`<br/>Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept. | `GET /api/v1/workspace/archiveHistory` | reads |
 | `workspace.changePlan`<br/>Refused for a workspace's own members. A plan changes through billing, or through the instance's operator. | `POST /api/v1/workspace/changePlan` | writes |
 | `workspace.deletedItems`<br/>The goals, initiatives, tasks and documents that were deleted and that the caller could restore, newest first, with who deleted each. | `GET /api/v1/workspace/deletedItems` | reads |
 | `workspace.exportArchive`<br/>Exports the whole workspace as a versioned, checksummed, encrypted archive. Audited. | `POST /api/v1/workspace/exportArchive` | writes |
 | `workspace.finishOnboarding`<br/>Mark the workspace's own setup as finished, so the wizard stops offering itself. | `POST /api/v1/workspace/finishOnboarding` | writes |
 | `workspace.importArchive`<br/>Imports a workspace from an encrypted archive, with a dry-run mode that predicts the real import. | `POST /api/v1/workspace/importArchive` | writes |
+| `workspace.listArchives`<br/>Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept. | `GET /api/v1/workspace/listArchives` | reads |
 | `workspace.overview`<br/>The current workspace and the member reading it. | `GET /api/v1/workspace/overview` | reads |
 | `workspace.provision`<br/>Start a workspace of your own, where sign-up is open to you. Refused under an invitation-only policy. | `POST /api/v1/workspace/provision` | writes |
 | `workspace.rename`<br/>Change a workspace's display name. | `POST /api/v1/workspace/rename` | writes |

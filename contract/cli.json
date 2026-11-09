@@ -2370,10 +2370,10 @@
       "pages": false
     },
     {
-      "name": "workspace archiveHistory",
-      "action": "workspace.archiveHistory",
+      "name": "workspace listArchives",
+      "action": "workspace.listArchives",
       "method": "GET",
-      "path": "/workspace/archiveHistory",
+      "path": "/workspace/listArchives",
       "scope": "read",
       "summary": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
       "flags": [],

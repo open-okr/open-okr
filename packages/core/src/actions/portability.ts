@@ -279,8 +279,8 @@ const ARCHIVE_HISTORY_LIMIT = 50;
  * the audit log. `full`, the level the archive itself needs. The file is not
  * kept, so this is a record of what was taken, never a way to take it again.
  */
-export const archiveHistory = defineReadAction({
-  name: "workspace.archiveHistory",
+export const listArchives = defineReadAction({
+  name: "workspace.listArchives",
   summary:
     "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
   input: z.object({}),

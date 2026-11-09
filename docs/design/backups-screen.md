@@ -35,7 +35,7 @@ Authority: REQUIREMENTS §4 Pillar F ("backups" in Admin) and §7's reliability 
 |---|---|---|
 | U1 | **A Backups section at `/admin/backups`**, `full` access, on every instance | S-36 lists it. `full` because the archive is the whole workspace (`portability.ts` says why) |
 | U2 | **First card: the workspace archive.** The existing export card moves here from Import and export, which keeps list exports and the archive import and links here | One place to take a copy. Two doors to one action would drift |
-| U3 | **Second card: archives taken.** Every `archive` run in the workspace, newest first, the last 50: who, when, the filename, the rows it held. A new read action, `workspace.archiveHistory`, at `full`, in the agent catalogue's admin toolset beside the export | Every administrator's, not only the reader's: somebody taking the whole workspace is something the others should be able to see without searching the audit log. It says the file itself is not kept, so it cannot be downloaded again |
+| U3 | **Second card: archives taken.** Every `archive` run in the workspace, newest first, the last 50: who, when, the filename, the rows it held. A new read action, `workspace.listArchives`, at `full`, in the agent catalogue's admin toolset beside the export | Every administrator's, not only the reader's: somebody taking the whole workspace is something the others should be able to see without searching the audit log. It says the file itself is not kept, so it cannot be downloaded again |
 | U4 | **Third card: restoring.** Words and links, no button. A copy is restored into a new, empty workspace through the archive import, and the cutover runbook is the procedure | Importing into the same workspace duplicates it (§0). A button that did that would be a trap |
 | U5 | **Fourth card: this instance's backups, self-hosted.** Says the server's operator takes them with `./openokr backup` or the chart's backup job, that each holds every workspace, and links to `docs/runbooks/restore.md`. No status | The application never sees a backup, so any status here would be invented. Q1 asks whether to change that |
 | U6 | **The same card on a cloud** says the provider backs up the service, and links `instance.supportEmail` when it is set. Nothing else about the provider's backups | How a provider keeps backups is theirs to state in their terms, not this screen's |
@@ -61,7 +61,7 @@ Authority: REQUIREMENTS §4 Pillar F ("backups" in Admin) and §7's reliability 
 
 | Kind | File | Covers |
 |---|---|---|
-| Integration | `packages/core/test/portability-archive.test.ts` (existing) | `workspace.archiveHistory`: every administrator's runs, `full` only, list exports excluded |
+| Integration | `packages/core/test/portability-archive.test.ts` (existing) | `workspace.listArchives`: every administrator's runs, `full` only, list exports excluded |
 | Browser | `e2e/s36r-backups.spec.ts` (new) | The four cards, taking an archive, the history row, the empty state |
 | Browser | `e2e/s36j-workspace-archive.spec.ts` (existing) | Moves to the Backups page |
 | Browser | `e2e/s43-accessibility.spec.ts` (existing) | Scans the new screen by itself, because its list walks `apps/web/app` |
@@ -71,7 +71,7 @@ Authority: REQUIREMENTS §4 Pillar F ("backups" in Admin) and §7's reliability 
 - UIUX-PLAN S-36: Backups as its own section with the four cards; "workspace export" points there.
 - `docs/admin/operations.md`: what Backups shows and how restoring works for a workspace.
 - `docs/runbooks/restore.md`: one line saying workspace administrators see no instance backup.
-- The contract artifacts, regenerated for `workspace.archiveHistory`.
+- The contract artifacts, regenerated for `workspace.listArchives`.
 - `packages/ui/src/i18n/messages/en.json` and `ms.json`.
 
 ## 7. What this does not do

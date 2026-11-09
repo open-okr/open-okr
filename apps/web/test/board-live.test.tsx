@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { TranslationsProvider } from "@openokr/ui";
+import { KeyboardRegistryProvider, TranslationsProvider } from "@openokr/ui";
 import type { ReactNode } from "react";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -124,12 +124,15 @@ const render = async (
   await act(async () => {
     root.render(
       <TranslationsProvider locale="en">
-        <Board
-          scope={props.scope ?? { kind: "space", id: SPACE }}
-          columns={COLUMNS}
-          canEdit={props.canEdit ?? true}
-          onMove={onMove}
-        />
+        {/* The board registers j and k, as the app shell provides (U2). */}
+        <KeyboardRegistryProvider>
+          <Board
+            scope={props.scope ?? { kind: "space", id: SPACE }}
+            columns={COLUMNS}
+            canEdit={props.canEdit ?? true}
+            onMove={onMove}
+          />
+        </KeyboardRegistryProvider>
       </TranslationsProvider>,
     );
   });

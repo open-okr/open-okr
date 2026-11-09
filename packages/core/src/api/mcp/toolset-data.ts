@@ -318,7 +318,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "blobs.claimUpload",
     "blobs.getForDownload",
     "workspace.exportArchive",
-    "workspace.archiveHistory",
+    "workspace.listArchives",
     "workspace.importArchive",
     "audit.export",
     "audit.verify",

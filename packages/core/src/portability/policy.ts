@@ -203,7 +203,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "alignment_scores",
     decision: "exclude",
     reason:
-      "The stored alignment score, a projection of the goals beside it. The import's own writes and the hourly fill store it again (alignment-engine.md §10).",
+      "The stored alignment score, a projection of the goals beside it. The import's own writes and the hourly fill store it again.",
   },
 
   // ── Identity, sessions and credentials ───────────────────────────────

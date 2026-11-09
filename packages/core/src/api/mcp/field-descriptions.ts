@@ -117,6 +117,7 @@ const FIELDS: Readonly<Record<string, string>> = {
   nextAction:
     "The next concrete step that would unblock it, due by the goal's next check-in.",
   keyResults: "The key results, in order. Verdicts refer to them by index.",
+  read: "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check.",
 };
 
 /** The description for one field of one tool, or null when there is none. */
