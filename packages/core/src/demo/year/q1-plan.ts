@@ -815,8 +815,11 @@ export const Q1_PLAN_EVENTS: readonly YearEvent[] = [
         },
       );
       context.ids.dependencies.set("P1.1-engineering", onboarding.id);
+      // Mei names what Engineering delivers as she confirms (plan 0.7.0 O5),
+      // so NW-Q1-20 reads the dependency as delivered once E3.1 is done.
       await callAction(context.action, "goals.confirmDependency", {
         id: onboarding.id,
+        providerKeyResultId: need(context.ids.keyResults, "E3.1", "Key result"),
       });
       const deflection = await callAction(
         context.action,

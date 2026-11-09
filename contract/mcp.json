@@ -10152,6 +10152,10 @@
             "type": "string",
             "maxLength": 200
           },
+          "providerKeyResultId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "note": {
             "type": "string",
             "maxLength": 500,
@@ -10178,7 +10182,7 @@
     },
     {
       "name": "goals.confirmDependency",
-      "description": "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
+      "description": "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10186,6 +10190,10 @@
             "type": "string",
             "format": "uuid",
             "description": "The goal's id, from goals.list, goals.due or goals.tree."
+          },
+          "providerKeyResultId": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -10240,6 +10248,45 @@
       "example": {
         "id": "00000000-0000-4000-8000-000000000000",
         "memberId": {}
+      }
+    },
+    {
+      "name": "goals.setDependencyProvider",
+      "description": "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+          },
+          "providerKeyResultId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "providerKeyResultId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "providerKeyResultId": {}
       }
     },
     {

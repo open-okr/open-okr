@@ -1124,6 +1124,305 @@ describe("the dependency register", () => {
   });
 });
 
+/**
+ * The key result that delivers a dependency (plan 0.7.0 O5, design
+ * `key-result-dependencies.md` K1 to K5 and K10).
+ */
+describe("naming the key result that delivers a dependency", () => {
+  const call = async (name: string, input: object, userId = OWNER) => {
+    const wb = await workerDb();
+    return callAction(
+      { pool: wb.appPool, ...context(userId) },
+      name as never,
+      input as never,
+    ) as Promise<never>;
+  };
+  type Entry = {
+    id: string;
+    provider: string;
+    providerSpaceId: string | null;
+    confirmed: boolean;
+    blocksPublish: boolean;
+    providerKeyResult: {
+      id: string;
+      title: string | null;
+      state: string;
+    } | null;
+  };
+  const entry = async (id: string): Promise<Entry | undefined> =>
+    ((await read()).register as unknown as Entry[]).find(
+      (one) => one.id === id,
+    );
+  const stored = async (id: string) => {
+    const wb = await workerDb();
+    return (
+      await wb.admin.query<{
+        provider_key_result_id: string | null;
+        provider_space_id: string | null;
+        confirmed: boolean;
+        confirmed_by_id: string | null;
+      }>(
+        `select provider_key_result_id, provider_space_id, confirmed, confirmed_by_id
+           from key_result_dependencies where id = $1`,
+        [id],
+      )
+    ).rows[0];
+  };
+  const gate4 = async () =>
+    (
+      (await call("workflow.read", { cycleId })) as {
+        gates: { passed: boolean }[];
+      }
+    ).gates[3]?.passed;
+
+  /** A depending key result in Revenue and two providing ones in Product. */
+  const setUp = async () => {
+    const depending = await keyResultOf(
+      await makeGoal({
+        title: "Onboarding runs without us in the room",
+        level: "department",
+        spaceId: spaceA,
+      }),
+    );
+    const providingGoal = await makeGoal({
+      title: "New accounts bring their data in one step",
+      level: "department",
+      spaceId: spaceB,
+    });
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string; title: string }>(
+      "select id, title from key_results where goal_id = $1 order by position, created_at",
+      [providingGoal],
+    );
+    return {
+      depending,
+      providingGoal,
+      first: rows[0] as { id: string; title: string },
+      second: rows[1] as { id: string; title: string },
+    };
+  };
+
+  it("names it on add, and takes the providing space from its goal", async () => {
+    const { depending, first } = await setUp();
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerKeyResultId: first.id,
+    })) as { id: string; blocksPublish: boolean };
+    expect(added.blocksPublish).toBe(true);
+
+    expect(await stored(added.id)).toMatchObject({
+      provider_key_result_id: first.id,
+      provider_space_id: spaceB,
+    });
+    expect(await entry(added.id)).toMatchObject({
+      provider: "Product",
+      providerSpaceId: spaceB,
+      providerKeyResult: { id: first.id, title: first.title, state: "pending" },
+    });
+  });
+
+  it("refuses a providing space that is not the key result's own", async () => {
+    const { depending, first } = await setUp();
+    await expect(
+      call("goals.addKeyResultDependency", {
+        keyResultId: depending,
+        providerSpaceId: spaceA,
+        providerKeyResultId: first.id,
+      }),
+    ).rejects.toThrow(/belongs to Product/);
+  });
+
+  it("refuses a key result in a personal or a company goal, saying a provider must be a team's", async () => {
+    const { depending } = await setUp();
+    // The default cycle uses no individual level, so a member's own goal sits
+    // at team level here; what matters is that no space owns it.
+    const personal = (await call("goals.create", {
+      title: "Learn the import pipeline",
+      cycleId,
+      level: "team",
+      ownerKind: "member",
+      memberId: ownerMemberId,
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+    })) as { id: string };
+    const company = await makeGoal({
+      title: "Become the default supplier",
+      level: "company",
+    });
+    for (const goalId of [personal.id, company]) {
+      const keyResult = (await call("goals.addKeyResult", {
+        goalId,
+        title: "Finish the course",
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 1,
+        weight: 1,
+      })) as { id: string };
+      await expect(
+        call("goals.addKeyResultDependency", {
+          keyResultId: depending,
+          providerKeyResultId: keyResult.id,
+        }),
+      ).rejects.toThrow(/a team's key result/);
+    }
+  });
+
+  it("refuses the depending key result itself, and so does the database", async () => {
+    const { depending } = await setUp();
+    await expect(
+      call("goals.addKeyResultDependency", {
+        keyResultId: depending,
+        providerKeyResultId: depending,
+      }),
+    ).rejects.toThrow(/cannot deliver its own dependency/);
+
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerSpaceId: spaceB,
+    })) as { id: string };
+    const wb = await workerDb();
+    await expect(
+      wb.admin.query(
+        "update key_result_dependencies set provider_key_result_id = key_result_id where id = $1",
+        [added.id],
+      ),
+    ).rejects.toThrow(/key_result_dependencies_provider_is_another/);
+  });
+
+  it("names one later, and clears it to none", async () => {
+    const { depending, first } = await setUp();
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerSpaceId: spaceB,
+    })) as { id: string };
+    expect((await entry(added.id))?.providerKeyResult).toBeNull();
+
+    await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    });
+    expect((await entry(added.id))?.providerKeyResult?.id).toBe(first.id);
+
+    await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: null,
+    });
+    expect((await entry(added.id))?.providerKeyResult).toBeNull();
+    // The team stays named: clearing the key result is not clearing who
+    // provides.
+    expect((await stored(added.id))?.provider_space_id).toBe(spaceB);
+  });
+
+  it("is named by the providing team as it confirms, and only from its own space", async () => {
+    const { depending, first } = await setUp();
+    const elsewhere = await makeGoal({
+      title: "Win two logos a quarter",
+      level: "department",
+      spaceId: spaceA,
+    });
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerSpaceId: spaceB,
+    })) as { id: string };
+
+    await expect(
+      call("goals.confirmDependency", {
+        id: added.id,
+        providerKeyResultId: await keyResultOf(elsewhere),
+      }),
+    ).rejects.toThrow(/key result of Product/);
+    expect((await stored(added.id))?.confirmed).toBe(false);
+
+    const confirmed = (await call("goals.confirmDependency", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    })) as { confirmed: boolean };
+    expect(confirmed.confirmed).toBe(true);
+    expect(await stored(added.id)).toMatchObject({
+      provider_key_result_id: first.id,
+      confirmed: true,
+      confirmed_by_id: ownerMemberId,
+    });
+  });
+
+  it("clears the confirmation when a different key result is named, and gate 4 says so", async () => {
+    const { depending, first, second } = await setUp();
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerSpaceId: spaceB,
+    })) as { id: string };
+    await call("goals.confirmDependency", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    });
+    expect(await gate4()).toBe(true);
+
+    const changed = (await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: second.id,
+    })) as { confirmed: boolean; blocksPublish: boolean };
+    expect(changed).toMatchObject({ confirmed: false, blocksPublish: true });
+    expect(await stored(added.id)).toMatchObject({
+      provider_key_result_id: second.id,
+      confirmed: false,
+      confirmed_by_id: null,
+    });
+    expect(await gate4()).toBe(false);
+
+    // A risk owner holds it, so the change leaves gate 4 green.
+    await call("goals.setDependencyRiskOwner", {
+      id: added.id,
+      memberId: ownerMemberId,
+    });
+    const back = (await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    })) as { confirmed: boolean; blocksPublish: boolean };
+    expect(back).toMatchObject({ confirmed: false, blocksPublish: false });
+  });
+
+  it("keeps the confirmation when the key result is cleared, or named again as it was", async () => {
+    const { depending, first } = await setUp();
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerSpaceId: spaceB,
+    })) as { id: string };
+    await call("goals.confirmDependency", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    });
+
+    const same = (await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: first.id,
+    })) as { confirmed: boolean };
+    expect(same.confirmed).toBe(true);
+
+    const cleared = (await call("goals.setDependencyProvider", {
+      id: added.id,
+      providerKeyResultId: null,
+    })) as { confirmed: boolean; blocksPublish: boolean };
+    expect(cleared).toMatchObject({ confirmed: true, blocksPublish: false });
+    expect((await stored(added.id))?.confirmed).toBe(true);
+  });
+
+  it("settles nothing by delivering: gate 4 stays red for a delivered entry nobody confirmed or owns", async () => {
+    const { depending, first } = await setUp();
+    const added = (await call("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerKeyResultId: first.id,
+    })) as { id: string };
+    await call("goals.recordValue", { id: first.id, value: 100 });
+
+    expect(await entry(added.id)).toMatchObject({
+      blocksPublish: true,
+      providerKeyResult: { state: "delivered" },
+    });
+    expect(await gate4()).toBe(false);
+  });
+});
+
 describe("horizontal links", () => {
   it("are stored once, whichever way round they are asked for", async () => {
     const first = await makeGoal({

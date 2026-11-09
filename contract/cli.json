@@ -8417,6 +8417,12 @@
           "required": false
         },
         {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "note",
           "field": "note",
           "type": "string",
@@ -8437,13 +8443,19 @@
       "method": "POST",
       "path": "/goals/confirmDependency",
       "scope": "write",
-      "summary": "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
+      "summary": "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
       "flags": [
         {
           "name": "id",
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -8465,6 +8477,29 @@
         {
           "name": "member-id",
           "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals setDependencyProvider",
+      "action": "goals.setDependencyProvider",
+      "method": "POST",
+      "path": "/goals/setDependencyProvider",
+      "scope": "write",
+      "summary": "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
           "type": "string",
           "required": true
         }

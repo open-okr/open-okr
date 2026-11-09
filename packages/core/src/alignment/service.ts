@@ -7,6 +7,7 @@ import {
   cycles,
   goalDependencies,
   goals,
+  includeDeleted,
   keyResultDependencies,
   keyResults,
   newId,
@@ -22,9 +23,14 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { visibleResourceIds } from "../access/reads.ts";
 import { selectInChunks } from "../actions/chunk.ts";
 import { cycleRulesInTx } from "../cycles/rules.ts";
 import type { OperationTx } from "../operations/operation.ts";
+import {
+  type DependencyDeliveryState,
+  dependencyDelivery,
+} from "./delivery.ts";
 
 /**
  * The alignment engine's half that needs rows (METHOD.md §5, design
@@ -688,6 +694,7 @@ export async function loadDependencyRegister(
         riskOwnerId: keyResultDependencies.riskOwnerId,
         escalatedToId: keyResultDependencies.escalatedToId,
         escalatedAt: keyResultDependencies.escalatedAt,
+        providerKeyResultId: keyResultDependencies.providerKeyResultId,
       })
       .from(keyResultDependencies)
       .where(
@@ -698,5 +705,107 @@ export async function loadDependencyRegister(
         ),
       )
       .orderBy(sql`${keyResultDependencies.createdAt} asc`),
+  );
+}
+
+/**
+ * The key result a register entry names, as one reader sees it (plan 0.7.0
+ * O5, design `key-result-dependencies.md` K8 and K9).
+ *
+ * A reader who cannot view the providing goal gets the id and `hidden`, and
+ * nothing else: no title, no goal and no progress, because any of them would
+ * tell them something about a goal they cannot open.
+ */
+export interface ProvidingKeyResult {
+  readonly id: string;
+  readonly title: string | null;
+  readonly goalId: string | null;
+  readonly goalTitle: string | null;
+  readonly progressPct: number | null;
+  readonly state: DependencyDeliveryState;
+}
+
+/**
+ * Every providing key result a read's register names, keyed by id.
+ *
+ * **One access call for the whole read** (K9, P7-T01b): the set filter
+ * `alignment.read` already uses, over the providing goals, rather than the
+ * getter once per entry. Deleted key results and goals are loaded too,
+ * because a removed key result reads `stopped` rather than vanishing from an
+ * entry that still depends on it.
+ */
+export async function loadProvidingKeyResults(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly keyResultIds: readonly (string | null)[];
+  },
+): Promise<ReadonlyMap<string, ProvidingKeyResult>> {
+  const ids = [
+    ...new Set(input.keyResultIds.filter((id): id is string => id !== null)),
+  ];
+  if (ids.length === 0) {
+    return new Map();
+  }
+  const rows = await selectInChunks(ids, (batch) =>
+    tx
+      .select({
+        id: keyResults.id,
+        title: keyResults.title,
+        progressPct: keyResults.progressPct,
+        deletedAt: keyResults.deletedAt,
+        goalId: goals.id,
+        goalTitle: goals.title,
+        goalClosedAt: goals.closedAt,
+        goalDeletedAt: goals.deletedAt,
+      })
+      .from(keyResults)
+      .innerJoin(goals, eq(goals.id, keyResults.goalId))
+      .where(
+        includeDeleted(
+          keyResults,
+          eq(keyResults.workspaceId, input.workspaceId),
+          inArray(keyResults.id, batch),
+        ),
+      ),
+  );
+  const visible = await visibleResourceIds(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    resourceType: "goal",
+    ids: [...new Set(rows.map((row) => row.goalId))],
+  });
+  return new Map(
+    rows.map((row) => {
+      const seen = visible.has(row.goalId);
+      const progressPct = Number(row.progressPct);
+      const state = dependencyDelivery({
+        visible: seen,
+        progressPct,
+        deleted: row.deletedAt !== null || row.goalDeletedAt !== null,
+        goalClosed: row.goalClosedAt !== null,
+      });
+      return [
+        row.id,
+        seen
+          ? {
+              id: row.id,
+              title: row.title,
+              goalId: row.goalId,
+              goalTitle: row.goalTitle,
+              progressPct,
+              state,
+            }
+          : {
+              id: row.id,
+              title: null,
+              goalId: null,
+              goalTitle: null,
+              progressPct: null,
+              state,
+            },
+      ];
+    }),
   );
 }

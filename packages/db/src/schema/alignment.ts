@@ -25,7 +25,8 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
  * for the reason the goals schema gives: Drizzle cannot express them, and an
  * invariant only application code holds is one a single forgotten path can
  * break. A goal cannot depend on itself; a register entry names a provider one
- * way or the other; a confirmation and a decision each carry who and when; and a
+ * way or the other, and a key result never delivers its own dependency
+ * (0162); a confirmation and a decision each carry who and when; and a
  * finding's scope agrees with its scope id.
  */
 
@@ -110,6 +111,17 @@ export const keyResultDependencies = pgTable("key_result_dependencies", {
   }),
   /** A supplier, a regulator, or a team that has not joined the workspace yet. */
   providerText: text("provider_text"),
+  /**
+   * The key result that delivers it, when one in this workspace does
+   * (migration 0162, plan 0.7.0 O5). Always one a space owns, and then
+   * `provider_space_id` is that space. Whether it has delivered is read from
+   * its progress, never stored here. Never the depending key result itself,
+   * which the migration's check holds.
+   */
+  providerKeyResultId: uuid("provider_key_result_id").references(
+    () => keyResults.id,
+    { onDelete: "set null" },
+  ),
   note: text("note"),
   confirmed: boolean("confirmed").notNull().default(false),
   confirmedById: uuid("confirmed_by_id").references(() => workspaceMembers.id),

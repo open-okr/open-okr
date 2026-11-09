@@ -211,6 +211,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "goals.addKeyResultDependency",
     "goals.confirmDependency",
     "goals.setDependencyRiskOwner",
+    "goals.setDependencyProvider",
     "goals.escalateDependency",
     "goals.removeKeyResultDependency",
     "alignment.read",

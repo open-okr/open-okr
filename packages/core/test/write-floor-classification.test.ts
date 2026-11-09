@@ -90,6 +90,7 @@ const OWN_CHECK = new Set([
   "goals.removeKeyResultDependency",
   "goals.reopen",
   "goals.revealVotes",
+  "goals.setDependencyProvider",
   "goals.setDependencyRiskOwner",
   "goals.setKind",
   "goals.startCheckIn",

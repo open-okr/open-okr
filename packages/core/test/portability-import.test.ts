@@ -848,6 +848,77 @@ describe("what a move keeps", () => {
     );
     expect(rows.map((row) => row.storage_key)).toEqual([key]);
   });
+
+  it("points a dependency at the providing key result's new id (plan 0.7.0 O5)", async () => {
+    const source = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    // A quarter the target has no cycle for, so nothing in it is skipped as
+    // a duplicate of the target's own current cycle.
+    const cycle = await source<{ id: string }>("cycles.create", {
+      on: "2030-02-15",
+      mode: "quarterly",
+    });
+    const objective = async (title: string, spaceName: string) => {
+      const space = await source<{ id: string }>("spaces.create", {
+        name: spaceName,
+      });
+      const goal = await source<{ id: string }>("goals.create", {
+        title,
+        cycleId: cycle.id,
+        level: "team",
+        ownerKind: "space",
+        spaceId: space.id,
+        weight: 1,
+      });
+      const keyResult = await source<{ id: string }>("goals.addKeyResult", {
+        goalId: goal.id,
+        title: `${title}: the measure`,
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 10,
+        weight: 1,
+      });
+      return keyResult.id;
+    };
+    const depending = await objective("Onboarding without us", "Product 2030");
+    const providing = await objective("Data in one step", "Engineering 2030");
+    await source("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerKeyResultId: providing,
+    });
+
+    const exported = await exportSource();
+    await importIntoTarget(exported.bytes, false);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      provider_key_result_id: string | null;
+      provider_title: string | null;
+      provider_workspace_id: string | null;
+    }>(
+      `select d.provider_key_result_id, k.title as provider_title,
+              k.workspace_id as provider_workspace_id
+         from key_result_dependencies d
+         left join key_results k on k.id = d.provider_key_result_id
+        where d.workspace_id = $1`,
+      [targetWorkspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.provider_key_result_id).not.toBe(providing);
+    expect(rows[0]).toMatchObject({
+      provider_title: "Data in one step: the measure",
+      provider_workspace_id: targetWorkspaceId,
+    });
+  });
 });
 
 describe("search after a move (completeness review M-31)", () => {

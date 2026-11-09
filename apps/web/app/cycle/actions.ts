@@ -232,6 +232,26 @@ export async function setDependencyRiskOwner(
 }
 
 /**
+ * Names the key result that delivers a dependency, or clears it (plan 0.7.0
+ * O5). The action takes the providing space from the key result, and says when
+ * naming a different one took the providing team's confirmation away.
+ */
+export async function setDependencyProvider(
+  _previous: WriteState,
+  formData: FormData,
+): Promise<WriteState> {
+  const id = String(formData.get("id") ?? "");
+  const providerKeyResultId = String(formData.get("providerKeyResultId") ?? "");
+  return run((context) =>
+    callAction(context, "goals.setDependencyProvider", {
+      id,
+      providerKeyResultId:
+        providerKeyResultId === "" ? null : providerKeyResultId,
+    }),
+  );
+}
+
+/**
  * Escalates an unconfirmed dependency to the cycle's sponsor (METHOD.md §5.4,
  * P9-T16b-b): the third way to settle one, beside a confirmation and a named
  * risk owner.

@@ -116,6 +116,8 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { providingKeyResultOutput } from "../alignment/delivery.ts";
+import { loadProvidingKeyResults } from "../alignment/service.ts";
 import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
 import { spaceHolidaysInTx } from "../cadence/holidays.ts";
@@ -4616,6 +4618,8 @@ export const readMonthlyRecord = defineReadAction({
         description: z.string(),
         confirmed: z.boolean(),
         riskOwnerId: z.uuid().nullable(),
+        /** The key result that delivers it, and whether it has (plan 0.7.0 O5). */
+        providerKeyResult: providingKeyResultOutput,
       }),
     ),
     decisions: z.array(decisionOutput),
@@ -4851,6 +4855,7 @@ export const readMonthlyRecord = defineReadAction({
             providerText: keyResultDependencies.providerText,
             confirmed: keyResultDependencies.confirmed,
             riskOwnerId: keyResultDependencies.riskOwnerId,
+            providerKeyResultId: keyResultDependencies.providerKeyResultId,
           })
           .from(keyResultDependencies)
           .innerJoin(
@@ -4866,6 +4871,12 @@ export const readMonthlyRecord = defineReadAction({
               session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
             ),
           );
+
+        const providing = await loadProvidingKeyResults(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          keyResultIds: dependencyRows.map((row) => row.providerKeyResultId),
+        });
 
         const decisionRows = await tx
           .select(decisionColumns)
@@ -4915,6 +4926,9 @@ export const readMonthlyRecord = defineReadAction({
             description: row.note ?? row.providerText ?? "",
             confirmed: row.confirmed,
             riskOwnerId: row.riskOwnerId,
+            providerKeyResult: row.providerKeyResultId
+              ? (providing.get(row.providerKeyResultId) ?? null)
+              : null,
           })),
           decisions: decisionRows.map(decisionRow),
         };

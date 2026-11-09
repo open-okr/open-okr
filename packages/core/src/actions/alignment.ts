@@ -41,12 +41,14 @@ import {
   notOneClickBecause,
   oneClickApplicable,
 } from "../alignment/applicable.ts";
+import { providingKeyResultOutput } from "../alignment/delivery.ts";
 import {
   alignmentBreakdown,
   alignmentInTx,
   alignmentThresholdsOf,
   blocksPublish,
   loadDependencyRegister,
+  loadProvidingKeyResults,
   recomputeAlignment,
   scopesForGoal,
 } from "../alignment/service.ts";
@@ -144,6 +146,98 @@ async function requireKeyResultGoal(
     throw new OperationError("not_found", "No such key result.");
   }
   return requireGoal(tx, workspaceId, memberId, row.goalId, requires);
+}
+
+/**
+ * The key result named as delivering a dependency (plan 0.7.0 O5, design
+ * `key-result-dependencies.md` K2 and K3).
+ *
+ * **View, not edit.** The register entry belongs to the depending team, and
+ * naming another team's key result discloses nothing the namer cannot already
+ * see. One they cannot see answers not-found, and says "key result" rather
+ * than "goal", so the refusal does not tell them which goal it hangs from.
+ *
+ * **A team's key result.** METHOD.md §5.4 names a providing team, and both
+ * confirmation and the silo check work from the space, so the key result's
+ * goal must be one a space owns. A company or a personal goal has nobody who
+ * could confirm what it delivers.
+ */
+async function requireProvidingKeyResult(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  named: {
+    readonly providerKeyResultId: string;
+    readonly dependingKeyResultId: string;
+  },
+): Promise<{ id: string; spaceId: string; spaceName: string }> {
+  if (named.providerKeyResultId === named.dependingKeyResultId) {
+    throw new OperationError(
+      "forbidden",
+      "A key result cannot deliver its own dependency. Name the key result in the other team that does.",
+    );
+  }
+  const [row] = await tx
+    .select({ goalId: keyResults.goalId })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(keyResults.id, named.providerKeyResultId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    throw new OperationError("not_found", "No such key result.");
+  }
+  let goal: Awaited<ReturnType<typeof requireGoal>>;
+  try {
+    goal = await requireGoal(
+      tx,
+      workspaceId,
+      memberId,
+      row.goalId,
+      ACCESS_LEVELS.view,
+    );
+  } catch (error) {
+    if (error instanceof OperationError && error.code === "not_found") {
+      throw new OperationError("not_found", "No such key result.");
+    }
+    throw error;
+  }
+  if (!goal.spaceId) {
+    throw new OperationError(
+      "forbidden",
+      "A provider must be a team's key result. This one belongs to a company or a personal objective, which has no team to confirm what it delivers.",
+    );
+  }
+  const [space] = await tx
+    .select({ name: spaces.name })
+    // openokr:allow-raw-read: the name only, for the refusal that names the
+    // team, and every human member holds `view` on every space through the
+    // `workspace_standard` binding. Called only from inside a write's
+    // operation, after the goal itself went through the getter.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.workspaceId, workspaceId),
+        eq(spaces.id, goal.spaceId),
+      ),
+    )
+    .limit(1);
+  if (!space) {
+    throw new OperationError(
+      "forbidden",
+      "A provider must be a team's key result, and the space that owns this one has been removed.",
+    );
+  }
+  return {
+    id: named.providerKeyResultId,
+    spaceId: goal.spaceId,
+    spaceName: space.name,
+  };
 }
 
 /**
@@ -455,14 +549,23 @@ export const addKeyResultDependency = defineWriteAction({
       keyResultId: z.uuid(),
       providerSpaceId: z.uuid().optional(),
       providerText: z.string().trim().max(200).optional(),
+      /**
+       * The key result that delivers it (plan 0.7.0 O5). It must belong to a
+       * goal a space owns, and that space becomes the provider; a
+       * `providerSpaceId` naming another space is refused.
+       */
+      providerKeyResultId: z.uuid().optional(),
       note: z.string().trim().max(500).optional(),
       riskOwnerId: z.uuid().optional(),
     })
     .refine(
-      (value) => Boolean(value.providerSpaceId) || Boolean(value.providerText),
+      (value) =>
+        Boolean(value.providerSpaceId) ||
+        Boolean(value.providerText) ||
+        Boolean(value.providerKeyResultId),
       {
         message:
-          "A dependency names who provides it, either a space in this workspace or a name. A register entry with no provider is not one.",
+          "A dependency names who provides it: a space in this workspace, a key result one of its teams owns, or a name. A register entry with no provider is not one.",
       },
     ),
   output: z.object({ id: z.uuid(), blocksPublish: z.boolean() }),
@@ -482,7 +585,24 @@ export const addKeyResultDependency = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      if (input.providerSpaceId) {
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, memberId, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: input.keyResultId,
+          })
+        : null;
+      if (
+        provider &&
+        input.providerSpaceId &&
+        input.providerSpaceId !== provider.spaceId
+      ) {
+        throw new OperationError(
+          "forbidden",
+          `The key result you named belongs to ${provider.spaceName}, not to the space this names. Name ${provider.spaceName} as the provider, or leave the space out.`,
+        );
+      }
+
+      if (input.providerSpaceId && !provider) {
         const [space] = await tx
           .select({ id: spaces.id })
           .from(spaces)
@@ -505,8 +625,11 @@ export const addKeyResultDependency = defineWriteAction({
         id,
         workspaceId,
         keyResultId: input.keyResultId,
-        providerSpaceId: input.providerSpaceId ?? null,
+        // The key result's own space when one is named (K2), so confirmation
+        // and the silo check keep working from the space as they always have.
+        providerSpaceId: provider?.spaceId ?? input.providerSpaceId ?? null,
         providerText: input.providerText ?? null,
+        providerKeyResultId: provider?.id ?? null,
         note: input.note ?? null,
         riskOwnerId: input.riskOwnerId ?? null,
         createdById: memberId,
@@ -531,7 +654,10 @@ export const addKeyResultDependency = defineWriteAction({
           action: "goals.addKeyResultDependency",
           targetType: "key_result_dependency",
           targetId: id,
-          payload: { keyResultId: input.keyResultId },
+          payload: {
+            keyResultId: input.keyResultId,
+            providerKeyResultId: provider?.id ?? null,
+          },
         },
       };
     },
@@ -541,8 +667,16 @@ export const addKeyResultDependency = defineWriteAction({
 export const confirmKeyResultDependency = defineWriteAction({
   name: "goals.confirmDependency",
   summary:
-    "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
-  input: z.object({ id: z.uuid() }),
+    "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
+  input: z.object({
+    id: z.uuid(),
+    /**
+     * Which of the confirming team's key results delivers it (plan 0.7.0
+     * O5, K4). It must sit in the providing space. Left out, whatever the
+     * entry already names is kept.
+     */
+    providerKeyResultId: z.uuid().optional(),
+  }),
   output: z.object({ id: z.uuid(), confirmed: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -557,6 +691,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           id: keyResultDependencies.id,
           keyResultId: keyResultDependencies.keyResultId,
           providerSpaceId: keyResultDependencies.providerSpaceId,
+          providerKeyResultId: keyResultDependencies.providerKeyResultId,
           confirmed: keyResultDependencies.confirmed,
         })
         .from(keyResultDependencies)
@@ -577,7 +712,14 @@ export const confirmKeyResultDependency = defineWriteAction({
           "This dependency names its provider as free text, so there is nobody in this workspace who can confirm it. Name a risk owner instead.",
         );
       }
-      if (row.confirmed) {
+      // A confirmed entry now named with a different key result is a new
+      // promise (K5), so it is confirmed again rather than answered as a
+      // repeat.
+      if (
+        row.confirmed &&
+        (input.providerKeyResultId === undefined ||
+          input.providerKeyResultId === row.providerKeyResultId)
+      ) {
         return {
           result: { id: input.id, confirmed: true },
           activity: {
@@ -640,6 +782,33 @@ export const confirmKeyResultDependency = defineWriteAction({
         ACCESS_LEVELS.view,
       );
 
+      // K4: the providing team knows which of its key results delivers, and
+      // confirming is the most accurate moment to say so. Only one of its
+      // own, because it is promising for its own team.
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, memberId, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: row.keyResultId,
+          })
+        : null;
+      if (provider && provider.spaceId !== row.providerSpaceId) {
+        const [confirming] = await tx
+          .select({ name: spaces.name })
+          .from(spaces)
+          .where(
+            activeOnly(
+              spaces,
+              eq(spaces.workspaceId, workspaceId),
+              eq(spaces.id, row.providerSpaceId),
+            ),
+          )
+          .limit(1);
+        throw new OperationError(
+          "forbidden",
+          `Name a key result of ${confirming?.name ?? "the providing space"}, the team confirming this dependency. That one belongs to ${provider.spaceName}.`,
+        );
+      }
+
       const now = new Date();
       // openokr:allow-mutation: same transaction.
       await tx
@@ -649,6 +818,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           confirmedById: memberId,
           confirmedAt: now,
           updatedAt: now,
+          ...(provider ? { providerKeyResultId: provider.id } : {}),
         })
         .where(
           activeOnly(
@@ -671,7 +841,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           action: "goals.confirmDependency",
           targetType: "key_result_dependency",
           targetId: input.id,
-          payload: {},
+          payload: provider ? { providerKeyResultId: provider.id } : {},
         },
       };
     },
@@ -763,6 +933,138 @@ export const setDependencyRiskOwner = defineWriteAction({
           targetType: "key_result_dependency",
           targetId: input.id,
           payload: { memberId: input.memberId },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Names, changes or clears the key result that delivers a dependency (plan
+ * 0.7.0 O5, design `key-result-dependencies.md` K3 and K5).
+ *
+ * The depending team's act, so `edit` on the depending goal, as adding the
+ * entry needs. The providing space follows the key result named (K2).
+ *
+ * **A different key result clears the confirmation** (K5). A confirmation
+ * is a promise about something specific, and another key result, possibly in
+ * another team, is another promise: the providing team confirms again. That
+ * holds when one is named where none was, too, because the team confirmed
+ * before anybody said what it was delivering. Clearing to none keeps the
+ * confirmation, which was never about the key result in the first place. The
+ * result's `blocksPublish` says when gate 4 is red because of it.
+ *
+ * Nothing is sent: the register and the drawer show it, and a new proactive
+ * message is the human's to add (design Q1).
+ */
+export const setDependencyProvider = defineWriteAction({
+  name: "goals.setDependencyProvider",
+  summary:
+    "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+  input: z.object({ id: z.uuid(), providerKeyResultId: z.uuid().nullable() }),
+  output: z.object({
+    id: z.uuid(),
+    confirmed: z.boolean(),
+    blocksPublish: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const actor = await actingMember(tx, workspaceId, context.actor.userId);
+      const [row] = await tx
+        .select({
+          id: keyResultDependencies.id,
+          keyResultId: keyResultDependencies.keyResultId,
+          providerSpaceId: keyResultDependencies.providerSpaceId,
+          providerKeyResultId: keyResultDependencies.providerKeyResultId,
+          confirmed: keyResultDependencies.confirmed,
+          riskOwnerId: keyResultDependencies.riskOwnerId,
+          escalatedToId: keyResultDependencies.escalatedToId,
+        })
+        .from(keyResultDependencies)
+        .where(
+          activeOnly(
+            keyResultDependencies,
+            eq(keyResultDependencies.workspaceId, workspaceId),
+            eq(keyResultDependencies.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError("not_found", "No such dependency.");
+      }
+      const goal = await requireKeyResultGoal(
+        tx,
+        workspaceId,
+        actor,
+        row.keyResultId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, actor, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: row.keyResultId,
+          })
+        : null;
+      const confirmationCleared =
+        provider !== null &&
+        row.confirmed &&
+        provider.id !== row.providerKeyResultId;
+      const after = {
+        confirmed: row.confirmed && !confirmationCleared,
+        riskOwnerId: row.riskOwnerId,
+        escalatedToId: row.escalatedToId,
+      };
+
+      // openokr:allow-mutation: same transaction.
+      await tx
+        .update(keyResultDependencies)
+        .set({
+          providerKeyResultId: provider?.id ?? null,
+          ...(provider ? { providerSpaceId: provider.spaceId } : {}),
+          ...(confirmationCleared
+            ? { confirmed: false, confirmedById: null, confirmedAt: null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            keyResultDependencies,
+            eq(keyResultDependencies.id, input.id),
+          ),
+        );
+
+      // The silo check reads the providing space, so a key result in another
+      // team moves it, in both the team it left and the one it named.
+      if (provider && provider.spaceId !== row.providerSpaceId) {
+        await recomputeAlignmentFor(tx, workspaceId, [
+          goal,
+          { cycleId: goal.cycleId, spaceId: provider.spaceId },
+          { cycleId: goal.cycleId, spaceId: row.providerSpaceId },
+        ]);
+      }
+
+      return {
+        result: {
+          id: input.id,
+          confirmed: after.confirmed,
+          blocksPublish: blocksPublish(after),
+        },
+        activity: {
+          kind: "alignment.register_provider_named" as const,
+          subjectType: "goal" as const,
+          subjectId: goal.id,
+          payload: { named: provider !== null, confirmationCleared },
+        },
+        audit: {
+          action: "goals.setDependencyProvider",
+          targetType: "key_result_dependency",
+          targetId: input.id,
+          payload: {
+            providerKeyResultId: provider?.id ?? null,
+            confirmationCleared,
+          },
         },
       };
     },
@@ -1332,6 +1634,11 @@ export const readAlignment = defineReadAction({
          * gate 4 refuses.
          */
         blocksPublish: z.boolean(),
+        /**
+         * The key result that delivers it, and whether it has (plan 0.7.0
+         * O5). Delivered settles nothing: `blocksPublish` reads as before.
+         */
+        providerKeyResult: providingKeyResultOutput,
       }),
     ),
     /** Who an escalation from this cycle would reach. Null when nobody is named. */
@@ -1508,6 +1815,11 @@ export const readAlignment = defineReadAction({
           context.workspaceId,
           keyResultRows.map((row) => row.id),
         );
+        const providing = await loadProvidingKeyResults(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          keyResultIds: registerRows.map((row) => row.providerKeyResultId),
+        });
 
         const spaceNames = new Map(
           (
@@ -1575,6 +1887,9 @@ export const readAlignment = defineReadAction({
                 : null,
               escalatedAt: row.escalatedAt?.toISOString() ?? null,
               blocksPublish: blocksPublish(row),
+              providerKeyResult: row.providerKeyResultId
+                ? (providing.get(row.providerKeyResultId) ?? null)
+                : null,
             },
           ];
         });

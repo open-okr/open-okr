@@ -120,7 +120,7 @@ The strength score for the set rises to green, 81%.
 
 **NW-Q1-13 · 13 Jan · Priya, Mei, Kofi · S-16 dependency register, alignment score · METHOD §5.2, §5.4**
 Dependencies are declared and confirmed:
-- P1 depends on Engineering's E3, and Mei confirms it.
+- P1 depends on Engineering's E3, and Mei confirms it, naming E3.1 as the key result that delivers it.
 - SU1.1 (deflection) depends on E1's in-product answers, and Mei confirms that too.
 
 Alignment health reads 100%: every goal below company level is aligned or stands alone with a reason. GitLab's rule is the same: "KRs with dependencies should not be considered final until other teams have confirmed support."

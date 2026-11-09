@@ -156,6 +156,38 @@ describe("running Q1 (NW-Q1-15 to NW-Q1-25)", () => {
     ).toBe(on("2027-02-26"));
   });
 
+  it("reads P1's dependency as delivered by E3.1 once Mei ticks it done (NW-Q1-20, plan 0.7.0 O5)", async () => {
+    if (!by("2027-02-12")) {
+      return;
+    }
+    const [p1] = await rows<{ id: string }>(
+      `select id from goals where workspace_id = $1 and cycle_id = $2
+          and title = 'Onboarding runs without us in the room' and deleted_at is null`,
+      [q1Id],
+    );
+    const wb = await workerDb();
+    const relations = await callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "goals.relations",
+      { id: p1?.id as string },
+    );
+    expect(relations.register).toEqual([
+      expect.objectContaining({
+        provider: "Engineering",
+        confirmed: true,
+        providerKeyResult: expect.objectContaining({
+          title: "Bulk import generally available by 15 February",
+          progressPct: 100,
+          state: "delivered",
+        }),
+      }),
+    ]);
+  });
+
   it("raises the blocker on guided setup, and resolves it a week later (NW-Q1-19, NW-Q1-20)", async () => {
     if (!by("2027-02-15")) {
       return;

@@ -241,4 +241,27 @@ describe("Q1's plan (NW-Q1-01 to NW-Q1-14)", () => {
     expect(dependencies).toHaveLength(2);
     expect(dependencies.every((one) => one.confirmed)).toBe(true);
   });
+
+  it("names E3.1 as what delivers P1.1's dependency, as Mei confirms it (NW-Q1-13, plan 0.7.0 O5)", async () => {
+    if (!by("2027-01-13")) {
+      return;
+    }
+    const named = await rows<{ depending: string; provider: string | null }>(
+      `select k.title as depending, p.title as provider
+         from key_result_dependencies d
+         join key_results k on k.id = d.key_result_id
+         left join key_results p on p.id = d.provider_key_result_id
+        where d.workspace_id = $1 and d.deleted_at is null
+        order by k.title`,
+    );
+    expect(named).toEqual([
+      {
+        depending: "Cut manual setup calls per new account from 1.2 to 0.6",
+        provider: "Bulk import generally available by 15 February",
+      },
+      // Deflection depends on E1 as a whole, and the scenario names no key
+      // result for it.
+      expect.objectContaining({ provider: null }),
+    ]);
+  });
 });

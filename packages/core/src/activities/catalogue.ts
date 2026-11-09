@@ -564,6 +564,13 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "alignment.register_risk_owned": z.object({}),
   // Escalated to the cycle's sponsor (§5.4, P9-T16b-b).
   "alignment.register_escalated": z.object({}),
+  // The key result that delivers it named, changed or cleared (plan 0.7.0
+  // O5). Whether the change took the providing team's confirmation away is
+  // the part of it a reader of the feed needs.
+  "alignment.register_provider_named": z.object({
+    named: z.boolean(),
+    confirmationCleared: z.boolean(),
+  }),
   "alignment.register_removed": z.object({}),
   "alignment.finding_dismissed": z.object({ ruleKey: z.string() }),
   // The one finding kind with a mechanical fix (§5.3, P4-T06b-b). The re-parent

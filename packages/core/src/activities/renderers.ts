@@ -480,6 +480,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "A risk owner was named for an unconfirmed dependency",
   "alignment.register_escalated": () =>
     "An unconfirmed dependency was escalated to the cycle's sponsor",
+  "alignment.register_provider_named": (p) =>
+    !p.named
+      ? "The key result that delivers a dependency was cleared"
+      : p.confirmationCleared
+        ? "A different key result was named to deliver a dependency, so the providing team confirms it again"
+        : "The key result that delivers a dependency was named",
   "alignment.register_removed": () =>
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>

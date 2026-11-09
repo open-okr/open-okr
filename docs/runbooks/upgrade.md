@@ -101,6 +101,14 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   check-ins, edits and scores go on, only publishing stops. With
   `OPENOKR_SCHEDULER=off`, `pnpm cadence:sweep` does it.
 
+- **A dependency names the key result that delivers it.** Migration 0162
+  adds `key_result_dependencies.provider_key_result_id`, with a check and a
+  partial index. It is additive and there is nothing to choose: every
+  existing entry names no key result and reads as it did. Once one is named,
+  on the cycle's dependency register or as the providing team confirms, the
+  register, the goal page and the monthly review show whether it has
+  delivered.
+
 - **The outbox rate.** Migration 0159 adds `outbox.claimed_at` and a partial
   index on it. Nothing changes unless you set
   `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE` (60 or more; 0, the default, is

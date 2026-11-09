@@ -94,6 +94,7 @@ import {
   readAlignmentScore,
   removeGoalDependency,
   removeKeyResultDependency,
+  setDependencyProvider,
   setDependencyRiskOwner,
 } from "./alignment.ts";
 import {
@@ -863,6 +864,7 @@ export const ACTION_MAP = {
   "goals.addKeyResultDependency": addKeyResultDependency,
   "goals.confirmDependency": confirmKeyResultDependency,
   "goals.setDependencyRiskOwner": setDependencyRiskOwner,
+  "goals.setDependencyProvider": setDependencyProvider,
   "goals.escalateDependency": escalateDependency,
   "goals.removeKeyResultDependency": removeKeyResultDependency,
   "alignment.read": readAlignment,

@@ -345,9 +345,11 @@ The snapshot is immutable, which is why it is a table rather than a column: an e
 Horizontal links between goals in different teams (METHOD.md §5.1). Two-way by meaning, stored once in canonical id order, with a unique index on the pair and a check constraint refusing a self-link.
 
 ### key_result_dependencies
-`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `note?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?` to workspace_members and `escalated_at?` (0124, P9-T16b-b, METHOD.md §5.4: the sponsor it was escalated to, copied at the time; the three are present together or not at all), `created_by_id` to workspace_members.
+`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `provider_key_result_id?` to key_results (0162, plan 0.7.0 O5, `on delete set null`, a partial index where set), `note?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?` to workspace_members and `escalated_at?` (0124, P9-T16b-b, METHOD.md §5.4: the sponsor it was escalated to, copied at the time; the three are present together or not at all), `created_by_id` to workspace_members.
 
 The §5.4 register. A provider is named either as a space in this workspace or as free text, and a check constraint requires one of the two. Only a space provider can be confirmed, and only by that space; only a space provider clears a silo finding, because only it names something the engine can find. Unconfirmed and unowned blocks publish gate 4.
+
+`provider_key_result_id` names the key result that delivers it (`docs/design/key-result-dependencies.md`). It is always a key result whose goal a space owns, and the write sets `provider_space_id` to that space; a check constraint refuses the depending key result itself. Naming a different one on a confirmed entry clears the confirmation. Whether it is delivered (the key result reads 100%), pending or stopped (deleted, or its goal closed short) is computed at every read and never stored, and it settles nothing: gate 4, the silo check and the score read the register as before.
 
 ### alignment_findings
 `scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?` to workspace_members, `decided_at?`.
@@ -365,7 +367,7 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 `from_goal_id` and `to_goal_id` to goals, `note?`, `created_by_id` to workspace_members.
 
 ### key_result_dependencies
-`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?`, `escalated_at?` (0124, P9-T16b-b).
+`key_result_id` to key_results, `provider_space_id?` to spaces, `provider_text?`, `provider_key_result_id?` to key_results (0162, plan 0.7.0 O5), `confirmed bool`, `confirmed_by_id?` to workspace_members, `confirmed_at?`, `risk_owner_id?` to workspace_members, `escalated_to_id?`, `escalated_by_id?`, `escalated_at?` (0124, P9-T16b-b).
 
 ### alignment_findings
 `scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
