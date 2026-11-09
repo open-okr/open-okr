@@ -566,6 +566,15 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // external agent needs no AI provider here (D9).
         minLevel: ACCESS_LEVELS.full,
       },
+      {
+        id: "admin-webhooks",
+        label: "Webhooks",
+        href: "/admin/webhooks",
+        section: "admin",
+        // A webhook sends workspace events out, as a bot token does, so the
+        // same level the channels card asks (outbound-webhooks.md W11).
+        minLevel: ACCESS_LEVELS.full,
+      },
     ],
   },
 ];

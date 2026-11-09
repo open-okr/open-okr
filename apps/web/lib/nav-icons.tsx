@@ -37,6 +37,7 @@ import {
   UserCog,
   UserPlus,
   Users,
+  Webhook,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -134,6 +135,8 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "admin-agents": <AgentFace className="size-full" />,
   // A plug: something from outside connected in (plan 0.7.0 A4).
   "admin-connections": <PlugZap className="size-full" />,
+  // The hook itself: events going out to somebody else (plan 0.7.0 D5).
+  "admin-webhooks": <Webhook className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */

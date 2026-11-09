@@ -1328,6 +1328,7 @@ export {
   type AdmissionLimits,
   AdmissionSettingError,
   adoptWorkspaces,
+  allowsPrivateWebhookTargets,
   type ClosureSchedule,
   type CreditSummary,
   countSeats,
@@ -1358,6 +1359,8 @@ export {
   type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
+export { WEBHOOK_EVENT_GROUPS } from "./webhooks/events.ts";
+export { DELIVERY_LOG_DAYS, FAILURES_BEFORE_OFF } from "./webhooks/jobs.ts";
 export { purgeWebhookDeliveries } from "./webhooks/retention.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
 export {

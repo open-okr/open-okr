@@ -62,6 +62,7 @@ export {
   seatsInUseInTx,
 } from "./plans.ts";
 export {
+  allowsPrivateWebhookTargets,
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,

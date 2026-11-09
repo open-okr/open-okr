@@ -156,6 +156,10 @@ export default defineConfig({
         // and counted, and no other spec sees a difference.
         OPENOKR_ERROR_DSN: TRACKER_DSN,
         OPENOKR_ERROR_ENVIRONMENT: "e2e",
+        // A webhook may post to a receiver on this machine, which is where
+        // s36s-webhooks.spec.ts runs one (outbound-webhooks.md Q1 and §6).
+        // Nothing else posts a webhook, so no other spec sees a difference.
+        OPENOKR_WEBHOOKS_ALLOW_PRIVATE: "true",
       },
     },
     {
