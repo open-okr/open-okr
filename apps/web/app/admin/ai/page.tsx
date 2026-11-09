@@ -36,6 +36,7 @@ import {
   saveWorkspaceKey,
   testWorkspaceKeyAction,
 } from "./actions.ts";
+import { AgentCallsCard } from "./agent-calls-card";
 import { AIForm } from "./ai-form.tsx";
 import { tierModelValue } from "./choices.ts";
 import {
@@ -630,6 +631,10 @@ export default async function AdminAIPage() {
           live in `governance.tsx` because the console is one screen and one
           file for it was getting long, not because it is a second screen. */}
       <UsageCard usage={usage} days={USAGE_WINDOW_DAYS} />
+      {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
+      <AgentCallsCard
+        summary={await callAction(context, "ai.readToolCallSummary", {})}
+      />
       <BudgetsCard
         budgets={budgets}
         people={directory.filter(

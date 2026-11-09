@@ -32,6 +32,7 @@ import {
   spaceFeed,
   workspaceFeed,
 } from "./activities.ts";
+import { listOwnToolCalls, readToolCallSummary } from "./agent-tool-calls.ts";
 import {
   bindAgentScope,
   bulkApplyProposedChanges,
@@ -589,6 +590,9 @@ export const ACTION_MAP = {
   "connections.revokeAsAdmin": revokeConnectionAsAdmin,
   // Plan 0.7.0 A2: the tool call record's retention, run daily.
   "connections.sweepToolCalls": sweepToolCalls,
+  // Plan 0.7.0 A2: a member's own agent calls, and the admin totals.
+  "connections.toolCalls": listOwnToolCalls,
+  "ai.readToolCallSummary": readToolCallSummary,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,

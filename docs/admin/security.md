@@ -17,6 +17,12 @@ tokens page says so without naming you. Your name is in the audit log. The
 screen works only in the browser, so neither a token nor an agent can list
 or end connections.
 
+Every call an agent makes is recorded: the tool, where it stopped and the ids
+it named, never what it sent or read back. The AI console counts them for the
+last 30 days, naming nobody, and each member sees their own agent's calls under
+the connection or token on their own pages. The record is kept 90 days unless
+the Limits card on Admin, General says otherwise.
+
 ## Single sign-on
 
 Admin, then **Single sign-on**. OpenOKR speaks OIDC and SAML 2.0 directly.

@@ -1,5 +1,6 @@
 import { callAction } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { AgentCallsLine } from "../../../lib/agent-calls-line";
 import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
@@ -103,6 +104,7 @@ export default async function ConnectionsPage() {
                     </span>
                   ) : null}
 
+                  <AgentCallsLine kind="grant" id={connection.id} />
                   {connection.revokedAt ? null : (
                     <RevokeForm action={revoke} id={connection.id} />
                   )}

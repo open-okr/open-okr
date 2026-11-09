@@ -9,6 +9,7 @@ import {
   NumberInput,
   TextInput,
 } from "@openokr/ui";
+import { AgentCallsLine } from "../../../lib/agent-calls-line";
 import { agentSetupLine, agentSetupUrl } from "../../../lib/agent-setup-prompt";
 import { getInstanceName } from "../../../lib/instance-name";
 import { instanceIssuer } from "../../../lib/issuer";
@@ -282,6 +283,9 @@ export default async function ApiTokensPage() {
                   <span className="text-xs text-bad">
                     {token.revokedReason}
                   </span>
+                ) : null}
+                {token.audience === "mcp" ? (
+                  <AgentCallsLine kind="token" id={token.id} />
                 ) : null}
                 {token.revokedAt ? null : (
                   <TokenForm action={revokeToken}>

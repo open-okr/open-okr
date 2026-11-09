@@ -1,4 +1,6 @@
 {
+  "account.agentCalls.stopped": "terhenti: {outcome}",
+  "account.agentCalls.week": "Minggu ini: {calls} panggilan, {refused} ditolak atau terhenti",
   "account.aiKeys.actions.failed": "Itu tidak berjaya, dan tiada apa-apa yang berubah.",
   "account.aiKeys.actions.malformed": "Itu bukan kunci yang boleh disimpan. Kunci terdiri daripada huruf, digit dan simbol biasa, tanpa ruang, pemisah baris atau tanda petik condong di dalamnya. Tiada apa-apa yang disimpan.",
   "account.aiKeys.actions.notAllowed": "Akses anda dalam ruang kerja ini tidak membenarkan anda mengubah kunci buat masa ini. Tiada apa-apa yang berubah.",
@@ -259,6 +261,10 @@
   "admin.ai.actions.whichModel": "Pilih model yang digunakan oleh peringkat ini.",
   "admin.ai.actions.whoseBudget": "Pilih bajet siapa ini, atau seluruh ruang kerja.",
   "admin.ai.addAModel": "Tambah model",
+  "admin.ai.agentCalls.none": "Tiada ejen luaran yang memanggil ruang kerja ini dalam 30 hari lepas.",
+  "admin.ai.agentCalls.title": "Panggilan ejen luaran, 30 hari lepas",
+  "admin.ai.agentCalls.toolCalls": "{calls} panggilan",
+  "admin.ai.agentCalls.totals": "{calls} panggilan, {refused} ditolak atau terhenti.",
   "admin.ai.backToTheDefault": "Kembali ke lalai",
   "admin.ai.baseUrlForA": "URL asas, untuk titik akhir yang dihos sendiri atau melalui proksi",
   "admin.ai.capabilityJsonMode": "Mod JSON",

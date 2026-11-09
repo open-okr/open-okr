@@ -1160,6 +1160,43 @@
       "pages": false
     },
     {
+      "name": "connections toolCalls",
+      "action": "connections.toolCalls",
+      "method": "GET",
+      "path": "/connections/toolCalls",
+      "scope": "read",
+      "summary": "The last calls one of your own agents made through a connection or an agent token, and this week's counts.",
+      "flags": [
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "grant",
+            "token"
+          ]
+        },
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "ai readToolCallSummary",
+      "action": "ai.readToolCallSummary",
+      "method": "GET",
+      "path": "/ai/readToolCallSummary",
+      "scope": "read",
+      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",

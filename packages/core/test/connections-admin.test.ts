@@ -263,3 +263,62 @@ describe("the agent call record's retention", () => {
     ).rejects.toThrow();
   });
 });
+
+// agent-tool-calls.md D14 and D15, plan 0.7.0 A2: a member sees their own
+// agent's calls; an administrator sees totals with nobody named.
+describe("reading the agent call record", () => {
+  const callNow = async (grantId: string, outcome: string, tool: string) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into ai_tool_calls (workspace_id, member_id, grant_id, tool, scope, outcome, duration_ms)
+       values ($1, $2, $3, $4, 'read', $5, 3)`,
+      [workspaceId, memberId, grantId, tool, outcome],
+    );
+  };
+
+  it("shows a member their own agent's calls and this week's counts", async () => {
+    const grantId = await memberGrant();
+    await callNow(grantId, "ok", "cycles.list");
+    await callNow(grantId, "refused_scope", "goals.create");
+    const own = await callAction(await as(MEMBER), "connections.toolCalls", {
+      kind: "grant",
+      id: grantId,
+    });
+    expect(own.calls.map((call) => call.tool).sort()).toEqual([
+      "cycles.list",
+      "goals.create",
+    ]);
+    expect(own.week).toEqual({ calls: 2, refused: 1 });
+  });
+
+  it("answers not-found for somebody else's connection", async () => {
+    const grantId = await memberGrant();
+    await expect(
+      callAction(await as(OWNER), "connections.toolCalls", {
+        kind: "grant",
+        id: grantId,
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("gives an administrator totals and the busiest tools, naming nobody", async () => {
+    const grantId = await memberGrant();
+    await callNow(grantId, "ok", "cycles.list");
+    await callNow(grantId, "ok", "cycles.list");
+    await callNow(grantId, "refused", "goals.read");
+    const summary = await callAction(
+      await as(OWNER),
+      "ai.readToolCallSummary",
+      {},
+    );
+    expect(summary).toEqual({
+      calls: 3,
+      refused: 1,
+      busiestTools: [
+        { tool: "cycles.list", calls: 2 },
+        { tool: "goals.read", calls: 1 },
+      ],
+    });
+    expect(JSON.stringify(summary)).not.toContain(memberId);
+  });
+});

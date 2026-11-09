@@ -1,4 +1,6 @@
 {
+  "account.agentCalls.stopped": "stopped: {outcome}",
+  "account.agentCalls.week": "This week: {calls} calls, {refused} refused or stopped short",
   "account.aiKeys.actions.failed": "That did not work, and nothing changed.",
   "account.aiKeys.actions.malformed": "That is not a key this can store. A key is letters, digits and plain symbols, with no spaces, line breaks or curly quotes inside it. Nothing was stored.",
   "account.aiKeys.actions.notAllowed": "Your access in this workspace does not let you change a key at the moment. Nothing changed.",
@@ -259,6 +261,10 @@
   "admin.ai.actions.whichModel": "Choose the model this tier uses.",
   "admin.ai.actions.whoseBudget": "Choose whose budget this is, or the whole workspace.",
   "admin.ai.addAModel": "Add a model",
+  "admin.ai.agentCalls.none": "No external agent has called this workspace in the last 30 days.",
+  "admin.ai.agentCalls.title": "External agent calls, last 30 days",
+  "admin.ai.agentCalls.toolCalls": "{calls} calls",
+  "admin.ai.agentCalls.totals": "{calls} calls, {refused} refused or stopped short.",
   "admin.ai.backToTheDefault": "Back to the default",
   "admin.ai.baseUrlForA": "Base URL, for a self-hosted or proxied endpoint",
   "admin.ai.capabilityJsonMode": "JSON mode",
