@@ -101,6 +101,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "A cache. Rebuilt on demand, and stale the moment it is copied.",
   },
   {
+    table: "sign_in_attempts",
+    decision: "exclude",
+    reason:
+      "Failed sign-ins and the holds they caused (plan 0.7.0 P10). Keyed by account and caller rather than by workspace, and about this instance's door, not the workspace's work.",
+  },
+  {
     table: "outbox",
     decision: "exclude",
     reason:
@@ -770,6 +776,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "export",
     reason:
       "Proposals a person made through the copilot, sitting in the review queue. Somebody has to answer them, and they should not have to answer them twice. An agent's proposals stay behind with the run that made it.",
+  },
+  {
+    table: "alignment_scores",
+    decision: "exclude",
+    reason:
+      "A stored alignment score (plan 0.7.0 D2) is derived from the goals it scores, so it is recomputed after an import rather than trusted: the hourly fill stores it, and the read computes a missing one meanwhile.",
   },
   {
     table: "alignment_findings",

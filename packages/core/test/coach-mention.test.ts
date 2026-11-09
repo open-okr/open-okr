@@ -563,7 +563,7 @@ describe("the reply itself", () => {
     const clean = coachReviewDocument([]);
     expect(isValidRichText(clean, RICH_TEXT_SCHEMA_VERSION)).toBe(true);
     expect(textOf(clean)).toBe(
-      "Reviewed against the quality checks in METHOD.md §4.1 and §4.2. Nothing needs attention.",
+      "Reviewed against the method's quality checks for objectives and key results. Nothing needs attention.",
     );
   });
 

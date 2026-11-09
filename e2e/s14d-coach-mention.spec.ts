@@ -26,7 +26,7 @@ let goalId = "";
 
 /** Unique per run, so a second run on the same database finds its own goal. */
 const TITLE = `Launch the coach review page ${Math.random().toString(36).slice(2, 8)}`;
-const REVIEWED = "Reviewed against the quality checks in METHOD.md";
+const REVIEWED = "Reviewed against the method's quality checks";
 
 const authed = () => ({ authorization: `Bearer ${token}` });
 

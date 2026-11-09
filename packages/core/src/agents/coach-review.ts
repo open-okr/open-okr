@@ -118,8 +118,8 @@ export function coachReviewDocument(
 ): RichTextDocument {
   const opening =
     points.length === 0
-      ? "Reviewed against the quality checks in METHOD.md §4.1 and §4.2. Nothing needs attention."
-      : `Reviewed against the quality checks in METHOD.md §4.1 and §4.2. ${
+      ? "Reviewed against the method's quality checks for objectives and key results. Nothing needs attention."
+      : `Reviewed against the method's quality checks for objectives and key results. ${
           points.length === 1
             ? "One needs attention:"
             : `${points.length} need attention:`

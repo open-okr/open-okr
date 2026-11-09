@@ -1174,7 +1174,7 @@ const reviewAlignment = evaluationSet<readonly ReviewableGoal[]>({
       expected: [],
     },
     {
-      name: "a finding of a kind §5.3 does not have",
+      name: "a finding of a kind the alignment checks do not have",
       context: GOALS,
       reply: json({ findings: [{ ...FINDINGS[0], kind: "vibes" }] }),
       expected: null,
