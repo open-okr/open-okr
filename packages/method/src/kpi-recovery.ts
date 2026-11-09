@@ -31,9 +31,11 @@ export interface EffectiveHealth {
 }
 
 /**
- * §6.5: the displayed health is the higher of real achievement and a
- * projection, so a recovery is visible before the lagging number catches up
- * (design §4).
+ * §6.5: while a recovery is open, the higher of real achievement and a
+ * projection along the recovery's progress, so a recovery is visible before
+ * the lagging number catches up (design §4). It is shown beside the KPI's real
+ * band and never in its place: the band is the KPI's health (§6.4,
+ * P9-T17b-a), and closing a recovery reads real achievement, not this.
  *
  * The `max(0, …)` guard covers one degenerate input. A recovery launches only
  * from an unhealthy KPI, so the start is always below the healthy threshold in

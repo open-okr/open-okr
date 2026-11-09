@@ -311,10 +311,11 @@ const RHYTHM_SPACES: readonly YearSpaceKey[] = [
  * C6, launched from the margin KPI and then shaped by Hugo (NW-Q3-04).
  *
  * The launch drafts §6.5's recovery: committed, its objective without a
- * number, the KPI itself first and the leading drivers under it after. The
- * semantic review finds tickets per account and deflection already owned by
- * C2.2 and SU1.1, so Hugo removes both and adds the renewal discount; the
- * expansion seats driver is the second response, which Tomás records.
+ * number, the KPI itself first and the leading drivers under it after, which
+ * in the margin's own tree is tickets per account alone. The semantic review
+ * finds that driver already owned by C2.2, so Hugo removes it and adds
+ * expansion seats and the renewal discount; expansion seats is the second
+ * response, which Tomás records.
  */
 const C6_ADDED = [
   {
@@ -477,7 +478,8 @@ export const Q3_PLAN_EVENTS: readonly YearEvent[] = [
             capacity: "fits",
           });
         } else {
-          // "These two claim the same movement": C2.2 and SU1.1 own them.
+          // "These two claim the same movement": tickets per account is
+          // already C2.2.
           await callAction(context.action, "goals.removeKeyResult", {
             id: keyResult.id,
           });

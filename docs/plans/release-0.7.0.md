@@ -189,7 +189,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B10 | to do | |
 | B11 | done | |
 | M1 to M4 | done | One change |
-| Section 3 | to do | Stale text, one change |
+| Section 3 | done | Stale text, one change |
 | A1 to A13 | to do | A1, A2, A4 and A6 design first |
 | O1 to O6 | to do | O2, O5 and O6 design first |
 | S1 to S3 | to do | |

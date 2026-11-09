@@ -12,7 +12,7 @@
 # **It destroys everything, every time, and that is the design.** A demo
 # instance strangers can write to accumulates whatever they wrote, and a reset
 # that tried to delete only what they added would be a delete path nobody
-# exercises against a schema of 129 tables. Starting from an empty volume is
+# exercises against a schema of well over a hundred tables. Starting from an empty volume is
 # the only reset that cannot leave half of something behind.
 #
 # **It is not a general erasure tool and must never become one.** The compose

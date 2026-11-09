@@ -35,6 +35,12 @@ release in an install command: the root README, the Helm README and the
 Compose guide each show a real version, because a reader copies the line.
 Change them to the new number in the same commit.
 
+**Then the screen-reader run**, for a release that changed a screen. The
+procedure is in [the accessibility design](../design/accessibility.md): a
+person, a screen reader and the steps it lists. Write the result in the release
+pull request's description: which reader, which browser, which steps failed.
+A step that fails becomes an issue with its number before the tag.
+
 Commit it, with a sign-off, and merge it to `main`.
 
 ## Tag

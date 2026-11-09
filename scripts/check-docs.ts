@@ -116,15 +116,24 @@ for (const tree of OWNED) {
   pages.push(...(await markdownUnder(tree)));
 }
 
+// The reference trees, read for their links only. The comment at the top has
+// always said these links are checked, and until 0.7.0 they were never read,
+// so a broken link there went unnoticed (plan 0.7.0, section 3). Their `pnpm`
+// commands are not checked: a design page quotes the commands of its time.
+const reference: string[] = [];
+for (const tree of NOT_INDEXED_PAGE_BY_PAGE) {
+  reference.push(...(await markdownUnder(tree)));
+}
+
 const scripts = new Set(
   Object.keys(
     JSON.parse(await readFile(join(ROOT, "package.json"), "utf8")).scripts ?? {},
   ),
 );
 
-// 1. Every link resolves.
+// 1. Every link resolves, in the owned pages and the reference trees.
 const linkedFromIndex = new Set<string>();
-for (const page of pages) {
+for (const page of [...pages, ...reference]) {
   const source = await readFile(join(ROOT, page), "utf8");
   for (const { target, line } of linksIn(source)) {
     if (/^(https?:|mailto:|#)/.test(target)) {
@@ -154,6 +163,9 @@ for (const page of pages) {
   }
 
   // 2. Every command it tells somebody to run exists.
+  if (reference.includes(page)) {
+    continue;
+  }
   for (const { script, line } of pnpmCommandsIn(source)) {
     if (!scripts.has(script)) {
       problems.push(
@@ -328,5 +340,5 @@ if (problems.length > 0) {
 }
 
 process.stdout.write(
-  `Documentation check passed. ${pages.length} page(s), every link resolves, every page is reachable from the index, and every command it names exists.\n`,
+  `Documentation check passed. ${pages.length} page(s) and the links of ${reference.length} reference page(s): every link resolves, every page is reachable from the index, and every command it names exists.\n`,
 );
