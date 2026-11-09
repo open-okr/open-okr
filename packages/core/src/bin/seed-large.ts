@@ -20,6 +20,7 @@
  */
 import { loadEnv } from "@openokr/config";
 import pg from "pg";
+import { fillAlignmentScores } from "../alignment/fill.ts";
 import {
   buildLargeDataset,
   LARGE_DATASET,
@@ -125,6 +126,16 @@ try {
       );
     },
   });
+  // The builder writes rows in bulk, past the structural writes that store
+  // each scope's alignment score, so the dataset is scored here. Without it
+  // §13.1's stored-score read would time a computation, not a row.
+  const scoring = performance.now();
+  const { filled } = await fillAlignmentScores(pool, {
+    workspaceIds: [workspace.id],
+  });
+  write(
+    `  ${"alignment_scores".padEnd(26)} ${filled.toLocaleString("en").padStart(10)} rows in ${((performance.now() - scoring) / 1000).toFixed(1)}s`,
+  );
   write("");
   write(`Done in ${report.seconds.toFixed(1)}s.`);
   write("");

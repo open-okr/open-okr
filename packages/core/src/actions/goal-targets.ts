@@ -38,7 +38,7 @@ import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
 import { recomputeGoalQualityInTx } from "../quality/service.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
-import { recomputeAlignmentFor } from "./alignment.ts";
+import { recomputeAlignmentFor, scopesHangingFrom } from "./alignment.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { treeGoal, treeNode } from "./goal-tree.ts";
 
@@ -493,9 +493,13 @@ export const restoreKeyResult = defineWriteAction({
       await recomputeForGoal(tx, workspaceId, row.goalId, rhythm.thresholds);
       await recomputeGoalQualityInTx(tx, { workspaceId, goalId: row.goalId });
       // KR-1 is an alignment finding at none, so a restore that brings an
-      // objective back from none clears it, as adding one does.
+      // objective back from none clears it, as adding one does. A goal
+      // hanging from it aligns again, wherever it sits (plan 0.7.0 D2).
       await recomputeAlignmentFor(tx, workspaceId, [
         { cycleId: row.cycleId, spaceId: row.spaceId },
+        ...(await scopesHangingFrom(tx, workspaceId, {
+          keyResultId: input.id,
+        })),
       ]);
 
       return {

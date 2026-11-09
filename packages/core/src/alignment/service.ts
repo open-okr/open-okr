@@ -1,7 +1,9 @@
 import {
   type AlignmentFindingKind,
+  type AlignmentScoreBreakdown,
   activeOnly,
   alignmentFindings,
+  alignmentScores,
   cycles,
   goalDependencies,
   goals,
@@ -44,7 +46,7 @@ import type { OperationTx } from "../operations/operation.ts";
  */
 
 /** §11's two alignment thresholds, out of a workspace's resolved registry. */
-function alignmentThresholdsOf(
+export function alignmentThresholdsOf(
   thresholds: ResolvedThresholds,
 ): AlignmentThresholds {
   return {
@@ -367,7 +369,8 @@ const identityOf = (finding: FindingIdentity): string =>
   `${finding.ruleKey} ${finding.subjectGoalId ?? ""} ${finding.targetGoalId ?? ""} ${finding.subjectKeyResultId ?? ""}`;
 
 /**
- * Recomputes one scope and reconciles the findings table against the answer.
+ * Recomputes one scope, reconciles the findings table against the answer and
+ * stores the score (`alignment_scores`, plan 0.7.0 D2).
  *
  * Four rules from design §6, and each exists because the alternative breaks
  * something:
@@ -384,6 +387,14 @@ const identityOf = (finding: FindingIdentity): string =>
 export async function recomputeAlignment(
   tx: OperationTx,
   input: AlignmentScopeInput,
+  options: {
+    /**
+     * Leave a stored score where one exists (the fill, design §10). A fill
+     * that read the graph before a concurrent write committed must not
+     * overwrite the fresher score that write stored.
+     */
+    readonly keepStored?: boolean;
+  } = {},
 ): Promise<AlignmentResult> {
   const { result } = await alignmentInTx(tx, input);
 
@@ -405,7 +416,52 @@ export async function recomputeAlignment(
     })),
   });
 
+  // The score, beside the findings and in the same transaction, so the two
+  // commit together and cannot disagree (design §10, D2). The band is not
+  // stored: it is read from the cycle's thresholds when the row is read.
+  const row = {
+    workspaceId: input.workspaceId,
+    cycleId: input.cycleId,
+    scope: input.scope.kind,
+    scopeId,
+    score: result.score,
+    breakdown: alignmentBreakdown(result),
+    computedAt: new Date(),
+  };
+  // openokr:allow-mutation: the calling Operation's own transaction, or the
+  // fill's tenant transaction. A projection of the rows, with no audit row
+  // of its own: the write that moved it has one.
+  const insert = tx.insert(alignmentScores).values({ id: newId(), ...row });
+  await (options.keepStored
+    ? insert.onConflictDoNothing()
+    : insert.onConflictDoUpdate({
+        target: [
+          alignmentScores.workspaceId,
+          alignmentScores.cycleId,
+          alignmentScores.scope,
+          alignmentScores.scopeId,
+        ],
+        set: {
+          score: row.score,
+          breakdown: row.breakdown,
+          computedAt: row.computedAt,
+        },
+      }));
+
   return result;
+}
+
+/** The counts the stored score is made of, out of one computation. */
+export function alignmentBreakdown(
+  result: AlignmentResult,
+): AlignmentScoreBreakdown {
+  return {
+    measured: result.measured,
+    withParent: result.counted - result.standingAlone,
+    standingAlone: result.standingAlone,
+    unaligned: result.measured - result.counted,
+    anchored: result.anchored,
+  };
 }
 
 /** One finding the caller wants to exist, in the shape the table stores. */

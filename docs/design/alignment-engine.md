@@ -393,12 +393,14 @@ rows.
 
 ## 10. The stored score (plan 0.7.0 D2)
 
-Status: proposed 9 November 2026, waiting for Akmal's "design approved". A new
-table, so it is designed first (CLAUDE.md).
+Status: proposed 9 November 2026. Approved by Akmal on 9 November 2026
+("design approved"), Q1 as proposed: latest only. **Built**, migration 0161 (numbered 0156 while it was built, and moved past 0157 to 0160 so that no database that already ran those refuses it as out of order),
+with D5 replaced and three gaps settled while building (§10.6). A new table,
+so it was designed first (CLAUDE.md).
 
 TECHNICAL-PLAN §4.5 specifies `alignment_scores`: "the METHOD.md §5.2 score,
-recomputed on structural change". DATABASE.md records it as not built:
-`alignment.read` computes the score when it is asked.
+recomputed on structural change". Before this change DATABASE.md recorded it
+as not built, and `alignment.read` computed the score when it was asked.
 
 ### 10.1 What exists
 
@@ -416,7 +418,7 @@ recomputed on structural change". DATABASE.md records it as not built:
 | D2 | **Written by `recomputeAlignment`, in the writing transaction**, an upsert beside the findings reconcile | It already holds the answer. The score and the findings then commit together and can never disagree |
 | D3 | **The band is not stored.** It is read from the score and the workspace's §11 alignment bands when the row is read | A workspace that moves its bands would otherwise read yesterday's band until somebody re-parents a goal |
 | D4 | **A new read, `alignment.score { cycleId, scope?, spaceId? }`**, returning the score, the band, the breakdown and `computedAt`, at view access on the scope. The Work Map uses it | One row instead of the graph on the busiest screen. `alignment.read` keeps computing, because it lists every unaligned goal by name, which a number cannot |
-| D5 | **Backfilled once by data change 0034**, every cycle's workspace scope and each space scope with goals, through `recomputeAlignment` | Then a missing row means exactly "no score yet", which is what a new cycle with no goals is, and no reader needs a fallback that computes |
+| D5 | ~~**Backfilled once by data change 0034**, every cycle's workspace scope and each space scope with goals, through `recomputeAlignment`~~ **Replaced while building** by an hourly fill and a read that computes a missing row (§10.6) | A data change lives in `packages/db`, which cannot reach `recomputeAlignment` |
 | D6 | **Tenant scoped, hard delete.** `workspace_id` with a tenant policy in the same migration; marked `openokr:hard-delete`, because a projection that a recompute replaces is not a record | As `search_documents` is. TECHNICAL-PLAN §7.2 gains a `No legacy source, derived` row |
 | D7 | **A test holds the stored and the computed answer equal** after every write in the alignment suite | The one way a projection goes wrong is quietly, and this is where it would |
 
@@ -434,9 +436,14 @@ activity log, which already records each structural change.
   same transaction, and `alignment.read` computes 100.
 - **Given** a workspace that moves its alignment bands, **when** the score is
   read, **then** the band follows the new bands with no recompute.
-- **Given** an instance upgraded with cycles already planned, **when** data
-  change 0034 has run, **then** every cycle with goals has a workspace row and
-  a row for each space with goals.
+- **Given** an instance upgraded with cycles already planned, **when** the
+  score is read before anything stored it, **then** it is computed and right,
+  and **when** the fill has run, **then** every cycle with goals has a
+  workspace row and a row for each space with goals, and a second run stores
+  nothing (§10.6, replacing data change 0034).
+- **Given** a parent deleted in one cycle with goals hanging from it in
+  another, **when** it is deleted or restored, **then** the other cycle's
+  stored score moves with it (§10.6).
 - **Given** a member who cannot see a space, **when** they ask for its score,
   **then** it is not found.
 - **Given** the Work Map, **when** it loads, **then** it reads one row and calls
@@ -446,8 +453,29 @@ activity log, which already records each structural change.
 
 | Kind | File | Covers |
 |---|---|---|
-| Integration | `packages/core/test/alignment-scores.test.ts` | The upsert on every §7 trigger, stored equals computed, the band from current thresholds, access |
-| Integration | `packages/db/test/data-change.test.ts` | 0034 backfills, and a second run changes nothing |
+| Integration | `packages/core/test/alignment-scores.test.ts` | The upsert on every §7 trigger, a parent deleted in another cycle, stored equals computed, the band from current thresholds, access, the read that computes a missing row, and the fill: once, and never over a row a write stored |
+| Integration | `packages/core/test/alignment.test.ts` (existing) | Stored equals computed after every test in the suite, through `alignment-stored.ts` (D7) |
 | Integration | `packages/db` migration suite, `pnpm db:lint` | Tenant policy, hard-delete marker, the unique index |
-| Unit | `apps/web/test/work-map.test.tsx` | The Work Map reads `alignment.score` |
-| Performance | `pnpm perf:budgets` | A new §13.1 row for the stored read, which should be a few milliseconds |
+| Unit | `apps/web/test/work-map.test.tsx` | The Work Map reads `alignment.score` and never `alignment.read` |
+| Unit | `apps/web/test/scheduler.test.ts` (existing) | The hourly fill is scheduled, as an instance job off the registry |
+| Performance | `pnpm perf:budgets` | §13.1's new row, "Alignment score read, one cycle": 50 ms at the 95th percentile |
+
+### 10.6 Settled while building, 9 November 2026
+
+Akmal delegated these to the coordinator's recommendations the same day.
+
+| # | Question | Settled |
+|---|---|---|
+| S1 | **D5 could not be built.** A data change lives in `packages/db`, which cannot import `packages/core` (where `recomputeAlignment` is) or `packages/method`. Repeating the §5.2 share in SQL would be a second copy of a METHOD rule, which CLAUDE.md forbids | **No data change.** `fillAlignmentScores` (`packages/core/src/alignment/fill.ts`) stores every live cycle with goals that has no workspace row, and every space with goals that has no row of its own, through `recomputeAlignment`, one workspace at a time inside its own tenant setting. The scheduler runs it hourly (`alignment.fillScores`, an instance job), `pnpm alignment:fill` runs it now, and `pnpm db:seed:large` runs it on its workspace. It never overwrites a row a write stored (`keepStored`), so a fill racing a write cannot leave the older answer |
+| S2 | Reading a scope before the fill reaches it | **`alignment.score` computes it** through `alignmentInTx`, stores nothing, and says so with `computedAt: null`. So an upgraded instance is right from the first load, and D7 holds either way |
+| S3 | The band needs `anchored` (§5.2: a gap whatever the share with no company-level objective), and D1's breakdown had no anchor | **`anchored` joins `breakdown`**, with `measured`, `withParent`, `standingAlone` and `unaligned`. `standingAlone` comes from the method package's result, so what a parent or a reason is stays one reading |
+| S4 | D3 said "the workspace's" bands, and `alignment.read` reads the cycle's own rules, which a closed cycle freezes | **The cycle's own rules**, as `alignment.read`, so stored and computed stay equal. For an open cycle these are the workspace's current bands |
+| S5 | The §13.1 row's ceiling | **"Alignment score read, one cycle": 50 ms at the 95th percentile.** TECHNICAL-PLAN §13.1, `BUDGETS` and its count move to sixteen rows |
+| S6 | Writes that move a scope other than their own. A child reads its parent: a deleted parent is no parent, and a parent's level anchors. A quarter's goals hang under an annual objective, so deleting or restoring a goal, changing its level, or removing or restoring a key result moves another cycle's score. `goals.delete` also recomputed nothing at all, though §7 lists it | **These writes also recompute every scope a child sits in** (`scopesHangingFrom`), and the delete recomputes its own scopes. While every read computed live none of this showed; a stored score would have kept the old number |
+| S7 | D4 named `scope?` beside `spaceId?` | **`spaceId?` alone**, as `alignment.read` takes it: a space id is the space scope, and none is the workspace's. View on the space or not found; the workspace's score is readable by any member, as `alignment.read` gives it to the Work Map today, guests included |
+
+Two writes that recompute at the same moment each read the graph as it stood
+before the other committed, so the later commit's score can miss the earlier
+write. The findings table has always had the same window. The next structural
+write in that cycle corrects it; a lock per cycle would close it, and is left
+as a question rather than built.

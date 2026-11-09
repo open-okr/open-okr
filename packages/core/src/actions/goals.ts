@@ -98,7 +98,7 @@ import { richTextSchema } from "../rich-text/field-schema.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
-import { recomputeAlignmentFor } from "./alignment.ts";
+import { recomputeAlignmentFor, scopesHangingFrom } from "./alignment.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { changeTargetInTx, targetReason } from "./goal-targets.ts";
@@ -313,6 +313,13 @@ async function realign(
   workspaceId: string,
   goalId: string,
   alsoCycleId?: string | null,
+  options: {
+    /**
+     * Also the scopes of the goals hanging from this one (plan 0.7.0 D2):
+     * for a restore and a level change, which move how its children read.
+     */
+    readonly children?: boolean;
+  } = {},
 ): Promise<void> {
   const [goal] = await tx
     .select({ cycleId: goals.cycleId, spaceId: goals.spaceId })
@@ -333,6 +340,9 @@ async function realign(
     // Moving a goal between cycles changes two pictures, not one: the cycle it
     // left has one goal fewer to hang together.
     touched.push({ cycleId: alsoCycleId, spaceId: goal.spaceId });
+  }
+  if (options.children) {
+    touched.push(...(await scopesHangingFrom(tx, workspaceId, { goalId })));
   }
   await recomputeAlignmentFor(tx, workspaceId, touched);
 }
@@ -1618,8 +1628,12 @@ export const updateGoal = defineWriteAction({
       // An update can move the parent, the level or the owning space, and all
       // three are what the score reads. It can also move only a title, and
       // recomputing then costs one query set and keeps this honest without a
-      // list of fields to forget to extend.
-      await realign(tx, workspaceId, updated.id);
+      // list of fields to forget to extend. A level also moves the goals
+      // hanging from this one, which may sit in another cycle: an annual
+      // objective that stops being a company one stops anchoring the quarter.
+      await realign(tx, workspaceId, updated.id, null, {
+        children: input.level !== undefined,
+      });
 
       return {
         result: { id: updated.id },
@@ -2807,6 +2821,13 @@ export const removeKeyResult = defineWriteAction({
       if (count === 0) {
         await realign(tx, workspaceId, owner.goalId);
       }
+      // A goal hanging from this key result has no parent now, wherever it
+      // sits, and its scope's stored score has to say so (plan 0.7.0 D2).
+      await recomputeAlignmentFor(
+        tx,
+        workspaceId,
+        await scopesHangingFrom(tx, workspaceId, { keyResultId: input.id }),
+      );
 
       return {
         result: { id: input.id },
@@ -3044,7 +3065,12 @@ export const deleteGoal = defineWriteAction({
       );
 
       const [goal] = await tx
-        .select({ title: goals.title, level: goals.level })
+        .select({
+          title: goals.title,
+          level: goals.level,
+          cycleId: goals.cycleId,
+          spaceId: goals.spaceId,
+        })
         .from(goals)
         .where(
           activeOnly(
@@ -3080,6 +3106,16 @@ export const deleteGoal = defineWriteAction({
             eq(goals.id, input.id),
           ),
         );
+
+      // Design §7 lists a delete among the writes that recompute, and this
+      // one did not: while every read computed live nobody could tell. With
+      // the score stored (plan 0.7.0 D2) the goal's own scopes would keep
+      // counting it, and so would every scope of the goals hanging from it,
+      // which a deleted parent leaves unaligned.
+      await recomputeAlignmentFor(tx, workspaceId, [
+        { cycleId: goal.cycleId, spaceId: goal.spaceId },
+        ...(await scopesHangingFrom(tx, workspaceId, { goalId: input.id })),
+      ]);
 
       return {
         result: { id: input.id },
@@ -3202,7 +3238,8 @@ export const restoreGoal = defineWriteAction({
         );
 
       await recompute(tx, workspaceId, input.id);
-      await realign(tx, workspaceId, input.id);
+      // With the goals hanging from it, which align again (plan 0.7.0 D2).
+      await realign(tx, workspaceId, input.id, null, { children: true });
 
       return {
         result: { id: input.id, keyResults: restored.length },

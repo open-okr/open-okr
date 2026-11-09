@@ -10330,6 +10330,37 @@
       }
     },
     {
+      "name": "alignment.score",
+      "description": "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The cycle's id, from cycles.current or cycles.list."
+          },
+          "spaceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The space's id, from spaces.list."
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "alignment.graph",
       "description": "The cascade as nodes and edges, for the alignment studio canvas.",
       "inputSchema": {

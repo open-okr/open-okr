@@ -370,8 +370,10 @@ The §5.4 register. A provider is named either as a space in this workspace or a
 ### alignment_findings
 `scope` (`workspace` / `space`), `scope_id?`, `kind` (`structure` / `relink` / `dependency` / `conflict` / `gap` / `divergence`), `severity` (`high` / `medium` / `low`), `subject_goal_id?` to goals, `subject_key_result_id?` to key_results, `target_goal_id?` to goals, `reason`, `rule_key?`, `source` (`engine` / `coach`), `state` (`open` / `applied` / `dismissed`), `decided_by_id?`, `decided_at?`.
 
-### alignment_scores *(specified in TECHNICAL-PLAN §4.5, not built)*
-`scope`, `scope_id?`, `cycle_id` to cycles, `score smallint`, `breakdown jsonb`, `computed_at`. No migration creates it: `alignment.read` computes the score when it is asked.
+### alignment_scores *(migration 0161, plan 0.7.0 D2, hard delete)*
+`scope` (`workspace` / `space`), `scope_id?` to spaces, `cycle_id` to cycles, `score smallint?` (0 to 100; null is METHOD.md §5.2's "no score", nothing below company level), `breakdown jsonb` (`measured`, `withParent`, `standingAlone`, `unaligned`, `anchored`), `computed_at`.
+
+The latest score per scope per cycle, unique on `(workspace_id, cycle_id, scope, scope_id)` with nulls not distinct, and a check that the scope agrees with its id. `recomputeAlignment` upserts it in the writing transaction beside the findings, so the two commit together. The band is not stored: `alignment.score` reads it from the score, `anchored` and the cycle's own thresholds, so moving a workspace's bands needs no recompute. A scope no write has touched since 0.7.0 has no row; `alignment.score` computes it without storing, and the hourly fill and `pnpm alignment:fill` store it. No `deleted_at`, because a projection that a recompute replaces is not a record. Design: `docs/design/alignment-engine.md` §10.
 
 ## 9. KPIs, trees and recovery (domain F)
 

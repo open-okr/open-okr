@@ -1,4 +1,12 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  jsonb,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { cycles } from "./cycles.ts";
 import { goals, keyResults } from "./goals.ts";
@@ -185,6 +193,54 @@ export const alignmentFindings = pgTable("alignment_findings", {
     .notNull()
     .defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * What the stored share is made of (design `alignment-engine.md` §10, D1).
+ * `withParent + standingAlone` is the share's numerator and `measured` its
+ * denominator. `anchored` is here because the band needs it: with no
+ * company-level objective the reading is a gap whatever the share (§5.2).
+ */
+export interface AlignmentScoreBreakdown {
+  /** Goals below company level in the scope. */
+  readonly measured: number;
+  /** Of those, the ones with a parent goal or key result. */
+  readonly withParent: number;
+  /** No parent, and a reason to stand alone. */
+  readonly standingAlone: number;
+  /** Neither, so not counted. */
+  readonly unaligned: number;
+  readonly anchored: boolean;
+}
+
+/**
+ * The latest alignment score per scope per cycle (plan 0.7.0 D2, migration
+ * 0161).
+ *
+ * A projection `recomputeAlignment` writes in the same transaction as the
+ * findings, so the two cannot disagree. No `deleted_at`: a recompute replaces
+ * the row, and an old score is not a record anybody restores. The band is
+ * not here, because it is read from the cycle's thresholds when the row is
+ * read.
+ */
+export const alignmentScores = pgTable("alignment_scores", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  cycleId: uuid("cycle_id")
+    .notNull()
+    .references(() => cycles.id, { onDelete: "cascade" }),
+  scope: text("scope", { enum: ALIGNMENT_FINDING_SCOPES }).notNull(),
+  scopeId: uuid("scope_id").references(() => spaces.id, {
+    onDelete: "cascade",
+  }),
+  /** Null when nothing below company level is in scope (§5.2). */
+  score: smallint("score"),
+  breakdown: jsonb("breakdown").$type<AlignmentScoreBreakdown>().notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type GoalDependencyRow = typeof goalDependencies.$inferSelect;

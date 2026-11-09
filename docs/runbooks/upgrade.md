@@ -107,6 +107,15 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   unlimited). With it set, one workspace's burst of mail and nudges waits
   its turn rather than delaying everybody else's.
 
+- **The stored alignment score.** Migration 0161 adds `alignment_scores`,
+  which every structural write now fills for its cycle. Cycles planned
+  before the upgrade have no row until something changes their structure,
+  so the Work Map computes their score as it did before, and the answer is
+  the same. An hourly job stores those rows within the hour;
+  `pnpm alignment:fill` stores them now, and is how an instance running with
+  `OPENOKR_SCHEDULER=off` gets them. Nothing to configure, and no data change
+  to run.
+
 - **Trials.** Migration 0158 adds two columns to `tenants`. Nothing changes
   until an operator sets a trial on a workspace's console page. An hourly
   job then ends each trial past its date: a live subscription carries on,

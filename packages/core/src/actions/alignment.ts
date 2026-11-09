@@ -17,9 +17,11 @@
 import {
   activeOnly,
   alignmentFindings,
+  alignmentScores,
   cycles,
   goalDependencies,
   goals,
+  includeDeleted,
   keyResultDependencies,
   keyResults,
   newId,
@@ -27,8 +29,8 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { ALIGNMENT_BANDS } from "@openokr/method";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { ALIGNMENT_BANDS, alignmentBand } from "@openokr/method";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
@@ -40,12 +42,15 @@ import {
   oneClickApplicable,
 } from "../alignment/applicable.ts";
 import {
+  alignmentBreakdown,
   alignmentInTx,
+  alignmentThresholdsOf,
   blocksPublish,
   loadDependencyRegister,
   recomputeAlignment,
   scopesForGoal,
 } from "../alignment/service.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -176,6 +181,55 @@ export async function recomputeAlignmentFor(
       });
     }
   }
+}
+
+/**
+ * The scopes of every live goal hanging from a goal, or from one of its key
+ * results (plan 0.7.0 D2).
+ *
+ * A child's alignment is read through its parent: a deleted parent is no
+ * parent, and a parent's level is what anchors a cycle (§5.1, §5.2). So
+ * deleting, restoring or re-levelling a goal, or removing one of its key
+ * results, moves the score of every scope a child sits in, which can be
+ * another space and another cycle: a quarter's goals hang under an annual
+ * objective. With the score stored, a scope the write did not recompute
+ * would keep a number the rows no longer support.
+ *
+ * Key results in any state, because the delete and the restore stamp them
+ * together with their goal.
+ */
+export async function scopesHangingFrom(
+  tx: OperationTx,
+  workspaceId: string,
+  from: { readonly goalId: string } | { readonly keyResultId: string },
+): Promise<{ cycleId: string | null; spaceId: string | null }[]> {
+  const ownKeyResults = tx
+    .select({ id: keyResults.id })
+    .from(keyResults)
+    .where(
+      includeDeleted(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        "goalId" in from
+          ? eq(keyResults.goalId, from.goalId)
+          : eq(keyResults.id, from.keyResultId),
+      ),
+    );
+  return tx
+    .selectDistinct({ cycleId: goals.cycleId, spaceId: goals.spaceId })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, workspaceId),
+        "goalId" in from
+          ? or(
+              eq(goals.parentGoalId, from.goalId),
+              inArray(goals.parentKeyResultId, ownKeyResults),
+            )
+          : inArray(goals.parentKeyResultId, ownKeyResults),
+      ),
+    );
 }
 
 export const addGoalDependency = defineWriteAction({
@@ -1581,6 +1635,156 @@ export const readAlignment = defineReadAction({
             cycle?.sponsorId && sponsorName
               ? { id: cycle.sponsorId, name: sponsorName }
               : null,
+        };
+      },
+    );
+  },
+});
+
+/**
+ * The alignment score for one scope, from the stored row (design
+ * `alignment-engine.md` §10, plan 0.7.0 D2).
+ *
+ * One row instead of the graph, for the screens that show only the number:
+ * the Work Map called `alignment.read` on every load for its score and band.
+ * `alignment.read` keeps computing, because it lists every unaligned goal by
+ * name, which a number cannot.
+ *
+ * **The band is read here, never stored** (D3): from the score, `anchored`
+ * and the cycle's own thresholds, the rules `alignment.read` reads too, so a
+ * workspace that moves its bands sees the new band at once and stored stays
+ * equal to computed. A closed cycle keeps the thresholds it closed under.
+ *
+ * **No row yet is computed, not stored.** A scope no write has touched since
+ * 0.7.0, such as a cycle planned before the upgrade, is computed through the
+ * same engine and returned with `computedAt` null, so the answer is right
+ * before the hourly fill stores it. A read never writes.
+ *
+ * Access: a space's score needs view on the space, and is not found
+ * otherwise. The workspace's score is a fact about the cycle, readable by any
+ * member, as `alignment.read` has always given it to the Work Map.
+ */
+export const readAlignmentScore = defineReadAction({
+  name: "alignment.score",
+  summary:
+    "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
+  input: z.object({
+    cycleId: z.uuid(),
+    /** One space's score. The workspace's when absent. */
+    spaceId: z.uuid().optional(),
+  }),
+  output: z.object({
+    /**
+     * The share of goals below company level that align or stand alone with
+     * a reason, as a whole percentage (METHOD.md §5.2). Null when nothing
+     * below company level is in scope.
+     */
+    score: z.number().int().nullable(),
+    band: z.enum(ALIGNMENT_BANDS).nullable(),
+    /** The healthy and watch thresholds the band was read against. */
+    threshold: z.number(),
+    watchThreshold: z.number(),
+    breakdown: z.object({
+      /** Goals below company level in scope. */
+      measured: z.number().int(),
+      withParent: z.number().int(),
+      /** No parent, and a reason to stand alone. */
+      standingAlone: z.number().int(),
+      unaligned: z.number().int(),
+      /** A company-level objective anchors the cycle. Always true for a space. */
+      anchored: z.boolean(),
+    }),
+    /** When the stored row was written. Null when nothing is stored yet. */
+    computedAt: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        if (input.spaceId) {
+          await getAccessScoped(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            resourceType: "space",
+            resourceId: input.spaceId,
+            requires: ACCESS_LEVELS.view as never,
+          });
+        }
+        const scope = input.spaceId
+          ? ({ kind: "space", spaceId: input.spaceId } as const)
+          : ({ kind: "workspace" } as const);
+
+        const [row] = await tx
+          .select({
+            score: alignmentScores.score,
+            breakdown: alignmentScores.breakdown,
+            computedAt: alignmentScores.computedAt,
+          })
+          .from(alignmentScores)
+          .where(
+            and(
+              eq(alignmentScores.workspaceId, context.workspaceId),
+              eq(alignmentScores.cycleId, input.cycleId),
+              eq(alignmentScores.scope, scope.kind),
+              scope.kind === "space"
+                ? eq(alignmentScores.scopeId, scope.spaceId)
+                : isNull(alignmentScores.scopeId),
+            ),
+          )
+          .limit(1);
+
+        const reading = row
+          ? {
+              score: row.score,
+              breakdown: row.breakdown,
+              computedAt: row.computedAt.toISOString(),
+            }
+          : await (async () => {
+              const { result } = await alignmentInTx(tx, {
+                workspaceId: context.workspaceId,
+                cycleId: input.cycleId,
+                scope,
+              });
+              return {
+                score: result.score,
+                breakdown: alignmentBreakdown(result),
+                computedAt: null,
+              };
+            })();
+
+        const thresholds = alignmentThresholdsOf(
+          (await cycleRulesInTx(tx, context.workspaceId, input.cycleId))
+            .thresholds,
+        );
+        return {
+          score: reading.score,
+          band:
+            reading.score === null
+              ? null
+              : alignmentBand(
+                  reading.score,
+                  thresholds,
+                  reading.breakdown.anchored,
+                ),
+          threshold: thresholds.healthy,
+          watchThreshold: thresholds.watch,
+          breakdown: {
+            measured: reading.breakdown.measured,
+            withParent: reading.breakdown.withParent,
+            standingAlone: reading.breakdown.standingAlone,
+            unaligned: reading.breakdown.unaligned,
+            anchored: reading.breakdown.anchored,
+          },
+          computedAt: reading.computedAt,
         };
       },
     );

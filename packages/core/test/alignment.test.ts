@@ -1,7 +1,8 @@
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { expectStoredEqualsComputed } from "./alignment-stored.ts";
 
 /**
  * Alignment against a real database (P3-T09, METHOD.md §5, design
@@ -157,6 +158,13 @@ beforeEach(async () => {
   );
   spaceA = a.id;
   spaceB = b.id;
+});
+
+// Stored equals computed after every test in this suite (design §10, D7):
+// whatever the writes above did, the score they stored is the score the
+// graph gives now, and no scope with goals is missing one.
+afterEach(async () => {
+  await expectStoredEqualsComputed(workspaceId, OWNER);
 });
 
 afterAll(async () => {

@@ -8535,6 +8535,29 @@
       "pages": false
     },
     {
+      "name": "alignment score",
+      "action": "alignment.score",
+      "method": "GET",
+      "path": "/alignment/score",
+      "scope": "read",
+      "summary": "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "alignment graph",
       "action": "alignment.graph",
       "method": "GET",

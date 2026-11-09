@@ -112,6 +112,9 @@ describe("the run table", () => {
   // `auth.purgeSignInAttempts` since plan 0.7.0 P10 (docs/design/
   // account-lockout.md D16): sign-in counters belong to no workspace and no
   // member, and letting a caller empty them would be a way to lift a hold.
+  // `alignment.fillScores` since plan 0.7.0 D2 (alignment-engine.md §10): it
+  // walks every workspace storing the scores no write has stored yet, as the
+  // system, and a reader already gets the same answer from `alignment.score`.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
@@ -122,6 +125,7 @@ describe("the run table", () => {
     "auth.purgeSignInAttempts",
     "cloud.sweepTrials",
     "cycles.sweepEnded",
+    "alignment.fillScores",
   ]);
 
   test("names a real action for every run", () => {
@@ -153,12 +157,14 @@ describe("the run table", () => {
       "auth.purgeSignInAttempts",
       "cloud.sweepTrials",
       "cycles.sweepEnded",
+      "alignment.fillScores",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
     expect(off.map((run) => run.job).sort()).toEqual([
+      "alignment.fillScores",
       "audit.chain",
       "auth.purgeSignInAttempts",
       "cloud.measureUsage",
@@ -202,6 +208,16 @@ describe("the run table", () => {
     );
     expect(sweep?.instance).toBe(true);
     expect(sweep?.cron).toBe("25 * * * *");
+  });
+
+  // An upgraded instance has cycles no write has scored yet. `alignment.score`
+  // computes those on read, and this stores them (alignment-engine.md §10).
+  test("fills the alignment scores no write has stored, every hour", () => {
+    const fill = SCHEDULED_RUNS.find(
+      (run) => run.action === "alignment.fillScores",
+    );
+    expect(fill?.instance).toBe(true);
+    expect(fill?.cron).toBe("35 * * * *");
   });
 
   test("purges stale sign-in counters for the instance, once a day", () => {

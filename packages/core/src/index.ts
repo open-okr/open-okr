@@ -217,6 +217,7 @@ export {
   summariseUsage,
   type UsageSummaryRow,
 } from "./ai/usage.ts";
+export { fillAlignmentScores } from "./alignment/fill.ts";
 export {
   buildCliContract,
   type CliCommand,

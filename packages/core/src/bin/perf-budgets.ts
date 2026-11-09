@@ -108,7 +108,11 @@ function inputFor(budget: Budget): Record<string, unknown> {
   if (budget.action === "tasks.board") {
     return { ...base, spaceId: sample.spaceId };
   }
-  if (budget.action === "alignment.read" || budget.action === "goals.tree") {
+  if (
+    budget.action === "alignment.read" ||
+    budget.action === "alignment.score" ||
+    budget.action === "goals.tree"
+  ) {
     return { ...base, cycleId: sample.cycleId };
   }
   return base;

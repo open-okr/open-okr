@@ -1,7 +1,7 @@
 /**
  * TECHNICAL-PLAN §13.1's budgets, and what measures each one (P7-T01b).
  *
- * §13.1 lists fifteen rows and they are not all the same kind of thing. Some
+ * §13.1 lists sixteen rows and they are not all the same kind of thing. Some
  * are a server read this process can time directly. Some are a browser paint,
  * a frame rate or a Core Web Vital, which needs a real page and belongs to
  * P7-T05. One is a delivery through a chat provider, which needs a channel and
@@ -106,6 +106,18 @@ export const BUDGETS: readonly Budget[] = [
     measuredBy: "here",
     action: "alignment.read",
     // The cycle is filled in by the runner, which reads one from the workspace.
+    input: {},
+  },
+  {
+    surface: "Alignment score read, one cycle",
+    ms: 50,
+    statistic: "p95",
+    measuredBy: "here",
+    // The stored row the Work Map reads (plan 0.7.0 D2), one row where the
+    // row above is the whole graph. `pnpm db:seed:large` stores the scores,
+    // so this times the row and not the fallback that computes. The cycle is
+    // filled in by the runner.
+    action: "alignment.score",
     input: {},
   },
   {

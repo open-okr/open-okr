@@ -214,6 +214,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "goals.escalateDependency",
     "goals.removeKeyResultDependency",
     "alignment.read",
+    "alignment.score",
     "alignment.graph",
     "alignment.dismissFinding",
     "alignment.applyFinding",

@@ -129,6 +129,13 @@ export interface AlignmentResult {
   /** Of those, the ones aligned or standing alone with a reason. */
   readonly counted: number;
   /**
+   * Of those counted, the ones counted by a reason alone: no parent, and a
+   * reason to stand alone. The rest of `counted` have a parent. Kept apart so
+   * the stored breakdown can say which way a goal counts (plan 0.7.0 D2)
+   * without a second reading of what a parent or a reason is.
+   */
+  readonly standingAlone: number;
+  /**
    * The goals the share did not count, sorted. §5.2 lists every one, whether
    * or not a check is raised against it: a goal that states a contribution
    * passes AL-1 and is still not counted, and AL-1 may be off.
@@ -211,6 +218,7 @@ export function alignmentScore(
       band: null,
       measured: 0,
       counted: 0,
+      standingAlone: 0,
       uncounted: [],
       findings: [],
       // Nothing to anchor, and nothing to scold.
@@ -244,6 +252,7 @@ export function alignmentScore(
 
   let measured = 0;
   let counted = 0;
+  let standingAlone = 0;
   const uncounted: string[] = [];
   for (const goal of goals) {
     const parentLevel = goal.parentGoalId
@@ -259,6 +268,9 @@ export function alignmentScore(
       // supports without pointing at it.
       if (aligned) {
         counted += 1;
+        if (parentLevel === null) {
+          standingAlone += 1;
+        }
       } else {
         uncounted.push(goal.id);
       }
@@ -332,6 +344,7 @@ export function alignmentScore(
     band: score === null ? null : alignmentBand(score, thresholds, anchored),
     measured,
     counted,
+    standingAlone,
     uncounted: uncounted.sort((left, right) => left.localeCompare(right)),
     findings: sortFindings(findings),
     anchored,

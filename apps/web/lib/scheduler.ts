@@ -46,6 +46,7 @@ import {
   callAction,
   chainWorkspace,
   defaultMetrics,
+  fillAlignmentScores,
   isCloudEnabled,
   listLiveWorkspaces,
   METRIC,
@@ -138,6 +139,10 @@ export interface ScheduledRun {
     // support-access.md §5). Access is refused at expiry without it; this
     // stamps the row and suspends the operator's member (plan 0.7.0, B2).
     | "support.sweepExpired"
+    // Storing the alignment scores no structural write has stored yet, such
+    // as an upgraded instance's earlier cycles (alignment-engine.md §10,
+    // plan 0.7.0 D2). `alignment.score` computes them on read meanwhile.
+    | "alignment.fillScores"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -295,6 +300,16 @@ const TRIAL_SWEEP_CRON = "25 * * * *";
 const SUPPORT_SWEEP_JOB = "support.sweepExpired";
 const SUPPORT_SWEEP_CRON = "*/5 * * * *";
 
+/**
+ * The alignment score fill (alignment-engine.md §10, plan 0.7.0 D2). Hourly,
+ * at a minute no other hourly job takes. A missing score is never wrong on
+ * screen, because the read computes it, so an hour is how long the Work Map
+ * may pay for the graph on a cycle nothing has written to since the upgrade.
+ * Once every scope has a row the pass is one indexed query per workspace.
+ */
+const ALIGNMENT_FILL_JOB = "alignment.fillScores";
+const ALIGNMENT_FILL_CRON = "35 * * * *";
+
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
  * Every minute.
@@ -395,6 +410,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: SUPPORT_SWEEP_JOB,
     action: "support.sweepExpired",
     cron: SUPPORT_SWEEP_CRON,
+    instance: true,
+  },
+  {
+    job: ALIGNMENT_FILL_JOB,
+    action: "alignment.fillScores",
+    cron: ALIGNMENT_FILL_CRON,
     instance: true,
   },
 ];
@@ -572,6 +593,15 @@ async function runInstance(run: ScheduledRun): Promise<void> {
       log(
         `support.sweepExpired could not end ${failed} expired support session(s); access is refused at expiry regardless`,
       );
+    }
+    return;
+  }
+  if (run.action === "alignment.fillScores") {
+    // Straight to the fill, as the system: it walks every workspace, has no
+    // member to act as, and stores what a structural write would have.
+    const { filled } = await fillAlignmentScores(getPool());
+    if (filled > 0) {
+      log(`alignment.fillScores stored ${filled} alignment score(s)`);
     }
     return;
   }
