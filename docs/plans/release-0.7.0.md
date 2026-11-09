@@ -193,8 +193,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Section 3 | done | Stale text, one change |
 | A1 to A13 | to do | A1 and A6 design first. A2 design approved: `docs/design/agent-tool-calls.md`. A4 design approved, with agent API tokens: `docs/design/agent-connections-admin.md`. A3 done |
 | O1 to O6 | to do | O2 and O5 design first. O6 design approved, with three more actions: `docs/design/irreversible-scope.md` |
-| S1 to S3 | to do | S2 done |
+| S1 to S3 | to do | S2 done. S3 done |
 | U1 to U3 | to do | U3 design first |
 | R1 to R4 | to do | R2 design approved: `docs/design/rich-text-editor.md` §11. R4 added from its Q2. R1 done |
-| P1 to P10 | to do | P1 done with B2. P2 design approved: `docs/design/support-access.md` §10. P10 design approved, with an email when a hold begins: `docs/design/account-lockout.md`. P4 and P7 design first. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet |
+| P1 to P10 | to do | P1 done with B2. P2 design approved: `docs/design/support-access.md` §10. P10 design approved, with an email when a hold begins: `docs/design/account-lockout.md`. P4 and P7 design first. P8 done. P9 done; the Compose smoke test with the new status and data-change steps is not run yet. P3 done except seats used, which needs a `seat_count` column on the usage snapshot and so a design |
 | D1 to D5 | to do | D4 only needs no design |
