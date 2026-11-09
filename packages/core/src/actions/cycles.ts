@@ -46,6 +46,7 @@ import {
   feedForwardInTx,
   feedFromClosedPredecessorInTx,
 } from "../cycles/archive.ts";
+import { CLOSING_PHASE } from "../cycles/closing.ts";
 import {
   addDays,
   cyclePeriodFor,
@@ -532,6 +533,14 @@ export const createCycle = defineWriteAction({
     name: z.string().trim().min(1).max(120).optional(),
     /** The source system's identifier for this cycle, when an import made it. */
     legacy: legacyKey.optional(),
+    /**
+     * The local date to create the cycle as of (okr-core-domain.md §10 C7,
+     * plan 0.7.0 O2). A period that has ended by then starts `closing`.
+     * Defaults to today in the workspace's timezone; a replay that writes a
+     * dated story in order, as the demo year does, passes the story's date,
+     * so a quarter it then publishes was not over on the day it published.
+     */
+    asOf: z.string().regex(LOCAL_DATE_PATTERN).optional(),
   }),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
@@ -579,7 +588,7 @@ export const createCycle = defineWriteAction({
         workspaceId,
         cadence,
         period,
-        today: formatLocalDate(localDateIn(new Date(), timeZone)),
+        today: input.asOf ?? formatLocalDate(localDateIn(new Date(), timeZone)),
         firstCycle: input.firstCycle,
         sponsorId: input.sponsorId ?? memberId,
         facilitatorId: input.facilitatorId ?? memberId,
@@ -633,6 +642,112 @@ export const createCycle = defineWriteAction({
                 }
               : {}),
           },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The facilitator starts closing a cycle early, or takes that back
+ * (docs/design/okr-core-domain.md §10 C4, C5, plan 0.7.0 O2).
+ *
+ * METHOD.md §8 holds the quarterly review about two weeks before the end, so a
+ * team that has started its review can say so. Undoing is allowed only while
+ * the end has not passed, or the hourly sweep would move it straight back.
+ * At `full`, like `cycles.update` and `cycles.close`.
+ */
+export const setCycleClosing = defineWriteAction({
+  name: "cycles.setClosing",
+  summary:
+    "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
+  input: z.object({ cycleId: z.uuid(), closing: z.boolean() }),
+  output: z.object({ id: z.uuid(), status: z.string(), phase: z.number() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [cycle] = await tx
+        .select({
+          name: cycles.name,
+          endsOn: cycles.endsOn,
+          status: cycles.status,
+          phase: cycles.phase,
+          publishedAt: cycles.publishedAt,
+        })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.id, input.cycleId),
+            eq(cycles.workspaceId, workspaceId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!cycle) {
+        throw new OperationError("not_found", "No such cycle.");
+      }
+      if (cycle.status === "closed") {
+        throw new OperationError("forbidden", "This cycle is already closed.");
+      }
+      const published = cycle.publishedAt !== null;
+      let status: "planning" | "active" | "closing";
+      let phase: number;
+      if (input.closing) {
+        if (cycle.status === "closing") {
+          throw new OperationError(
+            "forbidden",
+            "This cycle is already closing.",
+          );
+        }
+        status = "closing";
+        phase = CLOSING_PHASE;
+      } else {
+        if (cycle.status !== "closing") {
+          throw new OperationError("forbidden", "This cycle is not closing.");
+        }
+        const today = formatLocalDate(
+          localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
+        );
+        if (today > cycle.endsOn) {
+          throw new OperationError(
+            "forbidden",
+            `This cycle ended on ${cycle.endsOn}, so it stays closing until it is closed.`,
+          );
+        }
+        status = published ? "active" : "planning";
+        // Back to Run the cadence when published; otherwise where it was.
+        phase = published ? 6 : cycle.phase;
+      }
+      // openokr:allow-mutation: this Operation's own transaction.
+      await tx
+        .update(cycles)
+        .set({ status, phase, updatedAt: new Date() })
+        .where(activeOnly(cycles, eq(cycles.id, input.cycleId)));
+      return {
+        result: { id: input.cycleId, status, phase },
+        activity: input.closing
+          ? {
+              kind: "cycle.closing_started",
+              subjectType: "cycle",
+              subjectId: input.cycleId,
+              payload: {
+                cycleId: input.cycleId,
+                name: cycle.name,
+                by: "facilitator",
+              },
+            }
+          : {
+              kind: "cycle.closing_undone",
+              subjectType: "cycle",
+              subjectId: input.cycleId,
+              payload: { cycleId: input.cycleId, name: cycle.name },
+            },
+        audit: {
+          action: "cycles.setClosing",
+          targetType: "cycle",
+          targetId: input.cycleId,
+          payload: { closing: input.closing, from: cycle.status, to: status },
         },
       };
     },

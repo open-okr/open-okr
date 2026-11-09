@@ -289,6 +289,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `Cycle "${asString(p.name, "a new cycle")}" was created`,
   "cycle.resolved": (p) =>
     `Cycle "${asString(p.name, "the current cycle")}" was opened`,
+  "cycle.closing_started": (p) =>
+    p.by === "date"
+      ? `${asString(p.name, "The cycle")} ended and is closing: score it and close it`
+      : `${asString(p.name, "The cycle")} started closing early`,
+  "cycle.closing_undone": (p) =>
+    `${asString(p.name, "The cycle")} is no longer closing`,
   "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
   "cycle.archived": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was archived`,

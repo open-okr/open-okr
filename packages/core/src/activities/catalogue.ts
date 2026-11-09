@@ -321,6 +321,14 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "cycle.resolved": z.object({ name: z.string() }),
   "cycle.updated": z.object({ name: z.string() }),
+  // A cycle moved to closing, by its end date passing or by its facilitator,
+  // and a facilitator taking that back (okr-core-domain.md §10, plan 0.7.0 O2).
+  "cycle.closing_started": z.object({
+    cycleId: z.uuid(),
+    name: z.string(),
+    by: z.enum(["date", "facilitator"]),
+  }),
+  "cycle.closing_undone": z.object({ cycleId: z.uuid(), name: z.string() }),
   "cycle.archived": z.object({ name: z.string() }),
   "rhythm.updated": z.object({ keys: z.array(z.string()) }),
   // The METHOD.md §12 practice settings (P9-T01).

@@ -53,6 +53,7 @@ import {
   outboxRetentionDays,
   purgeStaleSignInAttempts,
   remindBeforeErasure,
+  sweepEndedCycles,
   sweepExpiredSessions,
   sweepTrials,
 } from "@openokr/core";
@@ -112,6 +113,10 @@ export interface ScheduledRun {
     | "channels.sweepMessageLog"
     // Plan 0.7.0 A2: the agent tool call record's retention, per workspace.
     | "connections.sweepToolCalls"
+    // Plan 0.7.0 O2: moving every ended cycle to closing, per workspace, as
+    // the system. Not a registry action: a date passing is not something an
+    // API caller starts (okr-core-domain.md §10 C2).
+    | "cycles.sweepEnded"
     // Instance housekeeping, run once rather than per workspace: settled
     // outbox rows have no tenant to scope to (completeness review M-19).
     | "outbox.purge"
@@ -246,6 +251,14 @@ const SIGN_IN_PURGE_CRON = "30 4 * * *";
 const TOOL_CALL_SWEEP_JOB = "connections.sweepToolCalls";
 const TOOL_CALL_SWEEP_CRON = "20 4 * * *";
 
+/**
+ * Moving ended cycles to closing (okr-core-domain.md §10 C1, plan 0.7.0 O2).
+ * Hourly, so a cycle moves within the hour after its workspace's own
+ * midnight, at a minute no agent cadence uses.
+ */
+const CYCLE_CLOSING_SWEEP_JOB = "cycles.sweepEnded";
+const CYCLE_CLOSING_SWEEP_CRON = "35 * * * *";
+
 /** Hourly, so a flag turned on today shows in the console within the hour. */
 const TENANCY_ADOPT_JOB = "tenancy.adopt";
 const TENANCY_ADOPT_CRON = "10 * * * *";
@@ -336,6 +349,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: TOOL_CALL_SWEEP_JOB,
     action: "connections.sweepToolCalls",
     cron: TOOL_CALL_SWEEP_CRON,
+  },
+  {
+    job: CYCLE_CLOSING_SWEEP_JOB,
+    action: "cycles.sweepEnded",
+    cron: CYCLE_CLOSING_SWEEP_CRON,
   },
   {
     job: TENANCY_ADOPT_JOB,
@@ -588,6 +606,14 @@ async function runOne(
   workspace: SchedulableWorkspace,
   run: ScheduledRun,
 ): Promise<void> {
+  // A date passing, as the system, through its own Operations (O2).
+  if (run.action === "cycles.sweepEnded") {
+    const moved = await sweepEndedCycles(getPool(), workspace.id);
+    if (moved > 0) {
+      log(`cycles.sweepEnded moved ${moved} cycle(s) to closing`);
+    }
+    return;
+  }
   const drafter = await drafterForAgent(
     workspace.id,
     run.action === "agents.runCoach" ? "coach" : "champion",

@@ -113,9 +113,9 @@ Two separate things, deliberately. `status` is the cycle's own lifecycle.
 
 | `status` | Meaning | Entered by |
 |---|---|---|
-| `planning` | Phases 0 to 5 are running. Goals may be drafted, nothing is published | Creation |
+| `planning` | Phases 0 to 5 are running. Goals may be drafted, nothing is published | Creation, for a period that has not ended (§10 C7); `cycles.setClosing` taking an unpublished cycle back |
 | `active` | Published, inside its dates. Phase 6 | Publication of the whole set, which also moves the pointer to phase 6 |
-| `closing` | Past `ends_on`, Phase 7 running | The cycle-end job, or the facilitator |
+| `closing` | Past `ends_on`, Phase 7 running | The hourly `cycles.sweepEnded` run once the end has passed, the facilitator through `cycles.setClosing`, or creation for a period already over (§10) |
 | `closed` | Scored and archived | The archive action (P3-T15) |
 
 `phase` is a smallint 0 to 7 the facilitator moves freely. It never gates a
@@ -635,7 +635,9 @@ drifting away from it.
 
 ## 10. Moving a cycle to closing (release 0.7.0, O2)
 
-Status: proposed 9 November 2026 for release 0.7.0 (plan O2), waiting for "design approved". New engine behaviour, so it is designed first.
+Status: approved by Akmal on 9 November 2026 ("design approved"), Q1 yes, and built at release 0.7.0 (plan O2).
+
+**Settled while building.** C7 broke a replay: the Northwind year writes its dated story at today's clock, so a quarter it made and then published had already ended, came out `closing`, and C6 refused the publish. `cycles.create` takes an optional `asOf`, the local date to create the cycle as of, and the year seed passes the date of the event it is writing. Without it, today in the workspace's timezone, as designed. The importer, which publishes nothing, needs none.
 
 ### 10.1 What exists
 

@@ -196,6 +196,9 @@ export async function cycleHolding(
     on,
     mode,
     firstCycle: false,
+    // As of the event being written, so a quarter the story publishes later
+    // was not already over on the day it is made (plan 0.7.0 O2).
+    asOf: context.on,
   });
   return {
     id: created.id,

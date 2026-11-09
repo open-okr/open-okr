@@ -103,6 +103,9 @@ describe("the run table", () => {
   // `support.sweepExpired` since plan 0.7.0 B2 (docs/design/support-access.md
   // §5): it ends every expired support session on the instance, as the
   // system, and an API caller has no business starting it.
+  // `cycles.sweepEnded` since plan 0.7.0 O2 (okr-core-domain.md §10 C2): a
+  // date passing moves a cycle to closing, as the system, and is nothing an
+  // API caller starts.
   // `cloud.sweepTrials` since plan 0.7.0 P4 (tenant-lifecycle.md §11 T4):
   // it walks every tenant whose trial ended, as the system, like the erasure
   // reminder.
@@ -118,6 +121,7 @@ describe("the run table", () => {
     "support.sweepExpired",
     "auth.purgeSignInAttempts",
     "cloud.sweepTrials",
+    "cycles.sweepEnded",
   ]);
 
   test("names a real action for every run", () => {
@@ -148,6 +152,7 @@ describe("the run table", () => {
       "support.sweepExpired",
       "auth.purgeSignInAttempts",
       "cloud.sweepTrials",
+      "cycles.sweepEnded",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -159,6 +164,7 @@ describe("the run table", () => {
       "cloud.measureUsage",
       "cloud.remindErasure",
       "cloud.sweepTrials",
+      "cycles.sweepEnded",
       "outbox.purge",
       "support.sweepExpired",
       "tenancy.adopt",
@@ -182,6 +188,14 @@ describe("the run table", () => {
 
   // Spraying random addresses makes sign-in counter rows, and nothing else
   // removes one nobody comes back to (account-lockout.md D16).
+  test("moves ended cycles to closing per workspace, every hour", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "cycles.sweepEnded",
+    );
+    expect(sweep?.instance).toBeUndefined();
+    expect(sweep?.cron).toBe("35 * * * *");
+  });
+
   test("ends trials past their date for the instance, every hour", () => {
     const sweep = SCHEDULED_RUNS.find(
       (run) => run.action === "cloud.sweepTrials",

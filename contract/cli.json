@@ -4357,6 +4357,12 @@
           "field": "legacy",
           "type": "object",
           "required": false
+        },
+        {
+          "name": "as-of",
+          "field": "asOf",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -4422,6 +4428,29 @@
           "field": "sessionDates",
           "type": "array",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "cycles setClosing",
+      "action": "cycles.setClosing",
+      "method": "POST",
+      "path": "/cycles/setClosing",
+      "scope": "write",
+      "summary": "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "closing",
+          "field": "closing",
+          "type": "boolean",
+          "required": true
         }
       ],
       "pages": false

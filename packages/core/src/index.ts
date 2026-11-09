@@ -746,6 +746,7 @@ export {
   type Reversal,
   reversalFor,
 } from "./copilot/proposals.ts";
+export { sweepEndedCycles } from "./cycles/closing.ts";
 export {
   type BuildDemoResult,
   buildDemoWorkspace,

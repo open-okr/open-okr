@@ -250,3 +250,35 @@ export async function linkToStrategy(
   revalidatePath("/cycle");
   return NO_ERROR;
 }
+
+/**
+ * Starts closing a cycle before its end, or takes that back while the end
+ * has not passed (S-04 phase 7, docs/design/okr-core-domain.md §10 C4, plan
+ * 0.7.0 O2). The server decides both and says why when it refuses.
+ */
+export async function setClosing(
+  _previous: WriteState,
+  form: FormData,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const cycleId = String(form.get("cycleId") ?? "").trim();
+  const closing = form.get("closing") === "true";
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "cycles.setClosing",
+      { cycleId, closing },
+    );
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/cycle");
+  return NO_ERROR;
+}

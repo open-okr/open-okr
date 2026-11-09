@@ -94,6 +94,13 @@ root key, and refuses to finish without it rather than report them sealed.
 
 Notes are added here as 0.7.0 is built, and finished before it is tagged.
 
+- **Ended cycles move to Closing.** Within the hour after the upgrade, every
+  cycle whose last day has passed and that nobody has closed moves to
+  Closing, with an audit row each; the cycle's sponsor or facilitator may
+  then hear the daily "the cycle ends unscored" reminder. Nothing is frozen:
+  check-ins, edits and scores go on, only publishing stops. With
+  `OPENOKR_SCHEDULER=off`, `pnpm cadence:sweep` does it.
+
 - **The outbox rate.** Migration 0159 adds `outbox.claimed_at` and a partial
   index on it. Nothing changes unless you set
   `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE` (60 or more; 0, the default, is

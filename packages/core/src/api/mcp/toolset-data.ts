@@ -183,6 +183,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "cycles.snapshot",
     "cycles.feedForward",
     "cycles.close",
+    "cycles.setClosing",
     "cycles.scorecard",
     "rhythm.read",
     "rhythm.update",

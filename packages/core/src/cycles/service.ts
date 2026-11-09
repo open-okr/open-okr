@@ -28,6 +28,7 @@ import {
   type CyclePeriod,
   cyclePeriodFor,
   localDateIn,
+  parseLocalDate,
   statusForDate,
 } from "./generation.ts";
 
@@ -322,8 +323,16 @@ export async function createCycleInTx<
       cadence: input.cadence,
       startsOn: input.period.startsOn,
       endsOn: input.period.endsOn,
-      status: "planning",
-      phase: input.period.mode === "annual" ? 0 : 1,
+      // A period that has already ended is closing, not being planned
+      // (okr-core-domain.md §10 C7). Never `active`: publication does that.
+      status: statusForDate(input.period, parseLocalDate(input.today), false),
+      phase:
+        statusForDate(input.period, parseLocalDate(input.today), false) ===
+        "closing"
+          ? 7
+          : input.period.mode === "annual"
+            ? 0
+            : 1,
       // The levels it begins with (METHOD v2 §2.7, P9-T07a-c).
       levels: levelsInUse(
         practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice,

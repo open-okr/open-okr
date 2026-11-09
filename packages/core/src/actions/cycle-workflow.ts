@@ -1372,6 +1372,14 @@ export const publishCycle = defineWriteAction({
           "This cycle is already published.",
         );
       }
+      // A cycle past its end, or one its facilitator has started closing, is
+      // scored and closed rather than published (okr-core-domain.md §10 C6).
+      if (cycle.status === "closing") {
+        throw new OperationError(
+          "forbidden",
+          "This cycle has ended or is closing. Score it and close it instead of publishing it.",
+        );
+      }
       const companyOut = Boolean(cycle.companyPublishedAt);
       if (input.step === "company" && companyOut) {
         throw new OperationError(

@@ -9,7 +9,7 @@ import {
   type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
@@ -76,6 +76,14 @@ export const generateMetadata = pageTitle("pageTitle.cycle");
  * screen's link means. Before this the page read the quarter and nothing else,
  * so an annual cycle could exist and never be opened.
  */
+
+/** The status chip's tone (UIUX-PLAN S-04, plan 0.7.0 O2). */
+const STATUS_TONE: Record<string, "neutral" | "info" | "ok" | "warn"> = {
+  planning: "info",
+  active: "ok",
+  closing: "warn",
+  closed: "neutral",
+};
 
 export default async function CyclePage({
   searchParams,
@@ -477,10 +485,21 @@ export default async function CyclePage({
                     viewing2: PHASE_TITLES[viewing] ?? "",
                   })}
                 </h1>
-                <p className="text-xs text-ink-3">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
                   {t("cycle.completionIsComputedNeverSelf", {
                     name: workflow.name,
                   })}
+                  {/* Where the cycle stands (UIUX-PLAN S-04, plan 0.7.0 O2):
+                      Closing above all, which a date can set overnight. */}
+                  <Chip tone={STATUS_TONE[workflow.status] ?? "neutral"}>
+                    {workflow.status === "planning"
+                      ? t("cycle.status.planning")
+                      : workflow.status === "active"
+                        ? t("cycle.status.active")
+                        : workflow.status === "closing"
+                          ? t("cycle.status.closing")
+                          : t("cycle.status.closed")}
+                  </Chip>
                 </p>
               </div>
               <CycleSwitcher
@@ -786,6 +805,11 @@ export default async function CyclePage({
               )}
               cycleId={workflow.cycleId}
               cycleName={workflow.name}
+              status={workflow.status}
+              endsOn={workflow.endsOn}
+              // The server decides with the workspace's own date and refuses
+              // in words; this only spares an undo that would be refused.
+              ended={new Date().toISOString().slice(0, 10) > workflow.endsOn}
               closure={workflow.closure}
               reviewMinutes={reviewMinutes}
               // The same evaluation `cycles.close` refuses on, so the control
