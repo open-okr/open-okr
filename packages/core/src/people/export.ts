@@ -110,6 +110,13 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "AI usage recorded against you",
   },
   {
+    // Plan 0.7.0 A2 (agent-tool-calls.md D17): a record of what somebody's
+    // agent did is about them. Tool, outcome and ids only; no argument text.
+    table: "ai_tool_calls",
+    column: "member_id",
+    label: "Calls your connected agents made",
+  },
+  {
     table: "api_tokens",
     column: "member_id",
     skip: "credential",

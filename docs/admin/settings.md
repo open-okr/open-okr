@@ -22,6 +22,7 @@ no administrator overrides it.
 | `importRowLimit` | 1,000 rows | An import in the browser is bigger than the default ceiling. The command line has no ceiling |
 | `messageLogRetentionDays` | 0, which keeps everything | Your policy says chat message records live for a set span |
 | `agentRunCostCapUsd` | 2.00 US dollars a run | You want a harder or softer ceiling on what an agent run may spend |
+| `agentToolCallRetentionDays` | 90 days | You want the record of what external agents called kept for longer, or for good with 0. It never holds what the agent sent or read back |
 | Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice compares the five side by side under "Compare profiles", links to the method behind them, shows what a profile changes before it is applied, keeps anything the workspace changed itself, lets any one setting be changed on its card, and resets a card to the profile. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
 
 `storageQuotaBytes`, `exportInlineRowLimit`, `importRowLimit`,

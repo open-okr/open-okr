@@ -64,6 +64,10 @@ export async function submitLimits(
       importRowLimit: numberField(form, "importRowLimit"),
       messageLogRetentionDays: numberField(form, "messageLogRetentionDays"),
       agentRunCostCapUsd: numberField(form, "agentRunCostCapUsd"),
+      agentToolCallRetentionDays: numberField(
+        form,
+        "agentToolCallRetentionDays",
+      ),
     };
     const posted = Object.fromEntries(
       Object.entries(input).filter(([, value]) => value !== undefined),

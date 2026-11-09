@@ -32,6 +32,7 @@ import { OperationError } from "../operations/operation.ts";
 import { requireSharedImage, shareAvatar } from "../people/profile.ts";
 import {
   agentRunCostCapSchema,
+  agentToolCallRetentionDaysSchema,
   brandingSchema,
   exportInlineRowLimitSchema,
   findWorkspaceSetting,
@@ -405,6 +406,8 @@ export const updateWorkspaceLimits = defineWriteAction({
       importRowLimit: importRowLimitSchema.optional(),
       messageLogRetentionDays: messageLogRetentionDaysSchema.optional(),
       agentRunCostCapUsd: agentRunCostCapSchema.optional(),
+      // Plan 0.7.0 A2: the agent tool call record's retention.
+      agentToolCallRetentionDays: agentToolCallRetentionDaysSchema.optional(),
     })
     .refine((value) => Object.keys(value).length > 0, {
       message: "nothing to update",

@@ -175,6 +175,7 @@ import {
 import {
   listWorkspaceConnections,
   revokeConnectionAsAdmin,
+  sweepToolCalls,
 } from "./connections-admin.ts";
 import {
   ask,
@@ -586,6 +587,8 @@ export const ACTION_MAP = {
   // Plan 0.7.0 A4: the administrator's view, browser only.
   "connections.list": listWorkspaceConnections,
   "connections.revokeAsAdmin": revokeConnectionAsAdmin,
+  // Plan 0.7.0 A2: the tool call record's retention, run daily.
+  "connections.sweepToolCalls": sweepToolCalls,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,

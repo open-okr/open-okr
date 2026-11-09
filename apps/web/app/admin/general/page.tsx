@@ -103,6 +103,7 @@ export default async function GeneralSettingsPage() {
     importRowLimit: limitOf("importRowLimit"),
     messageLogRetentionDays: limitOf("messageLogRetentionDays"),
     agentRunCostCapUsd: limitOf("agentRunCostCapUsd"),
+    agentToolCallRetentionDays: limitOf("agentToolCallRetentionDays"),
   };
   const canManage =
     (await resolveAccessLevelFor(workspace.workspaceId, workspace.memberId)) >=

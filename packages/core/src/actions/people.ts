@@ -844,6 +844,7 @@ export const eraseMember = defineWriteAction({
         oauthTokens: z.number(),
         copilotThreads: z.number(),
         copilotMessages: z.number(),
+        agentToolCalls: z.number(),
       }),
     }),
   }),

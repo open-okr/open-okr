@@ -28,6 +28,7 @@ import {
   activeOnly,
   aiMessages,
   aiThreads,
+  aiToolCalls,
   apiTokens,
   // Aliased: the rest of core imports the OKR meetings table under this name,
   // and these are sign-in sessions.
@@ -69,6 +70,8 @@ export interface ErasureSweep {
   readonly oauthTokens: number;
   readonly copilotThreads: number;
   readonly copilotMessages: number;
+  /** Plan 0.7.0 A2: the record of calls the member's agents made. */
+  readonly agentToolCalls: number;
 }
 
 const EMPTY_PAYLOAD = {} as const;
@@ -147,6 +150,15 @@ export async function sweepPersonalData(
       ),
     )
     .returning({ id: channelMessages.id });
+
+  // The record of what the member's agents did (agent-tool-calls.md D17),
+  // first, by member: deleting the tokens and grants below would cascade to
+  // most of it, but uncounted, and a count is the evidence the member gets.
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  const toolCalls = await tx
+    .delete(aiToolCalls)
+    .where(eq(aiToolCalls.memberId, input.memberId))
+    .returning({ id: aiToolCalls.id });
 
   // **Credentials, and they go first in spirit if not in order.** A token
   // that outlives an erasure is an account somebody can still act as.
@@ -272,6 +284,7 @@ export async function sweepPersonalData(
     oauthTokens: oauthTokenCount,
     copilotThreads: threadIds.length,
     copilotMessages: messageCount,
+    agentToolCalls: toolCalls.length,
   };
 }
 

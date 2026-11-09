@@ -85,6 +85,7 @@ capacity gauge.
 | `openokr_channel_deliveries_total` | provider, outcome |
 | `openokr_realtime_events_total` | topic |
 | `openokr_agent_runs_total` | trigger, outcome |
+| `openokr_agent_tool_call_record_failures_total` | none. An agent tool call whose record row could not be written; the agent's answer is unaffected |
 | `openokr_agent_run_duration_seconds` | trigger |
 | `openokr_ai_tokens_total` | provider, model, direction |
 | `openokr_ai_cost_total` | provider, model |

@@ -107,6 +107,11 @@ export {
   aiThreads,
 } from "./schema/ai-threads.ts";
 export {
+  aiToolCalls,
+  TOOL_CALL_OUTCOMES,
+  type ToolCallOutcome,
+} from "./schema/ai-tool-calls.ts";
+export {
   type AIBudget,
   type AIUsageEvent,
   aiBudgets,

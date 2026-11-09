@@ -108,6 +108,8 @@ export interface ScheduledRun {
     | "notifications.drainBatches"
     | "blobs.reapOrphans"
     | "channels.sweepMessageLog"
+    // Plan 0.7.0 A2: the agent tool call record's retention, per workspace.
+    | "connections.sweepToolCalls"
     // Instance housekeeping, run once rather than per workspace: settled
     // outbox rows have no tenant to scope to (completeness review M-19).
     | "outbox.purge"
@@ -219,6 +221,14 @@ const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
 const OUTBOX_PURGE_JOB = "outbox.purge";
 const OUTBOX_PURGE_CRON = "0 4 * * *";
 
+/**
+ * The agent tool call record's retention (agent-tool-calls.md D12, plan 0.7.0
+ * A2). Daily at 04:20 UTC, twenty minutes after the outbox purge, for the
+ * reason housekeeping takes turns. Per workspace, because the window is each
+ * workspace's own setting.
+ */
+const TOOL_CALL_SWEEP_JOB = "connections.sweepToolCalls";
+const TOOL_CALL_SWEEP_CRON = "20 4 * * *";
 
 /** Hourly, so a flag turned on today shows in the console within the hour. */
 const TENANCY_ADOPT_JOB = "tenancy.adopt";
@@ -297,6 +307,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: MESSAGE_LOG_SWEEP_JOB,
     action: "channels.sweepMessageLog",
     cron: MESSAGE_LOG_SWEEP_CRON,
+  },
+  {
+    job: TOOL_CALL_SWEEP_JOB,
+    action: "connections.sweepToolCalls",
+    cron: TOOL_CALL_SWEEP_CRON,
   },
   {
     job: TENANCY_ADOPT_JOB,
@@ -570,6 +585,10 @@ async function runOne(
   // an extra time each night (found building plan 0.7.0 A2, recorded as B12).
   if (run.action === "channels.sweepMessageLog") {
     await callAction(context, "channels.sweepMessageLog", {});
+    return;
+  }
+  if (run.action === "connections.sweepToolCalls") {
+    await callAction(context, "connections.sweepToolCalls", {});
     return;
   }
   if (run.action !== "agents.runChampion") {

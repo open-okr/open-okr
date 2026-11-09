@@ -210,6 +210,11 @@ export const METRIC = {
   agentRunsTotal: "openokr_agent_runs_total",
   /** Wall time of one agent run. */
   agentRunDuration: "openokr_agent_run_duration_seconds",
+  /**
+   * Agent tool calls whose record could not be written (plan 0.7.0 A2, D6).
+   * No labels: the answer the agent got never depends on this row.
+   */
+  agentToolCallRecordFailures: "openokr_agent_tool_call_record_failures_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",

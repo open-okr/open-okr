@@ -20,6 +20,7 @@ export interface WorkspaceLimits {
   readonly importRowLimit: number;
   readonly messageLogRetentionDays: number;
   readonly agentRunCostCapUsd: number;
+  readonly agentToolCallRetentionDays: number;
 }
 
 /**
@@ -130,6 +131,16 @@ export function LimitsCard({
               min={0}
               step={1}
               description={t("admin.general.limits.messageLogDaysHint")}
+              disabled={!canManage}
+              inputClassName="w-28"
+            />
+            <NumberInput
+              label={t("admin.general.limits.agentCallDays")}
+              name="agentToolCallRetentionDays"
+              defaultValue={limits.agentToolCallRetentionDays}
+              min={0}
+              step={1}
+              description={t("admin.general.limits.agentCallDaysHint")}
               disabled={!canManage}
               inputClassName="w-28"
             />

@@ -24,6 +24,7 @@ const LIMITS = {
   importRowLimit: 1000,
   messageLogRetentionDays: 0,
   agentRunCostCapUsd: 2,
+  agentToolCallRetentionDays: 90,
 };
 
 const rendered = (providerSetsTwo: boolean, canManage = true): string =>

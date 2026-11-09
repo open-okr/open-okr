@@ -307,6 +307,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "exclude",
     reason: "Sessions held open for an external agent.",
   },
+  {
+    table: "ai_tool_calls",
+    decision: "exclude",
+    reason:
+      "A record of the calls external agents made, naming grants and tokens the receiving instance does not have (agent-tool-calls.md D18).",
+  },
 
   // ── The audit chain ──────────────────────────────────────────────────
   {

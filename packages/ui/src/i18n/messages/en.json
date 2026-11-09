@@ -657,6 +657,8 @@
   "admin.general.instanceName.label": "Instance name",
   "admin.general.instanceName.restart": "Authenticator apps and passkey prompts show a new name after the next restart. An authenticator entry added before then keeps the name it was added with.",
   "admin.general.instanceName.title": "This instance",
+  "admin.general.limits.agentCallDays": "Keep the record of agent calls for",
+  "admin.general.limits.agentCallDaysHint": "Days. 0 keeps everything; otherwise at least 7.",
   "admin.general.limits.agentCostCap": "Agent cost cap per run",
   "admin.general.limits.agentCostCapHint": "US dollars of AI spend one agent run may use. 0 means the agents use no AI.",
   "admin.general.limits.exportRows": "Rows in an export you download at once",

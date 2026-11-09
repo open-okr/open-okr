@@ -347,7 +347,7 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `ai_feature_settings` | feature key, enabled, tier override, quota |
 | `ai_prompts` | feature key or agent identifier and phase, version, system prompt, default flag |
 | `ai_threads` / `ai_messages` | Copilot and agent conversations anchored to a subject, roles, tokens, cost |
-| `ai_tool_calls` | message or run reference, tool, input, output excerpt, status, permission checked, duration |
+| `ai_tool_calls` | member, the grant or agent token it came through, tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default |
 | `ai_usage_events` | member or agent, feature, source (copilot, mcp, assist, agent, rest, channel), provider, model, tokens, cost, latency, status, flagged |
 | `embeddings` | subject, chunk, content, vector, model, content hash |
 | `agents` | member reference, definition, planning instructions, execution instructions, provider and tier, schedule, autonomy (`sandbox` / `propose` / `scoped_direct`), scope, enabled, built-in kind (`coach` / `champion` / `custom`) |
@@ -370,7 +370,7 @@ Any external agent drives OpenOKR as the authenticated user.
 | Authentication | OAuth 2.1 authorisation code with PKCE for the HTTP transport. Scoped tokens remain for local and scripted use |
 | Identity | One grant is one user and one workspace, chosen at a consent and workspace-picker screen. Tool schemas never take a workspace identifier |
 | Enforcement | Every call resolves the acting member, applies the tenant setting, and runs the registry's `can()`. Write tools need write scope. Admin tools need admin scope and the underlying permission. Membership and suspension are revalidated per request, and losing membership revokes the grant |
-| Limits and audit | Per-token rate limits and cost caps. Every call writes a tool-call row and an audit event |
+| Limits and audit | Per-token rate limits and cost caps. Every call writes a tool-call row; a write and a scope refusal also write an audit event (0.7.0, docs/design/agent-tool-calls.md) |
 | Egress | The MCP server makes no outbound AI calls of its own, so it is air-gap safe by construction |
 
 ### 8.2 The authorisation server

@@ -3193,6 +3193,9 @@
                                 },
                                 "copilotMessages": {
                                   "type": "number"
+                                },
+                                "agentToolCalls": {
+                                  "type": "number"
                                 }
                               },
                               "required": [
@@ -3203,7 +3206,8 @@
                                 "oauthGrants",
                                 "oauthTokens",
                                 "copilotThreads",
-                                "copilotMessages"
+                                "copilotMessages",
+                                "agentToolCalls"
                               ],
                               "additionalProperties": false
                             }
@@ -7029,6 +7033,102 @@
                   "kind",
                   "id"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/connections/sweepToolCalls": {
+      "post": {
+        "operationId": "connections.sweepToolCalls",
+        "summary": "Deletes agent tool call records older than the workspace's retention window.",
+        "tags": [
+          "connections"
+        ],
+        "x-openokr-scope": "write",
+        "x-openokr-safety": "write",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "deleted": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "retentionDays": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "more": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "deleted",
+                        "retentionDays",
+                        "more"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "retentionDays": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                }
               }
             }
           }
@@ -12884,6 +12984,11 @@
                   "agentRunCostCapUsd": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "agentToolCallRetentionDays": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
                   }
                 }
               }

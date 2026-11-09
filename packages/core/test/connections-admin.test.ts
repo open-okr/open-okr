@@ -199,3 +199,67 @@ describe("ending a colleague's connection", () => {
     ).rejects.toMatchObject({ code: "forbidden" });
   });
 });
+
+// agent-tool-calls.md D11 and D12, plan 0.7.0 A2: the record of agent calls is
+// kept 90 days by default, and 0 keeps every row.
+describe("the agent call record's retention", () => {
+  const callAgo = async (grantId: string, days: number) => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      `insert into ai_tool_calls (workspace_id, member_id, grant_id, tool, scope, outcome, duration_ms, called_at)
+       values ($1, $2, $3, 'cycles.list', 'read', 'ok', 4, now() - ($4 || ' days')::interval)`,
+      [workspaceId, memberId, grantId, String(days)],
+    );
+  };
+  const count = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select count(*)::int as n from ai_tool_calls where workspace_id = $1",
+      [workspaceId],
+    );
+    return rows[0].n as number;
+  };
+
+  it("removes what is older than 90 days by default, and audits the count", async () => {
+    const grantId = await memberGrant();
+    await callAgo(grantId, 100);
+    await callAgo(grantId, 1);
+    const swept = await callAction(
+      {
+        pool: (await workerDb()).appPool,
+        workspaceId,
+        actor: { kind: "system" },
+      },
+      "connections.sweepToolCalls",
+      {},
+    );
+    expect(swept).toMatchObject({ deleted: 1, retentionDays: 90 });
+    expect(await count()).toBe(1);
+  });
+
+  it("keeps every row when the window is 0", async () => {
+    const grantId = await memberGrant();
+    await callAgo(grantId, 4000);
+    await callAction(await as(OWNER), "settings.updateWorkspaceLimits", {
+      agentToolCallRetentionDays: 0,
+    });
+    await callAction(
+      {
+        pool: (await workerDb()).appPool,
+        workspaceId,
+        actor: { kind: "system" },
+      },
+      "connections.sweepToolCalls",
+      {},
+    );
+    expect(await count()).toBe(1);
+  });
+
+  it("refuses a window under a week", async () => {
+    await expect(
+      callAction(await as(OWNER), "settings.updateWorkspaceLimits", {
+        agentToolCallRetentionDays: 3,
+      }),
+    ).rejects.toThrow();
+  });
+});

@@ -284,6 +284,13 @@ async function answer(request: NextRequest): Promise<Response> {
     userId: resolved.userId,
     scopes: resolved.scopes,
     toolsets: chosen.toolsets,
+    // Who the agent acts as and through which connection, so every call is
+    // recorded (docs/design/agent-tool-calls.md, plan 0.7.0 A2).
+    memberId: resolved.memberId,
+    connection:
+      resolved.via === "grant"
+        ? { grantId: resolved.grantId }
+        : { tokenId: resolved.tokenId },
     // Only the transport knows which instance it is serving, and a citation
     // worth quoting is one a person can open (P5-T09c).
     instanceUrl: issuer,

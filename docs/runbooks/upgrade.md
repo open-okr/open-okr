@@ -101,6 +101,7 @@ Notes are added here as 0.7.0 is built, and finished before it is tagged.
   wizard before 0.7.0", and a choice there replaces it. A self-hosted
   instance is unaffected, except that `OPENOKR_REGISTRATION` now works after
   setup where nothing else was saved.
+- **Every agent call is now recorded.** Migration 0153 adds `ai_tool_calls`: the tool, where the call stopped and the ids it named, never what was sent or read back. It is kept 90 days by default, set on Admin, General, Limits; 0 keeps every row. A daily sweep removes older rows.
 - **Five actions need the destructive scope.** `cycles.close`,
   `sessions.close`, `people.suspend`, `people.convertToGuest` and
   `workspace.setState` were plain writes; each now needs a token or agent

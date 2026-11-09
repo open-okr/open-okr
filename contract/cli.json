@@ -1143,6 +1143,23 @@
       "pages": false
     },
     {
+      "name": "connections sweepToolCalls",
+      "action": "connections.sweepToolCalls",
+      "method": "POST",
+      "path": "/connections/sweepToolCalls",
+      "scope": "write",
+      "summary": "Deletes agent tool call records older than the workspace's retention window.",
+      "flags": [
+        {
+          "name": "retention-days",
+          "field": "retentionDays",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",
@@ -2395,6 +2412,12 @@
           "name": "agent-run-cost-cap-usd",
           "field": "agentRunCostCapUsd",
           "type": "number",
+          "required": false
+        },
+        {
+          "name": "agent-tool-call-retention-days",
+          "field": "agentToolCallRetentionDays",
+          "type": "integer",
           "required": false
         }
       ],

@@ -197,6 +197,20 @@ export const DEFAULT_IMPORT_ROW_LIMIT = 1000;
 export const agentRunCostCapSchema = z.number().nonnegative();
 
 /**
+ * How long the record of agent tool calls is kept (agent-tool-calls.md D11,
+ * plan 0.7.0 A2): 0 keeps every row, otherwise 7 days to five years.
+ */
+export const agentToolCallRetentionDaysSchema = z
+  .number()
+  .int()
+  .refine((days) => days === 0 || (days >= 7 && days <= 365 * 5), {
+    message: "Use 0 to keep everything, or between 7 days and five years.",
+  });
+
+/** 90 days (Akmal's Q2 answer, 9 November 2026). */
+export const DEFAULT_AGENT_TOOL_CALL_RETENTION_DAYS = 90;
+
+/**
  * The cap a workspace inherits, in US dollars per agent run (P4-T05a).
  *
  * Exported because the run itself needs it for workspaces provisioned before
@@ -669,6 +683,20 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "sets it, because it is the provider's lever.",
     resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
     schema: agentRunCostCapSchema,
+    card: "limits",
+  },
+  {
+    key: "agentToolCallRetentionDays",
+    scope: "workspace",
+    home: "workspaces.settings",
+    why:
+      "90 days, Akmal's choice on 9 November 2026 (plan 0.7.0 A2). A busy " +
+      "agent makes thousands of calls a day, and a log nobody prunes " +
+      "outgrows its use. The table is new in 0.7.0, so a default window " +
+      "deletes nothing anybody already had, unlike the message log's case. " +
+      "0 keeps every row. On the limits card.",
+    resolve: () => DEFAULT_AGENT_TOOL_CALL_RETENTION_DAYS,
+    schema: agentToolCallRetentionDaysSchema,
     card: "limits",
   },
   // The four AI egress controls (AI-NATIVE-PLAN §4's privacy card,

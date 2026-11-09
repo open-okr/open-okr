@@ -657,6 +657,8 @@
   "admin.general.instanceName.label": "Nama instans",
   "admin.general.instanceName.restart": "Aplikasi pengesah dan gesaan kunci laluan memaparkan nama baharu selepas instans dimulakan semula. Entri pengesah yang ditambah sebelum itu mengekalkan nama semasa ia ditambah.",
   "admin.general.instanceName.title": "Instans ini",
+  "admin.general.limits.agentCallDays": "Simpan rekod panggilan ejen selama",
+  "admin.general.limits.agentCallDaysHint": "Hari. 0 menyimpan semuanya; selain itu sekurang-kurangnya 7.",
   "admin.general.limits.agentCostCap": "Had kos ejen setiap larian",
   "admin.general.limits.agentCostCapHint": "Dolar AS perbelanjaan AI yang boleh digunakan oleh satu larian ejen. 0 bermaksud ejen tidak menggunakan AI.",
   "admin.general.limits.exportRows": "Baris dalam eksport yang dimuat turun serta-merta",

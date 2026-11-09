@@ -254,6 +254,11 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   // Plan 0.7.0 A3: an agent connection asked for a tool beyond its scope.
   "agent.scope_refused": z.object({ tool: z.string(), needed: z.string() }),
+  // Plan 0.7.0 A2: the tool call record's retention sweep.
+  "connection.tool_calls_swept": z.object({
+    deleted: z.number(),
+    retentionDays: z.number(),
+  }),
   // Plan 0.7.0 A4: an administrator ended a member's agent connection.
   "connection.ended_by_admin": z.object({
     kind: z.string(),
@@ -786,6 +791,8 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "agent.scope_refused",
   // It names a colleague and their tool (agent-connections-admin.md D6).
   "connection.ended_by_admin",
+  // Housekeeping with no reader on the feed (plan 0.7.0 A2).
+  "connection.tool_calls_swept",
 ]);
 
 /**

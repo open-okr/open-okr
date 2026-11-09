@@ -24,8 +24,9 @@ import {
   oauthGrants,
   withWorkspace,
   workspaceMembers,
+  workspaces,
 } from "@openokr/db";
-import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -33,6 +34,7 @@ import { clientDisplayName } from "../api/oauth/clients.ts";
 import { REVOCATION_REASONS, revokeGrant } from "../api/oauth/grants.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { OperationError } from "../operations/operation.ts";
+import { DEFAULT_AGENT_TOOL_CALL_RETENTION_DAYS } from "../settings/registry.ts";
 import { refuseUnlessSignedIn } from "./api-tokens.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
@@ -339,4 +341,88 @@ export const revokeConnectionAsAdmin = defineWriteAction({
       },
     };
   },
+});
+
+/** Rows one sweep removes at most, so a first run on a big log is a batch. */
+const TOOL_CALL_SWEEP_BATCH = 5000;
+
+/**
+ * Removes agent tool call records older than the workspace's retention
+ * window (agent-tool-calls.md D11, D12, plan 0.7.0 A2).
+ *
+ * A pipeline write, scheduled daily, because a retention delete is the
+ * deletion nobody watches: its audit row, with the count and the window, is
+ * the evidence. 0 keeps everything; the default is 90 days.
+ */
+export const sweepToolCalls = defineWriteAction({
+  name: "connections.sweepToolCalls",
+  agentSurface: false,
+  summary:
+    "Deletes agent tool call records older than the workspace's retention window.",
+  input: z.object({
+    /** Overrides the workspace's own setting. For tests and an operator. */
+    retentionDays: z.number().int().min(0).optional(),
+  }),
+  output: z.object({
+    deleted: z.number().int(),
+    retentionDays: z.number().int(),
+    /** True when the batch filled, so a backlog remains for the next run. */
+    more: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [workspace] = await tx
+        .select({ settings: workspaces.settings })
+        // openokr:allow-raw-read: this workspace's own settings row, read
+        // inside the Operation, as the message log sweep does.
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      const configured = (
+        workspace?.settings as Record<string, unknown> | undefined
+      )?.agentToolCallRetentionDays;
+      const retentionDays =
+        input.retentionDays ??
+        (typeof configured === "number"
+          ? configured
+          : DEFAULT_AGENT_TOOL_CALL_RETENTION_DAYS);
+
+      let deleted = 0;
+      let more = false;
+      if (retentionDays > 0) {
+        const cutoff = new Date(Date.now() - retentionDays * 86_400_000);
+        // openokr:allow-mutation: the Operation's own transaction. A hard
+        // delete, as migration 0153's marker says: retention removes rows.
+        const removed = await tx.execute<{ id: string }>(sql`
+          delete from ai_tool_calls
+           where id in (
+             select id from ai_tool_calls
+              where workspace_id = ${workspaceId}
+                and called_at < ${cutoff}
+              limit ${TOOL_CALL_SWEEP_BATCH}
+           )
+          returning id`);
+        deleted = removed.rows.length;
+        more = deleted === TOOL_CALL_SWEEP_BATCH;
+      }
+
+      return {
+        result: { deleted, retentionDays, more },
+        activity: {
+          kind: "connection.tool_calls_swept",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { deleted, retentionDays },
+        },
+        audit: {
+          // Counts and the window, never a tool or an id.
+          action: "connections.sweepToolCalls",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: { deleted, retentionDays, more },
+        },
+      };
+    },
+  }),
 });
