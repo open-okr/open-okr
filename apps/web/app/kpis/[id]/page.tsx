@@ -278,7 +278,35 @@ export default async function KpiDetailPage({
         </CardHeader>
         {canEdit ? (
           <CardBody>
-            <ActionForm action={updateKpiRule} className="flex flex-col gap-2">
+            <ActionForm
+              action={updateKpiRule}
+              // What the form is drawn with, so a field somebody changed
+              // since is refused rather than overwritten (D3).
+              read={{
+                targetType: kpi.targetType,
+                greenLow: kpi.greenLow,
+                greenHigh: kpi.greenHigh,
+                redLow: kpi.redLow,
+                redHigh: kpi.redHigh,
+                ownerMemberId: kpi.namedOwnerId,
+                tier: kpi.tier,
+              }}
+              readLabels={{
+                ...Object.fromEntries(
+                  people.map((person) => [person.id, person.name]),
+                ),
+                at_least: t("kpis.rule.atLeast"),
+                at_most: t("kpis.rule.atMost"),
+                increase_to: t("kpis.rule.increaseTo"),
+                decrease_to: t("kpis.rule.decreaseTo"),
+                range: t("kpis.rule.range"),
+                input: t("kpis.rule.tierInput"),
+                output: t("kpis.rule.tierOutput"),
+                outcome: t("kpis.rule.tierOutcome"),
+                impact: t("kpis.rule.tierImpact"),
+              }}
+              className="flex flex-col gap-2"
+            >
               <input type="hidden" name="kpiId" value={kpi.id} />
               <JudgedBy
                 idPrefix="edit"

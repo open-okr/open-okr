@@ -1,7 +1,13 @@
 "use client";
 
+import type { Comparable } from "@openokr/core";
 import { RefusedFields } from "@openokr/ui";
-import { useActionState } from "react";
+import { Fragment, useActionState } from "react";
+import {
+  ConflictNotice,
+  ReadField,
+  useConflictForm,
+} from "../../lib/conflict-notice.tsx";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
 
 /**
@@ -15,11 +21,20 @@ import { NO_ERROR, type WriteState } from "./write-state.ts";
  * The only client-side component in the cycle workspace. The panels stay server
  * components and pass their markup through as children, so the page's data still
  * arrives rendered rather than fetched.
+ *
+ * **`read` makes it an edit form that cannot overwrite somebody else's
+ * change** (optimistic-concurrency.md V4). It carries the values the form
+ * was drawn with, the action sends only what changed with them, and a field
+ * somebody moved since comes back as a conflict with keep mine and take
+ * theirs. The fields are drawn again whenever what was read changes, so
+ * taking theirs, or a save, shows what is stored.
  */
 export function ActionForm({
   action,
   className,
   label,
+  read,
+  readLabels,
   children,
 }: {
   readonly action: (
@@ -33,19 +48,39 @@ export function ActionForm({
    * a name a screen reader announces six identical forms (M-07).
    */
   readonly label?: string;
+  /** The values the form was drawn with, by the action's field names. */
+  readonly read?: Readonly<Record<string, Comparable>>;
+  /** Words for a stored value a conflict shows: a member's name for an id. */
+  readonly readLabels?: Readonly<Record<string, string>>;
   readonly children: React.ReactNode;
 }) {
   const [state, formAction, pending] = useActionState(action, NO_ERROR);
+  const { conflict, resending, onSubmit, keepMine, takeTheirs } =
+    useConflictForm(state, formAction);
   return (
     <form
       action={formAction}
+      onSubmit={read === undefined ? undefined : onSubmit}
       className={className}
       aria-busy={pending}
       aria-label={label}
     >
+      {read === undefined ? null : <ReadField read={read} />}
       {/* Each field shows what the server refused about it (U1b). */}
-      <RefusedFields fields={state.fields}>{children}</RefusedFields>
-      {state.error ? (
+      <RefusedFields fields={state.fields}>
+        <Fragment key={read === undefined ? "" : JSON.stringify(read)}>
+          {children}
+        </Fragment>
+      </RefusedFields>
+      {conflict ? (
+        <ConflictNotice
+          conflict={conflict}
+          {...(readLabels ? { labels: readLabels } : {})}
+          pending={resending || pending}
+          onKeepMine={keepMine}
+          onTakeTheirs={takeTheirs}
+        />
+      ) : state.error ? (
         <p
           role="alert"
           className="mt-1.5 rounded-md bg-bad-bg px-2.5 py-1.5 text-xs text-bad"

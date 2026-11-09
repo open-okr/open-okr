@@ -1,3 +1,5 @@
+import type { Conflict } from "../../lib/conflict.ts";
+
 /**
  * What a space write reports back (P6-G18a).
  *
@@ -21,6 +23,11 @@ export interface SpaceWriteState {
    * started. An end-to-end case raced exactly that way.
    */
   readonly saved?: boolean;
+  /**
+   * Somebody changed a field this save changes since the form read it
+   * (optimistic-concurrency.md V4). Nothing was written.
+   */
+  readonly conflict?: Conflict;
 }
 
 export const NO_SPACE_ERROR: SpaceWriteState = { error: null };

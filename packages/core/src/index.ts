@@ -1057,6 +1057,9 @@ export {
   type ResolvedActor,
   runOperation,
 } from "./operations/operation.ts";
+// What an edit screen sends as `read`, and which fields it changed
+// (optimistic-concurrency.md V3), compared the way the server compares them.
+export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {

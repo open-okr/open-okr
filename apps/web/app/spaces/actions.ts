@@ -16,6 +16,7 @@
  */
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { conflictOf, onlyChanged, readFromForm } from "../../lib/conflict.ts";
 import { getPool } from "../../lib/pool";
 import { refusedByField } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
@@ -29,6 +30,8 @@ async function run(
     workspaceId: string;
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
+  /** What an edit sent, which a conflict shows beside what is stored. */
+  sent?: Readonly<Record<string, unknown>>,
 ): Promise<SpaceWriteState> {
   const { session, workspace } = await requireWorkspace();
   let result: unknown;
@@ -39,6 +42,10 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
+    const conflict = conflictOf(error, sent);
+    if (conflict) {
+      return { error: null, conflict };
+    }
     // A schema's refusal too, which used to reach the error page: a name
     // longer than a space takes is the person's to fix (plan U1b).
     const refused = refusedByField(error, (await getTranslations()).t);
@@ -82,15 +89,31 @@ export async function updateSpace(
   const id = String(formData.get("id") ?? "");
   const name = String(formData.get("name") ?? "").trim();
   const mission = String(formData.get("mission") ?? "").trim();
-
-  return run(["/spaces", `/spaces/${id}`], (context) =>
-    callAction(context, "spaces.update", {
-      id,
+  // Only what the person changed, with what the form read for it, so a
+  // field somebody else changed since is refused rather than overwritten
+  // (optimistic-concurrency.md V4).
+  const { set, read } = onlyChanged(
+    {
       ...(name ? { name } : {}),
       // An empty mission is a real answer and clears it, which is why the
       // action takes a nullable rather than an optional here.
       mission: mission === "" ? null : mission,
-    }),
+    },
+    readFromForm(formData),
+  );
+  if (read && Object.keys(set).length === 0) {
+    return { ...NO_SPACE_ERROR, saved: true };
+  }
+
+  return run(
+    ["/spaces", `/spaces/${id}`],
+    (context) =>
+      callAction(context, "spaces.update", {
+        id,
+        ...set,
+        ...(read ? { read } : {}),
+      }),
+    set,
   );
 }
 

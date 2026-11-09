@@ -1,3 +1,5 @@
+import type { Conflict } from "../../lib/conflict.ts";
+
 /**
  * What a cycle workspace write reports back.
  *
@@ -18,6 +20,12 @@ export interface WriteState {
    * the inheritance went.
    */
   readonly notice?: string | null;
+  /**
+   * Somebody changed a field this save changes since the form read it
+   * (optimistic-concurrency.md V4). Nothing was written; the screen offers
+   * keep mine and take theirs.
+   */
+  readonly conflict?: Conflict;
 }
 
 export const NO_ERROR: WriteState = { error: null };

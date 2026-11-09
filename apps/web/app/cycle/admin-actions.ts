@@ -12,6 +12,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { type Conflict, conflictOf } from "../../lib/conflict.ts";
 import { refusedState } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -22,6 +23,8 @@ export interface CycleResult {
   readonly fields?: Readonly<Record<string, string>>;
   /** The cycle a create made, so the screen can open it. */
   readonly id?: string;
+  /** The deadline was changed since the card read it; nothing was saved. */
+  readonly conflict?: Conflict;
 }
 
 async function context() {
@@ -81,10 +84,16 @@ export async function createCycle(input: {
 export async function updateCycleDates(input: {
   id: string;
   publicationDeadline: string | null;
+  /** The deadline the card was drawn with (optimistic-concurrency.md V4). */
+  read?: { publicationDeadline: string | null };
 }): Promise<CycleResult> {
   try {
     await callAction(await context(), "cycles.update", input);
   } catch (error) {
+    const conflict = conflictOf(error, input);
+    if (conflict) {
+      return { error: null, conflict };
+    }
     return refused(error, ["publicationDeadline"]);
   }
   revalidatePath("/", "layout");

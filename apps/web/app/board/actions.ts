@@ -10,6 +10,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { conflictOf } from "../../lib/conflict.ts";
 import { refusedByField, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -216,13 +217,24 @@ export async function setChecklistItemAction(
 export async function setDueOnAction(
   id: string,
   dueOn: string,
+  /** The date the field was drawn with, empty for none (V4). */
+  read?: string,
 ): Promise<WriteState> {
+  const value = dueOn === "" ? null : dueOn;
   return run(
     (context) =>
       callAction(context, "tasks.update", {
         id,
-        dueOn: dueOn === "" ? null : dueOn,
+        dueOn: value,
+        ...(read === undefined
+          ? {}
+          : { read: { dueOn: read === "" ? null : read } }),
       }),
     ["/board", `/tasks/${id}`, "/review"],
+    (error, t) => {
+      // Somebody moved the date since this page read it (D3).
+      const conflict = conflictOf(error, { dueOn: value });
+      return conflict ? { error: null, conflict } : refusedSentence(error, t);
+    },
   );
 }

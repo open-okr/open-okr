@@ -15,6 +15,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { conflictOf } from "../../lib/conflict.ts";
 import { refusedByField, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -39,6 +40,8 @@ async function run(
   }) => Promise<unknown>,
   paths: readonly string[] = ["/initiatives"],
   answer: Answer = refusedSentence,
+  /** What an edit sent, which a conflict shows beside what is stored. */
+  sent?: Readonly<Record<string, unknown>>,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -48,6 +51,10 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
+    const conflict = conflictOf(error, sent);
+    if (conflict) {
+      return { error: null, conflict };
+    }
     const refused = answer(error, (await getTranslations()).t);
     if (refused === null) {
       throw error;
@@ -132,6 +139,8 @@ export async function createInitiativeAction(
 export async function setStatusAction(
   id: string,
   status: string,
+  /** The status the select was drawn with (optimistic-concurrency.md V4). */
+  read?: string,
 ): Promise<WriteState> {
   const value = asStatus(status);
   if (!value) {
@@ -140,14 +149,22 @@ export async function setStatusAction(
   }
   return run(
     (context) =>
-      callAction(context, "initiatives.update", { id, status: value }),
+      callAction(context, "initiatives.update", {
+        id,
+        status: value,
+        ...(read === undefined ? {} : { read: { status: read } }),
+      }),
     ["/initiatives", `/initiatives/${id}`],
+    undefined,
+    { status: value },
   );
 }
 
 export async function setCapacityAction(
   id: string,
   capacity: string,
+  /** The verdict the select was drawn with, empty for none (V4). */
+  read?: string,
 ): Promise<WriteState> {
   // The empty string is "nobody has judged it", which is a different fact from
   // `fits` and the one gate five reads differently.
@@ -158,8 +175,16 @@ export async function setCapacityAction(
   }
   return run(
     (context) =>
-      callAction(context, "initiatives.update", { id, capacity: value }),
+      callAction(context, "initiatives.update", {
+        id,
+        capacity: value,
+        ...(read === undefined
+          ? {}
+          : { read: { capacity: read === "" ? null : read } }),
+      }),
     ["/initiatives", `/initiatives/${id}`, "/cycle"],
+    undefined,
+    { capacity: value },
   );
 }
 

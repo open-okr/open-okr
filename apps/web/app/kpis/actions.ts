@@ -10,6 +10,7 @@ import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { assistContext } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
+import { conflictOf, onlyChanged, readFromForm } from "../../lib/conflict.ts";
 import {
   refusedByField,
   refusedSentence,
@@ -201,12 +202,27 @@ export async function updateKpiRule(
   formData: FormData,
 ): Promise<WriteState> {
   const kpiId = String(formData.get("kpiId") ?? "");
-  return run((context) =>
-    callAction(context, "kpis.update", {
-      kpiId,
-      ...kpiRuleFrom(formData),
-      ...ownerAndTier(formData),
-    }),
+  // Only what the person changed, with what the page read for it, so a
+  // field somebody else changed since is refused rather than overwritten
+  // (optimistic-concurrency.md V4).
+  const { set, read } = onlyChanged(
+    { ...kpiRuleFrom(formData), ...ownerAndTier(formData) },
+    readFromForm(formData),
+  );
+  if (read && Object.keys(set).length === 0) {
+    return NO_ERROR;
+  }
+  return run(
+    (context) =>
+      callAction(context, "kpis.update", {
+        kpiId,
+        ...set,
+        ...(read ? { read } : {}),
+      }),
+    (error, t) => {
+      const conflict = conflictOf(error, set);
+      return conflict ? { error: null, conflict } : refusedByField(error, t);
+    },
   );
 }
 

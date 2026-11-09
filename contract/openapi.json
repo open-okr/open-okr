@@ -25924,33 +25924,40 @@
                         ]
                       },
                       "levels": {
-                        "type": "array",
-                        "items": {
-                          "anyOf": [
-                            {
-                              "type": [
-                                "string",
-                                "number",
-                                "boolean",
-                                "null"
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "null"
+                                    ]
+                                  }
+                                }
                               ]
-                            },
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {
-                                "type": [
-                                  "string",
-                                  "number",
-                                  "boolean",
-                                  "null"
-                                ]
-                              }
                             }
-                          ]
-                        }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       },
                       "contributingUnits": {
                         "type": [
@@ -25969,33 +25976,40 @@
                         ]
                       },
                       "sessionDates": {
-                        "type": "array",
-                        "items": {
-                          "anyOf": [
-                            {
-                              "type": [
-                                "string",
-                                "number",
-                                "boolean",
-                                "null"
+                        "anyOf": [
+                          {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": [
+                                    "string",
+                                    "number",
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "propertyNames": {
+                                    "type": "string"
+                                  },
+                                  "additionalProperties": {
+                                    "type": [
+                                      "string",
+                                      "number",
+                                      "boolean",
+                                      "null"
+                                    ]
+                                  }
+                                }
                               ]
-                            },
-                            {
-                              "type": "object",
-                              "propertyNames": {
-                                "type": "string"
-                              },
-                              "additionalProperties": {
-                                "type": [
-                                  "string",
-                                  "number",
-                                  "boolean",
-                                  "null"
-                                ]
-                              }
                             }
-                          ]
-                        }
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
                       }
                     }
                   }

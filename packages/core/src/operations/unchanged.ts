@@ -73,10 +73,13 @@ export function sameField(read: Comparable, stored: Comparable): boolean {
  */
 const readScalar = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
-/** A list as the caller read it: a cycle's levels, or its session dates. */
-const readList = z.array(
-  z.union([readScalar, z.record(z.string(), readScalar)]),
-);
+/**
+ * A list as the caller read it: a cycle's levels, or its session dates.
+ * Null is an empty list, as it compares.
+ */
+const readList = z
+  .array(z.union([readScalar, z.record(z.string(), readScalar)]))
+  .nullable();
 
 /**
  * The optional `read` an update action takes (V1, V3): for each field it

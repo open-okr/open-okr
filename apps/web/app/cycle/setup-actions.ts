@@ -17,6 +17,7 @@
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { conflictOf, onlyChanged, readFromForm } from "../../lib/conflict.ts";
 import { refusedByField } from "../../lib/refusal";
 import { documentOrNull, unreadableFields } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
@@ -31,6 +32,8 @@ async function run(
   }) => Promise<unknown>,
   /** A refused input path to the form field it was typed in, where they differ. */
   fieldOf: (path: string) => string = (path) => path,
+  /** What an edit sent, which a conflict shows beside what is stored. */
+  sent?: Readonly<Record<string, unknown>>,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -40,6 +43,10 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
+    const conflict = conflictOf(error, sent);
+    if (conflict) {
+      return { error: null, conflict };
+    }
     const refused = refusedByField(error, (await getTranslations()).t);
     if (refused === null) {
       throw error;
@@ -81,14 +88,27 @@ export async function saveCycleSetup(
     key,
     on: text(formData, `session-${key}`),
   })).filter((entry) => entry.on !== "");
+  // Only what the person changed, with what the form read for it, so a
+  // field somebody else changed since is refused rather than overwritten
+  // (optimistic-concurrency.md V4).
+  const { set, read } = onlyChanged(
+    {
+      sponsorId: sponsorId === "" ? null : sponsorId,
+      facilitatorId: facilitatorId === "" ? null : facilitatorId,
+      firstCycle: formData.get("firstCycle") === "on",
+      sessionDates,
+    },
+    readFromForm(formData),
+  );
+  if (read && Object.keys(set).length === 0) {
+    return NO_ERROR;
+  }
   return run(
     (context) =>
       callAction(context, "cycles.update", {
         id: text(formData, "cycleId"),
-        sponsorId: sponsorId === "" ? null : sponsorId,
-        facilitatorId: facilitatorId === "" ? null : facilitatorId,
-        firstCycle: formData.get("firstCycle") === "on",
-        sessionDates,
+        ...set,
+        ...(read ? { read } : {}),
       }),
     // A refused date is the one typed into that session's field, which the
     // input names by its place in the list of dates filled in.
@@ -97,6 +117,7 @@ export async function saveCycleSetup(
       const entry = at ? sessionDates[Number(at[1])] : undefined;
       return entry ? `session-${entry.key}` : path;
     },
+    set,
   );
 }
 
