@@ -12,11 +12,20 @@
  * milliseconds against the mock, so a stored result could only be a copy of
  * this that goes stale when an upgrade changes a set.
  */
+
+import { redactPersonalData } from "@openokr/adapters";
 import { evaluatePrompt } from "@openokr/agents";
-import { evaluationPasses, setDefaultPromptEvaluator } from "@openokr/core";
+import {
+  evaluationPasses,
+  setDefaultPromptEvaluator,
+  setPersonalDataFinder,
+} from "@openokr/core";
 
 export function installPromptEvaluator(): void {
   setDefaultPromptEvaluator(evaluatePrompt);
+  // The same finder a prompt's evaluation uses, for an agent's instructions
+  // (plan 0.7.0 A7, agent-instructions.md I7).
+  setPersonalDataFinder(redactPersonalData);
 }
 
 /** One editable prompt's current version, against its set. */

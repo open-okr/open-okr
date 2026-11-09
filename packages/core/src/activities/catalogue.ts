@@ -278,6 +278,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "agent.created": z.object({}).catchall(z.unknown()),
   "agent.enabled_changed": z.object({ enabled: z.boolean() }),
+  // Plan 0.7.0 A7: a new version of a stage's instructions, saved or restored.
+  "agent.instructions_saved": z.object({
+    stage: z.string(),
+    version: z.number(),
+    restoredFrom: z.number().optional(),
+  }),
   "agent.scope_bound": z.object({}).catchall(z.unknown()),
   "agent.run_started": z.object({}).catchall(z.unknown()),
   "agent.run_task_processed": z.object({

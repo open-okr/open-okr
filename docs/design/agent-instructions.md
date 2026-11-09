@@ -1,6 +1,6 @@
 # How a run uses an agent's instructions
 
-Status: proposed 10 November 2026 for release 0.7.0 (plan A7), waiting for "design approved". Akmal asked for this design on 10 November. It adds a new subsystem (the planner) and decides how much an agent may choose, so it is designed first (CLAUDE.md).
+Status: approved 10 November 2026, every question as proposed, and built in 0.7.0 (plan A7). It adds a new subsystem (the planner) and decides how much an agent may choose, so it was designed first (CLAUDE.md).
 
 Authority: AI-NATIVE-PLAN §6.5 ("staged instructions (planning and execution) that are versioned like prompts"; "The planning phase decomposes the work"), `agents.md` §8 (instructions vary by the cycle's phase), AI-NATIVE-PLAN §6.5's own open item from completeness review M-11: "which registry actions a custom agent's planner may choose from and what it is shown of its bound resources".
 
@@ -59,3 +59,20 @@ On a custom agent's page in Admin, Agents: two text areas, "While planning (phas
 | Evaluation | `packages/agents/src/evaluation` (A9's sets) | The planner's set |
 | Integration | `packages/core/test/agent-instructions.test.ts` | Versioning in `ai_prompts`, restore, version 0 from the column, planned runs producing proposals |
 | Browser | `e2e/s36q-agent-instructions.spec.ts` | Edit, history and restore; with AI off no "Plan a run" |
+
+## 6. As built
+
+| Piece | Where |
+|---|---|
+| Stage by phase, versions, the planner's view, menu and checks | `packages/core/src/agents/instructions.ts` |
+| `agents.instructions`, `agents.setInstructions`, `agents.restoreInstructions`, `agents.planRun` (all off the agent surface) | `packages/core/src/actions/agent-instructions.ts` |
+| The planner's model call, and its evaluation set | `planRun` in `packages/agents/src/drafter.ts`; `packages/agents/src/evaluation/sets.ts` |
+| The personal-data check on save | `setPersonalDataFinder`, installed at boot with the adapters' `redactPersonalData` beside A9's evaluator |
+| The screen | Each agent's row on Admin, Agents: `apps/web/app/admin/agents/agent-instructions.tsx` |
+
+Where the build is narrower than §1, and why:
+
+- **The menu is the `core` toolset (I4).** Agents carry no toolsets of their own, so the everyday set every agent connection starts from is the menu, without `agents.*` and `proposals.*`. A task's input must parse strictly: a field the action does not take refuses the plan.
+- **A plan is previewed, then started (I3, §4).** `agents.planRun` answers the checked tasks or the refusal and starts nothing; "Start this run" calls `agents.startRun` with them. A refused plan is said on the screen rather than written to a run's log, because no run exists yet.
+- **No planned run on the agent's own schedule yet (I6).** Planning is by hand for 0.7.0. A scheduled planned run spends model tokens with nobody watching, so it waits for a row of its own.
+- **The cycle (I1)** is the workspace's current quarterly cycle; an agent's bound space has no cycle of its own.

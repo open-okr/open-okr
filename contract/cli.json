@@ -3781,6 +3781,106 @@
       "pages": false
     },
     {
+      "name": "agents instructions",
+      "action": "agents.instructions",
+      "method": "GET",
+      "path": "/agents/instructions",
+      "scope": "read",
+      "summary": "An agent's planning and execution instructions: the version in use, the stage the cycle asks for now, and each stage's history.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents setInstructions",
+      "action": "agents.setInstructions",
+      "method": "POST",
+      "path": "/agents/setInstructions",
+      "scope": "write",
+      "summary": "Saves a new version of a custom agent's planning or execution instructions.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stage",
+          "field": "stage",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "planning",
+            "execution"
+          ]
+        },
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents restoreInstructions",
+      "action": "agents.restoreInstructions",
+      "method": "POST",
+      "path": "/agents/restoreInstructions",
+      "scope": "write",
+      "summary": "Makes an older version of a custom agent's instructions the one in use, as a new version.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stage",
+          "field": "stage",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "planning",
+            "execution"
+          ]
+        },
+        {
+          "name": "version",
+          "field": "version",
+          "type": "integer",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents planRun",
+      "action": "agents.planRun",
+      "method": "GET",
+      "path": "/agents/planRun",
+      "scope": "read",
+      "summary": "Plans a custom agent's next run from its instructions for the cycle's stage and what it can see, and checks every task. Starts nothing: agents.startRun takes the tasks.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "proposals list",
       "action": "proposals.list",
       "method": "GET",

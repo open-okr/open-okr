@@ -258,6 +258,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Agent "${asString(p.name, "New agent")}" was created`,
   "agent.enabled_changed": (p) =>
     `An agent was turned ${p.enabled ? "on" : "off"}`,
+  "agent.instructions_saved": (p) =>
+    p.restoredFrom === undefined
+      ? `An agent's ${asString(p.stage, "")} instructions were saved as version ${String(p.version)}`
+      : `An agent's ${asString(p.stage, "")} instructions went back to version ${String(p.restoredFrom)}`,
   "agent.scope_bound": (p) =>
     `An agent was granted access to a ${asString(p.resourceType, "resource")}`,
   "agent.run_started": () => "An agent run started",

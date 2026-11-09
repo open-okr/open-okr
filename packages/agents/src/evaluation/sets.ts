@@ -30,6 +30,7 @@ import {
   type KpiRequestContext,
   type MeasureContext,
   type ParentContext,
+  type PlanRunContext,
   PROMPT_KEYS,
   type PromptKey,
   type ProposalRequestContext,
@@ -517,6 +518,91 @@ const suggestKpi = evaluationSet<KpiRequestContext>({
     {
       name: "a reply the schema refuses twice",
       context: KPI,
+      reply: UNREADABLE,
+      expected: null,
+    },
+  ],
+});
+
+// ---------------------------------------------------------------------------
+// A custom agent's planning step (plan 0.7.0 A7)
+
+const PLAN_CONTEXT: PlanRunContext = {
+  agentName: "Onboarding helper",
+  stage: "execution",
+  instructions:
+    "Each week, look for key results with low confidence and propose a check-in note asking the owner what changed.",
+  resources: [
+    {
+      kind: "goal",
+      id: "01a1c0af-0000-7000-8000-000000000001",
+      title: "Make onboarding self-serve",
+      level: "team",
+      state: "at_risk",
+      progressPct: 35,
+      confidence: null,
+      goalId: null,
+    },
+    {
+      kind: "key_result",
+      id: "01a1c0af-0000-7000-8000-000000000002",
+      title: "Raise self-serve activation from 20% to 45%",
+      level: null,
+      state: null,
+      progressPct: 30,
+      confidence: 0.3,
+      goalId: "01a1c0af-0000-7000-8000-000000000001",
+    },
+  ],
+  menu: [
+    { name: "goals.read", summary: "Reads one goal." },
+    { name: "comments.create", summary: "Adds a comment to a subject." },
+  ],
+};
+
+const PLANNED_TASK = {
+  action: "comments.create",
+  inputJson: json({
+    subjectType: "goal",
+    subjectId: "01a1c0af-0000-7000-8000-000000000001",
+  }),
+  subjectType: "goal",
+  subjectId: "01a1c0af-0000-7000-8000-000000000001",
+  why: "Confidence on activation is 0.3; ask the owner what changed.",
+};
+
+const planRun = evaluationSet<PlanRunContext>({
+  capability: "planRun",
+  call: (drafter, context) => drafter.planRun?.(context),
+  fixtures: [
+    {
+      name: "one task from the menu about a goal it can see",
+      context: PLAN_CONTEXT,
+      reply: json({ tasks: [PLANNED_TASK] }),
+      expected: {
+        tasks: [
+          {
+            action: "comments.create",
+            input: {
+              subjectType: "goal",
+              subjectId: "01a1c0af-0000-7000-8000-000000000001",
+            },
+            subjectType: "goal",
+            subjectId: "01a1c0af-0000-7000-8000-000000000001",
+            why: PLANNED_TASK.why,
+          },
+        ],
+      },
+    },
+    {
+      name: "nothing worth doing, so no tasks",
+      context: { ...PLAN_CONTEXT, resources: [] },
+      reply: json({ tasks: [] }),
+      expected: { tasks: [] },
+    },
+    {
+      name: "a reply the schema refuses twice",
+      context: PLAN_CONTEXT,
       reply: UNREADABLE,
       expected: null,
     },
@@ -1108,6 +1194,7 @@ export const EVALUATION_SETS: readonly EvaluationSet[] = [
   narrateTrend,
   summariseBlockers,
   suggestKpi,
+  planRun,
   clusterNotes,
   narrateDiagnostic,
   draftMinutes,

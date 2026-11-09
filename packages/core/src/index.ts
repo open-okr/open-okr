@@ -125,6 +125,8 @@ export type {
   NoteThemes,
   ParentContext,
   ParsedFilter,
+  PlannedRun,
+  PlanRunContext,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
@@ -196,6 +198,10 @@ export {
   type SeededModel,
   seededModelsForProvider,
 } from "./ai/model-catalog.ts";
+export {
+  type PersonalDataFinder,
+  setPersonalDataFinder,
+} from "./ai/personal-data.ts";
 export {
   evaluationPasses,
   type PromptEvaluation,

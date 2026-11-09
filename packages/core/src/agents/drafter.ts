@@ -374,6 +374,39 @@ export interface SummarisableBlocker {
 }
 
 /** What the KPI assist is asked to turn into a metric (P4-T15b-b). */
+/** What the planner is given (agent-instructions.md I1, I4, I5). */
+export interface PlanRunContext {
+  readonly agentName: string;
+  readonly stage: "planning" | "execution";
+  /** The stage's instructions, the newest version: the administrator's words. */
+  readonly instructions: string;
+  /** Titles, states and numbers in the agent's bindings, and nothing else. */
+  readonly resources: readonly {
+    readonly kind: "goal" | "key_result" | "kpi";
+    readonly id: string;
+    readonly title: string;
+    readonly level: string | null;
+    readonly state: string | null;
+    readonly progressPct: number | null;
+    readonly confidence: number | null;
+    readonly goalId: string | null;
+  }[];
+  /** The actions it may choose, by name and summary. */
+  readonly menu: readonly { readonly name: string; readonly summary: string }[];
+}
+
+/** The planner's answer, before the caller checks it. */
+export interface PlannedRun {
+  readonly tasks: readonly {
+    readonly action: string;
+    readonly input: Record<string, unknown>;
+    readonly subjectType: string | null;
+    readonly subjectId: string | null;
+    /** One line on why, shown beside the task before anybody starts the run. */
+    readonly why: string;
+  }[];
+}
+
 export interface KpiRequestContext {
   /** What somebody typed, in their words. */
   readonly description: string;
@@ -661,6 +694,14 @@ export interface AgentDrafter {
    * §6's parser. A formula that does not parse is dropped rather than offered.
    */
   suggestKpi?(context: KpiRequestContext): Promise<SuggestedKpi | null>;
+  /**
+   * A custom agent's planning step (plan 0.7.0 A7, agent-instructions.md
+   * I3): its instructions for the stage and what it can see, turned into the
+   * tasks its run will take. Every task is checked by the caller against the
+   * menu and the action's own input schema before a run is offered; a model
+   * that names something else is refused, never trusted.
+   */
+  planRun?(context: PlanRunContext): Promise<PlannedRun | null>;
   /**
    * §2.3's retro clustering, positional over one board (P4-T15c).
    *

@@ -37,6 +37,8 @@ import type {
   NoteThemes,
   ParentContext,
   ParsedFilter,
+  PlannedRun,
+  PlanRunContext,
   ProposalRequestContext,
   ProposedAction,
   ProposedImportMapping,
@@ -616,6 +618,64 @@ const KPI_JSON_SCHEMA = {
     why: { type: "string", maxLength: 500 },
   },
 } as const;
+
+/**
+ * A custom agent's planning step (plan 0.7.0 A7, agent-instructions.md I3).
+ *
+ * Each task's input arrives as a JSON string rather than an open object, so
+ * the response schema stays strict for every provider; the caller parses it
+ * and checks it against the action's own input schema before any run starts.
+ */
+const PLAN_TASKS_MAX = 10;
+
+const PLAN_SHAPE = z.object({
+  tasks: z
+    .array(
+      z.object({
+        action: z.string().min(1).max(100),
+        inputJson: z.string().max(4000),
+        subjectType: z.string().max(40),
+        subjectId: z.string().max(60),
+        why: z.string().max(300),
+      }),
+    )
+    .max(PLAN_TASKS_MAX),
+});
+
+const PLAN_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["tasks"],
+  properties: {
+    tasks: {
+      type: "array",
+      maxItems: PLAN_TASKS_MAX,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["action", "inputJson", "subjectType", "subjectId", "why"],
+        properties: {
+          action: { type: "string", maxLength: 100 },
+          inputJson: { type: "string", maxLength: 4000 },
+          subjectType: { type: "string", maxLength: 40 },
+          subjectId: { type: "string", maxLength: 60 },
+          why: { type: "string", maxLength: 300 },
+        },
+      },
+    },
+  },
+} as const;
+
+const PLAN_SYSTEM =
+  "You plan the next run of an agent that works inside an OKR workspace. " +
+  "Follow the administrator's instructions for this stage. Choose at most " +
+  `${PLAN_TASKS_MAX} tasks, each one action from the list you are given and ` +
+  "nothing else, with its input as a JSON object written as a string. Use " +
+  "only the ids of the goals, key results and KPIs you are shown. Name the " +
+  "subject each task is about by its kind and id, or leave both empty. Say " +
+  "in one short line why each task is worth doing. Writes become proposals a " +
+  "person decides, so propose what helps rather than what is drastic. If " +
+  "nothing is worth doing, return no tasks.";
 
 const KPI_SYSTEM =
   "You turn a description of something somebody wants to measure into one " +
@@ -1609,6 +1669,79 @@ export function createProviderDrafter(
           ],
         });
         return summary.trim() === "" ? null : summary;
+      } catch {
+        return null;
+      }
+    },
+
+    async planRun(context: PlanRunContext): Promise<PlannedRun | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const planned = await extractStructured({
+          provider: forFeature("planRun"),
+          purpose: "assist",
+          model: options.model,
+          schema: PLAN_SHAPE,
+          jsonSchema: PLAN_JSON_SCHEMA,
+          maxTokens: 1500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: PLAN_SYSTEM },
+            {
+              role: "user",
+              content: [
+                `Agent: ${context.agentName}. Stage: ${context.stage}.`,
+                "Instructions:",
+                context.instructions.trim() === ""
+                  ? "(none given)"
+                  : context.instructions,
+                "What you can see:",
+                ...context.resources.map(
+                  (resource) =>
+                    `- ${resource.kind} ${resource.id}: ${resource.title}` +
+                    (resource.level ? `, ${resource.level}` : "") +
+                    (resource.state ? `, ${resource.state}` : "") +
+                    (resource.progressPct === null
+                      ? ""
+                      : `, ${resource.progressPct}% progress`) +
+                    (resource.confidence === null
+                      ? ""
+                      : `, confidence ${resource.confidence}`) +
+                    (resource.goalId ? `, of goal ${resource.goalId}` : ""),
+                ),
+                "Actions you may choose:",
+                ...context.menu.map(
+                  (choice) => `- ${choice.name}: ${choice.summary}`,
+                ),
+              ].join(NEWLINE),
+            },
+          ],
+        });
+        const tasks: PlannedRun["tasks"][number][] = [];
+        for (const task of planned.tasks) {
+          let input: unknown;
+          try {
+            input =
+              task.inputJson.trim() === "" ? {} : JSON.parse(task.inputJson);
+          } catch {
+            input = null;
+          }
+          tasks.push({
+            action: task.action,
+            input:
+              typeof input === "object" &&
+              input !== null &&
+              !Array.isArray(input)
+                ? (input as Record<string, unknown>)
+                : {},
+            subjectType: task.subjectType === "" ? null : task.subjectType,
+            subjectId: task.subjectId === "" ? null : task.subjectId,
+            why: task.why,
+          });
+        }
+        return { tasks };
       } catch {
         return null;
       }

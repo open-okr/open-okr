@@ -34,6 +34,12 @@ import {
   spaceFeed,
   workspaceFeed,
 } from "./activities.ts";
+import {
+  planAgentRun,
+  readAgentInstructions,
+  restoreAgentInstructions,
+  setAgentInstructions,
+} from "./agent-instructions.ts";
 import { listOwnToolCalls, readToolCallSummary } from "./agent-tool-calls.ts";
 import {
   bindAgentScope,
@@ -714,6 +720,10 @@ export const ACTION_MAP = {
   "agents.answerMention": answerCoachMention,
   "agents.mentionable": mentionableAgents,
   "agents.listRuns": listAgentRuns,
+  "agents.instructions": readAgentInstructions,
+  "agents.setInstructions": setAgentInstructions,
+  "agents.restoreInstructions": restoreAgentInstructions,
+  "agents.planRun": planAgentRun,
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
