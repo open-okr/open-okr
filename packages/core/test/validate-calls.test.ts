@@ -169,6 +169,51 @@ describe("a write checked without committing", () => {
   });
 });
 
+describe("a write that runs another write (plan D4)", () => {
+  it("dry-runs the write it runs too, so applying a proposal keeps nothing", async () => {
+    const wb = await workerDb();
+    const goal = (await call("goals.create", goalInput())) as { id: string };
+    const { rows: runs } = await wb.admin.query<{ id: string }>(
+      `insert into agent_runs (id, workspace_id, agent_id, status, trigger)
+       select gen_random_uuid(), $1, id, 'completed', 'manual'
+         from agents where workspace_id = $1 and kind = 'champion'
+       returning id`,
+      [workspaceId],
+    );
+    const { rows } = await wb.admin.query<{ id: string }>(
+      `insert into proposed_changes
+         (id, workspace_id, run_id, action, payload, subject_type, subject_id, status)
+       values (gen_random_uuid(), $1, $2, 'goals.update', $3::jsonb, 'goal', $4, 'pending')
+       returning id`,
+      [
+        workspaceId,
+        runs[0]?.id,
+        JSON.stringify({ id: goal.id, title: "Renamed by a proposal" }),
+        goal.id,
+      ],
+    );
+    const proposalId = rows[0]?.id as string;
+
+    // `proposals.apply` runs the proposed write on its own connection, where
+    // rolling back the outer transaction alone would not take it back.
+    const checked = await validateAction(await context(), "proposals.apply", {
+      id: proposalId,
+    });
+    expect(checked).not.toBeNull();
+
+    const { rows: titles } = await wb.admin.query<{ title: string }>(
+      "select title from goals where id = $1",
+      [goal.id],
+    );
+    expect(titles[0]?.title).toBe(goalInput().title);
+    const { rows: states } = await wb.admin.query<{ status: string }>(
+      "select status from proposed_changes where id = $1",
+      [proposalId],
+    );
+    expect(states[0]?.status).toBe("pending");
+  });
+});
+
 describe("the REST parameter", () => {
   const create = REST_ROUTES.find((route) => route.action === "goals.create");
   const list = REST_ROUTES.find((route) => route.action === "goals.list");

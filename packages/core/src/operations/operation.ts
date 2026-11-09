@@ -31,6 +31,7 @@
  * is one function, replaced wholesale, and no handler changes when it is.
  */
 
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import {
   activeOnly,
@@ -560,6 +561,42 @@ async function appendAudit(
   });
 }
 
+/**
+ * Whether the code running now is inside a dry run (plan D4).
+ *
+ * A write may run another write on its own connection, as `proposals.apply`
+ * runs the proposed action: that nested write commits in its own transaction,
+ * so rolling back the outer one would not take it back. Every write started
+ * inside a dry run is therefore a dry run too, and `callAction` refuses one
+ * that cannot be (`DryRunUnavailable`). One store per process, for the reason
+ * `provisioning-authority.ts` keeps one: Next can load this module twice.
+ */
+const dryRunGlobals = globalThis as typeof globalThis & {
+  openokrDryRun?: AsyncLocalStorage<true>;
+};
+dryRunGlobals.openokrDryRun ??= new AsyncLocalStorage<true>();
+const dryRuns = dryRunGlobals.openokrDryRun;
+
+export function insideDryRun(): boolean {
+  return dryRuns.getStore() === true;
+}
+
+/**
+ * A dry run reached a write that cannot be one: a handler that is not built
+ * from one operation, so it could commit something no rollback takes back.
+ * The check is refused rather than the write being let through.
+ */
+export class DryRunUnavailable extends Error {
+  readonly action: string;
+  constructor(action: string) {
+    super(
+      `This cannot be checked without committing, because it runs ${action}, which is not one operation.`,
+    );
+    this.name = "DryRunUnavailable";
+    this.action = action;
+  }
+}
+
 /** Carries a dry run's result out of the transaction it rolled back. */
 class DryRunRollback extends Error {
   readonly result: unknown;
@@ -588,265 +625,271 @@ export async function runOperation<TResult, TLoaded = undefined>(
   const metrics = defaultMetrics();
   const startedAt = performance.now();
   const operationOutcome: Outcome = OUTCOME.ok;
+  // Asked for, or inherited from the write that started this one.
+  const dryRun = spec.dryRun === true || insideDryRun();
+  const inScope = <T>(run: () => Promise<T>): Promise<T> =>
+    dryRun ? dryRuns.run(true, run) : run();
 
-  return withContext(
-    db,
-    {
-      workspaceId: spec.workspaceId,
-      ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
-      ...(spec.deviceCodeHash ? { deviceCodeHash: spec.deviceCodeHash } : {}),
-    },
-    async (tx) => {
-      // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`
-      // collapses to view-only for every write except the recovery list.
-      // Checked ahead of everything else, including who is asking — a
-      // frozen workspace refuses the write before spending effort on an
-      // actor it will not matter to. A workspace with no row yet
-      // (`workspace.provision`, mid-transaction) has no state to collapse,
-      // so this is silent rather than a special case keyed on `bootstrap`.
-      if (!isRecoveryAction(spec.action)) {
-        const [current] = await tx
-          .select({ state: workspaces.state })
-          .from(workspaces)
-          .where(activeOnly(workspaces, eq(workspaces.id, spec.workspaceId)))
-          .limit(1);
-        if (current && current.state !== "active") {
+  return inScope(() =>
+    withContext(
+      db,
+      {
+        workspaceId: spec.workspaceId,
+        ...(spec.actor.userId ? { userId: spec.actor.userId } : {}),
+        ...(spec.deviceCodeHash ? { deviceCodeHash: spec.deviceCodeHash } : {}),
+      },
+      async (tx) => {
+        // 0. The freeze overlay (§4.1, §8.2): a workspace that is not `active`
+        // collapses to view-only for every write except the recovery list.
+        // Checked ahead of everything else, including who is asking — a
+        // frozen workspace refuses the write before spending effort on an
+        // actor it will not matter to. A workspace with no row yet
+        // (`workspace.provision`, mid-transaction) has no state to collapse,
+        // so this is silent rather than a special case keyed on `bootstrap`.
+        if (!isRecoveryAction(spec.action)) {
+          const [current] = await tx
+            .select({ state: workspaces.state })
+            .from(workspaces)
+            .where(activeOnly(workspaces, eq(workspaces.id, spec.workspaceId)))
+            .limit(1);
+          if (current && current.state !== "active") {
+            throw new OperationError(
+              "forbidden",
+              current.state === "frozen"
+                ? "This workspace is frozen. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated."
+                : "This workspace is read-only. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated.",
+            );
+          }
+        }
+
+        // 1. Who is asking, resolved against rows loaded in this transaction.
+        const actor = spec.bootstrap
+          ? ({
+              kind: spec.actor.kind,
+              memberId: null,
+              operatorUserId: null,
+              level: ACCESS_LEVELS.full,
+            } satisfies ResolvedActor)
+          : await resolveActor(tx, spec.workspaceId, spec.actor);
+
+        // 2. Anything else the decision depends on, freshly loaded.
+        const loaded = spec.load
+          ? await spec.load({ tx, workspaceId: spec.workspaceId, actor })
+          : (undefined as TLoaded);
+
+        // 3. Authorise, before a single write.
+        //
+        // Against the workspace, or against the subject when the action named
+        // one and its type has a resolver, whichever is higher (P6-G13c). A
+        // subject whose type nothing resolves falls back rather than refusing:
+        // the fallback is the behaviour every action had before this existed,
+        // and turning an unresolvable type into a refusal would break writes
+        // that have nothing to do with this change.
+        const level = await floorLevel(tx, spec, actor);
+        if (level < required) {
           throw new OperationError(
             "forbidden",
-            current.state === "frozen"
-              ? "This workspace is frozen. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated."
-              : "This workspace is read-only. Only member and settings management, and turning single sign-on on or off, are allowed until it is reactivated.",
+            `${spec.action} needs a higher access level than you hold.`,
           );
         }
-      }
 
-      // 1. Who is asking, resolved against rows loaded in this transaction.
-      const actor = spec.bootstrap
-        ? ({
-            kind: spec.actor.kind,
-            memberId: null,
-            operatorUserId: null,
-            level: ACCESS_LEVELS.full,
-          } satisfies ResolvedActor)
-        : await resolveActor(tx, spec.workspaceId, spec.actor);
-
-      // 2. Anything else the decision depends on, freshly loaded.
-      const loaded = spec.load
-        ? await spec.load({ tx, workspaceId: spec.workspaceId, actor })
-        : (undefined as TLoaded);
-
-      // 3. Authorise, before a single write.
-      //
-      // Against the workspace, or against the subject when the action named
-      // one and its type has a resolver, whichever is higher (P6-G13c). A
-      // subject whose type nothing resolves falls back rather than refusing:
-      // the fallback is the behaviour every action had before this existed,
-      // and turning an unresolvable type into a refusal would break writes
-      // that have nothing to do with this change.
-      const level = await floorLevel(tx, spec, actor);
-      if (level < required) {
-        throw new OperationError(
-          "forbidden",
-          `${spec.action} needs a higher access level than you hold.`,
-        );
-      }
-
-      // 4. The change itself, plus what it has to record.
-      const outcome = await spec.execute({
-        tx,
-        workspaceId: spec.workspaceId,
-        actor,
-        loaded,
-      });
-
-      // 5. The activity row. A kind outside the catalogue, or a payload that
-      //    does not match its own kind's schema, refuses here rather than
-      //    persisting — this is what makes "an event kind outside the
-      //    catalogue cannot be persisted" true of every write path at once
-      //    instead of every call site having to remember its own check.
-      const activityPayload = outcome.activity.payload ?? {};
-      validateActivityPayload(outcome.activity.kind, activityPayload);
-      const contextId =
-        outcome.activity.contextId ??
-        (await resolveActivityContext(
+        // 4. The change itself, plus what it has to record.
+        const outcome = await spec.execute({
           tx,
-          spec.workspaceId,
-          outcome.activity.subjectType,
-          outcome.activity.subjectId,
-        ));
-      const [insertedActivity] = await tx
-        .insert(activities)
-        .values({
           workspaceId: spec.workspaceId,
-          kind: outcome.activity.kind,
-          payload: activityPayload,
-          actorMemberId: actor.memberId,
-          actorKind: actor.kind,
-          subjectType: outcome.activity.subjectType,
-          subjectId: outcome.activity.subjectId,
-          spaceId: outcome.activity.spaceId ?? null,
-          contextId: contextId ?? null,
-          at: new Date(),
-        })
-        .returning({ id: activities.id });
+          actor,
+          loaded,
+        });
 
-      // **A notification this write made in its own words points at the
-      // event too** (UAT M10-04). A comment notifies its subject's
-      // followers inside the action, before this row exists, so the inbox
-      // had no activity to render and said "Something new here". Every row
-      // this transaction wrote with no activity and no nudge behind it is
-      // about this write, so it is linked here, once, for every action.
-      // openokr:allow-mutation: the Operation's own transaction.
-      await tx
-        .update(notifications)
-        .set({ activityId: (insertedActivity as { id: string }).id })
-        .where(
-          activeOnly(
-            notifications,
-            eq(notifications.workspaceId, spec.workspaceId),
-            isNull(notifications.activityId),
-            isNull(notifications.nudgeId),
-            sql`${notifications.createdAt} = now()`,
-          ),
-        );
+        // 5. The activity row. A kind outside the catalogue, or a payload that
+        //    does not match its own kind's schema, refuses here rather than
+        //    persisting — this is what makes "an event kind outside the
+        //    catalogue cannot be persisted" true of every write path at once
+        //    instead of every call site having to remember its own check.
+        const activityPayload = outcome.activity.payload ?? {};
+        validateActivityPayload(outcome.activity.kind, activityPayload);
+        const contextId =
+          outcome.activity.contextId ??
+          (await resolveActivityContext(
+            tx,
+            spec.workspaceId,
+            outcome.activity.subjectType,
+            outcome.activity.subjectId,
+          ));
+        const [insertedActivity] = await tx
+          .insert(activities)
+          .values({
+            workspaceId: spec.workspaceId,
+            kind: outcome.activity.kind,
+            payload: activityPayload,
+            actorMemberId: actor.memberId,
+            actorKind: actor.kind,
+            subjectType: outcome.activity.subjectType,
+            subjectId: outcome.activity.subjectId,
+            spaceId: outcome.activity.spaceId ?? null,
+            contextId: contextId ?? null,
+            at: new Date(),
+          })
+          .returning({ id: activities.id });
 
-      /**
-       * The feed's own live insert (P6-G11c).
-       *
-       * Here rather than in each action, for the reason the embedding job
-       * two blocks down gives: an enqueue every write has to remember is an
-       * enqueue the next write will forget. Every activity is a feed row, so
-       * every activity announces itself.
-       *
-       * Unconditional on `notify`. That flag decides whether anybody is
-       * *messaged*, and a feed is not a message: an activity nobody is
-       * subscribed to still belongs on the space's and the workspace's feed.
-       * `suppressNotifications` is not consulted for the same reason, with
-       * one exception below.
-       *
-       * **An import is the exception.** `suppressDispatch` exists because a
-       * run writes thousands of rows, and a thousand pings would make every
-       * open feed in the workspace re-render a thousand times while saying
-       * nothing a single refresh at the end would not. An import's rows are
-       * on the feed either way, from the first navigation after it.
-       */
-      if (!spec.suppressNotifications) {
-        await enqueueOutbox(
-          tx,
-          feedAddedEvent({
+        // **A notification this write made in its own words points at the
+        // event too** (UAT M10-04). A comment notifies its subject's
+        // followers inside the action, before this row exists, so the inbox
+        // had no activity to render and said "Something new here". Every row
+        // this transaction wrote with no activity and no nudge behind it is
+        // about this write, so it is linked here, once, for every action.
+        // openokr:allow-mutation: the Operation's own transaction.
+        await tx
+          .update(notifications)
+          .set({ activityId: (insertedActivity as { id: string }).id })
+          .where(
+            activeOnly(
+              notifications,
+              eq(notifications.workspaceId, spec.workspaceId),
+              isNull(notifications.activityId),
+              isNull(notifications.nudgeId),
+              sql`${notifications.createdAt} = now()`,
+            ),
+          );
+
+        /**
+         * The feed's own live insert (P6-G11c).
+         *
+         * Here rather than in each action, for the reason the embedding job
+         * two blocks down gives: an enqueue every write has to remember is an
+         * enqueue the next write will forget. Every activity is a feed row, so
+         * every activity announces itself.
+         *
+         * Unconditional on `notify`. That flag decides whether anybody is
+         * *messaged*, and a feed is not a message: an activity nobody is
+         * subscribed to still belongs on the space's and the workspace's feed.
+         * `suppressNotifications` is not consulted for the same reason, with
+         * one exception below.
+         *
+         * **An import is the exception.** `suppressDispatch` exists because a
+         * run writes thousands of rows, and a thousand pings would make every
+         * open feed in the workspace re-render a thousand times while saying
+         * nothing a single refresh at the end would not. An import's rows are
+         * on the feed either way, from the first navigation after it.
+         */
+        if (!spec.suppressNotifications) {
+          await enqueueOutbox(
+            tx,
+            feedAddedEvent({
+              workspaceId: spec.workspaceId,
+              activityId: (insertedActivity as { id: string }).id,
+              actorMemberId: actor.memberId,
+            }),
+          );
+        }
+
+        if (outcome.activity.notify && !spec.suppressNotifications) {
+          await fanOutActivity(tx, {
             workspaceId: spec.workspaceId,
             activityId: (insertedActivity as { id: string }).id,
+            subjectType: outcome.activity.subjectType,
+            subjectId: outcome.activity.subjectId,
             actorMemberId: actor.memberId,
-          }),
-        );
-      }
+          });
+        }
 
-      if (outcome.activity.notify && !spec.suppressNotifications) {
-        await fanOutActivity(tx, {
-          workspaceId: spec.workspaceId,
-          activityId: (insertedActivity as { id: string }).id,
-          subjectType: outcome.activity.subjectType,
-          subjectId: outcome.activity.subjectId,
-          actorMemberId: actor.memberId,
+        // 6. The audit row, chained. The channel is merged in here, once, so
+        //    "she checked in from Slack" is answerable for every action rather
+        //    than only for the ones whose author remembered (P5-T06a).
+        await appendAudit(tx, spec.workspaceId, actor, {
+          ...outcome.audit,
+          ...(spec.channel
+            ? {
+                payload: {
+                  ...(outcome.audit.payload ?? {}),
+                  channel: spec.channel,
+                },
+              }
+            : {}),
         });
-      }
 
-      // 6. The audit row, chained. The channel is merged in here, once, so
-      //    "she checked in from Slack" is answerable for every action rather
-      //    than only for the ones whose author remembered (P5-T06a).
-      await appendAudit(tx, spec.workspaceId, actor, {
-        ...outcome.audit,
-        ...(spec.channel
-          ? {
-              payload: {
-                ...(outcome.audit.payload ?? {}),
-                channel: spec.channel,
-              },
-            }
-          : {}),
-      });
+        // 7. Side effects, as outbox rows. The relay delivers them after this
+        //    transaction commits, so nothing fires for a change that rolls back.
+        for (const message of outcome.outbox ?? []) {
+          await enqueueOutbox(tx, message);
+        }
 
-      // 7. Side effects, as outbox rows. The relay delivers them after this
-      //    transaction commits, so nothing fires for a change that rolls back.
-      for (const message of outcome.outbox ?? []) {
-        await enqueueOutbox(tx, message);
-      }
+        /**
+         * 8. The embedding job, as one more outbox row (P4-T13a).
+         *
+         * Here rather than in each action, because an enqueue that every write has
+         * to remember is an enqueue the ninth content kind will forget. Two ways in:
+         * the activity's own subject is embeddable, or the write named the content
+         * explicitly because its activity points at a container.
+         *
+         * The key carries a timestamp, so it never collides. Coalescing to one
+         * pending row per entity was the first idea and was wrong: a second edit
+         * arriving while the relay holds the first row would collide on the unique
+         * key, and a failed enqueue inside this transaction would roll back a
+         * legitimate domain write. Duplicate rows are the cheaper mistake, because
+         * the worker's hash check makes the second one a no-op.
+         */
+        const embedTarget =
+          outcome.activity.embed ??
+          (isEmbeddableSubject(outcome.activity.subjectType)
+            ? {
+                entityType: outcome.activity.subjectType,
+                entityId: outcome.activity.subjectId,
+              }
+            : null);
+        if (embedTarget) {
+          await enqueueOutbox(tx, {
+            topic: EMBED_TOPIC,
+            payload: {
+              workspaceId: spec.workspaceId,
+              entityType: embedTarget.entityType,
+              entityId: embedTarget.entityId,
+            },
+            idempotencyKey: `${EMBED_TOPIC}:${embedTarget.entityType}:${embedTarget.entityId}:${Date.now()}:${randomUUID()}`,
+          });
+        }
 
-      /**
-       * 8. The embedding job, as one more outbox row (P4-T13a).
-       *
-       * Here rather than in each action, because an enqueue that every write has
-       * to remember is an enqueue the ninth content kind will forget. Two ways in:
-       * the activity's own subject is embeddable, or the write named the content
-       * explicitly because its activity points at a container.
-       *
-       * The key carries a timestamp, so it never collides. Coalescing to one
-       * pending row per entity was the first idea and was wrong: a second edit
-       * arriving while the relay holds the first row would collide on the unique
-       * key, and a failed enqueue inside this transaction would roll back a
-       * legitimate domain write. Duplicate rows are the cheaper mistake, because
-       * the worker's hash check makes the second one a no-op.
-       */
-      const embedTarget =
-        outcome.activity.embed ??
-        (isEmbeddableSubject(outcome.activity.subjectType)
-          ? {
-              entityType: outcome.activity.subjectType,
-              entityId: outcome.activity.subjectId,
-            }
-          : null);
-      if (embedTarget) {
-        await enqueueOutbox(tx, {
-          topic: EMBED_TOPIC,
-          payload: {
-            workspaceId: spec.workspaceId,
-            entityType: embedTarget.entityType,
-            entityId: embedTarget.entityId,
-          },
-          idempotencyKey: `${EMBED_TOPIC}:${embedTarget.entityType}:${embedTarget.entityId}:${Date.now()}:${randomUUID()}`,
-        });
-      }
+        /**
+         * 9. The search indexing job, beside the embedding one (P5-T13).
+         *
+         * The same trigger and the same shape, from the same place, so the two
+         * indexes are refreshed by the same write and cannot come to disagree
+         * about what exists. The sets differ because the questions differ: a KPI,
+         * an initiative, a task and a session are searchable and hold no prose
+         * worth embedding.
+         */
+        const indexTarget =
+          outcome.activity.embed ??
+          (isIndexableSubject(outcome.activity.subjectType)
+            ? {
+                entityType: outcome.activity.subjectType,
+                entityId: outcome.activity.subjectId,
+              }
+            : null);
+        if (indexTarget) {
+          await enqueueOutbox(tx, {
+            topic: INDEX_TOPIC,
+            payload: {
+              workspaceId: spec.workspaceId,
+              entityType: indexTarget.entityType,
+              entityId: indexTarget.entityId,
+            },
+            // A timestamp and a fresh identifier, for the reason the embedding
+            // key above records: coalescing to one pending row per entity
+            // collides the moment a second edit arrives while the relay holds
+            // the first, and a failed enqueue would roll back a real write.
+            idempotencyKey: `${INDEX_TOPIC}:${indexTarget.entityType}:${indexTarget.entityId}:${Date.now()}:${randomUUID()}`,
+          });
+        }
 
-      /**
-       * 9. The search indexing job, beside the embedding one (P5-T13).
-       *
-       * The same trigger and the same shape, from the same place, so the two
-       * indexes are refreshed by the same write and cannot come to disagree
-       * about what exists. The sets differ because the questions differ: a KPI,
-       * an initiative, a task and a session are searchable and hold no prose
-       * worth embedding.
-       */
-      const indexTarget =
-        outcome.activity.embed ??
-        (isIndexableSubject(outcome.activity.subjectType)
-          ? {
-              entityType: outcome.activity.subjectType,
-              entityId: outcome.activity.subjectId,
-            }
-          : null);
-      if (indexTarget) {
-        await enqueueOutbox(tx, {
-          topic: INDEX_TOPIC,
-          payload: {
-            workspaceId: spec.workspaceId,
-            entityType: indexTarget.entityType,
-            entityId: indexTarget.entityId,
-          },
-          // A timestamp and a fresh identifier, for the reason the embedding
-          // key above records: coalescing to one pending row per entity
-          // collides the moment a second edit arrives while the relay holds
-          // the first, and a failed enqueue would roll back a real write.
-          idempotencyKey: `${INDEX_TOPIC}:${indexTarget.entityType}:${indexTarget.entityId}:${Date.now()}:${randomUUID()}`,
-        });
-      }
-
-      if (spec.dryRun) {
-        // Thrown rather than returned, so `withContext` rolls back exactly as
-        // it does for a refusal, and caught below.
-        throw new DryRunRollback(outcome.result);
-      }
-      return outcome.result;
-    },
+        if (dryRun) {
+          // Thrown rather than returned, so `withContext` rolls back exactly as
+          // it does for a refusal, and caught below.
+          throw new DryRunRollback(outcome.result);
+        }
+        return outcome.result;
+      },
+    ),
   ).then(
     (result) => {
       recordOperation(metrics, spec.action, operationOutcome, startedAt);

@@ -18,9 +18,11 @@
  * becomes `internal` with a fixed sentence. A stack trace, a driver message or a
  * constraint name in a response body is a map of the schema.
  */
+
 import { ZodError } from "zod";
 import { SSOConnectionRejected } from "../auth/sso.ts";
 import { OperationError } from "../operations/errors.ts";
+import { DryRunUnavailable } from "../operations/operation.ts";
 import { AdmissionError } from "../tenancy/admission.ts";
 
 export const API_ERROR_CODES = [
@@ -142,6 +144,11 @@ export function errorFor(thrown: unknown): ApiError {
     return thrown.details === undefined
       ? base
       : { ...base, details: thrown.details };
+  }
+  if (thrown instanceof DryRunUnavailable) {
+    // A validation call that reached a write it cannot roll back (plan D4).
+    // Refused before anything was kept, and said plainly.
+    return apiError("unsupported_parameter", thrown.message);
   }
   if (thrown instanceof SSOConnectionRejected) {
     // A fourth refusal, and it is about the input like a Zod one is: a single

@@ -14,6 +14,7 @@
 
 import { reportError } from "../errors/report.ts";
 import { OperationError } from "../operations/errors.ts";
+import { DryRunUnavailable, insideDryRun } from "../operations/operation.ts";
 import {
   ACCESS_LEVEL_NAMES,
   defaultMetrics,
@@ -1073,6 +1074,16 @@ async function admitAndCall<K extends ActionName>(
   input: ActionInput<K>,
 ): Promise<ActionOutput<K>> {
   const action = ACTION_MAP[name];
+  // A write reached from inside a dry run must be one too (plan D4). A write
+  // built from one operation inherits it; any other could commit on its own
+  // connection, so the check is refused rather than the write let through.
+  if (
+    insideDryRun() &&
+    (action as ActionDefinition).safety !== "read" &&
+    !(action as ActionDefinition).validate
+  ) {
+    throw new DryRunUnavailable(name);
+  }
   // The cast is the one place the registry's heterogeneous shapes meet a
   // single call signature; the public types above keep callers honest.
   const call = () =>
