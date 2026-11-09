@@ -9,6 +9,7 @@ import {
   useTranslations,
 } from "@openokr/ui";
 import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
+import Link from "next/link";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { OkrGoal, OkrTree } from "../../lib/okr-tree/cache.ts";
 import { HealthChip } from "./health-chip.tsx";
@@ -683,12 +684,12 @@ function ContextCard({ data }: NodeProps<Node<ContextData, "context">>) {
         </span>
         {/* Read-only on the canvas: it opens in its own cycle, with the
          * drawer, because this cycle's cache does not hold it. */}
-        <a
+        <Link
           href={`/goals?okr=${context.id}`}
           className="nodrag line-clamp-2 text-xs font-semibold text-ink-2 hover:underline"
         >
           {context.title}
-        </a>
+        </Link>
       </div>
       <ul className="mt-1 flex flex-col">
         {context.keyResults.map((keyResult) => (

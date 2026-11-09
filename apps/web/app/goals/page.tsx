@@ -647,9 +647,9 @@ export default async function GoalsPage({
                 </p>
                 <p className="text-xs text-ink-3">
                   {t("goals.objectivesAreDraftedIn")}{" "}
-                  <a className="underline" href="/cycle?phase=4">
+                  <Link className="underline" href="/cycle?phase=4">
                     {t("goals.openDrafting")}
-                  </a>
+                  </Link>
                   .
                 </p>
               </div>
@@ -719,7 +719,7 @@ function AlignmentScore({
   readonly label: string;
 }) {
   return (
-    <a
+    <Link
       href="/cycle?phase=5"
       className="flex flex-none items-baseline gap-2 rounded-control px-2 py-1 hover:bg-raised"
     >
@@ -740,7 +740,7 @@ function AlignmentScore({
          * measures 2.56:1 on this surface. */}
         <span className="text-xs font-semibold tabular-nums text-ink-3">%</span>
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -929,7 +929,7 @@ async function Filters({
           ],
         ] as const
       ).map(([key, to, label]) => (
-        <a
+        <Link
           key={key}
           href={to}
           aria-current={scope === key ? "true" : undefined}
@@ -949,7 +949,7 @@ async function Filters({
               {counts[key]}
             </span>
           ) : null}
-        </a>
+        </Link>
       ))}
     </fieldset>
   );
@@ -1077,7 +1077,7 @@ async function Filters({
         />
         {/* A yes or a no, drawn as a box that is ticked or not. It stays a
          * link, so the state is still an address somebody can send. */}
-        <a
+        <Link
           href={href({ closed: includeClosed ? null : "1" })}
           aria-current={includeClosed ? "true" : undefined}
           className="inline-flex items-center gap-1.75 text-[12.5px] text-ink-2"
@@ -1102,7 +1102,7 @@ async function Filters({
             ) : null}
           </span>
           {t("goals.filter.includeClosed")}
-        </a>
+        </Link>
       </div>
     </>
   );
@@ -1111,7 +1111,7 @@ async function Filters({
     active.length === 0
       ? null
       : active.map((one) => (
-          <a
+          <Link
             key={one.key}
             href={href({ [one.key]: null })}
             aria-label={t("goals.filter.removeOne", { filter: one.label })}
@@ -1126,7 +1126,7 @@ async function Filters({
                 strokeLinecap="round"
               />
             </svg>
-          </a>
+          </Link>
         ));
 
   return (
@@ -1138,12 +1138,12 @@ async function Filters({
       chips={chips}
       clearAll={
         active.length === 0 ? null : (
-          <a
+          <Link
             href={clearAllHref}
             className="px-1.5 text-[12.5px] font-semibold text-brand-text hover:underline"
           >
             {t("goals.filter.clearAll")}
-          </a>
+          </Link>
         )
       }
       activeCount={active.length}
@@ -1198,7 +1198,7 @@ function Pill({
   readonly children: ReactNode;
 }) {
   return (
-    <a
+    <Link
       href={href}
       aria-current={on ? "true" : undefined}
       className={`inline-flex h-6.5 items-center rounded-full border px-2.5 text-xs whitespace-nowrap ${
@@ -1208,7 +1208,7 @@ function Pill({
       }`}
     >
       {children}
-    </a>
+    </Link>
   );
 }
 

@@ -63,9 +63,12 @@ export async function SpaceGoals({
             </p>
             <p className="text-xs text-ink-3">
               {t("goals.objectivesAreDraftedIn")}{" "}
-              <a className="underline" href={`/cycle?phase=4&space=${spaceId}`}>
+              <Link
+                className="underline"
+                href={`/cycle?phase=4&space=${spaceId}`}
+              >
                 {t("goals.openDrafting")}
-              </a>
+              </Link>
             </p>
           </div>
         }

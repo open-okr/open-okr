@@ -1,13 +1,15 @@
 import { cn } from "@openokr/ui";
+import Link from "next/link";
 
 /**
  * The screens inside one sidebar area, as tabs (navigation-five-areas.md,
  * OKRGoal UX review N1 and N2).
  *
  * Fifteen sidebar rows became five areas. The screens did not move: each tab
- * is a plain link to the route it always had, so a link in an email or a
+ * is a link to the route it always had, so a link in an email or a
  * bookmark still lands, and the area's sidebar row stays lit through the
- * registry's `parent`.
+ * registry's `parent`. `Link` rather than `<a>`, so switching tabs fetches
+ * the screen alone instead of reloading the whole document.
  */
 export const AREAS = {
   updates: [
@@ -53,7 +55,7 @@ export function AreaTabs({
       {AREAS[area].map((tab) => {
         const open = tab.href === current;
         return (
-          <a
+          <Link
             key={tab.href}
             href={tab.href}
             aria-current={open ? "page" : undefined}
@@ -65,7 +67,7 @@ export function AreaTabs({
             )}
           >
             {t(tab.key)}
-          </a>
+          </Link>
         );
       })}
     </nav>

@@ -8,6 +8,7 @@ import {
   CardHeader,
   dueDayLabel,
 } from "@openokr/ui";
+import Link from "next/link";
 import { healthWord } from "../../lib/health-words.ts";
 import type { TeamRhythm, WeekCard } from "../../lib/my-week.ts";
 import { ActionForm } from "../cycle/action-form.tsx";
@@ -73,12 +74,12 @@ export function MyWeek({
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <span className="flex min-w-0 flex-col">
-                  <a
+                  <Link
                     href={`/goals/${goal.id}`}
                     className="text-sm font-semibold text-ink hover:underline"
                   >
                     {goal.title}
-                  </a>
+                  </Link>
                   <span className="text-xs text-ink-3">
                     {[
                       healthWord(t, goal.health),
@@ -105,7 +106,7 @@ export function MyWeek({
                       .join(" · ")}
                   </span>
                 </span>
-                <a
+                <Link
                   href={href}
                   className={buttonVariants({
                     variant: action === "checkIn" ? "primary" : "default",
@@ -115,7 +116,7 @@ export function MyWeek({
                   {action === "checkIn"
                     ? t("home.myWeek.checkIn")
                     : t("home.myWeek.update")}
-                </a>
+                </Link>
               </div>
               {goal.keyResults.length > 0 ? (
                 <ul className="flex flex-col gap-1">
@@ -158,9 +159,9 @@ export function TeamDigest({
           {t("home.digest.title", { count: owed.length })}
         </h2>
         <span className="flex items-center gap-2">
-          <a href="/review" className="text-xs text-brand-text underline">
+          <Link href="/review" className="text-xs text-brand-text underline">
             {t("home.digest.openUpdates")}
-          </a>
+          </Link>
           {ids.length > 1 ? (
             <ActionForm action={acknowledgeAll}>
               {ids.map((id) => (
@@ -176,12 +177,12 @@ export function TeamDigest({
       <CardBody className="flex flex-col gap-1.5">
         {owed.map((item) => (
           <div key={item.id} className="flex flex-col text-xs">
-            <a
+            <Link
               href={item.href}
               className="font-semibold text-ink hover:underline"
             >
               {item.title}
-            </a>
+            </Link>
             {item.preview?.excerpt ? (
               <span className="line-clamp-2 text-ink-3">
                 {item.preview.excerpt}
@@ -213,12 +214,12 @@ export function RhythmByTeam({
       <CardBody className="flex flex-col gap-2">
         {rows.map((row) => (
           <div key={row.spaceId} className="flex items-center gap-2.5 text-xs">
-            <a
+            <Link
               href={`/spaces/${row.spaceId}`}
               className="w-40 flex-none truncate font-semibold text-ink hover:underline"
             >
               {row.name}
-            </a>
+            </Link>
             <Bar
               value={row.current}
               max={row.total}

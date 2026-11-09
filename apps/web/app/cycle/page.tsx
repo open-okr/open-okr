@@ -10,6 +10,7 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { Card, CardBody, CardHeader } from "@openokr/ui";
+import Link from "next/link";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
@@ -482,9 +483,12 @@ export default async function CyclePage({
                   ))}
                 </ul>
                 <p className="text-xs text-warn">
-                  <a className="underline" href={phaseHref(1, pinnedCycleId)}>
+                  <Link
+                    className="underline"
+                    href={phaseHref(1, pinnedCycleId)}
+                  >
                     {t("cycle.goAndGatherWhat")}
-                  </a>
+                  </Link>
                 </p>
               </CardBody>
             ) : null}
@@ -819,12 +823,12 @@ export default async function CyclePage({
                       />
                       <span className="text-xs text-ink-3">
                         {decision.goalId ? (
-                          <a
+                          <Link
                             className="underline"
                             href={`/goals/${decision.goalId}`}
                           >
                             {decision.keyResultTitle ?? decision.goalTitle}
-                          </a>
+                          </Link>
                         ) : (
                           (decision.keyResultTitle ?? decision.goalTitle)
                         )}{" "}

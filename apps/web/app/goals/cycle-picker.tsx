@@ -9,6 +9,7 @@ import {
   Tooltip,
   useTranslations,
 } from "@openokr/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 import { addCycle } from "./editor-actions.ts";
@@ -126,7 +127,7 @@ export function CyclePicker({
             <ul className="mt-1.5 max-h-52 overflow-auto">
               {matches.map((cycle) => (
                 <li key={cycle.id}>
-                  <a
+                  <Link
                     href={hrefTemplate.replace(CYCLE_PLACEHOLDER, cycle.id)}
                     aria-current={cycle.id === cycleId ? "true" : undefined}
                     className={`block rounded-control px-2 py-1.5 text-xs hover:bg-bg ${
@@ -136,7 +137,7 @@ export function CyclePicker({
                     }`}
                   >
                     {cycle.name}
-                  </a>
+                  </Link>
                 </li>
               ))}
               {matches.length === 0 ? (

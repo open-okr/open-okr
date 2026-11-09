@@ -343,6 +343,20 @@ test("a title changed since it was read is not overwritten", async ({
 });
 
 /**
+ * Opens the filter panel unless it is already open. The scope tabs navigate
+ * without a reload, so the panel stays as it was left, where a reload used to
+ * close it (it opens by itself only while a filter is set). A second click
+ * would close it.
+ */
+async function openFilters(target: Page): Promise<void> {
+  const button = target.getByRole("button", { name: "Filter", exact: true });
+  if ((await button.getAttribute("aria-expanded")) !== "true") {
+    await button.click();
+  }
+  await expect(button).toHaveAttribute("aria-expanded", "true");
+}
+
+/**
  * The scope tabs and the filters, each kept in the address (P9-T07a-b). The
  * objective this file added is the reader's own and sits in no space, so My
  * team and Company leave it out and Mine and its champion keep it.
@@ -358,9 +372,7 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // The level chips offer only the levels this cycle uses (P9-T07a-c), and
   // individual OKRs are off by default.
   // Behind the Filter button since the OKRGoal UX review (N5).
-  await page
-    .getByRole("button", { name: "Filter", exact: true })
-    .click();
+  await openFilters(page);
   const levels = page.locator("#main-content").getByRole("group", {
     name: "Level",
   });
@@ -384,9 +396,7 @@ test("the scope tabs and filters narrow the list, and the address keeps them", a
   // tab (guided-inputs §4.10).
   await scope.getByRole("link", { name: "All" }).click();
   await expect(page).toHaveURL(/scope=all/);
-  await page
-    .getByRole("button", { name: "Filter", exact: true })
-    .click();
+  await openFilters(page);
   // Scoped to the page's own content: the screen just left can still be in
   // the document, hidden, while the next one renders.
   const champion = page

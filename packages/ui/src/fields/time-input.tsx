@@ -23,6 +23,9 @@ export interface TimeInputProps {
   readonly value?: string | null;
   readonly defaultValue?: string | null;
   readonly onValueChange?: (value: string | null) => void;
+  /** Earliest and latest wall-clock times, `HH:MM`. */
+  readonly min?: string;
+  readonly max?: string;
   /** Whose clock it is, said with the field: "In Asia/Jakarta." */
   readonly description?: ReactNode;
   /** Why the time cannot be saved as it is. Shown and announced while set. */
@@ -48,6 +51,8 @@ export function TimeInput({
   value,
   defaultValue,
   onValueChange,
+  min,
+  max,
   description,
   error,
   required,
@@ -78,6 +83,8 @@ export function TimeInput({
         type="time"
         name={name}
         value={current}
+        min={min}
+        max={max}
         required={required}
         aria-label={hideLabel ? label : undefined}
         onChange={(event) => {

@@ -13,6 +13,7 @@
  * types a URL except the first `goto("/")`, which is opening the product.
  */
 import type { BrowserContext, Page } from "@playwright/test";
+import { fillDateTime } from "./date-time.ts";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
@@ -63,7 +64,7 @@ test("sign in, and schedule a session the way a coordinator would", async () => 
   const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
   await form.getByLabel("Ritual").selectOption("weekly");
   await form.getByLabel("Title").fill("Entry point weekly");
-  await form.getByLabel("Date and time").fill(`${tomorrow}T10:00`);
+  await fillDateTime(form, "Date and time", `${tomorrow}T10:00`);
   await form.getByRole("button", { name: "Schedule", exact: true }).click();
   await expect(form.getByRole("status")).toHaveText("Scheduled.", {
     timeout: 10_000,

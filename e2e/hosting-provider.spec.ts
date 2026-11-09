@@ -17,6 +17,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import type pg from "pg";
+import { fillDateTime } from "./date-time.ts";
 import { expect, test } from "./fixtures.ts";
 import {
   applySettings,
@@ -266,8 +267,8 @@ test("operator: a site message for one customer reaches its people and nobody el
   const at = (minutes: number) =>
     new Date(Date.now() + minutes * 60_000).toISOString().slice(0, 16);
   await operator.getByLabel("Message", { exact: true }).fill(MESSAGE);
-  await operator.getByLabel("Shows from").fill(at(-5));
-  await operator.getByLabel("Stops at").fill(at(60));
+  await fillDateTime(operator, "Shows from", at(-5));
+  await fillDateTime(operator, "Stops at", at(60));
   await operator.locator(`#target-${workspaceId}`).check();
   await operator.getByRole("button", { name: "Show this message" }).click();
   await expect(

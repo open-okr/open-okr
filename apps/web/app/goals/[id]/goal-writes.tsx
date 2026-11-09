@@ -7,6 +7,7 @@ import {
   EntityPicker,
   useTranslations,
 } from "@openokr/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
@@ -159,9 +160,9 @@ export function GoalWrites({
               ) : kpis.length === 0 ? (
                 <span className="text-xs text-ink-4">
                   {t("goal.writes.noKpisYet")}{" "}
-                  <a className="underline" href="/kpis">
+                  <Link className="underline" href="/kpis">
                     {t("goal.writes.addAKpi")}
-                  </a>
+                  </Link>
                 </span>
               ) : (
                 <>

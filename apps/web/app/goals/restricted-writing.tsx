@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslations } from "@openokr/ui";
+import Link from "next/link";
 
 /** Why a new objective may not be written here now, and where that changes. */
 export interface WritingRefusal {
@@ -40,13 +41,13 @@ export function RestrictedWriting({
       </ul>
       <span className="flex flex-wrap items-center gap-3">
         {refusal.links.map((link) => (
-          <a
+          <Link
             key={link.href}
             href={link.href}
             className="font-semibold text-brand-text underline"
           >
             {link.label}
-          </a>
+          </Link>
         ))}
         <button
           type="button"

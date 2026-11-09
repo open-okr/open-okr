@@ -2066,6 +2066,8 @@
   "fields.counter": "{used} daripada {max} aksara",
   "fields.counterOver": "{used} daripada {max} aksara. Buang {over} untuk menyimpannya.",
   "fields.dateRange.endBeforeStart": "Tamat sebelum bermula. Pilih tarikh pada atau selepas {start}.",
+  "fields.dateTime.date": "{label}: tarikh",
+  "fields.dateTime.time": "{label}: masa",
   "fields.dateTime.inZone": "Mengikut waktu {zone}.",
   "fields.email.invalid": "Semak alamat itu. Ia perlu nama, @ dan domain, seperti priya@northwind.example.",
   "fields.identifier.oneWord": "ID ialah satu perkataan, tanpa ruang. Salin seperti yang ditunjukkan oleh sistem lain itu.",

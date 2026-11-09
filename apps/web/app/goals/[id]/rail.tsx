@@ -1,4 +1,5 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
 import { getTranslations } from "../../../lib/translations";
 import { HealthChip } from "../health-chip.tsx";
 
@@ -69,7 +70,7 @@ export async function Rail({
         </CardHeader>
         <CardBody>
           {relations.parent ? (
-            <a
+            <Link
               href={`/goals/${relations.parent.id}`}
               className="flex flex-col gap-0.5"
             >
@@ -79,7 +80,7 @@ export async function Rail({
               <span className="text-xs text-ink-3">
                 {relations.parent.level}
               </span>
-            </a>
+            </Link>
           ) : level === "company" ? (
             <p className="text-xs text-ink-3">
               {t("goals.detail.rail.aCompanyObjectiveAnchors")}
@@ -106,7 +107,7 @@ export async function Rail({
             </p>
           ) : (
             relations.children.map((child) => (
-              <a
+              <Link
                 key={child.id}
                 href={`/goals/${child.id}`}
                 className="flex items-center justify-between gap-2"
@@ -120,7 +121,7 @@ export async function Rail({
                   </span>
                 </span>
                 <HealthChip health={child.health} />
-              </a>
+              </Link>
             ))
           )}
         </CardBody>
@@ -137,14 +138,14 @@ export async function Rail({
           {relations.dependencies.length === 0 ? (
             <p className="text-xs text-ink-3">
               {t("goals.detail.rail.noHorizontalLinksA")}{" "}
-              <a className="underline" href="/goals?display=diagram">
+              <Link className="underline" href="/goals?display=diagram">
                 {t("goals.detail.rail.addOneInThe")}
-              </a>
+              </Link>
               .
             </p>
           ) : (
             relations.dependencies.map((dependency) => (
-              <a
+              <Link
                 key={dependency.id}
                 href={`/goals/${dependency.goalId}`}
                 className="flex flex-col gap-0.5"
@@ -155,7 +156,7 @@ export async function Rail({
                 {dependency.note ? (
                   <span className="text-xs text-ink-3">{dependency.note}</span>
                 ) : null}
-              </a>
+              </Link>
             ))
           )}
         </CardBody>

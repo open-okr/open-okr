@@ -45,8 +45,14 @@ export const DEVELOPMENT_AUTH_SECRET = "openokr-insecure-development-secret";
  * §3: "a version mismatch after a deployment triggers one reload").
  * Computed once at module load, not per call, so every request this
  * process ever serves embeds the same id until it actually restarts.
+ * The value lives on `globalThis` because the bundler loads this module once
+ * per route bundle. A per-module value made the pages and `/api/app-version`
+ * disagree, which reloaded every new tab once.
  */
-const PROCESS_BUILD_ID = crypto.randomUUID();
+const BUILD_ID_KEY = Symbol.for("openokr.processBuildId");
+const processGlobal = globalThis as { [BUILD_ID_KEY]?: string };
+processGlobal[BUILD_ID_KEY] ??= crypto.randomUUID();
+const PROCESS_BUILD_ID: string = processGlobal[BUILD_ID_KEY];
 
 /** Secrets that must never reach production, whatever their source. */
 const PLACEHOLDER_SECRETS = new Set([DEVELOPMENT_AUTH_SECRET]);

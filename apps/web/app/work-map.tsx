@@ -16,6 +16,7 @@ import {
   type MessageValues,
   Tooltip,
 } from "@openokr/ui";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { progressCeiling } from "../lib/ceilings.ts";
 import { confidenceDisplay } from "../lib/confidence-display.ts";
@@ -281,7 +282,7 @@ export async function GoalTable({
                   }
                 >
                   <th scope="row" className="min-w-44 px-3 py-2 font-normal">
-                    <a
+                    <Link
                       href={rowHref(node)}
                       className="flex items-center gap-2"
                       style={{
@@ -315,7 +316,7 @@ export async function GoalTable({
                           {node.note}
                         </Chip>
                       ) : null}
-                    </a>
+                    </Link>
                   </th>
                   <td className="px-2 py-2">
                     <HealthChip health={node.health} />
@@ -393,9 +394,9 @@ export async function WorkMap({
               </p>
               <p className="text-xs text-ink-3">
                 {t("workMap.objectivesAreDraftedIn")}{" "}
-                <a className="underline" href="/cycle?phase=4">
+                <Link className="underline" href="/cycle?phase=4">
                   {t("workMap.startDrafting")}
-                </a>
+                </Link>
                 .
               </p>
             </div>
@@ -409,13 +410,13 @@ export async function WorkMap({
             <CardBody className="flex flex-col gap-2.5">
               <div className="flex items-start justify-between gap-2">
                 <h2 className="text-sm font-bold text-ink">{selected.title}</h2>
-                <a
+                <Link
                   href={hrefFor(null)}
                   aria-label={t("workMap.closeThePanel")}
                   className="text-xs text-ink-3 hover:text-ink"
                 >
                   ✕
-                </a>
+                </Link>
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 <Chip tone="neutral">
@@ -449,12 +450,12 @@ export async function WorkMap({
                 />
               ) : null}
 
-              <a
+              <Link
                 className="text-xs text-brand-text underline"
                 href={`/goals/${selected.goalId}`}
               >
                 {t("workMap.openTheGoal")}
-              </a>
+              </Link>
             </CardBody>
           </Card>
         </aside>
