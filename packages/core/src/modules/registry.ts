@@ -545,6 +545,17 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // same fact the nudge card guards.
         minLevel: ACCESS_LEVELS.full,
       },
+      {
+        id: "admin-connections",
+        label: "Agent connections",
+        href: "/admin/connections",
+        section: "admin",
+        // Every member's external agent connections and agent tokens, and
+        // ending one (agent-connections-admin.md, plan 0.7.0 A4). `full`, the
+        // level that may already suspend the member. Shown with AI off: an
+        // external agent needs no AI provider here (D9).
+        minLevel: ACCESS_LEVELS.full,
+      },
     ],
   },
 ];

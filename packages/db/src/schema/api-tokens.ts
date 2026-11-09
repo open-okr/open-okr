@@ -48,6 +48,8 @@ export const apiTokens = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** Why, when not by its owner: `admin` since 0.7.0 (migration 0152). */
+    revokedReason: text("revoked_reason"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

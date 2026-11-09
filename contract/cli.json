@@ -1088,6 +1088,61 @@
       "pages": false
     },
     {
+      "name": "connections list",
+      "action": "connections.list",
+      "method": "GET",
+      "path": "/connections/list",
+      "scope": "read",
+      "summary": "Every agent connection and agent token in the workspace, for an administrator.",
+      "flags": [
+        {
+          "name": "state",
+          "field": "state",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "live",
+            "ended",
+            "all"
+          ]
+        },
+        {
+          "name": "page",
+          "field": "page",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "connections revokeAsAdmin",
+      "action": "connections.revokeAsAdmin",
+      "method": "POST",
+      "path": "/connections/revokeAsAdmin",
+      "scope": "destructive",
+      "summary": "End a member's agent connection or agent token, as an administrator.",
+      "flags": [
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "grant",
+            "token"
+          ]
+        },
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "tokens mine",
       "action": "tokens.mine",
       "method": "GET",

@@ -276,6 +276,13 @@ export default async function ApiTokensPage() {
                     lastUsedAt: shortDate(token.lastUsedAt),
                   })}
                 </span>
+                {/* Why it stopped, when its owner did not stop it (plan
+                 * 0.7.0 A4): never who, which the audit row records. */}
+                {token.revokedReason ? (
+                  <span className="text-xs text-bad">
+                    {token.revokedReason}
+                  </span>
+                ) : null}
                 {token.revokedAt ? null : (
                   <TokenForm action={revokeToken}>
                     <input type="hidden" name="id" value={token.id} />

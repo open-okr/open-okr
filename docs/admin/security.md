@@ -7,6 +7,16 @@ a passkey, and a one-time code from an authenticator app with backup codes.
 Session tokens are hashed at rest, and a member can list their sessions and
 revoke one.
 
+## Agent connections
+
+Admin, then **Agent connections**. Every external agent a member connected to
+this workspace, and every agent token a member made, with when each was last
+used. You can end any of them: the agent stops at once, the member is told in
+their inbox that an administrator ended it, and their own Connections or API
+tokens page says so without naming you. Your name is in the audit log. The
+screen works only in the browser, so neither a token nor an agent can list
+or end connections.
+
 ## Single sign-on
 
 Admin, then **Single sign-on**. OpenOKR speaks OIDC and SAML 2.0 directly.

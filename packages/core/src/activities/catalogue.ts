@@ -254,6 +254,12 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   // Plan 0.7.0 A3: an agent connection asked for a tool beyond its scope.
   "agent.scope_refused": z.object({ tool: z.string(), needed: z.string() }),
+  // Plan 0.7.0 A4: an administrator ended a member's agent connection.
+  "connection.ended_by_admin": z.object({
+    kind: z.string(),
+    id: z.string(),
+    memberId: z.string(),
+  }),
   "agent.created": z.object({}).catchall(z.unknown()),
   "agent.enabled_changed": z.object({ enabled: z.boolean() }),
   "agent.scope_bound": z.object({}).catchall(z.unknown()),
@@ -778,6 +784,8 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   // An agent connection refused a tool beyond its scope (plan 0.7.0 A3).
   // A retrying agent would fill the feed; the audit row is the record.
   "agent.scope_refused",
+  // It names a colleague and their tool (agent-connections-admin.md D6).
+  "connection.ended_by_admin",
 ]);
 
 /**

@@ -1,0 +1,15 @@
+-- Why an API token was revoked (docs/design/agent-connections-admin.md,
+-- plan 0.7.0 A4, approved 9 November 2026).
+--
+-- An administrator may now end a colleague's agent token, as they may end a
+-- colleague's agent connection. The member's own tokens page then has to say
+-- why the token stopped, without naming who, the way `oauth_grants` already
+-- does with its `revoked_reason`. Null for a token its owner revoked, and for
+-- every token revoked before 0.7.0.
+--
+-- No check constraint, like `oauth_grants.revoked_reason`: the sentence a
+-- reason reads as lives in code, beside the keys.
+--
+-- Forward-only and safe for a rolling upgrade: one nullable column the
+-- previous release never reads. The table's tenant policy is unchanged.
+alter table api_tokens add column revoked_reason text;

@@ -234,6 +234,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.outcome === "redacted"
       ? `Personal data was replaced before an AI request to ${asString(p.provider, "a provider")}`
       : `An AI request to ${asString(p.provider, "a provider")} was withheld by the privacy settings`,
+  "connection.ended_by_admin": () =>
+    "An administrator ended a member's agent connection",
   "agent.scope_refused": (p) =>
     `An agent connection was refused ${asString(p.tool, "a tool")}: it needs ${asString(p.needed, "more")} scope`,
   "agent.created": (p) =>

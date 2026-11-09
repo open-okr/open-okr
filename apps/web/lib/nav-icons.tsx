@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Palette,
   Plug,
+  PlugZap,
   Radio,
   RefreshCw,
   ScrollText,
@@ -128,6 +129,8 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // text colour like every icon here. Idle, so it blinks and glances on its
   // slow loop (docs/design/agent-faces.md).
   "admin-agents": <AgentFace className="size-full" />,
+  // A plug: something from outside connected in (plan 0.7.0 A4).
+  "admin-connections": <PlugZap className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */

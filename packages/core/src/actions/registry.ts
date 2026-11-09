@@ -173,6 +173,10 @@ import {
   updateCommentAction,
 } from "./comments.ts";
 import {
+  listWorkspaceConnections,
+  revokeConnectionAsAdmin,
+} from "./connections-admin.ts";
+import {
   ask,
   completeRun,
   readAvailability,
@@ -579,6 +583,9 @@ export const ACTION_MAP = {
   "channels.removeTemplateMapping": removeTemplateMapping,
   "connections.mine": listMyConnections,
   "connections.revoke": revokeConnection,
+  // Plan 0.7.0 A4: the administrator's view, browser only.
+  "connections.list": listWorkspaceConnections,
+  "connections.revokeAsAdmin": revokeConnectionAsAdmin,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,
