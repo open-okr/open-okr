@@ -8,14 +8,16 @@ import {
   SubmitButton,
 } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { PreviousNext } from "../../../lib/previous-next.tsx";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -85,14 +87,6 @@ export default async function InitiativePage({
   };
   const { id } = await params;
 
-  // Whether this reader is watching this subject (P6-G07b). Read here rather
-  // than in the control, because the control is a client component and the
-  // answer is part of the page's own first paint.
-  const watch = await callAction(context, "subscriptions.read", {
-    subjectType: "initiative",
-    subjectId: id,
-  });
-
   const initiative = await callAction(context, "initiatives.read", {
     id,
   }).catch((error: unknown) => {
@@ -102,6 +96,19 @@ export default async function InitiativePage({
       notFound();
     }
     throw error;
+  });
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (initiative.id !== id) {
+    redirect(`/initiatives/${initiative.id}`);
+  }
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "initiative",
+    subjectId: id,
   });
 
   const level = await resolveAccessLevelFor(
@@ -268,6 +275,7 @@ export default async function InitiativePage({
             subjectId={id}
             initial={watch}
           />
+          <CopyLink path={shortLinkPath("initiative", initiative)} />
         </CardHeader>
         {initiative.capacity === "exceeds" ? (
           <CardBody>

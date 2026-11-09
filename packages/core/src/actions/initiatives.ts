@@ -63,6 +63,8 @@ const richText = richTextSchema();
 
 const initiativeOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   spaceId: z.uuid(),
   spaceName: z.string(),
   title: z.string(),
@@ -271,6 +273,7 @@ async function withLinks(
   workspaceId: string,
   rows: readonly {
     id: string;
+    shortId: string | null;
     spaceId: string;
     spaceName: string;
     title: string;
@@ -330,6 +333,7 @@ async function withLinks(
     const done = Number(counted?.done ?? 0);
     return {
       id: row.id,
+      shortId: row.shortId,
       spaceId: row.spaceId,
       spaceName: row.spaceName,
       title: row.title,
@@ -354,6 +358,7 @@ async function withLinks(
 
 const LIST_COLUMNS = {
   id: initiatives.id,
+  shortId: initiatives.shortId,
   spaceId: initiatives.spaceId,
   spaceName: spaces.name,
   title: initiatives.title,

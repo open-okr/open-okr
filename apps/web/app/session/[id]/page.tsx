@@ -40,17 +40,19 @@ import {
 } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { confidenceDisplay } from "../../../lib/confidence-display.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import {
   nameOf,
   SESSION_KIND_NAME_KEYS,
 } from "../../../lib/identifier-names.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -144,6 +146,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // results to offer them to a commitment.
   let sessionRow: {
     id: string;
+    /** The public address (docs/design/short-ids.md S6). */
+    shortId: string | null;
     spaceId: string | null;
     cycleId: string | null;
     kind: string;
@@ -168,6 +172,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as typeof sessionRow;
   } catch {
     notFound();
+  }
+  // A short link lands on the page at its key, which every link, form and the
+  // live channel on it are built from (docs/design/short-ids.md S6).
+  if (sessionRow.id !== id) {
+    redirect(`/session/${sessionRow.id}`);
   }
 
   const participants = (await callAction(context, "sessions.participants", {
@@ -781,9 +790,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
             })}
           </p>
         </div>
-        <Chip tone="neutral">
-          {nameOf(SESSION_KIND_NAME_KEYS, sessionRow.kind, t)}
-        </Chip>
+        <div className="flex items-center gap-2">
+          <CopyLink path={shortLinkPath("session", sessionRow)} />
+          <Chip tone="neutral">
+            {nameOf(SESSION_KIND_NAME_KEYS, sessionRow.kind, t)}
+          </Chip>
+        </div>
       </div>
 
       {/* State-specific controls (facilitator only) */}

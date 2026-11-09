@@ -112,6 +112,7 @@ export async function loadReadableDocument(
   const [row] = await tx
     .select({
       id: documents.id,
+      shortId: documents.shortId,
       subjectType: documents.subjectType,
       subjectId: documents.subjectId,
       title: documents.title,

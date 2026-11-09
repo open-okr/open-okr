@@ -32,13 +32,14 @@ import {
 } from "@openokr/ui";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DecisionText } from "../../../lib/decision-text.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
@@ -48,6 +49,11 @@ import { itemTitle } from "../../../lib/page-title.ts";
 import { PreviousNext } from "../../../lib/previous-next.tsx";
 import { ReviewerIsChampionNote } from "../../../lib/reviewer-is-champion-note.tsx";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
+import {
+  keyResultLinkPath,
+  shortLinkPath,
+  withQuery,
+} from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -126,6 +132,11 @@ export default async function GoalPage({
       notFound();
     }
     throw error;
+  }
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (goal.id !== id) {
+    redirect(withQuery(`/goals/${goal.id}`, await searchParams));
   }
 
   const feedParams = await searchParams;
@@ -389,6 +400,7 @@ export default async function GoalPage({
                 : healthWord(t, goal.health)}
             </Chip>
             <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+            <CopyLink path={shortLinkPath("goal", goal)} />
             {/* Check in's door on the goal itself, now that it has left the
              * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
             {open ? (
@@ -548,6 +560,7 @@ export default async function GoalPage({
                       <span className="text-sm font-bold text-ink">
                         {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
+                      <CopyLink path={keyResultLinkPath(keyResult)} />
                       {/* The work behind this measure, as a board (M-02): the
                           tasks that name it and its initiatives' tasks. */}
                       <Link

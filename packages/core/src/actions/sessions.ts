@@ -509,6 +509,8 @@ async function resolveSpaceContextId(
 
 const sessionOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   workspaceId: z.uuid(),
   spaceId: z.uuid().nullable(),
   cycleId: z.uuid().nullable(),
@@ -595,6 +597,7 @@ function toOutput(
   const isFacilitator = viewerMemberId === row.facilitatorId;
   return {
     id: row.id,
+    shortId: row.shortId ?? null,
     workspaceId: row.workspaceId,
     spaceId: row.spaceId ?? null,
     cycleId: row.cycleId ?? null,

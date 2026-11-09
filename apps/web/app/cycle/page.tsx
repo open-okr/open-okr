@@ -11,14 +11,17 @@ import {
 } from "@openokr/method";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
+import { CopyLink } from "../../lib/copy-link.tsx";
 import { reviewMinutesFor } from "../../lib/cycle-review-minutes.ts";
 import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
+import { shortLinkPath, withQuery } from "../../lib/short-links.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import {
@@ -114,6 +117,14 @@ export default async function CyclePage({
 
   const query = await searchParams;
   const everyCycle = await callAction(context, "cycles.list", {});
+  // A short link lands on the cycle at its key, which every link on this
+  // screen carries (docs/design/short-ids.md S6).
+  const byShortId = query.cycle
+    ? everyCycle.find((one) => one.shortId === query.cycle)
+    : undefined;
+  if (byShortId) {
+    redirect(withQuery("/cycle", { ...query, cycle: byShortId.id }));
+  }
   const named = everyCycle.find((one) => one.id === query.cycle) ?? null;
   const mode: "annual" | "quarterly" =
     named?.mode ?? (query.mode === "annual" ? "annual" : "quarterly");
@@ -502,11 +513,14 @@ export default async function CyclePage({
                   </Chip>
                 </p>
               </div>
-              <CycleSwitcher
-                mode={workflow.mode}
-                cycles={everyCycle}
-                currentId={cycle.id}
-              />
+              <div className="flex items-center gap-2">
+                <CopyLink path={shortLinkPath("cycle", cycle)} />
+                <CycleSwitcher
+                  mode={workflow.mode}
+                  cycles={everyCycle}
+                  currentId={cycle.id}
+                />
+              </div>
             </CardHeader>
             {draftingBlocked || showGaps ? (
               <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">

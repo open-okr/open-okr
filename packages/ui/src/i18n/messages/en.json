@@ -1678,6 +1678,8 @@
   "copy.copied": "Copied",
   "copy.failed": "Copy failed. Select the text below and copy it by hand.",
   "copy.manualLabel": "Text to copy",
+  "copy.link": "Copy link",
+  "copy.linkTitle": "Copies a short link, to paste in a message or a document",
   "cycle.actions.closedAndFed": "Closed. Its result is on the scorecard, and {next} has received its scores, carried work, learnings and process priority.",
   "cycle.actions.closedNothingToFeed": "Closed. Its result is on the scorecard. The next cycle receives its scores, carried work, learnings and process priority when it is created.",
   "cycle.actions.issueNeedsASentence": "An issue needs a sentence saying what it is.",

@@ -61,6 +61,8 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
   "/setup":
     "the first-run wizard, which redirects on a claimed instance and has no app shell; first-run-wizard.spec.ts drives it on the unclaimed second instance",
   "/setup/account": "the second wizard step, same instance and same reason",
+  "/key-results/[id]":
+    "a redirect with no screen of its own: a key result's short link lands on its goal's page at the row, which /goals/[id] scans; short-links.spec.ts follows one",
   // **The four P8 screens this instance does not have** (P8-G01). The scan
   // walks the route tree, which is what makes a screen added tomorrow
   // scanned tomorrow, and it picked these up the moment P8 landed them. None

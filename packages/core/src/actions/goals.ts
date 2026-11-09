@@ -131,6 +131,8 @@ const keyResultOutput = z.object({
   /** Failing check ids for this row (P4-T02a stored them, P4-T06c reads them). */
   qualityFlags: z.array(z.string()),
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   goalId: z.uuid(),
   title: z.string(),
   unit: z.string().nullable(),
@@ -160,6 +162,8 @@ const keyResultOutput = z.object({
 
 const goalOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   title: z.string(),
   description: z.unknown().nullable(),
   cycleId: z.uuid().nullable(),
@@ -367,6 +371,7 @@ async function requireGoalAccess(
 
 function keyResultRow(row: {
   id: string;
+  shortId: string | null;
   goalId: string;
   title: string;
   unit: string | null;
@@ -408,6 +413,7 @@ function keyResultRow(row: {
 
 const GOAL_COLUMNS = {
   id: goals.id,
+  shortId: goals.shortId,
   title: goals.title,
   description: goals.description,
   cycleId: goals.cycleId,
@@ -439,6 +445,7 @@ const GOAL_COLUMNS = {
 
 const KEY_RESULT_COLUMNS = {
   id: keyResults.id,
+  shortId: keyResults.shortId,
   goalId: keyResults.goalId,
   title: keyResults.title,
   unit: keyResults.unit,

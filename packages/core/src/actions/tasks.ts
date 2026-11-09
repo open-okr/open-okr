@@ -717,6 +717,8 @@ export const readTask = defineReadAction({
   summary: "One task with its assignees and its checklist.",
   input: z.object({ id: ADDRESS.task }),
   output: taskCard.extend({
+    /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+    shortId: z.string().nullable(),
     spaceName: z.string(),
     initiativeTitle: z.string().nullable(),
     description: z.unknown().nullable(),
@@ -753,6 +755,7 @@ export const readTask = defineReadAction({
         const [row] = await tx
           .select({
             ...CARD_COLUMNS,
+            shortId: tasks.shortId,
             spaceName: spaces.name,
             initiativeTitle: initiatives.title,
             description: tasks.description,
@@ -800,6 +803,7 @@ export const readTask = defineReadAction({
 
         return {
           ...card,
+          shortId: row.shortId,
           spaceName: row.spaceName,
           initiativeTitle: row.initiativeTitle,
           description: row.description ?? null,

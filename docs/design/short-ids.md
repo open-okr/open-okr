@@ -52,7 +52,8 @@ So the rule is written and broken everywhere but KPIs. Fixing it is not one chan
 | Integration | `packages/core/test/search-palette.test.ts` (existing) | `search.jump` for all eight kinds, a guest, a deleted goal and `kinds` |
 | Integration | `packages/core/test/mcp-research.test.ts` (existing) | `fetch` of a short link, and another workspace's reader holding it |
 | Contract | `pnpm check:contract` | The widened inputs |
-| Browser | `e2e/short-links.spec.ts` | Copy link, open it, land on the page |
+| Unit | `apps/web/test/short-links.test.ts` | The path each Copy link copies, and the redirect keeping its query |
+| Browser | `e2e/short-links.spec.ts` | Copy link on a goal and the clipboard, each of the seven's link landing on its page, a key result's link landing on its row, REST by short id, and an unknown one not found |
 
 ## 5. What this does not do
 
@@ -77,6 +78,10 @@ Where the build moved from §1, and why.
 | B9 | `search.jump` for all eight | It takes an optional `kinds`, so a page asks for its own kind; with none it tries goal, key result, KPI, initiative, task, document, session, cycle in that order and answers the first the reader can open. A deleted row is not offered | Uniqueness is per table, so two kinds could share a short id; the order breaks the tie |
 | B10 | Not in S5 | The agent's `fetch` tool takes a short link (`/goals/<short id>`, `openokr://goal/<short id>`) and cites the goal by its key | An agent handed a copied link has to be able to read it |
 | B11 | The contract | An address field is `{ "type": "string", "minLength": 1, "maxLength": 64 }`, with no `format`. The MCP field descriptions say "id or short id" for the seven | A description on the schema itself would replace the per-field sentence an agent reads |
+
+| B12 | Outputs gain `shortId` | Beside `id`, nullable until data change 0034 reaches the row: `goals.read` and `goals.list` (each goal and each key result), `initiatives.read` and `initiatives.list`, `tasks.read`, `documents.read`, every action answering a session, and every action answering a cycle | What a page needs for its Copy link, and what an integration needs to start sharing short links |
+| B13 | "Copy link" on each of the seven's pages and drawers | On the goal, initiative, task, document, session and cycle pages, and on each key result's row of its goal page (a key result has no page or drawer of its own). `apps/web/lib/copy-link.tsx` puts the tab's own origin in front of the path, so a link copied on an instance reached by another name opens there. A row the data change has not reached copies its UUID link | A longer link is still a link |
+| B14 | The routes accept it | Each page reads its row first and, when the address was a short id, redirects to the same page at its UUID with the query it came with (`apps/web/lib/short-links.ts`). The cycle screen matches `?cycle=` against the cycles' short ids. A key result's link is `/key-results/<short id>`, a new route that asks `search.jump` and redirects to `/goals/<goal>#kr-<key result>` | In 0.7.0 the page still lives at its UUID (S1), and every link, form and live channel on it is built from that |
 
 Inputs left on `z.uuid()` on purpose, because only the importer, the agent runner or the copilot's own bookkeeping sends them, each with a key it already holds: `comments.importComment`, `subscriptions.importWatcher`, `copilot.recordProposal`, `copilot.completeRun`, `copilot.recordAnswer`, `agents.startRun` and `audit.list`'s `targetId`.
 

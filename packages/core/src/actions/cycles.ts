@@ -85,6 +85,8 @@ const KPI_CORRIDOR_KEYS = ["kpi.healthyThreshold", "kpi.watchThreshold"];
 
 const cycleOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   name: z.string(),
   mode: z.enum(["annual", "quarterly"]),
   cadence: z.enum(CYCLE_CADENCES),
@@ -163,6 +165,7 @@ async function requireCycleRole(
 
 const toCycleOutput = (row: {
   id: string;
+  shortId: string | null;
   name: string;
   mode: "annual" | "quarterly";
   cadence: (typeof CYCLE_CADENCES)[number];
@@ -177,6 +180,7 @@ const toCycleOutput = (row: {
   facilitatorId: string | null;
 }): CycleOutput => ({
   id: row.id,
+  shortId: row.shortId,
   name: row.name,
   mode: row.mode,
   cadence: row.cadence,
@@ -195,6 +199,7 @@ const toCycleOutput = (row: {
 
 const CYCLE_COLUMNS = {
   id: cycles.id,
+  shortId: cycles.shortId,
   name: cycles.name,
   mode: cycles.mode,
   cadence: cycles.cadence,

@@ -26,8 +26,8 @@ const APP = fileURLToPath(new URL("../app", import.meta.url));
 const E2E = fileURLToPath(new URL("../../../e2e", import.meta.url));
 
 const NO_DIRECT_VISIT: Readonly<Record<string, string>> = {
-  "/documents/[id]":
-    "reached by clicking its own goal's link in s29-documents, because there is no document index to navigate from",
+  // `/documents/[id]` had a reason here until plan 0.7.0 D1:
+  // short-links.spec.ts opens a document by its key and by its short id.
   "/session/[id]/minutes":
     "reached from the session screen in sessions.spec.ts once a session has closed, which is the only state the minutes exist in",
   "/reset-password":

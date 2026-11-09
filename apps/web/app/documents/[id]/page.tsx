@@ -1,15 +1,17 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { uploadTextFile } from "../../../lib/attachment-actions.ts";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { FILE_LINKS, richTextHtml } from "../../../lib/rich-text-html.ts";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -70,14 +72,6 @@ export default async function DocumentPage({
   };
   const { id } = await params;
 
-  // Whether this reader is watching this subject (P6-G07b). Read here rather
-  // than in the control, because the control is a client component and the
-  // answer is part of the page's own first paint.
-  const watch = await callAction(context, "subscriptions.read", {
-    subjectType: "document",
-    subjectId: id,
-  });
-
   const document = await callAction(context, "documents.read", { id }).catch(
     (error: unknown) => {
       // Somebody else's draft answers exactly as one that never existed.
@@ -87,6 +81,19 @@ export default async function DocumentPage({
       throw error;
     },
   );
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (document.id !== id) {
+    redirect(`/documents/${document.id}`);
+  }
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "document",
+    subjectId: id,
+  });
 
   const difference = await callAction(context, "documents.difference", { id });
 
@@ -152,6 +159,7 @@ export default async function DocumentPage({
               subjectId={id}
               initial={watch}
             />
+            <CopyLink path={shortLinkPath("document", document)} />
           </CardHeader>
           {document.state === "draft" ? (
             <CardBody>

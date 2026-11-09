@@ -209,6 +209,8 @@ export const readDocument = defineReadAction({
   summary: "One document with its body and its version list.",
   input: z.object({ id: ADDRESS.document }),
   output: documentSummary.extend({
+    /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+    shortId: z.string().nullable(),
     body: z.unknown().nullable(),
     versions: z.array(
       z.object({

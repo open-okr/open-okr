@@ -1678,6 +1678,8 @@
   "copy.copied": "Disalin",
   "copy.failed": "Gagal menyalin. Pilih teks di bawah dan salin secara manual.",
   "copy.manualLabel": "Teks untuk disalin",
+  "copy.link": "Salin pautan",
+  "copy.linkTitle": "Menyalin pautan pendek, untuk ditampal dalam mesej atau dokumen",
   "cycle.actions.closedAndFed": "Ditutup. Keputusannya ada pada kad skor, dan {next} telah menerima skor, kerja yang dibawa, pembelajaran dan keutamaan prosesnya.",
   "cycle.actions.closedNothingToFeed": "Ditutup. Keputusannya ada pada kad skor. Kitaran seterusnya menerima skor, kerja yang dibawa, pembelajaran dan keutamaan prosesnya apabila ia dicipta.",
   "cycle.actions.issueNeedsASentence": "Isu memerlukan satu ayat yang menyatakan apa isu itu.",
