@@ -21,14 +21,17 @@ test("takes an archive on Backups and sees it head the list, beside the restore 
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Archives taken" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Restoring" })).toBeVisible();
-  const instance = page.locator("div", {
-    has: page.getByRole("heading", { name: "This instance's backups" }),
-  });
   // Self-hosted names the command; a cloud names the provider. Either way
-  // no date, size or file of an instance backup is shown.
-  await expect(instance.last()).toContainText(
-    /\.\/openokr backup|The provider backs up the service/,
-  );
+  // no date, size or file of an instance backup is shown. The innermost
+  // element holding both the heading and the words is the card itself; the
+  // heading alone would match the card's header row.
+  const instance = page
+    .locator("div")
+    .filter({
+      has: page.getByRole("heading", { name: "This instance's backups" }),
+    })
+    .filter({ hasText: /\.\/openokr backup|The provider backs up the service/ });
+  await expect(instance.last()).toBeVisible();
 
   await page.getByLabel("Passphrase").first().fill("a passphrase kept safe");
   await page.getByLabel("Include files").uncheck();
