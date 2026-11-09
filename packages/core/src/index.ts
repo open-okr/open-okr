@@ -1017,10 +1017,12 @@ export {
   readBillingAsOperator,
   readInstanceFlags,
   readUsageAsOperator,
+  readWorkspaceLimitsAsOperator,
   requestSupportSession,
   revokeOperator,
   setLifecycleAsOperator,
   setPlanAsOperator,
+  setWorkspaceLimitsAsOperator,
   sweepExpiredSessions,
 } from "./operator/index.ts";
 export {

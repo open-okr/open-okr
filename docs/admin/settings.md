@@ -25,9 +25,11 @@ no administrator overrides it.
 | Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice compares the five side by side under "Compare profiles", links to the method behind them, shows what a profile changes before it is applied, keeps anything the workspace changed itself, lets any one setting be changed on its card, and resets a card to the profile. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
 
 `storageQuotaBytes`, `exportInlineRowLimit`, `importRowLimit`,
-`messageLogRetentionDays` and `agentRunCostCapUsd` have no screen and no
-action that writes them yet. The product honours a value stored in the
-workspace's settings and uses the default above otherwise.
+`messageLogRetentionDays` and `agentRunCostCapUsd` are on the Limits card on
+Admin, General, with a button that returns all five to their defaults. On a
+managed cloud the storage quota and the agent cost cap are your provider's to
+set: the card shows them and who sets them, and the provider changes them
+from their operator console.
 
 ### Trusted email domains
 

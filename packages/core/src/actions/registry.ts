@@ -468,6 +468,7 @@ import {
   setWorkspaceBrandingImage,
   updateWorkspaceBranding,
   updateWorkspaceGeneralSettings,
+  updateWorkspaceLimits,
 } from "./settings.ts";
 import {
   addSpaceMember,
@@ -633,6 +634,8 @@ export const ACTION_MAP = {
   "settings.readForMember": readSettingsForMember,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
+  // Plan 0.7.0 B10: the five limits nothing could write.
+  "settings.updateWorkspaceLimits": updateWorkspaceLimits,
   "settings.setWorkspaceBrandingImage": setWorkspaceBrandingImage,
   "settings.resetWorkspaceSettings": resetWorkspaceSettings,
   "ai.readProviderConfig": readProviderConfig,

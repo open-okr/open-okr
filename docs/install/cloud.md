@@ -47,6 +47,12 @@ An administrator sees the workspace's plan, its seats and who holds each one
 on **Admin, Plan and seats**. An operator changes the plan, on the workspace's
 page in the console.
 
+The same page sets the workspace's storage quota and agent cost cap per run,
+which on a cloud are the provider's to set. A reason is required and appears in
+the customer's own audit log. The workspace's administrators see both on their
+Limits card and cannot change them; they still set the export, import and
+message-log limits themselves.
+
 | Rule | Why |
 |---|---|
 | A seat is a person who is here or has been invited | An invitation holds a seat, so a full workspace is refused at the invitation rather than when somebody clicks the link |

@@ -56,6 +56,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     level: z.number(),
   }),
   "support.ended": z.object({ reason: z.string() }),
+  // Plan 0.7.0 B10: the limits card, or a cloud operator setting the two
+  // limits that are the provider's.
+  "workspace.limits_updated": z.object({ keys: z.array(z.string()) }),
   "workspace.erasure_reminded": z.object({ eraseOn: z.string() }),
   "workspace.lifecycle_changed": z.object({
     state: z.enum(["active", "suspended", "closed"]),
@@ -790,6 +793,7 @@ export const AGGREGATABLE_KINDS: ReadonlySet<string> = new Set([
   "member.imported",
   "workspace.general_settings_updated",
   "workspace.branding_updated",
+  "workspace.limits_updated",
   // Every real AI call writes one of these; the feed would otherwise be
   // mostly usage noise the instant a real feature calls a provider.
   "ai.usage_recorded",

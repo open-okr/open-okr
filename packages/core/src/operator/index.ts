@@ -12,6 +12,10 @@ export {
   revokeOperator,
 } from "./grants.ts";
 export { setLifecycleAsOperator } from "./lifecycle.ts";
+export {
+  readWorkspaceLimitsAsOperator,
+  setWorkspaceLimitsAsOperator,
+} from "./limits.ts";
 export { setPlanAsOperator } from "./plans.ts";
 export {
   endSupportSession,

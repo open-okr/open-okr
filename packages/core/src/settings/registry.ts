@@ -177,11 +177,11 @@ export const trustedEmailDomainsSchema = z.array(
 
 export const requireSecondFactorSchema = z.boolean();
 
-const storageQuotaBytesSchema = z.number().int().positive();
+export const storageQuotaBytesSchema = z.number().int().positive();
 
-const exportInlineRowLimitSchema = z.number().int().positive();
+export const exportInlineRowLimitSchema = z.number().int().positive();
 
-const importRowLimitSchema = z.number().int().positive();
+export const importRowLimitSchema = z.number().int().positive();
 
 /**
  * How many rows one wizard run may carry (P6-T01b-b).
@@ -194,7 +194,7 @@ const importRowLimitSchema = z.number().int().positive();
 export const DEFAULT_IMPORT_ROW_LIMIT = 1000;
 
 /** Dollars, not cents, and zero is allowed: it means "may not spend". */
-const agentRunCostCapSchema = z.number().nonnegative();
+export const agentRunCostCapSchema = z.number().nonnegative();
 
 /**
  * The cap a workspace inherits, in US dollars per agent run (P4-T05a).
@@ -256,7 +256,7 @@ export const DEFAULT_MESSAGE_LOG_RETENTION_DAYS = 0;
  * what somebody debugging a delivery reaches for. A week is the shortest
  * window where the record still outlives the question.
  */
-const messageLogRetentionDaysSchema = z
+export const messageLogRetentionDaysSchema = z
   .number()
   .int()
   .refine((days) => days === 0 || days >= 7, {
@@ -412,10 +412,11 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "5 GiB: enough for a small team's files on the local disk driver " +
       "without configuration, small enough that a runaway upload loop is " +
       "noticed. TECHNICAL-PLAN names no figure; P2-T05 picked this one. " +
-      "No S-36 card names it yet, so it has none here; a storage admin " +
-      "card is a later task's follow-up, not this one's to invent.",
+      "On the limits card since 0.7.0 (plan B10); on a cloud, only an " +
+      "operator sets it, because it is the provider's lever.",
     resolve: () => 5 * 1024 * 1024 * 1024,
     schema: storageQuotaBytesSchema,
+    card: "limits",
   },
   {
     key: "exportInlineRowLimit",
@@ -427,9 +428,10 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "minute building one. Above it the relay builds the file and the " +
       "person collects it from their own list. TECHNICAL-PLAN section 4.9 says to " +
       "run large sets asynchronously and names no figure; P5-T15 picked " +
-      "this one. No S-36 card names it yet, so it has none here.",
+      "this one. On the limits card since 0.7.0 (plan B10).",
     resolve: () => 5000,
     schema: exportInlineRowLimitSchema,
+    card: "limits",
   },
   {
     key: "importRowLimit",
@@ -443,10 +445,11 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "holding a table in a request, so the bound is on the wizard's two " +
       "actions and not on the command. A file above it is " +
       "refused with the number rather than truncated, because half an " +
-      "import nobody asked for is worse than none. No S-36 card names it " +
-      "yet, so it has none here.",
+      "import nobody asked for is worse than none. On the limits card " +
+      "since 0.7.0 (plan B10).",
     resolve: () => DEFAULT_IMPORT_ROW_LIMIT,
     schema: importRowLimitSchema,
+    card: "limits",
   },
   {
     key: "orphanBlobMinutes",
@@ -477,9 +480,10 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "key, a channel, an escalation step and a suppression reason, and an " +
       "agent run log is the record of what an agent did on the workspace's " +
       "behalf. A sweep over either would delete the evidence the product is " +
-      "required to keep. No S-36 card names this yet, so it has none here.",
+      "required to keep. On the limits card since 0.7.0 (plan B10).",
     resolve: () => DEFAULT_MESSAGE_LOG_RETENTION_DAYS,
     schema: messageLogRetentionDaysSchema,
+    card: "limits",
   },
   {
     key: "teamVoting",
@@ -660,10 +664,12 @@ export const SETTINGS_REGISTRY: readonly SettingDefinition[] = [
       "so this only ever bounds AI spend, and one run drafting a handful of " +
       "check-ins does not approach it. TECHNICAL-PLAN names no figure; " +
       "P4-T05a picked this one. Zero is a valid value and means the agent " +
-      "may not spend at all, which halts its run rather than failing it. No " +
-      "S-36 card names it yet, so it has none here.",
+      "may not spend at all, which halts its run rather than failing it. On " +
+      "the limits card since 0.7.0 (plan B10); on a cloud, only an operator " +
+      "sets it, because it is the provider's lever.",
     resolve: () => DEFAULT_AGENT_RUN_COST_CAP_USD,
     schema: agentRunCostCapSchema,
+    card: "limits",
   },
   // The four AI egress controls (AI-NATIVE-PLAN §4's privacy card,
   // completeness review M-10). Their card is on S-37 rather than S-36, and

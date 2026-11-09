@@ -5,6 +5,7 @@ import {
   readBillingAsOperator,
   readPlans,
   readUsageAsOperator,
+  readWorkspaceLimitsAsOperator,
 } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
@@ -15,6 +16,8 @@ import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { moveLifecycle } from "./lifecycle-actions";
 import { LifecycleForm } from "./lifecycle-form";
+import { setLimits } from "./limits-actions";
+import { OperatorLimitsForm } from "./limits-form";
 import { setPlan } from "./plan-actions";
 import { OperatorPlanForm } from "./plan-form";
 import { SupportRequest } from "./support-request";
@@ -190,6 +193,12 @@ export default async function OperatorWorkspacePage({
   }
 
   const [usage] = await readUsageAsOperator(pool, operator.userId, workspaceId);
+  // The provider's two limits (plan 0.7.0 B10).
+  const limits = await readWorkspaceLimitsAsOperator(
+    pool,
+    operator.userId,
+    workspaceId,
+  );
   const billing = await readBillingAsOperator(
     pool,
     operator.userId,
@@ -437,6 +446,15 @@ export default async function OperatorWorkspacePage({
             }))}
             workspaceId={tenant.workspaceId}
             workspaceName={tenant.name}
+          />
+
+          {/* Plan 0.7.0 B10: the storage quota and the agent cost cap are the
+           * provider's on a cloud, so they are set here and not on S-36. */}
+          <OperatorLimitsForm
+            action={setLimits}
+            storageQuotaBytes={limits.storageQuotaBytes}
+            agentRunCostCapUsd={limits.agentRunCostCapUsd}
+            workspaceId={tenant.workspaceId}
           />
 
           <LifecycleForm

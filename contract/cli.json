@@ -2299,6 +2299,47 @@
       "pages": false
     },
     {
+      "name": "settings updateWorkspaceLimits",
+      "action": "settings.updateWorkspaceLimits",
+      "method": "POST",
+      "path": "/settings/updateWorkspaceLimits",
+      "scope": "write",
+      "summary": "Change the workspace's storage quota, export and import row limits, message log retention or agent run cost cap.",
+      "flags": [
+        {
+          "name": "storage-quota-bytes",
+          "field": "storageQuotaBytes",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "export-inline-row-limit",
+          "field": "exportInlineRowLimit",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "import-row-limit",
+          "field": "importRowLimit",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "message-log-retention-days",
+          "field": "messageLogRetentionDays",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "agent-run-cost-cap-usd",
+          "field": "agentRunCostCapUsd",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "settings setWorkspaceBrandingImage",
       "action": "settings.setWorkspaceBrandingImage",
       "method": "POST",

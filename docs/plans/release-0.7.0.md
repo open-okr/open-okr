@@ -186,7 +186,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | B7 | done | |
 | B8 | yours | Turn on private vulnerability reporting |
 | B9 | to do | After B5: becomes an integration test of the cutover runbook, because the script can only pass once a frozen workspace may export |
-| B10 | to do | |
+| B10 | done | |
 | B11 | done | |
 | M1 to M4 | done | One change |
 | Section 3 | done | Stale text, one change |

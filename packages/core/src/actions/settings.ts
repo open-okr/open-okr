@@ -31,14 +31,20 @@ import {
 import { OperationError } from "../operations/operation.ts";
 import { requireSharedImage, shareAvatar } from "../people/profile.ts";
 import {
+  agentRunCostCapSchema,
   brandingSchema,
+  exportInlineRowLimitSchema,
   findWorkspaceSetting,
+  importRowLimitSchema,
   languageSchema,
+  messageLogRetentionDaysSchema,
   requireSecondFactorSchema,
   settingsByCard,
+  storageQuotaBytesSchema,
   timezoneSchema,
   trustedEmailDomainsSchema,
 } from "../settings/registry.ts";
+import { isCloudEnabled } from "../tenancy/index.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 const settingsValue = z.record(z.string(), z.unknown());
@@ -367,6 +373,100 @@ export const updateWorkspaceGeneralSettings = defineWriteAction({
   }),
 });
 
+/**
+ * The two limits that are a provider's levers on a cloud (plan 0.7.0 B10,
+ * Akmal's choice of 9 November 2026). A cloud's operator sets them on the
+ * workspace's console page; its administrators may not, and may not reset
+ * them either. On a self-hosted instance they are the administrator's.
+ */
+export const PROVIDER_LIMIT_KEYS: ReadonlySet<string> = new Set([
+  "storageQuotaBytes",
+  "agentRunCostCapUsd",
+]);
+
+const PROVIDER_SETS_IT =
+  "On this cloud your provider sets the storage quota and the agent cost cap. Ask them to change it.";
+
+/**
+ * The limits card on S-36 (plan 0.7.0 B10).
+ *
+ * Five settings were declared with defaults and honoured when stored, and
+ * nothing wrote them. Each is validated by its own registry schema, so the
+ * card, the operator's page and a direct call hold one rule.
+ */
+export const updateWorkspaceLimits = defineWriteAction({
+  name: "settings.updateWorkspaceLimits",
+  summary:
+    "Change the workspace's storage quota, export and import row limits, message log retention or agent run cost cap.",
+  input: z
+    .object({
+      storageQuotaBytes: storageQuotaBytesSchema.optional(),
+      exportInlineRowLimit: exportInlineRowLimitSchema.optional(),
+      importRowLimit: importRowLimitSchema.optional(),
+      messageLogRetentionDays: messageLogRetentionDaysSchema.optional(),
+      agentRunCostCapUsd: agentRunCostCapSchema.optional(),
+    })
+    .refine((value) => Object.keys(value).length > 0, {
+      message: "nothing to update",
+    }),
+  output: z.object({ workspaceId: z.uuid(), settings: settingsValue }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async load({ tx, workspaceId }) {
+      // Read before the change, outside the decision: the cloud flag is the
+      // instance's own setting, not a tenant row, so it may be read here
+      // (registration.ts says the same).
+      if (
+        Object.keys(input).some((key) => PROVIDER_LIMIT_KEYS.has(key)) &&
+        (await isCloudEnabled(context.pool))
+      ) {
+        throw new OperationError("forbidden", PROVIDER_SETS_IT);
+      }
+      const [current] = await tx
+        .select({ settings: workspaces.settings })
+        .from(workspaces)
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .limit(1);
+      if (!current) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      return current.settings;
+    },
+    async execute({ tx, workspaceId, loaded }) {
+      const patch: Record<string, unknown> = { ...input };
+      const nextSettings: WorkspaceSettings = { ...loaded, ...patch };
+
+      // openokr:allow-mutation: this is the operation's own execute, on the
+      // transaction runOperation opened. The change, the activity and the
+      // audit row commit together.
+      const [updated] = await tx
+        .update(workspaces)
+        .set({ settings: nextSettings, updatedAt: new Date() })
+        .where(activeOnly(workspaces, eq(workspaces.id, workspaceId)))
+        .returning({ settings: workspaces.settings });
+      if (!updated) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+
+      return {
+        result: { workspaceId, settings: updated.settings },
+        activity: {
+          kind: "workspace.limits_updated",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { keys: Object.keys(patch) },
+        },
+        audit: {
+          action: "settings.update_workspace_limits",
+          targetType: "workspace",
+          targetId: workspaceId,
+          payload: patch,
+        },
+      };
+    },
+  }),
+});
+
 export const updateWorkspaceBranding = defineWriteAction({
   name: "settings.updateWorkspaceBranding",
   summary: "Replace the workspace's branding.",
@@ -581,7 +681,7 @@ export const resetWorkspaceSettings = defineWriteAction({
   input: resetInput,
   output: z.object({ workspaceId: z.uuid(), settings: settingsValue }),
   access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     async load({ tx, workspaceId }) {
       const [current] = await tx
         .select({ settings: workspaces.settings })
@@ -591,10 +691,19 @@ export const resetWorkspaceSettings = defineWriteAction({
       if (!current) {
         throw new OperationError("not_found", "No such workspace.");
       }
-      return current.settings;
+      // On a cloud the provider's two limits are not the administrator's to
+      // reset, any more than to set (plan 0.7.0 B10).
+      const cloud = await isCloudEnabled(context.pool);
+      return { settings: current.settings, cloud };
     },
-    async execute({ tx, workspaceId, loaded }) {
-      const targets = settingsToReset(input);
+    async execute({ tx, workspaceId, loaded: { settings: loaded, cloud } }) {
+      const named = settingsToReset(input);
+      if (cloud && "key" in input && PROVIDER_LIMIT_KEYS.has(input.key)) {
+        throw new OperationError("forbidden", PROVIDER_SETS_IT);
+      }
+      const targets = cloud
+        ? named.filter((setting) => !PROVIDER_LIMIT_KEYS.has(setting.key))
+        : named;
       // No browser signal is available from an admin screen the way one is
       // at registration, so a reset resolves each setting the same way the
       // registry itself falls back: with no context at all.
