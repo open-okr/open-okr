@@ -1205,6 +1205,12 @@ export {
   setupRefusal,
 } from "./setup/state.ts";
 export {
+  resolveStatusThresholds,
+  StatusSettingError,
+  type StatusThresholds,
+  statusThresholdsFrom,
+} from "./status/thresholds.ts";
+export {
   type BoardChangedEvent,
   boardChannel,
 } from "./tasks/live.ts";

@@ -5,6 +5,7 @@ import { resolveSignupPolicy } from "./lib/auth";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
+import { installStatusThresholds } from "./lib/status-thresholds";
 import { installTelemetry } from "./lib/telemetry";
 import { tenantFloor } from "./lib/tenant-floor";
 
@@ -156,6 +157,10 @@ export async function resolveAdmission(): Promise<void> {
     return;
   }
   await installAdmission();
+  // The status thresholds resolve beside the limits and fail the boot the same
+  // way: docs/design/status-and-capacity.md §4 asks for them to be checked at
+  // resolve time, like the admission floors (plan 0.7.0 P8).
+  await installStatusThresholds();
 }
 
 /**

@@ -5,6 +5,7 @@ import { installAdmission } from "../lib/admission";
 import { resolveSignupPolicy } from "../lib/auth";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
+import { installStatusThresholds } from "../lib/status-thresholds";
 import { installTelemetry } from "../lib/telemetry";
 
 // Mocked rather than allowed to run: the real one opens a pool and polls
@@ -32,6 +33,11 @@ vi.mock("../lib/auth", () => ({ resolveSignupPolicy: vi.fn() }));
 // same graph. Mocked for the import cost, and the mock is what makes the two
 // ordering assertions below possible at all.
 vi.mock("../lib/admission", () => ({ installAdmission: vi.fn() }));
+// The `/api/status` thresholds resolve beside the limits (plan 0.7.0 P8),
+// and read `system_settings`, so they are mocked for the same reason.
+vi.mock("../lib/status-thresholds", () => ({
+  installStatusThresholds: vi.fn(),
+}));
 // The sixth route (P8-T07). `lib/sso` reaches the pool and the key ring
 // to decrypt SSO connections at boot. Mocked for the import cost.
 vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
@@ -216,6 +222,8 @@ test("admission is installed before the relay and the scheduler (P8-T06a)", asyn
   await register();
 
   expect(installAdmission).toHaveBeenCalled();
+  // And the status thresholds with them, so a bad pair stops the boot.
+  expect(installStatusThresholds).toHaveBeenCalled();
   expect(vi.mocked(installAdmission).mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(startRelay).mock.invocationCallOrder[0] as number,
   );
