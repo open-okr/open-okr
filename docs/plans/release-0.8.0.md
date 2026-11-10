@@ -12,7 +12,7 @@ This plan grows as changes are named for 0.8.0. So far it holds nine things:
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
 7. **Screen layout**: layouts that waste space or squeeze content. Section 7. The first, Phase 1's Roles and Suggested timeline, asked for by Akmal on 10 November 2026.
 8. **After sign-up**: a page that says to check your email, and a welcome page when the link is opened. Section 8. Asked for by Akmal on 10 November 2026.
-9. **The product tour on first sign-in**: a Start tour or Skip tour dialog, then one step at a time with the step's area lit and the rest dimmed. Section 9. Asked for by Akmal on 10 November 2026, with tour.niazmorshed.dev as the example. One decision (Q9).
+9. **The product tour on first sign-in**: a Start tour or Skip tour dialog, then one step at a time with the step's area lit and the rest dimmed, ending with Start drafting OKRs. Section 9. Asked for by Akmal on 10 November 2026, with tour.niazmorshed.dev as the example. Q9 decided the same day.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -266,26 +266,28 @@ The example, `shadcn/tour` (MIT), is a shadcn registry component. It needs `moti
 
 | # | Change | Size | Gate |
 |---|---|---|---|
-| T1 | **A welcome dialog, then a spotlight tour, on the first screen after the first sign-in**, whatever that screen is, so My week gets it too. For the person who creates a workspace it comes after the onboarding setup, finished or dismissed, never on top of it. The dialog: "Welcome to *instance name*", one line on what the tour shows, **Start tour** and **Skip tour**. **Skip tour ends the tour for good**: the same `people.finishOwnTour` write as today, and Escape does the same. **Start tour** shows the steps one at a time, each with its number ("2 of 6"), Back, Next and Skip tour. The step's area is lit and everything else is dimmed and cannot be clicked until the tour ends. The step's card sits beside the area, and the area is scrolled into view first. A step whose area is not on screen, such as the cycle strip outside planning or the search box on a phone, is left out rather than pointing at nothing. Finishing the last step is the same write. **One tour, not two**: the Work Map card is removed, and a member who finished or ended the old tour is not offered the new one. **Take the tour again** in the avatar menu starts it once more, so an early Skip is never final. That entry is an addition to the request, and can be dropped. **On a demo** (`OPENOKR_DEMO=on`) a persona is shared by every visitor, so the first visitor's Skip would end it for everyone after them. There the choice is remembered in the browser rather than on the member. Accessibility: the dialog and each step are dialogs that hold focus and give it back where it was, the step number is announced, the keyboard does everything (Tab, Enter, Escape, the arrow keys for Back and Next), and with reduced motion the spotlight moves without animating | M | None. UIUX-PLAN S-34 changes with it, since it reverses L-08's card-not-overlay choice. §9's quality gates apply, and `e2e/s43b-accessibility-keyboard.spec.ts` gains the tour |
+| T1 | **A welcome dialog, then a spotlight tour, on the first screen after the first sign-in**, whatever that screen is, so My week gets it too. For the person who creates a workspace it comes after the onboarding setup, finished or dismissed, never on top of it. The dialog: "Welcome to *instance name*", one line on what the tour shows, **Start tour** and **Skip tour**. **Skip tour ends the tour for good**: the same `people.finishOwnTour` write as today, and Escape does the same. **Start tour** shows the steps one at a time, each with its number ("2 of 6"), Back, Next and Skip tour. The step's area is lit and everything else is dimmed and cannot be clicked until the tour ends. The step's card sits beside the area, and the area is scrolled into view first. A step whose area is not on screen, such as the cycle strip outside planning or the search box on a phone, is left out rather than pointing at nothing. **The last step ends with a Start drafting OKRs button** (Q9) that finishes the tour, with the same write, and opens the cycle page, `/cycle`. The cycle page opens on the cycle's current phase, which for a new workspace is Phase 1, Prepare: the step drafting needs first, and F1 shows what is still missing there. For somebody who cannot draft, a viewer for instance, or a guest, whom the cycle page sends to their spaces, the button reads Finish and stays on the page. **One tour, not two**: the Work Map card is removed, and a member who finished or ended the old tour is not offered the new one. **Take the tour again** in the avatar menu starts it once more, so an early Skip is never final. That entry is an addition to the request, and can be dropped. **On a demo** (`OPENOKR_DEMO=on`) a persona is shared by every visitor, so the first visitor's Skip would end it for everyone after them. There the choice is remembered in the browser rather than on the member. Accessibility: the dialog and each step are dialogs that hold focus and give it back where it was, the step number is announced, the keyboard does everything (Tab, Enter, Escape, the arrow keys for Back and Next), and with reduced motion the spotlight moves without animating | M | None. UIUX-PLAN S-34 changes with it, since it reverses L-08's card-not-overlay choice. §9's quality gates apply, and `e2e/s43b-accessibility-keyboard.spec.ts` gains the tour |
 
 ### 9.3 Decision
 
-| # | Question | Options | Recommended |
-|---|---|---|---|
-| Q9 | Which steps? | **(a)** S-34's five, pointed at what the shell shows on every screen: Home, where check-ins are; Updates, what you owe; Goals, the company map; the cycle strip, while a cycle is being planned; and Search with ⌘K. Ask AI is added when the copilot can answer. **(b)** A new list, such as the shell in order from the workspace switcher down, as in the example | **(a).** S-34 already says what a new member needs to find, and every step is on every screen, so the tour never has to change page |
+Akmal decided Q9 on 10 November 2026.
+
+| # | Question | Decided |
+|---|---|---|
+| Q9 | Which steps? | **S-34's five, pointed at what the shell shows on every screen**: Home, where check-ins are; Updates, what you owe; Goals, the company map; the cycle strip, while a cycle is being planned; and Search with ⌘K. Ask AI is added when the copilot can answer. **The tour ends with a Start drafting OKRs button that goes to the cycle page.** Not chosen: a new list walking the shell from the workspace switcher down, as in the example |
 
 ### 9.4 What the specification gains
 
 | Row | Pages |
 |---|---|
-| T1 | UIUX-PLAN §6, S-34: the welcome dialog, the spotlight, when it is offered, Take the tour again, the demo rule; §7, the tour's focus handling; `docs/design/role-homes.md`, which says the tour moved with the map |
+| T1 | UIUX-PLAN §6, S-34: the welcome dialog, the spotlight, when it is offered, the five steps and the closing Start drafting OKRs, Take the tour again, the demo rule; §7, the tour's focus handling; `docs/design/role-homes.md`, which says the tour moved with the map |
 
 ## 10. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
 3. S1 and S2, then S3's design. Every new person on a cloud meets them first.
-4. Q9, then T1. It is what that new person sees next.
+4. T1. It is what that new person sees next, and it leads them to the cycle page.
 5. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
 6. F1 and L1. No design, and both are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read.
 7. The design for Y3 to Y6, then the code, one row each.
@@ -318,8 +320,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S1 | to do | |
 | S2 | to do | |
 | S3 | to do | Design first; the same as the hosting draft's H1 |
-| T1 | to do | Waits on Q9 |
+| T1 | to do | Q9 decided |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
 | Q7, Q8 | yours | Section 5.3 |
-| Q9 | yours | Section 9.3 |
+| Q9 | decided | 10 November 2026, section 9.3: S-34's five steps, ending with Start drafting OKRs |
