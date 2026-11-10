@@ -33,6 +33,16 @@ describe("storageDriverFor", () => {
     expect(storage).toBeInstanceOf(S3Storage);
   });
 
+  test("a bucket with no keys builds, and leaves the credentials to the pod's role", async () => {
+    // Plan 0.8.0 H9: workload identity gives the pod a role and no key, and
+    // the AWS SDK's default chain finds it. Before, the schema refused the
+    // bucket at boot, so this could not parse at all.
+    const storage = storageDriverFor(
+      parseEnv({ ...BASE, OPENOKR_STORAGE_S3_BUCKET: "openokr-files" }),
+    );
+    expect(storage).toBeInstanceOf(S3Storage);
+  });
+
   test("an endpoint reaches the driver, so MinIO and R2 work", async () => {
     const storage = storageDriverFor(
       parseEnv({

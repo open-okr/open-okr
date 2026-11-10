@@ -63,8 +63,15 @@ export function storageDriverFor(env: Env): FileStorage {
   return new S3Storage({
     bucket: env.OPENOKR_STORAGE_S3_BUCKET,
     region: env.OPENOKR_STORAGE_S3_REGION,
-    accessKeyId: env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID as string,
-    secretAccessKey: env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY as string,
+    // Both or neither, which the environment schema guarantees. Neither lets
+    // the AWS SDK find the pod's own credentials (plan 0.8.0 H9).
+    ...(env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID &&
+    env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY
+      ? {
+          accessKeyId: env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID,
+          secretAccessKey: env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY,
+        }
+      : {}),
     ...(env.OPENOKR_STORAGE_S3_ENDPOINT
       ? { endpoint: env.OPENOKR_STORAGE_S3_ENDPOINT }
       : {}),

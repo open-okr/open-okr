@@ -112,8 +112,22 @@ helm upgrade openokr . \
 ```
 
 Credentials come from a Secret and never from values, because a value lands in
-the release and `helm get values` reads it back. The chart refuses a bucket
-with no Secret named.
+the release and `helm get values` reads it back.
+
+**On AWS, prefer no key at all.** Leave `storage.s3.existingSecret` empty and
+give the pod a role: the AWS SDK's default chain finds it, so no long-lived key
+exists anywhere. With IRSA, annotate the service account; with EKS Pod
+Identity, associate the service account with the role; on EC2, an instance
+profile does the same. With no key the SDK may ask the cloud's metadata
+service for credentials, so a store inside an air-gapped network, MinIO for
+one, keeps using a key pair.
+
+```sh
+helm upgrade openokr . \
+  --set storage.s3.bucket=openokr-files \
+  --set storage.s3.region=eu-west-1 \
+  --set-string serviceAccount.annotations."eks\.amazonaws\.com/role-arn"=arn:aws:iam::123456789012:role/openokr-files
+```
 
 A named bucket lifts the single-replica limit: object storage is shared, so the
 access mode of the local volume stops mattering. The volume stays mounted and
@@ -126,7 +140,7 @@ unused, which costs nothing and means turning S3 off again needs no new claim.
 | `storage.s3.endpoint` | none | Empty means AWS S3 itself |
 | `storage.s3.forcePathStyle` | none | `on`, `off`, or empty to let the driver decide |
 | `storage.s3.keyPrefix` | none | So one bucket can hold several instances |
-| `storage.s3.existingSecret` | none | Required when a bucket is named |
+| `storage.s3.existingSecret` | none | A Secret holding a key pair. Empty means no key: the AWS SDK finds the pod's own credentials (IRSA, EKS Pod Identity, an instance profile) |
 
 ## Upgrading
 

@@ -68,11 +68,14 @@ fi
 defaults=$(render)
 
 # --- S3-compatible object storage (P6-G05) --------------------------------
-if render --set storage.s3.bucket=openokr-files 2>&1 \
-  | grep -q "storage.s3.existingSecret is empty"; then
-  pass "refuses a bucket with no credential Secret"
+# A bucket with no Secret leaves the credentials to the pod's own role
+# (plan 0.8.0 H9): no key variable at all, so the AWS SDK's chain decides.
+keyless=$(render --set storage.s3.bucket=openokr-files 2>&1)
+if printf '%s' "$keyless" | grep -q "name: OPENOKR_STORAGE_S3_BUCKET" \
+  && ! printf '%s' "$keyless" | grep -q "name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID"; then
+  pass "a bucket with no Secret renders with no key, for workload identity"
 else
-  fail "accepted a bucket with credentials that could only come from values"
+  fail "a bucket with no Secret was refused, or rendered a key from nowhere"
 fi
 
 if render --set storage.s3.forcePathStyle=yes 2>&1 \

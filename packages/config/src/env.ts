@@ -268,25 +268,29 @@ const envSchema = z
     OPENOKR_STORAGE_S3_KEY_PREFIX: optional(z.string().min(1).optional()),
   })
   .superRefine((env, ctx) => {
-    // A named bucket with no credentials is the failure worth catching at boot:
-    // the driver would build, every upload would fail at the first request, and
-    // the message a user saw would be about an upload rather than about a
-    // missing variable. Half-configured is the state to refuse, not "unset".
+    // **Both keys or neither** (plan 0.8.0 H9). Neither leaves the
+    // credentials to the AWS SDK's default chain, which is how workload
+    // identity works: EKS Pod Identity, IRSA or an instance profile gives the
+    // pod a role and no key. Half a pair is the failure worth catching at
+    // boot: the driver would build, every upload would fail at the first
+    // request, and the message a user saw would be about an upload rather
+    // than about a missing variable.
     if (env.OPENOKR_STORAGE_S3_BUCKET === undefined) {
       return;
     }
-    for (const name of [
-      "OPENOKR_STORAGE_S3_ACCESS_KEY_ID",
-      "OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY",
-    ] as const) {
-      if (env[name] === undefined) {
-        ctx.addIssue({
-          code: "custom",
-          path: [name],
-          message: `${name} is required when OPENOKR_STORAGE_S3_BUCKET names a bucket. Unset the bucket to use local disk instead.`,
-        });
-      }
+    const id = env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID !== undefined;
+    const secret = env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY !== undefined;
+    if (id === secret) {
+      return;
     }
+    const missing = id
+      ? "OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY"
+      : "OPENOKR_STORAGE_S3_ACCESS_KEY_ID";
+    ctx.addIssue({
+      code: "custom",
+      path: [missing],
+      message: `${missing} is required with the other half of the S3 key pair. Set both, or neither to let the AWS SDK find the pod's own credentials.`,
+    });
   });
 
 export type Env = z.infer<typeof envSchema>;

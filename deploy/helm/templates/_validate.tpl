@@ -49,13 +49,11 @@ definition, so the replica count stops mattering.
 
 {{/*
 S3 credentials come from a Secret, never from values, so a key cannot land in
-the release where `helm get values` reads it back. The application refuses a
-named bucket with no credentials at boot too, but a pod crash-looping on a
-missing variable is a worse way to learn this than a template that says so.
+the release where `helm get values` reads it back. A bucket with no Secret is
+allowed since 0.8.0 (plan H9): the AWS SDK's default chain then finds the pod's
+own credentials, which is how EKS Pod Identity, IRSA and an instance profile
+work. Annotate the service account for that (serviceAccount.annotations).
 */}}
-{{- if and .Values.storage.s3.bucket (not .Values.storage.s3.existingSecret) -}}
-{{- fail "\n\nstorage.s3.bucket names a bucket but storage.s3.existingSecret is empty.\n\nCredentials are read from a Secret rather than from values, because a value lands in the release and `helm get values` reads it back.\n\n  kubectl create secret generic openokr-s3 \\\n    --from-literal=access-key-id=... \\\n    --from-literal=secret-access-key=...\n\n  --set storage.s3.existingSecret=openokr-s3\n" -}}
-{{- end -}}
 
 {{- if and .Values.storage.s3.forcePathStyle (not (has .Values.storage.s3.forcePathStyle (list "on" "off"))) -}}
 {{- fail "\n\nstorage.s3.forcePathStyle must be \"on\", \"off\" or empty.\n\nEmpty lets the driver decide: on when an endpoint is set, off for AWS S3.\n" -}}

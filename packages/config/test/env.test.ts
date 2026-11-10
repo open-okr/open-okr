@@ -213,16 +213,23 @@ describe("S3 storage", () => {
     expect(env.OPENOKR_STORAGE_ROOT).toBe("storage");
   });
 
-  test("a named bucket with no credentials is a boot error naming them", () => {
-    // The failure worth catching here rather than at the first upload: the
-    // driver would build fine, every request would fail, and the message a
-    // user saw would be about their file rather than about a missing variable.
-    expect(() =>
-      parseEnv({ ...VALID, OPENOKR_STORAGE_S3_BUCKET: "openokr-files" }),
-    ).toThrow(/OPENOKR_STORAGE_S3_ACCESS_KEY_ID/);
+  test("a named bucket with no keys leaves the credentials to the AWS SDK", () => {
+    // Plan 0.8.0 H9: workload identity (EKS Pod Identity, IRSA, an instance
+    // profile) gives the pod a role and no key, and the SDK's default chain
+    // finds it. Requiring a long-lived key made that impossible.
+    const env = parseEnv({
+      ...VALID,
+      OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+    });
+    expect(env.OPENOKR_STORAGE_S3_BUCKET).toBe("openokr-files");
+    expect(env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID).toBeUndefined();
+    expect(env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY).toBeUndefined();
   });
 
-  test("half a credential pair is still refused", () => {
+  test("half a credential pair is still refused, either half", () => {
+    // Half-configured is the state worth catching at boot: the driver would
+    // build, and every upload would fail with a message about the file rather
+    // than about the missing variable.
     expect(() =>
       parseEnv({
         ...VALID,
@@ -230,6 +237,13 @@ describe("S3 storage", () => {
         OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "key",
       }),
     ).toThrow(/OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY/);
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+        OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY: "secret",
+      }),
+    ).toThrow(/OPENOKR_STORAGE_S3_ACCESS_KEY_ID/);
   });
 
   test("a complete configuration parses, with a region default", () => {

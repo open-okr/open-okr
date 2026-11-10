@@ -169,6 +169,9 @@ spec:
             # Credentials come from a Secret and never from values, so they do
             # not land in the release's stored values where `helm get values`
             # would read them back. Same rule as database.existingSecret.
+            # With no Secret, nothing is set and the AWS SDK finds the pod's
+            # own credentials: workload identity (plan 0.8.0 H9).
+            {{- if .Values.storage.s3.existingSecret }}
             - name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
@@ -179,6 +182,7 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.storage.s3.existingSecret }}
                   key: {{ .Values.storage.s3.secretAccessKeyKey }}
+            {{- end }}
             {{- end }}
             {{- /* The optional virus scan. Absent unless a host is named.
                    Read through `default dict` rather than as a path: a

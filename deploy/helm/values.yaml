@@ -194,9 +194,11 @@ storage:
     forcePathStyle: ""
     # Prefix every object key, so one bucket can hold several instances.
     keyPrefix: ""
-    # A Secret holding the credentials. Required when a bucket is named:
-    # putting a key in values would store it in the release, where anyone with
-    # `helm get values` can read it. Same rule as database.existingSecret.
+    # A Secret holding a key pair, or empty. Empty since 0.8.0 means no key:
+    # the AWS SDK finds the pod's own credentials, which is how EKS Pod
+    # Identity, IRSA and an instance profile work (annotate the service account
+    # below for IRSA). A key in values would land in the release, where anyone
+    # with `helm get values` can read it, so a pair is only ever read from here.
     existingSecret: ""
     accessKeyIdKey: "access-key-id"
     secretAccessKeyKey: "secret-access-key"
