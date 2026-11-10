@@ -62,6 +62,16 @@ from a checkout with `helm install openokr ./deploy/helm` and set
 Migrations run as a job from the same image, before the application rolls, so
 an upgrade is `helm upgrade` and nothing else.
 
+## Behind a load balancer or a CDN
+
+The inbox, the feed, the board, the agents screen and the copilot each hold a
+live stream open. Every one sends a comment line every 25 seconds when nothing
+else is said, so an idle timeout of 60 seconds or more (AWS load balancers
+default to 60, Cloudflare to about 100) never cuts it. A proxy set below 25
+seconds will, and every open tab reconnects each time. Do not buffer the
+responses: they are `text/event-stream`, and the server already sends
+`X-Accel-Buffering: no` for nginx.
+
 ## What to check before you call it done
 
 `sh deploy/helm/check.sh` runs the chart's own behaviour checks with no cluster

@@ -399,7 +399,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H8 | done | `database.existingSecretAdminKey` reads the owner role from the operator's own Secret, and refuses without `existingSecret`. **Deviation:** adminUrl beside existingSecret is warned about in the install notes rather than refused, because it works wherever the operator made a Secret of the chart's own name, which is OKRGoal's workaround; refusing would break its next deploy. OKRGoal can move to the key and drop the workaround |
 | H9 | done | Both keys or neither, in the environment schema, the driver and the chart. Neither lets the AWS SDK's default chain find the pod's own role; half a pair is still refused at boot. The Helm README shows IRSA, Pod Identity and an instance profile |
 | H10 | to do | Design first; split into rows once designed |
-| H11 | to do | |
+| H11 | done | `apps/web/lib/keep-alive.ts`: a heartbeat every 25 seconds on all five live routes (inbox, feed, board, agents, copilot), stopping when the request ends or a write fails. A test refuses a live route without it. `docs/install/kubernetes.md` says what idle timeout a proxy needs |
 | H12 | to do | |
 | H13 | to do | |
 | H14 | to do | |
