@@ -173,6 +173,21 @@ models without it.
 | S-49 | Credits used of the allowance, purchased credits left and when the soonest of them expire ("300 of these expire on 3 March 2027"), when the allowance resets, **Buy {count} credits**, and credits used by where they went (the copilot, assists, the Coach and the Champion, chat channels, the API, your own agent) |
 | Admin, AI | Says plainly that a key added here spends no credits |
 | Any AI affordance, out of credits | Hidden, as it is with a provider off, and a banner across the product says AI is paused until the 1st or until somebody buys more, and that nothing else stopped. A disabled control on each of some twenty screens would say the same thing twenty times |
+| Admin, AI, a plan with no credits | With no key of the workspace's own, says the plan includes no AI credits, so AI is off here, and links to the Plan page (plan 0.8.0 O1). It used to say only "not configured" |
+
+### 9.1 Why AI is off, in words (plan 0.8.0 O1)
+
+The copilot said "No AI provider is configured" whenever no drafter could be built, including on a cloud whose provider's key worked for every workspace with a plan. The host now names the step of the provider chain that stopped it (`apps/web/lib/ai-provider.ts`, `resolveProviderForTier`), passes it to core on the action context as `aiOff`, and every copilot surface turns it into one sentence (`packages/core/src/ai/off-reason.ts`).
+
+| Step that stopped it | What the reader is told |
+|---|---|
+| Nothing routes the tier, or no key answers the routed provider | No AI provider is configured |
+| The provider's key, and the workspace's plan has no AI credits | The plan includes no AI credits; an administrator can choose a plan with credits on the Plan page or add the workspace's own key on the AI page |
+| The month's credits are spent | The paused sentence above, unchanged |
+| The workspace's egress controls let nothing reach the provider | Its AI privacy settings let nothing reach the provider; an administrator can change that on the AI page |
+| The routed model has no price | The model has no price, so it is not used; an administrator can price it or choose another |
+
+A background copilot run gets no reason from the relay and reads as no provider, which only happens when AI went off between the question and the run.
 
 **No new proactive message.** A warning at 80% would be a new kind of nudge, which
 needs your decision and a rule key, so it is left out.

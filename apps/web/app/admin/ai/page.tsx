@@ -19,6 +19,7 @@ import {
   TextInput,
   UrlInput,
 } from "@openokr/ui";
+import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
@@ -220,6 +221,20 @@ export default async function AdminAIPage() {
             <h1 className="text-lg font-bold text-ink">{t("common.ai")}</h1>
             {hosted.kind === "credits" ? (
               <p className="text-ink-2 text-sm">{t("admin.credits.ownKey")}</p>
+            ) : null}
+            {/* A cloud workspace whose plan carries no AI credits and that has
+                no key of its own has no AI at all, while this page used to say
+                only "not configured" (plan 0.8.0 O1). Say why, and where. */}
+            {hosted.kind === "none" && configured.length === 0 ? (
+              <p
+                className="text-warn text-sm"
+                data-testid="ai-plan-without-credits"
+              >
+                {t("admin.ai.planWithoutCredits")}{" "}
+                <Link className="underline" href="/admin/plan">
+                  {t("admin.ai.choosePlan")}
+                </Link>
+              </p>
             ) : null}
             <p className="text-xs text-ink-3">
               {t("admin.ai.everyRuleScoreGate")}

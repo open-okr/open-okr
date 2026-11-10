@@ -38,7 +38,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../lib/auth";
-import { drafterFor } from "../../../lib/drafter";
+import { resolveDrafterFor } from "../../../lib/drafter";
 import { getRealtime } from "../../../lib/realtime";
 import { relayEnabled } from "../../../lib/relay";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -111,10 +111,11 @@ export async function POST(request: NextRequest) {
     return backgroundRun(pool, workspaceId, userId, asked, request.signal);
   }
 
-  // Null means the provider is off, which the panel renders as its own state
+  // No drafter means AI is off, which the panel renders as its own state
   // rather than as a failure. `streamAnswer` still records the question and
-  // still returns the passages retrieval found.
-  const drafter = await drafterFor(workspaceId, "balanced", userId, {
+  // still returns the passages retrieval found, and says why with the reason
+  // the chain stopped on (plan 0.8.0 O1).
+  const outcome = await resolveDrafterFor(workspaceId, "balanced", userId, {
     source: "copilot",
   });
 
@@ -137,7 +138,9 @@ export async function POST(request: NextRequest) {
             pool,
             workspaceId,
             actor: { kind: "human", userId },
-            ...(drafter ? { drafter } : {}),
+            ...("drafter" in outcome
+              ? { drafter: outcome.drafter }
+              : { aiOff: outcome.off }),
           },
           { workspaceId, ...asked },
           request.signal,

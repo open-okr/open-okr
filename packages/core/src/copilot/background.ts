@@ -37,6 +37,7 @@
  */
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
 import { type AnswerSource, citationsFrom, groundQuestion } from "./answer.ts";
 
@@ -177,9 +178,11 @@ export async function runCopilotAnswer(
   });
 
   if (!prepared.ask || !context.drafter?.answerGrounded) {
+    // The relay passes no reason, so this reads as no provider, as before. It
+    // only happens when AI went off between the question and this run.
     return halt(
       prepared.unavailableReason ??
-        "No AI provider is configured, so these are the passages that match your question.",
+        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
     );
   }
 

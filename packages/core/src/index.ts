@@ -199,6 +199,11 @@ export {
   seededModelsForProvider,
 } from "./ai/model-catalog.ts";
 export {
+  AI_OFF_REASONS,
+  type AIOffReason,
+  aiOffSentence,
+} from "./ai/off-reason.ts";
+export {
   type PersonalDataFinder,
   setPersonalDataFinder,
 } from "./ai/personal-data.ts";

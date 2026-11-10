@@ -209,6 +209,34 @@ describe("the AI-off state, which is what a self-hosted instance gets", () => {
     expect(availability.reason).toContain("No AI provider");
   });
 
+  // Plan 0.8.0 O1: a cloud workspace with no plan read "No AI provider is
+  // configured" while the provider's key worked for everybody else.
+  it("names the step that stopped the host, when the host says", async () => {
+    const availability = (await callAction(
+      { ...(await contextFor(OWNER)), aiOff: "plan_without_credits" as const },
+      "copilot.availability" as never,
+      {} as never,
+    )) as { providerConfigured: boolean; reason: string | null };
+    expect(availability.providerConfigured).toBe(false);
+    expect(availability.reason).toContain("plan includes no AI credits");
+    expect(availability.reason).toContain("Plan page");
+    expect(availability.reason).not.toContain("No AI provider");
+  });
+
+  it("answers with the same reason, above the passages", async () => {
+    const result = await answerQuestion(
+      { ...(await contextFor(OWNER)), aiOff: "egress_blocked" as const },
+      {
+        workspaceId,
+        question: "What is happening with mid-market activation?",
+      },
+    );
+    expect(result.unavailableReason).toContain("AI privacy settings");
+    expect(result.unavailableReason).toContain(
+      "these are the passages that match your question",
+    );
+  });
+
   it("reports available once a provider can answer", async () => {
     const drafter = new StubDrafter({ text: "yes", usedSourceIndexes: [] });
     const availability = (await callAction(

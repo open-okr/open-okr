@@ -35,6 +35,7 @@ import type {
   GroundingSource,
 } from "../agents/drafter.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { aiOffSentence } from "../ai/off-reason.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
@@ -205,9 +206,7 @@ export async function groundQuestion(
     if (paused) {
       return nothing(paused);
     }
-    return nothing(
-      "No AI provider is configured, so these are the passages that match your question.",
-    );
+    return nothing(aiOffSentence(context.aiOff ?? "no_provider", "answer"));
   }
 
   const availability = await checkFeatureAvailability(pool, {
@@ -267,7 +266,7 @@ export async function answerQuestion(
   if (!prepared.ask || !drafter?.answerGrounded) {
     return nothing(
       prepared.unavailableReason ??
-        "No AI provider is configured, so these are the passages that match your question.",
+        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
     );
   }
 
@@ -363,7 +362,7 @@ export async function* streamAnswer(
       kind: "unavailable",
       reason:
         prepared.unavailableReason ??
-        "No AI provider is configured, so these are the passages that match your question.",
+        aiOffSentence(context.aiOff ?? "no_provider", "answer"),
     };
     yield { kind: "done", answerMessageId: null, stopped: false };
     return;

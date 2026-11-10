@@ -36,6 +36,7 @@ import {
 } from "@openokr/adapters";
 import { loadEnv } from "@openokr/config";
 import {
+  type AIOffReason,
   callRecorder,
   guardsAIEndpoints,
   type ResolvedAICredential,
@@ -140,10 +141,38 @@ export async function providerForTier(
   forUser?: string,
   attribution: UsageAttribution = {},
 ): Promise<RoutedProvider | null> {
+  const outcome = await resolveProviderForTier(
+    workspaceId,
+    tier,
+    forUser,
+    attribution,
+  );
+  return "routed" in outcome ? outcome.routed : null;
+}
+
+/** A provider, or the step of the chain that stopped one being built. */
+export type ProviderOutcome =
+  | { readonly routed: RoutedProvider }
+  | { readonly off: AIOffReason };
+
+/**
+ * `providerForTier`, saying which step stopped it when it builds nothing
+ * (plan 0.8.0 O1).
+ *
+ * The chain is the same and in the same order. The only difference is that a
+ * null now carries its reason, so the copilot can tell a reader to choose a
+ * plan rather than that no provider is configured.
+ */
+export async function resolveProviderForTier(
+  workspaceId: string,
+  tier: ModelTier,
+  forUser?: string,
+  attribution: UsageAttribution = {},
+): Promise<ProviderOutcome> {
   const pool = getPool();
   const route = await resolveTierRoute(pool, { workspaceId, tier });
   if (!route) {
-    return null;
+    return { off: "no_provider" };
   }
   const resolved = await resolveAICredential(pool, getKeyRing(), process.env, {
     workspaceId,
@@ -151,7 +180,7 @@ export async function providerForTier(
     ...(forUser ? { userId: forUser } : {}),
   });
   if (resolved.source === "off") {
-    return null;
+    return { off: "no_provider" };
   }
 
   // **The provider's own key has limits a workspace's does not**
@@ -162,7 +191,7 @@ export async function providerForTier(
     ? await readHostedAccess(pool, workspaceId)
     : null;
   if (hosted?.kind === "none") {
-    return null;
+    return { off: "plan_without_credits" };
   }
   const isAgent = !forUser;
   const left =
@@ -172,7 +201,7 @@ export async function providerForTier(
         : hosted.availableUsd
       : null;
   if (left !== null && left <= 0) {
-    return null;
+    return { off: "credits_used" };
   }
   const priced = onProvidersKey
     ? await resolveDeploymentRates(pool, route.provider, route.modelId)
@@ -182,7 +211,7 @@ export async function providerForTier(
         modelId: route.modelId,
       });
   if (!priced) {
-    return null;
+    return { off: "model_unpriced" };
   }
   const config = providerConfigFor(resolved, {
     guardOutbound: await guardsAIEndpoints(pool),
@@ -190,10 +219,11 @@ export async function providerForTier(
     appName: await getInstanceName(),
   });
   if (!config) {
-    return null;
+    // An endpoint with no address: nothing is configured that can answer.
+    return { off: "no_provider" };
   }
   const policy = await resolveAIPrivacySettings(pool, workspaceId);
-  return {
+  const routed: RoutedProvider = {
     provider: createAIProvider(config, {
       policy,
       onWithheld: (event) =>
@@ -215,4 +245,5 @@ export async function providerForTier(
       ? {}
       : { costCachedInPerMillion: priced.costCachedInPerMillion }),
   };
+  return { routed };
 }
