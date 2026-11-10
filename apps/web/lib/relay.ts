@@ -25,8 +25,11 @@
  * nothing and works in every deployment shape, including one container started
  * by hand.
  *
- * An operator who does want a dedicated drainer sets `OPENOKR_RELAY=off` on the
- * serving replicas and leaves one instance with it on.
+ * An operator who does want a dedicated drainer sets `OPENOKR_RELAY=elsewhere`
+ * on the serving replicas and leaves one instance with it on, which is what
+ * the Helm chart's worker does (plan 0.8.0 H10d,
+ * docs/design/worker-deployment.md D2). `elsewhere` rather than `off`,
+ * because the copilot and the metrics need to know the queue is still drained.
  */
 import {
   EmailChannel,
@@ -55,6 +58,7 @@ import {
 } from "@openokr/core";
 import { outboxRowsPerMinute } from "./admission";
 import { providerForTier } from "./ai-provider";
+import { relayMode } from "./background-work";
 import { getBilling } from "./billing";
 import { drafterFor } from "./drafter";
 import { embedFor } from "./embedder";
@@ -443,7 +447,8 @@ async function postToSpaceChannel(
 }
 
 /**
- * Whether this process drains the queue.
+ * Whether this process drains the queue: `on` only. `elsewhere` drains it
+ * from another process, which `outboxDrained` in `background-work.ts` asks.
  *
  * Read through the validated environment rather than `process.env` directly, so
  * `OPENOKR_RELAY=fasle` is a boot error naming the variable rather than a
@@ -452,7 +457,7 @@ async function postToSpaceChannel(
 export function relayEnabled(
   env: Pick<Env, "OPENOKR_RELAY"> = loadEnv(),
 ): boolean {
-  return env.OPENOKR_RELAY !== "off";
+  return relayMode(env) === "on";
 }
 
 const globals = globalThis as typeof globalThis & {
@@ -467,7 +472,16 @@ const globals = globalThis as typeof globalThis & {
  * leave the first one polling forever.
  */
 export function startRelay(): OutboxRelay | null {
-  if (!relayEnabled()) {
+  const mode = relayMode();
+  if (mode === "elsewhere") {
+    log("runs elsewhere (OPENOKR_RELAY=elsewhere)");
+    // The queue's gauges, without a relay (docs/design/worker-deployment.md
+    // §1.3): the outbox is shared, so this process reads the same numbers the
+    // worker would, and a scrape of the Service still shows the queue.
+    OutboxRelay.registerGauges(getPool(), getTelemetry(), outboxRowsPerMinute);
+    return null;
+  }
+  if (mode === "off") {
     log("disabled by OPENOKR_RELAY=off");
     return null;
   }

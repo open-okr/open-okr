@@ -135,6 +135,26 @@ The age is measured from the row's own `created_at`, not from `available_at`.
 A row being retried has `available_at` in the future, so measuring from that
 would report a negative lag for exactly the rows that are struggling.
 
+### Which process counts what
+
+Each process serves its own numbers. With one process, or one Compose
+container, that is all of them. With the relay and the scheduler on worker
+pods (`OPENOKR_RELAY` and `OPENOKR_SCHEDULER` set to `elsewhere` on the web
+pods, which the Helm chart's `worker.enabled` does), they split:
+
+| Series | Where it is counted |
+|---|---|
+| The outbox gauges: pending, oldest pending, rate held | Every process. They are queries against the shared outbox, so a web pod with the relay `elsewhere` serves the same numbers the worker does |
+| `openokr_outbox_dispatched_total`, `openokr_outbox_dead_lettered_total`, `openokr_channel_deliveries_total`, the copilot's AI tokens and cost | Where the relay runs: the worker |
+| `openokr_job_runs_total`, `openokr_job_duration_seconds`, `openokr_nudges_total`, `openokr_agent_runs_total`, `openokr_agent_run_duration_seconds` | Where the scheduler runs: the worker |
+| The request series, the capacity gauges, the sign-in and caller-address counts | Where the request was served: the web pods |
+
+**So scrape every pod, not the Service.** A scrape through the Service reaches
+one pod at a time, and the worker is never behind it. Point Prometheus at each
+pod's `/api/metrics` with the scrape token, for example with Kubernetes pod
+discovery on the release's `app.kubernetes.io/instance` label, and add the
+counters across pods.
+
 ### What is never in a label
 
 No workspace id. No member id. No email address or phone number. No goal

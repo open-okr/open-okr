@@ -9,31 +9,41 @@
  *
  * A pod with the scheduler off still answers "operational", as before: an
  * instance may switch the scheduler off everywhere and run its sweeps by hand,
- * and its status should not turn red for that choice. When the worker split
- * (plan row H10) runs the scheduler on some pods only, that is the place to
- * judge the shared stamp from pods that have it off.
+ * and its status should not turn red for that choice.
+ *
+ * **A pod with the scheduler `elsewhere` judges the shared stamp** (plan 0.8.0
+ * H10d, docs/design/worker-deployment.md §1.3). The worker runs it, so the
+ * stamp the worker writes is the only reading there is: by its age against the
+ * same two thresholds, or, with no stamp yet, by the time since this process
+ * started, the grace a scheduler's own boot gives. A stamp that cannot be read
+ * is `unavailable`, which the database component already says.
  */
+import type { BackgroundMode } from "./background-work";
 
 export type ComponentStatus = "operational" | "degraded" | "unavailable";
 
 export interface SchedulerReading {
-  /** Whether this pod runs the scheduler (`OPENOKR_SCHEDULER`). */
-  readonly enabledHere: boolean;
+  /** Where the scheduler runs, from this pod (`OPENOKR_SCHEDULER`). */
+  readonly mode: BackgroundMode;
   /** Whether this pod's scheduler failed to start. */
   readonly failedHere: boolean;
   /** When this pod last completed a run, in epoch ms. */
   readonly localLastRun: number | null;
   /** When any pod last completed a run, from the database, in epoch ms. */
   readonly sharedLastRun: number | null;
+  /** Whether reading the shared stamp failed, as opposed to finding none. */
+  readonly sharedUnreadable: boolean;
   /** When this pod booted its scheduler, for the grace before a first run. */
   readonly bootedAt: number | null;
+  /** When this process started, for `elsewhere`'s grace before a first run. */
+  readonly processStartedAt: number;
   readonly now: number;
   readonly degradedSeconds: number;
   readonly unavailableSeconds: number;
 }
 
 export function judgeScheduler(reading: SchedulerReading): ComponentStatus {
-  if (!reading.enabledHere) {
+  if (reading.mode === "off") {
     return "operational";
   }
   const byAge = (since: number): ComponentStatus => {
@@ -46,6 +56,13 @@ export function judgeScheduler(reading: SchedulerReading): ComponentStatus {
     }
     return "operational";
   };
+
+  if (reading.mode === "elsewhere") {
+    if (reading.sharedUnreadable) {
+      return "unavailable";
+    }
+    return byAge(reading.sharedLastRun ?? reading.processStartedAt);
+  }
 
   const lastRun = Math.max(
     reading.sharedLastRun ?? Number.NEGATIVE_INFINITY,

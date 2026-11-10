@@ -21,8 +21,9 @@
  * **Several hosts are wasteful rather than dangerous**, which is a weaker
  * guarantee than the relay's and worth stating. pg-boss keeps one schedule per
  * job name however many processes declare it, and hands a queued job to one
- * worker. What several hosts cost is the polling. `OPENOKR_SCHEDULER=off`
- * leaves one instance doing it.
+ * worker. What several hosts cost is the polling. `OPENOKR_SCHEDULER=elsewhere`
+ * on the serving replicas leaves one instance doing it, which is what the Helm
+ * chart's worker does (plan 0.8.0 H10d, docs/design/worker-deployment.md D2).
  *
  * **A failing workspace never stops the sweep.** `agents.runChampion` raises
  * `not_found` for a workspace whose Champion is turned off, which is an
@@ -62,6 +63,7 @@ import {
   sweepExpiredSessions,
   sweepTrials,
 } from "@openokr/core";
+import { schedulerMode } from "./background-work";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
@@ -91,7 +93,8 @@ const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * Whether this process runs the recurring work.
+ * Whether this process runs the recurring work: `on` only. `elsewhere` means
+ * another process of this instance runs it (`background-work.ts`).
  *
  * Read through the validated environment rather than `process.env`, so
  * `OPENOKR_SCHEDULER=of` is a boot error naming the variable rather than a
@@ -100,7 +103,7 @@ const reason = (error: unknown): string =>
 export function schedulerEnabled(
   env: Pick<Env, "OPENOKR_SCHEDULER"> = loadEnv(),
 ): boolean {
-  return env.OPENOKR_SCHEDULER !== "off";
+  return schedulerMode(env) === "on";
 }
 
 /** A workspace, as much of it as a scheduled run needs to decide. */
@@ -758,11 +761,16 @@ async function runOne(
  * green and the status page called the scheduler operational for two hours
  * after a boot that never started it. Both read this now.
  */
-export type SchedulerState = "off" | "starting" | "running" | "failed";
+export type SchedulerState =
+  | "off"
+  | "elsewhere"
+  | "starting"
+  | "running"
+  | "failed";
 
 const globals = globalThis as typeof globalThis & {
   openokrScheduler?: PgBossJobQueue;
-  openokrSchedulerState?: Exclude<SchedulerState, "off">;
+  openokrSchedulerState?: Exclude<SchedulerState, "off" | "elsewhere">;
   /** Updated after each successful scheduler sweep (P8-T06c). */
   openokrSchedulerLastRunAt?: number;
   /** Set to `Date.now()` at boot so the status endpoint does not report
@@ -808,10 +816,14 @@ export function schedulerBootedAt(): number | null {
   return globals.openokrSchedulerBootedAt ?? null;
 }
 
-/** The scheduler's state in this process. */
+/**
+ * The scheduler's state in this process. `off` and `elsewhere` are the two
+ * ways it does not run here (plan 0.8.0 H10d); `/api/health` says which.
+ */
 export function schedulerState(): SchedulerState {
-  if (!schedulerEnabled()) {
-    return "off";
+  const mode = schedulerMode();
+  if (mode !== "on") {
+    return mode;
   }
   return globals.openokrSchedulerState ?? "starting";
 }
@@ -828,7 +840,12 @@ export function schedulerState(): SchedulerState {
  * discover through a serving outage than through a log line.
  */
 export function startScheduler(): PgBossJobQueue | null {
-  if (!schedulerEnabled()) {
+  const mode = schedulerMode();
+  if (mode === "elsewhere") {
+    log("runs elsewhere (OPENOKR_SCHEDULER=elsewhere)");
+    return null;
+  }
+  if (mode === "off") {
     log("disabled by OPENOKR_SCHEDULER=off");
     return null;
   }

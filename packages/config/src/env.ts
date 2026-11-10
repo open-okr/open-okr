@@ -195,9 +195,14 @@ const envSchema = z
      * a deployment that drains nothing sends no invitation email and publishes
      * no live event, and that was the state of every deployment until now
      * (PLAN.md §12 R10). Concurrent relays are safe: rows are claimed with
-     * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
-     * when you want one dedicated drainer instead of all of them polling. */
-    OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
+     * `FOR UPDATE SKIP LOCKED` under a lease.
+     *
+     * `elsewhere` (plan 0.8.0 H10d, docs/design/worker-deployment.md D2)
+     * means another process of this instance drains it, such as the Helm
+     * chart's worker: nothing drains here, but the copilot still runs in the
+     * background and the outbox gauges are still served. `off` means not
+     * here, and perhaps nowhere. */
+    OPENOKR_RELAY: optional(z.enum(["on", "off", "elsewhere"]).default("on")),
 
     /** How many database connections one process may hold (P8-T06b).
      *
@@ -246,8 +251,15 @@ const envSchema = z
      * and until now no instance had ever run one on its own clock. Unlike the
      * relay, concurrent schedulers are wasteful rather than dangerous: pg-boss
      * holds one schedule per name however many hosts declare it, and a job is
-     * handed to one worker. Set `off` on the replicas you do not want polling. */
-    OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
+     * handed to one worker. Set `off` on the replicas you do not want polling.
+     *
+     * `elsewhere` (plan 0.8.0 H10d, docs/design/worker-deployment.md D2)
+     * means another process of this instance runs it: nothing runs here, and
+     * `/api/status` judges the stamp the other process writes rather than
+     * answering `operational` as it does for `off`. */
+    OPENOKR_SCHEDULER: optional(
+      z.enum(["on", "off", "elsewhere"]).default("on"),
+    ),
 
     /** Whether this instance is a public demonstration (P8-T13c). Off by
      * default, and it is a claim about the deployment rather than a feature

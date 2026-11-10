@@ -42,6 +42,14 @@ describe("GET /api/health", () => {
     expect((await response.json()).scheduler).toBe("failed");
   });
 
+  // docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d.
+  it("says the scheduler runs elsewhere, and still answers 200", async () => {
+    state.mockReturnValue("elsewhere");
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect((await response.json()).scheduler).toBe("elsewhere");
+  });
+
   it("says so when the role bypasses row-level security", async () => {
     floor.mockResolvedValue("bypassed");
     const response = await GET();

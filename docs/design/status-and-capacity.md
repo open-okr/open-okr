@@ -155,12 +155,21 @@ on `globalThis`, and, since 0.8.0, the same time in `system_settings` under
 so with several pods only the one that ran it had a timestamp, and a healthy
 scheduler read as degraded whenever another pod answered. The status endpoint
 judges the newer of the shared and the local reading against a grace period
-(`apps/web/lib/scheduler-health.ts`). A scheduler turned off by configuration
-on the answering pod reports `operational`, so an instance that runs its
-sweeps by hand is not reported down; when plan row H10 splits the scheduler
-onto worker pods, that is the place to judge the shared stamp from pods that
-have it off. One that failed to start reports `unavailable` at once, unless
-another pod's run is fresh.
+(`apps/web/lib/scheduler-health.ts`). One that failed to start reports
+`unavailable` at once, unless another pod's run is fresh.
+
+What the answering pod's `OPENOKR_SCHEDULER` says decides the rule (plan 0.8.0
+H10d, [worker-deployment](worker-deployment.md) §1.3):
+
+| `OPENOKR_SCHEDULER` on the answering pod | The scheduler component |
+|---|---|
+| `on`, the default | The newer of the shared and the local stamp, by age. Before any run, grace from this pod's scheduler boot |
+| `elsewhere`, as on the Helm chart's web pods with the worker on | The shared stamp, by age. Before any run, grace from this process's start. A stamp that cannot be read is `unavailable` |
+| `off` | `operational`, whatever the stamp: an instance that runs its sweeps by hand is not reported down |
+
+With `elsewhere`, Admin General shows the scheduler notice when this judgement
+is `unavailable`, with a sentence that sends the administrator to the worker.
+`/api/health` says `scheduler: "elsewhere"`.
 
 | Setting | Default | Meaning |
 |---|---|---|

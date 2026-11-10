@@ -313,23 +313,42 @@ export class OutboxRelay {
     // **Registered here, not in the drain loop, and read at scrape time.**
     // This is what makes a stopped relay legible. Counters written during a
     // drain say nothing once draining stops, so the series goes flat at
-    // whatever it last reported and the outage looks like quiet. These two
-    // are queries against the world as it is when somebody asks, so a relay
+    // whatever it last reported and the outage looks like quiet. These are
+    // queries against the world as it is when somebody asks, so a relay
     // that died an hour ago reports an hour of lag.
-    options.metrics?.gauge(OUTBOX_PENDING, () => this.#pendingCount());
-    options.metrics?.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
-      OutboxRelay.oldestPendingSeconds(this.#pool, this.#rate()),
+    if (options.metrics) {
+      OutboxRelay.registerGauges(pool, options.metrics, options.rowsPerMinute);
+    }
+  }
+
+  /**
+   * Registers the queue's gauges, with or without a relay (plan 0.8.0 H10d,
+   * docs/design/worker-deployment.md §1.3).
+   *
+   * A relay registers them when it is built. A process with the relay on
+   * another pod (`OPENOKR_RELAY=elsewhere`) calls this instead, so a scrape
+   * of the Service still shows how far behind the queue is: every number
+   * here is a query against the shared outbox, the same from any process.
+   */
+  static registerGauges(
+    pool: RelayPool,
+    metrics: Pick<MetricRecorder, "gauge">,
+    rowsPerMinute?: () => number,
+  ): void {
+    const rate = (): number => rateOf(rowsPerMinute?.());
+    metrics.gauge(OUTBOX_PENDING, () => OutboxRelay.pendingCount(pool));
+    metrics.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
+      OutboxRelay.oldestPendingSeconds(pool, rate()),
     );
     // Whether the outbox rate is engaging now, and how much it holds (R11).
     // Each answers 0 without a query while the limit is unset.
-    options.metrics?.gauge(
+    metrics.gauge(
       OUTBOX_RATE_HELD_WORKSPACES,
-      async () =>
-        (await OutboxRelay.rateHeld(this.#pool, this.#rate())).workspaces,
+      async () => (await OutboxRelay.rateHeld(pool, rate())).workspaces,
     );
-    options.metrics?.gauge(
+    metrics.gauge(
       OUTBOX_RATE_HELD_ROWS,
-      async () => (await OutboxRelay.rateHeld(this.#pool, this.#rate())).rows,
+      async () => (await OutboxRelay.rateHeld(pool, rate())).rows,
     );
   }
 
@@ -338,9 +357,9 @@ export class OutboxRelay {
     return rateOf(this.#options.rowsPerMinute?.());
   }
 
-  /** Rows waiting: not delivered, not given up on, and due. */
-  async #pendingCount(): Promise<number> {
-    const client = await this.#pool.connect();
+  /** Rows waiting: not delivered and not given up on. */
+  static async pendingCount(pool: RelayPool): Promise<number> {
+    const client = await pool.connect();
     try {
       const result = await client.query(
         `select count(*)::bigint as pending

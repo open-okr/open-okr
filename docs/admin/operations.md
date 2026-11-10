@@ -102,7 +102,14 @@ An instance runs these on a clock, all on by default:
 | Alignment scores | Hourly, at :35 | Stores the alignment score of each cycle nothing has changed since it was upgraded to 0.7. Until then the score is computed when it is read, so the figure is right either way |
 
 `OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,
-and then `pnpm cadence:sweep` and `pnpm audit:chain` are the manual equivalents
+and `OPENOKR_SCHEDULER=elsewhere` says another process of this instance runs
+them, such as the Helm chart's worker: nothing runs on that host, but
+`/api/status` there judges the stamp the other process writes rather than
+answering `operational`, and Admin General warns when it has gone stale.
+`OPENOKR_RELAY` takes the same three values for the outbox relay; with
+`elsewhere` the copilot still answers in the background and `/api/metrics`
+still serves the queue's gauges. With `off`, `pnpm cadence:sweep` and
+`pnpm audit:chain` are the manual equivalents
 of the two that matter most, `pnpm cloud:support-sweep` ends expired
 support sessions, and `pnpm alignment:fill` stores the missing alignment
 scores. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox

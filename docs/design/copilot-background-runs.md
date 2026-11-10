@@ -25,14 +25,18 @@ on 20 September 2026.
 | Only a run the member sends to the background | Nothing shipped changes, and the member is asked to predict the thing nobody can predict. The common case, asked without thinking and closed the tab, still loses its run |
 | Only when tools run | The narrowest reading of the row's words. A plain question that happens to take a minute is still lost, which is the case the criterion describes |
 
-**The fallback is the old path.** `OPENOKR_RELAY=off` is how an operator moves
-the relay to its own instance, and enqueuing on a process that drains nothing
-would be enqueuing into nothing. That process answers inline exactly as before.
+**The fallback is the old path.** With `OPENOKR_RELAY=off` nothing may be
+draining the queue, and enqueuing would be enqueuing into nothing. That
+process answers inline exactly as before.
 
-**The limitation worth knowing**: a deployment that serves requests from
-processes with the relay off and drains from a separate one gets the inline
-path, and with it no rejoining. A process can only ask whether it drains the
-queue itself.
+**A relay on another process keeps the background run** (plan 0.8.0 H10d,
+[worker-deployment](worker-deployment.md) §1.3). `OPENOKR_RELAY=elsewhere` says
+another process of this instance drains the queue, such as the Helm chart's
+worker. The question is enqueued as usual, the worker's relay drafts the
+answer and publishes it over `pg_notify`, and the serving process's
+subscription receives it, so the reader can still close the tab and rejoin.
+Until 0.8.0 a process could only ask whether it drained the queue itself, and
+a deployment that drained from a separate process got the inline path.
 
 ## The shape
 
@@ -103,6 +107,11 @@ no words in it is still refused.
 **Given** an instance with `OPENOKR_RELAY=off`,
 **when** a member asks,
 **then** the answer streams inline exactly as it did before.
+
+**Given** a serving process with `OPENOKR_RELAY=elsewhere`,
+**when** a member asks,
+**then** the question is enqueued as a background run
+(`apps/web/test/copilot-route-mode.test.ts`).
 
 ## Where the tests are
 

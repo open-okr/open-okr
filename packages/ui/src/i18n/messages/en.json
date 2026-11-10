@@ -749,6 +749,8 @@
   "admin.general.registration.inviteOnlyHint": "People join through an invitation from a workspace admin.",
   "admin.general.registration.lead": "Who may create an account on this instance.",
   "admin.general.registration.title": "Registration",
+  "admin.general.scheduler.elsewhereFix": "Check the worker pods: whether they are running, and the lines in their log that begin with \"scheduler:\". With the Helm chart they are the Deployment named after the release with -worker on the end. A worker that keeps restarting, or a scheduler there that could not start, is the usual cause.",
+  "admin.general.scheduler.elsewhereWhat": "This instance runs the scheduler on separate worker pods (OPENOKR_SCHEDULER=elsewhere), and no scheduler has completed a run for longer than the status check allows, four hours unless that was changed. Nothing that runs on a clock is happening: the Coach and the Champion do not run, reminders and digests are not sent, and goals past their check-in date are not marked outdated.",
   "admin.general.scheduler.fix": "The server log says why, on the line that begins with \"scheduler: could not start\". A database role that cannot use the pgboss schema is the usual cause; restarting the instance re-applies its privileges.",
   "admin.general.scheduler.title": "The scheduler is not running",
   "admin.general.scheduler.what": "The scheduler could not start on this instance. Nothing that runs on a clock is happening: the Coach and the Champion do not run, reminders and digests are not sent, and goals past their check-in date are not marked outdated.",

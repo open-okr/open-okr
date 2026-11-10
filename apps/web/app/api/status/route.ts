@@ -1,15 +1,8 @@
 import { OutboxRelay } from "@openokr/adapters";
-import { readSchedulerHeartbeat } from "@openokr/core";
 import { NextResponse } from "next/server";
 import { outboxRowsPerMinute } from "../../../lib/admission";
 import { getPool } from "../../../lib/pool";
-import {
-  schedulerBootedAt,
-  schedulerEnabled,
-  schedulerLastRunAt,
-  schedulerState,
-} from "../../../lib/scheduler";
-import { judgeScheduler } from "../../../lib/scheduler-health";
+import { schedulerStatus } from "../../../lib/scheduler-status";
 import { statusThresholds } from "../../../lib/status-thresholds";
 
 /**
@@ -53,10 +46,6 @@ interface StatusResponse {
 const relayDegradedSeconds = (): number => statusThresholds().relay.degraded;
 const relayUnavailableSeconds = (): number =>
   statusThresholds().relay.unavailable;
-const schedulerDegradedSeconds = (): number =>
-  statusThresholds().scheduler.degraded;
-const schedulerUnavailableSeconds = (): number =>
-  statusThresholds().scheduler.unavailable;
 
 function worst(...statuses: ComponentStatus[]): ComponentStatus {
   if (statuses.includes("unavailable")) return "unavailable";
@@ -91,27 +80,14 @@ async function checkRelay(): Promise<ComponentStatus> {
   }
 }
 
-async function checkScheduler(): Promise<ComponentStatus> {
-  // The shared stamp, so every pod answers the same (plan 0.8.0 H12). A read
-  // that fails falls back to this pod's own reading, as before.
-  const shared = await readSchedulerHeartbeat(getPool()).catch(() => null);
-  return judgeScheduler({
-    enabledHere: schedulerEnabled(),
-    failedHere: schedulerState() === "failed",
-    localLastRun: schedulerLastRunAt(),
-    sharedLastRun: shared,
-    bootedAt: schedulerBootedAt(),
-    now: Date.now(),
-    degradedSeconds: schedulerDegradedSeconds(),
-    unavailableSeconds: schedulerUnavailableSeconds(),
-  });
-}
-
 export async function GET(): Promise<NextResponse<StatusResponse>> {
+  // The scheduler is judged by the shared stamp, so every pod answers the
+  // same (plan 0.8.0 H12), including a pod whose scheduler runs on the worker
+  // (H10d). `lib/scheduler-status.ts` gathers the reading.
   const [database, relay, scheduler] = await Promise.all([
     checkDatabase(),
     checkRelay(),
-    checkScheduler(),
+    schedulerStatus(),
   ]);
 
   const overall = worst(database, relay, scheduler);

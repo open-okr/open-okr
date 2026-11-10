@@ -18,7 +18,7 @@ import { getBilling } from "../../../lib/billing";
 import { holdOf, readLifecycle } from "../../../lib/held-by";
 import { getMailSettings } from "../../../lib/mail";
 import { pageTitle } from "../../../lib/page-title.ts";
-import { schedulerState } from "../../../lib/scheduler";
+import { schedulerNotice } from "../../../lib/scheduler-status";
 import { tenantFloor } from "../../../lib/tenant-floor";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -146,7 +146,7 @@ export default async function GeneralSettingsPage() {
        */}
       <InstanceHealthNotice
         tenantFloorBypassed={floor === "bypassed"}
-        schedulerFailed={schedulerState() === "failed"}
+        scheduler={await schedulerNotice()}
         unplacedCallers={unresolvedCallersSeen()}
         cloud={cloud}
       />

@@ -476,3 +476,27 @@ describe("how long a stopping process may drain", () => {
     },
   );
 });
+
+// docs/design/worker-deployment.md D2, plan 0.8.0 H10d.
+describe("where the relay and the scheduler run", () => {
+  test.each(["OPENOKR_RELAY", "OPENOKR_SCHEDULER"] as const)(
+    "%s defaults to on and takes on, off and elsewhere",
+    (variable) => {
+      expect(parseEnv(VALID)[variable]).toBe("on");
+      for (const value of ["on", "off", "elsewhere"] as const) {
+        expect(parseEnv({ ...VALID, [variable]: value })[variable]).toBe(value);
+      }
+    },
+  );
+
+  test.each(["OPENOKR_RELAY", "OPENOKR_SCHEDULER"] as const)(
+    "%s refuses a value it does not know, naming the variable",
+    (variable) => {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, [variable]: "sometimes" }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toEqual([variable]);
+    },
+  );
+});

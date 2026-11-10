@@ -22,13 +22,13 @@
  * here, a job produces the prose, and this subscribes to the channel that job
  * publishes on. Reloading is `/api/copilot/live` subscribing to the same one.
  *
- * **Unless nothing is draining the queue**, in which case this answers inline
- * exactly as it did before. `OPENOKR_RELAY=off` is how an operator moves the
- * relay to its own instance, and enqueuing here would be enqueuing into
- * nothing. The limitation worth knowing is that a deployment which serves
- * requests from processes with the relay off and drains from a separate one
- * gets the inline path, and with it no rejoining: this process can only ask
- * whether it drains the queue itself.
+ * **Unless nothing may be draining the queue**, in which case this answers
+ * inline exactly as it did before. With `OPENOKR_RELAY=off` enqueuing here
+ * could be enqueuing into nothing. With `elsewhere`, another process of this
+ * instance drains it, such as the Helm chart's worker (plan 0.8.0 H10d,
+ * docs/design/worker-deployment.md §1.3): its relay drafts the answer and
+ * publishes over `pg_notify`, which reaches the subscription below in this
+ * process, so the run stays in the background and the reader can rejoin it.
  */
 import {
   type CopilotEvent,
@@ -38,9 +38,9 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../lib/auth";
+import { outboxDrained } from "../../../lib/background-work";
 import { resolveDrafterFor } from "../../../lib/drafter";
 import { getRealtime } from "../../../lib/realtime";
-import { relayEnabled } from "../../../lib/relay";
 import { requireWorkspace } from "../../../lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
   const pool = getPool();
 
-  if (relayEnabled()) {
+  if (outboxDrained()) {
     return backgroundRun(pool, workspaceId, userId, asked, request.signal);
   }
 

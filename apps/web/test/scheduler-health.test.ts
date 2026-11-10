@@ -9,11 +9,13 @@ const MINUTE = 60_000;
 const NOW = Date.parse("2026-11-10T12:00:00Z");
 
 const reading = (patch: Partial<SchedulerReading>): SchedulerReading => ({
-  enabledHere: true,
+  mode: "on",
   failedHere: false,
   localLastRun: null,
   sharedLastRun: null,
+  sharedUnreadable: false,
   bootedAt: NOW - 400 * MINUTE,
+  processStartedAt: NOW - 400 * MINUTE,
   now: NOW,
   degradedSeconds: 7200,
   unavailableSeconds: 14400,
@@ -78,7 +80,55 @@ describe("judgeScheduler", () => {
   test("a pod with the scheduler off answers operational, as before", () => {
     expect(
       judgeScheduler(
-        reading({ enabledHere: false, sharedLastRun: NOW - 300 * MINUTE }),
+        reading({ mode: "off", sharedLastRun: NOW - 300 * MINUTE }),
+      ),
+    ).toBe("operational");
+  });
+});
+
+// docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d: a pod whose
+// scheduler runs on the worker judges the stamp the worker writes.
+describe("judgeScheduler, with the scheduler elsewhere", () => {
+  const elsewhere = (patch: Partial<SchedulerReading>): SchedulerReading =>
+    reading({ mode: "elsewhere", bootedAt: null, ...patch });
+
+  test("judges the shared stamp by its age", () => {
+    expect(judgeScheduler(elsewhere({ sharedLastRun: NOW - MINUTE }))).toBe(
+      "operational",
+    );
+    expect(
+      judgeScheduler(elsewhere({ sharedLastRun: NOW - 180 * MINUTE })),
+    ).toBe("degraded");
+    expect(
+      judgeScheduler(elsewhere({ sharedLastRun: NOW - 300 * MINUTE })),
+    ).toBe("unavailable");
+  });
+
+  test("with no stamp yet, grace runs from this process's start", () => {
+    expect(
+      judgeScheduler(elsewhere({ processStartedAt: NOW - 10 * MINUTE })),
+    ).toBe("operational");
+    expect(
+      judgeScheduler(elsewhere({ processStartedAt: NOW - 300 * MINUTE })),
+    ).toBe("unavailable");
+  });
+
+  test("a stamp that cannot be read is unavailable", () => {
+    expect(
+      judgeScheduler(
+        elsewhere({ sharedUnreadable: true, processStartedAt: NOW - MINUTE }),
+      ),
+    ).toBe("unavailable");
+  });
+
+  test("off still answers operational whatever the stamp", () => {
+    expect(
+      judgeScheduler(
+        reading({
+          mode: "off",
+          sharedUnreadable: true,
+          processStartedAt: NOW - 300 * MINUTE,
+        }),
       ),
     ).toBe("operational");
   });

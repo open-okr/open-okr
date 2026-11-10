@@ -876,6 +876,36 @@ describe("the outbox rate per workspace", () => {
   });
 });
 
+// docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d: a web pod with the
+// relay on the worker runs none, and a scrape of the Service still has to
+// show how far behind the queue is.
+describe("the queue's gauges, served without a relay", () => {
+  it("registers the same four series a relay registers, read at scrape time", async () => {
+    const wb = await workerDb();
+    const read = new Map<string, () => number | Promise<number>>();
+    OutboxRelay.registerGauges(wb.appPool, {
+      gauge: (name, reader) => {
+        read.set(name, reader);
+      },
+    });
+    expect([...read.keys()].sort()).toEqual([
+      "openokr_outbox_oldest_pending_seconds",
+      "openokr_outbox_pending",
+      "openokr_outbox_rate_held_rows",
+      "openokr_outbox_rate_held_workspaces",
+    ]);
+
+    // Nothing queried yet: an empty queue now, two rows by the scrape.
+    await enqueue(wb.admin, "goal.published", "gauge:1", {}, 30);
+    await enqueue(wb.admin, "goal.published", "gauge:2");
+    expect(await read.get("openokr_outbox_pending")?.()).toBe(2);
+    expect(
+      await read.get("openokr_outbox_oldest_pending_seconds")?.(),
+    ).toBeGreaterThanOrEqual(30);
+    expect(await read.get("openokr_outbox_rate_held_rows")?.()).toBe(0);
+  });
+});
+
 describe("what a delivered row keeps (completeness review M-19)", () => {
   it("strips the fields its topic names when it is delivered, and keeps the rest", async () => {
     const wb = await workerDb();

@@ -11,9 +11,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const TOKEN = "a-scrape-token-of-at-least-thirty-two-characters";
 
+// Gauges are read when the endpoint is, as the real meter reads them.
+const gauges = new Map<string, () => unknown>();
 vi.mock("../lib/telemetry", () => ({
   isMetricsEnabled: () => true,
-  getTelemetry: () => ({ scrape: async () => "openokr_up 1\n" }),
+  getTelemetry: () => ({
+    gauge: (name: string, read: () => unknown) => gauges.set(name, read),
+    scrape: async () => {
+      const lines = ["openokr_up 1"];
+      for (const [name, read] of gauges) {
+        lines.push(`${name} ${await read()}`);
+      }
+      return `${lines.join("\n")}\n`;
+    },
+  }),
+}));
+// An outbox of three waiting rows, the oldest twelve seconds old.
+vi.mock("../lib/pool", () => ({
+  getPool: () => ({
+    connect: async () => ({
+      query: async (text: string) => ({
+        rows: [text.includes("count(*)") ? { pending: 3 } : { lag: 12 }],
+        rowCount: 1,
+      }),
+      release: () => undefined,
+    }),
+  }),
 }));
 // The session path, which these cases never satisfy: no signed-in browser.
 vi.mock("../lib/workspace", () => ({
@@ -68,5 +91,28 @@ describe("scraping the metrics with the instance's token", () => {
     delete process.env.OPENOKR_METRICS_TOKEN;
     resetEnvCache();
     expect((await scrape(`Bearer ${TOKEN}`)).status).toBe(404);
+  });
+});
+
+// docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d.
+describe("a process with the relay on the worker", () => {
+  it("still serves the queue's gauges, so a scrape of the Service shows it", async () => {
+    const relay = process.env.OPENOKR_RELAY;
+    process.env.OPENOKR_RELAY = "elsewhere";
+    resetEnvCache();
+    const { startRelay } = await import("../lib/relay");
+    const write = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    try {
+      expect(startRelay()).toBeNull();
+    } finally {
+      write.mockRestore();
+      process.env.OPENOKR_RELAY = relay;
+    }
+
+    const response = await scrape(`Bearer ${TOKEN}`);
+    expect(response.status).toBe(200);
+    const text = await response.text();
+    expect(text).toContain("openokr_outbox_pending 3");
+    expect(text).toContain("openokr_outbox_oldest_pending_seconds 12");
   });
 });

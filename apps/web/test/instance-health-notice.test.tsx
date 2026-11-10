@@ -30,7 +30,7 @@ const rendered = async (
   renderToString(
     await InstanceHealthNotice({
       tenantFloorBypassed: false,
-      schedulerFailed: false,
+      scheduler: null,
       unplacedCallers: false,
       cloud: false,
       ...props,
@@ -62,5 +62,27 @@ describe("the caller address notice", () => {
     });
     expect(html).toContain('data-testid="tenant-floor-notice"');
     expect(html).toContain('data-testid="caller-address-notice"');
+  });
+});
+
+// docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d.
+describe("the scheduler notice", () => {
+  it("says this instance's scheduler could not start", async () => {
+    const html = await rendered({ scheduler: "failed" });
+    expect(html).toContain('data-testid="scheduler-notice"');
+    expect(html).toContain("could not start");
+    expect(html).not.toContain("worker");
+  });
+
+  it("names the worker when the scheduler runs elsewhere and has stopped", async () => {
+    const html = await rendered({ scheduler: "elsewhere" });
+    expect(html).toContain('data-testid="scheduler-notice"');
+    expect(html).toContain("OPENOKR_SCHEDULER=elsewhere");
+    expect(html).toContain("worker");
+    expect(html).not.toContain("could not start on this instance");
+  });
+
+  it("is not shown when the scheduler is fine", async () => {
+    expect(await rendered({ scheduler: null })).toBe("");
   });
 });

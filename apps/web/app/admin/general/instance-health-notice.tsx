@@ -21,20 +21,26 @@ import { getTranslations } from "../../../lib/translations";
  * a managed cloud: the network in front is the operator's, who reads
  * `openokr_caller_addresses_total` and the log, not a customer's
  * administrator.
+ *
+ * **The scheduler notice has two forms** (plan 0.8.0 H10d,
+ * docs/design/worker-deployment.md §1.3). `failed` is this process's
+ * scheduler that could not start. `elsewhere` is a process whose scheduler
+ * runs on the worker, when no scheduler has completed a run for longer than
+ * `/api/status` allows: the fix is on the worker, so the notice says so.
  */
 export async function InstanceHealthNotice({
   tenantFloorBypassed,
-  schedulerFailed,
+  scheduler,
   unplacedCallers,
   cloud,
 }: {
   tenantFloorBypassed: boolean;
-  schedulerFailed: boolean;
+  scheduler: "failed" | "elsewhere" | null;
   unplacedCallers: boolean;
   cloud: boolean;
 }) {
   const callerAddress = unplacedCallers && !cloud;
-  if (!tenantFloorBypassed && !schedulerFailed && !callerAddress) {
+  if (!tenantFloorBypassed && scheduler === null && !callerAddress) {
     return null;
   }
   const { t } = await getTranslations();
@@ -57,7 +63,7 @@ export async function InstanceHealthNotice({
           </p>
         </section>
       ) : null}
-      {schedulerFailed ? (
+      {scheduler !== null ? (
         <section
           className="rounded-md border border-warn/30 bg-warn-bg p-4.5"
           data-testid="scheduler-notice"
@@ -66,10 +72,14 @@ export async function InstanceHealthNotice({
             {t("admin.general.scheduler.title")}
           </h2>
           <p className="mt-1.5 text-sm text-ink-2">
-            {t("admin.general.scheduler.what")}
+            {scheduler === "elsewhere"
+              ? t("admin.general.scheduler.elsewhereWhat")
+              : t("admin.general.scheduler.what")}
           </p>
           <p className="mt-1.5 text-sm text-ink-2">
-            {t("admin.general.scheduler.fix")}
+            {scheduler === "elsewhere"
+              ? t("admin.general.scheduler.elsewhereFix")
+              : t("admin.general.scheduler.fix")}
           </p>
         </section>
       ) : null}
