@@ -40,8 +40,17 @@ export interface SettingWrite {
   readonly key: string;
   readonly value?: unknown;
   readonly secret?: string;
-  /** Recorded on the row so the admin screen can say where it came from. */
-  readonly source?: "wizard" | "environment" | "admin" | "operator";
+  /**
+   * Recorded on the row so the admin screen can say where it came from. The
+   * column is plain text (migration 0007); "scheduler" marks the heartbeat
+   * stamp the scheduler writes (plan 0.8.0 H12).
+   */
+  readonly source?:
+    | "wizard"
+    | "environment"
+    | "admin"
+    | "operator"
+    | "scheduler";
 }
 
 interface SettingRow {

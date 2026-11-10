@@ -54,6 +54,7 @@ import {
   outboxRetentionDays,
   purgeStaleSignInAttempts,
   purgeWebhookDeliveries,
+  recordSchedulerHeartbeat as recordSharedHeartbeat,
   remindBeforeErasure,
   remindTrialsEnding,
   reportError,
@@ -766,7 +767,18 @@ const globals = globalThis as typeof globalThis & {
  * this to decide whether the scheduler component is operational.
  */
 function recordSchedulerHeartbeat(): void {
-  globals.openokrSchedulerLastRunAt = Date.now();
+  const now = Date.now();
+  globals.openokrSchedulerLastRunAt = now;
+  // And in the database, so every pod's /api/status reads the same answer
+  // (plan 0.8.0 H12). A failed write leaves this pod's own reading, which is
+  // what the endpoint used before, so it is logged rather than thrown.
+  recordSharedHeartbeat(getPool(), getKeyRing(), new Date(now)).catch(
+    (error: unknown) => {
+      log(
+        `could not record the heartbeat: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  );
 }
 
 /**

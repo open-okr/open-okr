@@ -1189,6 +1189,7 @@ export {
   getInstanceSetting,
   INSTANCE_SETTINGS,
   type InstanceSettingDefinition,
+  SCHEDULER_LAST_RUN_AT,
   SETUP_COMPLETED_AT,
 } from "./secrets/instance-registry.ts";
 export {
@@ -1284,6 +1285,10 @@ export {
   type SetupState,
   setupRefusal,
 } from "./setup/state.ts";
+export {
+  readSchedulerHeartbeat,
+  recordSchedulerHeartbeat,
+} from "./status/scheduler-heartbeat.ts";
 export {
   resolveStatusThresholds,
   StatusSettingError,

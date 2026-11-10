@@ -149,11 +149,18 @@ Champion's hourly, daily, weekly and cycle runs, the Coach's nightly run,
 the usage sweep (hourly), and the audit chain (every minute).
 
 Rather than coupling to pg-boss internals, the scheduler records its own
-heartbeat: an `openokrSchedulerLastRunAt` timestamp on `globalThis`,
-updated after each scheduled run. The status endpoint reads that timestamp
-and compares it against a grace period. A scheduler turned off by
-configuration reports `operational`, and one that failed to start reports
-`unavailable` at once.
+heartbeat after each scheduled run: an `openokrSchedulerLastRunAt` timestamp
+on `globalThis`, and, since 0.8.0, the same time in `system_settings` under
+`scheduler.last_run_at` (plan 0.8.0 H12). pg-boss hands each job to one pod,
+so with several pods only the one that ran it had a timestamp, and a healthy
+scheduler read as degraded whenever another pod answered. The status endpoint
+judges the newer of the shared and the local reading against a grace period
+(`apps/web/lib/scheduler-health.ts`). A scheduler turned off by configuration
+on the answering pod reports `operational`, so an instance that runs its
+sweeps by hand is not reported down; when plan row H10 splits the scheduler
+onto worker pods, that is the place to judge the shared stamp from pods that
+have it off. One that failed to start reports `unavailable` at once, unless
+another pod's run is fresh.
 
 | Setting | Default | Meaning |
 |---|---|---|

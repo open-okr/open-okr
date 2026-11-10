@@ -400,7 +400,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H9 | done | Both keys or neither, in the environment schema, the driver and the chart. Neither lets the AWS SDK's default chain find the pod's own role; half a pair is still refused at boot. The Helm README shows IRSA, Pod Identity and an instance profile |
 | H10 | to do | Design first; split into rows once designed |
 | H11 | done | `apps/web/lib/keep-alive.ts`: a heartbeat every 25 seconds on all five live routes (inbox, feed, board, agents, copilot), stopping when the request ends or a write fails. A test refuses a live route without it. `docs/install/kubernetes.md` says what idle timeout a proxy needs |
-| H12 | to do | |
+| H12 | done | The pod that completes a run also writes `scheduler.last_run_at` to `system_settings`; `/api/status` judges the newer of that and its own (`apps/web/lib/scheduler-health.ts`). A pod with the scheduler off still answers operational, so an instance running its sweeps by hand is not reported down; H10 is where that changes. `status-and-capacity.md` §2.6 |
 | H13 | to do | |
 | H14 | to do | |
 | H15 | done | PR #203, merged 10 November 2026 with every CI job green |
