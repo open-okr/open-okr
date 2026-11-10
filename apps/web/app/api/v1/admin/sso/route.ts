@@ -9,6 +9,7 @@ import {
 import { NextResponse } from "next/server";
 import { requireAccessLevel } from "../../../../../lib/access";
 import { getPool } from "../../../../../lib/auth";
+import { refuseCrossSite } from "../../../../../lib/same-origin";
 import { getKeyRing } from "../../../../../lib/secrets";
 import { expireSSOProviders } from "../../../../../lib/sso";
 
@@ -31,7 +32,11 @@ import { expireSSOProviders } from "../../../../../lib/sso";
  */
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<Response> {
+  const crossSite = refuseCrossSite(request);
+  if (crossSite) {
+    return crossSite;
+  }
   try {
     // **The workspace comes from here, not from the connection** (audit,
     // 18 September 2026). This route used to insert with
