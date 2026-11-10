@@ -38,6 +38,12 @@ const TAG_BYTES = 16;
 const FINGERPRINT_CHARS = 16;
 
 export class KeyRingError extends Error {
+  /**
+   * Its messages name a key's label, its length or its fingerprint, never
+   * the key, so an error report may carry them (error-reporting.md D5).
+   */
+  readonly safeMessage = true;
+
   constructor(message: string) {
     super(message);
     this.name = "KeyRingError";

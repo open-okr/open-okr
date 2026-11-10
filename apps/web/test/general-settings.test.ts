@@ -93,11 +93,15 @@ describe("the general card's save", () => {
     );
 
     expect(callAction).not.toHaveBeenCalled();
+    // Under the timezone, where it was chosen (plan U1b).
     expect(state).toEqual({
-      error: en("admin.general.generalSettingsForm.unknownTimezone", {
-        timezone: "Mars/Olympus_Mons",
-      }),
+      error: null,
       saved: null,
+      fields: {
+        timezone: en("admin.general.generalSettingsForm.unknownTimezone", {
+          timezone: "Mars/Olympus_Mons",
+        }),
+      },
     });
   });
 
@@ -109,10 +113,38 @@ describe("the general card's save", () => {
 
     expect(callAction).not.toHaveBeenCalled();
     expect(state).toEqual({
-      error: en("admin.general.generalSettingsForm.notADomain", {
-        domain: "priya@northwind",
-      }),
+      error: null,
       saved: null,
+      fields: {
+        trustedEmailDomains: en(
+          "admin.general.generalSettingsForm.notADomain",
+          { domain: "priya@northwind" },
+        ),
+      },
+    });
+  });
+
+  it("puts a domain the action refuses under the list, whichever entry it was", async () => {
+    callAction.mockRejectedValue(
+      new OperationError(
+        "forbidden",
+        "That domain belongs to another workspace.",
+        undefined,
+        "trustedEmailDomains.1",
+      ),
+    );
+
+    const state = await submitGeneral(
+      NOTHING_SAVED,
+      card({ trustedEmailDomains: "northwind.example, northwind.test" }),
+    );
+
+    expect(state).toEqual({
+      error: null,
+      saved: null,
+      fields: {
+        trustedEmailDomains: "That domain belongs to another workspace.",
+      },
     });
   });
 

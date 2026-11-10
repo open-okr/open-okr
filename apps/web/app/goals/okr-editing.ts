@@ -216,6 +216,9 @@ export function useKeyResultCells(
     /** A value is history, recorded the way a check-in records it. */
     saveValue: (value: number) =>
       okr.mutate({ kind: "recordValue", id: keyResult.id, value }),
+    /** A confidence outside a check-in (okr-writing.md §4.2, plan 0.7.0 O4). */
+    saveConfidence: (confidence: number) =>
+      okr.mutate({ kind: "updateConfidence", id: keyResult.id, confidence }),
     easing,
     targetCell,
     saveTarget: (targetValue: number) => {

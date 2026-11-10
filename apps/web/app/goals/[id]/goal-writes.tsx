@@ -17,6 +17,7 @@ import {
   linkKeyResultKpi,
   moveGoalToCycle,
   unlinkKeyResultKpi,
+  type WriteResult,
 } from "./write-actions.ts";
 
 /**
@@ -85,13 +86,18 @@ export function GoalWrites({
     ? pickedKpi
     : (kpis?.[0]?.id ?? "");
 
-  const run = (name: string, work: () => Promise<{ error: string | null }>) => {
+  // A refused cycle, key result or KPI, shown under its picker (§4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
+
+  const run = (name: string, work: () => Promise<WriteResult>) => {
     setProblem(null);
+    setRefused({});
     setActing(name);
     start(async () => {
       const result = await work();
-      if (result.error) {
+      if (result.error || result.fields) {
         setProblem(result.error);
+        setRefused(result.fields ?? {});
         return;
       }
       router.refresh();
@@ -126,6 +132,7 @@ export function GoalWrites({
                 value={target === "" ? null : target}
                 options={cycles.map(namedOption)}
                 disabled={pending}
+                error={refused.cycleId}
                 onValueChange={(next) => setTarget(next ?? "")}
                 className="w-56"
                 inputClassName="text-xs"
@@ -176,6 +183,7 @@ export function GoalWrites({
                         label: keyResult.title,
                       }))}
                       disabled={pending}
+                      error={refused.id}
                       onValueChange={(next) => setPickedKeyResult(next ?? "")}
                       className="w-64"
                       inputClassName="text-xs"
@@ -192,6 +200,7 @@ export function GoalWrites({
                           : kpi.shortId,
                       }))}
                       disabled={pending}
+                      error={refused.kpiId}
                       onValueChange={(next) => setPickedKpi(next ?? "")}
                       className="w-64"
                       inputClassName="text-xs"

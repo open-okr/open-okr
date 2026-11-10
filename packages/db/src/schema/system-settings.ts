@@ -17,7 +17,7 @@ export const systemSettings = pgTable("system_settings", {
   secretDataKey: text("secret_data_key"),
   /** Which root key wrapped it, so rotation knows what to re-wrap. */
   secretKeyId: text("secret_key_id"),
-  /** Where the value came from: 'wizard', 'environment' or 'admin'. */
+  /** Where the value came from: 'wizard', 'environment', 'admin', or 'operator' on a cloud (0.7.0). */
   source: text("source").notNull().default("admin"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

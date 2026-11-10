@@ -72,6 +72,7 @@ export function SiteMessageForm({
           id="body"
           maxLength={1000}
           name="body"
+          error={state?.fields?.body}
           placeholder={t("operator.siteMessage.placeholder")}
           required
           rows={3}
@@ -88,6 +89,7 @@ export function SiteMessageForm({
             defaultValue="info"
             id="level"
             name="level"
+            error={state?.fields?.level}
           >
             <option value="info">
               {t("operator.siteMessage.toneInformation")}

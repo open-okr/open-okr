@@ -10,6 +10,9 @@
  *
  * The preview is a dry run, so the shared workspace this suite runs in is not
  * changed by it.
+ *
+ * **Taken on Backups, opened on Import** since plan 0.7.0 U3: the export card
+ * moved to the Backups section, one place to take a copy.
  */
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
@@ -20,7 +23,7 @@ test("exports under a passphrase, and only that passphrase previews the import",
   page,
 }) => {
   await signIn(page);
-  await goTo(page, "/admin/imports");
+  await goTo(page, "/admin/backups");
 
   const exportCard = page.locator("div", {
     has: page.getByRole("heading", { name: "Export workspace" }),
@@ -40,6 +43,7 @@ test("exports under a passphrase, and only that passphrase previews the import",
   ]);
   const archive = await download.path();
 
+  await goTo(page, "/admin/imports");
   const importPassphrase = page.getByLabel("Passphrase").last();
   const file = page.locator('input[type="file"][accept=".okr"]');
 

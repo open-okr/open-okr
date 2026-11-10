@@ -9,6 +9,8 @@ export interface BrandingState {
   readonly error: string | null;
   /** The confirmation. Empty before a save. */
   readonly saved: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 export const NOTHING_SAVED: BrandingState = { error: null, saved: null };

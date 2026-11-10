@@ -37,6 +37,8 @@ import type {
   NoteThemes,
   ParentContext,
   ParsedFilter,
+  PlannedRun,
+  PlanRunContext,
   ProposalRequestContext,
   ProposedAction,
   ProposedImportMapping,
@@ -52,7 +54,12 @@ import type {
   ThreadSummary,
   TrendContext,
 } from "@openokr/core";
-import { costOfUsage } from "@openokr/core";
+import {
+  costOfUsage,
+  DEFAULT_PROMPTS,
+  PROMPT_KEYS,
+  type PromptKey,
+} from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
 
@@ -111,18 +118,8 @@ const REWRITE_JSON_SCHEMA = {
   properties: { rewritten: { type: "string", maxLength: 500 } },
 } as const;
 
-/**
- * The assist is told the rule and asked for one sentence.
- *
- * It is **not** asked to claim it fixed anything: the caller re-runs §4 over
- * whatever comes back and reports what actually passes, so a persuasive rewrite
- * that fixes nothing is caught by the catalogue rather than believed.
- */
-const REWRITE_SYSTEM =
-  "You rewrite one key result so that it satisfies a named check, changing as " +
-  "little as possible and keeping the author's intent. Return one line. Keep " +
-  "any number, unit or date that is already there unless the check is about " +
-  "that number. Never add a number that was not given to you.";
+// The rewrite's own prompt is `rewrite.failing_rule` in core's catalogue, with
+// the objective draft's: the two a workspace may version (plan 0.7.0 A9).
 
 /**
  * The copilot's voice (AI-NATIVE-PLAN.md §2.4, P4-T14a-b).
@@ -387,14 +384,6 @@ const PARENT_JSON_SCHEMA = {
   },
 } as const;
 
-const OBJECTIVE_SYSTEM =
-  "You turn an ambition somebody typed into one objective and the measures " +
-  "under it. The objective says what changes, not what gets done. Each " +
-  "measure carries a baseline and a target as real numbers, and its sentence " +
-  "carries them too. Never repeat an objective that already exists. Never " +
-  "invent a number you were not given: if you have to choose one, choose a " +
-  "round figure the writer will obviously want to correct.";
-
 const MEASURE_SYSTEM =
   "You put numbers on a key result somebody is part way through writing: a " +
   "unit, a direction, a baseline and a target. Keep any number already in " +
@@ -629,6 +618,64 @@ const KPI_JSON_SCHEMA = {
     why: { type: "string", maxLength: 500 },
   },
 } as const;
+
+/**
+ * A custom agent's planning step (plan 0.7.0 A7, agent-instructions.md I3).
+ *
+ * Each task's input arrives as a JSON string rather than an open object, so
+ * the response schema stays strict for every provider; the caller parses it
+ * and checks it against the action's own input schema before any run starts.
+ */
+const PLAN_TASKS_MAX = 10;
+
+const PLAN_SHAPE = z.object({
+  tasks: z
+    .array(
+      z.object({
+        action: z.string().min(1).max(100),
+        inputJson: z.string().max(4000),
+        subjectType: z.string().max(40),
+        subjectId: z.string().max(60),
+        why: z.string().max(300),
+      }),
+    )
+    .max(PLAN_TASKS_MAX),
+});
+
+const PLAN_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["tasks"],
+  properties: {
+    tasks: {
+      type: "array",
+      maxItems: PLAN_TASKS_MAX,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["action", "inputJson", "subjectType", "subjectId", "why"],
+        properties: {
+          action: { type: "string", maxLength: 100 },
+          inputJson: { type: "string", maxLength: 4000 },
+          subjectType: { type: "string", maxLength: 40 },
+          subjectId: { type: "string", maxLength: 60 },
+          why: { type: "string", maxLength: 300 },
+        },
+      },
+    },
+  },
+} as const;
+
+const PLAN_SYSTEM =
+  "You plan the next run of an agent that works inside an OKR workspace. " +
+  "Follow the administrator's instructions for this stage. Choose at most " +
+  `${PLAN_TASKS_MAX} tasks, each one action from the list you are given and ` +
+  "nothing else, with its input as a JSON object written as a string. Use " +
+  "only the ids of the goals, key results and KPIs you are shown. Name the " +
+  "subject each task is about by its kind and id, or leave both empty. Say " +
+  "in one short line why each task is worth doing. Writes become proposals a " +
+  "person decides, so propose what helps rather than what is drastic. If " +
+  "nothing is worth doing, return no tasks.";
 
 const KPI_SYSTEM =
   "You turn a description of something somebody wants to measure into one " +
@@ -944,6 +991,16 @@ export interface ProviderDrafterOptions {
   readonly costInPerMillion: number;
   readonly costOutPerMillion: number;
   readonly costCachedInPerMillion?: number;
+  /**
+   * The workspace's own text for an editable prompt, by prompt key (plan
+   * 0.7.0 A9, docs/design/ai-evaluation.md §6).
+   *
+   * A key left out, or given blank, sends core's built-in text. The host
+   * passes only versions that pass their evaluation set, so this is never
+   * where a prompt is judged; the evaluation set builds a drafter with a
+   * candidate here, which is how it runs exactly the code a workspace runs.
+   */
+  readonly systemPrompts?: Readonly<Record<string, string>>;
 }
 
 /** Editor JSON from one paragraph of plain text, which is all a model returns. */
@@ -961,6 +1018,12 @@ export function createProviderDrafter(
   options: ProviderDrafterOptions,
 ): AgentDrafter {
   let spent = 0;
+
+  /** The workspace's version of an editable prompt, or the built-in text. */
+  const systemPromptFor = (key: PromptKey): string => {
+    const own = options.systemPrompts?.[key];
+    return own !== undefined && own.trim() !== "" ? own : DEFAULT_PROMPTS[key];
+  };
 
   /** The provider, with each call saying which feature asked, for the usage row. */
   const forFeature = (feature: string): AIProvider => {
@@ -1275,7 +1338,10 @@ export function createProviderDrafter(
           maxTokens: 900,
           onUsage: charge,
           messages: [
-            { role: "system", content: OBJECTIVE_SYSTEM },
+            {
+              role: "system",
+              content: systemPromptFor(PROMPT_KEYS.draftObjective),
+            },
             {
               role: "user",
               content:
@@ -1603,6 +1669,79 @@ export function createProviderDrafter(
           ],
         });
         return summary.trim() === "" ? null : summary;
+      } catch {
+        return null;
+      }
+    },
+
+    async planRun(context: PlanRunContext): Promise<PlannedRun | null> {
+      if (!affordable()) {
+        return null;
+      }
+      try {
+        const planned = await extractStructured({
+          provider: forFeature("planRun"),
+          purpose: "assist",
+          model: options.model,
+          schema: PLAN_SHAPE,
+          jsonSchema: PLAN_JSON_SCHEMA,
+          maxTokens: 1500,
+          onUsage: charge,
+          messages: [
+            { role: "system", content: PLAN_SYSTEM },
+            {
+              role: "user",
+              content: [
+                `Agent: ${context.agentName}. Stage: ${context.stage}.`,
+                "Instructions:",
+                context.instructions.trim() === ""
+                  ? "(none given)"
+                  : context.instructions,
+                "What you can see:",
+                ...context.resources.map(
+                  (resource) =>
+                    `- ${resource.kind} ${resource.id}: ${resource.title}` +
+                    (resource.level ? `, ${resource.level}` : "") +
+                    (resource.state ? `, ${resource.state}` : "") +
+                    (resource.progressPct === null
+                      ? ""
+                      : `, ${resource.progressPct}% progress`) +
+                    (resource.confidence === null
+                      ? ""
+                      : `, confidence ${resource.confidence}`) +
+                    (resource.goalId ? `, of goal ${resource.goalId}` : ""),
+                ),
+                "Actions you may choose:",
+                ...context.menu.map(
+                  (choice) => `- ${choice.name}: ${choice.summary}`,
+                ),
+              ].join(NEWLINE),
+            },
+          ],
+        });
+        const tasks: PlannedRun["tasks"][number][] = [];
+        for (const task of planned.tasks) {
+          let input: unknown;
+          try {
+            input =
+              task.inputJson.trim() === "" ? {} : JSON.parse(task.inputJson);
+          } catch {
+            input = null;
+          }
+          tasks.push({
+            action: task.action,
+            input:
+              typeof input === "object" &&
+              input !== null &&
+              !Array.isArray(input)
+                ? (input as Record<string, unknown>)
+                : {},
+            subjectType: task.subjectType === "" ? null : task.subjectType,
+            subjectId: task.subjectId === "" ? null : task.subjectId,
+            why: task.why,
+          });
+        }
+        return { tasks };
       } catch {
         return null;
       }
@@ -1956,7 +2095,10 @@ export function createProviderDrafter(
           maxTokens: 200,
           onUsage: charge,
           messages: [
-            { role: "system", content: REWRITE_SYSTEM },
+            {
+              role: "system",
+              content: systemPromptFor(PROMPT_KEYS.rewriteForRule),
+            },
             {
               role: "user",
               content:

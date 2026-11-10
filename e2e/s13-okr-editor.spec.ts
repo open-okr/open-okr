@@ -10,7 +10,8 @@
  *   name it, then the key result is created under that objective.
  *
  *   Given a key result with a value, when they type a new value in the table,
- *   then the value is recorded and the progress beside it moves.
+ *   then the value is recorded and the progress beside it moves. A confidence
+ *   typed into the row is kept without a check-in (plan 0.7.0 O4).
  *
  *   Given the Diagram tab, when it is opened, then the same cycle is drawn
  *   with its objectives and their key results.
@@ -182,6 +183,21 @@ test("a value typed into the table is recorded and moves the progress", async ()
   // 40 of a 100 target, recorded through the same action a check-in uses.
   await expect(value).toHaveValue("40", { timeout: 15_000 });
   await expect(page.getByText("40%").first()).toBeVisible();
+});
+
+/**
+ * A confidence between check-ins (okr-writing.md §4.2, plan 0.7.0 O4): set in
+ * the row, on the workspace's scale, and still there after a reload.
+ */
+test("a confidence set in the table is kept, without a check-in", async () => {
+  const confidence = () =>
+    page.getByRole("textbox", { name: `Confidence of ${KEY_RESULT}` });
+  await confidence().fill("7");
+  await confidence().press("Enter");
+
+  await persisted(async () => {
+    await expect(confidence()).toHaveValue("7", { timeout: 5_000 });
+  });
 });
 
 /**

@@ -7,9 +7,10 @@
  * the screen can do nothing they cannot and is refused the same way.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusalFields } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NOTHING_SAVED, type PracticeState } from "./practice-state.ts";
@@ -24,11 +25,18 @@ async function context() {
 }
 
 /** A refusal's own sentence, or the error itself when it is not a refusal. */
-function refused(error: unknown): PracticeState {
-  if (error instanceof OperationError) {
-    return { error: error.message, saved: null };
+/**
+ * A refusal as the card's sentence. Every setting here is a choice from the
+ * method's own list, so a refusal is about the practice as a whole rather
+ * than one box; a schema's refusal too, which used to reach the error page
+ * (plan U1b).
+ */
+async function refused(error: unknown): Promise<PracticeState> {
+  const refusal = refusalFields(error, (await getTranslations()).t);
+  if (refusal === null) {
+    throw error;
   }
-  throw error;
+  return { error: refusal.message, saved: null };
 }
 
 /**

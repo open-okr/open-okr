@@ -13,13 +13,27 @@
  * vision yet" and "our vision is blank" are different answers and the column
  * can hold both.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
-import { documentOrNull } from "../../lib/rich-text-form.ts";
+import { refusedByField } from "../../lib/refusal";
+import { documentOrNull, unreadableFields } from "../../lib/rich-text-form.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "./write-state.ts";
+
+/**
+ * A refused write as the form shows it: under the field it is about, or as
+ * the form's sentence (guided-inputs §4.2). Anything that was not a refusal
+ * goes on to the error page.
+ */
+async function refused(error: unknown): Promise<WriteState> {
+  const state = refusedByField(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
 
 export async function setFrame(
   _previous: WriteState,
@@ -38,7 +52,13 @@ export async function setFrame(
     notDoing === "malformed"
   ) {
     const { t } = await getTranslations();
-    return { error: t("fields.richTextUnreadable") };
+    return {
+      error: null,
+      fields: unreadableFields(
+        { mission, vision, strategy, notDoing },
+        t("fields.richTextUnreadable"),
+      ),
+    };
   }
 
   // The two lists arrive positionally, one entry per row of the fieldset, and
@@ -61,6 +81,9 @@ export async function setFrame(
   // Asked only once the frame is agreed (METHOD.md §2.1, P9-T13-c-c); an
   // empty field sends nothing, and the action says when one was needed.
   const reason = String(form.get("reason") ?? "").trim();
+  // The cycle the form was drawn in, so a quarterly cycle is refused by the
+  // server as well as by the screen (plan 0.7.0 O1).
+  const cycleId = String(form.get("cycleId") ?? "").trim();
 
   try {
     await callAction(
@@ -80,13 +103,11 @@ export async function setFrame(
         notDoing,
         strategies,
         ...(reason === "" ? {} : { reason }),
+        ...(cycleId === "" ? {} : { cycleId }),
       },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -131,10 +152,7 @@ export async function closeCycle(
       ? t("cycle.actions.closedAndFed", { next: closed.fedInto.name })
       : t("cycle.actions.closedNothingToFeed");
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   revalidatePath("/scorecard");
@@ -178,7 +196,10 @@ export async function sendForward(
 
   if (title === "") {
     const { t } = await getTranslations();
-    return { error: t("cycle.actions.quarterlyObjectiveNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("cycle.actions.quarterlyObjectiveNeedsATitle") },
+    };
   }
 
   try {
@@ -199,10 +220,7 @@ export async function sendForward(
       weight: 1,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;
@@ -238,10 +256,36 @@ export async function linkToStrategy(
       },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    return refused(error);
+  }
+  revalidatePath("/cycle");
+  return NO_ERROR;
+}
+
+/**
+ * Starts closing a cycle before its end, or takes that back while the end
+ * has not passed (S-04 phase 7, docs/design/okr-core-domain.md §10 C4, plan
+ * 0.7.0 O2). The server decides both and says why when it refuses.
+ */
+export async function setClosing(
+  _previous: WriteState,
+  form: FormData,
+): Promise<WriteState> {
+  const { session, workspace } = await requireWorkspace();
+  const cycleId = String(form.get("cycleId") ?? "").trim();
+  const closing = form.get("closing") === "true";
+  try {
+    await callAction(
+      {
+        pool: getPool(),
+        workspaceId: workspace.workspaceId,
+        actor: { kind: "human", userId: session.user.id },
+      },
+      "cycles.setClosing",
+      { cycleId, closing },
+    );
+  } catch (error) {
+    return refused(error);
   }
   revalidatePath("/cycle");
   return NO_ERROR;

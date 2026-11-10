@@ -69,9 +69,13 @@ describe("a value recorded from the Work Map", () => {
       const state = await recordFromMap({ error: null }, submitted(value));
 
       expect(callAction).not.toHaveBeenCalled();
-      expect(state.error).toBe(
-        translate(CATALOGUES.en, "quickCheckIn.typeAValueFirst"),
-      );
+      // Under the value box, where it is to be typed (plan U1b).
+      expect(state).toEqual({
+        error: null,
+        fields: {
+          value: translate(CATALOGUES.en, "quickCheckIn.typeAValueFirst"),
+        },
+      });
     });
   }
 
@@ -79,7 +83,7 @@ describe("a value recorded from the Work Map", () => {
     const state = await recordFromMap({ error: null }, submitted("about ten"));
 
     expect(callAction).not.toHaveBeenCalled();
-    expect(state.error).toBe(
+    expect(state.fields?.value).toBe(
       translate(CATALOGUES.en, "cycle.actions.valueHasToBeANumber"),
     );
   });

@@ -9,6 +9,7 @@ import {
   type ConfidenceDisplay,
   EntityPicker,
   formatConfidence,
+  RefusedFields,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -69,27 +70,30 @@ function NextActionForm({
     >
       <input type="hidden" name="sessionId" value={sessionId} />
       <input type="hidden" name="keyResultId" value={score.keyResultId} />
-      <div className="flex flex-wrap gap-2">
-        <TextInput
-          label={t("session.detail.nextActions.theNextAction")}
-          hideLabel
-          name="nextAction"
-          placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
-          maxLength={500}
-          className="min-w-0 flex-1"
-        />
-        <EntityPicker
-          label={t("session.detail.nextActions.whoOwnsIt")}
-          hideLabel
-          name="ownerId"
-          placeholder={t("session.detail.nextActions.whoOwnsIt")}
-          options={peopleOptions(owners)}
-          className="w-48"
-        />
-        <Button type="submit" variant="primary" size="sm" disabled={pending}>
-          {t("session.detail.nextActions.setIt")}
-        </Button>
-      </div>
+      {/* Each field shows what was refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>
+        <div className="flex flex-wrap gap-2">
+          <TextInput
+            label={t("session.detail.nextActions.theNextAction")}
+            hideLabel
+            name="nextAction"
+            placeholder={t("session.detail.blockerPanel.theNextActionAnd")}
+            maxLength={500}
+            className="min-w-0 flex-1"
+          />
+          <EntityPicker
+            label={t("session.detail.nextActions.whoOwnsIt")}
+            hideLabel
+            name="ownerId"
+            placeholder={t("session.detail.nextActions.whoOwnsIt")}
+            options={peopleOptions(owners)}
+            className="w-48"
+          />
+          <Button type="submit" variant="primary" size="sm" disabled={pending}>
+            {t("session.detail.nextActions.setIt")}
+          </Button>
+        </div>
+      </RefusedFields>
       {state.error ? (
         <p role="alert" className="text-xs text-bad">
           {state.error}

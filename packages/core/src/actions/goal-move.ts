@@ -31,6 +31,7 @@ import { eq, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { recomputeUnitQualityInTx } from "../quality/service.ts";
 import { recomputeAlignmentFor } from "./alignment.ts";
@@ -102,7 +103,7 @@ export const moveGoalToSpace = defineWriteAction({
   // openokr:policy-exempt: moving an objective between spaces changes one that exists, which stays open under every setting (METHOD.md §2.9); edit on both spaces is the access model's to ask, and it is asked.
   summary:
     "Moves an objective to another space, with its key results, check-ins, dependencies and alignment. Needs edit on both spaces.",
-  input: z.object({ id: z.uuid(), spaceId: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal, spaceId: z.uuid() }),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({

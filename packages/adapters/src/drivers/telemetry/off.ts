@@ -54,6 +54,11 @@ export class OffTelemetry implements Telemetry {
     );
   }
 
+  traceOf(_error: unknown): { traceId: string; spanId: string } | null {
+    // Nothing traces, so nothing failed inside a span.
+    return null;
+  }
+
   stop(): Promise<void> {
     return Promise.resolve();
   }

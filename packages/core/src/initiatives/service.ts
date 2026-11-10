@@ -52,6 +52,7 @@ import {
   unbindGroup,
 } from "../access/contexts.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { freshShortId } from "../ids/short.ts";
 import { type LegacyKey, legacyColumns } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
@@ -156,6 +157,7 @@ export async function createInitiativeInTx<
     .values({
       id: initiativeId,
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "initiative", input.workspaceId),
       spaceId: input.spaceId,
       title: input.title.trim(),
       description: (input.description ?? null) as never,

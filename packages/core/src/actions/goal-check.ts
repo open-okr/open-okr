@@ -24,6 +24,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { evaluateDraftInTx } from "../quality/service.ts";
 import { actingMemberId } from "./api-tokens.ts";
@@ -44,7 +45,7 @@ export const checkDraft = defineReadAction({
     title: z.string().trim().min(1).max(500),
     level: z.enum(GOAL_LEVELS),
     kind: z.enum(GOAL_KINDS).optional(),
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     spaceId: z.uuid().optional(),
     reviewerId: z.uuid().optional(),
     keyResults: z

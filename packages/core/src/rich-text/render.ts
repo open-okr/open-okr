@@ -22,6 +22,14 @@ export interface RichTextResolvers {
     shortId: string,
   ): { readonly href: string; readonly label: string } | undefined;
   resolveAttachment?(blobId: string): { readonly href: string } | undefined;
+  /**
+   * What a link the allow-list accepted becomes on this surface: the address
+   * to emit, or undefined to keep the words and drop the link (plan 0.7.0,
+   * R3). A mail cannot follow a relative link, so it keeps only absolute
+   * ones. It can narrow and never widen: what it hands back passes the
+   * allow-list again.
+   */
+  resolveLinkHref?(href: string): string | undefined;
 }
 
 function escapeHtml(value: string): string {
@@ -54,7 +62,11 @@ const MARK_TAG_BY_TYPE: Readonly<Record<string, string>> = {
   underline: "u",
 };
 
-function wrapMarks(inner: string, marks: readonly Mark[] | undefined): string {
+function wrapMarks(
+  inner: string,
+  marks: readonly Mark[] | undefined,
+  resolvers: RichTextResolvers,
+): string {
   if (!marks || marks.length === 0) {
     return inner;
   }
@@ -68,7 +80,13 @@ function wrapMarks(inner: string, marks: readonly Mark[] | undefined): string {
       if (!isAllowedLinkHref(mark.attrs.href)) {
         return html;
       }
-      return `<a href="${escapeHtml(mark.attrs.href)}" rel="noopener noreferrer">${html}</a>`;
+      const href = resolvers.resolveLinkHref
+        ? resolvers.resolveLinkHref(mark.attrs.href)
+        : mark.attrs.href;
+      if (href === undefined || !isAllowedLinkHref(href)) {
+        return html;
+      }
+      return `<a href="${escapeHtml(href)}" rel="noopener noreferrer">${html}</a>`;
     }
     const tag = MARK_TAG_BY_TYPE[mark.type];
     return tag ? `<${tag}>${html}</${tag}>` : html;
@@ -77,7 +95,7 @@ function wrapMarks(inner: string, marks: readonly Mark[] | undefined): string {
 
 function renderNode(node: RichTextNode, resolvers: RichTextResolvers): string {
   if (node.type === "text") {
-    return wrapMarks(escapeHtml(node.text), node.marks);
+    return wrapMarks(escapeHtml(node.text), node.marks, resolvers);
   }
 
   if (node.type === "hardBreak") {

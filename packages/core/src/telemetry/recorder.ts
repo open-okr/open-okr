@@ -191,6 +191,14 @@ export const METRIC = {
   outboxOldestPendingSeconds: "openokr_outbox_oldest_pending_seconds",
   /** Rows given up on, by topic. */
   outboxDeadLetteredTotal: "openokr_outbox_dead_lettered_total",
+  /**
+   * Workspaces at their outbox rate now, and their due rows waiting only
+   * because of it (tenant-limits.md §10 R11, plan 0.7.0 P7). Read at scrape
+   * time, 0 without a query while the limit is unset. No workspace label: an
+   * unbounded label is what P7-T06b refused.
+   */
+  outboxRateHeldWorkspaces: "openokr_outbox_rate_held_workspaces",
+  outboxRateHeldRows: "openokr_outbox_rate_held_rows",
 
   /** Scheduled runs, by job name and outcome. */
   jobRunsTotal: "openokr_job_runs_total",
@@ -210,6 +218,19 @@ export const METRIC = {
   agentRunsTotal: "openokr_agent_runs_total",
   /** Wall time of one agent run. */
   agentRunDuration: "openokr_agent_run_duration_seconds",
+  /**
+   * Agent tool calls whose record could not be written (plan 0.7.0 A2, D6).
+   * No labels: the answer the agent got never depends on this row.
+   */
+  agentToolCallRecordFailures: "openokr_agent_tool_call_record_failures_total",
+
+  /**
+   * Password attempts refused by a sign-in hold, by which counter held them,
+   * `pair` or `account` (account-lockout.md D13, plan 0.7.0 P10). Pair holds
+   * are counted here rather than audited, because they are mostly somebody's
+   * own typing and one row each would be unbounded.
+   */
+  signInHeldTotal: "openokr_sign_in_held_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",
@@ -231,6 +252,20 @@ export const METRIC = {
   concurrentActions: "openokr_concurrent_actions",
   /** Admission refusals, by reason (rate or concurrency). */
   admissionRefusalsTotal: "openokr_admission_refusals_total",
+
+  /**
+   * Unexpected errors, by where they were caught (error-reporting.md D3, plan
+   * 0.7.0 E1). Every one is counted, including those the caps hold back, so
+   * this is the number to alert on. `source` is one of eight fixed values; the
+   * workspace and the member are fields in the log line, never labels (D7).
+   */
+  errorsTotal: "openokr_errors_total",
+  /**
+   * Reports that did not reach the tracker, by reason: `queue_full`,
+   * `rate_limited` (the tracker said 429) or `send_failed` (D10, plan 0.7.0
+   * E2). Zero on an instance with no DSN, which sends nothing to drop.
+   */
+  errorReportsDroppedTotal: "openokr_error_reports_dropped_total",
 } as const;
 
 /**
@@ -256,6 +291,8 @@ export const OUTCOME = {
   refused: "refused",
   notFound: "not_found",
   error: "error",
+  /** A dry run that passed every check and kept nothing (plan D4). */
+  validated: "validated",
 } as const;
 
 export type Outcome = (typeof OUTCOME)[keyof typeof OUTCOME];

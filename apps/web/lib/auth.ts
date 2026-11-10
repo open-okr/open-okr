@@ -1,5 +1,6 @@
 import { loadEnv } from "@openokr/config";
 import {
+  authLimiterStorage,
   createAuth,
   followSSOProviders,
   resolveRequireEmailVerification,
@@ -7,6 +8,7 @@ import {
   type SSOProviderConfig,
 } from "@openokr/core";
 import { nextCookies } from "better-auth/next-js";
+import { getCache } from "./cache";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -112,6 +114,19 @@ function buildAuth(
         import("./account-mail"),
       ]);
       await sendMail({ to, ...(await resetPasswordMail(to, url)) });
+    },
+    // The address limiter's count in Postgres, so every replica shares one
+    // (account-lockout.md D10).
+    rateLimitStorage: authLimiterStorage(getCache()),
+    // Somebody is trying this account's password (account-lockout.md Q2).
+    // Through the same mail as the reset, so a console transport writes it
+    // to the log and nothing waits on a mail server.
+    sendSignInHeldNotice: async ({ to, resetUrl }) => {
+      const [{ sendMail }, { signInHeldMail }] = await Promise.all([
+        import("./mail"),
+        import("./account-mail"),
+      ]);
+      await sendMail({ to, ...(await signInHeldMail(to, resetUrl)) });
     },
     // Resolved at boot from `mail.transport`: the question is whether a
     // link can arrive, not whether this is a managed cloud (P8-T02b).

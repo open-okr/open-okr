@@ -1,4 +1,12 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  jsonb,
+  pgTable,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { cycles } from "./cycles.ts";
 import { goals, keyResults } from "./goals.ts";
@@ -17,7 +25,8 @@ import { workspaceMembers, workspaces } from "./workspaces.ts";
  * for the reason the goals schema gives: Drizzle cannot express them, and an
  * invariant only application code holds is one a single forgotten path can
  * break. A goal cannot depend on itself; a register entry names a provider one
- * way or the other; a confirmation and a decision each carry who and when; and a
+ * way or the other, and a key result never delivers its own dependency
+ * (0162); a confirmation and a decision each carry who and when; and a
  * finding's scope agrees with its scope id.
  */
 
@@ -102,6 +111,17 @@ export const keyResultDependencies = pgTable("key_result_dependencies", {
   }),
   /** A supplier, a regulator, or a team that has not joined the workspace yet. */
   providerText: text("provider_text"),
+  /**
+   * The key result that delivers it, when one in this workspace does
+   * (migration 0162, plan 0.7.0 O5). Always one a space owns, and then
+   * `provider_space_id` is that space. Whether it has delivered is read from
+   * its progress, never stored here. Never the depending key result itself,
+   * which the migration's check holds.
+   */
+  providerKeyResultId: uuid("provider_key_result_id").references(
+    () => keyResults.id,
+    { onDelete: "set null" },
+  ),
   note: text("note"),
   confirmed: boolean("confirmed").notNull().default(false),
   confirmedById: uuid("confirmed_by_id").references(() => workspaceMembers.id),
@@ -185,6 +205,54 @@ export const alignmentFindings = pgTable("alignment_findings", {
     .notNull()
     .defaultNow(),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+/**
+ * What the stored share is made of (design `alignment-engine.md` §10, D1).
+ * `withParent + standingAlone` is the share's numerator and `measured` its
+ * denominator. `anchored` is here because the band needs it: with no
+ * company-level objective the reading is a gap whatever the share (§5.2).
+ */
+export interface AlignmentScoreBreakdown {
+  /** Goals below company level in the scope. */
+  readonly measured: number;
+  /** Of those, the ones with a parent goal or key result. */
+  readonly withParent: number;
+  /** No parent, and a reason to stand alone. */
+  readonly standingAlone: number;
+  /** Neither, so not counted. */
+  readonly unaligned: number;
+  readonly anchored: boolean;
+}
+
+/**
+ * The latest alignment score per scope per cycle (plan 0.7.0 D2, migration
+ * 0161).
+ *
+ * A projection `recomputeAlignment` writes in the same transaction as the
+ * findings, so the two cannot disagree. No `deleted_at`: a recompute replaces
+ * the row, and an old score is not a record anybody restores. The band is
+ * not here, because it is read from the cycle's thresholds when the row is
+ * read.
+ */
+export const alignmentScores = pgTable("alignment_scores", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  cycleId: uuid("cycle_id")
+    .notNull()
+    .references(() => cycles.id, { onDelete: "cascade" }),
+  scope: text("scope", { enum: ALIGNMENT_FINDING_SCOPES }).notNull(),
+  scopeId: uuid("scope_id").references(() => spaces.id, {
+    onDelete: "cascade",
+  }),
+  /** Null when nothing below company level is in scope (§5.2). */
+  score: smallint("score"),
+  breakdown: jsonb("breakdown").$type<AlignmentScoreBreakdown>().notNull(),
+  computedAt: timestamp("computed_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
 });
 
 export type GoalDependencyRow = typeof goalDependencies.$inferSelect;

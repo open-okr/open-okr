@@ -54,7 +54,7 @@ The mockups quote the canon rather than inventing numbers, because a developer w
 | Alignment as a share of goals below company level aligned or standing alone: healthy at 90%, watch from 80% (P9-T16a) | METHOD.md §5.2 |
 | Semantic finding types: relink, dependency, conflict, gap | METHOD.md §5.3 |
 | KPI corridors and tiers, and a recovery shown beside the real band  | METHOD.md §6.2, §6.4, §6.5 |
-| The seven blocker types, and a next action due by the next check-in. 09-channels and 10-review-inbox still draw the older five types and a 24-hour clock | METHOD.md §7.3 |
+| The seven blocker types, and a next action due by the next check-in | METHOD.md §7.3 |
 | The eleven quarterly stages and their minutes, the nine root causes, the five process statements | METHOD.md §8.1, §8.4, §8.5 |
 | `checkin.overdue`, `kpi.recovery_proposed`, `quality.conflict` and the other trigger keys | AI-NATIVE-PLAN.md §6.4 |
 | The escalation ladder steps and the blocker ladder | AI-NATIVE-PLAN.md §6.3 |

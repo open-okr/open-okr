@@ -9,6 +9,7 @@ import {
   TextArea,
   TextInput,
 } from "@openokr/ui";
+import Link from "next/link";
 import { richTextHtml } from "../../lib/rich-text-html.ts";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
@@ -76,11 +77,20 @@ export interface Frame {
 export async function AnnualFrame({
   frame,
   canEdit,
+  cycle,
 }: {
   readonly frame: Frame | null;
   readonly canEdit: boolean;
+  /**
+   * The cycle the frame is drawn in (plan 0.7.0 O1). A quarterly cycle reads
+   * the frame and never writes it (METHOD.md §2.1): its phase 3 revalidates
+   * it. The form sends the cycle, so the server makes the same decision.
+   */
+  readonly cycle: { readonly id: string; readonly mode: string } | null;
 }) {
   const { t } = await getTranslations();
+  const inAQuarter = cycle?.mode === "quarterly";
+  const editable = canEdit && !inAQuarter;
 
   const strategies = frame?.strategies ?? [];
 
@@ -113,8 +123,23 @@ export async function AnnualFrame({
             </p>
           ) : null}
 
-          {canEdit ? (
+          {inAQuarter ? (
+            <p className="mb-3 text-sm text-ink-2">
+              {t("cycle.annualFrame.referenceInAQuarter")}{" "}
+              <Link
+                href="/cycle?mode=annual&phase=0"
+                className="font-medium text-brand-text hover:underline"
+              >
+                {t("cycle.annualFrame.theAnnualCycle")}
+              </Link>
+            </p>
+          ) : null}
+
+          {editable ? (
             <ActionForm action={setFrame} className="flex flex-col gap-3">
+              {cycle ? (
+                <input type="hidden" name="cycleId" value={cycle.id} />
+              ) : null}
               <div className="flex flex-wrap gap-2">
                 {/* The server's 40 and 80 (cycles.setAnnualFrame). */}
                 <TextInput

@@ -22,12 +22,15 @@ no administrator overrides it.
 | `importRowLimit` | 1,000 rows | An import in the browser is bigger than the default ceiling. The command line has no ceiling |
 | `messageLogRetentionDays` | 0, which keeps everything | Your policy says chat message records live for a set span |
 | `agentRunCostCapUsd` | 2.00 US dollars a run | You want a harder or softer ceiling on what an agent run may spend |
+| `agentToolCallRetentionDays` | 90 days | You want the record of what external agents called kept for longer, or for good with 0. It never holds what the agent sent or read back |
 | Practice: a profile and its settings | Recommended, nothing changed | Your organisation runs OKRs differently from the defaults: a formal planning process (Governed), tracking without the planning workflow (Lightweight), Google's playbook or Radical Focus. Admin, Practice compares the five side by side under "Compare profiles", links to the method behind them, shows what a profile changes before it is applied, keeps anything the workspace changed itself, lets any one setting be changed on its card, and resets a card to the profile. A profile that sets a number, such as Lightweight's fortnightly check-ins, moves it on Rhythm and thresholds too |
 
 `storageQuotaBytes`, `exportInlineRowLimit`, `importRowLimit`,
-`messageLogRetentionDays` and `agentRunCostCapUsd` have no screen and no
-action that writes them yet. The product honours a value stored in the
-workspace's settings and uses the default above otherwise.
+`messageLogRetentionDays` and `agentRunCostCapUsd` are on the Limits card on
+Admin, General, with a button that returns all five to their defaults. On a
+managed cloud the storage quota and the agent cost cap are your provider's to
+set: the card shows them and who sets them, and the provider changes them
+from their operator console.
 
 ### Trusted email domains
 
@@ -81,9 +84,12 @@ workspace.
 | `instance.termsUrl`, `instance.privacyUrl` | Empty | Named on the sign-up page once set, with `OPENOKR_TERMS_URL` and `OPENOKR_PRIVACY_URL` |
 | `instance.supportEmail` | Empty | Who a customer writes to about their plan. Set it with `OPENOKR_SUPPORT_EMAIL` |
 | `mail.transport` | `console` | The console driver logs each message instead of sending it. **Change this.** In production it logs only the masked recipient and the subject, because a password-reset or invitation link in a log is a credential; on a development machine it logs the whole message. The General screen shows a banner while it is the case |
-| `registration.policy` | Computed | Who may create an account. Set it on General in admin: **Invitation only**, **Company email addresses** (anybody may sign up with a company address and start a workspace; Gmail, Yahoo, Outlook and other free mail addresses need an invitation), or **Anyone**. Stored as `invite_only`, `company_domains` or `open`. With nothing saved it follows `OPENOKR_REGISTRATION`, and with that unset it is open until somebody claims the instance and invitation-only afterwards. A managed cloud stays open unless a policy is set. A value saved on General wins over the variable. Every change is in the instance audit chain |
+| `registration.policy` | Computed | Who may create an account. Set it on General in admin: **Invitation only**, **Company email addresses** (anybody may sign up with a company address and start a workspace; Gmail, Yahoo, Outlook and other free mail addresses need an invitation), or **Anyone**. Stored as `invite_only`, `company_domains` or `open`. With nothing saved it follows `OPENOKR_REGISTRATION`, and with that unset it is open until somebody claims the instance and invitation-only afterwards. A managed cloud stays open unless a policy is set, and its operator sets one on the console's Instance screen. A value saved on General wins over the variable. The setup wizard saves none from 0.7.0. Every change is in the instance audit chain |
 | `scan.clamd.host` | Empty, meaning no virus scan | Name a ClamAV daemon (clamd) with `OPENOKR_CLAMD_HOST` and every uploaded file waits as "being checked" until clamd has scanned it. A file it flags is held back and never served. See [Security](security.md#uploaded-files) |
+| `webhooks.allowPrivateTargets` | Off | Whether a webhook may post to an address inside the network: a private range, loopback or `localhost`, and over plain `http` there. Set it with `OPENOKR_WEBHOOKS_ALLOW_PRIVATE=true` on a self-hosted instance whose receivers are on its own intranet. Ignored with the cloud flag on. Cloud metadata addresses are refused either way |
 | `scan.clamd.port` | `3310` | clamd's own default. Set it with `OPENOKR_CLAMD_PORT` when yours listens elsewhere |
+| `observability.errors.dsn` | Empty, meaning no error report leaves the instance | Name the DSN of a tracker that speaks Sentry's protocol (Sentry, GlitchTip, Bugsink) with `OPENOKR_ERROR_DSN`, in the deployment's secrets, and every unexpected error is also sent there. Environment only, with no screen, because its key lets anyone write into the tracker. A value that is not a DSN stops the instance starting. See [Sending errors to a tracker](../runbooks/observability.md#sending-errors-to-a-tracker) |
+| `observability.errors.environment` | `production` | Which deployment a report came from, with `OPENOKR_ERROR_ENVIRONMENT`. Set `staging` on a staging instance that shares production's tracker |
 
 ## The two rules behind all of this
 

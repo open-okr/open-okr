@@ -9,15 +9,22 @@
  * administrator could create one from the rhythm settings, and no screen could.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { type Conflict, conflictOf } from "../../lib/conflict.ts";
+import { refusedState } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 export interface CycleResult {
   readonly error: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   /** The cycle a create made, so the screen can open it. */
   readonly id?: string;
+  /** The deadline was changed since the card read it; nothing was saved. */
+  readonly conflict?: Conflict;
 }
 
 async function context() {
@@ -29,11 +36,23 @@ async function context() {
   };
 }
 
-const refused = (error: unknown): CycleResult => {
-  if (error instanceof OperationError) {
-    return { error: error.message };
+/**
+ * A refusal as the card shows it: under the one date it draws for this write
+ * when it names that date, and as the card's sentence otherwise. A schema's
+ * refusal too, which used to reach the error page (plan U1b).
+ */
+const refused = async (
+  error: unknown,
+  drawn: readonly string[],
+): Promise<CycleResult> => {
+  const state = refusedState(error, (await getTranslations()).t, drawn);
+  if (state === null) {
+    throw error;
   }
-  throw error;
+  return {
+    error: state.error ?? null,
+    ...(state.fields ? { fields: state.fields } : {}),
+  };
 };
 
 export async function createCycle(input: {
@@ -56,7 +75,7 @@ export async function createCycle(input: {
     });
     id = created.id;
   } catch (error) {
-    return refused(error);
+    return refused(error, ["on"]);
   }
   revalidatePath("/", "layout");
   return { error: null, id };
@@ -65,11 +84,17 @@ export async function createCycle(input: {
 export async function updateCycleDates(input: {
   id: string;
   publicationDeadline: string | null;
+  /** The deadline the card was drawn with (optimistic-concurrency.md V4). */
+  read?: { publicationDeadline: string | null };
 }): Promise<CycleResult> {
   try {
     await callAction(await context(), "cycles.update", input);
   } catch (error) {
-    return refused(error);
+    const conflict = conflictOf(error, input);
+    if (conflict) {
+      return { error: null, conflict };
+    }
+    return refused(error, ["publicationDeadline"]);
   }
   revalidatePath("/", "layout");
   return { error: null };
@@ -81,7 +106,7 @@ export async function archiveCycle(input: {
   try {
     await callAction(await context(), "cycles.archive", input);
   } catch (error) {
-    return refused(error);
+    return refused(error, []);
   }
   // Archiving moves what the scorecard, the Work Map and every cycle-scoped
   // read answer with, and none of those is this page.

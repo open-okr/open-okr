@@ -393,6 +393,6 @@ describe("settling a workspace billing made read-only", () => {
   it("refuses a workspace billing did not suspend", async () => {
     await expect(
       callAction(await context(), "billing.settleEnded", {}),
-    ).rejects.toThrow(/did not make this workspace read-only/);
+    ).rejects.toThrow(/made this workspace read-only/);
   });
 });

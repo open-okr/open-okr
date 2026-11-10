@@ -286,6 +286,7 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `session.due_soon` | 1 day before the weekly session | Coordinator and space |
 | `session.open` | At the scheduled start | Space |
 | `session.missed` | 1 day after a missed session | Coordinator, then sponsor |
+| `session.left_open` | A weekly session still running past its §11 length (`sessions.weeklyMinutes`, upper bound), for one day; carries the Champion's proposal to close it (plan 0.7.0 A13) | Facilitator, or the space's coordinator where the session names none |
 | `streak.at_risk` | The week would break the streak | Coordinator |
 | `digest.weekly` | After the session closes | Space and leadership |
 | `digest.daily` | The member's local morning | Everyone opted in |
@@ -323,16 +324,17 @@ Every proactive message the product sends. Each row is a rule key, and each writ
 | `quality.divergence` | Reported health disagrees with the data within the divergence window | Champion and reviewer |
 | `quality.trending_off` | The forecast misses the target | Champion |
 | `quality.process_health_low` | A process-health statement scores low at review | Sponsor, as next cycle's improvement action |
+| `quality.review_requested` | A member mentions the Coach in a comment on a goal (§6.5, "Conversation"; plan 0.7.0 A8) | The member who asked. The review itself is the Coach's reply in that thread |
 
 ### 6.5 Agent definition and runs
 
 - **Identity.** An agent row owns a member record with `kind = 'agent'`. It has a name, an avatar and a profile, and appears in feeds, mentions and audit like anyone. The Coach and the Champion ship as seeded agents; a workspace may create more.
 - **Definition.** A persona, staged instructions (planning and execution) that are versioned like prompts, a provider and tier choice, a schedule, an autonomy policy, a sandbox flag and an access scope.
 - **Least privilege.** The agent's member group gets explicit bindings on named spaces, goals and KPI trees only. Read-only by default with per-resource write grants. Never a workspace-wide grant.
-- **Runs.** A durable state machine: planning, running, then completed, failed or cancelled, with a task list. The planning phase decomposes the work. The execution phase pops one task per job, runs a bounded tool loop, appends a human-readable log, and reschedules itself until done. Runs resume across restarts, and every tool call carries the run identifier. Built at completeness review M-11 for a run started with its task list already decomposed: `agents.startRun` queues the first step through the outbox in the transaction that writes the run, the relay hands each step to the executor in `packages/agents`, and each step queues the next. A step names its task index, so a redelivered row is skipped rather than taken twice. A custom agent has no deterministic form: at every step the host resolves the agent's tier (default `deep`) through its one provider choke point, and a run with no provider, or whose egress level lets nothing reach it, ends cancelled with the reason in its log. A read task runs as the agent in every mode rather than becoming a proposal. **Not built, and waiting on a decision:** the planning phase itself, meaning which registry actions a custom agent's planner may choose from and what it is shown of its bound resources.
+- **Runs.** A durable state machine: planning, running, then completed, failed or cancelled, with a task list. The planning phase decomposes the work. The execution phase pops one task per job, runs a bounded tool loop, appends a human-readable log, and reschedules itself until done. Runs resume across restarts, and every tool call carries the run identifier. Built at completeness review M-11 for a run started with its task list already decomposed: `agents.startRun` queues the first step through the outbox in the transaction that writes the run, the relay hands each step to the executor in `packages/agents`, and each step queues the next. A step names its task index, so a redelivered row is skipped rather than taken twice. A custom agent has no deterministic form: at every step the host resolves the agent's tier (default `deep`) through its one provider choke point, and a run with no provider, or whose egress level lets nothing reach it, ends cancelled with the reason in its log. A read task runs as the agent in every mode rather than becoming a proposal. **The planning phase, built at 0.7.0 (plan A7, [agent-instructions](../design/agent-instructions.md)):** the stage's instructions (planning in phases 0 to 5, execution in 6 and 7, versioned in `ai_prompts`) and the titles, states and numbers in the agent's bindings go to the model, which may choose reads and writes from the `core` toolset and never a destructive action; every task is checked against its action's schema, and a person starts the run from the preview.
 - **Write policy.** `sandbox` returns simulated results and commits nothing. `propose` (the default) turns every write into a proposal envelope queued to the review inbox, where a human applies or dismisses in bulk. `scoped_direct` commits immediately within the agent's bindings, still fully audited.
 - **Cost.** Every step meters under the agent. Per-agent and per-workspace caps halt a run mid-flight with a clear log line.
-- **Conversation.** An agent is addressable. Mention the Coach on a goal and it reviews that goal and replies in the thread.
+- **Conversation.** An agent is addressable. Mention the Coach on a goal and it reviews that goal and replies in the thread. Built at plan 0.7.0 A8: the comment enqueues the request in its own transaction, the relay has the Coach review the goal through its own bindings against METHOD.md §4.1 and §4.2 with no provider, the reply is a comment answering the one that asked, every point citing its check, and the person who asked gets one `quality.review_requested` nudge under the ordinary suppression rules. A goal the Coach cannot see gets no reply. The words are the method's; no model phrases them yet ([agents.md](../design/agents.md) §14).
 
 ## 7. Schema
 
@@ -347,7 +349,7 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `ai_feature_settings` | feature key, enabled, tier override, quota |
 | `ai_prompts` | feature key or agent identifier and phase, version, system prompt, default flag |
 | `ai_threads` / `ai_messages` | Copilot and agent conversations anchored to a subject, roles, tokens, cost |
-| `ai_tool_calls` | message or run reference, tool, input, output excerpt, status, permission checked, duration |
+| `ai_tool_calls` | member, the grant or agent token it came through, tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default |
 | `ai_usage_events` | member or agent, feature, source (copilot, mcp, assist, agent, rest, channel), provider, model, tokens, cost, latency, status, flagged |
 | `embeddings` | subject, chunk, content, vector, model, content hash |
 | `agents` | member reference, definition, planning instructions, execution instructions, provider and tier, schedule, autonomy (`sandbox` / `propose` / `scoped_direct`), scope, enabled, built-in kind (`coach` / `champion` / `custom`) |
@@ -370,7 +372,7 @@ Any external agent drives OpenOKR as the authenticated user.
 | Authentication | OAuth 2.1 authorisation code with PKCE for the HTTP transport. Scoped tokens remain for local and scripted use |
 | Identity | One grant is one user and one workspace, chosen at a consent and workspace-picker screen. Tool schemas never take a workspace identifier |
 | Enforcement | Every call resolves the acting member, applies the tenant setting, and runs the registry's `can()`. Write tools need write scope. Admin tools need admin scope and the underlying permission. Membership and suspension are revalidated per request, and losing membership revokes the grant |
-| Limits and audit | Per-token rate limits and cost caps. Every call writes a tool-call row and an audit event |
+| Limits and audit | Per-token rate limits and cost caps. Every call writes a tool-call row; a write and a scope refusal also write an audit event (0.7.0, docs/design/agent-tool-calls.md) |
 | Egress | The MCP server makes no outbound AI calls of its own, so it is air-gap safe by construction |
 
 ### 8.2 The authorisation server
@@ -391,6 +393,8 @@ Any external agent drives OpenOKR as the authenticated user.
 
 pgvector with no new service. An outbox-driven worker chunks and embeds goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts on write, keyed by content hash. Retrieval is always access-filtered through the same layer as reads, with hybrid ranking against full text. Local embeddings keep retrieval air-gap safe. Chunks are passed as cited, untrusted data. Where pgvector is unavailable, semantic features degrade to full text and everything still works.
 
+**As built at 0.7.0 (plan A10).** A document is embedded once it is published, never as a draft. A session is embedded as its shared record: its title, the wins it named and the shifts it agreed, never the facilitator's per-stage notes, which are private by design. KPIs are embedded too, by title and description, and like their search rows every member reads them. "Cycle artifacts" are the learnings and next-cycle drafts; a cycle itself is a period with a name and no prose, so it is not embedded. Rows written before 0.7.0 are embedded on their next write, as nothing reindexes the past.
+
 ## 10. Evaluation, quality and degradation
 
 - **Evaluation harness.** Golden fixtures per capability against a deterministic mock provider, asserting schema validity, tool selection, latency and the absence of personal data in prompts. An optional live smoke test on a cheap model, never blocking CI.
@@ -399,6 +403,7 @@ pgvector with no new service. An outbox-driven worker chunks and embeds goals, k
 - **Live transport tests.** Drive the real authorisation and transport stack end to end and assert that an under-privileged call is denied and no cross-tenant data appears in any result. The claim that every call is permission-checked is machine-verified, not asserted.
 - **Prompt gating.** A prompt version that regresses the evaluation set fails the check.
 - **Agent safety tests.** Sandbox commits nothing. Proposal mode commits nothing until applied. A cost cap halts a run mid-flight. An instruction injected into retrieved content cannot exceed the agent's bindings.
+- **As built at 0.7.0 (plan A9).** One set per drafter capability, 23 in all, each passing whole against the mock: decision A4's bar, stated per capability in [ai-evaluation](../design/ai-evaluation.md) §5. The unit suite runs them, so a built-in prompt that regresses one fails CI; `ai.updatePrompt` runs the key's set and refuses a version that fails it; a stored version is sent only while it passes, which also covers one saved before the gate; the usage card computes the latest results as it renders; and `pnpm ai:evaluate --provider --model` is the live smoke test. Before A9 nothing sent a saved version, and the two built-in texts the card showed were not the ones the drafter sent; both are fixed.
 - **Nudge tests.** Deduplication holds under bursts. Quiet hours defer. Escalation advances exactly one step. A snooze never hides a review-inbox obligation. Volume per member per week stays under the configured ceiling in a simulated month.
 
 ## 11. Decisions

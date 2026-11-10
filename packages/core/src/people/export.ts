@@ -110,6 +110,13 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     label: "AI usage recorded against you",
   },
   {
+    // Plan 0.7.0 A2 (agent-tool-calls.md D17): a record of what somebody's
+    // agent did is about them. Tool, outcome and ids only; no argument text.
+    table: "ai_tool_calls",
+    column: "member_id",
+    label: "Calls your connected agents made",
+  },
+  {
     table: "api_tokens",
     column: "member_id",
     skip: "credential",
@@ -363,6 +370,21 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
     table: "kudos",
     column: "to_member_id",
     label: "Kudos you received",
+  },
+  {
+    // Plan 0.7.0 D5 (docs/design/outbound-webhooks.md W1).
+    table: "webhooks",
+    column: "owner_member_id",
+    skip: "structural",
+    because:
+      "Being named a hook's owner is a role: whose access decides what it delivers. The hook belongs to the workspace.",
+  },
+  {
+    table: "webhooks",
+    column: "created_by_member_id",
+    skip: "workspace_record",
+    because:
+      "A workspace's outbound hook, set up by an administrator for the workspace, holding a sealed signing secret. Not personal data.",
   },
 ];
 

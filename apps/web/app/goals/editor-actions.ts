@@ -16,14 +16,18 @@
  * its count and score move with them.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import type { CycleCadence, GoalLevel } from "@openokr/db";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusalFields, refusedState } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 
 interface EditorResult {
   readonly error: string | null;
+  /** Each refused field's message, for a form that draws it (§4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 export interface CreatedResult extends EditorResult {
@@ -45,11 +49,24 @@ async function actingMemberId(): Promise<string> {
   return workspace.memberId;
 }
 
-const refused = (error: unknown): EditorResult => {
-  if (error instanceof OperationError) {
-    return { error: error.message };
+/**
+ * A refused add, as every caller can show it (guided-inputs §4.2, plan U1b).
+ *
+ * **The sentence is always kept.** The OKR table's and the diagram's add rows
+ * show only the sentence, while the new objective form and the goal page's
+ * add row also put each field's message under that field. So the fields come
+ * beside the sentence, and a form that draws a refused field says the
+ * sentence only when none of its fields took it. A schema's refusal too,
+ * which used to reach the error page.
+ */
+const refused = async (error: unknown): Promise<EditorResult> => {
+  const refusal = refusalFields(error, (await getTranslations()).t);
+  if (refusal === null) {
+    throw error;
   }
-  throw error;
+  return Object.keys(refusal.fields).length === 0
+    ? { error: refusal.message }
+    : { error: refusal.message, fields: refusal.fields };
 };
 
 /**
@@ -102,7 +119,7 @@ export async function addObjective(input: {
     refresh();
     return { error: null, id: created.id };
   } catch (error) {
-    return { ...refused(error), id: null };
+    return { ...(await refused(error)), id: null };
   }
 }
 
@@ -144,7 +161,7 @@ export async function addKeyResult(input: {
     refresh();
     return { error: null, id: created.id };
   } catch (error) {
-    return { ...refused(error), id: null };
+    return { ...(await refused(error)), id: null };
   }
 }
 
@@ -175,6 +192,19 @@ export async function addCycle(input: {
     refresh();
     return { error: null, id: created.id };
   } catch (error) {
-    return { ...refused(error), id: null };
+    // Only the picker's dialog creates a cycle, and it draws all three.
+    const state = refusedState(error, (await getTranslations()).t, [
+      "name",
+      "cadence",
+      "on",
+    ]);
+    if (state === null) {
+      throw error;
+    }
+    return {
+      error: state.error ?? null,
+      ...(state.fields ? { fields: state.fields } : {}),
+      id: null,
+    };
   }
 }

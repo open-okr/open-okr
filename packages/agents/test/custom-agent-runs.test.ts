@@ -1,6 +1,8 @@
 import { OutboxRelay } from "@openokr/adapters";
 import {
+  AGENT_RUN_CHANGED_TOPIC,
   AGENT_RUN_STEP_TOPIC,
+  agentRunVersion,
   callAction,
   dispatchOutbox,
   provisionWorkspaceForUser,
@@ -537,5 +539,90 @@ describe("with AI off", () => {
     expect(state.status).toBe("cancelled");
     expect(state.log[0]?.message).toMatch(/privacy settings/);
     expect(await spaceName(ownSpaceId)).not.toBe("Withheld");
+  });
+});
+
+/**
+ * Live agent run streams (PLAN.md §7, release 0.7.0 A11).
+ *
+ * Every step and every halt is its own transaction, so each tells the agents
+ * screen once, with a version that only rises. The writes before the first
+ * step are proved in `packages/core/test/agent-run-live.test.ts`.
+ */
+describe("the agents screen hears every step", () => {
+  async function versionsOf(runId: string): Promise<number[]> {
+    const wb = await workerDb();
+    const result = await wb.admin.query<{ version: number }>(
+      `select (payload->>'version')::int as version
+         from outbox
+        where topic = $1 and payload->>'runId' = $2
+        order by created_at, 1`,
+      [AGENT_RUN_CHANGED_TOPIC, runId],
+    );
+    return result.rows.map((row) => row.version);
+  }
+
+  it("once when it starts, once per step, and the last one ends it", async () => {
+    const agent = await createAgent("scoped_direct");
+    const run = await callAction(ownerContext(), "agents.startRun", {
+      agentId: agent.id,
+      trigger: "manual",
+      tasks: [rename(ownSpaceId, "One"), rename(ownSpaceId, "Two")],
+    });
+
+    await drain();
+
+    // Started (0), the first step's line (1), then the second step's line and
+    // the end in one transaction (3).
+    expect(await versionsOf(run.id)).toEqual([0, 1, 3]);
+    const state = await runOf(run.id);
+    expect(
+      agentRunVersion({ status: state.status, logLength: state.log.length }),
+    ).toBe(3);
+
+    // Identifiers only, on the workspace's run channel.
+    const wb = await workerDb();
+    const payloads = await wb.admin.query<{
+      payload: Record<string, unknown>;
+    }>(
+      "select payload from outbox where topic = $1 and payload->>'runId' = $2",
+      [AGENT_RUN_CHANGED_TOPIC, run.id],
+    );
+    for (const { payload } of payloads.rows) {
+      expect(Object.keys(payload).sort()).toEqual([
+        "channel",
+        "runId",
+        "version",
+        "workspaceId",
+      ]);
+      expect(payload.channel).toBe(`workspace:${workspaceId}:agent-runs`);
+    }
+  });
+
+  it("once when a halt ends it, with the reason's line counted", async () => {
+    const agent = await createAgent("scoped_direct");
+    const run = await callAction(ownerContext(), "agents.startRun", {
+      agentId: agent.id,
+      trigger: "manual",
+      tasks: [rename(ownSpaceId, "Never reached")],
+    });
+
+    await drain(null);
+
+    expect(await versionsOf(run.id)).toEqual([0, 2]);
+  });
+
+  it("says nothing for a step skipped because the run had already ended", async () => {
+    const agent = await createAgent("scoped_direct");
+    const run = await callAction(ownerContext(), "agents.startRun", {
+      agentId: agent.id,
+      trigger: "manual",
+      tasks: [rename(ownSpaceId, "Cancelled first")],
+    });
+    await callAction(ownerContext(), "agents.cancelRun", { id: run.id });
+
+    await drain();
+
+    expect(await versionsOf(run.id)).toEqual([0, 1]);
   });
 });

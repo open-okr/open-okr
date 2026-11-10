@@ -31,6 +31,7 @@ import { ASSIST_FEATURE_KEYS } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { type ActionCallContext, defineReadAction } from "./define.ts";
@@ -98,7 +99,7 @@ export const draftObjective = defineReadAction({
     "Drafts an objective and its key results from a plain-language ambition, with the quality checks it passes.",
   input: z.object({
     ambition: z.string().trim().min(1).max(2000),
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     spaceId: z.uuid().optional(),
     /** The level the draft is for, which decides which §4 rules apply. */
     level: z.enum(["company", "department", "team", "individual"]),
@@ -249,7 +250,7 @@ export const suggestMeasure = defineReadAction({
   summary:
     "Suggests a unit, a direction, a baseline and a target for a key result, with the checks they pass.",
   input: z.object({
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     /** The sentence somebody has typed so far. */
     title: z.string().trim().min(1).max(500),
     unit: z.string().trim().max(60).optional(),
@@ -343,7 +344,7 @@ export const suggestParent = defineReadAction({
   agentSurface: false,
   summary:
     "Suggests which objective this one should align to, from the ones the reader may see.",
-  input: z.object({ goalId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal }),
   output: z
     .object({
       parentGoalId: z.uuid(),

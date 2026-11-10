@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
 import { AI_PROVIDER_KINDS, MODEL_TIERS } from "@openokr/db";
 import { describe, expect, test } from "vitest";
-import { readScreen } from "./screen-text.ts";
+import { readScreen, withMessages } from "./screen-text.ts";
 
 /**
  * The AI console covers what the registry offers (S-37, P6-G12a).
@@ -181,5 +181,21 @@ describe("the AI console's second half (P6-G12b)", () => {
     // `knownPromptKeys` rather than a list here: the editor should grow with
     // the catalogue, and a hard-coded pair would silently stop covering it.
     expect(pageSource).toContain("knownPromptKeys()");
+  });
+
+  test("shows the latest evaluation results on the usage card (plan 0.7.0 A9)", () => {
+    // AI-NATIVE-PLAN §4's "Latest evaluation results", for the same prompts
+    // the editor reads, computed as the page renders rather than stored.
+    expect(pageSource).toContain("latestEvaluations(prompts)");
+    expect(pageSource).toMatch(/<UsageCard[^>]*evaluations=\{evaluations\}/);
+    expect(governanceSource).toContain("Latest evaluation results");
+    // A stored version that fails says it is not the one sent.
+    expect(withMessages(governanceSource)).toContain(
+      "This version is not sent: the built-in text is sent instead.",
+    );
+    // And the Prompts card says a version is checked before it is kept.
+    expect(governanceSource).toContain(
+      "A new version is run through its evaluation set before it is saved",
+    );
   });
 });

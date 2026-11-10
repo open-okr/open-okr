@@ -41,12 +41,19 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { notifyRecipients } from "../notifications/create.ts";
 import { resolveRecipients } from "../notifications/recipients.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import {
+  changedFields,
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { boardChannel } from "../tasks/live.ts";
@@ -336,8 +343,8 @@ const BOARD_COLUMN = 50;
 const boardInput = z
   .object({
     spaceId: z.uuid().optional(),
-    initiativeId: z.uuid().optional(),
-    keyResultId: z.uuid().optional(),
+    initiativeId: ADDRESS.initiative.optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
     /** Cards per column. Optional for the reason `goals.list` states. */
     limit: z.number().int().min(1).max(200).optional(),
   })
@@ -648,7 +655,7 @@ export const listTasks = defineReadAction({
      * initiative's progress is the share of these that are done, which is why
      * it read zero for everybody until this row.
      */
-    initiativeId: z.uuid().optional(),
+    initiativeId: ADDRESS.initiative.optional(),
   }),
   output: z.array(taskCard),
   access: ACCESS_LEVELS.view,
@@ -714,8 +721,10 @@ export const listTasks = defineReadAction({
 export const readTask = defineReadAction({
   name: "tasks.read",
   summary: "One task with its assignees and its checklist.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.task }),
   output: taskCard.extend({
+    /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+    shortId: z.string().nullable(),
     spaceName: z.string(),
     initiativeTitle: z.string().nullable(),
     description: z.unknown().nullable(),
@@ -752,6 +761,7 @@ export const readTask = defineReadAction({
         const [row] = await tx
           .select({
             ...CARD_COLUMNS,
+            shortId: tasks.shortId,
             spaceName: spaces.name,
             initiativeTitle: initiatives.title,
             description: tasks.description,
@@ -799,6 +809,7 @@ export const readTask = defineReadAction({
 
         return {
           ...card,
+          shortId: row.shortId,
           spaceName: row.spaceName,
           initiativeTitle: row.initiativeTitle,
           description: row.description ?? null,
@@ -816,8 +827,8 @@ export const createTask = defineWriteAction({
     spaceId: z.uuid(),
     title: z.string().trim().min(1).max(500),
     description: richText.optional(),
-    initiativeId: z.uuid().optional(),
-    keyResultId: z.uuid().optional(),
+    initiativeId: ADDRESS.initiative.optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
     status: z.enum(TASK_STATUSES).optional(),
     dueOn: localDate.optional(),
     assigneeIds: z.array(z.uuid()).max(20).optional(),
@@ -940,23 +951,38 @@ async function notifyAssignees(
   });
 }
 
+/**
+ * The fields `tasks.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). The description is rich text, which V5
+ * leaves out.
+ */
+const TASK_READ = [
+  "title",
+  "status",
+  "dueOn",
+  "initiativeId",
+  "keyResultId",
+] as const;
+
 export const updateTask = defineWriteAction({
   name: "tasks.update",
   summary:
-    "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+    "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
   input: z
     .object({
-      id: z.uuid(),
+      id: ADDRESS.task,
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       status: z.enum(TASK_STATUSES).optional(),
       dueOn: localDate.nullable().optional(),
-      initiativeId: z.uuid().nullable().optional(),
-      keyResultId: z.uuid().nullable().optional(),
+      initiativeId: ADDRESS.initiative.nullable().optional(),
+      keyResultId: ADDRESS.keyResult.nullable().optional(),
+      read: readOf(TASK_READ),
     })
-    .refine((value) => Object.keys(value).length > 1, {
+    .refine((value) => changedFields(value).length > 0, {
       message: "an update has to change something",
-    }),
+    })
+    .refine(...readsEveryChange(TASK_READ)),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -976,6 +1002,34 @@ export const updateTask = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "task",
+        subjectId: input.id,
+        fields: TASK_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              title: tasks.title,
+              status: tasks.status,
+              dueOn: tasks.dueOn,
+              initiativeId: tasks.initiativeId,
+              keyResultId: tasks.keyResultId,
+            })
+            .from(tasks)
+            .where(
+              activeOnly(
+                tasks,
+                eq(tasks.workspaceId, workspaceId),
+                eq(tasks.id, input.id),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row;
+        },
+      });
       // openokr:allow-mutation: the calling Operation's own transaction.
       await tx
         .update(tasks)
@@ -1013,13 +1067,18 @@ export const updateTask = defineWriteAction({
           kind: "task.updated",
           subjectType: "task",
           subjectId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: {
+            // The changed fields, never `read` (D3), and the status a webhook
+            // event reads (D5).
+            fields: changedFields(input),
+            ...(input.status === undefined ? {} : { status: input.status }),
+          },
         },
         audit: {
           action: "tasks.update",
           targetType: "task",
           targetId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: { fields: changedFields(input) },
         },
       };
     },
@@ -1031,10 +1090,10 @@ export const moveTask = defineWriteAction({
   summary:
     "Moves a card to a column and a slot, under a lock so two drags cannot lose one.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.task,
     status: z.enum(TASK_STATUSES),
     /** The card it lands after, or absent for the top of the column. */
-    afterTaskId: z.uuid().nullable().optional(),
+    afterTaskId: ADDRESS.task.nullable().optional(),
   }),
   output: z.object({
     id: z.uuid(),
@@ -1085,7 +1144,7 @@ export const assignTask = defineWriteAction({
   name: "tasks.assign",
   summary:
     "Assigns a member, which grants them edit on this task and notifies them.",
-  input: z.object({ id: z.uuid(), memberId: z.uuid() }),
+  input: z.object({ id: ADDRESS.task, memberId: z.uuid() }),
   output: z.object({ assigned: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1146,7 +1205,7 @@ export const assignTask = defineWriteAction({
 export const unassignTask = defineWriteAction({
   name: "tasks.unassign",
   summary: "Removes an assignment and the edit access it granted.",
-  input: z.object({ id: z.uuid(), memberId: z.uuid() }),
+  input: z.object({ id: ADDRESS.task, memberId: z.uuid() }),
   output: z.object({ unassigned: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1201,7 +1260,7 @@ export const addChecklistItem = defineWriteAction({
   name: "tasks.addChecklistItem",
   summary: "Adds one line to a task's checklist.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.task,
     title: z.string().trim().min(1).max(300),
     /** The source-system identity, when an import is creating this (P6-T04a). */
     legacy: legacyKey.optional(),
@@ -1254,7 +1313,7 @@ export const setChecklistItem = defineWriteAction({
   name: "tasks.setChecklistItem",
   summary: "Ticks or unticks one checklist line.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.task,
     itemId: z.uuid(),
     done: z.boolean(),
   }),
@@ -1304,7 +1363,7 @@ export const setChecklistItem = defineWriteAction({
 export const removeChecklistItem = defineWriteAction({
   name: "tasks.removeChecklistItem",
   summary: "Removes one checklist line.",
-  input: z.object({ id: z.uuid(), itemId: z.uuid() }),
+  input: z.object({ id: ADDRESS.task, itemId: z.uuid() }),
   output: z.object({ itemId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -1353,7 +1412,7 @@ export const removeChecklistItem = defineWriteAction({
 export const deleteTask = defineWriteAction({
   name: "tasks.delete",
   summary: "Soft-deletes a task, its assignments and its checklist.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.task }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -1449,7 +1508,7 @@ export const restoreTask = defineWriteAction({
   name: "tasks.restore",
   summary:
     "Brings back a deleted task with the assignments and checklist lines deleted with it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.task }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -1576,7 +1635,7 @@ export const readLinkedWork = defineReadAction({
   name: "tasks.linkedWork",
   summary:
     "Linked work per key result for one cycle: two counts, and the sentence when they disagree with the measure.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.array(
     z.object({
       keyResultId: z.uuid(),

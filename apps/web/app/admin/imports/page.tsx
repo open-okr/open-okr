@@ -1,12 +1,12 @@
 import { callAction, TEMPLATES } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ArchiveImportCard } from "./archive-import-card.tsx";
-import { ExportCard } from "./export-card.tsx";
 import { ImportWizard } from "./wizard.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminImports");
@@ -113,11 +113,20 @@ export default async function ImportsPage() {
             )}
           </CardBody>
         </Card>
-        {/* Workspace archive export and import (P6-T05c) */}
+        {/* Workspace archive import (P6-T05c). Taking an archive moved to
+            Backups, one place to take a copy (backups-screen.md U2). */}
         <h2 className="mt-2 text-base font-bold text-ink">
           {t("admin.imports.workspaceArchive")}
         </h2>
-        <ExportCard />
+        <p className="text-sm text-ink-2">
+          {t("admin.imports.takeArchiveOnBackups")}{" "}
+          <Link
+            className="font-medium text-brand-text hover:underline"
+            href="/admin/backups"
+          >
+            {t("admin.backups.title")}
+          </Link>
+        </p>
         <ArchiveImportCard />
       </div>
     </>

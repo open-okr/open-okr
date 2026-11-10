@@ -48,11 +48,14 @@ import {
 } from "../secrets/instance-registry.ts";
 import { readSetting } from "../secrets/instance-settings.ts";
 import { listMembershipsForUser } from "../workspaces/memberships.ts";
+import { MIN_ACTIONS_PER_MINUTE, MIN_CONCURRENT_ACTIONS } from "./admission.ts";
 import { isCloudEnabled } from "./settings.ts";
 import { readTenant, setTenantPlanInTx } from "./store.ts";
 
 const CLOUD_PLANS_KEY = "cloud.plans";
 const CLOUD_DEFAULT_PLAN_KEY = "cloud.defaultPlan";
+const CLOUD_TRIAL_DAYS_KEY = "cloud.trialDays";
+const CLOUD_TRIAL_PLAN_KEY = "cloud.trialPlan";
 const FREE_WORKSPACES_KEY = "cloud.limits.freeWorkspacesPerPerson";
 
 /**
@@ -85,9 +88,60 @@ const planSchema = z.object({
       year: z.string().trim().min(1).optional(),
     })
     .optional(),
+  /**
+   * This plan's own tenant limits, where it varies them (plan 0.7.0 P5,
+   * approved by Akmal on 10 November 2026; plans-and-seats.md §4,
+   * tenant-limits.md §9). Each one absent is the instance's
+   * `cloud.limits.*`; zero is unlimited, as there. The floors are the
+   * instance settings' own, so a plan cannot set a number that is an outage.
+   * The outbox rate stays instance-wide: the relay reads one rate for every
+   * workspace in one query.
+   */
+  limits: z
+    .object({
+      actionsPerMinute: z
+        .number()
+        .int()
+        .min(0)
+        .refine((value) => value === 0 || value >= MIN_ACTIONS_PER_MINUTE, {
+          message: `Zero, or ${MIN_ACTIONS_PER_MINUTE} or more.`,
+        })
+        .optional(),
+      concurrentActions: z
+        .number()
+        .int()
+        .min(0)
+        .refine((value) => value === 0 || value >= MIN_CONCURRENT_ACTIONS, {
+          message: `Zero, or ${MIN_CONCURRENT_ACTIONS} or more.`,
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type Plan = z.infer<typeof planSchema>;
+
+/**
+ * The admission limits a workspace's plan sets, or null where its plan sets
+ * none (P5). The one function tenant-limits.md §9 said making limits per-plan
+ * would take: the tenant's plan, read once, and its `limits` if any. Null too
+ * for a workspace with no tenant row or no plan, which is every self-hosted
+ * instance and every group.
+ */
+export async function planLimitsFor(
+  pool: Pool,
+  workspaceId: string,
+): Promise<{
+  readonly actionsPerMinute?: number;
+  readonly concurrentActions?: number;
+} | null> {
+  const tenant = await readTenant(pool, workspaceId);
+  if (!tenant?.planKey) {
+    return null;
+  }
+  const plan = await planByKey(pool, tenant.planKey);
+  return plan?.limits ?? null;
+}
 
 const plansSchema = z.array(planSchema);
 
@@ -218,11 +272,31 @@ export async function seatState(
 ): Promise<SeatState> {
   const tenant = await readTenant(pool, workspaceId);
   const limit = tenant?.seats ?? null;
-  const pending = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
-    pendingInvitationCountInTx(tx, workspaceId),
+  const used = await withWorkspace(drizzle(pool), workspaceId, (tx) =>
+    seatsHeldInTx(tx, workspaceId),
   );
-  const used = (await countSeats(pool, workspaceId)) + pending;
   return { limit, used, full: limit !== null && used >= limit };
+}
+
+/**
+ * Who holds a seat, from inside a transaction: the humans here or on their
+ * way, plus the personal invitations still waiting (plans-and-seats.md §2).
+ *
+ * **The one definition** (operator-console.md §11 P2, plan 0.7.0 P3). The
+ * seat state, the seat check and the operator's usage snapshot all count with
+ * it, so the console and the limit cannot disagree about who holds a seat.
+ * `arriving` is the address being admitted now, whose own invitation is the
+ * seat they are about to take.
+ */
+export async function seatsHeldInTx(
+  tx: AnyTx,
+  workspaceId: string,
+  arriving?: string,
+): Promise<number> {
+  return (
+    (await seatsInUseInTx(tx, workspaceId)) +
+    (await pendingInvitationCountInTx(tx, workspaceId, arriving))
+  );
 }
 
 /**
@@ -294,6 +368,37 @@ export async function resolveDefaultPlan(pool: Pool): Promise<Plan | null> {
 }
 
 /**
+ * The trial a sign-up starts by itself, or null (docs/design/
+ * tenant-lifecycle.md §11 Q1, plan 0.7.0 P4b): both `cloud.trialDays` above
+ * zero and `cloud.trialPlan` naming a catalogue plan. Either unset, or a key
+ * the catalogue does not hold, is no trial, as `cloud.defaultPlan` reads.
+ */
+export async function resolveSignupTrial(
+  pool: Pool,
+): Promise<{ readonly plan: Plan; readonly days: number } | null> {
+  const read = async (key: string) => {
+    const definition = getInstanceSetting(key);
+    const stored = await readSetting(pool, key);
+    return (
+      stored ??
+      (definition ? environmentValue(definition, process.env) : undefined) ??
+      definition?.fallback
+    );
+  };
+  const days = Number(await read(CLOUD_TRIAL_DAYS_KEY));
+  const key = await read(CLOUD_TRIAL_PLAN_KEY);
+  if (
+    !(Number.isInteger(days) && days > 0) ||
+    typeof key !== "string" ||
+    key.trim() === ""
+  ) {
+    return null;
+  }
+  const plan = (await readPlans(pool)).find((one) => one.key === key.trim());
+  return plan ? { plan, days } : null;
+}
+
+/**
  * How many free workspaces one person may own (docs/design/hosting-profiles.md §3).
  *
  * Each one is worth AI credits, so without this a free plan is as much AI as
@@ -340,7 +445,10 @@ export async function requireFreeWorkspaceRoom(
             workspaceMembers,
             eq(workspaceMembers.id, memberId),
             eq(workspaceRoles.builtinKey, PROTECTED_ROLE_KEY),
-            eq(tenants.planKey, plan.key),
+            // A trial lands on the default plan when it ends, so it counts
+            // now; otherwise each new trial is a way past the limit
+            // (tenant-lifecycle.md §11 T9).
+            or(eq(tenants.planKey, plan.key), isNotNull(tenants.trialEndsAt)),
           ),
         )
         .limit(1),
@@ -406,22 +514,10 @@ async function seatCheckInTx(
     return { limit: null, used: 0 };
   }
 
-  const [row] = await tx
-    .select({ n: count() })
-    .from(workspaceMembers)
-    .where(
-      activeOnly(
-        workspaceMembers,
-        and(
-          eq(workspaceMembers.workspaceId, workspaceId),
-          eq(workspaceMembers.kind, "human"),
-          inArray(workspaceMembers.status, [...SEAT_STATUSES]),
-        ),
-      ),
-    );
-
-  const pending = await pendingInvitationCountInTx(tx, workspaceId, arriving);
-  return { limit: tenant.seats, used: (row?.n ?? 0) + pending };
+  return {
+    limit: tenant.seats,
+    used: await seatsHeldInTx(tx, workspaceId, arriving),
+  };
 }
 
 /**

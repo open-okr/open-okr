@@ -64,3 +64,20 @@ export function documentOrNull(
   }
   return read.state === "document" ? read.document : null;
 }
+
+/**
+ * The refusal for each of a form's rich text fields that came back
+ * "malformed", keyed by the field's name, so the message stands under the
+ * field that could not be read rather than over the whole form
+ * (guided-inputs §4.2, plan U1b).
+ */
+export function unreadableFields(
+  documents: Readonly<Record<string, unknown>>,
+  message: string,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    Object.entries(documents)
+      .filter(([, value]) => value === "malformed")
+      .map(([name]) => [name, message]),
+  );
+}

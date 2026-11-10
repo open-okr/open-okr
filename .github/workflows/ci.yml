@@ -188,8 +188,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # **This job is the AI-off leg** (PLAN.md §9, AI-NATIVE-PLAN §10,
+  # docs/design/ai-off-leg.md). It boots with no AI provider, runs every P0
+  # flow (`e2e/p0-flows.ts` names them) and `e2e/ai-off.spec.ts` proves no
+  # screen draws an AI affordance and both agents still run. One job rather
+  # than a second copy of the suite: the whole suite already runs here with AI
+  # off, so a second job would rerun the same specs and prove nothing new.
+  # `playwright.config.ts` empties every deployment AI variable for both
+  # servers, and `apps/web/test/ai-off-leg.test.ts` fails if this file ever
+  # sets one.
   e2e:
-    name: End to end (shard ${{ matrix.shard }}/${{ strategy.job-total }})
+    name: End to end, AI off (shard ${{ matrix.shard }}/${{ strategy.job-total }})
     needs: scope
     if: needs.scope.outputs.code == 'true'
     runs-on: ubuntu-latest

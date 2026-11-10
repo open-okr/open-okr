@@ -121,20 +121,25 @@ describe("storing a key", () => {
       );
       expect(callAction).not.toHaveBeenCalled();
       expect(state.ok).toBe(false);
-      expect(state.message).toBe(
+      // Under the key, where it was pasted (plan U1b).
+      expect(state.fields?.apiKey).toBe(
         "That is not a key this can store. A key is letters, digits and plain symbols, with no spaces, line breaks or curly quotes inside it. Nothing was stored.",
       );
-      expect(state.message).not.toContain(malformed.trim().slice(0, 12));
+      expect(state.fields?.apiKey).not.toContain(malformed.trim().slice(0, 12));
     },
   );
 
-  it("asks for a key when the field was empty", async () => {
+  it("asks for a key when the field was empty, under the key", async () => {
     const state = await savePersonalKey(
       NOTHING,
       submitted({ provider: "anthropic", apiKey: "   " }),
     );
     expect(callAction).not.toHaveBeenCalled();
-    expect(state).toEqual({ ok: false, message: "Paste a key first." });
+    expect(state).toEqual({
+      ok: false,
+      message: "",
+      fields: { apiKey: "Paste a key first." },
+    });
   });
 
   it("refuses a provider this product does not have", async () => {

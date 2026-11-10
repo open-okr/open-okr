@@ -164,13 +164,26 @@ export type OkrMutation =
   | {
       readonly kind: "patchKeyResult";
       readonly id: string;
-      readonly set: Omit<KeyResultFields, "currentValue" | "targetValue">;
+      // A value, a target and a confidence each have their own action.
+      readonly set: Omit<
+        KeyResultFields,
+        "currentValue" | "targetValue" | "confidence"
+      >;
       readonly read: Readonly<Record<string, Readable>>;
     }
   | {
       readonly kind: "recordValue";
       readonly id: string;
       readonly value: number;
+    }
+  | {
+      /**
+       * A key result's confidence set outside a check-in, nought to one
+       * (okr-writing.md §4.2, plan 0.7.0 O4).
+       */
+      readonly kind: "updateConfidence";
+      readonly id: string;
+      readonly confidence: number;
     }
   | {
       readonly kind: "changeTarget";
@@ -307,6 +320,12 @@ async function write(mutation: OkrMutation): Promise<OkrGoal | null> {
       await callAction(ctx, "goals.recordValue", {
         id: mutation.id,
         value: mutation.value,
+      });
+      return null;
+    case "updateConfidence":
+      await callAction(ctx, "goals.updateConfidence", {
+        id: mutation.id,
+        confidence: mutation.confidence,
       });
       return null;
     case "removeKeyResult":

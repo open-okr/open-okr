@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusalFields } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -26,6 +26,7 @@ async function ask(formData: FormData): Promise<void> {
   const workspaceId = String(formData.get("workspaceId") ?? "");
 
   let refused: string | null = null;
+  let onReason = false;
   try {
     await requestSupportSession(getPool(), {
       workspaceId,
@@ -38,14 +39,16 @@ async function ask(formData: FormData): Promise<void> {
     // trace. They used to vanish, so the page looked as if the request had
     // gone and nothing had (UAT BUG-020). The sentence is carried back to the
     // form instead, and a schema's is its sentence rather than its JSON.
-    refused = refusalOf(error);
-    if (refused === null) {
+    const refusal = refusalFields(error, (await getTranslations()).t);
+    if (refusal === null) {
       throw error;
     }
+    refused = refusal.fields.reason ?? refusal.message;
+    onReason = refusal.fields.reason !== undefined;
   }
   if (refused !== null) {
     redirect(
-      `/operator/${workspaceId}?refused=${encodeURIComponent(refused.slice(0, 300))}`,
+      `/operator/${workspaceId}?refused=${encodeURIComponent(refused.slice(0, 300))}${onReason ? "&refusedOn=reason" : ""}`,
     );
   }
   revalidatePath(`/operator/${workspaceId}`);
@@ -55,9 +58,12 @@ export async function SupportRequest({
   pending,
   workspaceId,
   refused = null,
+  refusedOnReason = false,
 }: {
   readonly pending: boolean;
   readonly workspaceId: string;
+  /** True when the refusal was about the reason, so it shows under it. */
+  readonly refusedOnReason?: boolean;
   /** Why the last request was refused, carried back by \`ask\`. */
   readonly refused?: string | null;
 }) {
@@ -77,7 +83,7 @@ export async function SupportRequest({
       className="flex flex-col gap-3 rounded-lg border border-line bg-surface p-4"
     >
       <input name="workspaceId" type="hidden" value={workspaceId} />
-      {refused ? (
+      {refused && !refusedOnReason ? (
         <p role="alert" className="text-bad text-sm">
           {refused}
         </p>
@@ -94,6 +100,7 @@ export async function SupportRequest({
           placeholder={t("operator.supportRequest.placeholder")}
           required
           rows={2}
+          error={refusedOnReason ? refused : null}
         />
         <p className="text-ink-3 text-xs">
           {t("operator.supportRequest.adminDecides")}

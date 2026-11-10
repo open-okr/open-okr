@@ -402,6 +402,110 @@ test("an image arrives as a preview, and comes back without its EXIF", async () 
   expect(body.equals(PHOTO_WITH_EXIF)).toBe(false);
 });
 
+/**
+ * A file put into the text rather than through the files panel (plan 0.7.0
+ * R4, rich-text-editor.md §11).
+ *
+ * The editor uploads it at once and the node turns ready; saving records the
+ * file against the document, so the files panel lists it as in the text and
+ * the link opens. That a second member opens it too is proved against a real
+ * database in `packages/core/test/attachments-from-text.test.ts`, where a
+ * second account is cheap.
+ */
+const textFile = (name: string, words: string) => ({ name, words });
+
+async function openTheDocument(): Promise<void> {
+  await goTo(page, `/goals/${goalId}`);
+  await page.getByRole("link", { name: TITLE }).click();
+  await expect(
+    page.getByRole("heading", { level: 1, name: TITLE }),
+  ).toBeVisible({ timeout: 15_000 });
+}
+
+test("a file pasted into a document is saved with it and opens from its files", async () => {
+  await openTheDocument();
+  const pasted = textFile("whiteboard-notes.txt", "Notes from the whiteboard.");
+
+  await editor().evaluate((element, file) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([file.words], file.name, { type: "text/plain" }));
+    element.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: transfer,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, pasted);
+  await expect(
+    editor().locator('[data-attachment-node="true"][data-status="ready"]', {
+      hasText: pasted.name,
+    }),
+  ).toBeVisible({ timeout: 20_000 });
+
+  await page.getByRole("button", { name: "Save" }).click();
+  await expect(page.getByText("Saved. Not published yet.")).toBeVisible({
+    timeout: 15_000,
+  });
+
+  await openTheDocument();
+  const row = page
+    .getByTestId("attachment-list")
+    .locator("li", { hasText: pasted.name });
+  await expect(row).toContainText(
+    "In the text. Take it out of the text to remove it.",
+    { timeout: 15_000 },
+  );
+  const target = await row
+    .getByRole("link", { name: pasted.name })
+    .getAttribute("href");
+  expect(target).toMatch(/^\/api\/blobs\/[0-9a-f-]{36}$/);
+  const response = await page.request.get(target as string);
+  expect(response.status()).toBe(200);
+  expect(await response.text()).toBe(pasted.words);
+});
+
+test("a file dropped into a comment is a link in the posted comment", async () => {
+  await openTheDocument();
+  const dropped = textFile("comment-notes.txt", "What we agreed.");
+  const thread = page.getByTestId("comment-thread");
+  const composer = thread.getByRole("textbox", { name: "Your comment" });
+  await composer.fill("The notes");
+
+  await composer.evaluate((element, file) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([file.words], file.name, { type: "text/plain" }));
+    // Over the field's middle: the editor places a drop where it lands.
+    const box = element.getBoundingClientRect();
+    element.dispatchEvent(
+      new DragEvent("drop", {
+        dataTransfer: transfer,
+        clientX: box.left + box.width / 2,
+        clientY: box.top + box.height / 2,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  }, dropped);
+  await expect(
+    composer.locator('[data-attachment-node="true"][data-status="ready"]', {
+      hasText: dropped.name,
+    }),
+  ).toBeVisible({ timeout: 20_000 });
+
+  await thread.getByRole("button", { name: "Post" }).click();
+  const link = thread
+    .locator('[id^="comment-"]')
+    .filter({ hasText: "The notes" })
+    .getByRole("link", { name: dropped.name });
+  await expect(link).toBeVisible({ timeout: 15_000 });
+  const target = await link.getAttribute("href");
+  expect(target).toMatch(/^\/api\/blobs\/[0-9a-f-]{36}$/);
+  const response = await page.request.get(target as string);
+  expect(response.status()).toBe(200);
+  expect(await response.text()).toBe(dropped.words);
+});
+
 test("the cycle screen can reach the next quarter", async () => {
   // `cycles.create`, `update` and `archive` had no browser caller, so a
   // workspace could plan exactly one cycle: the one provisioning made. The

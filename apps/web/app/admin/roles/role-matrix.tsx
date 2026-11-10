@@ -13,6 +13,7 @@ import { useState, useTransition } from "react";
 import {
   createRoleAction,
   deleteRoleAction,
+  type RoleResult,
   setPermissionAction,
 } from "./actions.ts";
 
@@ -93,13 +94,18 @@ export function RoleMatrix({
   // that control shows a spinner.
   const [acting, setActing] = useState<string | null>(null);
 
-  const run = (name: string, work: () => Promise<{ error: string | null }>) => {
+  // A refused name for the new role, shown under its box (guided-inputs §4.2).
+  const [nameRefused, setNameRefused] = useState<string | null>(null);
+
+  const run = (name: string, work: () => Promise<RoleResult>) => {
     setProblem(null);
+    setNameRefused(null);
     setActing(name);
     start(async () => {
       const result = await work();
-      if (result.error) {
+      if (result.error || result.fields) {
         setProblem(result.error);
+        setNameRefused(result.fields?.name ?? null);
         return;
       }
       router.refresh();
@@ -282,6 +288,7 @@ export function RoleMatrix({
             value={name}
             placeholder={t("admin.roles.namePlaceholder")}
             disabled={pending}
+            error={nameRefused}
             onChange={(event) => setName(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
@@ -301,7 +308,7 @@ export function RoleMatrix({
             onClick={() =>
               run("create", async () => {
                 const result = await createRoleAction({ name: name.trim() });
-                if (!result.error) {
+                if (!result.error && !result.fields) {
                   setName("");
                   setAdding(false);
                 }

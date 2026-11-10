@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { useFormReset } from "./form-reset.ts";
@@ -154,7 +155,7 @@ export function matchDeviceTimezone(
 export function TimezoneSelect({
   label,
   description,
-  error,
+  error: givenError,
   name,
   zones,
   value,
@@ -162,6 +163,10 @@ export function TimezoneSelect({
   onValueChange,
   required,
 }: TimezoneSelectProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields` says
+  // what the server refused about this field (guided-inputs §4.2, plan U1b).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t, locale: catalogue } = useTranslations();
   // The pseudo-locale is a catalogue check, not a language Intl can name a
   // zone in.

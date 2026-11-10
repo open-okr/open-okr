@@ -36,3 +36,50 @@ describe("a rich text field", () => {
     expect(richTextSchema().parse(doc)).toEqual(doc);
   });
 });
+
+// rich-text-editor.md §7 promised a server check that refuses a save while a
+// file is still uploading, and there was none (plan 0.7.0, R1, §11 D1).
+describe("a rich text field holding a file", () => {
+  // An attachment is inline, so it sits in a paragraph.
+  const withFile = (attrs: Record<string, unknown>) => ({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          {
+            type: "attachment",
+            attrs: {
+              filename: "plan.pdf",
+              contentType: "application/pdf",
+              ...attrs,
+            },
+          },
+        ],
+      },
+    ],
+  });
+  const UPLOADING =
+    "A file in this text is still uploading. Wait for it to finish, then save.";
+
+  it("refuses a file that is still uploading", () => {
+    const result = richTextSchema().safeParse(
+      withFile({ status: "uploading" }),
+    );
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe(UPLOADING);
+  });
+
+  it("refuses a file marked ready with nothing behind it", () => {
+    const result = richTextSchema().safeParse(withFile({ status: "ready" }));
+    expect(result.error?.issues[0]?.message).toBe(UPLOADING);
+  });
+
+  it("keeps a file that finished uploading", () => {
+    const doc = withFile({
+      status: "ready",
+      blobId: "6a1f9c62-3d8e-4f0a-9b7c-2e5d8a4f1b30",
+    });
+    expect(richTextSchema().parse(doc)).toEqual(doc);
+  });
+});

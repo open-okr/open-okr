@@ -99,7 +99,11 @@ export async function SpaceManagement({
         </div>
       </CardHeader>
       <CardBody className="flex flex-col gap-4">
-        <SpaceForm action={updateSpace} className="flex flex-col gap-2">
+        <SpaceForm
+          action={updateSpace}
+          read={{ name, mission }}
+          className="flex flex-col gap-2"
+        >
           <input type="hidden" name="id" value={spaceId} />
           <TextInput
             label={t("common.name")}

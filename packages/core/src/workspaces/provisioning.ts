@@ -63,7 +63,9 @@ import {
   applyPlanInTx,
   resolveCloudTenancy,
   resolveDefaultPlan,
+  resolveSignupTrial,
   seedTenantInTx,
+  startTrialInTx,
 } from "../tenancy/index.ts";
 
 export interface WorkspaceUser {
@@ -117,10 +119,13 @@ export function slugify(name: string): string {
     // Apostrophes disappear rather than separate: "Ada's" is one word, so
     // "adas", not "ada-s".
     .replace(/['’]/g, "")
+    // One dash per run, so each end holds at most one, and the trims below
+    // take a single character rather than a run (CodeQL js/polynomial-redos).
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-/, "")
+    .replace(/-$/, "")
     .slice(0, 40)
-    .replace(/-+$/g, "");
+    .replace(/-$/, "");
   return slug === "" ? "workspace" : slug;
 }
 
@@ -174,6 +179,11 @@ export async function createWorkspace(
   // nothing (P8-T02a).
   const cloud = await resolveCloudTenancy(pool);
   const defaultPlan = cloud.enabled ? await resolveDefaultPlan(pool) : null;
+  // A sign-up's own trial (tenant-lifecycle.md §11 Q1, plan 0.7.0 P4b): only
+  // for a workspace made for somebody who signed up, never one an operator
+  // makes for an owner still to come, whose trial the operator sets.
+  const trial =
+    cloud.enabled && "user" in input ? await resolveSignupTrial(pool) : null;
 
   // A bootstrap operation: it creates the workspace it runs in, so there is no
   // member to authorise against and no workspace to load. Everything else is
@@ -207,7 +217,9 @@ export async function createWorkspace(
         // (TECHNICAL-PLAN §4.14). Returns immediately when the cloud is off,
         // so the self-hosted path executes a call and writes nothing.
         await seedTenantInTx(tx, { workspaceId, cloud });
-        if (defaultPlan) {
+        if (trial) {
+          await startTrialInTx(tx, { workspaceId, ...trial });
+        } else if (defaultPlan) {
           await applyPlanInTx(tx, { workspaceId, plan: defaultPlan });
         }
         return {

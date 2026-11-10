@@ -135,6 +135,25 @@ describe("the two gates, and neither substituting for the other", () => {
     expect(outcome.text).toContain("goals.create needs write");
   });
 
+  // agent-surface.md's acceptance says the denial is audited, and it was not:
+  // the refusal returned before anything was written (plan 0.7.0, A3).
+  it("records the refusal in the workspace's audit log, naming the channel", async () => {
+    await run("goals.create", { title: "Never written" }, ["read"]);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select action, payload from audit_events where workspace_id = $1 and action = 'agent.scope_refused'",
+      [workspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].payload).toMatchObject({
+      tool: "goals.create",
+      needed: "write",
+      granted: ["read"],
+      channel: "mcp",
+    });
+  });
+
   it("refuses before the action runs, so nothing is half done", async () => {
     await run("goals.create", { title: "Never written" }, ["read"]);
 
@@ -236,7 +255,9 @@ describe("what a refusal says, and what it does not", () => {
     // can fix it. Before P5-T16 a read never reached this branch at all,
     // because the read builder did not parse, and the identifier went to the
     // database instead.
-    await expect(run("goals.read", { id: "not-a-uuid" })).resolves.toEqual({
+    // A number, because any short string is an address since 0.7.0 and one
+    // that names nothing is not-found rather than invalid (short-ids.md S4).
+    await expect(run("goals.read", { id: 42 })).resolves.toEqual({
       text: expect.stringContaining("That input is not valid. id:"),
       isError: true,
     });
@@ -477,5 +498,102 @@ describe("the session record", () => {
 
     await wb.admin.query("delete from oauth_grants where id = $1", [grantId]);
     expect(await sessions()).toHaveLength(0);
+  });
+});
+
+// docs/design/agent-tool-calls.md, plan 0.7.0 A2: one row for every call,
+// and never an argument value, a result or a refusal sentence.
+describe("the record of every call", () => {
+  const recorded = async (grant: string) => {
+    const wb = await workerDb();
+    const { rows: members } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return {
+      workspaceId,
+      userId: OWNER,
+      memberId: members[0]?.id as string,
+      connection: { grantId: grant },
+    };
+  };
+  const rowsOf = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select tool, scope, outcome, refusal_code, target_ids, row_to_json(c)::text as whole from ai_tool_calls c where workspace_id = $1 order by called_at",
+      [workspaceId],
+    );
+    return rows;
+  };
+
+  it("records a call that answered, with no argument text", async () => {
+    await grantWith(["read", "write"]);
+    const wb = await workerDb();
+    await dispatchTool(
+      wb.appPool,
+      { ...(await recorded(grantId)), scopes: ["read", "write"] },
+      "search",
+      { query: "A secret plan nobody should log" },
+    );
+    const rows = await rowsOf();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      tool: "search",
+      scope: "read",
+      outcome: "ok",
+    });
+    expect(rows[0].whole).not.toContain("secret plan");
+  });
+
+  it("records a scope refusal in the same transaction as its audit row", async () => {
+    await grantWith(["read"]);
+    const wb = await workerDb();
+    await dispatchTool(
+      wb.appPool,
+      { ...(await recorded(grantId)), scopes: ["read"] },
+      "goals.create",
+      { title: "Never written" },
+    );
+    const rows = await rowsOf();
+    expect(rows.map((row) => row.outcome)).toEqual(["refused_scope"]);
+    const audit = await wb.admin.query(
+      "select count(*)::int as n from audit_events where workspace_id = $1 and action = 'agent.scope_refused'",
+      [workspaceId],
+    );
+    expect(audit.rows[0].n).toBe(1);
+  });
+
+  it("records an unknown tool without keeping the name the agent sent", async () => {
+    await grantWith(["read"]);
+    const wb = await workerDb();
+    await dispatchTool(
+      wb.appPool,
+      { ...(await recorded(grantId)), scopes: ["read"] },
+      "goals.doSomethingSecret",
+      {},
+    );
+    const rows = await rowsOf();
+    expect(rows[0]).toMatchObject({ tool: null, outcome: "unknown_tool" });
+    expect(rows[0].whole).not.toContain("doSomethingSecret");
+  });
+
+  it("keeps the ids a read named, and nothing else of its input", async () => {
+    await grantWith(["read"]);
+    const wb = await workerDb();
+    const id = "6a1f9c62-3d8e-4f0a-9b7c-2e5d8a4f1b30";
+    await dispatchTool(
+      wb.appPool,
+      { ...(await recorded(grantId)), scopes: ["read"] },
+      "goals.read",
+      { id },
+    );
+    const rows = await rowsOf();
+    expect(rows[0].target_ids).toEqual([id]);
+    expect(rows[0].outcome).toBe("refused");
+  });
+
+  it("records nothing for a caller that is not the transport", async () => {
+    await run("cycles.list", {}, ["read"]);
+    expect(await rowsOf()).toEqual([]);
   });
 });

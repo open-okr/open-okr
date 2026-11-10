@@ -8,13 +8,16 @@ import {
   SubmitButton,
 } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { PreviousNext } from "../../../lib/previous-next.tsx";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -84,14 +87,6 @@ export default async function InitiativePage({
   };
   const { id } = await params;
 
-  // Whether this reader is watching this subject (P6-G07b). Read here rather
-  // than in the control, because the control is a client component and the
-  // answer is part of the page's own first paint.
-  const watch = await callAction(context, "subscriptions.read", {
-    subjectType: "initiative",
-    subjectId: id,
-  });
-
   const initiative = await callAction(context, "initiatives.read", {
     id,
   }).catch((error: unknown) => {
@@ -102,11 +97,32 @@ export default async function InitiativePage({
     }
     throw error;
   });
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (initiative.id !== id) {
+    redirect(`/initiatives/${initiative.id}`);
+  }
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "initiative",
+    subjectId: id,
+  });
 
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
     workspace.memberId,
   );
+
+  // The initiatives either side of this one, in the list's own order, for
+  // the links and the `[` and `]` keys (plan 0.7.0, U2). The whole list as
+  // the reader may see it: this page's address carries no filter.
+  const everyInitiative = await callAction(context, "initiatives.list", {});
+  const at = everyInitiative.findIndex((one) => one.id === id);
+  const before = at > 0 ? everyInitiative[at - 1] : undefined;
+  const after = at >= 0 ? everyInitiative[at + 1] : undefined;
 
   // The files on this subject (P6-G27b). Seven attachment actions shipped and
   // none of them had a caller anywhere.
@@ -170,12 +186,32 @@ export default async function InitiativePage({
          * IN2: 21px wide at 375 with a 200-character title). */}
         <CardHeader className="flex-wrap justify-between">
           <div className="flex min-w-0 flex-1 basis-64 flex-col gap-0.5 md:max-w-8/12">
-            <Link
-              href="/initiatives"
-              className="text-xs text-ink-3 hover:text-brand-text"
-            >
-              {t("common.initiatives")}
-            </Link>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <Link
+                href="/initiatives"
+                className="text-xs text-ink-3 hover:text-brand-text"
+              >
+                {t("common.initiatives")}
+              </Link>
+              <PreviousNext
+                previous={
+                  before
+                    ? {
+                        href: `/initiatives/${before.id}`,
+                        label: t("initiatives.detail.previous"),
+                      }
+                    : null
+                }
+                next={
+                  after
+                    ? {
+                        href: `/initiatives/${after.id}`,
+                        label: t("initiatives.detail.next"),
+                      }
+                    : null
+                }
+              />
+            </div>
             <h1 className="text-lg font-bold text-ink [overflow-wrap:anywhere]">
               {initiative.title}
             </h1>
@@ -239,6 +275,7 @@ export default async function InitiativePage({
             subjectId={id}
             initial={watch}
           />
+          <CopyLink path={shortLinkPath("initiative", initiative)} />
         </CardHeader>
         {initiative.capacity === "exceeds" ? (
           <CardBody>

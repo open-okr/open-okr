@@ -1,6 +1,11 @@
 "use client";
 
-import { guardPress, Spinner, useTranslations } from "@openokr/ui";
+import {
+  guardPress,
+  RefusedFields,
+  Spinner,
+  useTranslations,
+} from "@openokr/ui";
 import {
   type FormEvent,
   type ReactNode,
@@ -46,7 +51,9 @@ export function MemberFieldsForm({
       data-testid="member-fields"
       className="flex flex-col gap-2"
     >
-      {children}
+      {/* The fields are the page's, so each takes what was refused about it
+       * by its name (guided-inputs §4.2, plan U1b). */}
+      <RefusedFields fields={state?.fields}>{children}</RefusedFields>
       {/* Refused with `aria-disabled`, not `disabled`, so the button keeps
        * keyboard focus while the form is sent; see `guardPress`. */}
       <button
@@ -59,7 +66,7 @@ export function MemberFieldsForm({
         {pending ? <Spinner /> : null}
         <span>{t("common.save")}</span>
       </button>
-      {state && !state.ok ? (
+      {state && !state.ok && !state.fields ? (
         <p role="alert" className="text-xs text-bad">
           {state.message}
         </p>

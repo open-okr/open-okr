@@ -279,6 +279,23 @@ describe.skipIf(!runnable)("importing one company's files", () => {
     );
   });
 
+  it("the comment records its image as a text row, so its readers open it and not only whoever ran the import", async () => {
+    await run(true);
+    // rich-text-editor.md §11: the rewrite is a text write, and a text write
+    // records a row for each file it names.
+    const attached = await rows<{ origin: string }>(
+      `select a.origin
+         from attachments a
+         join comments c on c.id = a.subject_id
+         join blobs b on b.id = a.blob_id
+        where a.subject_type = 'comment'
+          and a.deleted_at is null
+          and c.legacy_id = 'task_comments:4'
+          and b.legacy_id = 'task_files_inline:4:0'`,
+    );
+    expect(attached).toEqual([{ origin: "text" }]);
+  });
+
   it("a re-run writes no second copy", async () => {
     await run(true);
     const blobsBefore = await count(

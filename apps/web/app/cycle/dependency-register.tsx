@@ -9,6 +9,10 @@ import {
   TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
+import {
+  deliveryReading,
+  type ProviderKeyResult,
+} from "../../lib/dependency-delivery.ts";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
 import { searchAnyone } from "../../lib/member-search.ts";
 import { getTranslations } from "../../lib/translations";
@@ -18,6 +22,7 @@ import {
   confirmDependency,
   escalateDependency,
   removeDependency,
+  setDependencyProvider,
   setDependencyRiskOwner,
 } from "./actions.ts";
 
@@ -60,6 +65,8 @@ export interface RegisterEntry {
   readonly escalatedToName: string | null;
   readonly escalatedAt: string | null;
   readonly blocksPublish: boolean;
+  /** What delivers it, and whether it has (plan 0.7.0 O5). */
+  readonly providerKeyResult: ProviderKeyResult | null;
 }
 
 export interface RegisterKeyResult {
@@ -179,6 +186,10 @@ export async function DependencyRegister({
           <ul className="flex flex-col gap-2.5">
             {ordered.map((entry) => {
               const state = stateOf(entry, t);
+              const delivery = entry.providerKeyResult
+                ? deliveryReading(t, entry.providerKeyResult, entry.provider)
+                : null;
+              const named = entry.providerKeyResult;
               return (
                 <li
                   key={entry.id}
@@ -202,6 +213,19 @@ export async function DependencyRegister({
                     <Chip tone={state.tone}>{state.label}</Chip>
                   </div>
                   <p className="text-xs text-ink-4">{state.detail}</p>
+                  {delivery ? (
+                    <div
+                      className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3"
+                      data-testid="dependency-delivery"
+                    >
+                      <span>{delivery.line}</span>
+                      {delivery.chip ? (
+                        <Chip tone={delivery.chip.tone}>
+                          {delivery.chip.label}
+                        </Chip>
+                      ) : null}
+                    </div>
+                  ) : null}
 
                   {canEdit ? (
                     <div className="flex flex-wrap items-center gap-2">
@@ -272,6 +296,60 @@ export async function DependencyRegister({
                           {t("common.set")}
                         </SubmitButton>
                       </ActionForm>
+
+                      {/* Not offered over a key result this reader cannot
+                          see: the choice would replace something they were
+                          never shown. */}
+                      {named?.state === "hidden" ? null : (
+                        <ActionForm
+                          action={setDependencyProvider}
+                          className="flex items-center gap-1.5"
+                        >
+                          <input type="hidden" name="id" value={entry.id} />
+                          <EntityPicker
+                            label={t("cycle.dependencyRegister.deliveredBy")}
+                            name="providerKeyResultId"
+                            defaultValue={named?.id ?? null}
+                            options={keyResults
+                              .filter(
+                                (keyResult) =>
+                                  keyResult.id !== entry.keyResultId,
+                              )
+                              .map((keyResult) => ({
+                                id: keyResult.id,
+                                label: keyResult.title,
+                                detail: keyResult.goalTitle,
+                              }))}
+                            current={
+                              named?.title
+                                ? {
+                                    id: named.id,
+                                    label: named.title,
+                                    detail: named.goalTitle,
+                                  }
+                                : null
+                            }
+                            noneLabel={t(
+                              "cycle.dependencyRegister.noKeyResultNamed",
+                            )}
+                            description={
+                              entry.confirmed
+                                ? t(
+                                    "cycle.dependencyRegister.namingAnotherClears",
+                                  )
+                                : undefined
+                            }
+                            className="w-64"
+                            inputClassName="text-xs"
+                          />
+                          <SubmitButton
+                            bare
+                            className="rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2"
+                          >
+                            {t("common.set")}
+                          </SubmitButton>
+                        </ActionForm>
+                      )}
 
                       <ActionForm action={removeDependency}>
                         <input type="hidden" name="id" value={entry.id} />

@@ -75,7 +75,7 @@ fix it and push again. A pull request merges only when CI is green.
 |---|---|---|
 | Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm check:air-gap`, `pnpm check:docs`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, four shards, each against its own Postgres | The push changed no code |
-| End to end | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs | The push changed no code |
+| End to end, AI off | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs. **This is the AI-off leg** (`docs/design/ai-off-leg.md`): the servers boot with every deployment AI variable empty, every test carries `@ai-off`, `e2e/ai-off.spec.ts` fails if the copilot has a provider or any main screen draws an AI affordance, and `e2e/p0-flows.ts` names the P0 flows the run contains | The push changed no code |
 | Accessibility and web vitals | Part of the same end-to-end job. `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a TECHNICAL-PLAN §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
 | Helm chart | Chart checks, then a real install into a kind cluster | The push changed no code |
@@ -229,6 +229,15 @@ moment somebody calls it.
 `packages/importer/test/mapping-coverage.test.ts` fails naming each table with
 no row, and each row naming a table that does not exist. The row either names
 the FlowyTeam source or says `No legacy source` with a reason.
+
+**A change to a built-in AI prompt, or to the code around one, runs the
+evaluation set.** `packages/agents/test/evaluation.test.ts` runs one set of
+golden fixtures per AI capability against the deterministic mock provider and
+fails naming the capability, the fixture and the check: the result the product
+returns, the schema, the prompt sent, personal data in the request, the size
+of the request, and the time taken. `pnpm ai:evaluate` prints the same run per
+capability. The server runs a prompt's set again before `ai.updatePrompt`
+saves a new version (`docs/design/ai-evaluation.md`).
 
 `pnpm test` runs Turbo's per-package tasks, so it caches and only re-runs what
 changed. `pnpm test:ci` is the whole repository as one suite, which is what CI

@@ -34,6 +34,11 @@ const REASON_WORDS: Record<string, string> = {
   role: "watchControl.becauseRole",
   review: "watchControl.becauseReview",
   check_in: "watchControl.becauseCheckIn",
+  // Plan 0.7.0. Inbox reasons rather than subscriptions: nothing subscribes a
+  // member with them, but every reason the table stores has its words here.
+  support_request: "watchControl.becauseSupport",
+  support_ended: "watchControl.becauseSupport",
+  connection_ended: "watchControl.becauseConnection",
 };
 
 /** A reason a member should think twice about switching off. */
@@ -68,7 +73,7 @@ export function WatchControl({
       <div className="flex items-center gap-2">
         <Button
           type="button"
-          variant={state.watching ? "default" : "ai"}
+          variant={state.watching ? "default" : "secondary"}
           size="sm"
           pending={pending}
           data-testid="watch-control"

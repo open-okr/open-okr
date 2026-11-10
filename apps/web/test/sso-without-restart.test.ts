@@ -54,6 +54,8 @@ class SSOConnectionRejected extends Error {
 
 vi.mock("@openokr/core", () => ({
   ACCESS_LEVELS: { full: "full" },
+  // The shared sign-in limiter (plan 0.7.0 P10b); these tests need none.
+  authLimiterStorage: () => undefined,
   createAuth: createAuthMock,
   createSSOConnection: createSSOConnectionMock,
   followSSOProviders: (tracker: unknown, build: (p: unknown) => unknown) => {
@@ -71,13 +73,18 @@ vi.mock("@openokr/core", () => ({
     return tracked.tracker;
   },
 }));
-vi.mock("@openokr/config", () => ({
+// The real module, with only the environment replaced: whatever else
+// the auth instance's imports read from it (error reporting reads its
+// package name) stays as it ships.
+vi.mock("@openokr/config", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@openokr/config")>()),
   loadEnv: () => ({
     BETTER_AUTH_SECRET: "a-test-secret-of-sufficient-length-for-signing",
     BETTER_AUTH_URL: BASE_URL,
   }),
 }));
 vi.mock("better-auth/next-js", () => ({ nextCookies: () => ({}) }));
+vi.mock("../lib/cache", () => ({ getCache: () => undefined }));
 vi.mock("../lib/instance-name", () => ({ getInstanceName: vi.fn() }));
 vi.mock("../lib/pool", () => ({ getPool: () => "the pool" }));
 vi.mock("../lib/secrets", () => ({ getKeyRing: () => "the ring" }));

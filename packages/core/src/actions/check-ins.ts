@@ -39,6 +39,7 @@ import {
 import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { leavesOnInTx } from "../people/leave.ts";
@@ -49,7 +50,7 @@ import { defineReadAction, defineWriteAction } from "./define.ts";
 const richText = richTextSchema();
 
 const composerValue = z.object({
-  keyResultId: z.uuid(),
+  keyResultId: ADDRESS.keyResult,
   value: z.number().optional(),
   confidence: z.number().min(0).max(1).optional(),
   /**
@@ -137,7 +138,7 @@ export const startCheckIn = defineWriteAction({
   name: "goals.startCheckIn",
   summary:
     "Opens or reopens the author's draft check-in on a goal. Completely silent.",
-  input: z.object({ goalId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal }),
   output: z.object({ id: z.uuid(), reopened: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -211,7 +212,7 @@ export const publishDraftedCheckIn = defineWriteAction({
   summary:
     "Opens the author's draft check-in on a goal and publishes it in one action, for a proposal a human applies.",
   input: z.object({
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     status: z.enum(CHECK_IN_STATUSES),
     confidence: z.number().min(0).max(1),
     narrative: richText,
@@ -286,6 +287,7 @@ export const publishDraftedCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId: draft.checkInId,
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
@@ -377,6 +379,7 @@ export const publishCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId: input.id,
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
@@ -719,7 +722,7 @@ export const castConfidenceVote = defineWriteAction({
   summary:
     "A private confidence vote on one key result. Readable only by its author until the reveal.",
   input: z.object({
-    keyResultId: z.uuid(),
+    keyResultId: ADDRESS.keyResult,
     confidence: z.number().min(0).max(1),
   }),
   output: z.object({ id: z.uuid() }),
@@ -828,7 +831,7 @@ export const revealConfidenceVotes = defineWriteAction({
   name: "goals.revealVotes",
   summary:
     "Reveals every vote on a key result in one write, so no client sees a partial reveal.",
-  input: z.object({ keyResultId: z.uuid() }),
+  input: z.object({ keyResultId: ADDRESS.keyResult }),
   output: z.object({ revealed: z.number().int() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -900,7 +903,7 @@ export const listCheckIns = defineReadAction({
   summary:
     "One goal's check-in timeline, newest first, with each one's snapshot differences.",
   input: z.object({
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     includeDrafts: z.boolean().default(true),
   }),
   output: z.object({
@@ -1049,7 +1052,7 @@ export const readConfidenceVotes = defineReadAction({
   name: "goals.readVotes",
   summary:
     "The votes on one key result: only your own until the reveal, all of them and the average after it.",
-  input: z.object({ keyResultId: z.uuid() }),
+  input: z.object({ keyResultId: ADDRESS.keyResult }),
   output: z.object({
     revealed: z.boolean(),
     count: z.number().int(),
@@ -1172,7 +1175,7 @@ export const importCheckIn = defineWriteAction({
   summary:
     "Publishes a check-in an import found, keeping its own author and its own date.",
   input: z.object({
-    goalId: z.uuid(),
+    goalId: ADDRESS.goal,
     /** The member who wrote it in the source, not the one running the import. */
     authorMemberId: z.uuid(),
     status: z.enum(CHECK_IN_STATUSES),
@@ -1272,6 +1275,7 @@ export const importCheckIn = defineWriteAction({
           payload: {
             status: input.status,
             valuesWritten: published.valuesWritten,
+            checkInId,
           },
         },
         audit: {

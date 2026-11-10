@@ -3,11 +3,13 @@ import {
   channelConnections,
   includeDeleted,
   ssoConnections,
+  webhooks,
   withWorkspace,
 } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { callAction } from "../src/actions/registry.ts";
 import {
   openAccountToken,
   sealAccountToken,
@@ -274,6 +276,63 @@ describe("rotating the secrets workspaces hold", () => {
     const second = await rotateInstanceSecrets(wb.appPool, rotatingRing);
     expect(second.rewrapped).toBe(0);
     expect(second.current).toBe(3);
+  });
+});
+
+/**
+ * A webhook's signing secret, and the one it replaced while that still signs
+ * (docs/design/outbound-webhooks.md W6). Both are sealed under the root key,
+ * so a rotation that skipped them would stop every hook signing.
+ */
+describe("rotating webhook signing secrets", () => {
+  it("re-wraps the current and the previous secret, so both still open", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $1, $2)",
+      ["rotate-hooks", "rotate-hooks@example.com"],
+    );
+    const { workspaceId } = await createWorkspace(wb.appPool, {
+      user: { id: "rotate-hooks", name: "rotate-hooks" },
+    });
+    const context = {
+      pool: wb.appPool,
+      workspaceId,
+      actor: { kind: "human" as const, userId: "rotate-hooks" },
+      ring: oldRing,
+      checkOutboundUrl: async () => ({ ok: true as const }),
+    };
+    const created = await callAction(context, "webhooks.create", {
+      name: "Receiver",
+      url: "https://hooks.example/in",
+      events: ["objective.created"],
+    });
+    const rotated = await callAction(context, "webhooks.rotateSecret", {
+      id: created.id,
+    });
+
+    const report = await rotateInstanceSecrets(wb.appPool, rotatingRing);
+    expect(report.workspaceSecrets).toBe(2);
+
+    const [row] = await withWorkspace(wb.db, workspaceId, (tx) =>
+      tx.select().from(webhooks).where(includeDeleted(webhooks)),
+    );
+    if (!row?.secretCiphertext || !row.previousSecretCiphertext) {
+      throw new Error("both secrets should be stored");
+    }
+    expect(
+      decryptSecret(newRingOnly, {
+        ciphertext: row.secretCiphertext,
+        dataKey: row.secretDataKey as string,
+        keyId: row.secretKeyId as string,
+      }),
+    ).toBe(rotated.secret);
+    expect(
+      decryptSecret(newRingOnly, {
+        ciphertext: row.previousSecretCiphertext,
+        dataKey: row.previousSecretDataKey as string,
+        keyId: row.previousSecretKeyId as string,
+      }),
+    ).toBe(created.secret);
   });
 });
 

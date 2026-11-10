@@ -90,10 +90,10 @@ export async function finishSetup(
 
   try {
     await completeSetup(pool, getKeyRing(), {
+      // No registration policy: the computed default closes a claimed
+      // self-hosted instance by itself, and a cloud stays open
+      // (registration-policy.md §9, plan 0.7.0 B1).
       settings: name === null ? [] : [{ key: "instance.name", value: name }],
-      // Registration is open until the instance is claimed, and this is the
-      // moment it is claimed.
-      closeRegistration: true,
     });
     return { ok: true };
   } catch (error) {

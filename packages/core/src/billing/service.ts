@@ -5,7 +5,13 @@
  * functions that talk to the provider write nothing, and there is one place a plan
  * changes, however it was asked for.
  */
-import { activeOnly, billingAccounts, users, withWorkspace } from "@openokr/db";
+import {
+  activeOnly,
+  billingAccounts,
+  tenants,
+  users,
+  withWorkspace,
+} from "@openokr/db";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
@@ -28,7 +34,8 @@ import {
 } from "../tenancy/index.ts";
 import type { BillingGateway } from "./gateway.ts";
 import { readCreditPack } from "./settings.ts";
-import { LIVE_STATUSES, planForPrice } from "./webhook.ts";
+import { LIVE_STATUSES } from "./statuses.ts";
+import { planForPrice } from "./webhook.ts";
 
 export type BillingInterval = "month" | "year";
 
@@ -446,10 +453,17 @@ export async function settleEndedInTx(
       ),
     )
     .limit(1);
-  if (!account?.suspendedByBilling) {
+  // Either "you are over your plan" mode settles here: billing's, or the
+  // trial sweep's (tenant-lifecycle.md §11 T8).
+  const [tenant] = await tx
+    .select({ suspendedByTrial: tenants.suspendedByTrial })
+    .from(tenants)
+    .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
+    .limit(1);
+  if (!account?.suspendedByBilling && !tenant?.suspendedByTrial) {
     throw new OperationError(
       "forbidden",
-      "Billing did not make this workspace read-only.",
+      "Neither billing nor a trial's end made this workspace read-only.",
     );
   }
   const seats = input.plan?.seats ?? null;
@@ -458,10 +472,17 @@ export async function settleEndedInTx(
     refuseBelowHeadcount(input.plan?.name ?? "free", seats, used);
   }
   await applyPlanInTx(tx, input);
+  // Clears the trial's flag with the move, as every lifecycle move does.
   await setTenantStateInTx(tx, {
     workspaceId: input.workspaceId,
     state: "active",
   });
+  // Settling is choosing a plan, which ends any trial (T3).
+  // openokr:allow-mutation: the caller's Operation transaction.
+  await tx
+    .update(tenants)
+    .set({ trialEndsAt: null, trialRemindedAt: null })
+    .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)));
   // openokr:allow-mutation: the caller's Operation transaction.
   await tx
     .update(billingAccounts)

@@ -32,6 +32,11 @@ interface AlignmentFinding {
   readonly source: string;
   readonly subjectGoalId: string | null;
   readonly subjectGoalTitle: string | null;
+  /**
+   * The read's own answer to "does one click fix this" (design
+   * `alignment-engine.md` §9), the one `alignment.applyFinding` acts on.
+   */
+  readonly oneClickApplicable: boolean;
 }
 
 export interface AlignmentReading {
@@ -284,11 +289,12 @@ export function AlignmentPanel({
                   {canEdit ? (
                     <span className="flex flex-wrap gap-1.5">
                       {/* §5.3 offers the click only where the fix is
-                          mechanical, so only a relink gets one. A conflict or
-                          a gap has a conversation to have rather than a
-                          button to press, and the action refuses them by name
-                          if anybody tries. */}
-                      {finding.kind === "relink" ? (
+                          mechanical. The read says which, from the same
+                          function the action asks, so a relink with no new
+                          parent gets no button the action would refuse. A
+                          conflict or a gap has a conversation to have
+                          rather than a button to press. */}
+                      {finding.oneClickApplicable ? (
                         <ActionForm action={applyFinding}>
                           <input
                             type="hidden"

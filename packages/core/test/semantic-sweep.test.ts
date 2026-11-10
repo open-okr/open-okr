@@ -363,6 +363,240 @@ describe("applying a relink", () => {
   });
 });
 
+/**
+ * One-click applicability on the read (plan 0.7.0 A6, design
+ * `alignment-engine.md` §9).
+ *
+ * Here rather than in `alignment.test.ts`, which the design first named,
+ * because a relink is only ever written by the Coach's review and this file
+ * has the reviewer stand-in that writes one through the real path.
+ */
+describe("which findings the read says one click applies (A6)", () => {
+  const readFindings = async (userId = OWNER, includeDismissed = false) => {
+    const wb = await workerDb();
+    const read = await callAction(
+      { pool: wb.appPool, ...context(undefined, userId) },
+      "alignment.read",
+      { cycleId, includeDismissed },
+    );
+    return read.findings;
+  };
+
+  it("acceptance: an open relink naming both goals says true and names the target", async () => {
+    const child = await makeGoal("Grow mid-market revenue", spaceId);
+    const parent = await makeGoal("Win the mid-market", spaceId);
+    await runCoach(
+      reviewer([
+        {
+          kind: "relink",
+          subjectIndex: 0,
+          targetIndex: 1,
+          severity: "medium",
+          reason: "This supports the mid-market objective, not its own.",
+        },
+      ]),
+    );
+
+    const [relink] = (await readFindings()).filter(
+      (finding) => finding.kind === "relink",
+    );
+    expect(relink).toMatchObject({
+      oneClickApplicable: true,
+      subjectGoalId: child,
+      subjectGoalTitle: "Grow mid-market revenue",
+      targetGoalId: parent,
+      targetGoalTitle: "Win the mid-market",
+    });
+  });
+
+  it("acceptance: a relink with no target says false, and applying it anyway is refused", async () => {
+    await makeGoal("Grow mid-market revenue", spaceId);
+    await makeGoal("Win the mid-market", spaceId);
+    await runCoach(
+      reviewer([
+        {
+          kind: "relink",
+          subjectIndex: 0,
+          targetIndex: null,
+          severity: "medium",
+          reason:
+            "This belongs under something, and the review did not say what.",
+        },
+      ]),
+    );
+
+    const [relink] = (await readFindings()).filter(
+      (finding) => finding.kind === "relink",
+    );
+    expect(relink).toMatchObject({
+      oneClickApplicable: false,
+      targetGoalId: null,
+      targetGoalTitle: null,
+    });
+
+    const wb = await workerDb();
+    await expect(
+      callAction({ pool: wb.appPool, ...context() }, "alignment.applyFinding", {
+        id: relink?.id as string,
+      }),
+    ).rejects.toThrow(/names only one of them/);
+  });
+
+  it("acceptance: a conflict, a gap and a dependency say false, though each names two goals", async () => {
+    await makeGoal("Grow mid-market revenue", spaceId);
+    await makeGoal("Reduce churn", otherSpaceId);
+    await runCoach(
+      reviewer(
+        (["conflict", "gap", "dependency"] as const).map((kind) => ({
+          kind,
+          subjectIndex: 0,
+          targetIndex: 1,
+          severity: "medium" as const,
+          reason: `A ${kind} between the two, for the read to report.`,
+        })),
+      ),
+    );
+
+    const read = await readFindings();
+    expect(
+      read
+        .filter((finding) => finding.source === "coach")
+        .map((finding) => [finding.kind, finding.oneClickApplicable])
+        .sort(),
+    ).toEqual([
+      ["conflict", false],
+      ["dependency", false],
+      ["gap", false],
+    ]);
+  });
+
+  it("acceptance: an applied or a dismissed relink says false", async () => {
+    await makeGoal("Grow mid-market revenue", spaceId);
+    await makeGoal("Win the mid-market", spaceId);
+    await makeGoal("Reduce churn", spaceId);
+    await runCoach(
+      reviewer([
+        {
+          kind: "relink",
+          subjectIndex: 0,
+          targetIndex: 1,
+          severity: "medium",
+          reason: "This supports the mid-market objective, not its own.",
+        },
+        {
+          kind: "relink",
+          subjectIndex: 2,
+          targetIndex: 1,
+          severity: "low",
+          reason: "Churn is how the mid-market is kept, so it belongs there.",
+        },
+      ]),
+    );
+    const [first, second] = (await readFindings()).filter(
+      (finding) => finding.kind === "relink",
+    );
+
+    const wb = await workerDb();
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "alignment.applyFinding",
+      { id: first?.id as string },
+    );
+    await callAction(
+      { pool: wb.appPool, ...context() },
+      "alignment.dismissFinding",
+      { id: second?.id as string },
+    );
+
+    const decided = (await readFindings(OWNER, true)).filter(
+      (finding) => finding.kind === "relink",
+    );
+    expect(
+      decided.map((finding) => [finding.state, finding.oneClickApplicable]),
+    ).toEqual(
+      expect.arrayContaining([
+        ["applied", false],
+        ["dismissed", false],
+      ]),
+    );
+    expect(decided).toHaveLength(2);
+  });
+
+  it("names the target's title only to a reader who can see the target", async () => {
+    // A guest, through the invitation a guest actually receives. A guest
+    // inherits no workspace-wide view, so they see a goal only through a role
+    // on it, which makes them the reader who can open one end of a finding
+    // and not the other.
+    const wb = await workerDb();
+    const guest = "semantic-guest";
+    const email = "semantic-guest@partner.example";
+    await wb.admin.query(
+      "insert into users (id, name, email) values ($1, $2, $3)",
+      [guest, "Guest", email],
+    );
+    const link = (await callAction(
+      { pool: wb.appPool, ...context() },
+      "invitations.createPersonalLink",
+      { email, guestSpaceId: otherSpaceId },
+    )) as { token: string };
+    const { memberId: guestMemberId } = (await callAction(
+      { pool: wb.appPool, ...context(undefined, guest) },
+      "invitations.acceptLink",
+      { token: link.token },
+    )) as { memberId: string };
+
+    // The guest reviews the goal to move, and has no role on its new parent.
+    const goal = async (title: string, space: string, reviewerId: string) =>
+      (
+        (await callAction({ pool: wb.appPool, ...context() }, "goals.create", {
+          title,
+          cycleId,
+          spaceId: space,
+          level: "team",
+          ownerKind: "space",
+          championId: ownerMemberId,
+          reviewerId,
+          weight: 1,
+        })) as { id: string }
+      ).id;
+    const child = await goal("Grow mid-market revenue", spaceId, guestMemberId);
+    const parent = await goal("Win enterprise", otherSpaceId, ownerMemberId);
+    await runCoach(
+      reviewer([
+        {
+          kind: "relink",
+          subjectIndex: 0,
+          targetIndex: 1,
+          severity: "medium",
+          reason: "This supports the enterprise objective, not its own.",
+        },
+      ]),
+    );
+
+    const [asOwner] = (await readFindings()).filter(
+      (finding) => finding.kind === "relink",
+    );
+    expect(asOwner).toMatchObject({
+      subjectGoalId: child,
+      targetGoalId: parent,
+      targetGoalTitle: "Win enterprise",
+    });
+
+    // The finding, and that it has a target, but not what the target is
+    // called. Whether one click applies is a fact about the finding; this
+    // guest would be refused at the click, on the target's edit check.
+    const [asGuest] = (await readFindings(guest)).filter(
+      (finding) => finding.kind === "relink",
+    );
+    expect(asGuest).toMatchObject({
+      subjectGoalTitle: "Grow mid-market revenue",
+      targetGoalId: parent,
+      targetGoalTitle: null,
+      oneClickApplicable: true,
+    });
+  });
+});
+
 describe("the acceptance criterion: a conflict across two spaces", () => {
   it("raises one finding for both champions, and one dismissal clears it", async () => {
     const a = await makeGoal("Grow mid-market revenue", spaceId);

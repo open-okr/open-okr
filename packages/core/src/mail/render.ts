@@ -16,7 +16,18 @@
  *
  * **Every value is escaped here**, and a mail can pass no markup at all.
  * A goal title or a comment excerpt is text, whatever characters it holds.
+ * Rich text is the one exception that is not text, and it is not markup
+ * either: it arrives as editor JSON and is drawn by the shared sanitising
+ * renderer, the way every other surface draws it.
  */
+import { richTextAsLine } from "@openokr/formats";
+import { plainTextBlocks } from "../rich-text/excerpt.ts";
+import { renderRichTextToHtml } from "../rich-text/render.ts";
+import {
+  RICH_TEXT_SCHEMA_VERSION,
+  type RichTextDocument,
+} from "../rich-text/schema.ts";
+import { isValidRichText } from "../rich-text/validate.ts";
 
 /** A run of text, optionally bold. The only inline formatting a mail gets. */
 type EmailInline = string | { readonly bold: string };
@@ -76,6 +87,17 @@ export type EmailBlock =
       readonly kind: "list";
       readonly title: string;
       readonly items: readonly string[];
+    }
+  | {
+      readonly kind: "richText";
+      /**
+       * Editor JSON as it is stored (plan 0.7.0, R3). Checked against the
+       * allow-list again here, because a document can reach a mail from an
+       * import and a mail is the surface least watched. One that fails is
+       * said as its plain text, escaped, rather than refused: the rest of the
+       * mail is still worth sending.
+       */
+      readonly document: unknown;
     };
 
 export interface EmailFrame {
@@ -144,6 +166,49 @@ function safeHref(href: string): string {
     throw new Error(`A mail link must be http or https, not ${href}`);
   }
   return escapeHtml(parsed.toString());
+}
+
+/**
+ * A link in rich text that a mail can carry: an absolute web or mail address.
+ * The allow-list also takes a relative link, which works on a screen of the
+ * product and goes nowhere from a mail client, so a mail keeps its words and
+ * drops the link (email-templates.md §10: every link in a mail works).
+ */
+function mailLinkHref(href: string): string | undefined {
+  try {
+    const url = new URL(href);
+    return ["https:", "http:", "mailto:"].includes(url.protocol)
+      ? url.toString()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The document, when it is one the allow-list accepts. */
+function richTextOf(value: unknown): RichTextDocument | null {
+  return isValidRichText(value, RICH_TEXT_SCHEMA_VERSION) ? value : null;
+}
+
+const RICH_TEXT_STYLE = `margin:0 0 18px;font-size:14px;line-height:1.6;color:${INK_2};`;
+
+function richTextHtml(value: unknown): string {
+  const document = richTextOf(value);
+  if (document) {
+    return `<div class="em-ink2" style="${RICH_TEXT_STYLE}">${renderRichTextToHtml(document, { resolveLinkHref: mailLinkHref })}</div>`;
+  }
+  const line = richTextAsLine(value);
+  return line === ""
+    ? ""
+    : `<p class="em-ink2" style="${RICH_TEXT_STYLE}">${escapeHtml(line)}</p>`;
+}
+
+function richTextLines(value: unknown): string[] {
+  const document = richTextOf(value);
+  const blocks = document
+    ? plainTextBlocks(document, { linkHref: mailLinkHref })
+    : [richTextAsLine(value)].filter((line) => line !== "");
+  return blocks.flatMap((block) => [block, ""]);
 }
 
 /** The two letters in the mark: the first of the first two words. */
@@ -303,6 +368,8 @@ function blockHtml(
         block.items.map((item) => `<li>${escapeHtml(item)}</li>`).join("") +
         `</ul>`
       );
+    case "richText":
+      return richTextHtml(block.document);
   }
 }
 
@@ -355,6 +422,8 @@ function blockText(block: EmailBlock): string[] {
       ];
     case "list":
       return [block.title, ...block.items.map((item) => `- ${item}`), ""];
+    case "richText":
+      return richTextLines(block.document);
   }
 }
 

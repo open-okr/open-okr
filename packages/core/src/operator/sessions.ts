@@ -27,7 +27,6 @@ import {
   type OperatorSessionEndReason,
   operatorSessions,
   withInstanceAdmin,
-  withOperator,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
@@ -39,12 +38,15 @@ import { bindGroup, ensureMemberGroup } from "../access/contexts.ts";
 import { ACCESS_LEVELS, type AccessLevel } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { builtinRoleId } from "../access/roles.ts";
+import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
+import { notifyRecipients } from "../notifications/create.ts";
 import {
   OperationError,
   type OperationTx,
   runOperation,
 } from "../operations/operation.ts";
+import { workspaceAdministratorIds } from "../people/lifecycle.ts";
 import { isLiveOperator } from "./store.ts";
 
 /** How long a session may run. */
@@ -92,10 +94,17 @@ export interface RequestSupportInput {
 /**
  * An operator asks. Nothing is granted and nothing is readable yet.
  *
- * Written under the operator's own key rather than through an Operation:
- * there is no acting member in the workspace to authorise, which is the whole
- * situation this exists to resolve. The grant, which is the part that
- * actually changes access, is an Operation on the customer's side.
+ * **An Operation since 0.7.0** (support-access.md §10 D4, plan P2). It used
+ * to be one insert under the operator's own key, which left no activity, no
+ * audit row and nobody told. Now the session row, a `support.requested`
+ * activity, an audit row naming the operator and the reason, and one inbox
+ * row for each administrator who can answer commit together, and the request
+ * is recorded on the instance chain after. The acting principal is the
+ * operator, who resolves to no member: there is still nobody in the workspace
+ * to authorise, which is the situation this exists to resolve.
+ *
+ * **Refused in a suspended or closed workspace** (§10 D7, Akmal's Q2 answer),
+ * by the freeze overlay, because the grant would be refused there anyway.
  */
 export async function requestSupportSession(
   pool: Pool,
@@ -109,58 +118,104 @@ export async function requestSupportSession(
   }
   const { reason } = requestSchema.parse({ reason: input.reason });
 
-  const db = drizzle(pool);
+  const row = await runOperation(
+    { pool },
+    {
+      action: "support.request",
+      workspaceId: input.workspaceId,
+      actor: { kind: "operator", userId: input.operatorUserId },
+      async execute({ tx, workspaceId }) {
+        // **Somebody already in the workspace cannot ask to be let in.** They
+        // do not need to be: they are already there. Refused here as well as
+        // at the grant, because a request that can never be granted is worse
+        // than a refusal.
+        const [existing] = await tx
+          .select({ id: workspaceMembers.id })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, workspaceId),
+              eq(workspaceMembers.userId, input.operatorUserId),
+              // The suspended guest an ended session left is not a
+              // membership (UAT BUG-029): the grant wakes it.
+              or(
+                ne(workspaceMembers.kind, "guest"),
+                ne(workspaceMembers.status, "suspended"),
+              ),
+            ),
+          )
+          .limit(1);
+        if (existing) {
+          throw new OperationError(
+            "forbidden",
+            "You are already a member of this workspace, so you do not need support access.",
+          );
+        }
 
-  // **Somebody already in the workspace cannot ask to be let in.** They do
-  // not need to be: they are already there. Refused here as well as at the
-  // grant, because a request that can never be granted is worse than a
-  // refusal. It sits in the customer's screen, they press the button, and
-  // nothing happens.
-  const [existing] = await withWorkspace(db, input.workspaceId, (tx) =>
-    tx
-      .select({ id: workspaceMembers.id })
-      .from(workspaceMembers)
-      .where(
-        activeOnly(
-          workspaceMembers,
-          eq(workspaceMembers.workspaceId, input.workspaceId),
-          eq(workspaceMembers.userId, input.operatorUserId),
-          // The suspended guest an ended session left is not a membership
-          // (UAT BUG-029): the grant wakes it rather than refusing.
-          or(
-            ne(workspaceMembers.kind, "guest"),
-            ne(workspaceMembers.status, "suspended"),
-          ),
-        ),
-      )
-      .limit(1),
-  );
-  if (existing) {
-    throw new OperationError(
-      "forbidden",
-      "You are already a member of this workspace, so you do not need support access.",
-    );
-  }
-  const [row] = await withOperator(db, input.operatorUserId, (tx) =>
-    // openokr:allow-mutation: a request is not a change to the workspace. It
-    // grants nothing, reads nothing and has no acting member to authorise;
-    // the grant is where an Operation belongs, and that is below.
-    tx
-      .insert(operatorSessions)
-      .values({
-        workspaceId: input.workspaceId,
-        operatorUserId: input.operatorUserId,
-        reason,
-      })
-      .returning({ id: operatorSessions.id }),
+        // openokr:allow-mutation: the Operation's own transaction. The one
+        // live or pending session per workspace is a unique index, so a
+        // second request writes nothing and is refused by name below.
+        const [created] = await tx
+          .insert(operatorSessions)
+          .values({
+            workspaceId,
+            operatorUserId: input.operatorUserId,
+            reason,
+          })
+          .onConflictDoNothing()
+          .returning({ id: operatorSessions.id });
+        if (!created) {
+          throw new OperationError(
+            "forbidden",
+            "There is already a live or pending request for this workspace.",
+          );
+        }
+
+        // The members who can answer it (§10 D3): the same rule the grant
+        // screen checks. The reason text is never on these rows (D10).
+        const administrators = await workspaceAdministratorIds(tx, workspaceId);
+        await notifyRecipients(tx, {
+          workspaceId,
+          subjectType: "support_session",
+          subjectId: created.id,
+          recipients: administrators.map((memberId) => ({
+            memberId,
+            reason: "support_request" as const,
+          })),
+        });
+
+        return {
+          result: created,
+          activity: {
+            kind: "support.requested",
+            subjectType: "workspace",
+            subjectId: workspaceId,
+            payload: {},
+          },
+          audit: {
+            action: "support.request",
+            targetType: "workspace",
+            targetId: workspaceId,
+            payload: {
+              sessionId: created.id,
+              operatorUserId: input.operatorUserId,
+              reason,
+            },
+          },
+        };
+      },
+    },
   );
 
-  if (!row) {
-    throw new OperationError(
-      "forbidden",
-      "There is already a live or pending request for this workspace.",
-    );
-  }
+  await recordInstanceAuditEvent(pool, {
+    action: "operator.support_requested",
+    payload: {
+      workspaceId: input.workspaceId,
+      sessionId: row.id,
+      operatorUserId: input.operatorUserId,
+    },
+  });
   return row;
 }
 
@@ -445,7 +500,7 @@ export async function endSupportSession(
         }
         return session;
       },
-      async execute({ tx, workspaceId, loaded }) {
+      async execute({ tx, workspaceId, loaded, actor }) {
         const now = new Date();
         // openokr:allow-mutation: the Operation's own transaction.
         await tx
@@ -457,6 +512,27 @@ export async function endSupportSession(
               eq(operatorSessions.id, input.sessionId),
             ),
           );
+
+        // Everybody who answers for the workspace hears that somebody who was
+        // inside has left (§10 D5, D6). Not after a refusal, when nobody
+        // entered, and not the member who ended it, who knows.
+        if (loaded.grantedAt !== null && input.reason !== "refused") {
+          const administrators = await workspaceAdministratorIds(
+            tx,
+            workspaceId,
+          );
+          await notifyRecipients(tx, {
+            workspaceId,
+            subjectType: "support_session",
+            subjectId: loaded.id,
+            recipients: administrators
+              .filter((memberId) => memberId !== actor.memberId)
+              .map((memberId) => ({
+                memberId,
+                reason: "support_ended" as const,
+              })),
+          });
+        }
 
         if (loaded.memberId) {
           // Suspended, never deleted. `resolveActor` refuses a suspended
@@ -532,20 +608,40 @@ async function findExpiredSessions(
   );
 }
 
-/** Ends every session whose time is up. Idempotent. */
+/**
+ * Ends every session whose time is up. Idempotent.
+ *
+ * **One session that cannot end does not stop the rest.** Each is ended in
+ * its own Operation, and a refusal is counted rather than thrown: a frozen
+ * workspace refuses `support.end` today, and before 0.7.0 one such session
+ * failed the whole sweep every five minutes (plan B2). Access is refused at
+ * expiry either way; what a failure leaves is the owner's screen out of date.
+ */
 export async function sweepExpiredSessions(
   pool: Pool,
   now: Date = new Date(),
-): Promise<{ readonly ended: number }> {
+  options: {
+    /** How one session is ended. A test passes one that fails. */
+    readonly end?: typeof endSupportSession;
+  } = {},
+): Promise<{ readonly ended: number; readonly failed: number }> {
   const due = await findExpiredSessions(pool, now);
+  const end = options.end ?? endSupportSession;
+  let ended = 0;
+  let failed = 0;
   for (const session of due) {
-    await endSupportSession(pool, {
-      workspaceId: session.workspaceId,
-      sessionId: session.id,
-      reason: "expired",
-    });
+    try {
+      await end(pool, {
+        workspaceId: session.workspaceId,
+        sessionId: session.id,
+        reason: "expired",
+      });
+      ended += 1;
+    } catch {
+      failed += 1;
+    }
   }
-  return { ended: due.length };
+  return { ended, failed };
 }
 
 /** The live session a workspace's members are entitled to see. */

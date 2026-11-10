@@ -46,12 +46,20 @@ import {
   callAction,
   chainWorkspace,
   defaultMetrics,
+  fillAlignmentScores,
   isCloudEnabled,
   listLiveWorkspaces,
   METRIC,
   measureAllWorkspaces,
   outboxRetentionDays,
+  purgeStaleSignInAttempts,
+  purgeWebhookDeliveries,
   remindBeforeErasure,
+  remindTrialsEnding,
+  reportError,
+  sweepEndedCycles,
+  sweepExpiredSessions,
+  sweepTrials,
 } from "@openokr/core";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
@@ -107,9 +115,20 @@ export interface ScheduledRun {
     | "notifications.drainBatches"
     | "blobs.reapOrphans"
     | "channels.sweepMessageLog"
+    // Plan 0.7.0 A2: the agent tool call record's retention, per workspace.
+    | "connections.sweepToolCalls"
+    // Plan 0.7.0 D5: the webhook delivery log's thirty days, per workspace.
+    // Not a registry action: delivery bookkeeping, as the outbox purge is.
+    | "webhooks.purgeDeliveries"
+    // Plan 0.7.0 O2: moving every ended cycle to closing, per workspace, as
+    // the system. Not a registry action: a date passing is not something an
+    // API caller starts (okr-core-domain.md §10 C2).
+    | "cycles.sweepEnded"
     // Instance housekeeping, run once rather than per workspace: settled
     // outbox rows have no tenant to scope to (completeness review M-19).
     | "outbox.purge"
+    // Sign-in counters nobody touched for 30 days (account-lockout.md D16).
+    | "auth.purgeSignInAttempts"
     // Instance housekeeping too, and each does nothing with the cloud flag off:
     // giving workspaces from before the flag a tenant record, and refreshing the
     // usage figures the console and the plan screen read.
@@ -119,6 +138,17 @@ export interface ScheduledRun {
     // (docs/design/workspace-erasure.md §12). Nothing with the flag off or
     // with retention at seven days or fewer.
     | "cloud.remindErasure"
+    // Ending every trial past its date (docs/design/tenant-lifecycle.md §11,
+    // plan 0.7.0 P4). Nothing with the cloud flag off.
+    | "cloud.sweepTrials"
+    // Ending every support session past its expiry (docs/design/
+    // support-access.md §5). Access is refused at expiry without it; this
+    // stamps the row and suspends the operator's member (plan 0.7.0, B2).
+    | "support.sweepExpired"
+    // Storing the alignment scores no structural write has stored yet, such
+    // as an upgraded instance's earlier cycles (alignment-engine.md §10,
+    // plan 0.7.0 D2). `alignment.score` computes them on read meanwhile.
+    | "alignment.fillScores"
     // Not a registry action: chaining the audit trail is maintenance, and
     // exposing it over REST, the command line and the agent catalogue would
     // be four surfaces for something only a scheduler and an operator call
@@ -214,6 +244,40 @@ const MESSAGE_LOG_SWEEP_CRON = "40 3 * * *";
 const OUTBOX_PURGE_JOB = "outbox.purge";
 const OUTBOX_PURGE_CRON = "0 4 * * *";
 
+/**
+ * The sign-in counters' purge (account-lockout.md D16, plan 0.7.0 P10).
+ * Daily at 04:30 UTC, after the tool call sweep, for the reason housekeeping
+ * takes turns. Spraying random addresses makes rows; thirty days without a
+ * touch removes them.
+ */
+const SIGN_IN_PURGE_JOB = "auth.purgeSignInAttempts";
+const SIGN_IN_PURGE_CRON = "30 4 * * *";
+
+/**
+ * The agent tool call record's retention (agent-tool-calls.md D12, plan 0.7.0
+ * A2). Daily at 04:20 UTC, twenty minutes after the outbox purge, for the
+ * reason housekeeping takes turns. Per workspace, because the window is each
+ * workspace's own setting.
+ */
+const TOOL_CALL_SWEEP_JOB = "connections.sweepToolCalls";
+const TOOL_CALL_SWEEP_CRON = "20 4 * * *";
+
+/**
+ * The webhook delivery log's retention (outbound-webhooks.md W10, plan 0.7.0
+ * D5). Daily at 04:50 UTC, after the sign-in purge, for the reason
+ * housekeeping takes turns. Per workspace, under each one's tenant setting.
+ */
+const WEBHOOK_PURGE_JOB = "webhooks.purgeDeliveries";
+const WEBHOOK_PURGE_CRON = "50 4 * * *";
+
+/**
+ * Moving ended cycles to closing (okr-core-domain.md §10 C1, plan 0.7.0 O2).
+ * Hourly, so a cycle moves within the hour after its workspace's own
+ * midnight, at a minute no agent cadence uses.
+ */
+const CYCLE_CLOSING_SWEEP_JOB = "cycles.sweepEnded";
+const CYCLE_CLOSING_SWEEP_CRON = "35 * * * *";
+
 /** Hourly, so a flag turned on today shows in the console within the hour. */
 const TENANCY_ADOPT_JOB = "tenancy.adopt";
 const TENANCY_ADOPT_CRON = "10 * * * *";
@@ -231,6 +295,34 @@ const CLOUD_USAGE_CRON = "40 * * * *";
  */
 const ERASURE_REMINDER_JOB = "cloud.remindErasure";
 const ERASURE_REMINDER_CRON = "50 * * * *";
+
+/**
+ * The trial sweep (tenant-lifecycle.md §11 T4). Hourly, so a trial ends
+ * within the hour of its date wherever the customer is, at a minute no other
+ * cloud job takes.
+ */
+const TRIAL_SWEEP_JOB = "cloud.sweepTrials";
+const TRIAL_SWEEP_CRON = "25 * * * *";
+
+/**
+ * Every five minutes. A session ends at its expiry whether or not this runs,
+ * because `resolveActor` refuses an expired one at use; what waits for the
+ * sweep is the owner's screen saying the session is over. Five minutes is how
+ * long that screen may be wrong, and the pass costs one indexed query when
+ * nothing is due.
+ */
+const SUPPORT_SWEEP_JOB = "support.sweepExpired";
+const SUPPORT_SWEEP_CRON = "*/5 * * * *";
+
+/**
+ * The alignment score fill (alignment-engine.md §10, plan 0.7.0 D2). Hourly,
+ * at a minute no other hourly job takes. A missing score is never wrong on
+ * screen, because the read computes it, so an hour is how long the Work Map
+ * may pay for the graph on a cycle nothing has written to since the upgrade.
+ * Once every scope has a row the pass is one indexed query per workspace.
+ */
+const ALIGNMENT_FILL_JOB = "alignment.fillScores";
+const ALIGNMENT_FILL_CRON = "35 * * * *";
 
 const AUDIT_CHAIN_JOB = "audit.chain";
 /**
@@ -283,6 +375,21 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     cron: MESSAGE_LOG_SWEEP_CRON,
   },
   {
+    job: TOOL_CALL_SWEEP_JOB,
+    action: "connections.sweepToolCalls",
+    cron: TOOL_CALL_SWEEP_CRON,
+  },
+  {
+    job: CYCLE_CLOSING_SWEEP_JOB,
+    action: "cycles.sweepEnded",
+    cron: CYCLE_CLOSING_SWEEP_CRON,
+  },
+  {
+    job: WEBHOOK_PURGE_JOB,
+    action: "webhooks.purgeDeliveries",
+    cron: WEBHOOK_PURGE_CRON,
+  },
+  {
     job: TENANCY_ADOPT_JOB,
     action: "tenancy.adopt",
     cron: TENANCY_ADOPT_CRON,
@@ -301,9 +408,33 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     instance: true,
   },
   {
+    job: SIGN_IN_PURGE_JOB,
+    action: "auth.purgeSignInAttempts",
+    cron: SIGN_IN_PURGE_CRON,
+    instance: true,
+  },
+  {
     job: ERASURE_REMINDER_JOB,
     action: "cloud.remindErasure",
     cron: ERASURE_REMINDER_CRON,
+    instance: true,
+  },
+  {
+    job: TRIAL_SWEEP_JOB,
+    action: "cloud.sweepTrials",
+    cron: TRIAL_SWEEP_CRON,
+    instance: true,
+  },
+  {
+    job: SUPPORT_SWEEP_JOB,
+    action: "support.sweepExpired",
+    cron: SUPPORT_SWEEP_CRON,
+    instance: true,
+  },
+  {
+    job: ALIGNMENT_FILL_JOB,
+    action: "alignment.fillScores",
+    cron: ALIGNMENT_FILL_CRON,
     instance: true,
   },
 ];
@@ -458,10 +589,50 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     }
     return;
   }
+  if (run.action === "cloud.sweepTrials") {
+    const { ended } = await sweepTrials(getPool());
+    if (ended > 0) {
+      log(`cloud.sweepTrials ended ${ended} trial(s)`);
+    }
+    // The week's warning, beside the end it warns of (§11 Q2, P4c).
+    const reminded = await remindTrialsEnding(getPool());
+    if (reminded > 0) {
+      log(`cloud.sweepTrials reminded ${reminded} workspace(s)`);
+    }
+    return;
+  }
   if (run.action === "cloud.remindErasure") {
     const reminded = await remindBeforeErasure(getPool());
     if (reminded > 0) {
       log(`cloud.remindErasure reminded ${reminded} workspace(s)`);
+    }
+    return;
+  }
+  if (run.action === "support.sweepExpired") {
+    const { ended, failed } = await sweepExpiredSessions(getPool());
+    if (ended > 0) {
+      log(`support.sweepExpired ended ${ended} support session(s)`);
+    }
+    if (failed > 0) {
+      log(
+        `support.sweepExpired could not end ${failed} expired support session(s); access is refused at expiry regardless`,
+      );
+    }
+    return;
+  }
+  if (run.action === "alignment.fillScores") {
+    // Straight to the fill, as the system: it walks every workspace, has no
+    // member to act as, and stores what a structural write would have.
+    const { filled } = await fillAlignmentScores(getPool());
+    if (filled > 0) {
+      log(`alignment.fillScores stored ${filled} alignment score(s)`);
+    }
+    return;
+  }
+  if (run.action === "auth.purgeSignInAttempts") {
+    const purged = await purgeStaleSignInAttempts(getPool());
+    if (purged > 0) {
+      log(`auth.purgeSignInAttempts removed ${purged} sign-in counter(s)`);
     }
     return;
   }
@@ -489,6 +660,22 @@ async function runOne(
   workspace: SchedulableWorkspace,
   run: ScheduledRun,
 ): Promise<void> {
+  // Delivery bookkeeping past its thirty days (D5), straight to the purge.
+  if (run.action === "webhooks.purgeDeliveries") {
+    const purged = await purgeWebhookDeliveries(getPool(), workspace.id);
+    if (purged > 0) {
+      log(`webhooks.purgeDeliveries removed ${purged} delivery row(s)`);
+    }
+    return;
+  }
+  // A date passing, as the system, through its own Operations (O2).
+  if (run.action === "cycles.sweepEnded") {
+    const moved = await sweepEndedCycles(getPool(), workspace.id);
+    if (moved > 0) {
+      log(`cycles.sweepEnded moved ${moved} cycle(s) to closing`);
+    }
+    return;
+  }
   const drafter = await drafterForAgent(
     workspace.id,
     run.action === "agents.runCoach" ? "coach" : "champion",
@@ -529,6 +716,23 @@ async function runOne(
   if (run.action === "agents.runCoach") {
     await callAction(context, "agents.runCoach", {});
     return;
+  }
+  // **Each sweep names its own action.** The message log sweep had no branch
+  // here, so its daily run fell through to the line below and ran the
+  // Champion instead: message log retention never ran, and the Champion ran
+  // an extra time each night (found building plan 0.7.0 A2, recorded as B12).
+  if (run.action === "channels.sweepMessageLog") {
+    await callAction(context, "channels.sweepMessageLog", {});
+    return;
+  }
+  if (run.action === "connections.sweepToolCalls") {
+    await callAction(context, "connections.sweepToolCalls", {});
+    return;
+  }
+  if (run.action !== "agents.runChampion") {
+    // A run added to SCHEDULED_RUNS without a branch here would otherwise
+    // run the Champion, as the message log sweep did. Fail loudly instead.
+    throw new Error(`No branch dispatches the scheduled run ${run.job}.`);
   }
   await callAction(context, "agents.runChampion", {
     ...(run.cadence ? { cadence: run.cadence } : {}),
@@ -637,9 +841,17 @@ export function startScheduler(): PgBossJobQueue | null {
               logError(
                 `${job.job} failed for ${workspace.slug}: ${reason(error)}`,
               );
+              // An action the run called has usually reported it already;
+              // this adds the job name to that report (error-reporting.md D2).
+              reportError(error, {
+                source: "job",
+                tags: { job: job.job },
+                workspaceId: workspace.id,
+              });
             },
             onInstanceError(job, error) {
               logError(`${job.job} failed: ${reason(error)}`);
+              reportError(error, { source: "job", tags: { job: job.job } });
             },
           });
           recordSchedulerHeartbeat();

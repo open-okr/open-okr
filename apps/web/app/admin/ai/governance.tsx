@@ -31,6 +31,7 @@ import {
   ASSIST_NAME_KEYS,
   PROMPT_NAME_KEYS,
 } from "../../../lib/identifier-names.ts";
+import type { PromptEvaluationRow } from "../../../lib/prompt-evaluation.ts";
 import { getTranslations } from "../../../lib/translations";
 import {
   removeBudget,
@@ -129,12 +130,115 @@ export interface PromptRow {
   }[];
 }
 
+/**
+ * Each evaluation check's name, as the card says it (plan 0.7.0 A9).
+ *
+ * The set names its checks in English for the log and the refusal; a person
+ * reading the card gets these. A check added to the set and not here shows
+ * its own name rather than nothing.
+ */
+const CHECK_WORDS: Readonly<Record<string, string>> = {
+  result: "admin.ai.evaluation.check.result",
+  schema: "admin.ai.evaluation.check.schema",
+  prompt: "admin.ai.evaluation.check.prompt",
+  "personal-data": "admin.ai.evaluation.check.personalData",
+  budget: "admin.ai.evaluation.check.budget",
+  latency: "admin.ai.evaluation.check.latency",
+};
+
+/**
+ * The usage card's latest evaluation results (AI-NATIVE-PLAN §4, plan 0.7.0
+ * A9, docs/design/ai-evaluation.md §9).
+ *
+ * One line per editable prompt: which version is current, how many of its
+ * set's examples pass, and when a stored version fails, what failed and that
+ * the built-in text is what goes. Computed when the page renders against the
+ * mock, so it needs no provider and shows with AI off.
+ */
+async function EvaluationResults({
+  evaluations,
+}: {
+  readonly evaluations: readonly PromptEvaluationRow[];
+}) {
+  const { t } = await getTranslations();
+  return (
+    <section
+      aria-labelledby="ai-evaluation-results"
+      className="flex flex-col gap-1.5 border-t border-line pt-3"
+    >
+      <h3
+        id="ai-evaluation-results"
+        className="text-xs font-bold uppercase tracking-wide text-ink-3"
+      >
+        {t("admin.ai.evaluation.title")}
+      </h3>
+      <p className="text-xs text-ink-3">{t("admin.ai.evaluation.what")}</p>
+      <ul className="flex flex-col gap-1.5">
+        {evaluations.map((row) => {
+          const failed = row.fixtures - row.passed;
+          return (
+            <li
+              key={row.promptKey}
+              className="flex flex-wrap items-center gap-2 text-sm text-ink"
+            >
+              <span className="font-medium">
+                {promptName(row.promptKey, t)}
+              </span>
+              <span className="text-xs text-ink-3">
+                {row.isDefault
+                  ? t("admin.ai.governance.builtIn")
+                  : t("admin.ai.governance.version", { version: row.version })}
+              </span>
+              {failed === 0 ? (
+                <Chip tone="ok">
+                  {t("admin.ai.evaluation.passes", {
+                    passed: row.passed,
+                    fixtures: row.fixtures,
+                  })}
+                </Chip>
+              ) : (
+                <Chip tone="warn">
+                  {t("admin.ai.evaluation.fails", {
+                    failed,
+                    fixtures: row.fixtures,
+                  })}
+                </Chip>
+              )}
+              {failed === 0 ? null : (
+                <span className="w-full text-xs text-ink-2">
+                  {t(
+                    // A stored version that fails is not sent, and the
+                    // sentence says so; a built-in one always is.
+                    row.sent
+                      ? "admin.ai.evaluation.failedChecks"
+                      : "admin.ai.evaluation.failedChecksNotSent",
+                    {
+                      checks: row.failedChecks
+                        .map((check) => {
+                          const words = CHECK_WORDS[check];
+                          return words === undefined ? check : t(words);
+                        })
+                        .join(", "),
+                    },
+                  )}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
 export async function UsageCard({
   usage,
   days,
+  evaluations,
 }: {
   readonly usage: UsageSummary;
   readonly days: number;
+  readonly evaluations: readonly PromptEvaluationRow[];
 }) {
   const { t } = await getTranslations();
 
@@ -165,15 +269,18 @@ export async function UsageCard({
           <Chip tone="ok">{t("admin.ai.governance.nothingFlagged")}</Chip>
         )}
       </CardHeader>
-      <CardBody className="flex flex-wrap gap-6">
-        {figures.map(([label, value]) => (
-          <div key={label} className="flex flex-col">
-            <span className="text-lg font-bold tabular-nums text-ink">
-              {value}
-            </span>
-            <span className="text-xs text-ink-3">{label}</span>
-          </div>
-        ))}
+      <CardBody className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-6">
+          {figures.map(([label, value]) => (
+            <div key={label} className="flex flex-col">
+              <span className="text-lg font-bold tabular-nums text-ink">
+                {value}
+              </span>
+              <span className="text-xs text-ink-3">{label}</span>
+            </div>
+          ))}
+        </div>
+        <EvaluationResults evaluations={evaluations} />
       </CardBody>
     </Card>
   );
@@ -413,6 +520,9 @@ export async function PromptsCard({
           </h2>
           <p className="text-xs text-ink-3">
             {t("admin.ai.governance.everyEditIsA")}
+          </p>
+          <p className="text-xs text-ink-3">
+            {t("admin.ai.governance.checkedBeforeSaving")}
           </p>
         </div>
       </CardHeader>

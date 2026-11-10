@@ -12,7 +12,9 @@
  * that is not in here, and cannot reach one on easier terms than it declares.
  */
 
+import { reportError } from "../errors/report.ts";
 import { OperationError } from "../operations/errors.ts";
+import { DryRunUnavailable, insideDryRun } from "../operations/operation.ts";
 import {
   ACCESS_LEVEL_NAMES,
   defaultMetrics,
@@ -32,6 +34,13 @@ import {
   spaceFeed,
   workspaceFeed,
 } from "./activities.ts";
+import {
+  planAgentRun,
+  readAgentInstructions,
+  restoreAgentInstructions,
+  setAgentInstructions,
+} from "./agent-instructions.ts";
+import { listOwnToolCalls, readToolCallSummary } from "./agent-tool-calls.ts";
 import {
   bindAgentScope,
   bulkApplyProposedChanges,
@@ -90,8 +99,10 @@ import {
   escalateDependency,
   readAlignment,
   readAlignmentGraph,
+  readAlignmentScore,
   removeGoalDependency,
   removeKeyResultDependency,
+  setDependencyProvider,
   setDependencyRiskOwner,
 } from "./alignment.ts";
 import {
@@ -160,6 +171,7 @@ import {
   revealConfidenceVotes,
   startCheckIn,
 } from "./check-ins.ts";
+import { answerCoachMention, mentionableAgents } from "./coach-mention.ts";
 import {
   addReactionAction,
   createCommentAction,
@@ -172,6 +184,11 @@ import {
   replaceImportedBodyAction,
   updateCommentAction,
 } from "./comments.ts";
+import {
+  listWorkspaceConnections,
+  revokeConnectionAsAdmin,
+  sweepToolCalls,
+} from "./connections-admin.ts";
 import {
   ask,
   completeRun,
@@ -215,6 +232,7 @@ import {
   readRhythmSettings,
   readScorecard,
   setAnnualFrame,
+  setCycleClosing,
   snapshotCycle,
   updateCycle,
   updateRhythmSettings,
@@ -282,6 +300,7 @@ import {
   unlinkKeyResultKpi,
   updateGoal,
   updateKeyResult,
+  updateKeyResultConfidence,
 } from "./goals.ts";
 import {
   finishImportRun,
@@ -367,7 +386,7 @@ import {
   updateMember,
   updateOwnProfile,
 } from "./people.ts";
-import { exportArchive, importArchive } from "./portability.ts";
+import { exportArchive, importArchive, listArchives } from "./portability.ts";
 import {
   applyPracticeProfile,
   readPractice,
@@ -392,6 +411,11 @@ import {
   listRoles,
   setRolePermission,
 } from "./roles.ts";
+import {
+  currentCeiling,
+  ScopeCeilingRefused,
+  withCeiling,
+} from "./scope-ceiling.ts";
 import { findEntities, readPaletteJump, runSearch } from "./search.ts";
 import {
   addRetroNote,
@@ -436,6 +460,7 @@ import {
   readScoringStatus,
   readSession,
   readSessionLowScores,
+  readStageCompletion,
   readStreak,
   reassignSessionBlocker,
   recordDecision,
@@ -468,6 +493,7 @@ import {
   setWorkspaceBrandingImage,
   updateWorkspaceBranding,
   updateWorkspaceGeneralSettings,
+  updateWorkspaceLimits,
 } from "./settings.ts";
 import {
   addSpaceMember,
@@ -507,6 +533,16 @@ import {
   updateTask,
 } from "./tasks.ts";
 import { finishOwnTour, readOwnTour } from "./tour.ts";
+import {
+  createWebhook,
+  listWebhookDeliveries,
+  listWebhooks,
+  redeliverWebhook,
+  removeWebhook,
+  rotateWebhookSecret,
+  testWebhook,
+  updateWebhook,
+} from "./webhooks.ts";
 import { decomposeKeyResult, summariseThread } from "./work-assists.ts";
 import {
   changeWorkspacePlan,
@@ -578,6 +614,23 @@ export const ACTION_MAP = {
   "channels.removeTemplateMapping": removeTemplateMapping,
   "connections.mine": listMyConnections,
   "connections.revoke": revokeConnection,
+  // Plan 0.7.0 A4: the administrator's view, browser only.
+  "connections.list": listWorkspaceConnections,
+  "connections.revokeAsAdmin": revokeConnectionAsAdmin,
+  // Plan 0.7.0 A2: the tool call record's retention, run daily.
+  "connections.sweepToolCalls": sweepToolCalls,
+  // Plan 0.7.0 D5: outbound webhooks, an administrator's, never an agent's.
+  "webhooks.list": listWebhooks,
+  "webhooks.create": createWebhook,
+  "webhooks.update": updateWebhook,
+  "webhooks.rotateSecret": rotateWebhookSecret,
+  "webhooks.remove": removeWebhook,
+  "webhooks.test": testWebhook,
+  "webhooks.deliveries": listWebhookDeliveries,
+  "webhooks.redeliver": redeliverWebhook,
+  // Plan 0.7.0 A2: a member's own agent calls, and the admin totals.
+  "connections.toolCalls": listOwnToolCalls,
+  "ai.readToolCallSummary": readToolCallSummary,
   "tokens.mine": listMyTokens,
   "tokens.create": createApiToken,
   "tokens.revoke": revokeApiToken,
@@ -618,6 +671,7 @@ export const ACTION_MAP = {
   "activities.workspaceFeed": workspaceFeed,
   // P6-T05a. The whole workspace as one sealed, checksummed file (§7.3).
   "workspace.exportArchive": exportArchive,
+  "workspace.listArchives": listArchives,
   // P6-T05b. An archive into another instance (§7.3).
   "workspace.importArchive": importArchive,
   // P8-T10. The audit trail, filtered out as a file, and the chain checked.
@@ -633,6 +687,8 @@ export const ACTION_MAP = {
   "settings.readForMember": readSettingsForMember,
   "settings.updateWorkspaceGeneral": updateWorkspaceGeneralSettings,
   "settings.updateWorkspaceBranding": updateWorkspaceBranding,
+  // Plan 0.7.0 B10: the five limits nothing could write.
+  "settings.updateWorkspaceLimits": updateWorkspaceLimits,
   "settings.setWorkspaceBrandingImage": setWorkspaceBrandingImage,
   "settings.resetWorkspaceSettings": resetWorkspaceSettings,
   "ai.readProviderConfig": readProviderConfig,
@@ -680,7 +736,13 @@ export const ACTION_MAP = {
   "agents.cancelRun": cancelAgentRun,
   "agents.runChampion": runChampion,
   "agents.runCoach": runCoach,
+  "agents.answerMention": answerCoachMention,
+  "agents.mentionable": mentionableAgents,
   "agents.listRuns": listAgentRuns,
+  "agents.instructions": readAgentInstructions,
+  "agents.setInstructions": setAgentInstructions,
+  "agents.restoreInstructions": restoreAgentInstructions,
+  "agents.planRun": planAgentRun,
   "proposals.list": listProposedChanges,
   "proposals.bulkApply": bulkApplyProposedChanges,
   "proposals.bulkDismiss": bulkDismissProposedChanges,
@@ -709,6 +771,7 @@ export const ACTION_MAP = {
   "cycles.ensureCurrent": ensureCurrentCycle,
   "cycles.create": createCycle,
   "cycles.update": updateCycle,
+  "cycles.setClosing": setCycleClosing,
   "cycles.archive": archiveCycle,
   "cycles.snapshot": snapshotCycle,
   "cycles.feedForward": feedForwardCycle,
@@ -811,6 +874,7 @@ export const ACTION_MAP = {
   "goals.targetHistory": readTargetHistory,
   "goals.restoreKeyResult": restoreKeyResult,
   "goals.recordValue": recordKeyResultValue,
+  "goals.updateConfidence": updateKeyResultConfidence,
   "goals.removeKeyResult": removeKeyResult,
   "goals.linkKpi": linkKeyResultKpi,
   "goals.unlinkKpi": unlinkKeyResultKpi,
@@ -840,9 +904,11 @@ export const ACTION_MAP = {
   "goals.addKeyResultDependency": addKeyResultDependency,
   "goals.confirmDependency": confirmKeyResultDependency,
   "goals.setDependencyRiskOwner": setDependencyRiskOwner,
+  "goals.setDependencyProvider": setDependencyProvider,
   "goals.escalateDependency": escalateDependency,
   "goals.removeKeyResultDependency": removeKeyResultDependency,
   "alignment.read": readAlignment,
+  "alignment.score": readAlignmentScore,
   "alignment.graph": readAlignmentGraph,
   "goals.relations": readGoalRelations,
   "kpis.createCategory": createKpiCategory,
@@ -961,6 +1027,8 @@ export const ACTION_MAP = {
   "sessions.forward": readForward,
   "sessions.minutes": readMinutes,
   "sessions.scoringStatus": readScoringStatus,
+  // Each stage's completion condition, shown and not enforced (plan 0.7.0, S1).
+  "sessions.stageCompletion": readStageCompletion,
   "sessions.roomPulse": readRoomPulse,
   "sessions.setStageNote": setStageNote,
 
@@ -1009,14 +1077,128 @@ export async function callAction<K extends ActionName>(
   name: K,
   input: ActionInput<K>,
 ): Promise<ActionOutput<K>> {
+  try {
+    return await admitAndCall(context, name, input);
+  } catch (error) {
+    // **The one door is the one place that sees every unexpected error**
+    // (docs/design/error-reporting.md D2, plan 0.7.0 E1). REST, the agent
+    // endpoint and the chat commands turn a fault into `internal` before
+    // Next could see it, and many server actions answer with a sentence.
+    // Held, not sent: the request around this call adds the digest Next
+    // shows the person, and a refusal returns from the classifier at once.
+    reportError(
+      error,
+      {
+        source: "action",
+        action: name,
+        workspaceId: context.workspaceId,
+        memberId: context.actor.memberId ?? null,
+        userId: context.actor.userId ?? null,
+      },
+      { hold: true },
+    );
+    throw error;
+  }
+}
+
+/** Admission, then the measured call: what `callAction` was before E1. */
+async function admitAndCall<K extends ActionName>(
+  context: ActionCallContext,
+  name: K,
+  input: ActionInput<K>,
+): Promise<ActionOutput<K>> {
   const action = ACTION_MAP[name];
+  holdToCeiling(context, name, action as ActionDefinition);
+  // A write reached from inside a dry run must be one too (plan D4). A write
+  // built from one operation inherits it; any other could commit on its own
+  // connection, so the check is refused rather than the write let through.
+  if (
+    insideDryRun() &&
+    (action as ActionDefinition).safety !== "read" &&
+    !(action as ActionDefinition).validate
+  ) {
+    throw new DryRunUnavailable(name);
+  }
   // The cast is the one place the registry's heterogeneous shapes meet a
   // single call signature; the public types above keep callers honest.
   const call = () =>
     (action as ActionDefinition).handler(context, input) as Promise<
       ActionOutput<K>
     >;
+  return withScopes(context, () =>
+    admitted(context, name, action as ActionDefinition, call),
+  );
+}
 
+/**
+ * The token's ceiling, checked before anything runs (token-scope-ceiling.md
+ * C1, C2): the call's own scopes where it brings them, otherwise the ceiling
+ * of the call that started this one. No token, no ceiling.
+ */
+function holdToCeiling(
+  context: ActionCallContext,
+  name: string,
+  action: ActionDefinition,
+): void {
+  const ceiling = context.scopes ?? currentCeiling();
+  if (ceiling && !ceiling.includes(action.safety)) {
+    throw new ScopeCeilingRefused(name, action.safety, ceiling);
+  }
+}
+
+/** Runs `fn` under the call's scopes, when it brings any and none is set. */
+function withScopes<T>(
+  context: ActionCallContext,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return context.scopes && !currentCeiling()
+    ? withCeiling(context.scopes, fn)
+    : fn();
+}
+
+/**
+ * A write checked without committing (plan D4, TECHNICAL-PLAN §14 "validation
+ * endpoints").
+ *
+ * The write itself, run as a dry run: the same parse, load, authorisation and
+ * checks, then rolled back. So it answers the parsed input with its defaults
+ * filled in and the result the write would have returned, or throws exactly
+ * what the write would have thrown. Through the same door as `callAction`,
+ * admission and measurement included, because it costs what the write costs.
+ *
+ * Null for an action that cannot be run this way: a read, which commits
+ * nothing anyway, and a write whose handler is written by hand rather than
+ * built from one operation, which could do work outside the transaction.
+ */
+export async function validateAction<K extends ActionName>(
+  context: ActionCallContext,
+  name: K,
+  input: unknown,
+): Promise<{
+  readonly input: ActionInput<K>;
+  readonly result: ActionOutput<K>;
+} | null> {
+  const action = ACTION_MAP[name] as ActionDefinition;
+  const validate = action.validate;
+  if (!validate) {
+    return null;
+  }
+  holdToCeiling(context, name, action);
+  const call = () =>
+    validate(context, input) as Promise<{
+      readonly input: ActionInput<K>;
+      readonly result: ActionOutput<K>;
+    }>;
+  return withScopes(context, () => admitted(context, name, action, call));
+}
+
+/** Admission, then the measured call: the one door every action comes through. */
+async function admitted<T>(
+  context: ActionCallContext,
+  name: ActionName,
+  action: ActionDefinition,
+  call: () => Promise<T>,
+): Promise<T> {
   // Measured here rather than per action, because this is the one door every
   // surface comes through: the web app, the REST projection, the command
   // line, the agent tool catalogue and the chat commands (P7-T06a). An
@@ -1066,12 +1248,12 @@ export async function callAction<K extends ActionName>(
  * Split out at P8-T06a so admission can wrap it without indenting two
  * hundred lines of comment that explain the measurement.
  */
-async function callMeasured<K extends ActionName>(
+async function callMeasured<T>(
   context: ActionCallContext,
-  name: K,
+  name: ActionName,
   action: ActionDefinition,
-  call: () => Promise<ActionOutput<K>>,
-): Promise<ActionOutput<K>> {
+  call: () => Promise<T>,
+): Promise<T> {
   const metrics = context.metrics ?? defaultMetrics();
   if (metrics === NO_METRICS) {
     // The instance is not measuring itself. Skip the timer and the labels

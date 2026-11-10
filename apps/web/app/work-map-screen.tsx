@@ -95,10 +95,12 @@ export async function WorkMapScreen({
     ? await callAction(context, "workflow.read", { cycleId })
     : null;
 
+  // The stored score, one row, rather than `alignment.read`'s whole graph:
+  // the header shows the number and its band and nothing else (plan 0.7.0
+  // D2). The list of unaligned goals is the OKRs screen's diagram's.
   const alignment = cycleId
-    ? await callAction(context, "alignment.read", {
+    ? await callAction(context, "alignment.score", {
         cycleId,
-        includeDismissed: false,
         ...(scope === "company" ? {} : { spaceId: scope }),
       })
     : null;

@@ -9,13 +9,17 @@
  * joined them with completeness review M-07.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedState } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 export interface WriteResult {
   readonly error: string | null;
+  /** Each refused field's message, shown under its picker (§4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 async function context() {
@@ -27,11 +31,23 @@ async function context() {
   };
 }
 
-const refused = (error: unknown): WriteResult => {
-  if (error instanceof OperationError) {
-    return { error: error.message };
+/**
+ * A refusal as the card shows it: under the picker this write drew when it
+ * names one, and as the card's sentence otherwise. A schema's refusal too,
+ * which used to reach the error page (guided-inputs §4.2, plan U1b).
+ */
+const refused = async (
+  error: unknown,
+  drawn: readonly string[],
+): Promise<WriteResult> => {
+  const state = refusedState(error, (await getTranslations()).t, drawn);
+  if (state === null) {
+    throw error;
   }
-  throw error;
+  return {
+    error: state.error ?? null,
+    ...(state.fields ? { fields: state.fields } : {}),
+  };
 };
 
 export async function moveGoalToCycle(input: {
@@ -41,7 +57,7 @@ export async function moveGoalToCycle(input: {
   try {
     await callAction(await context(), "goals.moveToCycle", input);
   } catch (error) {
-    return refused(error);
+    return refused(error, ["cycleId"]);
   }
   // Both cycles read differently now, and neither is only this page: the
   // scorecard, the cycle screen and the Work Map all count by cycle.
@@ -61,7 +77,8 @@ export async function linkKeyResultKpi(input: {
   try {
     await callAction(await context(), "goals.linkKpi", input);
   } catch (error) {
-    return refused(error);
+    // `id` is the key result picked to link.
+    return refused(error, ["id", "kpiId"]);
   }
   // The goal's progress moves, and so does every goal above it and the KPI's
   // own page, which lists the key results it measures.
@@ -75,7 +92,7 @@ export async function unlinkKeyResultKpi(input: {
   try {
     await callAction(await context(), "goals.unlinkKpi", input);
   } catch (error) {
-    return refused(error);
+    return refused(error, []);
   }
   revalidatePath("/", "layout");
   return { error: null };

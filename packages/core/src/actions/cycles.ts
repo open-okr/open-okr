@@ -46,6 +46,7 @@ import {
   feedForwardInTx,
   feedFromClosedPredecessorInTx,
 } from "../cycles/archive.ts";
+import { CLOSING_PHASE } from "../cycles/closing.ts";
 import {
   addDays,
   cyclePeriodFor,
@@ -70,9 +71,15 @@ import {
   resolveWorkspaceCadence,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { cycleLevelsInTx } from "../practice/levels.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
@@ -83,6 +90,8 @@ const KPI_CORRIDOR_KEYS = ["kpi.healthyThreshold", "kpi.watchThreshold"];
 
 const cycleOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   name: z.string(),
   mode: z.enum(["annual", "quarterly"]),
   cadence: z.enum(CYCLE_CADENCES),
@@ -161,6 +170,7 @@ async function requireCycleRole(
 
 const toCycleOutput = (row: {
   id: string;
+  shortId: string | null;
   name: string;
   mode: "annual" | "quarterly";
   cadence: (typeof CYCLE_CADENCES)[number];
@@ -175,6 +185,7 @@ const toCycleOutput = (row: {
   facilitatorId: string | null;
 }): CycleOutput => ({
   id: row.id,
+  shortId: row.shortId,
   name: row.name,
   mode: row.mode,
   cadence: row.cadence,
@@ -193,6 +204,7 @@ const toCycleOutput = (row: {
 
 const CYCLE_COLUMNS = {
   id: cycles.id,
+  shortId: cycles.shortId,
   name: cycles.name,
   mode: cycles.mode,
   cadence: cycles.cadence,
@@ -217,7 +229,7 @@ export const readCycleRules = defineReadAction({
   name: "cycles.rules",
   summary:
     "The practice settings and thresholds a cycle is read under: today's while it is open, the ones it closed with after.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     source: z.enum(["live", "snapshot", "canon"]),
     thresholds: z.record(z.string(), z.unknown()),
@@ -272,7 +284,7 @@ export const readCycleLevels = defineReadAction({
   name: "cycles.levelsInUse",
   summary:
     "The OKR levels one cycle offers: the levels it began with, plus any its objectives already use.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({ levels: z.array(z.enum(GOAL_LEVELS)) }),
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -532,6 +544,14 @@ export const createCycle = defineWriteAction({
     name: z.string().trim().min(1).max(120).optional(),
     /** The source system's identifier for this cycle, when an import made it. */
     legacy: legacyKey.optional(),
+    /**
+     * The local date to create the cycle as of (okr-core-domain.md §10 C7,
+     * plan 0.7.0 O2). A period that has ended by then starts `closing`.
+     * Defaults to today in the workspace's timezone; a replay that writes a
+     * dated story in order, as the demo year does, passes the story's date,
+     * so a quarter it then publishes was not over on the day it published.
+     */
+    asOf: z.string().regex(LOCAL_DATE_PATTERN).optional(),
   }),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
@@ -579,7 +599,7 @@ export const createCycle = defineWriteAction({
         workspaceId,
         cadence,
         period,
-        today: formatLocalDate(localDateIn(new Date(), timeZone)),
+        today: input.asOf ?? formatLocalDate(localDateIn(new Date(), timeZone)),
         firstCycle: input.firstCycle,
         sponsorId: input.sponsorId ?? memberId,
         facilitatorId: input.facilitatorId ?? memberId,
@@ -639,33 +659,158 @@ export const createCycle = defineWriteAction({
   }),
 });
 
+/**
+ * The facilitator starts closing a cycle early, or takes that back
+ * (docs/design/okr-core-domain.md §10 C4, C5, plan 0.7.0 O2).
+ *
+ * METHOD.md §8 holds the quarterly review about two weeks before the end, so a
+ * team that has started its review can say so. Undoing is allowed only while
+ * the end has not passed, or the hourly sweep would move it straight back.
+ * At `full`, like `cycles.update` and `cycles.close`.
+ */
+export const setCycleClosing = defineWriteAction({
+  name: "cycles.setClosing",
+  summary:
+    "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
+  input: z.object({ cycleId: ADDRESS.cycle, closing: z.boolean() }),
+  output: z.object({ id: z.uuid(), status: z.string(), phase: z.number() }),
+  access: ACCESS_LEVELS.full,
+  operation: (_context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const [cycle] = await tx
+        .select({
+          name: cycles.name,
+          endsOn: cycles.endsOn,
+          status: cycles.status,
+          phase: cycles.phase,
+          publishedAt: cycles.publishedAt,
+        })
+        .from(cycles)
+        .where(
+          activeOnly(
+            cycles,
+            eq(cycles.id, input.cycleId),
+            eq(cycles.workspaceId, workspaceId),
+          ),
+        )
+        .for("update")
+        .limit(1);
+      if (!cycle) {
+        throw new OperationError("not_found", "No such cycle.");
+      }
+      if (cycle.status === "closed") {
+        throw new OperationError("forbidden", "This cycle is already closed.");
+      }
+      const published = cycle.publishedAt !== null;
+      let status: "planning" | "active" | "closing";
+      let phase: number;
+      if (input.closing) {
+        if (cycle.status === "closing") {
+          throw new OperationError(
+            "forbidden",
+            "This cycle is already closing.",
+          );
+        }
+        status = "closing";
+        phase = CLOSING_PHASE;
+      } else {
+        if (cycle.status !== "closing") {
+          throw new OperationError("forbidden", "This cycle is not closing.");
+        }
+        const today = formatLocalDate(
+          localDateIn(new Date(), await workspaceTimeZone(tx, workspaceId)),
+        );
+        if (today > cycle.endsOn) {
+          throw new OperationError(
+            "forbidden",
+            `This cycle ended on ${cycle.endsOn}, so it stays closing until it is closed.`,
+          );
+        }
+        status = published ? "active" : "planning";
+        // Back to Run the cadence when published; otherwise where it was.
+        phase = published ? 6 : cycle.phase;
+      }
+      // openokr:allow-mutation: this Operation's own transaction.
+      await tx
+        .update(cycles)
+        .set({ status, phase, updatedAt: new Date() })
+        .where(activeOnly(cycles, eq(cycles.id, input.cycleId)));
+      return {
+        result: { id: input.cycleId, status, phase },
+        activity: input.closing
+          ? {
+              kind: "cycle.closing_started",
+              subjectType: "cycle",
+              subjectId: input.cycleId,
+              payload: {
+                cycleId: input.cycleId,
+                name: cycle.name,
+                by: "facilitator",
+              },
+            }
+          : {
+              kind: "cycle.closing_undone",
+              subjectType: "cycle",
+              subjectId: input.cycleId,
+              payload: { cycleId: input.cycleId, name: cycle.name },
+            },
+        audit: {
+          action: "cycles.setClosing",
+          targetType: "cycle",
+          targetId: input.cycleId,
+          payload: { closing: input.closing, from: cycle.status, to: status },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * The fields `cycles.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). Levels and session dates are lists, read
+ * and compared in the order they are stored.
+ */
+const CYCLE_READ = [
+  "phase",
+  "sponsorId",
+  "facilitatorId",
+  "publicationDeadline",
+  "levels",
+  "contributingUnits",
+  "firstCycle",
+  "sessionDates",
+] as const;
+
 export const updateCycle = defineWriteAction({
   name: "cycles.update",
   summary:
-    "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
-  input: z.object({
-    id: z.uuid(),
-    phase: z.number().int().min(0).max(7).optional(),
-    sponsorId: z.uuid().nullable().optional(),
-    facilitatorId: z.uuid().nullable().optional(),
-    publicationDeadline: z
-      .string()
-      .regex(LOCAL_DATE_PATTERN)
-      .nullable()
-      .optional(),
-    levels: z.array(z.enum(GOAL_LEVELS)).min(1).optional(),
-    contributingUnits: z.string().max(2000).nullable().optional(),
-    firstCycle: z.boolean().optional(),
-    sessionDates: z
-      .array(
-        z.object({
-          key: z.string().min(1).max(60),
-          on: z.string().regex(LOCAL_DATE_PATTERN),
-        }),
-      )
-      .max(20)
-      .optional(),
-  }),
+    "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
+  input: z
+    .object({
+      id: ADDRESS.cycle,
+      phase: z.number().int().min(0).max(7).optional(),
+      sponsorId: z.uuid().nullable().optional(),
+      facilitatorId: z.uuid().nullable().optional(),
+      publicationDeadline: z
+        .string()
+        .regex(LOCAL_DATE_PATTERN)
+        .nullable()
+        .optional(),
+      levels: z.array(z.enum(GOAL_LEVELS)).min(1).optional(),
+      contributingUnits: z.string().max(2000).nullable().optional(),
+      firstCycle: z.boolean().optional(),
+      sessionDates: z
+        .array(
+          z.object({
+            key: z.string().min(1).max(60),
+            on: z.string().regex(LOCAL_DATE_PATTERN),
+          }),
+        )
+        .max(20)
+        .optional(),
+      read: readOf(CYCLE_READ, ["levels", "sessionDates"]),
+    })
+    .refine(...readsEveryChange(CYCLE_READ)),
   output: cycleOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -701,6 +846,42 @@ export const updateCycle = defineWriteAction({
           "This cycle is closed. Its record does not change after the archive.",
         );
       }
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "cycle",
+        subjectId: input.id,
+        fields: CYCLE_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              phase: cycles.phase,
+              sponsorId: cycles.sponsorId,
+              facilitatorId: cycles.facilitatorId,
+              publicationDeadline: cycles.publicationDeadline,
+              levels: cycles.levels,
+              contributingUnits: cycles.contributingUnits,
+              firstCycle: cycles.firstCycle,
+              sessionDates: cycles.sessionDates,
+            })
+            .from(cycles)
+            .where(
+              activeOnly(
+                cycles,
+                eq(cycles.id, input.id),
+                eq(cycles.workspaceId, workspaceId),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return (
+            row && {
+              ...row,
+              sessionDates: row.sessionDates.map((entry) => ({ ...entry })),
+            }
+          );
+        },
+      });
       if (
         input.publicationDeadline &&
         input.publicationDeadline >= existing.startsOn
@@ -742,7 +923,7 @@ export const updateCycle = defineWriteAction({
           kind: "cycle.updated",
           subjectType: "cycle",
           subjectId: updated.id,
-          payload: { name: updated.name },
+          payload: { name: updated.name, fields: Object.keys(patch) },
         },
         audit: {
           action: "cycles.update",
@@ -758,7 +939,7 @@ export const updateCycle = defineWriteAction({
 export const archiveCycle = defineWriteAction({
   name: "cycles.archive",
   summary: "Archives a cycle. Its goals and scores stay readable.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.cycle }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -1361,11 +1542,45 @@ export const setAnnualFrame = defineWriteAction({
      * frame still being drafted, and for a new year.
      */
     reason: z.string().trim().min(1).max(500).optional(),
+    /**
+     * The cycle this write is made from (docs/design/okr-core-domain.md §3.1,
+     * plan 0.7.0 O1). An annual cycle may write the frame, and so may a call
+     * made from no cycle at all. A quarterly cycle may not: the frame is its
+     * reference, and its phase 3 revalidates the frame without rewriting it
+     * (METHOD.md §2.1).
+     */
+    cycleId: ADDRESS.cycle.optional(),
   }),
   output: frameOutput,
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
+      if (input.cycleId) {
+        const [acting] = await tx
+          .select({ mode: cycles.mode })
+          // openokr:allow-raw-read: a cycle carries no access context of its
+          // own and is read by workspace, which `full` on this action has
+          // already granted; the tenant floor scopes it.
+          .from(cycles)
+          .where(
+            activeOnly(
+              cycles,
+              eq(cycles.id, input.cycleId),
+              eq(cycles.workspaceId, workspaceId),
+            ),
+          )
+          .limit(1);
+        if (!acting) {
+          throw new OperationError("not_found", "That cycle was not found.");
+        }
+        if (acting.mode !== "annual") {
+          throw new OperationError(
+            "forbidden",
+            "The annual frame is reference during a quarterly cycle. Change it from the annual cycle; this cycle's phase 3 revalidates it.",
+          );
+        }
+      }
+
       const [current] = await tx
         .select({
           id: annualFrames.id,
@@ -1664,7 +1879,7 @@ export const snapshotCycle = defineWriteAction({
   name: "cycles.snapshot",
   summary:
     "Records what a cycle achieved: the result, the band counts and the portfolio verdict, one snapshot per owner.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     snapshots: z.number().int(),
     resultValue: z.number().nullable(),
@@ -1889,7 +2104,7 @@ export const feedForwardCycle = defineWriteAction({
   name: "cycles.feedForward",
   summary:
     "Re-runs the close's inheritance into a named cycle: prior scores, carried work and deferred objectives as issues, kept and modified objectives as pre-filled drafts, learnings into the input pack, the lowest process-health statement as an improvement action, and the annual frame. Closing a cycle already does this.",
-  input: z.object({ fromCycleId: z.uuid(), toCycleId: z.uuid() }),
+  input: z.object({ fromCycleId: ADDRESS.cycle, toCycleId: ADDRESS.cycle }),
   output: feedForwardOutput,
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1941,14 +2156,15 @@ export const feedForwardCycle = defineWriteAction({
  *
  * `full`, the same as publishing: closing is the other end of the act that
  * publication starts, and it fixes the result the scorecard will show for good.
- * Not destructive in the registry's sense, because nothing a person can see is
- * removed.
+ * Destructive in the registry's sense since 0.7.0 (irreversible-scope.md):
+ * nothing a person can see is removed, but the result is fixed for the whole
+ * workspace and cannot be undone, so a default token may not do it.
  */
 export const closeCycle = defineWriteAction({
   name: "cycles.close",
   summary:
     "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     cycleId: z.uuid(),
     snapshots: z.number().int(),
@@ -1960,6 +2176,9 @@ export const closeCycle = defineWriteAction({
       .nullable(),
   }),
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it fixes every space's result for good.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const rhythm = resolveRhythm(await readRhythmRow(tx, workspaceId));

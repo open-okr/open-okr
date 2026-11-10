@@ -22,6 +22,15 @@ const nextConfig: NextConfig = {
       "../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**/*",
     ],
   },
+  /**
+   * A source map beside every browser chunk (docs/design/error-reporting.md
+   * D18, plan 0.7.0 E3). The server reads them to turn a browser's frames
+   * into source files before a report is written, so every tracker gets
+   * readable frames with no upload step per release. Next serves them too,
+   * and what they reveal is the public repository. Server maps are a
+   * different question, measured and left off (§10, D19).
+   */
+  productionBrowserSourceMaps: true,
   transpilePackages: [
     "@openokr/adapters",
     "@openokr/agents",

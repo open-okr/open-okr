@@ -46,6 +46,7 @@ import {
   recomputeGateState,
   revalidationOfRow,
 } from "../cycles/workflow.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { policyDecisionInTx, requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -236,7 +237,7 @@ export const readWorkflow = defineReadAction({
   name: "workflow.read",
   summary:
     "A cycle's phase completion, its six publish gates and the rows they are computed from.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     cycleId: z.uuid(),
     name: z.string(),
@@ -701,7 +702,7 @@ export const setPackItem = defineWriteAction({
   name: "workflow.setPackItem",
   summary: "Marks one of the seven input-pack items gathered, with a note.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     itemKey: z.number().int().min(1).max(INPUT_PACK_ITEMS.length),
     gathered: z.boolean(),
     note: z.string().trim().max(2000).nullable().optional(),
@@ -757,7 +758,7 @@ export const distributePack = defineWriteAction({
   name: "workflow.distributePack",
   summary:
     "Records that the input pack reached people, which the input pack's lead time is measured from.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({ distributedAt: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -803,7 +804,7 @@ export const addIssue = defineWriteAction({
   name: "workflow.addIssue",
   summary: "Adds a ranked strategic issue to a cycle's phase 2 list.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     text: z.string().trim().min(1).max(500),
     impact: z.number().int().min(1).max(5).default(3),
     source: z.enum(ISSUE_SOURCES).default("manual"),
@@ -852,7 +853,7 @@ export const setIssueImpact = defineWriteAction({
   name: "workflow.setIssueImpact",
   summary: "Reranks a strategic issue. The list is ordered by impact.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     issueId: z.uuid(),
     impact: z.number().int().min(1).max(5),
   }),
@@ -902,7 +903,7 @@ export const addPriority = defineWriteAction({
   summary:
     "Adds a phase 3 priority, optionally promoting the issue it came from.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     text: z.string().trim().min(1).max(500),
     successStatement: z.string().trim().max(1000).nullable().optional(),
     /** The issue this priority answers, which is then marked as promoted. */
@@ -988,7 +989,7 @@ export const setRevalidation = defineWriteAction({
     "Records the quarterly revalidation: the frame holds, or changed with a note.",
   input: z
     .object({
-      cycleId: z.uuid(),
+      cycleId: ADDRESS.cycle,
       holds: z.boolean(),
       changed: z.boolean(),
       /** Editor JSON (guided-inputs changes 12 and 13b). */
@@ -1073,7 +1074,7 @@ export const setBaselineHealth = defineWriteAction({
   summary:
     "Records phase 2's KPI reading in its three columns: stable, declining, business as usual.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     stable: cycleNote.optional(),
     declining: cycleNote.optional(),
     businessAsUsual: cycleNote.optional(),
@@ -1151,7 +1152,7 @@ export const setCapacityNotes = defineWriteAction({
   name: "workflow.setCapacityNotes",
   summary:
     "Records what was cut, which publish gate 5 reads: if nothing was cut, capacity was not checked.",
-  input: z.object({ cycleId: z.uuid(), cuts: cycleNote }),
+  input: z.object({ cycleId: ADDRESS.cycle, cuts: cycleNote }),
   output: z.object({ cycleId: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1224,8 +1225,8 @@ export const setFocusKeyResults = defineWriteAction({
   name: "workflow.setFocusKeyResults",
   summary: "Chooses which of the year's key results a quarter focuses on.",
   input: z.object({
-    cycleId: z.uuid(),
-    keyResultIds: z.array(z.uuid()).max(50),
+    cycleId: ADDRESS.cycle,
+    keyResultIds: z.array(ADDRESS.keyResult).max(50),
   }),
   output: z.object({ cycleId: z.uuid(), count: z.number().int() }),
   access: ACCESS_LEVELS.edit,
@@ -1317,7 +1318,7 @@ export const publishCycle = defineWriteAction({
   summary:
     "Publishes the set, or its company half first, refusing while a gate set to block is red or cannot be evaluated.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     /**
      * Which step (METHOD.md §4.5, P9-T03b). `company` publishes the company
      * set before the cycle starts; `teams` publishes the department and team
@@ -1370,6 +1371,14 @@ export const publishCycle = defineWriteAction({
         throw new OperationError(
           "forbidden",
           "This cycle is already published.",
+        );
+      }
+      // A cycle past its end, or one its facilitator has started closing, is
+      // scored and closed rather than published (okr-core-domain.md §10 C6).
+      if (cycle.status === "closing") {
+        throw new OperationError(
+          "forbidden",
+          "This cycle has ended or is closing. Score it and close it instead of publishing it.",
         );
       }
       const companyOut = Boolean(cycle.companyPublishedAt);

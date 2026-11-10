@@ -7,6 +7,50 @@ a passkey, and a one-time code from an authenticator app with backup codes.
 Session tokens are hashed at rest, and a member can list their sessions and
 revoke one.
 
+### Sign-in protection
+
+Wrong passwords hold password sign-in for a while. Nothing needs unlocking:
+a hold ends on its own.
+
+| What happened | What it holds | For how long |
+|---|---|---|
+| Five wrong passwords in a row for one account, from one network | The next password attempt for that account, from that network | 1 minute, then 2, 4, 8 and 15 at most |
+| Twenty wrong passwords in a row for one account, from anywhere | The next password attempt for that account, from any network that has not signed in to it in the last 30 days | The same curve |
+
+- **Never held**: passkeys, single sign-on and asking for a reset link. These
+  are the ways round a hold.
+- **What clears a hold**: signing in by any of those, or completing a password
+  reset. A day with no wrong password forgets the count.
+- **What is recorded**: when an account hold begins, one `auth.sign_in_held`
+  row on the instance audit chain names the account, and the account holder
+  gets an email saying somebody is trying their password. Every refused
+  attempt counts in `openokr_sign_in_held_total`
+  ([observability](../runbooks/observability.md)).
+- **The second factor** keeps its own lock: ten wrong codes in a row lock that
+  account's second factor for 15 minutes, and `auth.second_factor_locked` on
+  the instance audit chain records when it begins.
+- **Per network**: ten sign-in attempts a minute from one network address,
+  and five reset requests. The count is kept in the database, so every
+  replica shares it. A refusal writes `auth.rate_limited`.
+- The answer is the same whether or not an account exists, so a hold tells
+  nobody who has one. The counts are kept as keyed hashes, never as addresses.
+
+## Agent connections
+
+Admin, then **Agent connections**. Every external agent a member connected to
+this workspace, and every agent token a member made, with when each was last
+used. You can end any of them: the agent stops at once, the member is told in
+their inbox that an administrator ended it, and their own Connections or API
+tokens page says so without naming you. Your name is in the audit log. The
+screen works only in the browser, so neither a token nor an agent can list
+or end connections.
+
+Every call an agent makes is recorded: the tool, where it stopped and the ids
+it named, never what it sent or read back. The AI console counts them for the
+last 30 days, naming nobody, and each member sees their own agent's calls under
+the connection or token on their own pages. The record is kept 90 days unless
+the Limits card on Admin, General says otherwise.
+
 ## Single sign-on
 
 Admin, then **Single sign-on**. OpenOKR speaks OIDC and SAML 2.0 directly.
@@ -95,7 +139,7 @@ is hashed, so the original is never stored.
 
 | Stored | How |
 |---|---|
-| AI provider keys, chat channel credentials, SSO client secrets, the mail password | Sealed under the root key |
+| AI provider keys, chat channel credentials, SSO client secrets, the mail password, webhook signing secrets | Sealed under the root key |
 | The access, refresh and ID tokens an OIDC provider issues when somebody signs in | Sealed under the root key. Opened only on the server, when a sign-in or a token refresh needs them |
 | Session tokens, API tokens, agent access tokens, directory sync tokens, invitation links | Hashed |
 | Passwords | Hashed by the sign-in library |

@@ -25,8 +25,10 @@ import {
   blockers,
   checkIns,
   comments,
+  documents,
   goals,
   keyResults,
+  kpis,
   kudos,
   learnings,
   nextCycleDrafts,
@@ -303,6 +305,66 @@ async function governingResource(
           .limit(1),
       );
       return row ? throughSession(tx, workspaceId, row.sessionId) : null;
+    }
+
+    // Plan A10. Read rather than trusted, for the reason the goal case gives.
+    // A document is governed by what it hangs on, which the getter's own
+    // `document` resolver walks; a draft is withheld outright, because it is its
+    // author's alone and the getter's walk does not know that.
+    case "document": {
+      const row = one(
+        await tx
+          .select({ id: documents.id })
+          .from(documents)
+          .where(
+            activeOnly(
+              documents,
+              eq(documents.workspaceId, workspaceId),
+              eq(documents.id, entityId),
+              eq(documents.state, "published"),
+            ),
+          )
+          .limit(1),
+      );
+      return row ? { resourceType: "document", resourceId: entityId } : null;
+    }
+
+    // Every member reads every KPI, the rule `kpis.list` and the search index
+    // already follow, so the workspace governs it.
+    case "kpi": {
+      const row = one(
+        await tx
+          .select({ id: kpis.id })
+          .from(kpis)
+          .where(
+            activeOnly(
+              kpis,
+              eq(kpis.workspaceId, workspaceId),
+              eq(kpis.id, entityId),
+            ),
+          )
+          .limit(1),
+      );
+      return row
+        ? { resourceType: "workspace", resourceId: workspaceId }
+        : null;
+    }
+
+    case "session": {
+      const row = one(
+        await tx
+          .select({ id: okrSessions.id })
+          .from(okrSessions)
+          .where(
+            activeOnly(
+              okrSessions,
+              eq(okrSessions.workspaceId, workspaceId),
+              eq(okrSessions.id, entityId),
+            ),
+          )
+          .limit(1),
+      );
+      return row ? throughSession(tx, workspaceId, entityId) : null;
     }
 
     default:

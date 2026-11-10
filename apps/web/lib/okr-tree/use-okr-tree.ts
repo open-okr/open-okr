@@ -114,6 +114,10 @@ function optimistic(tree: OkrTree, mutation: OkrMutation): OkrTree {
       return patchKeyResultIn(tree, mutation.id, {
         currentValue: mutation.value,
       });
+    case "updateConfidence":
+      return patchKeyResultIn(tree, mutation.id, {
+        confidence: mutation.confidence,
+      });
     case "changeTarget":
       return patchKeyResultIn(tree, mutation.id, {
         targetValue: mutation.targetValue,

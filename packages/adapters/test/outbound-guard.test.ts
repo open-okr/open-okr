@@ -355,3 +355,94 @@ describe("createGuardedFetch", () => {
     expect(await response.text()).toBe("streamed");
   });
 });
+
+/**
+ * A webhook's request (docs/design/outbound-webhooks.md W7 and Q1): a POST
+ * with a body, an answer read up to a cap and thrown away, and an instance
+ * that may let hooks reach its own network but never its metadata service.
+ */
+describe("a webhook's request", () => {
+  const publicResolve = resolves({ "hooks.example": ["93.184.216.34"] });
+
+  it("posts the body it is given", async () => {
+    let seen: RequestInit | undefined;
+    const outcome = await outboundFetch("https://hooks.example/in", {
+      resolve: publicResolve,
+      method: "POST",
+      body: '{"type":"ping"}',
+      fetchImpl: async (_input, init) => {
+        seen = init;
+        return new Response(null, { status: 204 });
+      },
+    });
+    expect(outcome).toMatchObject({ ok: true, status: 204 });
+    expect(seen?.method).toBe("POST");
+    expect(seen?.body).toBe('{"type":"ping"}');
+    expect(seen?.redirect).toBe("manual");
+  });
+
+  it("keeps a long answer's status and reads only the first part of it", async () => {
+    const outcome = await outboundFetch("https://hooks.example/in", {
+      resolve: publicResolve,
+      method: "POST",
+      maxBytes: 10,
+      truncate: true,
+      fetchImpl: async () =>
+        new Response("y".repeat(5_000), {
+          status: 200,
+          headers: { "content-length": "5000" },
+        }),
+    });
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      expect(outcome.status).toBe(200);
+      expect(outcome.body.length).toBe(10);
+    }
+  });
+
+  it("refuses a private address unless private targets are allowed", async () => {
+    const internal = resolves({ "intranet.example": ["10.0.0.9"] });
+    expect(
+      await checkUrl("http://intranet.example/hook", { resolve: internal }),
+    ).toMatchObject({ ok: false, refusal: "address_not_allowed" });
+    expect(
+      await checkUrl("http://intranet.example/hook", {
+        resolve: internal,
+        allowPrivate: true,
+      }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await checkUrl("http://127.0.0.1:4000/hook", { allowPrivate: true }),
+    ).toMatchObject({ ok: true });
+    expect(
+      await checkUrl("http://localhost:4000/hook", {
+        allowPrivate: true,
+        resolve: resolves({ localhost: ["127.0.0.1"] }),
+      }),
+    ).toMatchObject({ ok: true });
+  });
+
+  it("refuses the metadata services even where private targets are allowed", async () => {
+    for (const candidate of [
+      "http://169.254.169.254/latest/meta-data/",
+      "http://100.100.100.200/latest/meta-data/",
+      "http://[fd00:ec2::254]/latest/meta-data/",
+      "http://[::ffff:169.254.169.254]/",
+      "http://[fe80::1]/",
+      "http://metadata.google.internal/computeMetadata/v1/",
+    ]) {
+      expect(
+        await checkUrl(candidate, { allowPrivate: true }),
+        candidate,
+      ).toMatchObject({ ok: false });
+    }
+    expect(
+      await checkUrl("https://sneaky.example/", {
+        allowPrivate: true,
+        resolve: resolves({
+          "sneaky.example": ["10.0.0.1", "169.254.169.254"],
+        }),
+      }),
+    ).toMatchObject({ ok: false, refusal: "address_not_allowed" });
+  });
+});

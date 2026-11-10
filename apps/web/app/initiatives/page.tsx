@@ -6,6 +6,7 @@ import {
   Chip,
   DateRangeInput,
   EntityPicker,
+  KeyboardList,
   type MessageValues,
   SubmitButton,
   TextInput,
@@ -175,15 +176,19 @@ export default async function InitiativesPage({
                   : t("initiatives.aFacilitatorRecords")}
               </p>
             ) : (
-              <ul className="flex flex-col divide-y divide-line">
-                {initiatives.map((initiative) => (
-                  <Row
-                    key={initiative.id}
-                    initiative={initiative}
-                    canEdit={canEdit}
-                  />
-                ))}
-              </ul>
+              // `j` and `k` walk the rows, and `e` puts the caret in a row's
+              // status where the reader may change it (plan 0.7.0, U2).
+              <KeyboardList edit={canEdit}>
+                <ul className="flex flex-col divide-y divide-line">
+                  {initiatives.map((initiative) => (
+                    <Row
+                      key={initiative.id}
+                      initiative={initiative}
+                      canEdit={canEdit}
+                    />
+                  ))}
+                </ul>
+              </KeyboardList>
             )}
           </CardBody>
         </Card>
@@ -425,6 +430,7 @@ async function Row({
     <li
       className="flex flex-wrap items-center gap-2 py-2"
       data-testid="initiative"
+      data-keyboard-row
     >
       {/*
        * Full width on a phone, so the two controls wrap below rather than
@@ -447,15 +453,18 @@ async function Row({
 
       {canEdit ? (
         <>
-          <InlineSelect
-            label={t("initiatives.statusOf", { title: initiative.title })}
-            value={initiative.status}
-            options={STATUS_OPTIONS.map((one) => ({
-              value: one.value,
-              label: t(one.labelKey),
-            }))}
-            onSave={setStatusAction.bind(null, initiative.id)}
-          />
+          {/* What `e` edits: a box with no layout of its own. */}
+          <span data-keyboard-edit className="contents">
+            <InlineSelect
+              label={t("initiatives.statusOf", { title: initiative.title })}
+              value={initiative.status}
+              options={STATUS_OPTIONS.map((one) => ({
+                value: one.value,
+                label: t(one.labelKey),
+              }))}
+              onSave={setStatusAction.bind(null, initiative.id)}
+            />
+          </span>
           <InlineSelect
             label={t("initiatives.capacityOf", { title: initiative.title })}
             value={initiative.capacity ?? ""}

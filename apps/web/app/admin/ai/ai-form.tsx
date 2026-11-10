@@ -1,5 +1,6 @@
 "use client";
 
+import { RefusedFields } from "@openokr/ui";
 import { useActionState } from "react";
 import { type FormResult, NOTHING_YET } from "./form-state.ts";
 
@@ -32,7 +33,8 @@ export function AIForm({
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
-      {children}
+      {/* Each field shows what the server refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       {state.message === "" ? null : (
         <p
           role={state.ok ? "status" : "alert"}

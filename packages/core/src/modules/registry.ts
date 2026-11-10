@@ -526,6 +526,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         minLevel: ACCESS_LEVELS.full,
       },
       {
+        id: "admin-backups",
+        label: "Backups",
+        href: "/admin/backups",
+        section: "admin",
+        // The workspace archive is the whole workspace, which is why taking
+        // one needs `full` (docs/design/backups-screen.md U1, plan 0.7.0 U3).
+        // Every instance has it: an archive needs no cloud and no provider.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
         id: "admin-ai",
         label: "AI",
         href: "/admin/ai",
@@ -543,6 +553,26 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
         // An agent's persona, its scope and what it did last hour. Reading a
         // run log is reading what the product said to people, which is the
         // same fact the nudge card guards.
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-connections",
+        label: "Agent connections",
+        href: "/admin/connections",
+        section: "admin",
+        // Every member's external agent connections and agent tokens, and
+        // ending one (agent-connections-admin.md, plan 0.7.0 A4). `full`, the
+        // level that may already suspend the member. Shown with AI off: an
+        // external agent needs no AI provider here (D9).
+        minLevel: ACCESS_LEVELS.full,
+      },
+      {
+        id: "admin-webhooks",
+        label: "Webhooks",
+        href: "/admin/webhooks",
+        section: "admin",
+        // A webhook sends workspace events out, as a bot token does, so the
+        // same level the channels card asks (outbound-webhooks.md W11).
         minLevel: ACCESS_LEVELS.full,
       },
     ],

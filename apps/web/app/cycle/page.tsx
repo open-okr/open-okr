@@ -9,15 +9,19 @@ import {
   type ResolvedPractice,
   type ResolvedThresholds,
 } from "@openokr/method";
-import { Card, CardBody, CardHeader } from "@openokr/ui";
+import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { workspaceReaderLevel } from "../../lib/access";
 import { Attachments } from "../../lib/attachments.tsx";
 import { getPool } from "../../lib/auth";
+import { CopyLink } from "../../lib/copy-link.tsx";
+import { reviewMinutesFor } from "../../lib/cycle-review-minutes.ts";
 import { DecisionText } from "../../lib/decision-text.tsx";
 import { readKpiOptions } from "../../lib/kpi-options.ts";
 import { pageTitle } from "../../lib/page-title.ts";
 import { CYCLE_TABS, SectionTabs } from "../../lib/section-tabs.tsx";
+import { shortLinkPath, withQuery } from "../../lib/short-links.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import {
@@ -76,6 +80,14 @@ export const generateMetadata = pageTitle("pageTitle.cycle");
  * so an annual cycle could exist and never be opened.
  */
 
+/** The status chip's tone (UIUX-PLAN S-04, plan 0.7.0 O2). */
+const STATUS_TONE: Record<string, "neutral" | "info" | "ok" | "warn"> = {
+  planning: "info",
+  active: "ok",
+  closing: "warn",
+  closed: "neutral",
+};
+
 export default async function CyclePage({
   searchParams,
 }: {
@@ -105,6 +117,14 @@ export default async function CyclePage({
 
   const query = await searchParams;
   const everyCycle = await callAction(context, "cycles.list", {});
+  // A short link lands on the cycle at its key, which every link on this
+  // screen carries (docs/design/short-ids.md S6).
+  const byShortId = query.cycle
+    ? everyCycle.find((one) => one.shortId === query.cycle)
+    : undefined;
+  if (byShortId) {
+    redirect(withQuery("/cycle", { ...query, cycle: byShortId.id }));
+  }
   const named = everyCycle.find((one) => one.id === query.cycle) ?? null;
   const mode: "annual" | "quarterly" =
     named?.mode ?? (query.mode === "annual" ? "annual" : "quarterly");
@@ -243,6 +263,29 @@ export default async function CyclePage({
   const reviewPractice = reviewRules
     ? (reviewRules.practice as unknown as ResolvedPractice)
     : null;
+
+  // A closed cycle links to its review minutes (sessions.md §9). Read from the
+  // sessions of every space the reader can see, as phase 6 reads its cadence,
+  // so the link never points at a review the reader could not open.
+  const reviewMinutes =
+    viewing === 7 && workflow.closure
+      ? reviewMinutesFor(
+          workflow.cycleId,
+          (
+            await Promise.all(
+              (
+                await callAction(context, "spaces.list", {})
+              ).map(async (space) =>
+                (
+                  await callAction(context, "sessions.list", {
+                    spaceId: space.id,
+                  })
+                ).map((one) => ({ ...one, spaceName: space.name })),
+              ),
+            )
+          ).flat(),
+        )
+      : [];
 
   const cadenceSpaces =
     viewing === 6 ? await callAction(context, "spaces.list", {}) : [];
@@ -453,17 +496,31 @@ export default async function CyclePage({
                     viewing2: PHASE_TITLES[viewing] ?? "",
                   })}
                 </h1>
-                <p className="text-xs text-ink-3">
+                <p className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
                   {t("cycle.completionIsComputedNeverSelf", {
                     name: workflow.name,
                   })}
+                  {/* Where the cycle stands (UIUX-PLAN S-04, plan 0.7.0 O2):
+                      Closing above all, which a date can set overnight. */}
+                  <Chip tone={STATUS_TONE[workflow.status] ?? "neutral"}>
+                    {workflow.status === "planning"
+                      ? t("cycle.status.planning")
+                      : workflow.status === "active"
+                        ? t("cycle.status.active")
+                        : workflow.status === "closing"
+                          ? t("cycle.status.closing")
+                          : t("cycle.status.closed")}
+                  </Chip>
                 </p>
               </div>
-              <CycleSwitcher
-                mode={workflow.mode}
-                cycles={everyCycle}
-                currentId={cycle.id}
-              />
+              <div className="flex items-center gap-2">
+                <CopyLink path={shortLinkPath("cycle", cycle)} />
+                <CycleSwitcher
+                  mode={workflow.mode}
+                  cycles={everyCycle}
+                  currentId={cycle.id}
+                />
+              </div>
             </CardHeader>
             {draftingBlocked || showGaps ? (
               <CardBody className="flex flex-col gap-1.5 border-warn-dot border-t bg-warn-bg">
@@ -687,7 +744,11 @@ export default async function CyclePage({
           ) : null}
 
           {viewing === 0 ? (
-            <AnnualFrame frame={frame} canEdit={canPublish} />
+            <AnnualFrame
+              frame={frame}
+              canEdit={canPublish}
+              cycle={{ id: cycle.id, mode: workflow.mode }}
+            />
           ) : null}
 
           {viewing === 0 ? (
@@ -758,7 +819,13 @@ export default async function CyclePage({
               )}
               cycleId={workflow.cycleId}
               cycleName={workflow.name}
+              status={workflow.status}
+              endsOn={workflow.endsOn}
+              // The server decides with the workspace's own date and refuses
+              // in words; this only spares an undo that would be refused.
+              ended={new Date().toISOString().slice(0, 10) > workflow.endsOn}
               closure={workflow.closure}
+              reviewMinutes={reviewMinutes}
               // The same evaluation `cycles.close` refuses on, so the control
               // is disabled for exactly the reasons the server would give.
               waitingFor={[

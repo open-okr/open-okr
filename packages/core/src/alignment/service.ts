@@ -1,10 +1,13 @@
 import {
   type AlignmentFindingKind,
+  type AlignmentScoreBreakdown,
   activeOnly,
   alignmentFindings,
+  alignmentScores,
   cycles,
   goalDependencies,
   goals,
+  includeDeleted,
   keyResultDependencies,
   keyResults,
   newId,
@@ -20,9 +23,14 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { visibleResourceIds } from "../access/reads.ts";
 import { selectInChunks } from "../actions/chunk.ts";
 import { cycleRulesInTx } from "../cycles/rules.ts";
 import type { OperationTx } from "../operations/operation.ts";
+import {
+  type DependencyDeliveryState,
+  dependencyDelivery,
+} from "./delivery.ts";
 
 /**
  * The alignment engine's half that needs rows (METHOD.md §5, design
@@ -44,7 +52,7 @@ import type { OperationTx } from "../operations/operation.ts";
  */
 
 /** §11's two alignment thresholds, out of a workspace's resolved registry. */
-function alignmentThresholdsOf(
+export function alignmentThresholdsOf(
   thresholds: ResolvedThresholds,
 ): AlignmentThresholds {
   return {
@@ -367,7 +375,8 @@ const identityOf = (finding: FindingIdentity): string =>
   `${finding.ruleKey} ${finding.subjectGoalId ?? ""} ${finding.targetGoalId ?? ""} ${finding.subjectKeyResultId ?? ""}`;
 
 /**
- * Recomputes one scope and reconciles the findings table against the answer.
+ * Recomputes one scope, reconciles the findings table against the answer and
+ * stores the score (`alignment_scores`, plan 0.7.0 D2).
  *
  * Four rules from design §6, and each exists because the alternative breaks
  * something:
@@ -384,7 +393,26 @@ const identityOf = (finding: FindingIdentity): string =>
 export async function recomputeAlignment(
   tx: OperationTx,
   input: AlignmentScopeInput,
+  options: {
+    /**
+     * Leave a stored score where one exists (the fill, design §10). A fill
+     * that read the graph before a concurrent write committed must not
+     * overwrite the fresher score that write stored.
+     */
+    readonly keepStored?: boolean;
+  } = {},
 ): Promise<AlignmentResult> {
+  // **One recompute per cycle at a time** (found by the e2e run of 9 November
+  // 2026: ten concurrent deletes in one cycle deadlocked, SQLSTATE 40P01).
+  // Every structural write recomputes its cycle's findings and score, and two
+  // of them updating the same rows in different orders wait on each other.
+  // Held to the end of the transaction, re-entrant within it, the same
+  // two-key form the board's reorder lock takes.
+  await tx.execute(sql`
+    select pg_advisory_xact_lock(
+      hashtext(${`alignment:${input.workspaceId}`}),
+      hashtext(${input.cycleId})
+    )`);
   const { result } = await alignmentInTx(tx, input);
 
   const scopeId = input.scope.kind === "space" ? input.scope.spaceId : null;
@@ -405,7 +433,52 @@ export async function recomputeAlignment(
     })),
   });
 
+  // The score, beside the findings and in the same transaction, so the two
+  // commit together and cannot disagree (design §10, D2). The band is not
+  // stored: it is read from the cycle's thresholds when the row is read.
+  const row = {
+    workspaceId: input.workspaceId,
+    cycleId: input.cycleId,
+    scope: input.scope.kind,
+    scopeId,
+    score: result.score,
+    breakdown: alignmentBreakdown(result),
+    computedAt: new Date(),
+  };
+  // openokr:allow-mutation: the calling Operation's own transaction, or the
+  // fill's tenant transaction. A projection of the rows, with no audit row
+  // of its own: the write that moved it has one.
+  const insert = tx.insert(alignmentScores).values({ id: newId(), ...row });
+  await (options.keepStored
+    ? insert.onConflictDoNothing()
+    : insert.onConflictDoUpdate({
+        target: [
+          alignmentScores.workspaceId,
+          alignmentScores.cycleId,
+          alignmentScores.scope,
+          alignmentScores.scopeId,
+        ],
+        set: {
+          score: row.score,
+          breakdown: row.breakdown,
+          computedAt: row.computedAt,
+        },
+      }));
+
   return result;
+}
+
+/** The counts the stored score is made of, out of one computation. */
+export function alignmentBreakdown(
+  result: AlignmentResult,
+): AlignmentScoreBreakdown {
+  return {
+    measured: result.measured,
+    withParent: result.counted - result.standingAlone,
+    standingAlone: result.standingAlone,
+    unaligned: result.measured - result.counted,
+    anchored: result.anchored,
+  };
 }
 
 /** One finding the caller wants to exist, in the shape the table stores. */
@@ -632,6 +705,7 @@ export async function loadDependencyRegister(
         riskOwnerId: keyResultDependencies.riskOwnerId,
         escalatedToId: keyResultDependencies.escalatedToId,
         escalatedAt: keyResultDependencies.escalatedAt,
+        providerKeyResultId: keyResultDependencies.providerKeyResultId,
       })
       .from(keyResultDependencies)
       .where(
@@ -642,5 +716,107 @@ export async function loadDependencyRegister(
         ),
       )
       .orderBy(sql`${keyResultDependencies.createdAt} asc`),
+  );
+}
+
+/**
+ * The key result a register entry names, as one reader sees it (plan 0.7.0
+ * O5, design `key-result-dependencies.md` K8 and K9).
+ *
+ * A reader who cannot view the providing goal gets the id and `hidden`, and
+ * nothing else: no title, no goal and no progress, because any of them would
+ * tell them something about a goal they cannot open.
+ */
+export interface ProvidingKeyResult {
+  readonly id: string;
+  readonly title: string | null;
+  readonly goalId: string | null;
+  readonly goalTitle: string | null;
+  readonly progressPct: number | null;
+  readonly state: DependencyDeliveryState;
+}
+
+/**
+ * Every providing key result a read's register names, keyed by id.
+ *
+ * **One access call for the whole read** (K9, P7-T01b): the set filter
+ * `alignment.read` already uses, over the providing goals, rather than the
+ * getter once per entry. Deleted key results and goals are loaded too,
+ * because a removed key result reads `stopped` rather than vanishing from an
+ * entry that still depends on it.
+ */
+export async function loadProvidingKeyResults(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly keyResultIds: readonly (string | null)[];
+  },
+): Promise<ReadonlyMap<string, ProvidingKeyResult>> {
+  const ids = [
+    ...new Set(input.keyResultIds.filter((id): id is string => id !== null)),
+  ];
+  if (ids.length === 0) {
+    return new Map();
+  }
+  const rows = await selectInChunks(ids, (batch) =>
+    tx
+      .select({
+        id: keyResults.id,
+        title: keyResults.title,
+        progressPct: keyResults.progressPct,
+        deletedAt: keyResults.deletedAt,
+        goalId: goals.id,
+        goalTitle: goals.title,
+        goalClosedAt: goals.closedAt,
+        goalDeletedAt: goals.deletedAt,
+      })
+      .from(keyResults)
+      .innerJoin(goals, eq(goals.id, keyResults.goalId))
+      .where(
+        includeDeleted(
+          keyResults,
+          eq(keyResults.workspaceId, input.workspaceId),
+          inArray(keyResults.id, batch),
+        ),
+      ),
+  );
+  const visible = await visibleResourceIds(tx, {
+    workspaceId: input.workspaceId,
+    memberId: input.memberId,
+    resourceType: "goal",
+    ids: [...new Set(rows.map((row) => row.goalId))],
+  });
+  return new Map(
+    rows.map((row) => {
+      const seen = visible.has(row.goalId);
+      const progressPct = Number(row.progressPct);
+      const state = dependencyDelivery({
+        visible: seen,
+        progressPct,
+        deleted: row.deletedAt !== null || row.goalDeletedAt !== null,
+        goalClosed: row.goalClosedAt !== null,
+      });
+      return [
+        row.id,
+        seen
+          ? {
+              id: row.id,
+              title: row.title,
+              goalId: row.goalId,
+              goalTitle: row.goalTitle,
+              progressPct,
+              state,
+            }
+          : {
+              id: row.id,
+              title: null,
+              goalId: null,
+              goalTitle: null,
+              progressPct: null,
+              state,
+            },
+      ];
+    }),
   );
 }

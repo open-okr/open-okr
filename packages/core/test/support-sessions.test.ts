@@ -310,6 +310,67 @@ describe("expiry is refused at use, not at the next sweep", () => {
     expect(rows[0].status).toBe("suspended");
   });
 
+  // Ending is recovery since P2 (support-access.md §10 D7): in a frozen
+  // workspace the owner's revoke failed silently and the sweep threw on it.
+  it("ends a session in a frozen workspace, because ending access is recovery", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await grant(id);
+    await expire();
+    await wb.admin.query(
+      "update workspaces set state = 'frozen' where id = $1",
+      [workspaceId],
+    );
+
+    await expect(sweepExpiredSessions(wb.appPool)).resolves.toEqual({
+      ended: 1,
+      failed: 0,
+    });
+  });
+
+  // A session the sweep cannot end must not stop it ending the rest (§10
+  // D8, plan B2). Two expired sessions in two workspaces; ending the first
+  // fails, and the second still ends.
+  it("ends the rest when ending one fails", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id: first } = await request();
+    await grant(first);
+    const other = (
+      await createWorkspace(wb.appPool, {
+        user: { id: GRANTER, name: "Granter" },
+      })
+    ).workspaceId;
+    const { id: second } = await requestSupportSession(wb.appPool, {
+      workspaceId: other,
+      operatorUserId: OPERATOR,
+      reason: "Ticket 9: the other customer.",
+    });
+    await grantSupportSession(wb.appPool, {
+      workspaceId: other,
+      sessionId: second,
+      grantedByUserId: GRANTER,
+    });
+    await wb.admin.query(
+      "update operator_sessions set expires_at = now() - interval '1 minute'",
+    );
+
+    const outcome = await sweepExpiredSessions(wb.appPool, new Date(), {
+      end: async (pool, input) => {
+        if (input.sessionId === first) {
+          throw new Error("this one cannot end");
+        }
+        await endSupportSession(pool, input);
+      },
+    });
+    expect(outcome).toEqual({ ended: 1, failed: 1 });
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from operator_sessions where ended_at is not null",
+    );
+    expect(rows.map((row) => row.id)).toEqual([second]);
+  });
+
   it("sweeps nothing twice", async () => {
     const wb = await workerDb();
     await grantOperator();
@@ -412,7 +473,9 @@ describe("the customer can see who was in their workspace", () => {
       "select action, payload from audit_events where workspace_id = $1 and action like 'support.%' order by at",
       [workspaceId],
     );
+    // The request too, since it became an Operation (support-access.md §10 D4).
     expect(rows.map((row) => row.action)).toEqual([
+      "support.request",
       "support.grant",
       "support.end",
     ]);
@@ -492,5 +555,105 @@ describe("the refusal happens where somebody can act on it", () => {
     await expect(listSupportSessions(wb.appPool, workspaceId)).resolves.toEqual(
       [],
     );
+  });
+});
+
+// support-access.md §10, plan 0.7.0 P2. The administrators who can answer a
+// request hear that it was made, and that a session they let in ended.
+describe("the inbox rows a support session writes", () => {
+  const rowsFor = async (reason: string) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ member_id: string }>(
+      "select recipient_member_id as member_id from notifications where workspace_id = $1 and reason = $2",
+      [workspaceId, reason],
+    );
+    return rows.map((row) => row.member_id);
+  };
+  const ownerMember = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return rows[0]?.id as string;
+  };
+
+  it("tells each administrator about a request, and records it twice", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+
+    expect(await rowsFor("support_request")).toEqual([await ownerMember()]);
+    const audit = await wb.admin.query(
+      "select actor_operator_user_id, payload from audit_events where workspace_id = $1 and action = 'support.request'",
+      [workspaceId],
+    );
+    expect(audit.rows).toHaveLength(1);
+    expect(audit.rows[0].actor_operator_user_id).toBe(OPERATOR);
+    const instance = await wb.admin.query(
+      "select payload from instance_audit_events where action = 'operator.support_requested'",
+    );
+    expect(instance.rows[0]?.payload).toMatchObject({ sessionId: id });
+  });
+
+  it("never puts the request's reason on an inbox row", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await request("Ticket 4821: something private.");
+    const { rows } = await wb.admin.query(
+      "select count(*)::int as n from notifications n where n.workspace_id = $1 and row_to_json(n)::text like '%4821%'",
+      [workspaceId],
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  it("tells each administrator when an expired session is swept", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await grant(id);
+    await wb.admin.query(
+      "update operator_sessions set expires_at = now() - interval '1 minute' where workspace_id = $1",
+      [workspaceId],
+    );
+    await sweepExpiredSessions(wb.appPool);
+    expect(await rowsFor("support_ended")).toEqual([await ownerMember()]);
+  });
+
+  it("writes no end row for a request that was refused", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await endSupportSession(wb.appPool, {
+      workspaceId,
+      sessionId: id,
+      reason: "refused",
+      endedByUserId: OWNER,
+    });
+    expect(await rowsFor("support_ended")).toEqual([]);
+  });
+
+  it("does not tell the member who revoked it", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    const { id } = await request();
+    await grant(id);
+    await endSupportSession(wb.appPool, {
+      workspaceId,
+      sessionId: id,
+      reason: "revoked",
+      endedByUserId: OWNER,
+    });
+    expect(await rowsFor("support_ended")).toEqual([]);
+  });
+
+  it("refuses a request into a frozen workspace", async () => {
+    const wb = await workerDb();
+    await grantOperator();
+    await wb.admin.query(
+      "update workspaces set state = 'frozen' where id = $1",
+      [workspaceId],
+    );
+    await expect(request()).rejects.toMatchObject({ code: "forbidden" });
   });
 });

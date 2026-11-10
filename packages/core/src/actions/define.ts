@@ -18,8 +18,10 @@ import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { PromptEvaluator } from "../ai/prompt-evaluation.ts";
 import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
+import { resolveAddresses } from "../ids/address.ts";
 import {
   type ActorInput,
   type OperationSpec,
@@ -29,7 +31,12 @@ import type { KeyRing } from "../secrets/key-ring.ts";
 import type { MetricRecorder } from "../telemetry/recorder.ts";
 import type { Admission } from "../tenancy/admission.ts";
 
-/** Read, write, or write that removes something a person can see. */
+/**
+ * Read, write, or destructive: a write that removes something a person can
+ * see, fixes a result for the whole workspace that cannot be undone, shuts a
+ * person out of the workspace, or stops its writes (irreversible-scope.md,
+ * plan 0.7.0 O6). A default token never carries the destructive scope.
+ */
 export type SafetyClass = "read" | "write" | "destructive";
 
 /**
@@ -65,6 +72,13 @@ export interface ActionCallContext {
   readonly pool: Pool;
   readonly workspaceId: string;
   readonly actor: ActorInput;
+  /**
+   * The calling token's scopes, set by REST and the agent endpoint and by
+   * nothing else (token-scope-ceiling.md C3). Every action the call causes,
+   * nested ones included, must fit within them. Absent means no token: the
+   * browser, the scheduler, the relay, chat and the importer, as before.
+   */
+  readonly scopes?: readonly string[];
   readonly ring?: KeyRing;
   /**
    * Reads and removes a file's bytes, when the host has a storage port to
@@ -94,6 +108,15 @@ export interface ActionCallContext {
    * and never decides that the proposal should exist.
    */
   readonly drafter?: AgentDrafter;
+  /**
+   * Runs a prompt key's evaluation set over a new version, for
+   * `ai.updatePrompt` (plan 0.7.0 A9, docs/design/ai-evaluation.md §7).
+   *
+   * Absent on almost every call, which means the one the host installed at
+   * boot. A caller that names its own wins, which is how a test gates a save
+   * without touching the process. With neither, a save is refused.
+   */
+  readonly evaluatePrompt?: PromptEvaluator;
   /**
    * The instance's own address, for the links inside a message an action
    * sends (completeness review H-12). The scheduler and the web host pass it;
@@ -187,6 +210,22 @@ export interface ActionCallContext {
    * every self-hosted instance, and each billing action refuses in words.
    */
   readonly billing?: BillingGateway;
+  /**
+   * Checks an address before it is stored as somewhere this server will
+   * send to: a webhook's URL (docs/design/outbound-webhooks.md W7).
+   *
+   * Structural, like `storage` and `billing` above and for the same reason:
+   * the outbound guard lives in `packages/adapters`, which this package may
+   * not import, so the host passes its `checkUrl`. Absent, a webhook cannot
+   * be saved, and the action says so rather than storing an address nobody
+   * checked.
+   */
+  readonly checkOutboundUrl?: (
+    url: string,
+    options: { readonly allowPrivate: boolean },
+  ) => Promise<
+    { readonly ok: true } | { readonly ok: false; readonly detail: string }
+  >;
 }
 
 export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
@@ -200,6 +239,18 @@ export interface ActionDefinition<TInput = unknown, TOutput = unknown> {
   readonly page?: PageContract;
   /** True when the handler is built from an operation spec. */
   readonly runsThroughPipeline: boolean;
+  /**
+   * The write run as a dry run (plan D4): parsed, loaded, authorised and
+   * checked exactly as the handler would, then rolled back. Answers the parsed
+   * input with its defaults filled in and what the write would have returned,
+   * or throws what the write would have thrown. Present only on writes built
+   * from an operation spec, because only those run wholly inside one
+   * transaction.
+   */
+  readonly validate?: (
+    context: ActionCallContext,
+    input: unknown,
+  ) => Promise<{ readonly input: TInput; readonly result: TOutput }>;
   /** The role domain a write is measured on (workspace-roles.md §11). */
   readonly domain?: RoleDomain;
   /**
@@ -244,7 +295,13 @@ export function defineReadAction<TInput, TOutput>(definition: {
     // Declared after the spread, so it wraps the handler the caller passed
     // rather than being replaced by it.
     async handler(context, rawInput) {
-      const input = definition.input.parse(rawInput);
+      // A short identifier anywhere an address is taken becomes the UUID it
+      // names before the handler sees it (docs/design/short-ids.md S5).
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
+      );
       const required = definition.access ?? ACCESS_LEVELS.view;
       // **The declared level is enforced here, once, for every read** (P6-G31).
       // It used to be recorded and never checked: twenty-nine reads declared
@@ -334,35 +391,56 @@ export function defineWriteAction<
       ? { agentSurface: false as const }
       : {}),
     async handler(context, rawInput) {
-      const input = definition.input.parse(rawInput);
-      const spec = definition.operation(context, input);
-      return runOperation<TOutput, TLoaded>(
-        { pool: context.pool },
-        {
-          ...spec,
-          // The level this action was declared with is the level
-          // `runOperation` actually enforces. Before this line it fell back
-          // to its own `edit` default instead, silently under-enforcing
-          // every write action across Phase 2 that declares `full` (rename,
-          // suspend, restore, convert-to-guest, erase, invitation create and
-          // revoke) — an `edit`-level member could reach all of them. An
-          // `operation()` callback that sets `requires` itself, for a
-          // resource-level rule finer than one flat number, still wins.
-          requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
-          action: definition.name,
-          workspaceId: context.workspaceId,
-          actor: context.actor,
-          ...(definition.domain ? { domain: definition.domain } : {}),
-          // Carried from the call context, so an action reached from chat is
-          // audited with the channel on it without the action knowing there
-          // are channels (P5-T06a). Absent for a browser call.
-          ...(context.channel ? { channel: context.channel } : {}),
-          // Threaded rather than read inside the pipeline, so that a bulk
-          // load is a property of the call and not of a global the next
-          // caller inherits (P6-T01a).
-          ...(context.bulk ? { suppressNotifications: true } : {}),
-        },
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
       );
+      return run(context, input, false);
+    },
+    async validate(context, rawInput) {
+      const input = await resolveAddresses(
+        context,
+        definition.input,
+        definition.input.parse(rawInput),
+      );
+      return { input, result: await run(context, input, true) };
     },
   };
+
+  function run(
+    context: ActionCallContext,
+    input: TInput,
+    dryRun: boolean,
+  ): Promise<TOutput> {
+    const spec = definition.operation(context, input);
+    return runOperation<TOutput, TLoaded>(
+      { pool: context.pool },
+      {
+        ...spec,
+        ...(dryRun ? { dryRun: true } : {}),
+        // The level this action was declared with is the level
+        // `runOperation` actually enforces. Before this line it fell back
+        // to its own `edit` default instead, silently under-enforcing
+        // every write action across Phase 2 that declares `full` (rename,
+        // suspend, restore, convert-to-guest, erase, invitation create and
+        // revoke) — an `edit`-level member could reach all of them. An
+        // `operation()` callback that sets `requires` itself, for a
+        // resource-level rule finer than one flat number, still wins.
+        requires: spec.requires ?? definition.access ?? ACCESS_LEVELS.edit,
+        action: definition.name,
+        workspaceId: context.workspaceId,
+        actor: context.actor,
+        ...(definition.domain ? { domain: definition.domain } : {}),
+        // Carried from the call context, so an action reached from chat is
+        // audited with the channel on it without the action knowing there
+        // are channels (P5-T06a). Absent for a browser call.
+        ...(context.channel ? { channel: context.channel } : {}),
+        // Threaded rather than read inside the pipeline, so that a bulk
+        // load is a property of the call and not of a global the next
+        // caller inherits (P6-T01a).
+        ...(context.bulk ? { suppressNotifications: true } : {}),
+      },
+    );
+  }
 }

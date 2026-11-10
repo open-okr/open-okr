@@ -1,13 +1,17 @@
 import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
+import { uploadTextFile } from "../../../lib/attachment-actions.ts";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { FILE_LINKS, richTextHtml } from "../../../lib/rich-text-html.ts";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -68,14 +72,6 @@ export default async function DocumentPage({
   };
   const { id } = await params;
 
-  // Whether this reader is watching this subject (P6-G07b). Read here rather
-  // than in the control, because the control is a client component and the
-  // answer is part of the page's own first paint.
-  const watch = await callAction(context, "subscriptions.read", {
-    subjectType: "document",
-    subjectId: id,
-  });
-
   const document = await callAction(context, "documents.read", { id }).catch(
     (error: unknown) => {
       // Somebody else's draft answers exactly as one that never existed.
@@ -85,6 +81,19 @@ export default async function DocumentPage({
       throw error;
     },
   );
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (document.id !== id) {
+    redirect(`/documents/${document.id}`);
+  }
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "document",
+    subjectId: id,
+  });
 
   const difference = await callAction(context, "documents.difference", { id });
 
@@ -112,8 +121,8 @@ export default async function DocumentPage({
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col gap-0.5">
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col gap-0.5">
               {back ? (
                 <Link
                   href={back}
@@ -140,16 +149,19 @@ export default async function DocumentPage({
                   : document.authorName}
               </p>
             </div>
-            <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
-              {document.state === "draft"
-                ? t("documents.detail.draft")
-                : t("documents.detail.published")}
-            </Chip>
-            <WatchControl
-              subjectType="document"
-              subjectId={id}
-              initial={watch}
-            />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
+                {document.state === "draft"
+                  ? t("documents.detail.draft")
+                  : t("documents.detail.published")}
+              </Chip>
+              <WatchControl
+                subjectType="document"
+                subjectId={id}
+                initial={watch}
+              />
+              <CopyLink path={shortLinkPath("document", document)} />
+            </div>
           </CardHeader>
           {document.state === "draft" ? (
             <CardBody>
@@ -162,6 +174,7 @@ export default async function DocumentPage({
             <DocumentEditor
               title={document.title}
               body={document.body}
+              html={richTextHtml(document.body, FILE_LINKS)}
               state={document.state}
               canEdit={canEdit}
               onSave={updateDocumentAction.bind(
@@ -176,6 +189,7 @@ export default async function DocumentPage({
                 document.subjectType,
                 document.subjectId,
               )}
+              storeFile={uploadTextFile}
             />
           </CardBody>
         </Card>

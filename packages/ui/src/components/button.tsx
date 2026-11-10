@@ -153,6 +153,9 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={refusing ? undefined : disabled}
         aria-disabled={refusing || undefined}
         aria-busy={busy || undefined}
+        // UIUX-PLAN §2's ✨ action is this variant, so the mark is what the
+        // AI-off leg looks for on every screen (docs/design/ai-off-leg.md §4).
+        data-ai-affordance={variant === "ai" ? "" : undefined}
         onClick={guardPress(refusing, onClick)}
         {...props}
       >

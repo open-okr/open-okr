@@ -158,6 +158,15 @@ const RHYTHM_ROWS = [
     escalates: true,
   },
   {
+    // Plan 0.7.0 A13, approved 9 November 2026 as a new proactive message:
+    // the one that carries the Champion's proposal to close a session.
+    key: "session.left_open",
+    title: "Session still open",
+    fires: "A weekly session runs past its length",
+    recipient: "Facilitator",
+    escalates: false,
+  },
+  {
     key: "streak.at_risk",
     title: "Streak at risk",
     fires: "Week would break streak",
@@ -209,7 +218,7 @@ const RHYTHM_ROWS = [
   {
     key: "cycle.planning_opens",
     title: "Planning opens",
-    fires: "6w (annual) or 3w (quarterly) before start",
+    fires: "6w (annual) or 4w (quarterly) before start",
     recipient: "Sponsor + facilitator",
     escalates: false,
   },
@@ -398,6 +407,16 @@ const QUALITY_ROWS = [
     title: "Process health low",
     fires: "Process-health statement scores low",
     recipient: "Sponsor",
+    deterministic: true,
+  },
+  {
+    // Plan 0.7.0 A8, approved 9 November 2026 as a new proactive message
+    // (AI-NATIVE-PLAN §6.5, "Conversation"). The review it carries is the §4
+    // checks themselves, so it needs no provider.
+    key: "quality.review_requested",
+    title: "The Coach reviewed your goal",
+    fires: "A member mentions the Coach in a comment on a goal",
+    recipient: "The member who asked, with the review in the goal's thread",
     deterministic: true,
   },
 ] as const;

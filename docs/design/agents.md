@@ -97,7 +97,7 @@ either way and only the suggested wording needs a provider.
 | `rule_key` | string, nullable | Resolves to a check or trigger in the method package |
 | `state` | `'open'`, `'applied'`, `'dismissed'` | Dismissing on one side dismisses everywhere |
 | `decided_by_id` | uuid, nullable | |
-| `one_click_applicable` | boolean | True when the fix is mechanical (re-parent, add dependency) |
+| `oneClickApplicable` | boolean, **derived, not a column** | True for an open `relink` naming both goals, the one fix that is mechanical. Not stored: `alignment.read` returns it and `alignment.applyFinding` acts on it, both from one function over the columns above. A dependency needs a provider and a direction, so it is not one click. See [alignment-engine.md §9](alignment-engine.md#9-one-click-applicability-plan-070-a6) |
 
 The `alignment_findings` table from P3-T09 is this table. P4-T06 adds the
 `source = 'coach'` rows. Engine findings are recomputed structurally; coach
@@ -154,7 +154,8 @@ reads `access_bindings` back to assert the absence.
 
 Default: `propose` for recovery OKRs, check-in drafts, and any data write.
 Nudges and digests are notifications, not proposals (they do not write domain
-data).
+data). Since plan 0.7.0 A13 that includes opening and skipping a weekly
+session: §13.
 
 ## 3. The trigger catalogue
 
@@ -182,6 +183,7 @@ the build.
 | `session.due_soon` | 1 day before weekly session | Coordinator + space | No | Yes |
 | `session.open` | Scheduled start | Space | No | Yes |
 | `session.missed` | 1 day after missed session | Coordinator, then sponsor | Yes | Yes |
+| `session.left_open` | A weekly session still running past its §11 length, for one day (plan 0.7.0 A13) | Facilitator | No | Yes |
 | `streak.at_risk` | Week would break streak | Coordinator | No | Yes |
 | `digest.weekly` | After session closes | Space + leadership | No | Yes |
 | `digest.daily` | Member's local morning | Opted-in members | No | Yes |
@@ -219,6 +221,7 @@ the build.
 | `quality.divergence` | Health disagrees with data | Champion + reviewer | No | Yes |
 | `quality.trending_off` | Forecast misses target | Champion | No | Yes |
 | `quality.process_health_low` | Process-health statement scores low | Sponsor | No | Yes |
+| `quality.review_requested` | A member mentions the Coach in a comment on a goal (plan 0.7.0 A8, §14) | The member who asked, with the review in the goal's thread | No | Yes |
 
 ### 3.3 Blocked triggers (awaiting P3 tasks)
 
@@ -598,7 +601,7 @@ every goal write would nudge a champion on each keystroke-sized save.
 | `quality.sandbagging_draft`, `quality.sandbagging_close` | Yes, since completeness review H-11 | `nudges/quality-triggers.ts` |
 | `quality.divergence`, `quality.trending_off` | Yes: divergence from its open findings, trending off from the stored forecast | `nudges/quality.ts`, `nudges/quality-triggers.ts` |
 | `quality.process_health_low` | Yes, the night after the review closes, since completeness review H-11 | `nudges/quality-triggers.ts` |
-| `quality.conflict` | No nudge: the semantic sweep writes a `quality.conflict` finding, which needs a provider, and nothing turns it into a message | `alignment/semantic.ts` |
+| `quality.conflict` | Yes, since plan 0.7.0 A5: each open conflict finding tells both champions, each about their own goal, while both goals are open. Only from a run whose semantic review ran, so with AI off a finding kept from an earlier run says nothing | `alignment/semantic.ts`, `nudges/quality.ts` |
 
 **The mapping is keyed on the condition, not on the check id.** KR-4 trips on
 "All lagging" and on "All leading", and only the first is
@@ -637,3 +640,106 @@ Given the Coach turned off, when the run is called, then it is refused.
 
 Given any Coach run with no provider configured, then its cost is zero and it
 writes no proposal.
+
+## 13. As built at 0.7.0 (A13): the Champion proposes opening and skipping sessions
+
+`sessions.md` §2.1 says the Champion opens and closes the weekly session.
+Akmal approved it on 9 November 2026 as proposals into the review queue, so the
+Champion's autonomy stays `propose` and it moves no session itself. Its weekly
+cadence already sends three lifecycle messages; two of them now carry the
+change they ask for, and a fourth, `session.left_open`, approved the same night
+as a new message, carries the close.
+
+| Message | Window | Proposal | Payload |
+|---|---|---|---|
+| `session.open` | Scheduled start to a day after it, session still `scheduled` | `sessions.open` | `{ id }` |
+| `session.missed` | The day after that, still `scheduled` | `sessions.skip` | `{ id }` |
+| `session.left_open` | `running` past §11's `sessions.weeklyMinutes` upper bound, for one day (`sessionLeftOpen`) | `sessions.close` | `{ id }` |
+| `session.due_soon` | The day before | None: opening early is not what the room booked | |
+
+| Piece | Where |
+|---|---|
+| Which message carries which proposal, weekly sessions only | `sessionProposalFor` in `packages/core/src/sessions/lifecycle-proposals.ts` |
+| Attaching it to the message | `dueSessionNudges` in `nudges/rituals.ts`, recorded by the ordinary `recordNudgesInTx` with the run's id |
+| Not asking again after a decision | `decidedSessionProposalsInTx`: one proposal per session per action, whatever became of it |
+| Settling the other one | `settleSessionProposalsInTx`, called by `sessions.open` and `sessions.skip`; the one being applied is left to `proposals.apply` |
+| The inbox row | `proposalHeadline`: "Open the session ..." and "Mark the session ... as skipped", with the session's title joined in `review.inbox` |
+
+**No new message, rule key, threshold or setting.** The windows are
+`sessionLifecycleStage`'s, unchanged since P4-T05b. The recipient is unchanged
+too: the facilitator, or the space's coordinator where the session names none.
+That recipient is who decides the proposal, because a session has no access
+context of its own (§11.2's first row).
+
+**Closing, added the same night.** Akmal approved `session.left_open` as a new
+proactive message on 9 November 2026. It goes to the facilitator, so the close
+proposal it carries is theirs to decide, and `sessions.close` settles a pending
+one when the session is closed by hand, as open and skip do. `sessions.close`
+is destructive (O6), so a token applying it needs the destructive scope once
+`docs/design/token-scope-ceiling.md` is built; the review inbox is unaffected.
+
+### 13.1 Acceptance criteria
+
+The Given / When / Then list is `sessions.md` §2.1's. The tests are
+`packages/core/test/champion-session-proposals.test.ts` and
+`e2e/s02c-session-proposals.spec.ts`.
+
+## 14. As built at 0.7.0 (A8): mention the Coach on a goal and it replies
+
+AI-NATIVE-PLAN §6.5, "Conversation". Approved on 9 November 2026 as a new
+proactive message, `quality.review_requested` (§3.2).
+
+| Step | What happens | Where |
+|---|---|---|
+| 1 | A comment on a goal mentions the workspace's Coach. Its write transaction enqueues `agents.coach.mentioned` with the comment, the goal and the goal's space. An edit that newly mentions the Coach does the same | `coachMentionOutboxInTx`, called by `comments.create` and `comments.update` |
+| 2 | The relay delivers the row and calls `agents.answerMention` as the Coach's agent member | `outbox/handlers.ts`, `agents/coach-mention-run.ts` |
+| 3 | The action reads the goal through the Coach's bindings and evaluates METHOD.md §4.1 and §4.2 on it and its key results, under the practice and strictness in force | `actions/coach-mention.ts`, `evaluateGoalInTx` |
+| 4 | It posts the reply as a comment on the goal, authored by the Coach, answering the comment that asked (`parent_id`) | `createComment` |
+| 5 | It records one `quality.review_requested` nudge to the person who asked, through the same leave, suppression, recording and delivery every run uses | `recordAndDeliverInTx`, extracted from `runDueNudgesInTx` |
+
+**The reply.** One line saying what it was checked against, then one bullet
+per check that blocks, warns or is still to do, worst first: the check's key
+and title, its status, the condition seen, METHOD.md §4's prompt for it, the
+key results it names, and `Rule: KR-3`. A pass and a check the practice turned
+to information are not raised. Every key goes through `describeRule` first, and
+one the package does not define throws rather than being cited
+(`agents/coach-review.ts`). Nothing needs attention, and it says so.
+
+**Decisions to check.**
+
+| Question | Decision | Why |
+|---|---|---|
+| What is reviewed | The §4.1 objective checks and §4.2 key result checks only | That is "the goal". Alignment checks are about other goals, and naming a parent or a sibling in a thread could tell its readers about a goal they cannot open |
+| AI | None. The words are `packages/method`'s | Deterministic first. A phrasing pass would be a new drafter capability with its own prompt and evaluation (A9); the reply already speaks in the method's own words |
+| A goal the Coach cannot see | Silence: no reply, no nudge, no activity, no audit row. The relay logs the skip with "There is no such goal." | The Coach is bound to spaces and to space-less goals by name. Even a reply saying only that it cannot see the goal would be the Coach writing on a goal outside its bindings. The refusal names nothing, and an administrator who wants it there binds it to the space |
+| Least privilege | `load` reads the goal through `agentSeesGoal`, and the pipeline's floor is measured at `view` on the goal's space (or on the goal, for one in no space) against the Coach's own level | A goal's own access context carries its space's groups and not the agents', so the space is where the Coach's binding is |
+| Who may call it | Only the Coach's agent member. Declared at `full`, not offered to agents | A person calling it is refused, so nobody answers for the Coach |
+| The Coach off, or in sandbox | No reply, nothing written, a logged skip | Sandbox commits nothing at all |
+| Deduplication | The reply is posted every time somebody asks; the nudge, which is the ping, is held as `dedup` when the asker already heard about this goal today, and quiet hours, the ceiling, snooze and leave hold as for every other message | Somebody who asked in a thread is answered in it. The suppression rules decide whether they are also told on their channel. Holding the reply itself would leave a person who asked twice, or whom the Champion reminded about a check-in that morning, with no answer |
+| Twice for one comment | Refused as "already answered", logged as a skip | The relay delivers at least once |
+| Which threads | A goal's only. A mention on a key result, a check-in or a task is an ordinary mention | §6.5 names the goal |
+| The composer | `@` offers the Coach while it is on (`agents.mentionable`), and never the Champion | Nothing answers a mention of the Champion |
+
+### 14.1 Acceptance criteria
+
+Given a comment on a goal that mentions the Coach, when it is posted, then one
+`agents.coach.mentioned` row is enqueued in the same transaction; a comment
+without the mention, or on a key result, enqueues none.
+
+Given that row, when the relay delivers it with no provider, then the Coach's
+reply answers the comment in the goal's thread, is valid editor JSON, raises
+the failing checks worst first, and each point cites a key `describeRule`
+resolves.
+
+Given the reply, then the asker has one `quality.review_requested` nudge of
+kind `quality`, subject the goal, at escalation step 0, and the audit row names
+the Coach's agent member.
+
+Given a second mention the same day, then the Coach answers again and the
+second nudge is held as `dedup`.
+
+Given a goal the Coach is not bound to, or the Coach off or in sandbox, then
+nothing is written and the skip is logged without naming the goal.
+
+The tests are `packages/core/test/coach-mention.test.ts` and
+`e2e/s14d-coach-mention.spec.ts`.

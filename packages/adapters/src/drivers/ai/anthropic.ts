@@ -5,10 +5,11 @@
  * system text is a separate top-level parameter, and every system-role
  * message in the port's own `ChatMessage[]` is folded into that parameter
  * before anything reaches the SDK. There is no embeddings endpoint at all,
- * so `embed()` refuses rather than guessing. There is no JSON-schema
- * response format either; `extract()` gets the same effect by forcing
- * exactly one tool call whose `input_schema` is the caller's schema, since a
- * forced tool call's only legal output is that tool's arguments.
+ * so `embed()` refuses rather than guessing. `extract()` asks for structured
+ * output, `output_config` with the caller's JSON schema, which every current
+ * model supports. The older models in `FORCED_TOOL_ONLY` lack it and get one
+ * forced tool call whose `input_schema` is the caller's schema instead, since
+ * a forced tool call's only legal output is that tool's arguments.
  *
  * `temperature` is never sent. The SDK speaks API version 2026-10-21, which
  * refuses `temperature`, `top_p` and `top_k` on every model, and Claude 4.7

@@ -1,3 +1,4 @@
+import { consoleMailRevealsContent } from "@openokr/adapters";
 import {
   ACCESS_LEVELS,
   callAction,
@@ -7,6 +8,7 @@ import {
   readInstanceName,
   readRegistrationPolicy,
   readUpdateCheck,
+  resolveWorkspaceSettings,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -24,6 +26,7 @@ import { ConsoleMailNotice } from "./console-mail-notice";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
 import { InstanceNameCard } from "./instance-name-card";
+import { LimitsCard, type WorkspaceLimits } from "./limits-card";
 import { RegistrationCard } from "./registration-card";
 import { SetupCard } from "./setup-card";
 import { UpdateCheckCard } from "./update-check-card";
@@ -87,6 +90,24 @@ export default async function GeneralSettingsPage() {
     lifecycle !== null &&
     (await resolveAccessLevelFor(workspace.workspaceId, workspace.memberId)) >=
       ACCESS_LEVELS.full;
+  // The limits card (plan 0.7.0 B10). A key nobody stored reads as the
+  // registry's default, which is what the product enforces for it.
+  const defaults = resolveWorkspaceSettings({});
+  const limitOf = (key: keyof WorkspaceLimits): number => {
+    const stored = read.settings[key];
+    return typeof stored === "number" ? stored : Number(defaults[key]);
+  };
+  const limits: WorkspaceLimits = {
+    storageQuotaBytes: limitOf("storageQuotaBytes"),
+    exportInlineRowLimit: limitOf("exportInlineRowLimit"),
+    importRowLimit: limitOf("importRowLimit"),
+    messageLogRetentionDays: limitOf("messageLogRetentionDays"),
+    agentRunCostCapUsd: limitOf("agentRunCostCapUsd"),
+    agentToolCallRetentionDays: limitOf("agentToolCallRetentionDays"),
+  };
+  const canManage =
+    (await resolveAccessLevelFor(workspace.workspaceId, workspace.memberId)) >=
+    ACCESS_LEVELS.full;
   const closeCard = !owns ? null : hold?.kind === "closed" ? (
     <CloseWorkspaceCard
       mode="closed"
@@ -126,8 +147,15 @@ export default async function GeneralSettingsPage() {
         tenantFloorBypassed={floor === "bypassed"}
         schedulerFailed={schedulerState() === "failed"}
       />
-      {mail.transport === "console" ? <ConsoleMailNotice /> : null}
+      {mail.transport === "console" ? (
+        <ConsoleMailNotice revealsContent={consoleMailRevealsContent()} />
+      ) : null}
       <GeneralSettingsForm settings={read.settings} zones={listTimezones()} />
+      <LimitsCard
+        limits={limits}
+        providerSetsTwo={cloud}
+        canManage={canManage}
+      />
       {instanceName ? (
         <InstanceNameCard
           name={instanceName.value}

@@ -8,6 +8,12 @@ export const NOTIFICATION_REASONS = [
   "role",
   "review",
   "check_in",
+  // Release 0.7.0, migration 0151. A support request and the end of a
+  // session, to the administrators who can answer (support-access.md §10),
+  // and a member's agent connection ended by an administrator (A4).
+  "support_request",
+  "support_ended",
+  "connection_ended",
 ] as const;
 export type NotificationReason = (typeof NOTIFICATION_REASONS)[number];
 

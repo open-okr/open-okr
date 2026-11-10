@@ -56,6 +56,7 @@ export {
   actionNames,
   callAction,
   getAction,
+  validateAction,
 } from "./actions/registry.ts";
 export { SEARCH_TEXT_MAX_LENGTH } from "./actions/search.ts";
 export {
@@ -124,6 +125,8 @@ export type {
   NoteThemes,
   ParentContext,
   ParsedFilter,
+  PlannedRun,
+  PlanRunContext,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
@@ -142,6 +145,14 @@ export type {
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
+export {
+  AGENT_RUN_CHANGED_TOPIC,
+  type AgentRunChangedEvent,
+  type AgentRunChangedMessage,
+  agentRunChangedEvent,
+  agentRunsChannel,
+  agentRunVersion,
+} from "./agents/live.ts";
 export {
   AGENT_RUN_STEP_TOPIC,
   type AgentRunStepJob,
@@ -188,9 +199,22 @@ export {
   seededModelsForProvider,
 } from "./ai/model-catalog.ts";
 export {
+  type PersonalDataFinder,
+  setPersonalDataFinder,
+} from "./ai/personal-data.ts";
+export {
+  evaluationPasses,
+  type PromptEvaluation,
+  type PromptEvaluator,
+  setDefaultPromptEvaluator,
+} from "./ai/prompt-evaluation.ts";
+export { currentPromptVersions } from "./ai/prompt-versions.ts";
+export {
   DEFAULT_PROMPTS,
   defaultPromptFor,
   knownPromptKeys,
+  PROMPT_KEYS,
+  type PromptKey,
 } from "./ai/prompts.ts";
 export {
   type AICredentialSource,
@@ -217,6 +241,7 @@ export {
   summariseUsage,
   type UsageSummaryRow,
 } from "./ai/usage.ts";
+export { fillAlignmentScores } from "./alignment/fill.ts";
 export {
   buildCliContract,
   type CliCommand,
@@ -427,6 +452,8 @@ export {
   REST_ROUTES,
   type RestRoute,
   routeAt,
+  VALIDATE_PARAMETER,
+  validateRequested,
 } from "./api/surface.ts";
 export {
   ADDRESS_RATE_LIMIT,
@@ -477,6 +504,8 @@ export {
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
 export { callerAddress } from "./auth/caller-address.ts";
+export { authLimiterStorage } from "./auth/limiter-storage.ts";
+export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
 export {
   syncAllSamlProviders,
   syncSamlProvider,
@@ -744,6 +773,7 @@ export {
   type Reversal,
   reversalFor,
 } from "./copilot/proposals.ts";
+export { sweepEndedCycles } from "./cycles/closing.ts";
 export {
   type BuildDemoResult,
   buildDemoWorkspace,
@@ -793,6 +823,38 @@ export {
   type ScimFilter,
   setDirectoryUserActive,
 } from "./directory-sync/users.ts";
+export {
+  BROWSER_ERROR_BODY_LIMIT,
+  BROWSER_ERRORS_PER_MINUTE,
+  type BrowserError,
+  describeBrowserError,
+  isExpectedBrowserError,
+  parseBrowserError,
+} from "./errors/browser.ts";
+export {
+  classifyError,
+  type DescribedError,
+  describeError,
+  ERROR_SOURCES,
+  type ErrorFrame,
+  type ErrorSource,
+  FRAME_LIMIT,
+  fingerprintOf,
+  parseStack,
+  scrubFile,
+} from "./errors/classify.ts";
+export {
+  type ErrorReport,
+  type ErrorReportContext,
+  type ErrorReportingOptions,
+  type ErrorReportSink,
+  flushErrorReports,
+  installErrorReporting,
+  REPORTS_PER_FINGERPRINT_PER_MINUTE,
+  REPORTS_PER_MINUTE,
+  reportDescribedError,
+  reportError,
+} from "./errors/report.ts";
 export { myExportBlob } from "./exports/collect.ts";
 // The shape the relay host fills in. A type, so nothing of the worker itself
 // reaches a caller that only needs to describe its own storage function.
@@ -995,6 +1057,9 @@ export {
   type ResolvedActor,
   runOperation,
 } from "./operations/operation.ts";
+// What an edit screen sends as `read`, and which fields it changed
+// (optimistic-concurrency.md V3), compared the way the server compares them.
+export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
@@ -1017,10 +1082,13 @@ export {
   readBillingAsOperator,
   readInstanceFlags,
   readUsageAsOperator,
+  readWorkspaceLimitsAsOperator,
   requestSupportSession,
   revokeOperator,
   setLifecycleAsOperator,
   setPlanAsOperator,
+  setTrialAsOperator,
+  setWorkspaceLimitsAsOperator,
   sweepExpiredSessions,
 } from "./operator/index.ts";
 export {
@@ -1028,6 +1096,7 @@ export {
   memberEmail,
   OUTBOX_HANDLERS,
   OUTBOX_REDACT_ON_DELIVERY,
+  OUTBOX_RETRY_POLICY,
   type OutboxDelivery,
   type OutboxHandler,
   type OutboxHandlerDeps,
@@ -1145,6 +1214,7 @@ export {
   type SessionStageChangedEvent,
   sessionChannel,
 } from "./sessions/live.ts";
+export type { StageGapReason } from "./sessions/stage-completion.ts";
 export {
   BRAND_SURFACES,
   type BrandPalette,
@@ -1205,6 +1275,12 @@ export {
   setupRefusal,
 } from "./setup/state.ts";
 export {
+  resolveStatusThresholds,
+  StatusSettingError,
+  type StatusThresholds,
+  statusThresholdsFrom,
+} from "./status/thresholds.ts";
+export {
   type BoardChangedEvent,
   boardChannel,
 } from "./tasks/live.ts";
@@ -1255,6 +1331,7 @@ export {
   type AdmissionLimits,
   AdmissionSettingError,
   adoptWorkspaces,
+  allowsPrivateWebhookTargets,
   type ClosureSchedule,
   type CreditSummary,
   countSeats,
@@ -1267,20 +1344,27 @@ export {
   hasPlanScreen,
   isCloudEnabled,
   listSeatHolders,
+  planLimitsFor,
   readClosureSchedule,
   readCreditSummary,
   readHostedAccess,
   readOwnPlan,
   readOwnUsage,
   readPlans,
+  readTrialNotice,
   readWorkspaceLifecycle,
   remindBeforeErasure,
+  remindTrialsEnding,
   resolveAdmissionLimits,
   seatState,
   setDefaultAdmission,
+  sweepTrials,
   type TenantLifecycle,
 } from "./tenancy/index.ts";
 export { withoutTrailingSlashes } from "./urls.ts";
+export { WEBHOOK_EVENT_GROUPS } from "./webhooks/events.ts";
+export { DELIVERY_LOG_DAYS, FAILURES_BEFORE_OFF } from "./webhooks/jobs.ts";
+export { purgeWebhookDeliveries } from "./webhooks/retention.ts";
 export { browserTimezoneFromCookies } from "./workspaces/browser-timezone.ts";
 export {
   createOwnWorkspace,
@@ -1305,11 +1389,14 @@ export {
   isRegistrationOpen,
   REGISTRATION_CLOSED_MESSAGE,
   REGISTRATION_POLICIES,
+  type RegistrationOrigin,
   type RegistrationPolicy,
   readRegistrationPolicy,
   registrationOpenOrInvited,
+  registrationPolicyOrigin,
   registrationRefusal,
   setRegistrationPolicy,
+  setRegistrationPolicyAsOperator,
 } from "./workspaces/registration.ts";
 export {
   type LiveWorkspace,

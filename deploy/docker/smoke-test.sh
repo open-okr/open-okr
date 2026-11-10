@@ -136,6 +136,19 @@ app_log | grep -qE "applied [0-9]+ migration" \
   || fail "migrations did not run on boot"
 pass "migrations ran on boot"
 
+# --- the metrics scrape token (plan 0.7.0 B3) --------------------------------
+# `up` writes the token Prometheus reads, mode 600, and a scrape with it is
+# answered; one without it is not-found rather than the sign-in page.
+[ -f ./secrets/observability-token ] || fail "up wrote no metrics scrape token"
+[ "$(stat -c %a ./secrets/observability-token 2>/dev/null || stat -f %Lp ./secrets/observability-token)" = "600" ] \
+  || fail "the metrics scrape token is not mode 600"
+scrape_token="$(cat ./secrets/observability-token)"
+[ "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $scrape_token" "$BASE/api/metrics")" = "200" ] \
+  || fail "a scrape with the token was not answered"
+[ "$(curl -s -o /dev/null -w '%{http_code}' "$BASE/api/metrics")" = "404" ] \
+  || fail "a scrape without the token was not refused as not-found"
+pass "the metrics scrape token is written and accepted"
+
 # --- the server runs as a role the tenant floor binds ----------------------
 # Completeness review H-01. The server used to connect as the Postgres image's
 # own role, which is a superuser, so row-level security never applied to the
@@ -176,6 +189,21 @@ if ./openokr operator --email ops@example.com --granted-by founder@example.com 2
   pass "the operator command runs inside the image"
 else
   fail "the operator command does not run inside the image"
+fi
+
+# The data changes too (PLAN §5.1, plan 0.7.0 P9). `status` reads the ledger
+# inside the image and names what has not run; on a fresh instance that is every
+# script. `data-change` runs them all, after which `status` says so.
+if ./openokr status 2>&1 | grep -q "Data changes: .* not complete"; then
+  pass "status names the data changes not yet run"
+else
+  fail "status does not report the data changes"
+fi
+./openokr data-change >/dev/null 2>&1 || fail "the data changes did not run inside the image"
+if ./openokr status 2>&1 | grep -q "Data changes: all .* complete"; then
+  pass "the data changes run inside the image, and status then says so"
+else
+  fail "status still names pending data changes after they ran"
 fi
 
 # The erasure command too (docs/design/workspace-erasure.md §7), for the same

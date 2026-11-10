@@ -5,6 +5,7 @@ import {
   readBillingAsOperator,
   readPlans,
   readUsageAsOperator,
+  readWorkspaceLimitsAsOperator,
 } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
@@ -15,9 +16,13 @@ import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
 import { moveLifecycle } from "./lifecycle-actions";
 import { LifecycleForm } from "./lifecycle-form";
+import { setLimits } from "./limits-actions";
+import { OperatorLimitsForm } from "./limits-form";
 import { setPlan } from "./plan-actions";
 import { OperatorPlanForm } from "./plan-form";
 import { SupportRequest } from "./support-request";
+import { setTrial } from "./trial-actions";
+import { OperatorTrialForm } from "./trial-form";
 
 /**
  * The tab reads the workspace's name, from the list this operator may see;
@@ -173,10 +178,13 @@ export default async function OperatorWorkspacePage({
   searchParams,
 }: {
   params: Promise<{ workspaceId: string }>;
-  searchParams?: Promise<{ refused?: string }>;
+  searchParams?: Promise<{ refused?: string; refusedOn?: string }>;
 }) {
   const { workspaceId } = await params;
-  const refused = (await searchParams)?.refused ?? null;
+  const query = await searchParams;
+  const refused = query?.refused ?? null;
+  // Which field the refusal was about, so it shows under that field (U1).
+  const refusedOnReason = query?.refusedOn === "reason";
   const operator = await requireOperator();
   const pool = getPool();
 
@@ -190,6 +198,12 @@ export default async function OperatorWorkspacePage({
   }
 
   const [usage] = await readUsageAsOperator(pool, operator.userId, workspaceId);
+  // The provider's two limits (plan 0.7.0 B10).
+  const limits = await readWorkspaceLimitsAsOperator(
+    pool,
+    operator.userId,
+    workspaceId,
+  );
   const billing = await readBillingAsOperator(
     pool,
     operator.userId,
@@ -297,11 +311,24 @@ export default async function OperatorWorkspacePage({
             {/* Four counts, and the date is not one of them. It sat here at
              * display size and wrapped onto two lines, which broke the row's
              * rhythm and put a date where a reader was scanning integers. A
-             * date is a different kind of fact and it reads below. */}
-            <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-4 sm:divide-y-0">
+             * date is a different kind of fact and it reads below. Five
+             * since plan 0.7.0 P3 added the seats the plan counts. */}
+            <div className="grid grid-cols-2 divide-x divide-y divide-line sm:grid-cols-5 sm:divide-y-0">
               <Count
                 label={t("operator.workspace.countMembers")}
                 value={String(usage.memberCount)}
+              />
+              {/* What the plan counts, beside who works here (operator-
+               * console.md §11 P4): invitations still waiting hold a seat. */}
+              <Count
+                label={t("operator.workspace.countSeats")}
+                value={
+                  usage.seatCount === null
+                    ? t("operator.workspaces.notMeasured")
+                    : tenant.seats === null
+                      ? String(usage.seatCount)
+                      : `${usage.seatCount} / ${tenant.seats}`
+                }
               />
               <Count
                 label={t("operator.workspace.countGoals")}
@@ -359,6 +386,19 @@ export default async function OperatorWorkspacePage({
             label={t("operator.workspace.factRegion")}
             value={tenant.region}
           />
+          {/* Tenant-lifecycle.md §11, plan 0.7.0 P4. */}
+          {tenant.trialEndsAt ? (
+            <Fact
+              label={t("operator.workspace.factTrialEnds")}
+              value={day(tenant.trialEndsAt)}
+            />
+          ) : null}
+          {tenant.tenantState === "suspended" && tenant.suspendedByTrial ? (
+            <Fact
+              label={t("operator.workspace.factReadOnly")}
+              value={t("operator.workspace.readOnlyByTrial")}
+            />
+          ) : null}
           {tenant.closedAt ? (
             <Fact
               label={t("operator.workspace.factClosed")}
@@ -393,6 +433,7 @@ export default async function OperatorWorkspacePage({
               pending={pending}
               workspaceId={workspaceId}
               refused={refused}
+              refusedOnReason={refusedOnReason}
             />
           </section>
 
@@ -437,6 +478,27 @@ export default async function OperatorWorkspacePage({
             }))}
             workspaceId={tenant.workspaceId}
             workspaceName={tenant.name}
+          />
+
+          {/* Start, extend or remove a trial (tenant-lifecycle.md §11 T2). */}
+          <OperatorTrialForm
+            action={setTrial}
+            endsOn={
+              tenant.trialEndsAt
+                ? tenant.trialEndsAt.toISOString().slice(0, 10)
+                : null
+            }
+            plans={plans.map((plan) => ({ key: plan.key, label: plan.name }))}
+            workspaceId={tenant.workspaceId}
+          />
+
+          {/* Plan 0.7.0 B10: the storage quota and the agent cost cap are the
+           * provider's on a cloud, so they are set here and not on S-36. */}
+          <OperatorLimitsForm
+            action={setLimits}
+            storageQuotaBytes={limits.storageQuotaBytes}
+            agentRunCostCapUsd={limits.agentRunCostCapUsd}
+            workspaceId={tenant.workspaceId}
           />
 
           <LifecycleForm

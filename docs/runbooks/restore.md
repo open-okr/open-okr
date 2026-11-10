@@ -1,7 +1,9 @@
 # Restore runbook
 
 When to use this: a database failure, a corrupted instance, or a migration to
-new hardware. The backup holds a `pg_dump` custom-format dump encrypted with
+new hardware. A workspace administrator sees no instance backup and cannot
+restore one: each holds every workspace. Their own copy is the workspace
+archive, on Admin, Backups. The backup holds a `pg_dump` custom-format dump encrypted with
 the instance's root key, plus blob storage if the backup included it.
 
 ## Prerequisites

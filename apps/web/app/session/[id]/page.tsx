@@ -20,7 +20,12 @@
  * filled every panel (the gap audit's B-10, closed by P6-G19a to P6-G19c).
  */
 
-import { ACCESS_LEVELS, callAction, OperationError } from "@openokr/core";
+import {
+  ACCESS_LEVELS,
+  callAction,
+  OperationError,
+  type StageGapReason,
+} from "@openokr/core";
 import {
   canonThresholds,
   REVIEW_STAGE_KEYS,
@@ -35,17 +40,19 @@ import {
 } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { confidenceDisplay } from "../../../lib/confidence-display.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import {
   nameOf,
   SESSION_KIND_NAME_KEYS,
 } from "../../../lib/identifier-names.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { getTranslations } from "../../../lib/translations";
 import { WeeklyFigures } from "../../../lib/weekly-figures.tsx";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -88,6 +95,7 @@ import { type RoomPulse, RoomPulsePanel } from "./room-pulse";
 import { RootCausePanel, type RootCauses } from "./root-cause";
 import { Scoring, type ScoringStatus } from "./scoring";
 import { SessionLive } from "./session-live";
+import { stageGapText } from "./stage-gap.ts";
 import { type TeamRetro, TeamRetroPanel } from "./team-retro";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
@@ -138,6 +146,8 @@ export default async function SessionPage({ params }: SessionPageProps) {
   // results to offer them to a commitment.
   let sessionRow: {
     id: string;
+    /** The public address (docs/design/short-ids.md S6). */
+    shortId: string | null;
     spaceId: string | null;
     cycleId: string | null;
     kind: string;
@@ -162,6 +172,11 @@ export default async function SessionPage({ params }: SessionPageProps) {
     })) as typeof sessionRow;
   } catch {
     notFound();
+  }
+  // A short link lands on the page at its key, which every link, form and the
+  // live channel on it are built from (docs/design/short-ids.md S6).
+  if (sessionRow.id !== id) {
+    redirect(`/session/${sessionRow.id}`);
   }
 
   const participants = (await callAction(context, "sessions.participants", {
@@ -471,6 +486,33 @@ export default async function SessionPage({ params }: SessionPageProps) {
       )
     : [];
 
+  // Each stage's completion condition (docs/design/sessions.md §4.1, plan
+  // 0.7.0 S1): shown on the rail and beside the advance, never enforced but
+  // for stage two's explanations. Not read before the review opens, because
+  // the rail judges only the stages the room has reached.
+  const stageCompletion =
+    isQuarterly && sessionRow.stageKey !== null
+      ? (
+          (await callAction(context, "sessions.stageCompletion", {
+            sessionId: id,
+          })) as {
+            stages: {
+              stageKey: string;
+              complete: boolean | null;
+              gap: { reason: StageGapReason; count: number } | null;
+              refusesAdvance: boolean;
+            }[];
+          }
+        ).stages
+      : [];
+  const currentCompletion = stageCompletion.find(
+    (entry) => entry.stageKey === sessionRow.stageKey,
+  );
+  const currentGap =
+    currentCompletion?.complete === false && currentCompletion.gap !== null
+      ? stageGapText(currentCompletion.gap, t)
+      : null;
+
   // The monthly review's whole record in one read (METHOD.md §7.5, P4-T09).
   // Loaded for a scheduled session as well, so a facilitator can see what the
   // room will be looking at before they open it.
@@ -748,9 +790,12 @@ export default async function SessionPage({ params }: SessionPageProps) {
             })}
           </p>
         </div>
-        <Chip tone="neutral">
-          {nameOf(SESSION_KIND_NAME_KEYS, sessionRow.kind, t)}
-        </Chip>
+        <div className="flex items-center gap-2">
+          <CopyLink path={shortLinkPath("session", sessionRow)} />
+          <Chip tone="neutral">
+            {nameOf(SESSION_KIND_NAME_KEYS, sessionRow.kind, t)}
+          </Chip>
+        </div>
       </div>
 
       {/* State-specific controls (facilitator only) */}
@@ -917,14 +962,29 @@ export default async function SessionPage({ params }: SessionPageProps) {
       {isFacilitator && isRunning && (
         <div className="flex gap-3">
           {!isOnLastStage && !isMonthly ? (
-            <AdvanceControl sessionId={id} />
+            <AdvanceControl
+              sessionId={id}
+              stageKey={sessionRow.stageKey}
+              missing={currentGap}
+              refuses={currentCompletion?.refusesAdvance ?? false}
+            />
           ) : (
             <form
               action={async () => {
                 "use server";
                 await closeSessionAction(id);
               }}
+              className="flex flex-col gap-1.5"
             >
+              {/* The last stage's gap, said the same way the advance says
+                  it (plan 0.7.0, S1). Closing is not refused for it. */}
+              {currentGap === null ? null : (
+                <p className="max-w-prose text-xs text-ink-2">
+                  {t("session.detail.advanceControl.notDoneYet", {
+                    missing: currentGap,
+                  })}
+                </p>
+              )}
               <Button type="submit" variant="primary">
                 {t("session.detail.closeSession")}
               </Button>
@@ -967,6 +1027,9 @@ export default async function SessionPage({ params }: SessionPageProps) {
           note={sessionRow.notes[sessionRow.stageKey ?? ""] ?? null}
           isFacilitator={isFacilitator}
           isRunning={isRunning}
+          completion={Object.fromEntries(
+            stageCompletion.map((entry) => [entry.stageKey, entry.complete]),
+          )}
         />
       ) : null}
 

@@ -182,7 +182,7 @@ export async function mayDecideProposal(
 /**
  * The row's first line: what applying it would do, and to what.
  *
- * The two actions the built-in agents propose get a sentence. Anything else,
+ * The actions the built-in agents propose get a sentence. Anything else,
  * which is whatever a custom agent was given, keeps the action's own name,
  * because a second description of every action in the registry would be one
  * more thing to go stale.
@@ -200,6 +200,22 @@ export function proposalHeadline(
     return subjectTitle
       ? `Launch a recovery objective for "${subjectTitle}"`
       : "Launch a recovery objective";
+  }
+  // The Champion's two session proposals (plan 0.7.0 A13).
+  if (action === "sessions.open") {
+    return subjectTitle
+      ? `Open the session "${subjectTitle}"`
+      : "Open the session";
+  }
+  if (action === "sessions.close") {
+    return subjectTitle
+      ? `Close the session "${subjectTitle}"`
+      : "Close the session";
+  }
+  if (action === "sessions.skip") {
+    return subjectTitle
+      ? `Mark the session "${subjectTitle}" as skipped`
+      : "Mark the session as skipped";
   }
   const named = `Decide on the proposed ${action.replace(/\./g, " ")}`;
   return subjectTitle ? `${named} for "${subjectTitle}"` : named;

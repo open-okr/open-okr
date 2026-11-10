@@ -42,6 +42,7 @@ import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { refreshGateStateFor } from "../cycles/workflow.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { bindImporterInTx } from "../imports/binding.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import {
@@ -53,6 +54,12 @@ import {
 } from "../initiatives/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import { OperationError } from "../operations/operation.ts";
+import {
+  changedFields,
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { richTextSchema } from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -62,6 +69,8 @@ const richText = richTextSchema();
 
 const initiativeOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   spaceId: z.uuid(),
   spaceName: z.string(),
   title: z.string(),
@@ -270,6 +279,7 @@ async function withLinks(
   workspaceId: string,
   rows: readonly {
     id: string;
+    shortId: string | null;
     spaceId: string;
     spaceName: string;
     title: string;
@@ -329,6 +339,7 @@ async function withLinks(
     const done = Number(counted?.done ?? 0);
     return {
       id: row.id,
+      shortId: row.shortId,
       spaceId: row.spaceId,
       spaceName: row.spaceName,
       title: row.title,
@@ -353,6 +364,7 @@ async function withLinks(
 
 const LIST_COLUMNS = {
   id: initiatives.id,
+  shortId: initiatives.shortId,
   spaceId: initiatives.spaceId,
   spaceName: spaces.name,
   title: initiatives.title,
@@ -371,7 +383,7 @@ export const listInitiatives = defineReadAction({
   summary: "Initiatives in a space, or the ones serving one key result.",
   input: z.object({
     spaceId: z.uuid().optional(),
-    keyResultId: z.uuid().optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
     status: z.enum(INITIATIVE_STATUSES).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
   }),
@@ -456,7 +468,7 @@ export const listInitiatives = defineReadAction({
 export const readInitiative = defineReadAction({
   name: "initiatives.read",
   summary: "One initiative with the key results it serves.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: initiativeOutput,
   access: ACCESS_LEVELS.view,
   async handler(context, input) {
@@ -523,7 +535,7 @@ export const createInitiative = defineWriteAction({
     status: z.enum(INITIATIVE_STATUSES).optional(),
     confidence: z.number().min(0).max(1).optional(),
     capacity: z.enum(CAPACITY_VERDICTS).optional(),
-    keyResultIds: z.array(z.uuid()).max(50).optional(),
+    keyResultIds: z.array(ADDRESS.keyResult).max(50).optional(),
     /** The source-system identity, when an import is creating this (P6-T01a). */
     legacy: legacyKey.optional(),
   }),
@@ -613,13 +625,28 @@ export const createInitiative = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `initiatives.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4). The description is rich text, which V5
+ * leaves out.
+ */
+const INITIATIVE_READ = [
+  "title",
+  "ownerId",
+  "startsOn",
+  "endsOn",
+  "status",
+  "confidence",
+  "capacity",
+] as const;
+
 export const updateInitiative = defineWriteAction({
   name: "initiatives.update",
   summary:
-    "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+    "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
   input: z
     .object({
-      id: z.uuid(),
+      id: ADDRESS.initiative,
       title: z.string().trim().min(1).max(500).optional(),
       description: richText.optional(),
       ownerId: z.uuid().optional(),
@@ -628,10 +655,12 @@ export const updateInitiative = defineWriteAction({
       status: z.enum(INITIATIVE_STATUSES).optional(),
       confidence: z.number().min(0).max(1).nullable().optional(),
       capacity: z.enum(CAPACITY_VERDICTS).nullable().optional(),
+      read: readOf(INITIATIVE_READ),
     })
-    .refine((value) => Object.keys(value).length > 1, {
+    .refine((value) => changedFields(value).length > 0, {
       message: "an update has to change something",
-    }),
+    })
+    .refine(...readsEveryChange(INITIATIVE_READ)),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -651,6 +680,36 @@ export const updateInitiative = defineWriteAction({
       );
     },
     async execute({ tx, workspaceId, loaded }) {
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "initiative",
+        subjectId: input.id,
+        fields: INITIATIVE_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              title: initiatives.title,
+              ownerId: initiatives.ownerId,
+              startsOn: initiatives.startsOn,
+              endsOn: initiatives.endsOn,
+              status: initiatives.status,
+              confidence: initiatives.confidence,
+              capacity: initiatives.capacity,
+            })
+            .from(initiatives)
+            .where(
+              activeOnly(
+                initiatives,
+                eq(initiatives.workspaceId, workspaceId),
+                eq(initiatives.id, input.id),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          return row && { ...row, confidence: asNumber(row.confidence) };
+        },
+      });
       // A change to one end is checked against the other as it is stored.
       assertWindow(
         input.startsOn === undefined ? loaded.startsOn : input.startsOn,
@@ -711,13 +770,18 @@ export const updateInitiative = defineWriteAction({
           kind: "initiative.updated",
           subjectType: "initiative",
           subjectId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: {
+            // The changed fields, never `read` (D3), and the status a webhook
+            // event reads (D5).
+            fields: changedFields(input),
+            ...(input.status === undefined ? {} : { status: input.status }),
+          },
         },
         audit: {
           action: "initiatives.update",
           targetType: "initiative",
           targetId: input.id,
-          payload: { fields: Object.keys(input).filter((key) => key !== "id") },
+          payload: { fields: changedFields(input) },
         },
       };
     },
@@ -729,7 +793,7 @@ export const linkInitiativeKeyResult = defineWriteAction({
   domain: "initiative",
   summary:
     "Records that this initiative is one of the ones that will move a key result.",
-  input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative, keyResultId: ADDRESS.keyResult }),
   output: z.object({ linked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -801,7 +865,7 @@ export const unlinkInitiativeKeyResult = defineWriteAction({
   name: "initiatives.unlinkKeyResult",
   domain: "initiative",
   summary: "Removes the link between an initiative and a key result.",
-  input: z.object({ id: z.uuid(), keyResultId: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative, keyResultId: ADDRESS.keyResult }),
   output: z.object({ unlinked: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -848,7 +912,7 @@ export const unlinkInitiativeKeyResult = defineWriteAction({
 export const deleteInitiative = defineWriteAction({
   name: "initiatives.delete",
   summary: "Soft-deletes an initiative and the links it held.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   safety: "destructive",
@@ -965,7 +1029,7 @@ export const restoreInitiative = defineWriteAction({
   name: "initiatives.restore",
   summary:
     "Brings back a deleted initiative and the key result links that were deleted with it.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.initiative }),
   output: z.object({ id: z.uuid(), links: z.number().int() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
@@ -1032,7 +1096,7 @@ export const readCapacity = defineReadAction({
   name: "initiatives.capacity",
   summary:
     "One cycle's capacity check: every key result's verdict and every initiative behind it.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     keyResults: z.array(
       z.object({

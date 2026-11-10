@@ -15,7 +15,7 @@ misleading the next operator.
 | Does OpenOKR send anything anywhere by default? | No. |
 | What has to be configured before it measures itself? | Nothing. |
 | Where are the numbers? | `GET /api/metrics`, for a signed-in member with `full` access. |
-| What makes data leave the host? | One setting: `observability.otlp.endpoint`. It is empty. |
+| What makes data leave the host? | Two settings, both empty: `observability.otlp.endpoint` for traces, and `observability.errors.dsn` for error reports. |
 
 ## Two settings, and they are not the same thing
 
@@ -28,6 +28,7 @@ operator believed it did not.
 | `instance.telemetry` | off | Anonymous usage reporting **to the OpenOKR project**. Data leaving your instance. Unrelated to everything else here. |
 | `observability.metrics` | **on** | This instance measuring itself and serving the numbers at `/api/metrics`. Local. Nothing leaves. |
 | `observability.otlp.endpoint` | **empty** | Where to send traces. The only setting in this product that can make a measurement leave the host. |
+| `observability.errors.dsn` | **empty** | Where to send error reports: the DSN of a tracker that speaks Sentry's protocol. The only other setting that can make anything leave the host. See [Sending errors to a tracker](#sending-errors-to-a-tracker). |
 
 `observability.metrics` defaults to on because a local endpoint behind an
 administrator session sends nothing anywhere, and a product that has to be
@@ -49,15 +50,22 @@ with `full` access in the workspace it has open. Anything else gets a
 not-found, which is the same answer a signed-out visitor gets: the endpoint is
 deliberately not an oracle for whether this instance is measuring itself.
 
-**An API token is not accepted here.** The endpoint reads the browser
-session, and a token from `/account/api-tokens` is checked only on `/api/v1`.
-A request with no session cookie is sent to the sign-in page.
+**A scraper uses the instance's scrape token**, `OPENOKR_METRICS_TOKEN`, sent
+as `Authorization: Bearer <token>`. `./openokr up` generates it into
+`deploy/docker/secrets/app.env` and writes the same value to
+`deploy/docker/secrets/observability-token`; the Helm chart generates it into
+its Secret. Unset means only a signed-in administrator is answered. A token
+from `/account/api-tokens` is not accepted here: it is a member's, for
+`/api/v1`. A wrong or missing token gets the same not-found as anybody else.
+
+To rotate it, change `OPENOKR_METRICS_TOKEN` in `app.env`, write the same
+value to `secrets/observability-token`, and run `./openokr up`.
 
 The body is Prometheus text exposition, `version=0.0.4`.
 
 ## What is measured
 
-Twenty-two series. Every one is a count, a duration, a queue reading or a
+Twenty-eight series. Every one is a count, a duration, a queue reading or a
 capacity gauge.
 
 **On the request's own thread**
@@ -79,12 +87,15 @@ capacity gauge.
 | `openokr_outbox_pending` | none |
 | `openokr_outbox_oldest_pending_seconds` | none |
 | `openokr_outbox_dead_lettered_total` | topic |
+| `openokr_outbox_rate_held_workspaces` | none. Workspaces at their outbox rate now (`cloud.limits.outboxRowsPerMinute`). 0 while the limit is unset |
+| `openokr_outbox_rate_held_rows` | none. Due rows waiting only because their workspace is at its rate. A steady number here is the limit doing its job, not an outage: those rows are not counted as relay lag |
 | `openokr_job_runs_total` | job, outcome |
 | `openokr_job_duration_seconds` | job |
 | `openokr_nudges_total` | rule, outcome, channel |
 | `openokr_channel_deliveries_total` | provider, outcome |
 | `openokr_realtime_events_total` | topic |
 | `openokr_agent_runs_total` | trigger, outcome |
+| `openokr_agent_tool_call_record_failures_total` | none. An agent tool call whose record row could not be written; the agent's answer is unaffected |
 | `openokr_agent_run_duration_seconds` | trigger |
 | `openokr_ai_tokens_total` | provider, model, direction |
 | `openokr_ai_cost_total` | provider, model |
@@ -96,6 +107,14 @@ capacity gauge.
 | `openokr_pool_connections` | state (active, idle, waiting) |
 | `openokr_concurrent_actions` | none |
 | `openokr_admission_refusals_total` | reason (rate, concurrency) |
+| `openokr_sign_in_held_total` | scope (pair, account). A password attempt refused by a sign-in hold. A steady `account` rate is somebody guessing one account from many networks |
+
+**Errors**
+
+| Series | Labels |
+|---|---|
+| `openokr_errors_total` | source (request, action, relay, dead_letter, job, agent, process, browser). Every unexpected error, including those the caps below hold back. Refusals are not errors and are not counted here: they are the `refused` and `not_found` outcomes above. Alert on this one |
+| `openokr_error_reports_dropped_total` | reason (queue_full, rate_limited, send_failed). A report the tracker did not get. Always zero with no tracker. A steady `send_failed` is a tracker that is down or a DSN pointing at the wrong place |
 
 ### The four readings that are taken at scrape time
 
@@ -144,6 +163,102 @@ so cannot come from a server-side series at all. They are named on the
 budgets dashboard with the tool that measures each, rather than left silently
 absent.
 
+## Unexpected errors
+
+Every unexpected error is one JSON line on stderr, on every install, with
+nothing to configure. A refusal (forbidden, not found, a conflict, input that
+failed validation, a limit) is not an error and writes nothing; neither does
+Next's own `notFound()` or `redirect()`. Design:
+[error-reporting.md](../design/error-reporting.md).
+
+```
+docker compose logs app | grep '"kind":"error.report"'
+```
+
+| Field | What it is |
+|---|---|
+| `source` | Where it was caught: `request`, `action`, `relay`, `dead_letter`, `job`, `agent`, `process` or `browser` |
+| `class`, `message` | The error's class. The message only for a class whose messages name code, such as `TypeError`; every other message reads `(message withheld)`, because a message here can quote what somebody typed |
+| `fingerprint` | The same for every repeat of one error, across releases |
+| `digest` | The reference the error page showed the person. Search for it when somebody quotes one |
+| `traceId`, `spanId` | The span it failed inside, with tracing on |
+| `route`, `method`, `action` | The route pattern (`/goals/[id]`, never the address), the method, and the action's name |
+| `workspaceId`, `memberId`, `userId` | Who was affected, as ids. In the line, never in a metric label |
+| `sqlState`, `constraint` | For a database error, instead of its message, which quotes the row |
+| `stack` | The frames, with the machine's own directories removed |
+
+**Errors in the browser** reach the log the same way, with source `browser`.
+The page posts each to `/api/client-errors` on the instance itself, which
+keeps one only from a signed-in person, at most ten a minute each, and always
+answers 204. The frames are resolved to source files from the source maps the
+build writes beside the browser's scripts. A browser's message is always
+withheld, because on that route anybody signed in could have written it.
+
+One error is reported once, by the first place that catches it, and carries
+what the later ones knew: an action that fails inside a page carries the
+action's name and the page's digest. A dead letter is always reported, because
+giving up on work is its own event.
+
+**Caps.** One error at most ten times a minute and sixty reports a minute in
+all. Past either, the error is still counted in `openokr_errors_total` and not
+written; one `"kind":"error.report.held"` line a minute says how many were held
+back. A broken page under load cannot flood the log.
+
+## Sending errors to a tracker
+
+Only do this if you run a tracker. It is the second thing on this page that
+leaves the host. Any tracker that speaks Sentry's protocol works: Sentry,
+self-hosted Sentry, GlitchTip or Bugsink. No SDK is involved; the instance
+POSTs one small envelope per report.
+
+```
+OPENOKR_ERROR_DSN=https://<key>@<tracker host>/<project id>
+OPENOKR_ERROR_ENVIRONMENT=production    # the default; staging for a staging instance
+```
+
+Copy the DSN from the tracker's project settings and restart. A value that is
+not a DSN refuses to boot and names the variable. The DSN is never logged and
+never shown on a screen, because its key lets anyone write into your tracker;
+in Compose it belongs in `secrets/app.env`, in Helm in a Secret
+(`errors.existingSecret`).
+
+| What the tracker receives | What it never receives |
+|---|---|
+| The class, the safe message (see "Unexpected errors" above), the scrubbed frames, the fingerprint the tracker groups by, the digest, the trace id with tracing on, the release (the version), the environment, `cloud.region`, the route pattern, the action, the method, and the workspace, member or user id as tags | A request body, a query string, a cookie, a header value, a name or email address, rich text, an AI prompt or reply, a provider's response, local variables |
+
+The local floor does not change: every error is still a JSON line and a count.
+Sending never slows a request: reports wait in a queue of at most a hundred and
+go out every two seconds, each send gives up after three seconds, and a `429`
+from the tracker pauses sending for as long as its `Retry-After` says. What
+does not arrive is counted in `openokr_error_reports_dropped_total`.
+
+**A tracker's reader may be an AI agent**, through Sentry's MCP server or
+Bugsink's API. Text a person typed into the product never reaches the tracker,
+so nobody can plant instructions there for it.
+
+### Which trackers have been checked
+
+Each was given two identical forced errors through the product's own
+classifier, scrub and driver, and checked for one issue holding both events,
+with the class, the message, readable frames and the tags.
+
+| Tracker | Version | Checked | Result |
+|---|---|---|---|
+| Bugsink | 2.6.3 (`bugsink/bugsink`, SQLite) | 9 November 2026 | One issue, two events, grouped by the product's fingerprint. Frames with file, function, line and in-app; release, environment, transaction and every tag as sent |
+| GlitchTip | Not yet | Before 0.7.0 ships | |
+| Sentry (sentry.io, EU) | Not yet | When OKRGoal's project exists | |
+
+**Checking one yourself.** Start the tracker, make a project, copy its DSN,
+set `OPENOKR_ERROR_DSN` and restart. Then open the instance signed in, open
+the browser's console and run
+`setTimeout(() => { throw new TypeError("tracker check") })`. Within a few
+seconds the tracker shows a `TypeError` with source `browser`; its message
+reads `TypeError (message withheld)`, because a browser's message is never
+sent. In the log, `docker compose logs app | grep '"source":"browser"'`
+shows the same report. If nothing arrives, look at
+`openokr_error_reports_dropped_total`: `send_failed` means the instance cannot
+reach the tracker or the tracker refused the envelope.
+
 ## One error the log leaves out
 
 "The destination stream closed early" is not logged unless `LOG_LEVEL` is
@@ -159,15 +274,13 @@ responses off, set `LOG_LEVEL=debug` and they come back.
 Off unless asked for. `./openokr up` starts three services and none of this.
 
 ```
-# the file Prometheus sends as a bearer token to /api/metrics
-printf '%s' "$TOKEN" > deploy/docker/secrets/observability-token
-
+./openokr up                        # writes secrets/observability-token
 docker compose --profile observability up -d
 open http://localhost:3001          # Grafana, admin/admin on first run
 ```
 
-The `openokr` target reads nothing until `/api/metrics` accepts a token (see "Reading the numbers by
-hand"); the `caddy` target, the proxy's HTTP series, needs none.
+The `openokr` target scrapes with the token `./openokr up` wrote (see "Reading
+the numbers by hand"); the `caddy` target, the proxy's HTTP series, needs none.
 
 Three dashboards are provisioned from files in
 `deploy/docker/observability/dashboards/`, so they are reviewable in a diff
@@ -258,5 +371,6 @@ somebody removes them or the member is erased.
 
 Everything on this page works with no outbound network at all. The exposition
 is served by the instance to whoever asks it. The profile scrapes over the
-compose network. Leave `observability.otlp.endpoint` empty and nothing in the
-product has an address to dial.
+compose network. Leave `observability.otlp.endpoint` and
+`observability.errors.dsn` empty and nothing in the product has an address to
+dial. A tracker on the same isolated network is fine.

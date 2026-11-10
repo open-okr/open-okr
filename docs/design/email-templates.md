@@ -53,9 +53,21 @@ A mail is a list of blocks. The renderer turns each block into table markup with
 | `nudges` | a card per nudge with a severity edge and the rule key with the escalation step | `- title (rule)`, the line, then `  Label: url` |
 | `stats` | up to three tiles: on track, at risk, off track | `5 on track, 2 at risk, 1 off track` |
 | `list` | a titled bullet list | the title, then `- item` |
-| `richText` | `renderRichTextToHtml`, the sanitising allow-list renderer | the shared plain-text excerpt |
+| `richText` | `renderRichTextToHtml`, the sanitising allow-list renderer | `plainTextBlocks`, the shared module's plain text: a block per paragraph, a dash or a number per list item, `>` before a quotation |
 
 Every value is escaped by the renderer, and a mail can pass no raw HTML. Rich text goes through the existing allow-list, as CLAUDE.md requires for every surface.
+
+**The `richText` block** (plan 0.7.0, R3) takes the editor JSON as stored. What it does beyond the screen's renderer:
+
+| Case | In the mail |
+|---|---|
+| A document the allow-list refuses, from an import or a stale row | Its words as one escaped line, never its structure. The rest of the mail still sends |
+| A link to `http`, `https` or `mailto` | Kept, and in the text part its address follows the words: `the brief (https://…)` |
+| A relative link | The words without the link, in both parts, because a mail client cannot follow it (§10) |
+| `javascript:` or any other scheme | Refused by the allow-list, as on every surface |
+| A mention, a link to a goal, an attachment | `@name`, the label and the file name, as text: a mail carries no lookups |
+
+No mail carries rich text yet. The digest's comment row is one line by design, the excerpt the activity stored, so the block waits for the first mail that quotes a whole document.
 
 ## 4. Tokens
 

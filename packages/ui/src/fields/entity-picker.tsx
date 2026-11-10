@@ -13,6 +13,7 @@ import {
   useState,
 } from "react";
 import { Avatar, avatarToneFor } from "../components/avatar.tsx";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import { useFormReset } from "./form-reset.ts";
@@ -148,7 +149,7 @@ export function EntityPicker({
   search,
   placeholder,
   description,
-  error,
+  error: givenError,
   required,
   disabled,
   className,
@@ -156,6 +157,10 @@ export function EntityPicker({
   onBlur,
   onKeyDown,
 }: EntityPickerProps) {
+  // A message passed in wins; otherwise the nearest `RefusedFields`
+  // says what the server refused about this field (guided-inputs §4.2).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t } = useTranslations();
   const [own, setOwn] = useState<string | null>(defaultValue ?? null);
   const chosen = value !== undefined ? value : own;

@@ -4,13 +4,26 @@ import { Dialog } from "@base-ui-components/react/dialog";
 import { useCallback, useState } from "react";
 import { Kbd } from "../components/kbd.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
-import { useKeyboardRegistry } from "./registry.tsx";
+import {
+  SHORTCUT_GROUPS,
+  type ShortcutGroup,
+  useKeyboardRegistry,
+} from "./registry.tsx";
 import { useKeyboardShortcut } from "./use-keyboard-shortcut.ts";
+
+/** Each section's heading, written out so the catalogue check finds it read. */
+const GROUP_HEADING: Readonly<Record<ShortcutGroup, string>> = {
+  global: "shell.shortcuts.group.global",
+  lists: "shell.shortcuts.group.lists",
+  detail: "shell.shortcuts.group.detail",
+  forms: "shell.shortcuts.group.forms",
+};
 
 /**
  * §4: "`?` opens the shortcut overlay." Lists exactly what is registered
  * right now on this screen — never a fixed, hand-maintained list — so it
- * can never claim a shortcut that is not actually live.
+ * can never claim a shortcut that is not actually live. Its sections come in
+ * one order and are named in the reader's language (plan 0.7.0, U2).
  */
 export function ShortcutOverlay() {
   const [open, setOpen] = useState(false);
@@ -22,19 +35,19 @@ export function ShortcutOverlay() {
       id: "shortcut-overlay.open",
       keys: "?",
       description: t("shell.shortcuts.overlayDescription"),
-      group: "Global",
+      group: "global",
     },
     useCallback(() => setOpen(true), []),
     { key: "?" },
   );
 
-  const groups = new Map<string, typeof shortcuts>();
-  for (const shortcut of shortcuts) {
-    groups.set(shortcut.group, [
-      ...(groups.get(shortcut.group) ?? []),
-      shortcut,
-    ]);
-  }
+  const groups = SHORTCUT_GROUPS.map(
+    (group) =>
+      [
+        group,
+        shortcuts.filter((shortcut) => shortcut.group === group),
+      ] as const,
+  ).filter(([, entries]) => entries.length > 0);
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -45,10 +58,13 @@ export function ShortcutOverlay() {
             {t("shell.shortcuts.title")}
           </Dialog.Title>
           <div className="mt-3 flex flex-col gap-4">
-            {[...groups.entries()].map(([group, groupShortcuts]) => (
+            {groups.map(([group, groupShortcuts]) => (
               <div key={group}>
-                <div className="mb-1.5 text-xs font-bold tracking-wide text-ink-4 uppercase">
-                  {group}
+                <div
+                  data-testid="shortcut-group"
+                  className="mb-1.5 text-xs font-bold tracking-wide text-ink-4 uppercase"
+                >
+                  {t(GROUP_HEADING[group])}
                 </div>
                 <ul className="flex flex-col gap-1.5">
                   {groupShortcuts.map((shortcut) => (

@@ -54,7 +54,7 @@ import {
  * token must not be a way for that credential to become wider. Checked before
  * the transaction opens, like every other authorisation.
  */
-function refuseUnlessSignedIn(
+export function refuseUnlessSignedIn(
   context: ActionCallContext,
   message: string,
 ): void {
@@ -73,6 +73,11 @@ const tokenSummary = z.object({
   expiresAt: z.string().nullable(),
   lastUsedAt: z.string().nullable(),
   revokedAt: z.string().nullable(),
+  /**
+   * Why it stopped, when its owner did not revoke it: the sentence, never
+   * who (plan 0.7.0 A4). Null for a token its owner revoked.
+   */
+  revokedReason: z.string().nullable(),
   createdAt: z.string(),
 });
 
@@ -144,6 +149,10 @@ export const listMyTokens = defineReadAction({
           expiresAt: iso(row.expiresAt),
           lastUsedAt: iso(row.lastUsedAt),
           revokedAt: iso(row.revokedAt),
+          revokedReason:
+            row.revokedReason === "admin"
+              ? "An administrator of this workspace ended this token."
+              : null,
           createdAt: row.createdAt.toISOString(),
         })),
       };

@@ -6,6 +6,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  KeyboardList,
   useTranslations,
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
@@ -159,43 +160,50 @@ export function ProposalQueue({
           </p>
         ) : (
           <>
-            <ul className="flex flex-col gap-2">
-              {proposals.map((proposal) => (
-                <li
-                  key={proposal.id}
-                  className="flex items-start gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
-                >
-                  <input
-                    type="checkbox"
-                    id={`proposal-${proposal.id}`}
-                    checked={chosen.has(proposal.id)}
-                    onChange={() => toggle(proposal.id)}
-                    className="mt-1"
-                  />
-                  <label
-                    htmlFor={`proposal-${proposal.id}`}
-                    className="flex min-w-0 flex-1 flex-col gap-0.5"
+            {/* `j` and `k` walk the proposals and `x` chooses one, so a
+             * reviewer can work the queue from the keyboard (plan 0.7.0,
+             * U2). No `e`: a proposal is applied or dismissed, not edited. */}
+            <KeyboardList select>
+              <ul className="flex flex-col gap-2">
+                {proposals.map((proposal) => (
+                  <li
+                    key={proposal.id}
+                    data-keyboard-row
+                    className="flex items-start gap-2.5 border-line border-b pb-2 last:border-0 last:pb-0"
                   >
-                    <span className="font-mono text-xs text-brand-text">
-                      {proposal.action}
-                    </span>
-                    <span className="text-sm text-ink">
-                      {describe(proposal.payload, t)}
-                    </span>
-                    <span className="text-xs text-ink-4">
-                      {proposal.subjectType
-                        ? t("admin.agents.proposalQueue.onASubject", {
-                            subjectType: proposal.subjectType.replace(
-                              /_/g,
-                              " ",
-                            ),
-                          })
-                        : t("admin.agents.proposalQueue.workspaceWide")}
-                    </span>
-                  </label>
-                </li>
-              ))}
-            </ul>
+                    <input
+                      type="checkbox"
+                      id={`proposal-${proposal.id}`}
+                      checked={chosen.has(proposal.id)}
+                      onChange={() => toggle(proposal.id)}
+                      data-keyboard-select
+                      className="mt-1"
+                    />
+                    <label
+                      htmlFor={`proposal-${proposal.id}`}
+                      className="flex min-w-0 flex-1 flex-col gap-0.5"
+                    >
+                      <span className="font-mono text-xs text-brand-text">
+                        {proposal.action}
+                      </span>
+                      <span className="text-sm text-ink">
+                        {describe(proposal.payload, t)}
+                      </span>
+                      <span className="text-xs text-ink-4">
+                        {proposal.subjectType
+                          ? t("admin.agents.proposalQueue.onASubject", {
+                              subjectType: proposal.subjectType.replace(
+                                /_/g,
+                                " ",
+                              ),
+                            })
+                          : t("admin.agents.proposalQueue.workspaceWide")}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </KeyboardList>
 
             <div className="flex flex-wrap items-center gap-2">
               <Button

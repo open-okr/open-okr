@@ -91,6 +91,14 @@ export interface Telemetry extends MetricRecorder {
    * watches.
    */
   scrape(): Promise<string>;
+  /**
+   * The trace and span an error failed inside, or null (error-reporting.md
+   * D20, plan 0.7.0 E1). Remembered by `span` when an error passes through
+   * it, the innermost span first, so an error report can name the trace an
+   * operator will find in their tracing backend. Always null with tracing
+   * off.
+   */
+  traceOf(error: unknown): { traceId: string; spanId: string } | null;
   /** Releases the meter. Safe to call twice. */
   stop(): Promise<void>;
 }

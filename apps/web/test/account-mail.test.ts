@@ -19,7 +19,7 @@ vi.mock("@openokr/core", async (importOriginal) => ({
   resolveInstanceDefaultLanguage: async () => language,
 }));
 
-const { resetPasswordMail, verifyEmailMail } = await import(
+const { resetPasswordMail, signInHeldMail, verifyEmailMail } = await import(
   "../lib/account-mail"
 );
 
@@ -59,5 +59,29 @@ describe("the confirmation mail", () => {
     expect(mail.subject).toBe("Confirm your email address for Northwind OKR");
     expect(mail.html).toContain("Confirm email");
     expect(mail.text).toContain(`Confirm email: ${VERIFY}`);
+  });
+});
+
+describe("the sign-in hold mail (account-lockout.md Q2)", () => {
+  const FORGOT = "https://okr.example.com/forgot-password";
+
+  it("names the account and sends the person to ask for a reset, not to a reset itself", async () => {
+    const mail = await signInHeldMail("sara@example.com", FORGOT);
+    expect(mail.subject).toBe(
+      "Somebody is trying to sign in to your Northwind OKR account",
+    );
+    expect(mail.html).toContain("<b>sara@example.com</b>");
+    expect(mail.html.split(`href="${FORGOT}"`)).toHaveLength(3);
+    expect(mail.text).toContain(`Choose a new password: ${FORGOT}`);
+    // Nothing in it says which network or how many attempts.
+    expect(mail.text).not.toMatch(/\d+\.\d+\.\d+\.\d+/);
+  });
+
+  it("is written in the instance's language", async () => {
+    language = "ms";
+    const mail = await signInHeldMail("sara@example.com", FORGOT);
+    expect(mail.subject).toBe(
+      "Seseorang cuba log masuk ke akaun Northwind OKR anda",
+    );
   });
 });

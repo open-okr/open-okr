@@ -4,7 +4,8 @@ import { callAction } from "@openokr/core";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedState } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 import {
   ACTIVE_WORKSPACE_COOKIE,
   requireWorkspace,
@@ -19,6 +20,8 @@ import {
  */
 export interface NewOwnWorkspaceState {
   readonly error?: string;
+  /** A refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 export async function createOwnWorkspaceAction(
@@ -38,11 +41,11 @@ export async function createOwnWorkspaceAction(
     );
     workspaceId = created.workspaceId;
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, (await getTranslations()).t, ["name"]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal };
+    return refused;
   }
 
   const cookieStore = await cookies();

@@ -24,6 +24,7 @@ import { getAccessScoped } from "../access/reads.ts";
 import { stampFirstDue } from "../cadence/service.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { requirePolicy } from "../practice/policy.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -133,7 +134,7 @@ export const publishDraft = defineWriteAction({
   name: "goals.publishDraft",
   summary:
     "Publishes an objective that waits as a draft. Its owner publishes it, and it goes live, or to its reviewer where the workspace asks the reviewer to approve.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({
     goal: treeGoal,
     /** True when it now waits for its reviewer rather than being live. */
@@ -204,7 +205,7 @@ export const approveDraft = defineWriteAction({
   name: "goals.approveDraft",
   summary:
     "Approves a published draft, which only its reviewer does. It goes live, and its check-in rhythm starts.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({ goal: treeGoal }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({

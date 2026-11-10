@@ -149,7 +149,7 @@ describe("a line of flags", () => {
     expect(result).toEqual({
       kind: "ok",
       input: { spaceId: "abc", includeClosed: true },
-      globals: { help: false },
+      globals: { help: false, validate: false },
     });
   });
 
@@ -209,6 +209,23 @@ describe("a line of flags", () => {
     expect(result.kind).toBe("error");
   });
 
+  it("takes --validate on a write, and refuses it on a read (plan D4)", () => {
+    const write = parse(
+      createGoal,
+      "--title Something --level team --validate",
+    );
+    expect(write.kind === "ok" && write.globals.validate).toBe(true);
+    expect(write.kind === "ok" && write.input).toEqual({
+      title: "Something",
+      level: "team",
+    });
+    expect(parse(listGoals, "--validate")).toEqual({
+      kind: "error",
+      message:
+        "--validate checks a write without committing it, and goals list is a read.",
+    });
+  });
+
   it("says when a flag that needs a value has none", () => {
     const result = parse(listGoals, "--space-id");
     expect(result).toEqual({
@@ -225,6 +242,11 @@ describe("help", () => {
     expect(text).toContain("read scope");
     expect(text).toContain("--level");
     expect(text).toContain("one of company, team");
+    expect(text).not.toContain("--validate");
+  });
+
+  it("offers --validate on a write", () => {
+    expect(commandHelp(createGoal)).toContain("--validate");
   });
 });
 

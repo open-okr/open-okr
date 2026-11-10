@@ -1,6 +1,6 @@
 "use client";
 
-import { CopyButton, useTranslations } from "@openokr/ui";
+import { CopyButton, RefusedFields, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import { agentSetupLine } from "../../../lib/agent-setup-prompt.ts";
 import { useInstanceName } from "../../../lib/instance-name-context";
@@ -48,7 +48,8 @@ export function TokenForm({
   const [state, formAction, pending] = useActionState(action, NOTHING_YET);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
-      {children}
+      {/* The name and the expiry show what was refused about them (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       {state.token ? (
         <div className="mt-1.5 flex flex-col gap-1.5 rounded-md bg-brand-weak px-2.5 py-2 text-xs text-brand-text">
           <code

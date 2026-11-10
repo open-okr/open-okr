@@ -17,9 +17,11 @@
 import {
   activeOnly,
   alignmentFindings,
+  alignmentScores,
   cycles,
   goalDependencies,
   goals,
+  includeDeleted,
   keyResultDependencies,
   keyResults,
   newId,
@@ -27,23 +29,38 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { ALIGNMENT_BANDS } from "@openokr/method";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { ALIGNMENT_BANDS, alignmentBand } from "@openokr/method";
+import { and, asc, eq, inArray, isNull, or } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
+import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped, visibleResourceIds } from "../access/reads.ts";
 import {
+  type NotOneClick,
+  notOneClickBecause,
+  oneClickApplicable,
+} from "../alignment/applicable.ts";
+import { providingKeyResultOutput } from "../alignment/delivery.ts";
+import {
+  alignmentBreakdown,
   alignmentInTx,
+  alignmentThresholdsOf,
   blocksPublish,
   loadDependencyRegister,
+  loadProvidingKeyResults,
   recomputeAlignment,
   scopesForGoal,
 } from "../alignment/service.ts";
+import { cycleRulesInTx } from "../cycles/rules.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { selectInChunks } from "./chunk.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { callAction } from "./registry.ts";
+
+/** A finding's second goal, joined beside its subject in `alignment.read`. */
+const targetGoals = alias(goals, "target_goals");
 
 async function actingMember(
   tx: OperationTx,
@@ -133,6 +150,98 @@ async function requireKeyResultGoal(
 }
 
 /**
+ * The key result named as delivering a dependency (plan 0.7.0 O5, design
+ * `key-result-dependencies.md` K2 and K3).
+ *
+ * **View, not edit.** The register entry belongs to the depending team, and
+ * naming another team's key result discloses nothing the namer cannot already
+ * see. One they cannot see answers not-found, and says "key result" rather
+ * than "goal", so the refusal does not tell them which goal it hangs from.
+ *
+ * **A team's key result.** METHOD.md §5.4 names a providing team, and both
+ * confirmation and the silo check work from the space, so the key result's
+ * goal must be one a space owns. A company or a personal goal has nobody who
+ * could confirm what it delivers.
+ */
+async function requireProvidingKeyResult(
+  tx: OperationTx,
+  workspaceId: string,
+  memberId: string,
+  named: {
+    readonly providerKeyResultId: string;
+    readonly dependingKeyResultId: string;
+  },
+): Promise<{ id: string; spaceId: string; spaceName: string }> {
+  if (named.providerKeyResultId === named.dependingKeyResultId) {
+    throw new OperationError(
+      "forbidden",
+      "A key result cannot deliver its own dependency. Name the key result in the other team that does.",
+    );
+  }
+  const [row] = await tx
+    .select({ goalId: keyResults.goalId })
+    .from(keyResults)
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        eq(keyResults.id, named.providerKeyResultId),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    throw new OperationError("not_found", "No such key result.");
+  }
+  let goal: Awaited<ReturnType<typeof requireGoal>>;
+  try {
+    goal = await requireGoal(
+      tx,
+      workspaceId,
+      memberId,
+      row.goalId,
+      ACCESS_LEVELS.view,
+    );
+  } catch (error) {
+    if (error instanceof OperationError && error.code === "not_found") {
+      throw new OperationError("not_found", "No such key result.");
+    }
+    throw error;
+  }
+  if (!goal.spaceId) {
+    throw new OperationError(
+      "forbidden",
+      "A provider must be a team's key result. This one belongs to a company or a personal objective, which has no team to confirm what it delivers.",
+    );
+  }
+  const [space] = await tx
+    .select({ name: spaces.name })
+    // openokr:allow-raw-read: the name only, for the refusal that names the
+    // team, and every human member holds `view` on every space through the
+    // `workspace_standard` binding. Called only from inside a write's
+    // operation, after the goal itself went through the getter.
+    .from(spaces)
+    .where(
+      activeOnly(
+        spaces,
+        eq(spaces.workspaceId, workspaceId),
+        eq(spaces.id, goal.spaceId),
+      ),
+    )
+    .limit(1);
+  if (!space) {
+    throw new OperationError(
+      "forbidden",
+      "A provider must be a team's key result, and the space that owns this one has been removed.",
+    );
+  }
+  return {
+    id: named.providerKeyResultId,
+    spaceId: goal.spaceId,
+    spaceName: space.name,
+  };
+}
+
+/**
  * Recomputes every scope a set of goals touches (design §7).
  *
  * The one entry point for it, so a structural write added later cannot leave the
@@ -146,7 +255,12 @@ export async function recomputeAlignmentFor(
   touched: readonly { cycleId: string | null; spaceId: string | null }[],
 ): Promise<void> {
   const done = new Set<string>();
-  for (const goal of touched) {
+  // Cycle by cycle in one order, so two writes that touch the same two cycles
+  // take `recomputeAlignment`'s per-cycle locks the same way round.
+  const ordered = [...touched].sort((a, b) =>
+    (a.cycleId ?? "").localeCompare(b.cycleId ?? ""),
+  );
+  for (const goal of ordered) {
     if (!goal.cycleId) {
       // A goal on a timeframe rather than a cycle is outside every alignment
       // scope, because §2 scopes the score to one cycle.
@@ -169,13 +283,62 @@ export async function recomputeAlignmentFor(
   }
 }
 
+/**
+ * The scopes of every live goal hanging from a goal, or from one of its key
+ * results (plan 0.7.0 D2).
+ *
+ * A child's alignment is read through its parent: a deleted parent is no
+ * parent, and a parent's level is what anchors a cycle (§5.1, §5.2). So
+ * deleting, restoring or re-levelling a goal, or removing one of its key
+ * results, moves the score of every scope a child sits in, which can be
+ * another space and another cycle: a quarter's goals hang under an annual
+ * objective. With the score stored, a scope the write did not recompute
+ * would keep a number the rows no longer support.
+ *
+ * Key results in any state, because the delete and the restore stamp them
+ * together with their goal.
+ */
+export async function scopesHangingFrom(
+  tx: OperationTx,
+  workspaceId: string,
+  from: { readonly goalId: string } | { readonly keyResultId: string },
+): Promise<{ cycleId: string | null; spaceId: string | null }[]> {
+  const ownKeyResults = tx
+    .select({ id: keyResults.id })
+    .from(keyResults)
+    .where(
+      includeDeleted(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        "goalId" in from
+          ? eq(keyResults.goalId, from.goalId)
+          : eq(keyResults.id, from.keyResultId),
+      ),
+    );
+  return tx
+    .selectDistinct({ cycleId: goals.cycleId, spaceId: goals.spaceId })
+    .from(goals)
+    .where(
+      activeOnly(
+        goals,
+        eq(goals.workspaceId, workspaceId),
+        "goalId" in from
+          ? or(
+              eq(goals.parentGoalId, from.goalId),
+              inArray(goals.parentKeyResultId, ownKeyResults),
+            )
+          : inArray(goals.parentKeyResultId, ownKeyResults),
+      ),
+    );
+}
+
 export const addGoalDependency = defineWriteAction({
   name: "goals.addDependency",
   summary:
     "Links two goals as depending on each other. Stored once; direction carries no meaning.",
   input: z.object({
-    fromGoalId: z.uuid(),
-    toGoalId: z.uuid(),
+    fromGoalId: ADDRESS.goal,
+    toGoalId: ADDRESS.goal,
     note: z.string().trim().max(500).optional(),
   }),
   output: z.object({ id: z.uuid() }),
@@ -389,17 +552,26 @@ export const addKeyResultDependency = defineWriteAction({
     "Records a key result's dependency on a providing team, for the register.",
   input: z
     .object({
-      keyResultId: z.uuid(),
+      keyResultId: ADDRESS.keyResult,
       providerSpaceId: z.uuid().optional(),
       providerText: z.string().trim().max(200).optional(),
+      /**
+       * The key result that delivers it (plan 0.7.0 O5). It must belong to a
+       * goal a space owns, and that space becomes the provider; a
+       * `providerSpaceId` naming another space is refused.
+       */
+      providerKeyResultId: ADDRESS.keyResult.optional(),
       note: z.string().trim().max(500).optional(),
       riskOwnerId: z.uuid().optional(),
     })
     .refine(
-      (value) => Boolean(value.providerSpaceId) || Boolean(value.providerText),
+      (value) =>
+        Boolean(value.providerSpaceId) ||
+        Boolean(value.providerText) ||
+        Boolean(value.providerKeyResultId),
       {
         message:
-          "A dependency names who provides it, either a space in this workspace or a name. A register entry with no provider is not one.",
+          "A dependency names who provides it: a space in this workspace, a key result one of its teams owns, or a name. A register entry with no provider is not one.",
       },
     ),
   output: z.object({ id: z.uuid(), blocksPublish: z.boolean() }),
@@ -419,7 +591,24 @@ export const addKeyResultDependency = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
 
-      if (input.providerSpaceId) {
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, memberId, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: input.keyResultId,
+          })
+        : null;
+      if (
+        provider &&
+        input.providerSpaceId &&
+        input.providerSpaceId !== provider.spaceId
+      ) {
+        throw new OperationError(
+          "forbidden",
+          `The key result you named belongs to ${provider.spaceName}, not to the space this names. Name ${provider.spaceName} as the provider, or leave the space out.`,
+        );
+      }
+
+      if (input.providerSpaceId && !provider) {
         const [space] = await tx
           .select({ id: spaces.id })
           .from(spaces)
@@ -442,8 +631,11 @@ export const addKeyResultDependency = defineWriteAction({
         id,
         workspaceId,
         keyResultId: input.keyResultId,
-        providerSpaceId: input.providerSpaceId ?? null,
+        // The key result's own space when one is named (K2), so confirmation
+        // and the silo check keep working from the space as they always have.
+        providerSpaceId: provider?.spaceId ?? input.providerSpaceId ?? null,
         providerText: input.providerText ?? null,
+        providerKeyResultId: provider?.id ?? null,
         note: input.note ?? null,
         riskOwnerId: input.riskOwnerId ?? null,
         createdById: memberId,
@@ -468,7 +660,10 @@ export const addKeyResultDependency = defineWriteAction({
           action: "goals.addKeyResultDependency",
           targetType: "key_result_dependency",
           targetId: id,
-          payload: { keyResultId: input.keyResultId },
+          payload: {
+            keyResultId: input.keyResultId,
+            providerKeyResultId: provider?.id ?? null,
+          },
         },
       };
     },
@@ -478,8 +673,16 @@ export const addKeyResultDependency = defineWriteAction({
 export const confirmKeyResultDependency = defineWriteAction({
   name: "goals.confirmDependency",
   summary:
-    "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
-  input: z.object({ id: z.uuid() }),
+    "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
+  input: z.object({
+    id: z.uuid(),
+    /**
+     * Which of the confirming team's key results delivers it (plan 0.7.0
+     * O5, K4). It must sit in the providing space. Left out, whatever the
+     * entry already names is kept.
+     */
+    providerKeyResultId: ADDRESS.keyResult.optional(),
+  }),
   output: z.object({ id: z.uuid(), confirmed: z.boolean() }),
   access: ACCESS_LEVELS.edit,
   operation: (context, input) => ({
@@ -494,6 +697,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           id: keyResultDependencies.id,
           keyResultId: keyResultDependencies.keyResultId,
           providerSpaceId: keyResultDependencies.providerSpaceId,
+          providerKeyResultId: keyResultDependencies.providerKeyResultId,
           confirmed: keyResultDependencies.confirmed,
         })
         .from(keyResultDependencies)
@@ -514,7 +718,14 @@ export const confirmKeyResultDependency = defineWriteAction({
           "This dependency names its provider as free text, so there is nobody in this workspace who can confirm it. Name a risk owner instead.",
         );
       }
-      if (row.confirmed) {
+      // A confirmed entry now named with a different key result is a new
+      // promise (K5), so it is confirmed again rather than answered as a
+      // repeat.
+      if (
+        row.confirmed &&
+        (input.providerKeyResultId === undefined ||
+          input.providerKeyResultId === row.providerKeyResultId)
+      ) {
         return {
           result: { id: input.id, confirmed: true },
           activity: {
@@ -577,6 +788,33 @@ export const confirmKeyResultDependency = defineWriteAction({
         ACCESS_LEVELS.view,
       );
 
+      // K4: the providing team knows which of its key results delivers, and
+      // confirming is the most accurate moment to say so. Only one of its
+      // own, because it is promising for its own team.
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, memberId, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: row.keyResultId,
+          })
+        : null;
+      if (provider && provider.spaceId !== row.providerSpaceId) {
+        const [confirming] = await tx
+          .select({ name: spaces.name })
+          .from(spaces)
+          .where(
+            activeOnly(
+              spaces,
+              eq(spaces.workspaceId, workspaceId),
+              eq(spaces.id, row.providerSpaceId),
+            ),
+          )
+          .limit(1);
+        throw new OperationError(
+          "forbidden",
+          `Name a key result of ${confirming?.name ?? "the providing space"}, the team confirming this dependency. That one belongs to ${provider.spaceName}.`,
+        );
+      }
+
       const now = new Date();
       // openokr:allow-mutation: same transaction.
       await tx
@@ -586,6 +824,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           confirmedById: memberId,
           confirmedAt: now,
           updatedAt: now,
+          ...(provider ? { providerKeyResultId: provider.id } : {}),
         })
         .where(
           activeOnly(
@@ -608,7 +847,7 @@ export const confirmKeyResultDependency = defineWriteAction({
           action: "goals.confirmDependency",
           targetType: "key_result_dependency",
           targetId: input.id,
-          payload: {},
+          payload: provider ? { providerKeyResultId: provider.id } : {},
         },
       };
     },
@@ -700,6 +939,141 @@ export const setDependencyRiskOwner = defineWriteAction({
           targetType: "key_result_dependency",
           targetId: input.id,
           payload: { memberId: input.memberId },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Names, changes or clears the key result that delivers a dependency (plan
+ * 0.7.0 O5, design `key-result-dependencies.md` K3 and K5).
+ *
+ * The depending team's act, so `edit` on the depending goal, as adding the
+ * entry needs. The providing space follows the key result named (K2).
+ *
+ * **A different key result clears the confirmation** (K5). A confirmation
+ * is a promise about something specific, and another key result, possibly in
+ * another team, is another promise: the providing team confirms again. That
+ * holds when one is named where none was, too, because the team confirmed
+ * before anybody said what it was delivering. Clearing to none keeps the
+ * confirmation, which was never about the key result in the first place. The
+ * result's `blocksPublish` says when gate 4 is red because of it.
+ *
+ * Nothing is sent: the register and the drawer show it, and a new proactive
+ * message is the human's to add (design Q1).
+ */
+export const setDependencyProvider = defineWriteAction({
+  name: "goals.setDependencyProvider",
+  summary:
+    "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+  input: z.object({
+    id: z.uuid(),
+    providerKeyResultId: ADDRESS.keyResult.nullable(),
+  }),
+  output: z.object({
+    id: z.uuid(),
+    confirmed: z.boolean(),
+    blocksPublish: z.boolean(),
+  }),
+  access: ACCESS_LEVELS.edit,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const actor = await actingMember(tx, workspaceId, context.actor.userId);
+      const [row] = await tx
+        .select({
+          id: keyResultDependencies.id,
+          keyResultId: keyResultDependencies.keyResultId,
+          providerSpaceId: keyResultDependencies.providerSpaceId,
+          providerKeyResultId: keyResultDependencies.providerKeyResultId,
+          confirmed: keyResultDependencies.confirmed,
+          riskOwnerId: keyResultDependencies.riskOwnerId,
+          escalatedToId: keyResultDependencies.escalatedToId,
+        })
+        .from(keyResultDependencies)
+        .where(
+          activeOnly(
+            keyResultDependencies,
+            eq(keyResultDependencies.workspaceId, workspaceId),
+            eq(keyResultDependencies.id, input.id),
+          ),
+        )
+        .limit(1);
+      if (!row) {
+        throw new OperationError("not_found", "No such dependency.");
+      }
+      const goal = await requireKeyResultGoal(
+        tx,
+        workspaceId,
+        actor,
+        row.keyResultId,
+        ACCESS_LEVELS.edit,
+      );
+
+      const provider = input.providerKeyResultId
+        ? await requireProvidingKeyResult(tx, workspaceId, actor, {
+            providerKeyResultId: input.providerKeyResultId,
+            dependingKeyResultId: row.keyResultId,
+          })
+        : null;
+      const confirmationCleared =
+        provider !== null &&
+        row.confirmed &&
+        provider.id !== row.providerKeyResultId;
+      const after = {
+        confirmed: row.confirmed && !confirmationCleared,
+        riskOwnerId: row.riskOwnerId,
+        escalatedToId: row.escalatedToId,
+      };
+
+      // openokr:allow-mutation: same transaction.
+      await tx
+        .update(keyResultDependencies)
+        .set({
+          providerKeyResultId: provider?.id ?? null,
+          ...(provider ? { providerSpaceId: provider.spaceId } : {}),
+          ...(confirmationCleared
+            ? { confirmed: false, confirmedById: null, confirmedAt: null }
+            : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          activeOnly(
+            keyResultDependencies,
+            eq(keyResultDependencies.id, input.id),
+          ),
+        );
+
+      // The silo check reads the providing space, so a key result in another
+      // team moves it, in both the team it left and the one it named.
+      if (provider && provider.spaceId !== row.providerSpaceId) {
+        await recomputeAlignmentFor(tx, workspaceId, [
+          goal,
+          { cycleId: goal.cycleId, spaceId: provider.spaceId },
+          { cycleId: goal.cycleId, spaceId: row.providerSpaceId },
+        ]);
+      }
+
+      return {
+        result: {
+          id: input.id,
+          confirmed: after.confirmed,
+          blocksPublish: blocksPublish(after),
+        },
+        activity: {
+          kind: "alignment.register_provider_named" as const,
+          subjectType: "goal" as const,
+          subjectId: goal.id,
+          payload: { named: provider !== null, confirmationCleared },
+        },
+        audit: {
+          action: "goals.setDependencyProvider",
+          targetType: "key_result_dependency",
+          targetId: input.id,
+          payload: {
+            providerKeyResultId: provider?.id ?? null,
+            confirmationCleared,
+          },
         },
       };
     },
@@ -986,7 +1360,7 @@ export const dismissAlignmentFinding = defineWriteAction({
 export const readAlignmentGraph = defineReadAction({
   name: "alignment.graph",
   summary: "The cascade as nodes and edges, for the alignment studio canvas.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.object({
     nodes: z.array(
       z.object({
@@ -1186,7 +1560,7 @@ export const readAlignment = defineReadAction({
   summary:
     "The alignment health score for one cycle, with every open finding and the goal each one opens.",
   input: z.object({
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     spaceId: z.uuid().optional(),
     /** Dismissed findings are hidden by default; the studio can ask for them. */
     includeDismissed: z.boolean().default(false),
@@ -1231,6 +1605,21 @@ export const readAlignment = defineReadAction({
         source: z.string(),
         subjectGoalId: z.uuid().nullable(),
         subjectGoalTitle: z.string().nullable(),
+        /**
+         * The second goal, for a finding about two: a relink's new parent, or
+         * the other end of a conflict or a dependency. The title is null when
+         * this reader cannot see that goal; the id still says there is one,
+         * as a parent pointer does everywhere else.
+         */
+        targetGoalId: z.uuid().nullable(),
+        targetGoalTitle: z.string().nullable(),
+        /**
+         * One click applies it: an open relink naming both goals (METHOD.md
+         * §5.3, design `alignment-engine.md` §9). Derived from the row, never
+         * stored, and the same answer `alignment.applyFinding` acts on. Whether
+         * this reader may apply it is asked when they do.
+         */
+        oneClickApplicable: z.boolean(),
       }),
     ),
     /** The §5.4 register for this cycle: what depends on whom, and who carries it. */
@@ -1254,6 +1643,11 @@ export const readAlignment = defineReadAction({
          * gate 4 refuses.
          */
         blocksPublish: z.boolean(),
+        /**
+         * The key result that delivers it, and whether it has (plan 0.7.0
+         * O5). Delivered settles nothing: `blocksPublish` reads as before.
+         */
+        providerKeyResult: providingKeyResultOutput,
       }),
     ),
     /** Who an escalation from this cycle would reach. Null when nobody is named. */
@@ -1314,6 +1708,8 @@ export const readAlignment = defineReadAction({
             source: alignmentFindings.source,
             subjectGoalId: alignmentFindings.subjectGoalId,
             subjectGoalTitle: goals.title,
+            targetGoalId: alignmentFindings.targetGoalId,
+            targetGoalTitle: targetGoals.title,
           })
           .from(alignmentFindings)
           .leftJoin(
@@ -1321,6 +1717,13 @@ export const readAlignment = defineReadAction({
             and(
               eq(goals.id, alignmentFindings.subjectGoalId),
               isNull(goals.deletedAt),
+            ),
+          )
+          .leftJoin(
+            targetGoals,
+            and(
+              eq(targetGoals.id, alignmentFindings.targetGoalId),
+              isNull(targetGoals.deletedAt),
             ),
           )
           .where(
@@ -1343,6 +1746,9 @@ export const readAlignment = defineReadAction({
         // One statement for the whole set (P7-T01b). A finding names a goal at
         // most once, but a cycle holds ten thousand of them, and asking the
         // getter per row cost two statements each.
+        // The targets are asked in the same statement: a finding is shown by
+        // its subject, and the second goal's title only to a reader who could
+        // open that goal too.
         const allowedFindingGoals = await visibleResourceIds(tx, {
           workspaceId: context.workspaceId,
           memberId,
@@ -1350,19 +1756,30 @@ export const readAlignment = defineReadAction({
           ids: [
             ...new Set(
               rows.flatMap((row) =>
-                row.subjectGoalId ? [row.subjectGoalId] : [],
+                [row.subjectGoalId, row.targetGoalId].filter(
+                  (id): id is string => id !== null,
+                ),
               ),
             ),
           ],
         });
-        const visible = rows.filter(
-          (row) =>
-            (!row.subjectGoalId ||
-              allowedFindingGoals.has(row.subjectGoalId)) &&
-            (row.source !== "engine" ||
-              row.kind !== "structure" ||
-              raisedNow.has(`${row.ruleKey} ${row.subjectGoalId ?? ""}`)),
-        );
+        const visible = rows
+          .filter(
+            (row) =>
+              (!row.subjectGoalId ||
+                allowedFindingGoals.has(row.subjectGoalId)) &&
+              (row.source !== "engine" ||
+                row.kind !== "structure" ||
+                raisedNow.has(`${row.ruleKey} ${row.subjectGoalId ?? ""}`)),
+          )
+          .map((row) => ({
+            ...row,
+            targetGoalTitle:
+              row.targetGoalId && allowedFindingGoals.has(row.targetGoalId)
+                ? row.targetGoalTitle
+                : null,
+            oneClickApplicable: oneClickApplicable(row),
+          }));
 
         // The register, for the goals this reader can see. §5.4's four columns:
         // the key result that depends, the providing team, whether they have
@@ -1407,6 +1824,11 @@ export const readAlignment = defineReadAction({
           context.workspaceId,
           keyResultRows.map((row) => row.id),
         );
+        const providing = await loadProvidingKeyResults(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          keyResultIds: registerRows.map((row) => row.providerKeyResultId),
+        });
 
         const spaceNames = new Map(
           (
@@ -1474,6 +1896,9 @@ export const readAlignment = defineReadAction({
                 : null,
               escalatedAt: row.escalatedAt?.toISOString() ?? null,
               blocksPublish: blocksPublish(row),
+              providerKeyResult: row.providerKeyResultId
+                ? (providing.get(row.providerKeyResultId) ?? null)
+                : null,
             },
           ];
         });
@@ -1541,6 +1966,156 @@ export const readAlignment = defineReadAction({
 });
 
 /**
+ * The alignment score for one scope, from the stored row (design
+ * `alignment-engine.md` §10, plan 0.7.0 D2).
+ *
+ * One row instead of the graph, for the screens that show only the number:
+ * the Work Map called `alignment.read` on every load for its score and band.
+ * `alignment.read` keeps computing, because it lists every unaligned goal by
+ * name, which a number cannot.
+ *
+ * **The band is read here, never stored** (D3): from the score, `anchored`
+ * and the cycle's own thresholds, the rules `alignment.read` reads too, so a
+ * workspace that moves its bands sees the new band at once and stored stays
+ * equal to computed. A closed cycle keeps the thresholds it closed under.
+ *
+ * **No row yet is computed, not stored.** A scope no write has touched since
+ * 0.7.0, such as a cycle planned before the upgrade, is computed through the
+ * same engine and returned with `computedAt` null, so the answer is right
+ * before the hourly fill stores it. A read never writes.
+ *
+ * Access: a space's score needs view on the space, and is not found
+ * otherwise. The workspace's score is a fact about the cycle, readable by any
+ * member, as `alignment.read` has always given it to the Work Map.
+ */
+export const readAlignmentScore = defineReadAction({
+  name: "alignment.score",
+  summary:
+    "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
+  input: z.object({
+    cycleId: ADDRESS.cycle,
+    /** One space's score. The workspace's when absent. */
+    spaceId: z.uuid().optional(),
+  }),
+  output: z.object({
+    /**
+     * The share of goals below company level that align or stand alone with
+     * a reason, as a whole percentage (METHOD.md §5.2). Null when nothing
+     * below company level is in scope.
+     */
+    score: z.number().int().nullable(),
+    band: z.enum(ALIGNMENT_BANDS).nullable(),
+    /** The healthy and watch thresholds the band was read against. */
+    threshold: z.number(),
+    watchThreshold: z.number(),
+    breakdown: z.object({
+      /** Goals below company level in scope. */
+      measured: z.number().int(),
+      withParent: z.number().int(),
+      /** No parent, and a reason to stand alone. */
+      standingAlone: z.number().int(),
+      unaligned: z.number().int(),
+      /** A company-level objective anchors the cycle. Always true for a space. */
+      anchored: z.boolean(),
+    }),
+    /** When the stored row was written. Null when nothing is stored yet. */
+    computedAt: z.string().nullable(),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such workspace.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        if (input.spaceId) {
+          await getAccessScoped(tx, {
+            workspaceId: context.workspaceId,
+            memberId,
+            resourceType: "space",
+            resourceId: input.spaceId,
+            requires: ACCESS_LEVELS.view as never,
+          });
+        }
+        const scope = input.spaceId
+          ? ({ kind: "space", spaceId: input.spaceId } as const)
+          : ({ kind: "workspace" } as const);
+
+        const [row] = await tx
+          .select({
+            score: alignmentScores.score,
+            breakdown: alignmentScores.breakdown,
+            computedAt: alignmentScores.computedAt,
+          })
+          .from(alignmentScores)
+          .where(
+            and(
+              eq(alignmentScores.workspaceId, context.workspaceId),
+              eq(alignmentScores.cycleId, input.cycleId),
+              eq(alignmentScores.scope, scope.kind),
+              scope.kind === "space"
+                ? eq(alignmentScores.scopeId, scope.spaceId)
+                : isNull(alignmentScores.scopeId),
+            ),
+          )
+          .limit(1);
+
+        const reading = row
+          ? {
+              score: row.score,
+              breakdown: row.breakdown,
+              computedAt: row.computedAt.toISOString(),
+            }
+          : await (async () => {
+              const { result } = await alignmentInTx(tx, {
+                workspaceId: context.workspaceId,
+                cycleId: input.cycleId,
+                scope,
+              });
+              return {
+                score: result.score,
+                breakdown: alignmentBreakdown(result),
+                computedAt: null,
+              };
+            })();
+
+        const thresholds = alignmentThresholdsOf(
+          (await cycleRulesInTx(tx, context.workspaceId, input.cycleId))
+            .thresholds,
+        );
+        return {
+          score: reading.score,
+          band:
+            reading.score === null
+              ? null
+              : alignmentBand(
+                  reading.score,
+                  thresholds,
+                  reading.breakdown.anchored,
+                ),
+          threshold: thresholds.healthy,
+          watchThreshold: thresholds.watch,
+          breakdown: {
+            measured: reading.breakdown.measured,
+            withParent: reading.breakdown.withParent,
+            standingAlone: reading.breakdown.standingAlone,
+            unaligned: reading.breakdown.unaligned,
+            anchored: reading.breakdown.anchored,
+          },
+          computedAt: reading.computedAt,
+        };
+      },
+    );
+  },
+});
+
+/**
  * Whoever can edit either goal a finding names may decide it (P4-T06b-b).
  *
  * A finding with no goal at all is the anchor finding (decision D-16), which
@@ -1573,6 +2148,15 @@ async function requireEitherEnd(
   }
   throw refusal;
 }
+
+/** Why `alignment.applyFinding` refused, in the words a person reads. */
+const NOT_ONE_CLICK: Readonly<Record<NotOneClick, string>> = {
+  not_mechanical:
+    "Only a relink finding has a mechanical fix. A dependency needs a provider named, and a conflict or a gap needs a conversation rather than a click.",
+  decided: "This finding has already been decided.",
+  missing_goal:
+    "A relink names the goal to move and the parent to move it under. This one names only one of them.",
+};
 
 /**
  * Applies a finding whose fix is mechanical (METHOD.md §5.3, P4-T06b-b).
@@ -1625,22 +2209,12 @@ export const applyAlignmentFinding = defineWriteAction({
       if (!row) {
         throw new OperationError("not_found", "No such finding.");
       }
-      if (row.kind !== "relink") {
+      // The same question `alignment.read` answers for every finding it
+      // returns (design §9), so the panel never draws a button this refuses.
+      if (!oneClickApplicable(row)) {
         throw new OperationError(
           "forbidden",
-          "Only a relink finding has a mechanical fix. A dependency needs a provider named, and a conflict or a gap needs a conversation rather than a click.",
-        );
-      }
-      if (row.state !== "open") {
-        throw new OperationError(
-          "forbidden",
-          "This finding has already been decided.",
-        );
-      }
-      if (!row.subjectGoalId || !row.targetGoalId) {
-        throw new OperationError(
-          "forbidden",
-          "A relink names the goal to move and the parent to move it under. This one names only one of them.",
+          NOT_ONE_CLICK[notOneClickBecause(row) ?? "missing_goal"],
         );
       }
 

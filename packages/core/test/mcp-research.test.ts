@@ -343,6 +343,30 @@ describe("fetch, which turns an address into content with a citation", () => {
     expect(parsed(outcome.text).id).toBe(goalA);
   });
 
+  it("resolves the short link a person copied, citing the goal by its key (short-ids.md S6)", async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ short_id: string }>(
+      "select short_id from goals where id = $1",
+      [goalA],
+    );
+    const shortId = rows[0]?.short_id as string;
+
+    const outcome = await run("fetch", {
+      url: `https://okr.example.com/goals/${shortId}`,
+    });
+    expect(outcome.isError).toBe(false);
+    expect(parsed(outcome.text).id).toBe(goalA);
+    expect(parsed(outcome.text).url).toBe(`/goals/${goalA}`);
+
+    // Another workspace's reader holds the same link and gets nothing.
+    const foreign = await run(
+      "fetch",
+      { url: `/goals/${shortId}` },
+      { workspaceId: workspaceB, userId: OWNER_B },
+    );
+    expect(foreign.isError).toBe(true);
+  });
+
   it("resolves an absolute instance URL", async () => {
     const outcome = await run("fetch", {
       url: `https://okr.example/goals/${goalA}?tab=history`,

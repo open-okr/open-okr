@@ -11,10 +11,25 @@
  * and no handles. That is what the gap audit recorded as G-04.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { refusedSentence } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+
+/**
+ * A refusal as the row's sentence: a switch or a ladder in a table row, with
+ * no box of its own to put it under. A schema's refusal too, which used to
+ * reach the error page (plan U1b).
+ */
+async function refused(error: unknown): Promise<RuleResult> {
+  const state = refusedSentence(error, (await getTranslations()).t);
+  if (state === null) {
+    throw error;
+  }
+  return { error: state.error, saved: false };
+}
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -52,10 +67,7 @@ export async function setNudgeRuleAction(input: {
   try {
     await callAction(await context(), "nudges.setRule", input);
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: false };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/admin/nudges");
   return { error: null, saved: true };
@@ -74,10 +86,7 @@ export async function setQuietModeAction(
   try {
     await callAction(await context(), "rhythm.update", { quietMode });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: false };
-    }
-    throw error;
+    return refused(error);
   }
   revalidatePath("/admin/nudges");
   return { error: null, saved: true };

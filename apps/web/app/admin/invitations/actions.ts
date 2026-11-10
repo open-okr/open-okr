@@ -4,6 +4,7 @@ import { loadEnv } from "@openokr/config";
 import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
@@ -58,14 +59,33 @@ function joinUrl(token: string): string {
 export interface InviteResult {
   readonly link?: IssuedLink;
   readonly error?: string;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
-async function reason(error: unknown): Promise<string> {
-  if (error instanceof Error) {
-    return error.message;
-  }
+/**
+ * A refused invitation under the field it names, an address or a domain,
+ * which `InviteForm` hands to the page's fields by name, or as the form's
+ * sentence (plan U1b). A schema's refusal is its own sentence rather than the
+ * JSON of every issue, which this used to show.
+ */
+async function refused(
+  error: unknown,
+  renamed?: Readonly<Record<string, string>>,
+): Promise<InviteResult> {
   const { t } = await getTranslations();
-  return t("admin.agents.proposalQueue.somethingWentWrong");
+  const state = refusedByField(error, t, renamed);
+  if (state !== null) {
+    return state.fields
+      ? { fields: state.fields }
+      : { error: state.error ?? "" };
+  }
+  return {
+    error:
+      error instanceof Error
+        ? error.message
+        : t("admin.agents.proposalQueue.somethingWentWrong"),
+  };
 }
 
 export async function createWorkspaceLinkAction(
@@ -100,7 +120,16 @@ export async function createWorkspaceLinkAction(
       },
     };
   } catch (error) {
-    return { error: await reason(error) };
+    // Every domain is a word in the one box.
+    return refused(
+      error,
+      Object.fromEntries(
+        domains.map((_, index) => [
+          `allowedDomains.${index}`,
+          "allowedDomains",
+        ]),
+      ),
+    );
   }
 }
 
@@ -134,7 +163,7 @@ export async function createPersonalLinkAction(
       },
     };
   } catch (error) {
-    return { error: await reason(error) };
+    return refused(error);
   }
 }
 
@@ -182,7 +211,7 @@ export async function createGuestLinkAction(
       },
     };
   } catch (error) {
-    return { error: await reason(error) };
+    return refused(error);
   }
 }
 

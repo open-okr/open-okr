@@ -293,6 +293,14 @@ Validation: each `unavailable` threshold must be strictly greater than
 its `degraded` threshold. Both must be positive. Checked at resolve time,
 the same as the admission floors.
 
+**Built in 0.7.0 (plan P8).** Until then the endpoint read only the four
+variables, and checked each only to be a positive number. Now
+`resolveStatusThresholds` in `packages/core/src/status/thresholds.ts`
+resolves each setting the usual way (stored, then the variable, then the
+default) once at boot, beside the admission limits, and a pair that fails the
+rule above stops the boot with a message naming both keys. A stored change
+takes effect at the next restart.
+
 ## 5. What is not built
 
 | Item | Why |

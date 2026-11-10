@@ -65,10 +65,27 @@ export interface AdmissionCounters {
 export interface AdmissionLimits {
   readonly actionsPerMinute: number;
   readonly concurrentActions: number;
+  /**
+   * Outbox claims one workspace may take a minute (tenant-limits.md §10 R1,
+   * plan 0.7.0 P6). Not an admission limit: the relay reads it. Resolved and
+   * validated here with the other two, so all three tenant limits are read
+   * and refused in one place. Absent is unlimited, as zero is.
+   */
+  readonly outboxRowsPerMinute?: number;
 }
 
 export interface Admission extends AdmissionLimits {
   readonly counters: AdmissionCounters;
+  /**
+   * A workspace's own limits where its plan sets them (plan 0.7.0 P5). Each
+   * one it names replaces the instance's for that workspace. The host caches
+   * it, so admission costs no database read per action.
+   */
+  readonly limitsFor?: (
+    workspaceId: string,
+  ) => Promise<Partial<
+    Pick<AdmissionLimits, "actionsPerMinute" | "concurrentActions">
+  > | null>;
 }
 
 /**
@@ -84,6 +101,8 @@ export interface Admission extends AdmissionLimits {
  */
 export const MIN_ACTIONS_PER_MINUTE = 60;
 export const MIN_CONCURRENT_ACTIONS = 2;
+/** One row a second, the same floor as actions (tenant-limits.md §10 R1). */
+export const MIN_OUTBOX_ROWS_PER_MINUTE = 60;
 
 /**
  * How long a concurrency counter lives without being touched.
@@ -131,6 +150,11 @@ export function validateAdmissionLimits(limits: AdmissionLimits): void {
     limits.concurrentActions,
     MIN_CONCURRENT_ACTIONS,
     "cloud.limits.concurrentActions",
+  );
+  check(
+    limits.outboxRowsPerMinute ?? 0,
+    MIN_OUTBOX_ROWS_PER_MINUTE,
+    "cloud.limits.outboxRowsPerMinute",
   );
 }
 
@@ -183,7 +207,14 @@ export async function admit(
   workspaceId: string,
   onRefusal?: (reason: string) => void,
 ): Promise<AdmissionRelease> {
-  const { actionsPerMinute, concurrentActions, counters } = admission;
+  // The plan's own numbers where it sets them (P5), else the instance's.
+  const own = admission.limitsFor
+    ? await admission.limitsFor(workspaceId)
+    : null;
+  const actionsPerMinute = own?.actionsPerMinute ?? admission.actionsPerMinute;
+  const concurrentActions =
+    own?.concurrentActions ?? admission.concurrentActions;
+  const { counters } = admission;
 
   // **The self-hosted path, and the common one.** Two comparisons against
   // zero and no round trip at all. §7: there is no second code path, and a

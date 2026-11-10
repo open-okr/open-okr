@@ -620,6 +620,47 @@ describe("what a move keeps", () => {
     expect(rows[0]?.tiers).toEqual(["balanced", "fast"]);
   });
 
+  it("moves a webhook with its events, off and without a secret (outbound-webhooks.md W14)", async () => {
+    await callAction(
+      {
+        pool,
+        workspaceId: sourceWorkspaceId,
+        actor: { kind: "human", userId: OWNER_A },
+        ring: parseKeyRing({ current: newRootKey() }),
+        checkOutboundUrl: async () => ({ ok: true as const }),
+      },
+      "webhooks.create",
+      {
+        name: "Receiver",
+        url: "https://hooks.example/in",
+        events: ["objective.created", "kpi.recorded"],
+      },
+    );
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.webhooks).toBeUndefined();
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      events: string[];
+      enabled: boolean;
+      off_reason: string | null;
+      secret_ciphertext: string | null;
+    }>(
+      "select events, enabled, off_reason, secret_ciphertext from webhooks where workspace_id = $1",
+      [targetWorkspaceId],
+    );
+    expect(rows).toEqual([
+      {
+        events: ["objective.created", "kpi.recorded"],
+        enabled: false,
+        off_reason: "imported",
+        secret_ciphertext: null,
+      },
+    ]);
+  });
+
   it("moves a row in every exported table with an array column", async () => {
     // The two above are the tests that move one. A third such table fails
     // here, so whoever adds it adds a row to move as well.
@@ -633,7 +674,7 @@ describe("what a move keeps", () => {
       rows
         .map((row) => row.table_name)
         .filter((table) => EXPORTED_TABLES.includes(table)),
-    ).toEqual(["ai_models", "annual_frame_revisions"]);
+    ).toEqual(["ai_models", "annual_frame_revisions", "webhooks"]);
   });
 
   it("writes an array literal Postgres reads back as it was", async () => {
@@ -847,6 +888,156 @@ describe("what a move keeps", () => {
       [targetWorkspaceId],
     );
     expect(rows.map((row) => row.storage_key)).toEqual([key]);
+  });
+
+  it("points a dependency at the providing key result's new id (plan 0.7.0 O5)", async () => {
+    const source = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    // A quarter the target has no cycle for, so nothing in it is skipped as
+    // a duplicate of the target's own current cycle.
+    const cycle = await source<{ id: string }>("cycles.create", {
+      on: "2030-02-15",
+      mode: "quarterly",
+    });
+    const objective = async (title: string, spaceName: string) => {
+      const space = await source<{ id: string }>("spaces.create", {
+        name: spaceName,
+      });
+      const goal = await source<{ id: string }>("goals.create", {
+        title,
+        cycleId: cycle.id,
+        level: "team",
+        ownerKind: "space",
+        spaceId: space.id,
+        weight: 1,
+      });
+      const keyResult = await source<{ id: string }>("goals.addKeyResult", {
+        goalId: goal.id,
+        title: `${title}: the measure`,
+        direction: "increase",
+        indicatorType: "leading",
+        baselineValue: 0,
+        targetValue: 10,
+        weight: 1,
+      });
+      return keyResult.id;
+    };
+    const depending = await objective("Onboarding without us", "Product 2030");
+    const providing = await objective("Data in one step", "Engineering 2030");
+    await source("goals.addKeyResultDependency", {
+      keyResultId: depending,
+      providerKeyResultId: providing,
+    });
+
+    const exported = await exportSource();
+    await importIntoTarget(exported.bytes, false);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      provider_key_result_id: string | null;
+      provider_title: string | null;
+      provider_workspace_id: string | null;
+    }>(
+      `select d.provider_key_result_id, k.title as provider_title,
+              k.workspace_id as provider_workspace_id
+         from key_result_dependencies d
+         left join key_results k on k.id = d.provider_key_result_id
+        where d.workspace_id = $1`,
+      [targetWorkspaceId],
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.provider_key_result_id).not.toBe(providing);
+    expect(rows[0]).toMatchObject({
+      provider_title: "Data in one step: the measure",
+      provider_workspace_id: targetWorkspaceId,
+    });
+  });
+
+  it("keeps each goal's short id, and gives a fresh one where the target already uses it (short-ids.md S8)", async () => {
+    const source = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: sourceWorkspaceId,
+          actor: { kind: "human", userId: OWNER_A },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    const cycle = await source<{ id: string }>("cycles.create", {
+      on: "2030-02-15",
+      mode: "quarterly",
+    });
+    const goal = (title: string) =>
+      source<{ id: string }>("goals.create", {
+        title,
+        cycleId: cycle.id,
+        level: "company",
+        ownerKind: "workspace",
+        weight: 1,
+      });
+    const kept = await goal("Win the mid-market");
+    const clashing = await goal("Keep every customer");
+
+    const wb = await workerDb();
+    const shortIdOf = async (id: string) =>
+      (
+        await wb.admin.query<{ short_id: string }>(
+          "select short_id from goals where id = $1",
+          [id],
+        )
+      ).rows[0]?.short_id as string;
+    const keptShortId = await shortIdOf(kept.id);
+    const clashingShortId = await shortIdOf(clashing.id);
+    // The target already gives that address to a goal of its own.
+    const inTarget = <T>(name: string, input: unknown) =>
+      callAction(
+        {
+          pool,
+          workspaceId: targetWorkspaceId,
+          actor: { kind: "human", userId: OWNER_B },
+        },
+        name as never,
+        input as never,
+      ) as Promise<T>;
+    const targetCycle = await inTarget<{ id: string }>("cycles.current", {
+      mode: "quarterly",
+    });
+    const target = await inTarget<{ id: string }>("goals.create", {
+      title: "Already here",
+      cycleId: targetCycle.id,
+      level: "company",
+      ownerKind: "workspace",
+      weight: 1,
+    });
+    await wb.admin.query("update goals set short_id = $1 where id = $2", [
+      clashingShortId,
+      target.id,
+    ]);
+
+    const exported = await exportSource();
+    const diff = await importIntoTarget(exported.bytes, false);
+    expect(diff.skipped.goals ?? 0).toBe(0);
+
+    const { rows } = await wb.admin.query<{ title: string; short_id: string }>(
+      `select title, short_id from goals
+        where workspace_id = $1 and title in ($2, $3)`,
+      [targetWorkspaceId, "Win the mid-market", "Keep every customer"],
+    );
+    const moved = new Map(rows.map((row) => [row.title, row.short_id]));
+    expect(moved.get("Win the mid-market")).toBe(keptShortId);
+    expect(moved.get("Keep every customer")).toMatch(
+      /^[1-9a-km-zA-HJ-NP-Z]{10}$/,
+    );
+    expect(moved.get("Keep every customer")).not.toBe(clashingShortId);
   });
 });
 

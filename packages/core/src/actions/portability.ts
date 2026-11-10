@@ -29,8 +29,15 @@
  * is bounded rather than hopeful.
  */
 import { createHash } from "node:crypto";
-import { activeOnly, exportRuns, workspaceImports } from "@openokr/db";
-import { eq } from "drizzle-orm";
+import {
+  activeOnly,
+  exportRuns,
+  withWorkspace,
+  workspaceImports,
+  workspaceMembers,
+} from "@openokr/db";
+import { and, desc, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { OperationError } from "../operations/operation.ts";
@@ -49,7 +56,7 @@ import {
   importWorkspace,
 } from "../portability/import.ts";
 import { rootKeyFingerprint } from "../secrets/key-ring.ts";
-import { defineWriteAction } from "./define.ts";
+import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /** `workspace-<slug>-<date>.okr`, which is what somebody downloads. */
 function archiveFilename(slug: string, at: Date): string {
@@ -260,6 +267,81 @@ const importDifferenceSchema = z.object({
  * **Idempotent.** A re-import of the same archive (identified by its SHA-256
  * digest) returns the stored report from the first run.
  */
+/** How many archive runs the Backups screen lists (backups-screen.md U3). */
+const ARCHIVE_HISTORY_LIMIT = 50;
+
+/**
+ * Every archive taken of this workspace, newest first (docs/design/
+ * backups-screen.md U3, plan 0.7.0 U3).
+ *
+ * **Every administrator's, not only the reader's.** Somebody taking the whole
+ * workspace is something the others should be able to see without searching
+ * the audit log. `full`, the level the archive itself needs. The file is not
+ * kept, so this is a record of what was taken, never a way to take it again.
+ */
+export const listArchives = defineReadAction({
+  name: "workspace.listArchives",
+  summary:
+    "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
+  input: z.object({}),
+  output: z.object({
+    archives: z.array(
+      z.object({
+        id: z.uuid(),
+        takenAt: z.string(),
+        takenByName: z.string().nullable(),
+        filename: z.string(),
+        rows: z.number().int().nullable(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.full,
+  async handler(context) {
+    return withWorkspace(
+      drizzle(context.pool),
+      context.workspaceId,
+      async (tx) => {
+        const rows = await tx
+          .select({
+            id: exportRuns.id,
+            takenAt: exportRuns.createdAt,
+            takenByName: workspaceMembers.name,
+            filename: exportRuns.filename,
+            rows: exportRuns.rowCount,
+          })
+          // openokr:allow-raw-read: `full` on the workspace was granted above,
+          // and an archive run belongs to the workspace rather than to any one
+          // protected aggregate.
+          .from(exportRuns)
+          .leftJoin(
+            workspaceMembers,
+            eq(workspaceMembers.id, exportRuns.requestedById),
+          )
+          .where(
+            activeOnly(
+              exportRuns,
+              and(
+                eq(exportRuns.workspaceId, context.workspaceId),
+                eq(exportRuns.kind, "archive"),
+              ),
+            ),
+          )
+          .orderBy(desc(exportRuns.createdAt))
+          .limit(ARCHIVE_HISTORY_LIMIT);
+        return {
+          archives: rows.map((row) => ({
+            id: row.id,
+            takenAt: row.takenAt.toISOString(),
+            takenByName: row.takenByName,
+            filename: row.filename,
+            rows: row.rows,
+          })),
+        };
+      },
+    );
+  },
+});
+
 export const importArchive = defineWriteAction({
   name: "workspace.importArchive",
   summary:

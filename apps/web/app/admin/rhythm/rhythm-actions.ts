@@ -10,12 +10,40 @@
  * and this is what carries that sentence to the screen.
  */
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusalFields, refusedSentence } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NOTHING_SAVED, type RhythmState } from "./rhythm-state.ts";
+
+/**
+ * A refused save as the card reads it, or null for a failure.
+ *
+ * The card already puts a refusal under the parameter it names: it reads the
+ * key from a sentence written `${key}: ${message}`, as `rhythm.update` words
+ * its own (P8-G11a). A schema's refusal, which used to reach the error page,
+ * is written the same way here when its path is one parameter's override, so
+ * it lands under that parameter too (guided-inputs §4.2, plan U1b). A key is
+ * `group.name`, so the path's second and third parts are the key.
+ */
+function refusedParameter(
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+): string | null {
+  const refusal = refusalFields(error, t);
+  if (refusal === null) {
+    return null;
+  }
+  for (const [path, message] of Object.entries(refusal.fields)) {
+    const [root, group, name] = path.split(".");
+    if (root === "overrides" && group && name) {
+      return `${group}.${name}: ${message}`;
+    }
+  }
+  return refusal.message;
+}
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -218,10 +246,11 @@ export async function saveRhythm(
   try {
     await callAction(await context(), "rhythm.update", patch);
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: null };
+    const refused = refusedParameter(error, t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return { error: refused, saved: null };
   }
 
   revalidatePath("/admin/rhythm");
@@ -280,10 +309,12 @@ export async function resetGroup(
       overrides: Object.fromEntries(wanted.map((key) => [key, null])),
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: null };
+    // A button with no field, so the sentence; a schema's too (plan U1b).
+    const refused = refusedSentence(error, t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return { error: refused.error, saved: null };
   }
 
   revalidatePath("/admin/rhythm");

@@ -11,6 +11,7 @@ import {
   admit,
   MIN_ACTIONS_PER_MINUTE,
   MIN_CONCURRENT_ACTIONS,
+  MIN_OUTBOX_ROWS_PER_MINUTE,
   validateAdmissionLimits,
 } from "../src/tenancy/admission.ts";
 
@@ -215,6 +216,23 @@ describe("the floors, so a number nobody thought about cannot stop the product",
     }
   });
 
+  // The outbox rate (tenant-limits.md §10 R1, plan 0.7.0 P6): resolved and
+  // validated with the other two, zero unlimited, below sixty refused.
+  it("refuses an outbox rate below the floor, naming the key, and accepts zero", () => {
+    const limits = (outboxRowsPerMinute: number) => ({
+      actionsPerMinute: 0,
+      concurrentActions: 0,
+      outboxRowsPerMinute,
+    });
+    expect(() => validateAdmissionLimits(limits(0))).not.toThrow();
+    expect(() =>
+      validateAdmissionLimits(limits(MIN_OUTBOX_ROWS_PER_MINUTE)),
+    ).not.toThrow();
+    expect(() => validateAdmissionLimits(limits(30))).toThrow(
+      /cloud\.limits\.outboxRowsPerMinute is 30, which is below the floor of 60/,
+    );
+  });
+
   it("refuses a concurrency of one, which serialises a whole tenant", () => {
     expect(() =>
       validateAdmissionLimits({ actionsPerMinute: 0, concurrentActions: 1 }),
@@ -274,5 +292,37 @@ describe("through callAction, which is the door this protects", () => {
 
     expect(error.code).toBe("rate_limited");
     expect(error.retryAfterSeconds).toBe(23);
+  });
+});
+
+describe("a plan's own limits (plan 0.7.0 P5)", () => {
+  it("uses the plan's number for its workspace, and the instance's for another", async () => {
+    const c = counters({});
+    const planned: Admission = {
+      ...admission({ actionsPerMinute: 600, concurrentActions: 0 }, c),
+      limitsFor: async (workspaceId) =>
+        workspaceId === "workspace-on-a-plan"
+          ? { actionsPerMinute: 120 }
+          : null,
+    };
+
+    await admit(planned, "workspace-on-a-plan");
+    await admit(planned, "workspace-1");
+
+    expect(c.calls).toEqual([
+      "rateLimit admission:rate:workspace-on-a-plan 120 60",
+      "rateLimit admission:rate:workspace-1 600 60",
+    ]);
+  });
+
+  it("lets a plan lift a limit to unlimited with zero, at no round trip", async () => {
+    const c = counters({});
+    const planned: Admission = {
+      ...admission({ actionsPerMinute: 600, concurrentActions: 4 }, c),
+      limitsFor: async () => ({ actionsPerMinute: 0, concurrentActions: 0 }),
+    };
+    const release = await admit(planned, "workspace-1");
+    await release();
+    expect(c.calls).toEqual([]);
   });
 });

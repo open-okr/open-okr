@@ -22,6 +22,18 @@ const posted = (container: HTMLElement, name: string) =>
   new FormData(container.querySelector("form") as HTMLFormElement).get(name);
 
 describe("a number field", () => {
+  test("shows a refusal from the server under itself (guided-inputs §4.2)", () => {
+    inEnglish(
+      <form>
+        <NumberInput label="Seats" name="seats" error="10 at most." />
+      </form>,
+    );
+    expect(screen.getByRole("alert").textContent).toBe("10 at most.");
+    expect(screen.getByLabelText("Seats").getAttribute("aria-invalid")).toBe(
+      "true",
+    );
+  });
+
   test("is labelled with its unit, and posts the raw number", async () => {
     const { container } = inEnglish(
       <form>

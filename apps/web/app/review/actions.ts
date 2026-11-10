@@ -13,9 +13,10 @@
  * inbox loses a row, the goal's timeline gains an acknowledged stamp, and the
  * sidebar badge counts one fewer.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusalFields, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
@@ -37,10 +38,13 @@ export async function acknowledge(
       { id },
     );
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // One button, so the refusal is its sentence; a schema's too, which
+    // used to reach the error page (plan U1b).
+    const refused = refusedSentence(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath("/review");
   revalidatePath("/check-in");
@@ -76,10 +80,11 @@ export async function acknowledgeAll(
       await callAction(context, "goals.acknowledgeCheckIn", { id });
       done += 1;
     } catch (error) {
-      if (!(error instanceof OperationError)) {
+      const refusal = refusalFields(error, t);
+      if (refusal === null) {
         throw error;
       }
-      refusals.push(error.message);
+      refusals.push(refusal.message);
     }
   }
   revalidatePath("/review");
@@ -141,10 +146,11 @@ export async function decideProposal(
       await callAction(context, "proposals.apply", { id });
     }
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = refusedSentence(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidatePath("/review");
   revalidatePath("/check-in");

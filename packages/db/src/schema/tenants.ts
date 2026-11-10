@@ -38,7 +38,23 @@ export const tenants = pgTable("tenants", {
   planKey: text("plan_key"),
   /** Null means unlimited. */
   seats: integer("seats"),
+  /**
+   * When a trial ends (docs/design/tenant-lifecycle.md §11). The hourly sweep
+   * settles it once the date passes, and clears it; choosing a plan clears it
+   * too. A past date is never a state.
+   */
   trialEndsAt: timestamp("trial_ends_at", { withTimezone: true }),
+  /**
+   * The sweep made it read-only because its people do not fit the default
+   * plan, as billing's flag does for a subscription. Read only while
+   * suspended; cleared on every lifecycle move. Migration 0158.
+   */
+  suspendedByTrial: boolean("suspended_by_trial").notNull().default(false),
+  /**
+   * When the owners and administrators were told the trial ends in seven
+   * days. Cleared whenever the end date moves. Migration 0158.
+   */
+  trialRemindedAt: timestamp("trial_reminded_at", { withTimezone: true }),
   /** Recorded, never routed on. */
   region: text("region").notNull(),
   closedAt: timestamp("closed_at", { withTimezone: true }),

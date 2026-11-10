@@ -116,6 +116,25 @@ test("acceptance: the review runs stages 1 to 4 and stops at recognition", async
   await expect(
     page.getByRole("button", { name: "Continue to next step" }),
   ).toHaveCount(0);
+  // Nobody has been recognised in a review written a moment ago, so the rail
+  // says the stage is not done and the close says what is missing, without
+  // refusing to close (plan 0.7.0, S1).
+  await expect(
+    page
+      .getByRole("region")
+      .filter({ hasText: "Stages" })
+      .getByRole("listitem")
+      .filter({ hasText: "Recognition and wins" })
+      .getByText("Not done"),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "This stage is not done yet. Nobody has been recognised yet.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Close session" }),
+  ).toBeEnabled();
 });
 
 test("acceptance: the retrospective runs stages 5 to 11 from the team retro", async () => {

@@ -1,6 +1,8 @@
+import { readTrialNotice } from "@openokr/core";
 import { Card, CardBody, Chip } from "@openokr/ui";
 import Link from "next/link";
-import type { Hold } from "./held-by.ts";
+import { type Hold, readLifecycle } from "./held-by.ts";
+import { getPool } from "./pool";
 import { getTranslations } from "./translations";
 
 /**
@@ -64,6 +66,16 @@ export async function WorkspaceStateBanner({
                 })
               : t("workspaceState.closedKept", { closed: day(hold.closedAt) })}
           </span>
+          {/* The archive is how a closed customer leaves with their data,
+              and it still works here (backups-screen.md U7, plan 0.7.0 U3). */}
+          {canRecover ? (
+            <Link
+              href="/admin/backups"
+              className="text-xs font-semibold text-brand-text hover:underline"
+            >
+              {t("workspaceState.takeAnArchive")}
+            </Link>
+          ) : null}
           {canRecover && hold.ownerMayReopen ? (
             <Link
               href="/admin/general"
@@ -93,9 +105,21 @@ export async function WorkspaceStateBanner({
         <span className="min-w-0 flex-1 text-sm text-ink-2">
           {frozen
             ? t("workspaceState.frozenExplained")
-            : t("workspaceState.readOnlyExplained")}
+            : hold?.kind === "trial"
+              ? t("workspaceState.trialEndedReadOnly")
+              : t("workspaceState.readOnlyExplained")}
         </span>
-        {hold ? (
+        {/* A trial's read-only mode is the customer's to leave, as billing's
+            is: choose a plan, or make the people fit and settle
+            (tenant-lifecycle.md §11 T8, T10). */}
+        {hold?.kind === "trial" && canRecover ? (
+          <Link
+            href="/admin/plan"
+            className="text-xs font-semibold text-brand-text hover:underline"
+          >
+            {t("workspaceState.choosePlan")}
+          </Link>
+        ) : hold ? (
           <span className="text-xs text-ink-4">
             {t("workspaceState.onlyTheProvider")}
           </span>
@@ -111,6 +135,61 @@ export async function WorkspaceStateBanner({
             {t("workspaceState.anAdministratorCanLiftIt")}
           </span>
         )}
+      </CardBody>
+    </Card>
+  );
+}
+
+/** As the erasure reminder's week (tenant-lifecycle.md §11 T10). */
+const TRIAL_NOTICE_DAYS = 7;
+
+/**
+ * The last week of a trial, for those who can choose a plan
+ * (docs/design/tenant-lifecycle.md §11 T10, plan 0.7.0 P4c). Page state
+ * rather than a message: the day, the plan, and what happens if nobody
+ * chooses. Nothing before that week, and nothing to anybody who cannot act
+ * on it.
+ */
+export async function TrialEndingBanner({
+  workspaceId,
+}: {
+  readonly workspaceId: string;
+}) {
+  const lifecycle = await readLifecycle(workspaceId);
+  const endsAt = lifecycle?.state === "active" ? lifecycle.trialEndsAt : null;
+  const now = Date.now();
+  if (
+    !endsAt ||
+    endsAt.getTime() <= now ||
+    endsAt.getTime() - now > TRIAL_NOTICE_DAYS * 24 * 60 * 60 * 1000
+  ) {
+    return null;
+  }
+  const notice = await readTrialNotice(getPool(), workspaceId).catch(
+    () => null,
+  );
+  const { t, locale } = await getTranslations();
+  const date = new Intl.DateTimeFormat(locale, {
+    dateStyle: "long",
+    timeZone: "UTC",
+  }).format(endsAt);
+  return (
+    <Card data-testid="trial-ending-banner">
+      <CardBody className="flex flex-wrap items-baseline gap-2.5">
+        <Chip tone="warn">{t("workspaceState.trial")}</Chip>
+        <span className="min-w-0 flex-1 text-sm text-ink-2">
+          {t("workspaceState.trialEnds", {
+            plan: notice?.planName ?? "",
+            date,
+            fallback: notice?.defaultPlanName ?? t("workspaceState.noPlan"),
+          })}
+        </span>
+        <Link
+          href="/admin/plan"
+          className="text-xs font-semibold text-brand-text hover:underline"
+        >
+          {t("workspaceState.choosePlan")}
+        </Link>
       </CardBody>
     </Card>
   );

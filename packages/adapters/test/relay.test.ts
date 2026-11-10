@@ -330,6 +330,35 @@ describe("OutboxRelay", () => {
     expect(dispatches).toBe(1);
   });
 
+  it("retries a topic on its own schedule and ceiling, and every other topic on the relay's (outbound-webhooks.md W9)", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "webhooks.deliver", "hook:1");
+    await enqueue(wb.admin, "mail.send", "mail:1");
+
+    const deadLettered: string[] = [];
+    const relay = new OutboxRelay(wb.admin, {
+      backoffSeconds: () => 0,
+      maxAttempts: 1,
+      retryPolicy: {
+        "webhooks.deliver": { maxAttempts: 3, backoffSeconds: () => 3_600 },
+      },
+      dispatch: async () => {
+        throw new Error("the receiver is down");
+      },
+      onDeadLetter: (record) => deadLettered.push(record.idempotencyKey),
+    });
+
+    await relay.drainOnce();
+    // The mail reached the relay's ceiling of one; the webhook waits an hour.
+    expect(deadLettered).toEqual(["mail:1"]);
+    const { rows } = await wb.admin.query<{ wait: number }>(
+      `select extract(epoch from available_at - now())::int as wait
+         from outbox where idempotency_key = 'hook:1'`,
+    );
+    expect(rows[0]?.wait).toBeGreaterThan(3_500);
+    expect(rows[0]?.wait).toBeLessThanOrEqual(3_600);
+  });
+
   it("still retries an ordinary failure, so one permanent case does not make every failure fatal", async () => {
     const wb = await workerDb();
     await enqueue(wb.admin, "mail.send", "transient:1");
@@ -541,6 +570,150 @@ describe("the relay is fair between workspaces", () => {
     expect(new Set(keys).size).toBe(8);
     expect(first.delivered).toHaveLength(4);
     expect(second.delivered).toHaveLength(4);
+  });
+});
+
+/**
+ * The outbox rate per workspace (docs/design/tenant-limits.md §10, plan 0.7.0
+ * P6 and P7). With a limit set, a workspace is offered only what is left of
+ * its minute's budget of claims; its other rows wait untouched. With none,
+ * nothing changes.
+ */
+describe("the outbox rate per workspace", () => {
+  const LIMIT = 60;
+
+  const states = async (keyPrefix: string) => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      `select attempts, available_at, claimed_at from outbox
+        where idempotency_key like $1 and delivered_at is null`,
+      [`${keyPrefix}%`],
+    );
+    return rows as { attempts: number; claimed_at: Date | null }[];
+  };
+
+  it("offers a workspace no more than its budget in a minute, and the others theirs", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 90; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `a-${n}`, 600 - n);
+    }
+    for (let n = 0; n < 3; n += 1) {
+      await enqueueFor(wb.admin, WS_B, `b-${n}`, 300 - n);
+    }
+
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 50,
+      rowsPerMinute: () => LIMIT,
+    });
+    for (let pass = 0; pass < 4; pass += 1) {
+      await relay.drainOnce();
+    }
+
+    const fromA = sink.delivered.filter((one) =>
+      one.idempotencyKey.startsWith("a-"),
+    );
+    const fromB = sink.delivered.filter((one) =>
+      one.idempotencyKey.startsWith("b-"),
+    );
+    expect(fromA).toHaveLength(LIMIT);
+    expect(fromB).toHaveLength(3);
+    // B's went in the first pass, beside A's first rows.
+    expect(
+      sink.delivered.slice(0, 6).map((one) => one.idempotencyKey),
+    ).toContain("b-0");
+  });
+
+  it("leaves the rows it holds untouched: no attempt counted, no lease taken", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 70; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `held-${n}`, 600 - n);
+    }
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: collector().dispatch,
+      batchSize: 100,
+      rowsPerMinute: () => LIMIT,
+    });
+    await relay.drainOnce();
+    await relay.drainOnce();
+
+    const waiting = await states("held-");
+    expect(waiting).toHaveLength(10);
+    for (const row of waiting) {
+      expect(row.attempts).toBe(0);
+      expect(row.claimed_at).toBeNull();
+    }
+  });
+
+  it("always claims rows that belong to no workspace", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 70; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `busy-${n}`, 600 - n);
+    }
+    await enqueueFor(wb.admin, null, "instance-row", 1);
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 100,
+      rowsPerMinute: () => LIMIT,
+    });
+    await relay.drainOnce();
+    await relay.drainOnce();
+    expect(sink.delivered.map((one) => one.idempotencyKey)).toContain(
+      "instance-row",
+    );
+  });
+
+  it("changes nothing with no limit: no claim time written, today's order", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 6; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `free-${n}`, 600 - n);
+    }
+    const sink = collector();
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: sink.dispatch,
+      batchSize: 4,
+      rowsPerMinute: () => 0,
+    });
+    await relay.drainOnce();
+    expect(sink.delivered.map((one) => one.idempotencyKey)).toEqual([
+      "free-0",
+      "free-1",
+      "free-2",
+      "free-3",
+    ]);
+    const { rows } = await wb.admin.query(
+      "select count(*)::int as n from outbox where claimed_at is not null",
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  it("does not read the limit's work as lag: a held workspace is left out of the oldest-pending age", async () => {
+    const wb = await workerDb();
+    for (let n = 0; n < 70; n += 1) {
+      await enqueueFor(wb.admin, WS_A, `lag-${n}`, 3_600 - n);
+    }
+    const relay = new OutboxRelay(wb.appPool, {
+      dispatch: collector().dispatch,
+      batchSize: 100,
+      rowsPerMinute: () => LIMIT,
+    });
+    await relay.drainOnce();
+
+    // A is at its rate now, with ten rows an hour old still waiting.
+    expect(await OutboxRelay.oldestPendingSeconds(wb.appPool, LIMIT)).toBe(0);
+    expect(
+      await OutboxRelay.oldestPendingSeconds(wb.appPool, 0),
+    ).toBeGreaterThan(3_000);
+    expect(await OutboxRelay.rateHeld(wb.appPool, LIMIT)).toEqual({
+      workspaces: 1,
+      rows: 10,
+    });
+    expect(await OutboxRelay.rateHeld(wb.appPool, 0)).toEqual({
+      workspaces: 0,
+      rows: 0,
+    });
   });
 });
 

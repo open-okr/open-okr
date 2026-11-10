@@ -35,6 +35,7 @@ import {
   includeDeleted,
   ssoConnections,
   systemSettings,
+  webhooks,
   withInstanceAdmin,
   withSystemScan,
   withWorkspace,
@@ -214,7 +215,7 @@ async function rotateAccountTokens(
   }
 }
 
-/** The three workspace tables that hold a sealed secret. */
+/** The four workspace tables that hold a sealed secret. */
 async function rotateWorkspaceSecrets(
   db: ReturnType<typeof drizzle>,
   ring: KeyRing,
@@ -286,6 +287,57 @@ async function rotateWorkspaceSecrets(
                 eq(channelConnections.id, row.id),
               ),
             );
+        }
+      }
+
+      // A webhook's signing secret, and the previous one while it still
+      // signs beside it (outbound-webhooks.md W6). Either may be absent: a
+      // hook an archive brought has none until its secret is rotated.
+      const hooks = await tx
+        .select({
+          id: webhooks.id,
+          ciphertext: webhooks.secretCiphertext,
+          dataKey: webhooks.secretDataKey,
+          keyId: webhooks.secretKeyId,
+          previousCiphertext: webhooks.previousSecretCiphertext,
+          previousDataKey: webhooks.previousSecretDataKey,
+          previousKeyId: webhooks.previousSecretKeyId,
+        })
+        .from(webhooks)
+        .where(includeDeleted(webhooks));
+      for (const row of hooks) {
+        const current =
+          row.ciphertext && row.dataKey && row.keyId
+            ? next({
+                ciphertext: row.ciphertext,
+                dataKey: row.dataKey,
+                keyId: row.keyId,
+              })
+            : null;
+        const previous =
+          row.previousCiphertext && row.previousDataKey && row.previousKeyId
+            ? next({
+                ciphertext: row.previousCiphertext,
+                dataKey: row.previousDataKey,
+                keyId: row.previousKeyId,
+              })
+            : null;
+        if (current || previous) {
+          // openokr:allow-mutation: key rotation re-wraps a data key and changes no value; see rotateInstanceSecrets.
+          await tx
+            .update(webhooks)
+            .set({
+              ...(current
+                ? { secretDataKey: current.dataKey, secretKeyId: current.keyId }
+                : {}),
+              ...(previous
+                ? {
+                    previousSecretDataKey: previous.dataKey,
+                    previousSecretKeyId: previous.keyId,
+                  }
+                : {}),
+            })
+            .where(includeDeleted(webhooks, eq(webhooks.id, row.id)));
         }
       }
 

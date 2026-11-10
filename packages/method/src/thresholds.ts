@@ -611,7 +611,7 @@ export const THRESHOLDS = {
     group: "kpi",
     label: "Recovery proposal delay",
     section: "6.5",
-    why: "Two consecutive unhealthy periods before the coach proposes anything, so one month that slipped never generates an unsolicited OKR. A fall from healthy to unhealthy in one period is proposed at once. The draft is available for one-click launch immediately regardless.",
+    why: "Two consecutive unhealthy periods before the OKR Champion proposes anything, so one month that slipped never generates an unsolicited OKR. A fall from healthy to unhealthy in one period is proposed at once. The draft is available for one-click launch immediately regardless.",
     default: 2,
     schema: z.number().int().min(1).max(12),
   }),

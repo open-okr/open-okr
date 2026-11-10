@@ -10,9 +10,10 @@
  * than in the browser. Fixing it now and adding a key result are work created
  * through their own actions, then recorded as the KPI's answer.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedByField, refusedSentence } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../../cycle/write-state.ts";
@@ -39,10 +40,13 @@ export async function launchRecovery(kpiId: string): Promise<WriteState> {
       cycleId: cycle.id,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // One click with no field, so the refusal is its sentence; a schema's
+    // too, which used to reach the error page (plan U1b).
+    const refused = refusedSentence(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidateBoard();
   return NO_ERROR;
@@ -72,6 +76,8 @@ async function respond(
     | { kind: "fix_now"; taskId: string }
     | { kind: "key_result"; keyResultId: string }
   >,
+  /** The action's input path to the form's field, where the two differ. */
+  renamed?: Readonly<Record<string, string>>,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   const context = {
@@ -83,10 +89,13 @@ async function respond(
     const answer = await create(context);
     await callAction(context, "kpis.recordResponse", { kpiId, ...answer });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // Under the field it names (guided-inputs §4.2), and a schema's refusal
+    // too, which used to reach the error page.
+    const refused = refusedByField(error, (await getTranslations()).t, renamed);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   revalidateBoard();
   return NO_ERROR;
@@ -111,24 +120,43 @@ export async function fixKpiNow(
   const ownerId = field(formData, "ownerId");
   const dueOn = field(formData, "dueOn");
   if (title === "") {
-    return { error: t("kpis.recovery.actions.fixNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("kpis.recovery.actions.fixNeedsATitle") },
+    };
   }
   if (spaceId === "") {
-    return { error: t("kpis.recovery.actions.fixLivesInASpace") };
+    return {
+      error: null,
+      fields: { spaceId: t("kpis.recovery.actions.fixLivesInASpace") },
+    };
   }
   if (ownerId === "" || dueOn === "") {
-    return { error: t("kpis.recovery.actions.fixNeedsAnOwnerAndADate") };
+    // Under whichever of the two is missing, the owner first.
+    return {
+      error: null,
+      fields: {
+        [ownerId === "" ? "ownerId" : "dueOn"]: t(
+          "kpis.recovery.actions.fixNeedsAnOwnerAndADate",
+        ),
+      },
+    };
   }
-  return respond(kpiId, async (context) => {
-    const task = await callAction(context, "tasks.create", {
-      spaceId,
-      title,
-      status: "todo",
-      dueOn,
-      assigneeIds: [ownerId],
-    });
-    return { kind: "fix_now", taskId: task.id };
-  });
+  return respond(
+    kpiId,
+    async (context) => {
+      const task = await callAction(context, "tasks.create", {
+        spaceId,
+        title,
+        status: "todo",
+        dueOn,
+        assigneeIds: [ownerId],
+      });
+      return { kind: "fix_now", taskId: task.id };
+    },
+    // The one person the fix is assigned to is the owner the form asked for.
+    { assigneeIds: "ownerId", "assigneeIds.0": "ownerId" },
+  );
 }
 
 /**
@@ -144,7 +172,10 @@ export async function nameKpiKeyResult(
   const keyResultId = field(formData, "keyResultId");
   if (keyResultId === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.recovery.actions.chooseAKeyResult") };
+    return {
+      error: null,
+      fields: { keyResultId: t("kpis.recovery.actions.chooseAKeyResult") },
+    };
   }
   return respond(kpiId, async () => ({ kind: "key_result", keyResultId }));
 }
@@ -168,32 +199,49 @@ export async function answerKpiWithKeyResult(
   const target = Number(field(formData, "target"));
   const reason = field(formData, "reason");
   if (goalId === "") {
-    return { error: t("kpis.recovery.actions.chooseAnObjective") };
+    return {
+      error: null,
+      fields: { goalId: t("kpis.recovery.actions.chooseAnObjective") },
+    };
   }
   if (title === "") {
-    return { error: t("kpis.recovery.actions.keyResultNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("kpis.recovery.actions.keyResultNeedsATitle") },
+    };
   }
-  if (
-    field(formData, "baseline") === "" ||
-    field(formData, "target") === "" ||
-    !Number.isFinite(baseline) ||
-    !Number.isFinite(target)
-  ) {
-    return { error: t("kpis.recovery.actions.keyResultNeedsNumbers") };
+  const baselineOk =
+    field(formData, "baseline") !== "" && Number.isFinite(baseline);
+  const targetOk = field(formData, "target") !== "" && Number.isFinite(target);
+  if (!baselineOk || !targetOk) {
+    // Under whichever of the two is not a number, the baseline first.
+    return {
+      error: null,
+      fields: {
+        [baselineOk ? "target" : "baseline"]: t(
+          "kpis.recovery.actions.keyResultNeedsNumbers",
+        ),
+      },
+    };
   }
-  return respond(kpiId, async (context) => {
-    const keyResult = await callAction(context, "goals.addKeyResult", {
-      goalId,
-      title,
-      kind: "metric",
-      direction,
-      indicatorType: "lagging",
-      baselineValue: baseline,
-      targetValue: target,
-      weight: 1,
-      kpiId,
-      ...(reason === "" ? {} : { reason }),
-    });
-    return { kind: "key_result", keyResultId: keyResult.id };
-  });
+  return respond(
+    kpiId,
+    async (context) => {
+      const keyResult = await callAction(context, "goals.addKeyResult", {
+        goalId,
+        title,
+        kind: "metric",
+        direction,
+        indicatorType: "lagging",
+        baselineValue: baseline,
+        targetValue: target,
+        weight: 1,
+        kpiId,
+        ...(reason === "" ? {} : { reason }),
+      });
+      return { kind: "key_result", keyResultId: keyResult.id };
+    },
+    // The form calls the action's baseline and target values by short names.
+    { baselineValue: "baseline", targetValue: "target" },
+  );
 }

@@ -41,6 +41,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
 import {
+  deliveryReading,
+  type ProviderKeyResult,
+} from "../../../lib/dependency-delivery.ts";
+import {
   recordDecisionAction,
   setShiftsAction,
   setTrendAction,
@@ -80,6 +84,8 @@ export interface MonthlyDependency {
   readonly description: string;
   readonly confirmed: boolean;
   readonly riskOwnerId: string | null;
+  /** What delivers it, and whether it has (plan 0.7.0 O5). */
+  readonly providerKeyResult: ProviderKeyResult | null;
 }
 
 export interface MonthlyDecision {
@@ -316,6 +322,7 @@ export function MonthlyReview({
                       {dependency.description}
                     </span>
                   ) : null}
+                  <DependencyDelivery provider={dependency.providerKeyResult} />
                 </li>
               ))}
             </ul>
@@ -621,5 +628,33 @@ export function MonthlyReview({
         </CardBody>
       </Card>
     </div>
+  );
+}
+
+/**
+ * What delivers a dependency, in the words the register uses (plan 0.7.0
+ * O5). The log does not name the providing team, so a key result this reader
+ * cannot see is said to be one they cannot open, and nothing more.
+ */
+function DependencyDelivery({
+  provider,
+}: {
+  readonly provider: ProviderKeyResult | null;
+}) {
+  const { t } = useTranslations();
+  if (!provider) {
+    return null;
+  }
+  const delivery = deliveryReading(t, provider, null);
+  return (
+    <span
+      className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3"
+      data-testid="dependency-delivery"
+    >
+      <span>{delivery.line}</span>
+      {delivery.chip ? (
+        <Chip tone={delivery.chip.tone}>{delivery.chip.label}</Chip>
+      ) : null}
+    </span>
   );
 }

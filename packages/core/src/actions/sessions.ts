@@ -75,6 +75,7 @@ import {
   portfolioVerdictOf,
   progressSignal,
   REVIEW_PARTS,
+  REVIEW_STAGE_KEYS,
   type ResolvedThresholds,
   type ReviewPart,
   type ReviewStageKey,
@@ -116,6 +117,8 @@ import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
+import { providingKeyResultOutput } from "../alignment/delivery.ts";
+import { loadProvidingKeyResults } from "../alignment/service.ts";
 import { nextCheckInDueAt } from "../cadence/blockers.ts";
 import { localInstant } from "../cadence/engine.ts";
 import { spaceHolidaysInTx } from "../cadence/holidays.ts";
@@ -135,6 +138,8 @@ import {
   readRhythmRow,
   workspaceTimeZone,
 } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
+import { freshShortId } from "../ids/short.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
@@ -146,8 +151,24 @@ import {
 } from "../rich-text/schema.ts";
 import { computedScoresInTx } from "../scoring/computed.ts";
 import { bookedRitualsBySpace, localDateOf } from "../sessions/booking.ts";
+import { settleSessionProposalsInTx } from "../sessions/lifecycle-proposals.ts";
 import { sessionChannel } from "../sessions/live.ts";
 import { measuredRhythmInTx } from "../sessions/measured-rhythm.ts";
+import {
+  actionsCondition,
+  learningsCondition,
+  managementCondition,
+  narrativesCondition,
+  pulseCondition,
+  recognitionCondition,
+  resetCondition,
+  rootCauseCondition,
+  STAGE_GAP_REASONS,
+  type StageCondition,
+  scoringCondition,
+  stageGapSentence,
+  surveyCondition,
+} from "../sessions/stage-completion.ts";
 import { resolveSpaceSettingsFrom } from "../settings/registry.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 import { wallClock } from "./wall-clock.ts";
@@ -488,6 +509,8 @@ async function resolveSpaceContextId(
 
 const sessionOutput = z.object({
   id: z.uuid(),
+  /** The public address beside the key (TECHNICAL-PLAN §3); null until data change 0034 has run. */
+  shortId: z.string().nullable(),
   workspaceId: z.uuid(),
   spaceId: z.uuid().nullable(),
   cycleId: z.uuid().nullable(),
@@ -574,6 +597,7 @@ function toOutput(
   const isFacilitator = viewerMemberId === row.facilitatorId;
   return {
     id: row.id,
+    shortId: row.shortId ?? null,
     workspaceId: row.workspaceId,
     spaceId: row.spaceId ?? null,
     cycleId: row.cycleId ?? null,
@@ -701,7 +725,7 @@ export const createSession = defineWriteAction({
     "Creates a scheduled session for a space. A time with no offset is read in the workspace timezone.",
   input: z.object({
     spaceId: z.uuid(),
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     kind: z.enum(SESSION_KINDS),
     title: z.string().trim().min(1).max(200),
     scheduledFor: z.iso.datetime({ offset: true, local: true }),
@@ -787,6 +811,7 @@ export const createSession = defineWriteAction({
       await tx.insert(sessions).values({
         id,
         workspaceId,
+        shortId: await freshShortId(tx, "session", workspaceId),
         spaceId: input.spaceId,
         cycleId: input.cycleId ?? null,
         kind: input.kind,
@@ -840,7 +865,7 @@ export const bookCycleSessions = defineWriteAction({
   input: z.object({
     spaceId: z.uuid(),
     /** The current cycle when omitted. */
-    cycleId: z.uuid().optional(),
+    cycleId: ADDRESS.cycle.optional(),
     /** 1 for Monday to 5 for Friday. */
     weekday: z.number().int().min(1).max(5),
     /** `HH:MM` where the workspace is. */
@@ -1063,7 +1088,7 @@ export const openSession = defineWriteAction({
   name: "sessions.open",
   summary:
     "Opens a scheduled session, setting it to running and starting the first stage.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1102,6 +1127,15 @@ export const openSession = defineWriteAction({
         })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
+      // The Champion's open and skip proposals on this session are answered
+      // now, whichever way it was opened (plan 0.7.0 A13).
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
+
       return {
         result: { id: input.id },
         /**
@@ -1135,6 +1169,9 @@ export const openSession = defineWriteAction({
           action: "sessions.open",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },
@@ -1145,7 +1182,16 @@ export const advanceStage = defineWriteAction({
   name: "sessions.advanceStage",
   summary:
     "Advances a running session to its next stage, recording elapsed time.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({
+    id: ADDRESS.session,
+    /**
+     * The stage the caller is looking at (docs/design/sessions.md §5). When
+     * given and the session has already left it, the advance is refused, so
+     * two people pressing continue on the same stage move it once, not twice.
+     * Optional for a caller with no screen, such as the command line.
+     */
+    fromStageKey: z.string().min(1).max(60).optional(),
+  }),
   output: z.object({ id: z.uuid(), realtimeChannel: z.string() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1164,6 +1210,19 @@ export const advanceStage = defineWriteAction({
 
       if (session.state !== "running") {
         throw new OperationError("not_found", "Session is not running.");
+      }
+
+      // A stale advance (plan 0.7.0, S2). Conflict rather than not-found: the
+      // session is there and the caller may see it, only not where they
+      // thought, and the screen reloads to where it is.
+      if (
+        input.fromStageKey !== undefined &&
+        input.fromStageKey !== session.stageKey
+      ) {
+        throw new OperationError(
+          "conflict",
+          "The session has already moved on from that stage. Here is where it is now.",
+        );
       }
 
       let nextStageKey: string | null = null;
@@ -1479,7 +1538,7 @@ export const advanceStage = defineWriteAction({
 export const skipSession = defineWriteAction({
   name: "sessions.skip",
   summary: "Marks a scheduled session as skipped.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -1508,6 +1567,14 @@ export const skipSession = defineWriteAction({
         .update(sessions)
         .set({ state: "skipped", updatedAt: now })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
+
+      // The same settling as `sessions.open` (plan 0.7.0 A13).
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
 
       // Reset streak on skip (§7.4: a skipped week breaks it). Only the weekly
       // check-in's own skip: a skipped monthly review is not a skipped week
@@ -1545,6 +1612,9 @@ export const skipSession = defineWriteAction({
           action: "sessions.skip",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },
@@ -1554,9 +1624,12 @@ export const skipSession = defineWriteAction({
 export const closeSession = defineWriteAction({
   name: "sessions.close",
   summary: "Closes a running session.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it fixes the meeting's record for good: there is no reopen.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       const memberId = actor.memberId;
@@ -1833,6 +1906,15 @@ export const closeSession = defineWriteAction({
         })
         .where(activeOnly(sessions, eq(sessions.id, input.id)));
 
+      // The same settling as `sessions.open` and `sessions.skip` (plan 0.7.0
+      // A13): closed by hand, a pending close proposal is decided.
+      const settledProposalIds = await settleSessionProposalsInTx(tx, {
+        workspaceId,
+        sessionId: input.id,
+        memberId,
+        ...(_context.proposalId ? { applying: _context.proposalId } : {}),
+      });
+
       return {
         result: { id: input.id },
         activity: {
@@ -1845,6 +1927,9 @@ export const closeSession = defineWriteAction({
           action: "sessions.close",
           targetType: "session",
           targetId: input.id,
+          ...(settledProposalIds.length > 0
+            ? { payload: { settledProposalIds } }
+            : {}),
         },
       };
     },
@@ -1858,7 +1943,7 @@ export const closeSession = defineWriteAction({
 export const readSession = defineReadAction({
   name: "sessions.read",
   summary: "One session by id. Returns not-found when the caller lacks access.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: sessionOutput,
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<SessionOutput> {
@@ -2142,7 +2227,7 @@ export const listSessions = defineReadAction({
 export const listParticipants = defineReadAction({
   name: "sessions.participants",
   summary: "Active space members for a session's space.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.array(
     z.object({
       memberId: z.uuid(),
@@ -2219,8 +2304,8 @@ export const castSessionVote = defineWriteAction({
   summary:
     "A private confidence vote on one key result within a session. Upserts: a second vote replaces the first.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     confidence: z.number().min(0).max(1),
   }),
   output: z.object({ id: z.uuid() }),
@@ -2318,8 +2403,8 @@ export const revealSessionVotes = defineWriteAction({
   name: "sessions.revealVotes",
   summary: "Reveals every vote on a key result in one session, atomically.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
   }),
   output: z.object({ revealed: z.number().int() }),
   access: ACCESS_LEVELS.edit,
@@ -2383,8 +2468,8 @@ export const confirmSessionConfidence = defineWriteAction({
   summary:
     "The champion confirms the final confidence and writes the what-changed note.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     confidence: z.number().min(0).max(1),
     whatChanged: z.string().trim().min(1).max(500),
   }),
@@ -2535,8 +2620,8 @@ export const sessionVotes = defineReadAction({
   summary:
     "Votes for one KR in a session. Before reveal: own vote only. After reveal: all.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
   }),
   output: z.array(
     z.object({
@@ -2624,7 +2709,7 @@ export const sessionVotes = defineReadAction({
 export const sessionConfidenceStatus = defineReadAction({
   name: "sessions.confidenceStatus",
   summary: "Which KRs are confirmed vs unconfirmed in this session.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       keyResultId: z.uuid(),
@@ -2823,8 +2908,8 @@ export const createSessionBlocker = defineWriteAction({
   summary:
     "Opens a blocker for a low-confidence KR during the diagnose step. Its next action is due by the goal's next check-in.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     type: z.enum(BLOCKER_TYPES),
     description: z.string().max(500).optional(),
     ownerId: z.uuid(),
@@ -2930,8 +3015,8 @@ export const setSessionNextAction = defineWriteAction({
   summary:
     "Names the next action for a key result scored in this session, with its owner, due by the goal's next check-in.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     nextAction: z.string().trim().min(1).max(500),
     ownerId: z.uuid(),
   }),
@@ -3049,7 +3134,7 @@ export const readSessionLowScores = defineReadAction({
   name: "sessions.lowScores",
   summary:
     "The key results scored low or lower than last time in a session, with each one's next action and whether it is blocked.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       keyResultId: z.uuid(),
@@ -3349,7 +3434,7 @@ export const reassignSessionBlocker = defineWriteAction({
 export const sessionBlockerStatus = defineReadAction({
   name: "sessions.blockerStatus",
   summary: "Blockers for a session, with aging information.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3444,12 +3529,12 @@ export const setSessionCommitments = defineWriteAction({
   summary:
     "Sets this week's commitments (2-3 actions, each with owner and optional KR link).",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     items: z.array(
       z.object({
         text: z.string().trim().min(1).max(500),
         ownerId: z.uuid(),
-        keyResultId: z.uuid().optional(),
+        keyResultId: ADDRESS.keyResult.optional(),
       }),
     ),
   }),
@@ -3601,7 +3686,7 @@ export const closeSessionCommitments = defineWriteAction({
 export const listSessionCommitments = defineReadAction({
   name: "sessions.listCommitments",
   summary: "Commitments for a session.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3674,7 +3759,7 @@ export const carriedCommitments = defineReadAction({
   name: "sessions.carriedCommitments",
   summary:
     "Commitments set by earlier sessions in this session's space and not yet closed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.array(
     z.object({
       id: z.uuid(),
@@ -3857,7 +3942,7 @@ export const setCoordinatorNote = defineWriteAction({
   name: "sessions.setCoordinatorNote",
   summary: "Adds the coordinator's note to the session digest.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
     note: richTextSchema({
       maxCharacters: COORDINATOR_NOTE_MAX_CHARACTERS,
@@ -4059,8 +4144,8 @@ export const setTrend = defineWriteAction({
   name: "sessions.setTrend",
   summary: "Records the room's trend for one objective in a monthly review.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     trend: z.enum(OBJECTIVE_TRENDS),
   }),
   output: z.object({ id: z.uuid() }),
@@ -4183,7 +4268,7 @@ export const setShifts = defineWriteAction({
   name: "sessions.setShifts",
   summary: "Records the resource or priority shifts noted in a monthly review.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * Editor JSON, or null for no shift. Plain text was taken until 0.4
      * (guided-inputs change 13b).
@@ -4230,6 +4315,9 @@ export const setShifts = defineWriteAction({
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
+          // The activity names the space; the content is the session's shared
+          // record, so that is what retrieval embeds (plan A10).
+          embed: { entityType: "session", entityId: input.sessionId },
           payload: { sessionId: input.sessionId },
         },
         audit: {
@@ -4251,7 +4339,7 @@ export const setSessionWins = defineWriteAction({
   name: "sessions.setWins",
   summary: "Names the week's wins in a weekly session, for its digest.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     wins: z.array(z.string().trim().min(1).max(200)).max(10),
   }),
   output: z.object({ id: z.uuid() }),
@@ -4297,6 +4385,8 @@ export const setSessionWins = defineWriteAction({
           contextId: session.spaceId
             ? await resolveSpaceContextId(tx, workspaceId, session.spaceId)
             : undefined,
+          // As the shifts above: the wins are part of the shared record.
+          embed: { entityType: "session", entityId: input.sessionId },
           payload: { count: input.wins.length },
         },
         audit: {
@@ -4315,9 +4405,9 @@ export const recordDecision = defineWriteAction({
   summary: "Records a decision against the key result or goal it affects.",
   input: z
     .object({
-      sessionId: z.uuid(),
-      goalId: z.uuid().optional(),
-      keyResultId: z.uuid().optional(),
+      sessionId: ADDRESS.session,
+      goalId: ADDRESS.goal.optional(),
+      keyResultId: ADDRESS.keyResult.optional(),
       /** Editor JSON. Plain text was taken until 0.4 (guided-inputs change 13b). */
       text: richTextSchema({
         maxCharacters: DECISION_MAX_CHARACTERS,
@@ -4517,7 +4607,7 @@ export const readMonthlyRecord = defineReadAction({
   name: "sessions.monthlyRecord",
   summary:
     "Everything recorded for one monthly review: trends, the dependency log, the shifts note, the moves and the decisions.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The shifts as plain text, from their document since 0.4. */
     shifts: z.string().nullable(),
@@ -4591,6 +4681,8 @@ export const readMonthlyRecord = defineReadAction({
         description: z.string(),
         confirmed: z.boolean(),
         riskOwnerId: z.uuid().nullable(),
+        /** The key result that delivers it, and whether it has (plan 0.7.0 O5). */
+        providerKeyResult: providingKeyResultOutput,
       }),
     ),
     decisions: z.array(decisionOutput),
@@ -4826,6 +4918,7 @@ export const readMonthlyRecord = defineReadAction({
             providerText: keyResultDependencies.providerText,
             confirmed: keyResultDependencies.confirmed,
             riskOwnerId: keyResultDependencies.riskOwnerId,
+            providerKeyResultId: keyResultDependencies.providerKeyResultId,
           })
           .from(keyResultDependencies)
           .innerJoin(
@@ -4841,6 +4934,12 @@ export const readMonthlyRecord = defineReadAction({
               session.cycleId ? eq(goals.cycleId, session.cycleId) : sql`true`,
             ),
           );
+
+        const providing = await loadProvidingKeyResults(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          keyResultIds: dependencyRows.map((row) => row.providerKeyResultId),
+        });
 
         const decisionRows = await tx
           .select(decisionColumns)
@@ -4890,6 +4989,9 @@ export const readMonthlyRecord = defineReadAction({
             description: row.note ?? row.providerText ?? "",
             confirmed: row.confirmed,
             riskOwnerId: row.riskOwnerId,
+            providerKeyResult: row.providerKeyResultId
+              ? (providing.get(row.providerKeyResultId) ?? null)
+              : null,
           })),
           decisions: decisionRows.map(decisionRow),
         };
@@ -4901,7 +5003,7 @@ export const readMonthlyRecord = defineReadAction({
 export const decisionsForGoal = defineReadAction({
   name: "decisions.forGoal",
   summary: "Decisions affecting one goal, newest first, for its page.",
-  input: z.object({ goalId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<DecisionOutput[]> {
@@ -4955,7 +5057,7 @@ export const decisionsForGoal = defineReadAction({
 export const decisionsForCycle = defineReadAction({
   name: "decisions.forCycle",
   summary: "Every decision recorded in one cycle, for the cycle workspace.",
-  input: z.object({ cycleId: z.uuid() }),
+  input: z.object({ cycleId: ADDRESS.cycle }),
   output: z.array(decisionOutput),
   access: ACCESS_LEVELS.view,
   async handler(context, input): Promise<DecisionOutput[]> {
@@ -5038,7 +5140,7 @@ async function requireFacilitator(
 export const addStageMinute = defineWriteAction({
   name: "sessions.addMinute",
   summary: "Gives the running stage one more minute.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.session }),
   output: z.object({ id: z.uuid(), stageKey: z.string(), added: z.number() }),
   access: ACCESS_LEVELS.edit,
   operation: (_context, input) => ({
@@ -5101,7 +5203,7 @@ export const setStageNote = defineWriteAction({
   name: "sessions.setStageNote",
   summary: "Writes the facilitator's private note for the running stage.",
   input: z.object({
-    id: z.uuid(),
+    id: ADDRESS.session,
     /**
      * Editor JSON, or null to clear the stage's note. Plain text was taken
      * until 0.4 (guided-inputs change 13b).
@@ -5184,7 +5286,7 @@ export const givePulse = defineWriteAction({
   name: "sessions.givePulse",
   summary: "Records one participant's pulse and their one word for the cycle.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     pulse: z.number().int().min(1).max(5),
     // §8.2 asks for one word. A sentence here turns the read of the room into a
     // paragraph nobody scans, so the boundary refuses it by name rather than
@@ -5315,11 +5417,60 @@ function countWords(
     .sort((a, b) => b.count - a.count || a.word.localeCompare(b.word));
 }
 
+/**
+ * The people a review's room is waiting for: every active member of its
+ * space, the same list `sessions.participants` reads. Stage one counts its
+ * pulses against it and stage eight its surveys (plan 0.7.0, S1).
+ */
+async function reviewParticipantIdsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  spaceId: string | null,
+): Promise<{ memberId: string }[]> {
+  if (!spaceId) {
+    return [];
+  }
+  return tx
+    .select({ memberId: spaceMembers.memberId })
+    .from(spaceMembers)
+    .innerJoin(workspaceMembers, eq(workspaceMembers.id, spaceMembers.memberId))
+    .where(
+      activeOnly(
+        spaceMembers,
+        eq(spaceMembers.workspaceId, workspaceId),
+        eq(spaceMembers.spaceId, spaceId),
+        eq(workspaceMembers.status, "active"),
+      ),
+    );
+}
+
+/** Every pulse and word given in one review, with whose they are. */
+async function pulseRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      memberId: sessionParticipants.memberId,
+      pulse: sessionParticipants.pulse,
+      word: sessionParticipants.word,
+    })
+    .from(sessionParticipants)
+    .where(
+      activeOnly(
+        sessionParticipants,
+        eq(sessionParticipants.workspaceId, workspaceId),
+        eq(sessionParticipants.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readRoomPulse = defineReadAction({
   name: "sessions.roomPulse",
   summary:
     "The read of the room for the facilitator, and the caller's own pulse for everybody.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** Null for anybody but the facilitator, and until somebody has spoken. */
     average: z.number().nullable(),
@@ -5366,45 +5517,24 @@ export const readRoomPulse = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            memberId: sessionParticipants.memberId,
-            pulse: sessionParticipants.pulse,
-            word: sessionParticipants.word,
-          })
-          .from(sessionParticipants)
-          .where(
-            activeOnly(
-              sessionParticipants,
-              eq(sessionParticipants.workspaceId, context.workspaceId),
-              eq(sessionParticipants.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await pulseRowsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         const spoken = rows.filter(
           (row): row is typeof row & { pulse: number } => row.pulse !== null,
         );
         const mineRow = rows.find((row) => row.memberId === memberId);
 
-        // How many the room is waiting for. Every active member of the space,
-        // which is the same list `sessions.participants` reads.
-        const expectedRows = session.spaceId
-          ? await tx
-              .select({ memberId: spaceMembers.memberId })
-              .from(spaceMembers)
-              .innerJoin(
-                workspaceMembers,
-                eq(workspaceMembers.id, spaceMembers.memberId),
-              )
-              .where(
-                activeOnly(
-                  spaceMembers,
-                  eq(spaceMembers.workspaceId, context.workspaceId),
-                  eq(spaceMembers.spaceId, session.spaceId),
-                  eq(workspaceMembers.status, "active"),
-                ),
-              )
-          : [];
+        // How many the room is waiting for: the same list stage one's
+        // completion condition reads (plan 0.7.0, S1).
+        const expectedRows = await reviewParticipantIdsInTx(
+          tx,
+          context.workspaceId,
+          session.spaceId,
+        );
 
         const isFacilitator = session.facilitatorId === memberId;
         const { thresholds } = resolveRhythm(
@@ -5490,8 +5620,8 @@ export const scoreKeyResult = defineWriteAction({
   name: "sessions.scoreKeyResult",
   summary: "Grades one key result 0.0 to 1.0 with a one-line reason.",
   input: z.object({
-    sessionId: z.uuid(),
-    keyResultId: z.uuid(),
+    sessionId: ADDRESS.session,
+    keyResultId: ADDRESS.keyResult,
     score: z.number().min(0).max(1),
     // §8.3 asks for a one-line reason. "Facts, not feelings" cannot be
     // enforced; a score nobody explained can be refused.
@@ -5769,7 +5899,7 @@ export const passMic = defineWriteAction({
   name: "sessions.passMic",
   summary: "Hands the mic to one objective's owner, or puts it down.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * Null puts the mic down and ends the round.
      *
@@ -5777,7 +5907,7 @@ export const passMic = defineWriteAction({
      * thing that marks an objective is the mic moving on from it and nothing
      * takes the mic after the last owner.
      */
-    goalId: z.uuid().nullable(),
+    goalId: ADDRESS.goal.nullable(),
   }),
   output: z.object({
     micGoalId: z.uuid().nullable(),
@@ -5944,8 +6074,8 @@ export const setNarrative = defineWriteAction({
   name: "sessions.setNarrative",
   summary: "Writes what the number does not show for one objective.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     body: narrativeBody,
   }),
   output: z.object({ goalId: z.uuid() }),
@@ -6091,7 +6221,7 @@ export const giveKudos = defineWriteAction({
   name: "sessions.giveKudos",
   summary: "Names the effort that deserved to be seen.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     toMemberId: z.uuid(),
     // §8.1: "Specific beats generous." A required line is the only part of that
     // a product can hold.
@@ -6181,11 +6311,49 @@ export const giveKudos = defineWriteAction({
   }),
 });
 
+/**
+ * Stage three's rows: every objective the review covers, with its champion
+ * and whatever the room recorded for it. Read by the stage and by the rail's
+ * completion condition, so both count the same objectives.
+ */
+async function narrativeRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { id: string; spaceId: string | null; cycleId: string | null },
+) {
+  const champions = alias(workspaceMembers, "champions");
+  const authors = alias(workspaceMembers, "authors");
+  return tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      championName: champions.name,
+      spokenAt: reviewNarratives.spokenAt,
+      body: reviewNarratives.body,
+      authorName: authors.name,
+    })
+    .from(goals)
+    .leftJoin(champions, eq(champions.id, goals.championId))
+    .leftJoin(
+      reviewNarratives,
+      and(
+        eq(reviewNarratives.goalId, goals.id),
+        eq(reviewNarratives.sessionId, session.id),
+        isNull(reviewNarratives.deletedAt),
+      ),
+    )
+    .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
+    .where(
+      activeOnly(goals, ...reviewObjectiveConditions(workspaceId, session)),
+    )
+    .orderBy(goals.position, goals.createdAt);
+}
+
 export const readNarratives = defineReadAction({
   name: "sessions.narratives",
   summary:
     "Stage three's state: who holds the mic, who has spoken, and what was written.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The one objective speaking now, or null before and after the round. */
     micGoalId: z.uuid().nullable(),
@@ -6228,36 +6396,7 @@ export const readNarratives = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const champions = alias(workspaceMembers, "champions");
-        const authors = alias(workspaceMembers, "authors");
-
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            championName: champions.name,
-            spokenAt: reviewNarratives.spokenAt,
-            body: reviewNarratives.body,
-            authorName: authors.name,
-          })
-          .from(goals)
-          .leftJoin(champions, eq(champions.id, goals.championId))
-          .leftJoin(
-            reviewNarratives,
-            and(
-              eq(reviewNarratives.goalId, goals.id),
-              eq(reviewNarratives.sessionId, input.sessionId),
-              isNull(reviewNarratives.deletedAt),
-            ),
-          )
-          .leftJoin(authors, eq(authors.id, reviewNarratives.authorMemberId))
-          .where(
-            activeOnly(
-              goals,
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt);
+        const rows = await narrativeRowsInTx(tx, context.workspaceId, session);
 
         const objectives = rows.map((row) => ({
           goalId: row.goalId,
@@ -6277,7 +6416,8 @@ export const readNarratives = defineReadAction({
           objectives,
           spoken,
           total: objectives.length,
-          complete: objectives.length > 0 && spoken === objectives.length,
+          // The rail's own answer for stage three (plan 0.7.0, S1).
+          complete: narrativesCondition(objectives).complete,
         };
       },
     );
@@ -6287,7 +6427,7 @@ export const readNarratives = defineReadAction({
 export const readRecognition = defineReadAction({
   name: "sessions.recognition",
   summary: "The quarterly review's recognition entries, oldest first.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     entries: z.array(
       z.object({
@@ -6485,7 +6625,7 @@ export const addRetroNote = defineWriteAction({
   name: "sessions.addRetroNote",
   summary: "Writes one note into the team retro's worked or did-not column.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     // §8.1's two columns are canon structure. A third would be a different
     // retro, so the enum refuses it at the boundary rather than storing it.
     columnKey: z.enum(RETRO_COLUMNS),
@@ -6561,7 +6701,7 @@ export const addRetroNote = defineWriteAction({
 export const removeRetroNote = defineWriteAction({
   name: "sessions.removeRetroNote",
   summary: "Removes one retro note, with the dots spent on it.",
-  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session, noteId: z.uuid() }),
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.edit,
   safety: "destructive",
@@ -6655,7 +6795,7 @@ export const removeRetroNote = defineWriteAction({
 export const castRetroVote = defineWriteAction({
   name: "sessions.castRetroVote",
   summary: "Spends or withdraws one dot on a retro note.",
-  input: z.object({ sessionId: z.uuid(), noteId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session, noteId: z.uuid() }),
   output: z.object({
     noteId: z.uuid(),
     votes: z.number().int(),
@@ -6797,7 +6937,7 @@ export const readRetro = defineReadAction({
   name: "sessions.retro",
   summary:
     "The team retro board: both columns, their notes and the reader's dots.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     columns: z.array(
       z.object({
@@ -6918,7 +7058,7 @@ export const setManagementAnswer = defineWriteAction({
   summary:
     "Records leadership's answer to one of the management retro's four questions.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     // 1 to 4, indexing the canon questions. The text lives in
     // `packages/method` and never in a row: §11 lists the management-retro
     // questions as unchangeable structure.
@@ -7020,11 +7160,54 @@ export const setManagementAnswer = defineWriteAction({
   }),
 });
 
+/**
+ * §8.7's four questions with what leadership answered. Read by the stage,
+ * which only leadership may open, and by the rail's completion condition,
+ * which counts the answers and returns none of them.
+ */
+async function managementQuestionsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const answerers = alias(workspaceMembers, "answerers");
+  const rows = await tx
+    .select({
+      questionKey: managementAnswers.questionKey,
+      bodyDocument: managementAnswers.bodyDocument,
+      answeredByName: answerers.name,
+    })
+    .from(managementAnswers)
+    .innerJoin(answerers, eq(answerers.id, managementAnswers.answeredById))
+    .where(
+      activeOnly(
+        managementAnswers,
+        eq(managementAnswers.workspaceId, workspaceId),
+        eq(managementAnswers.sessionId, sessionId),
+      ),
+    );
+  const byKey = new Map(rows.map((row) => [row.questionKey, row]));
+
+  // Driven by the canon list, not by the rows: all four questions are
+  // always asked, and an unanswered one is a gap the stage can see rather
+  // than a question that quietly disappeared.
+  return MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
+    const answer = byKey.get(index + 1);
+    return {
+      questionKey: index + 1,
+      question,
+      body: answer ? plainTextOfStored(answer.bodyDocument) : null,
+      bodyDocument: answer?.bodyDocument ?? null,
+      answeredByName: answer?.answeredByName ?? null,
+    };
+  });
+}
+
 export const readManagementRetro = defineReadAction({
   name: "sessions.managementRetro",
   summary:
     "The management retro's four questions with what leadership answered.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     questions: z.array(
       z.object({
@@ -7064,40 +7247,11 @@ export const readManagementRetro = defineReadAction({
           input.sessionId,
         );
 
-        const answerers = alias(workspaceMembers, "answerers");
-        const rows = await tx
-          .select({
-            questionKey: managementAnswers.questionKey,
-            bodyDocument: managementAnswers.bodyDocument,
-            answeredByName: answerers.name,
-          })
-          .from(managementAnswers)
-          .innerJoin(
-            answerers,
-            eq(answerers.id, managementAnswers.answeredById),
-          )
-          .where(
-            activeOnly(
-              managementAnswers,
-              eq(managementAnswers.workspaceId, context.workspaceId),
-              eq(managementAnswers.sessionId, input.sessionId),
-            ),
-          );
-        const byKey = new Map(rows.map((row) => [row.questionKey, row]));
-
-        // Driven by the canon list, not by the rows: all four questions are
-        // always asked, and an unanswered one is a gap the stage can see rather
-        // than a question that quietly disappeared.
-        const questions = MANAGEMENT_RETRO_QUESTIONS.map((question, index) => {
-          const answer = byKey.get(index + 1);
-          return {
-            questionKey: index + 1,
-            question,
-            body: answer ? plainTextOfStored(answer.bodyDocument) : null,
-            bodyDocument: answer?.bodyDocument ?? null,
-            answeredByName: answer?.answeredByName ?? null,
-          };
-        });
+        const questions = await managementQuestionsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const answered = questions.filter(
           (entry) => entry.body !== null,
         ).length;
@@ -7105,7 +7259,8 @@ export const readManagementRetro = defineReadAction({
         return {
           questions,
           answered,
-          complete: answered === questions.length,
+          // The rail's own answer for stage six (plan 0.7.0, S1).
+          complete: managementCondition(answered, questions.length).complete,
         };
       },
     );
@@ -7128,6 +7283,22 @@ export const readManagementRetro = defineReadAction({
  * why it missed what it promised.
  */
 async function missedKeyResultsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+  thresholds: ResolvedThresholds,
+) {
+  return (await rootCauseScopeInTx(tx, workspaceId, sessionId, thresholds))
+    .missed;
+}
+
+/**
+ * How many key results the review graded, and the ones below their
+ * threshold. The count is stage seven's "nothing scored is not nothing
+ * missed" (plan 0.7.0, S1): an empty miss list means nothing to name only
+ * once something has been graded.
+ */
+async function rootCauseScopeInTx(
   tx: OperationTx,
   workspaceId: string,
   sessionId: string,
@@ -7157,9 +7328,36 @@ async function missedKeyResultsInTx(
       ),
     )
     .orderBy(goals.position, keyResults.position);
-  return graded.filter((row) =>
-    needsRootCause(Number(row.score), row.kind, thresholds),
-  );
+  return {
+    graded: graded.length,
+    missed: graded.filter((row) =>
+      needsRootCause(Number(row.score), row.kind, thresholds),
+    ),
+  };
+}
+
+/** The causes named in one review, by key result. */
+async function namedRootCausesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  const named = await tx
+    .select({
+      keyResultId: rootCauses.keyResultId,
+      causeKey: rootCauses.causeKey,
+      secondaryCauseKey: rootCauses.secondaryCauseKey,
+      detail: rootCauses.detail,
+    })
+    .from(rootCauses)
+    .where(
+      activeOnly(
+        rootCauses,
+        eq(rootCauses.workspaceId, workspaceId),
+        eq(rootCauses.sessionId, sessionId),
+      ),
+    );
+  return new Map(named.map((row) => [row.keyResultId, row]));
 }
 
 export const setRootCause = defineWriteAction({
@@ -7168,8 +7366,8 @@ export const setRootCause = defineWriteAction({
     "Names the primary cause, and an optional second, for a key result that came in under its root-cause threshold.",
   input: z
     .object({
-      sessionId: z.uuid(),
-      keyResultId: z.uuid(),
+      sessionId: ADDRESS.session,
+      keyResultId: ADDRESS.keyResult,
       // 1 to 9, indexing §8.4's taxonomy. The text is canon in
       // `packages/method`; §11 lists the root-cause taxonomy among the
       // structures a workspace cannot change.
@@ -7327,7 +7525,7 @@ export const readRootCauses = defineReadAction({
   name: "sessions.rootCauses",
   summary:
     "Every key result this review graded below its root-cause threshold, with its causes.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /**
      * §11's `scoring.rootCauseThreshold` for each kind, so the screen never
@@ -7389,7 +7587,7 @@ export const readRootCauses = defineReadAction({
           context.workspaceId,
           session.cycleId,
         );
-        const missed = await missedKeyResultsInTx(
+        const { graded, missed } = await rootCauseScopeInTx(
           tx,
           context.workspaceId,
           input.sessionId,
@@ -7397,22 +7595,11 @@ export const readRootCauses = defineReadAction({
         );
         const required = practice["review.rootCauses"] !== "optional";
 
-        const named = await tx
-          .select({
-            keyResultId: rootCauses.keyResultId,
-            causeKey: rootCauses.causeKey,
-            secondaryCauseKey: rootCauses.secondaryCauseKey,
-            detail: rootCauses.detail,
-          })
-          .from(rootCauses)
-          .where(
-            activeOnly(
-              rootCauses,
-              eq(rootCauses.workspaceId, context.workspaceId),
-              eq(rootCauses.sessionId, input.sessionId),
-            ),
-          );
-        const byKeyResult = new Map(named.map((row) => [row.keyResultId, row]));
+        const byKeyResult = await namedRootCausesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         const keyResultRows = missed.map((entry) => {
           const cause = byKeyResult.get(entry.keyResultId);
@@ -7442,8 +7629,10 @@ export const readRootCauses = defineReadAction({
           thresholds: thresholds["scoring.rootCauseThreshold"],
           keyResults: keyResultRows,
           named: withCause,
-          complete:
-            keyResultRows.length > 0 && withCause === keyResultRows.length,
+          // The rail's own answer for stage seven (plan 0.7.0, S1). It asked
+          // for at least one miss until then, so a review where everything
+          // graded cleared its line read as unfinished here and nowhere else.
+          complete: rootCauseCondition(graded, keyResultRows).complete,
           required,
         };
       },
@@ -7475,7 +7664,7 @@ export const submitProcessHealth = defineWriteAction({
   name: "sessions.submitProcessHealth",
   summary: "Scores the five process-health statements anonymously.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     /**
      * All five, together.
      *
@@ -7601,11 +7790,33 @@ export const submitProcessHealth = defineWriteAction({
   }),
 });
 
+/** Every process-health answer in one review, keyed by its salted respondent. */
+async function processHealthRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      statementKey: processHealthResponses.statementKey,
+      score: processHealthResponses.score,
+      respondentHash: processHealthResponses.respondentHash,
+    })
+    .from(processHealthResponses)
+    .where(
+      activeOnly(
+        processHealthResponses,
+        eq(processHealthResponses.workspaceId, workspaceId),
+        eq(processHealthResponses.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readProcessHealth = defineReadAction({
   name: "sessions.processHealth",
   summary:
     "The five process-health statements with the room's averages, and the reader's own answers.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     statements: z.array(
       z.object({
@@ -7650,20 +7861,11 @@ export const readProcessHealth = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            statementKey: processHealthResponses.statementKey,
-            score: processHealthResponses.score,
-            respondentHash: processHealthResponses.respondentHash,
-          })
-          .from(processHealthResponses)
-          .where(
-            activeOnly(
-              processHealthResponses,
-              eq(processHealthResponses.workspaceId, context.workspaceId),
-              eq(processHealthResponses.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await processHealthRowsInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
 
         // The reader's own hash, recomputed rather than stored anywhere. With no
         // salt yet nobody has answered, so there is nothing of theirs to find.
@@ -7825,7 +8027,7 @@ async function diagnosticInputsInTx(
 export const recordDiagnostic = defineWriteAction({
   name: "sessions.recordDiagnostic",
   summary: "Reads the closing diagnostic and stores what the room was told.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     verdict: z.enum(DIAGNOSIS_VERDICTS),
     cycleScore: z.number(),
@@ -7977,7 +8179,7 @@ export const readDiagnostic = defineReadAction({
   name: "sessions.diagnostic",
   summary:
     "The closing diagnostic's verdict for this review, stored or still unreadable.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     /** The stored numbers when recorded, else what the room has so far. */
     cycleScore: z.number().nullable(),
@@ -8106,8 +8308,8 @@ export const decideObjective = defineWriteAction({
   summary:
     "Closes one objective with a keep, modify or abandon decision and a one-line why.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
     decision: z.enum(GOAL_CLOSE_DECISIONS),
     // Required. §8.8 asks for "one decision and a one-line why", and a decision
     // nobody explained is the default carry-over the section exists to stop.
@@ -8227,11 +8429,53 @@ export const decideObjective = defineWriteAction({
   }),
 });
 
+/**
+ * Stage nine's rows: every objective the review covers, and the decision the
+ * room recorded for each. Read by the stage and by the rail's completion
+ * condition, so both count the same objectives.
+ */
+async function resetRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { id: string; spaceId: string | null; cycleId: string | null },
+) {
+  const rows = await tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      kind: goals.kind,
+    })
+    .from(goals)
+    .where(
+      activeOnly(goals, ...reviewObjectiveConditions(workspaceId, session)),
+    )
+    .orderBy(goals.position, goals.createdAt);
+
+  const decisions = await tx
+    .select({
+      goalId: reviewDecisions.goalId,
+      decision: reviewDecisions.decision,
+      why: reviewDecisions.why,
+    })
+    .from(reviewDecisions)
+    .where(
+      activeOnly(
+        reviewDecisions,
+        eq(reviewDecisions.workspaceId, workspaceId),
+        eq(reviewDecisions.sessionId, session.id),
+      ),
+    );
+  return {
+    rows,
+    byGoal: new Map(decisions.map((row) => [row.goalId, row])),
+  };
+}
+
 export const readReset = defineReadAction({
   name: "sessions.reset",
   summary:
     "Stage nine's state: every objective in the review and how it was closed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     objectives: z.array(
       z.object({
@@ -8277,36 +8521,11 @@ export const readReset = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            kind: goals.kind,
-          })
-          .from(goals)
-          .where(
-            activeOnly(
-              goals,
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt);
-
-        const decisions = await tx
-          .select({
-            goalId: reviewDecisions.goalId,
-            decision: reviewDecisions.decision,
-            why: reviewDecisions.why,
-          })
-          .from(reviewDecisions)
-          .where(
-            activeOnly(
-              reviewDecisions,
-              eq(reviewDecisions.workspaceId, context.workspaceId),
-              eq(reviewDecisions.sessionId, input.sessionId),
-            ),
-          );
-        const byGoal = new Map(decisions.map((row) => [row.goalId, row]));
+        const { rows, byGoal } = await resetRowsInTx(
+          tx,
+          context.workspaceId,
+          session,
+        );
 
         // The grades from the review half (§8, P9-T20b-a).
         const { review } = await reviewHalvesInTx(
@@ -8371,7 +8590,8 @@ export const readReset = defineReadAction({
           objectives,
           decided: decidedCount,
           total: objectives.length,
-          complete: objectives.length > 0 && decidedCount === objectives.length,
+          // The rail's own answer for stage nine (plan 0.7.0, S1).
+          complete: resetCondition(objectives).complete,
         };
       },
     );
@@ -8388,7 +8608,7 @@ export const captureLearning = defineWriteAction({
   summary:
     "Records what the team now knows, optionally carried into the next cycle.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     text: z.string().trim().min(1).max(1000),
     /**
      * §8.9's "mark the ones to carry forward".
@@ -8518,7 +8738,7 @@ export const addReviewAction = defineWriteAction({
   name: "sessions.addAction",
   summary: "Adds an action with an owner and a date.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     what: z.string().trim().min(1).max(500),
     /**
      * Both required, and §8.1 says why in one line: "Every action has a name and
@@ -8604,7 +8824,7 @@ export const completeReviewAction = defineWriteAction({
   name: "sessions.completeAction",
   summary: "Marks one review action done, or not done again.",
   input: z.object({
-    sessionId: z.uuid(),
+    sessionId: ADDRESS.session,
     actionId: z.uuid(),
     done: z.boolean(),
   }),
@@ -8676,7 +8896,7 @@ export const readForward = defineReadAction({
   name: "sessions.forward",
   summary:
     "Stages ten and eleven: learnings, drafts, actions, and the retro themes worth promoting.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     learnings: z.array(
       z.object({
@@ -8909,7 +9129,7 @@ export const readMinutes = defineReadAction({
   name: "sessions.minutes",
   summary:
     "The review's minutes: the executive summary and every stage's record.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     title: z.string(),
     heldOn: z.string().nullable(),
@@ -9384,8 +9604,8 @@ export const revealObjectiveScore = defineWriteAction({
   name: "sessions.revealObjectiveScore",
   summary: "Reveals one objective's score to the whole room in a single write.",
   input: z.object({
-    sessionId: z.uuid(),
-    goalId: z.uuid(),
+    sessionId: ADDRESS.session,
+    goalId: ADDRESS.goal,
   }),
   output: z.object({
     revealed: z.number().int(),
@@ -9612,11 +9832,73 @@ const scoringKeyResult = z.object({
     .nullable(),
 });
 
+/**
+ * Every key result a review grades, with its evidence: the same objectives
+ * the stage's own close judges, so a company review lists every key result it
+ * then asks about. Read by stage two and by the rail's completion condition.
+ */
+async function scoringRowsInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: { spaceId: string | null; cycleId: string | null },
+) {
+  return tx
+    .select({
+      goalId: goals.id,
+      goalTitle: goals.title,
+      goalPosition: goals.position,
+      goalAddedMidCycleAt: goals.addedMidCycleAt,
+      keyResultId: keyResults.id,
+      title: keyResults.title,
+      weight: keyResults.weight,
+      baseline: keyResults.baselineValue,
+      target: keyResults.targetValue,
+      current: keyResults.currentValue,
+      unit: keyResults.unit,
+      position: keyResults.position,
+      kind: goals.kind,
+    })
+    .from(keyResults)
+    .innerJoin(goals, eq(goals.id, keyResults.goalId))
+    .where(
+      activeOnly(
+        keyResults,
+        eq(keyResults.workspaceId, workspaceId),
+        isNull(goals.deletedAt),
+        ...reviewObjectiveConditions(workspaceId, session),
+      ),
+    )
+    .orderBy(goals.position, goals.createdAt, keyResults.position);
+}
+
+/** The grades one review recorded, whether or not they are revealed yet. */
+async function reviewGradesInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  sessionId: string,
+) {
+  return tx
+    .select({
+      keyResultId: reviewScores.keyResultId,
+      score: reviewScores.score,
+      reason: reviewScores.reason,
+      revealedAt: reviewScores.revealedAt,
+    })
+    .from(reviewScores)
+    .where(
+      activeOnly(
+        reviewScores,
+        eq(reviewScores.workspaceId, workspaceId),
+        eq(reviewScores.sessionId, sessionId),
+      ),
+    );
+}
+
 export const readScoringStatus = defineReadAction({
   name: "sessions.scoringStatus",
   summary:
     "Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed.",
-  input: z.object({ sessionId: z.uuid() }),
+  input: z.object({ sessionId: ADDRESS.session }),
   output: z.object({
     objectives: z.array(
       z.object({
@@ -9706,51 +9988,12 @@ export const readScoringStatus = defineReadAction({
           ACCESS_LEVELS.view,
         );
 
-        const rows = await tx
-          .select({
-            goalId: goals.id,
-            goalTitle: goals.title,
-            goalPosition: goals.position,
-            goalAddedMidCycleAt: goals.addedMidCycleAt,
-            keyResultId: keyResults.id,
-            title: keyResults.title,
-            weight: keyResults.weight,
-            baseline: keyResults.baselineValue,
-            target: keyResults.targetValue,
-            current: keyResults.currentValue,
-            unit: keyResults.unit,
-            position: keyResults.position,
-            kind: goals.kind,
-          })
-          .from(keyResults)
-          .innerJoin(goals, eq(goals.id, keyResults.goalId))
-          .where(
-            activeOnly(
-              keyResults,
-              eq(keyResults.workspaceId, context.workspaceId),
-              isNull(goals.deletedAt),
-              // The same objectives the stage's own close judges, so a
-              // company review lists every key result it then asks about.
-              ...reviewObjectiveConditions(context.workspaceId, session),
-            ),
-          )
-          .orderBy(goals.position, goals.createdAt, keyResults.position);
-
-        const graded = await tx
-          .select({
-            keyResultId: reviewScores.keyResultId,
-            score: reviewScores.score,
-            reason: reviewScores.reason,
-            revealedAt: reviewScores.revealedAt,
-          })
-          .from(reviewScores)
-          .where(
-            activeOnly(
-              reviewScores,
-              eq(reviewScores.workspaceId, context.workspaceId),
-              eq(reviewScores.sessionId, input.sessionId),
-            ),
-          );
+        const rows = await scoringRowsInTx(tx, context.workspaceId, session);
+        const graded = await reviewGradesInTx(
+          tx,
+          context.workspaceId,
+          input.sessionId,
+        );
         const byKeyResult = new Map(
           graded.map((row) => [
             row.keyResultId,
@@ -9987,11 +10230,292 @@ export const readScoringStatus = defineReadAction({
                   scored: committedScores.length,
                 },
           tooSafe: tooSafePattern(revealed, thresholds) ? TOO_SAFE_TEXT : null,
-          complete:
-            objectives.length > 0 &&
-            objectives.every((entry) => entry.scored === entry.total),
+          // The rail's own answer for stage two (plan 0.7.0, S1).
+          complete: scoringCondition(
+            objectives.flatMap((entry) => entry.keyResults),
+          ).complete,
           adjustment: practice["scoring.adjustment"],
         };
+      },
+    );
+  },
+});
+
+// ---------------------------------------------------------------------------
+// Each stage's completion condition, shown and not enforced
+// (docs/design/sessions.md §4.1, plan 0.7.0 S1)
+// ---------------------------------------------------------------------------
+
+type ReviewSessionRow = Awaited<ReturnType<typeof requireSessionAccess>>;
+
+/**
+ * One stage's condition, or null where the stage has none the product can
+ * read from what it stores.
+ *
+ * Every branch reads the rows its own stage read loads, through the same
+ * helper, and decides through the same pure function in
+ * `sessions/stage-completion.ts`. Two places deciding whether a stage is done
+ * would be two answers on one screen.
+ */
+async function stageConditionInTx(
+  tx: OperationTx,
+  workspaceId: string,
+  session: ReviewSessionRow,
+  stageKey: ReviewStageKey,
+): Promise<StageCondition | null> {
+  switch (stageKey) {
+    case "open": {
+      const participants = await reviewParticipantIdsInTx(
+        tx,
+        workspaceId,
+        session.spaceId,
+      );
+      return pulseCondition(
+        participants.map((row) => row.memberId),
+        await pulseRowsInTx(tx, workspaceId, session.id),
+      );
+    }
+    case "score": {
+      const rows = await scoringRowsInTx(tx, workspaceId, session);
+      const grades = new Map(
+        (await reviewGradesInTx(tx, workspaceId, session.id)).map((row) => [
+          row.keyResultId,
+          row,
+        ]),
+      );
+      return scoringCondition(
+        rows.map((row) => {
+          const grade = grades.get(row.keyResultId);
+          return {
+            score: grade ? Number(grade.score) : null,
+            reason: grade?.reason ?? null,
+          };
+        }),
+      );
+    }
+    case "narratives":
+      return narrativesCondition(
+        await narrativeRowsInTx(tx, workspaceId, session),
+      );
+    case "recognition": {
+      const [row] = await tx
+        .select({ count: count() })
+        .from(kudos)
+        .where(
+          activeOnly(
+            kudos,
+            eq(kudos.workspaceId, workspaceId),
+            eq(kudos.sessionId, session.id),
+          ),
+        );
+      return recognitionCondition(Number(row?.count ?? 0));
+    }
+    case "team_retro":
+      // "Writing phase complete, dot voting complete" has nothing behind it:
+      // the board stores notes and dots, and nothing records when writing or
+      // voting ended. A rule made up here would be practice nobody decided.
+      return null;
+    case "management_retro": {
+      // The count, never the answers. The stage itself is leadership's, and
+      // the activity feed already tells the space each time one is recorded.
+      const questions = await managementQuestionsInTx(
+        tx,
+        workspaceId,
+        session.id,
+      );
+      return managementCondition(
+        questions.filter((entry) => entry.body !== null).length,
+        questions.length,
+      );
+    }
+    case "root_cause": {
+      // The rules the review's cycle is read by, as `sessions.rootCauses`
+      // reads them: §11's threshold for this workspace, never a literal.
+      const { thresholds, practice } = await cycleRulesInTx(
+        tx,
+        workspaceId,
+        session.cycleId,
+      );
+      // METHOD.md §12: where root causes are optional a miss "may be left
+      // without one", so there is nothing for the stage to be short of.
+      if (practice["review.rootCauses"] === "optional") {
+        return null;
+      }
+      const { graded, missed } = await rootCauseScopeInTx(
+        tx,
+        workspaceId,
+        session.id,
+        thresholds,
+      );
+      const named = await namedRootCausesInTx(tx, workspaceId, session.id);
+      return rootCauseCondition(
+        graded,
+        missed.map((row) => ({
+          causeKey: named.get(row.keyResultId)?.causeKey ?? null,
+        })),
+      );
+    }
+    case "process_health": {
+      const participants = await reviewParticipantIdsInTx(
+        tx,
+        workspaceId,
+        session.spaceId,
+      );
+      const respondents = new Set(
+        (await processHealthRowsInTx(tx, workspaceId, session.id)).map(
+          (row) => row.respondentHash,
+        ),
+      );
+      // Matched through the per-review salt, the way the survey recognises a
+      // second submission. Only the number leaves this function: who has not
+      // answered is the attribution §8.5 keeps out of every read.
+      const salt = session.processHealthSalt;
+      const notSubmitted = participants.filter(
+        (row) =>
+          salt === null || !respondents.has(respondentHash(salt, row.memberId)),
+      ).length;
+      return surveyCondition(notSubmitted);
+    }
+    case "keep_modify_abandon": {
+      const { rows, byGoal } = await resetRowsInTx(tx, workspaceId, session);
+      return resetCondition(
+        rows.map((row) => ({
+          decision: byGoal.get(row.goalId)?.decision ?? null,
+        })),
+      );
+    }
+    case "learnings": {
+      const [row] = await tx
+        .select({ count: count() })
+        .from(learnings)
+        .where(
+          activeOnly(
+            learnings,
+            eq(learnings.workspaceId, workspaceId),
+            eq(learnings.sessionId, session.id),
+          ),
+        );
+      return learningsCondition(Number(row?.count ?? 0));
+    }
+    case "actions": {
+      const owners = alias(workspaceMembers, "completion_action_owners");
+      const rows = await tx
+        .select({ status: owners.status, deletedAt: owners.deletedAt })
+        .from(reviewActions)
+        .leftJoin(owners, eq(owners.id, reviewActions.ownerId))
+        .where(
+          activeOnly(
+            reviewActions,
+            eq(reviewActions.workspaceId, workspaceId),
+            eq(reviewActions.sessionId, session.id),
+          ),
+        );
+      return actionsCondition(
+        rows.map((row) => ({
+          ownerActive: row.status === "active" && row.deletedAt === null,
+        })),
+      );
+    }
+  }
+}
+
+export const readStageCompletion = defineReadAction({
+  name: "sessions.stageCompletion",
+  summary:
+    "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
+  input: z.object({ sessionId: ADDRESS.session }),
+  output: z.object({
+    /** The stages this session walks, in §8.1's order: its half, where held apart. */
+    stages: z.array(
+      z.object({
+        stageKey: z.enum(REVIEW_STAGE_KEYS),
+        /**
+         * Null where the stage has no condition the product can read from
+         * what it stores. Today that is the team retro, and stage seven where
+         * the workspace leaves root causes optional.
+         */
+        complete: z.boolean().nullable(),
+        /** What is missing, in one English sentence. Null unless incomplete. */
+        missing: z.string().nullable(),
+        /** The same as data, so a screen can say it in its reader's language. */
+        gap: z
+          .object({
+            reason: z.enum(STAGE_GAP_REASONS),
+            count: z.number().int(),
+          })
+          .nullable(),
+        /**
+         * Whether `sessions.advanceStage` refuses to leave this stage as it
+         * stands. Only stage two, while a committed key result below its
+         * promise has no explanation (METHOD.md §8.3). Every other gap is
+         * shown and the facilitator may move on.
+         */
+        refusesAdvance: z.boolean(),
+      }),
+    ),
+  }),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such session.");
+    }
+
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as unknown as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        const session = await requireSessionAccess(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.sessionId,
+          ACCESS_LEVELS.view,
+        );
+        if (session.kind !== "quarterly") {
+          throw new OperationError(
+            "not_found",
+            "Stage completion belongs to a quarterly review.",
+          );
+        }
+
+        const stages = [];
+        for (const stageKey of reviewStageKeysFor(session.reviewPart)) {
+          const condition = await stageConditionInTx(
+            tx,
+            context.workspaceId,
+            session,
+            stageKey,
+          );
+          // The one refusal, asked of the function the advance itself asks,
+          // so the screen cannot promise a move the action then refuses.
+          const refusesAdvance =
+            stageKey === "score" &&
+            (
+              await unexplainedCommittedMissesInTx(
+                tx,
+                context.workspaceId,
+                session,
+              )
+            ).length > 0;
+          stages.push({
+            stageKey,
+            complete: condition?.complete ?? null,
+            missing:
+              condition?.gap == null
+                ? null
+                : stageGapSentence(
+                    condition.gap,
+                    MANAGEMENT_RETRO_QUESTIONS.length,
+                  ),
+            gap: condition?.gap ?? null,
+            refusesAdvance,
+          });
+        }
+        return { stages };
       },
     );
   },

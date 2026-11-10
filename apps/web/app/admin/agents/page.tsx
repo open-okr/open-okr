@@ -1,4 +1,4 @@
-import { ACCESS_LEVELS, callAction } from "@openokr/core";
+import { ACCESS_LEVELS, agentRunVersion, callAction } from "@openokr/core";
 import { AGENT_AUTONOMIES } from "@openokr/db";
 import {
   AgentFace,
@@ -15,10 +15,12 @@ import { SCHEDULE_NAME_KEYS } from "../../../lib/identifier-names.ts";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
+import { AgentInstructions } from "./agent-instructions";
 import { AgentPolicy } from "./agent-policy.tsx";
 import { AgentSwitch, CancelRun } from "./agent-switch";
 import { ProposalQueue } from "./proposal-queue";
 import { RunControls } from "./run-controls";
+import { AgentRunsLive } from "./runs-live.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.adminAgents");
 
@@ -126,6 +128,20 @@ export default async function AgentsPage() {
     actor: { kind: "human" as const, userId: session.user.id },
   };
   const agents = await callAction(context, "agents.list", {});
+  // Each agent's instructions and their history (plan 0.7.0 A7).
+  const instructions = new Map(
+    await Promise.all(
+      agents.map(
+        async (agent) =>
+          [
+            agent.id,
+            await callAction(context, "agents.instructions", {
+              agentId: agent.id,
+            }),
+          ] as const,
+      ),
+    ),
+  );
   const runs = await callAction(context, "agents.listRuns", { limit: 20 });
   // Which face a run wears, by the agent that ran it. A run carries the
   // agent's id and name but not its kind, and every run's agent is in the
@@ -171,6 +187,20 @@ export default async function AgentsPage() {
         </h1>
         <p className="text-sm text-ink-3">{t("admin.agents.everyAgentIsA")}</p>
       </div>
+
+      {/* The runs below move as they run (A11). Each run's version, so an
+          event for a state already on the page is skipped. */}
+      <AgentRunsLive
+        versions={Object.fromEntries(
+          runs.map((run) => [
+            run.id,
+            agentRunVersion({
+              status: run.status,
+              logLength: run.log.length,
+            }),
+          ]),
+        )}
+      />
 
       <RunControls drafting={drafting} />
 
@@ -243,6 +273,23 @@ export default async function AgentsPage() {
                     spaces={bindable.spaces}
                     trees={bindable.trees}
                   />
+                  {/* What it is told, by stage, and a planned run (A7). */}
+                  {(() => {
+                    const read = instructions.get(agent.id);
+                    return read ? (
+                      <AgentInstructions
+                        agentId={agent.id}
+                        agentName={agent.name}
+                        editable={read.editable}
+                        currentStage={read.currentStage}
+                        stages={read.stages}
+                        canPlan={
+                          agent.kind === "custom" && agent.enabled && drafting
+                        }
+                        tier={agent.tier}
+                      />
+                    ) : null;
+                  })()}
                 </li>
               ))}
             </ul>

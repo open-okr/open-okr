@@ -43,6 +43,13 @@ export const outbox = pgTable(
      * and nothing more.
      */
     workspaceId: uuid("workspace_id"),
+    /**
+     * When the relay last claimed the row, written only while an outbox rate
+     * is set (docs/design/tenant-limits.md §10, migration 0159). The rate
+     * counts claims in the last minute from this, so the outbox is its own
+     * record of the rate and every relay agrees.
+     */
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
   },
   (table) => [
     index("outbox_pending_idx").on(table.availableAt, table.createdAt),
@@ -50,5 +57,7 @@ export const outbox = pgTable(
     // not express here; the migration is the authority and this line exists
     // so a reader of the schema knows the index is there.
     index("outbox_fair_idx").on(table.workspaceId, table.createdAt, table.id),
+    // Partial in the migration too: only rows claimed under a rate.
+    index("outbox_claimed_at_idx").on(table.claimedAt),
   ],
 );

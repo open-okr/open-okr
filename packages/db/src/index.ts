@@ -18,7 +18,13 @@ export {
   type GrantOptions,
   grantAppPrivileges,
 } from "./grants.ts";
-export { idTimestamp, newId } from "./id.ts";
+export {
+  idTimestamp,
+  newId,
+  newShortId,
+  SHORT_ID_ALPHABET,
+  SHORT_ID_LENGTH,
+} from "./id.ts";
 export {
   type MigrationClient,
   MigrationError,
@@ -107,6 +113,11 @@ export {
   aiThreads,
 } from "./schema/ai-threads.ts";
 export {
+  aiToolCalls,
+  TOOL_CALL_OUTCOMES,
+  type ToolCallOutcome,
+} from "./schema/ai-tool-calls.ts";
+export {
   type AIBudget,
   type AIUsageEvent,
   aiBudgets,
@@ -132,8 +143,10 @@ export {
   type AlignmentFindingScope,
   type AlignmentFindingSource,
   type AlignmentFindingState,
+  type AlignmentScoreBreakdown,
   type AlignmentSeverity,
   alignmentFindings,
+  alignmentScores,
   type GoalDependencyRow,
   goalDependencies,
   type KeyResultDependencyRow,
@@ -296,8 +309,10 @@ export {
   directorySyncTokens,
 } from "./schema/directory-sync.ts";
 export {
+  ATTACHMENT_ORIGINS,
   ATTACHMENT_SUBJECT_TYPES,
   type Attachment,
+  type AttachmentOrigin,
   type AttachmentSubjectType,
   attachments,
   DOCUMENT_STATES,
@@ -578,6 +593,12 @@ export {
   type TenantState,
   tenants,
 } from "./schema/tenants.ts";
+export {
+  WEBHOOK_DELIVERY_OUTCOMES,
+  WEBHOOK_OFF_REASONS,
+  webhookDeliveries,
+  webhooks,
+} from "./schema/webhooks.ts";
 export {
   type WhatsAppTemplateMapping,
   whatsappTemplateMappings,

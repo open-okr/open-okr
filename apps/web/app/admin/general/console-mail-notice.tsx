@@ -7,11 +7,15 @@ import { getTranslations } from "../../../lib/translations";
  * **The console mail driver is the right default and the wrong long-term
  * state.** `mail.transport` defaults to `console`, which is what lets a
  * fresh checkout run the first-run wizard and click an invitation link with
- * no mail server anywhere. That driver writes each message to stdout: the
- * recipient's address, the subject and the body. So an instance still on it
- * a month later is logging every invitation, every digest and every
- * password reset, with the address of the person it was for, into logs that
- * are usually shipped somewhere.
+ * no mail server anywhere. So an instance still on it a month later has
+ * delivered nothing to anybody.
+ *
+ * **What the log holds depends on where it runs, and the banner says which.**
+ * On a developer's machine the driver writes the whole message, link and all.
+ * In production it writes a masked address and the subject and withholds the
+ * body (completeness review L-12). The banner said the body was logged on
+ * both until 0.7.0 (plan B7), so `revealsContent` now comes from the driver's
+ * own rule rather than from a sentence written before that rule changed.
  *
  * The P7-T08a privacy review found nothing anywhere that says so. The driver
  * is doing its job; the gap was that an operator could run like this for a
@@ -37,7 +41,12 @@ import { getTranslations } from "../../../lib/translations";
  * whole sentence to move the names within it, so the names live inside the
  * translated text.
  */
-export async function ConsoleMailNotice() {
+export async function ConsoleMailNotice({
+  revealsContent,
+}: {
+  /** Whether the driver logs whole messages here: `consoleMailRevealsContent()`. */
+  readonly revealsContent: boolean;
+}) {
   const { t } = await getTranslations();
 
   return (
@@ -46,10 +55,14 @@ export async function ConsoleMailNotice() {
         {t("admin.general.consoleMail.title")}
       </h2>
       <p className="mt-1.5 text-sm text-ink-2">
-        {t("admin.general.consoleMail.what")}
+        {revealsContent
+          ? t("admin.general.consoleMail.whatLocal")
+          : t("admin.general.consoleMail.what")}
       </p>
       <p className="mt-1.5 text-sm text-ink-2">
-        {t("admin.general.consoleMail.fix")}
+        {revealsContent
+          ? t("admin.general.consoleMail.fixLocal")
+          : t("admin.general.consoleMail.fix")}
       </p>
     </section>
   );

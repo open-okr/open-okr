@@ -150,9 +150,12 @@ const inAPastQuarter = async (
   const ago = new Date(Date.now() - 120 * 86_400_000)
     .toISOString()
     .slice(0, 10);
+  // Made as of a day inside it, so it is born active: a quarter that has
+  // already ended is born closing (O2), and nothing moves into one.
   const past = (await call("cycles.create", {
     on: ago,
     mode: "quarterly",
+    asOf: ago,
   })) as {
     id: string;
     startsOn: string;

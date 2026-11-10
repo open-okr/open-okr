@@ -13,9 +13,26 @@
 import { callAction, OperationError } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedByField } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { type CommitmentState, NO_ERROR } from "./commitment-state.ts";
+
+/**
+ * A refused write under the field it names, which the stage's forms wrap in
+ * `RefusedFields`, or as the stage's sentence (guided-inputs §4.2). A schema's
+ * refusal too, which used to reach the error page.
+ */
+async function refused(
+  error: unknown,
+  renamed?: Readonly<Record<string, string>>,
+): Promise<CommitmentState> {
+  const state = refusedByField(error, (await getTranslations()).t, renamed);
+  if (state === null) {
+    throw error;
+  }
+  return state;
+}
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -64,10 +81,13 @@ export async function closeCommitmentsAction(
   try {
     await callAction(await context(), "sessions.closeCommitments", { items });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    // A refused line on why stands under that commitment's own line.
+    return refused(
+      error,
+      Object.fromEntries(
+        items.map((item, index) => [`items.${index}.note`, `note:${item.id}`]),
+      ),
+    );
   }
   revalidatePath(`/session/${sessionId}`);
   return NO_ERROR;
@@ -89,10 +109,8 @@ export async function setWinsAction(
   try {
     await callAction(await context(), "sessions.setWins", { sessionId, wins });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    // Every line is named `win`, so a refused line is said under the form.
+    return refused(error);
   }
   revalidatePath(`/session/${sessionId}`);
   return NO_ERROR;
@@ -151,10 +169,9 @@ export async function setCommitmentsAction(
       items,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
-    }
-    throw error;
+    // Each row's fields share their names with the other rows', so a refused
+    // row is said under the form rather than under every row at once.
+    return refused(error);
   }
   revalidatePath(`/session/${sessionId}`);
   return NO_ERROR;
@@ -179,12 +196,19 @@ export async function advanceStageWithReason(
   form: FormData,
 ): Promise<CommitmentState> {
   const sessionId = String(form.get("sessionId") ?? "");
+  const fromStageKey = String(form.get("fromStageKey") ?? "");
   try {
     await callAction(await context(), "sessions.advanceStage", {
       id: sessionId,
+      ...(fromStageKey === "" ? {} : { fromStageKey }),
     });
   } catch (error) {
     if (error instanceof OperationError) {
+      // A stale advance: somebody else moved the session on. The page
+      // reloads to where it is now, with the sentence saying why.
+      if (error.code === "conflict") {
+        revalidatePath(`/session/${sessionId}`);
+      }
       return { error: error.message };
     }
     throw error;

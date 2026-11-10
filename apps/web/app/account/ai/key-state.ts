@@ -12,6 +12,11 @@
 export interface KeyResult {
   readonly ok: boolean;
   readonly message: string;
+  /**
+   * A refused field's message, shown under it (guided-inputs §4.2). The
+   * message is empty when there is one.
+   */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 export const NOTHING_YET: KeyResult = { ok: true, message: "" };

@@ -22,6 +22,7 @@ import {
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
+import { latestEvaluations } from "../../../lib/prompt-evaluation.ts";
 import { getKeyRing } from "../../../lib/secrets";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
@@ -36,6 +37,7 @@ import {
   saveWorkspaceKey,
   testWorkspaceKeyAction,
 } from "./actions.ts";
+import { AgentCallsCard } from "./agent-calls-card";
 import { AIForm } from "./ai-form.tsx";
 import { tierModelValue } from "./choices.ts";
 import {
@@ -195,6 +197,10 @@ export default async function AdminAIPage() {
     callAction(context, "people.directory", {}),
     callAction(context, "agents.list", {}),
   ]);
+
+  // The usage card's latest evaluation results (plan 0.7.0 A9): each prompt's
+  // current version against its set, computed now against the mock.
+  const evaluations = await latestEvaluations(prompts);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
   // What a tier can route to: every model the catalogue holds active.
@@ -629,7 +635,15 @@ export default async function AdminAIPage() {
           to cost, which assists are on, and what the prompts say. Its cards
           live in `governance.tsx` because the console is one screen and one
           file for it was getting long, not because it is a second screen. */}
-      <UsageCard usage={usage} days={USAGE_WINDOW_DAYS} />
+      <UsageCard
+        usage={usage}
+        days={USAGE_WINDOW_DAYS}
+        evaluations={evaluations}
+      />
+      {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
+      <AgentCallsCard
+        summary={await callAction(context, "ai.readToolCallSummary", {})}
+      />
       <BudgetsCard
         budgets={budgets}
         people={directory.filter(

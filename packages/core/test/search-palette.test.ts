@@ -426,6 +426,71 @@ describe("the jump offers nothing the reader could not open", () => {
     ).not.toContain("kpi");
   });
 
+  it("answers the short code of every addressable kind with its own page (short-ids.md S5)", async () => {
+    const wb = await workerDb();
+    const codeOf = async (table: string, id: string) =>
+      (
+        await wb.admin.query<{ short_id: string }>(
+          `select short_id from ${table} where id = $1`,
+          [id],
+        )
+      ).rows[0]?.short_id as string;
+    const byCode = async (table: string, id: string, userId = OWNER) =>
+      (await call(
+        "search.jump",
+        { shortId: await codeOf(table, id) },
+        userId,
+      )) as Match | null;
+
+    expect(await byCode("goals", goalId)).toMatchObject({
+      entityType: "goal",
+      entityId: goalId,
+      title: "Aurora launch lands with mid-market teams",
+      href: `/goals/${goalId}`,
+    });
+    expect(await byCode("key_results", keyResultId)).toMatchObject({
+      entityType: "key_result",
+      href: `/goals/${goalId}#kr-${keyResultId}`,
+    });
+    expect(await byCode("initiatives", initiativeId)).toMatchObject({
+      entityType: "initiative",
+      href: `/initiatives/${initiativeId}`,
+    });
+    expect(await byCode("tasks", taskId)).toMatchObject({
+      entityType: "task",
+      href: `/tasks/${taskId}`,
+    });
+    expect(await byCode("documents", documentId)).toMatchObject({
+      entityType: "document",
+      href: `/documents/${documentId}`,
+    });
+    expect(await byCode("okr_sessions", sessionId)).toMatchObject({
+      entityType: "session",
+      href: `/session/${sessionId}`,
+    });
+    expect(await byCode("cycles", cycle.id)).toMatchObject({
+      entityType: "cycle",
+      title: cycle.name,
+      href: `/cycle?cycle=${cycle.id}`,
+    });
+
+    // Narrowed to a kind, a code of another kind names nothing.
+    expect(
+      await call("search.jump", {
+        shortId: await codeOf("goals", goalId),
+        kinds: ["task"],
+      }),
+    ).toBeNull();
+    // A guest holds no blanket tier, so a goal it cannot read answers as a
+    // code that names nothing does.
+    expect(await byCode("goals", goalId, GUEST)).toBeNull();
+    expect(await call("search.jump", { shortId: "Zz9Zz9Zz9Z" })).toBeNull();
+    // A deleted goal is not offered.
+    const code = await codeOf("goals", goalId);
+    await call("goals.delete", { id: goalId });
+    expect(await call("search.jump", { shortId: code })).toBeNull();
+  });
+
   it("refuses a suspended reader outright", async () => {
     const wb = await workerDb();
     await wb.admin.query(

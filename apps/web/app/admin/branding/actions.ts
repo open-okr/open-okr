@@ -24,12 +24,12 @@ import {
   callAction,
   ImageRefusedError,
   MAX_IMAGE_PIXELS,
-  OperationError,
   storeUpload,
 } from "@openokr/core";
 import { HEX_COLOUR_PATTERN, statusHueOf } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedByField, refusedSentence } from "../../../lib/refusal";
 import { getStorage } from "../../../lib/storage";
 import { getTranslations } from "../../../lib/translations";
 import { getImageProcessor } from "../../../lib/upload-ports";
@@ -55,6 +55,13 @@ async function context() {
 
 const SLOTS: readonly BrandingImageSlot[] = ["logo", "favicon"];
 
+/** The form's own check, said under the one field it is about (§4.2). */
+const on = (field: string, message: string): BrandingState => ({
+  error: null,
+  saved: null,
+  fields: { [field]: message },
+});
+
 /** A file the form carried, or null when that picker was left empty. */
 const fileIn = (form: FormData, name: string): File | null => {
   const value = form.get(name);
@@ -76,10 +83,11 @@ export async function saveBranding(
         branding: {},
       });
     } catch (error) {
-      if (error instanceof OperationError) {
-        return { error: error.message, saved: null };
+      const refused = refusedSentence(error, t);
+      if (refused === null) {
+        throw error;
       }
-      throw error;
+      return { ...refused, saved: null };
     }
     // Every screen is drawn in the colour, starting with the root layout's
     // style sheet, so the whole tree is stale rather than this page.
@@ -98,20 +106,17 @@ export async function saveBranding(
   const colourChanged =
     primaryColor.toLowerCase() !== storedColour.toLowerCase();
   if (colourChanged && primaryColor !== "" && !HEX.test(primaryColor)) {
-    return {
-      error: t("admin.branding.brandingSettingsForm.sixHexDigits"),
-      saved: null,
-    };
+    return on(
+      "primaryColor",
+      t("admin.branding.brandingSettingsForm.sixHexDigits"),
+    );
   }
   // Asked here as well as by the action's schema, so the refusal reaches the
   // administrator in their own language rather than as the schema's English.
   const family =
     !colourChanged || primaryColor === "" ? null : statusHueOf(primaryColor);
   if (family !== null) {
-    return {
-      error: t(REFUSED_HUE[family], { colour: primaryColor }),
-      saved: null,
-    };
+    return on("primaryColor", t(REFUSED_HUE[family], { colour: primaryColor }));
   }
 
   // The type and size are asked here first so a wrong file is refused before
@@ -133,7 +138,7 @@ export async function saveBranding(
   const storedName = String(form.get("storedName") ?? "").trim();
   const nameChanged = workspaceName !== storedName;
   if (nameChanged && workspaceName === "") {
-    return { error: t("admin.branding.workspaceName.required"), saved: null };
+    return on("workspaceName", t("admin.branding.workspaceName.required"));
   }
 
   if (
@@ -187,10 +192,16 @@ export async function saveBranding(
         saved: null,
       };
     }
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: null };
+    // Under the name or the colour when the refusal is about one of them, a
+    // schema's included, which used to reach the error page (plan U1b).
+    const refused = refusedByField(error, t, {
+      name: "workspaceName",
+      "branding.primaryColor": "primaryColor",
+    });
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return { ...refused, saved: null };
   }
 
   revalidatePath("/", "layout");
@@ -208,10 +219,11 @@ export async function removeBrandingImage(
       blobId: null,
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { ok: false, message: error.message };
+    const refused = refusedSentence(error, t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return { ok: false, message: refused.error };
   }
   revalidatePath("/", "layout");
   return { ok: true, message: t("admin.branding.images.removed") };

@@ -65,7 +65,11 @@ import {
   requireAvatarImage,
   shareAvatar,
 } from "../people/profile.ts";
-import { markedAsRichText } from "../rich-text/field-schema.ts";
+import {
+  filesFinished,
+  markedAsRichText,
+  UPLOADING_MESSAGE,
+} from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { resolveMemberSettings } from "../settings/registry.ts";
@@ -86,7 +90,11 @@ const bioInputSchema = markedAsRichText(
       {
         message: "bio must be a valid rich text document.",
       },
-    ),
+    )
+    // Plan 0.7.0 R1, as on every other rich text field.
+    .refine((value) => value === null || filesFinished(value), {
+      message: UPLOADING_MESSAGE,
+    }),
 ).optional();
 
 const memberSummary = z.object({
@@ -404,6 +412,9 @@ export const suspendMember = defineWriteAction({
   input: z.object({ memberId: z.uuid() }),
   output: statusChangeOutput,
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it shuts a person out of the workspace.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       refuseIfLastOwner(
@@ -657,6 +668,9 @@ export const convertToGuest = defineWriteAction({
   input: z.object({ memberId: z.uuid() }),
   output: z.object({ id: z.uuid(), kind: z.literal("guest") }),
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it takes a member's access to most of the workspace.
+  safety: "destructive",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       refuseIfLastOwner(
@@ -830,6 +844,7 @@ export const eraseMember = defineWriteAction({
         oauthTokens: z.number(),
         copilotThreads: z.number(),
         copilotMessages: z.number(),
+        agentToolCalls: z.number(),
       }),
     }),
   }),

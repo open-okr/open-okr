@@ -18,9 +18,12 @@
  * becomes `internal` with a fixed sentence. A stack trace, a driver message or a
  * constraint name in a response body is a map of the schema.
  */
+
 import { ZodError } from "zod";
+import { ScopeCeilingRefused } from "../actions/scope-ceiling.ts";
 import { SSOConnectionRejected } from "../auth/sso.ts";
 import { OperationError } from "../operations/errors.ts";
+import { DryRunUnavailable } from "../operations/operation.ts";
 import { AdmissionError } from "../tenancy/admission.ts";
 
 export const API_ERROR_CODES = [
@@ -68,7 +71,10 @@ const STATUS: Readonly<Record<ApiErrorCode, number>> = {
 export interface ApiError {
   readonly code: ApiErrorCode;
   readonly message: string;
-  /** Field paths to messages, for `invalid_input` only. */
+  /**
+   * Field paths to messages: every field a schema refused on `invalid_input`,
+   * and the one field an `OperationError` names on any other code (plan U1).
+   */
   readonly fields?: Readonly<Record<string, string>>;
   /**
    * Seconds until the caller may try again, for `rate_limited` only
@@ -126,9 +132,29 @@ export function errorFor(thrown: unknown): ApiError {
     };
   }
   if (thrown instanceof OperationError) {
+    // A refusal that names its field says where, as a schema refusal does
+    // (plan U1), and keeps its own code: a conflict on a title is still a
+    // conflict.
+    const base = apiError(
+      thrown.code,
+      thrown.message,
+      thrown.field === undefined
+        ? undefined
+        : { [thrown.field]: thrown.message },
+    );
     return thrown.details === undefined
-      ? apiError(thrown.code, thrown.message)
-      : { ...apiError(thrown.code, thrown.message), details: thrown.details };
+      ? base
+      : { ...base, details: thrown.details };
+  }
+  if (thrown instanceof ScopeCeilingRefused) {
+    // An action the call caused that the token's scopes do not reach
+    // (token-scope-ceiling.md C4). The same code as the surface's own check.
+    return apiError("insufficient_scope", thrown.message);
+  }
+  if (thrown instanceof DryRunUnavailable) {
+    // A validation call that reached a write it cannot roll back (plan D4).
+    // Refused before anything was kept, and said plainly.
+    return apiError("unsupported_parameter", thrown.message);
   }
   if (thrown instanceof SSOConnectionRejected) {
     // A fourth refusal, and it is about the input like a Zod one is: a single

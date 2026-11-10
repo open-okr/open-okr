@@ -20,7 +20,6 @@ import {
   Sidebar,
   type SidebarGroup,
   Topbar,
-  TopbarSearch,
   UnsavedChangesProvider,
 } from "@openokr/ui";
 import { Ellipsis } from "lucide-react";
@@ -60,13 +59,14 @@ import { SidebarToggle } from "./sidebar-toggle.tsx";
 import { SiteMessages } from "./site-messages.tsx";
 import { StaleDeploymentWatcher } from "./stale-deployment-watcher.tsx";
 import { SupportBanner } from "./support-banner.tsx";
+import { TopbarSearchField } from "./topbar-search.tsx";
 import { getTranslations } from "./translations";
 import { requireWorkspace } from "./workspace.ts";
 import {
   workspaceBrandImages,
   workspaceTerms,
 } from "./workspace-presentation.ts";
-import { WorkspaceStateBanner } from "./workspace-state.tsx";
+import { TrialEndingBanner, WorkspaceStateBanner } from "./workspace-state.tsx";
 
 /**
  * The authenticated app shell (UIUX-PLAN.md §3, P2-T10). Every top-level
@@ -387,7 +387,7 @@ export async function AppShellLayout({
           topbar={
             <Topbar
               breadcrumb={workspace.name}
-              search={<TopbarSearch />}
+              search={<TopbarSearchField />}
               // UIUX-PLAN §3's `+ New`: a menu of what this member may
               // create, the same on every screen (lib/new-menu.tsx). Somebody
               // who cannot write is not offered it.
@@ -522,6 +522,11 @@ export async function AppShellLayout({
             userId={session.user.id}
             workspaceId={workspace.workspaceId}
           />
+          {workspace.state === "active" && level >= ACCESS_LEVELS.full ? (
+            <div className="mb-4.5 empty:hidden">
+              <TrialEndingBanner workspaceId={workspace.workspaceId} />
+            </div>
+          ) : null}
           {workspace.state === "active" ? null : (
             <div className="mb-4.5">
               <WorkspaceStateBanner

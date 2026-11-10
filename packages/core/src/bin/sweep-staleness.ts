@@ -20,6 +20,7 @@ import { isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { sweepStaleness } from "../cadence/service.ts";
+import { sweepEndedCycles } from "../cycles/closing.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
 import { runOperation } from "../operations/operation.ts";
@@ -59,6 +60,7 @@ async function main(): Promise<void> {
     }
 
     let flipped = 0;
+    let closing = 0;
     for (const workspace of targets) {
       const result = await runOperation(
         { pool },
@@ -93,13 +95,17 @@ async function main(): Promise<void> {
         },
       );
       flipped += result.flipped;
+      // The other date sweep (okr-core-domain.md §10 C10, plan 0.7.0 O2): one
+      // command for both, for an instance with OPENOKR_SCHEDULER=off.
+      const moved = await sweepEndedCycles(pool, workspace.id, now);
+      closing += moved;
       console.log(
-        `${workspace.slug}: examined ${result.examined}, flipped ${result.flipped}`,
+        `${workspace.slug}: examined ${result.examined}, flipped ${result.flipped}, ${moved} cycle(s) now closing`,
       );
     }
 
     console.log(
-      `Swept ${targets.length} workspace(s). ${flipped} goal(s) now read outdated.`,
+      `Swept ${targets.length} workspace(s). ${flipped} goal(s) now read outdated; ${closing} ended cycle(s) moved to closing.`,
     );
   } finally {
     await pool.end();

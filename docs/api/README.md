@@ -27,7 +27,7 @@ hashed at rest, scoped, and it records when it was last used.
 | Token property | Detail |
 |---|---|
 | Audience | **REST** for `/api/v1`, or **AI agent** for the agent endpoint. Each is refused at the other's door |
-| Scopes | `read`, `write` and `destructive`. The form starts with `read` alone, and destructive is never granted by default |
+| Scopes | `read`, `write` and `destructive`. The form starts with `read` alone, and destructive is never granted by default. Destructive covers what removes something a person can see, and, from 0.7.0, closing a cycle or a session, suspending a member, making a member a guest and changing the workspace's state |
 | Expiry | Set in days when you create it, or left empty for none |
 | Revocation | Immediate. The next request fails |
 | Membership | Revalidated on every request. Suspending the member kills the token |
@@ -119,6 +119,20 @@ importer's and the scheduler's actions are not agent tools at all; they stay on
 | Where you see it | **Connected apps** in the avatar menu, on the page headed Connected agents | **API tokens** in the avatar menu, with when it was last used |
 | Permissions | Yours, narrowed by its scopes | The same |
 
+### A desktop agent that speaks standard input and output
+
+Some local agents start a command and talk to it over its standard input and
+output instead of HTTP. `okr mcp` is that command: it passes each message to
+the agent endpoint with your agent token and writes the answer back.
+
+```sh
+pnpm okr login --url https://okr.example.com --mcp-token okr_mcp_...
+pnpm okr mcp
+```
+
+Point the agent's configuration at `okr mcp` as its command. Every check,
+scope and record is the endpoint's, exactly as over HTTP.
+
 **An agent token opens the agent endpoint and nothing else.** A REST token is
 refused there, and an agent token is refused at `/api/v1`. The endpoint does
 not assign a session to an agent-token connection; the protocol allows that,
@@ -164,6 +178,28 @@ A refusal names what happened rather than leaving the caller to guess:
 | 409 | A conflict: the thing is not in a state that allows this, or somebody changed it since you read it, and then the answer carries what is stored now |
 | 422 | The input did not validate. The answer names the field |
 | 429 | Rate limited |
+
+### Checking a write without committing it
+
+Add `?validate=true` to a write, or `--validate` to an `okr` command, and the
+instance runs the write's own checks and rolls it back. Nothing is kept.
+
+```sh
+curl -X POST "https://okr.example.com/api/v1/goals/create?validate=true" \
+  -H "authorization: Bearer $TOKEN" -H "content-type: application/json" \
+  -d '{"title": "Become the platform mid-market teams reach for first", "level": "team"}'
+pnpm okr goals create --title "Win the mid-market" --level team --validate
+```
+
+| The write would | The check answers |
+|---|---|
+| Succeed | 200, with `data` as `{ "valid": true, "input": ..., "result": ... }`: the input with its defaults filled in, and what the write would have returned |
+| Be refused | The same status and error the write would answer, with `fields` on a 422 |
+
+A check needs the scope the write needs and counts against the same rate
+limit, because it does the same work. A few writes are not one database
+operation and cannot be checked this way; they answer 400 and say so. The
+OpenAPI document marks every write that can.
 
 **404 covering both "gone" and "forbidden" is deliberate.** A distinct 403 on a
 protected resource tells an unauthorised caller that the resource exists, which

@@ -80,7 +80,7 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 
 | Toolset | Holds | Tools |
 |---|---|---|
-| `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites, and checking an unsaved draft, and the member's own check-in streak | 62 |
+| `core` | What a member does every week: search and fetch, goals and key results, publishing and approving a drafted objective, check-ins and acknowledgement, the review inbox, notifications, comments, KPIs read and record, tasks, initiatives, documents, the blocker board, my sessions, the planning workflow read that a prompt cites, and checking an unsaved draft, the member's own check-in streak, and a quick confidence update (plan 0.7.0 O4) | 63 |
 | `work` | The rest of everyday work: targets and history, dependencies on key results, KPI trees and recovery, checklists, attachments, reactions, the copilot | 78 |
 | `facilitation` | Running the rhythm: preparing, running remotely and following up sessions, the planning workflow, cycles, alignment, dependencies, decisions, closing | 91 |
 | `room` | The live room's own moves: private votes and their reveal, the mic, pulse, kudos, retro notes, anonymous process-health answers | 16 |
@@ -127,7 +127,7 @@ From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 1
 
 | Connection | Tools today | Tools after |
 |---|---|---|
-| Full token, no toolsets named | 415 | 62 |
+| Full token, no toolsets named | 415 | 62 (63 since O4) |
 | Read-only token, no toolsets named | 415 | 38 |
 | Full token, `core,work` | 415 | 140 |
 | Full token, `all` | 415 | 380 |
@@ -148,7 +148,7 @@ From the MCP audit (`docs/audits/mcp-audit-2026-10-29.md`, findings 7, 11, 13, 1
 ```
 Given a token with read, write and destructive scope
 When an agent calls tools/list on /api/mcp with no toolsets named
-Then it receives the 62 core tools
+Then it receives the 63 core tools
 And search, fetch and every tool a prompt cites are among them
 ```
 

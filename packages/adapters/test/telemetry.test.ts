@@ -418,6 +418,35 @@ describe("tracing is off unless there is somewhere to send spans", () => {
     ).resolves.toBe("ok");
     await telemetry.stop();
   });
+
+  it("remembers the innermost span an error failed inside (error-reporting.md D20)", async () => {
+    const telemetry = new OtelTelemetry({
+      otlpEndpoint: "http://127.0.0.1:1/v1/traces",
+    });
+    const error = new TypeError("x");
+    let inner: { traceId: string; spanId: string } | null = null;
+    await expect(
+      telemetry.span("action outer", {}, () =>
+        telemetry
+          .span("action inner", {}, async () => {
+            throw error;
+          })
+          .catch((caught: unknown) => {
+            inner = telemetry.traceOf(caught);
+            throw caught;
+          }),
+      ),
+    ).rejects.toBe(error);
+
+    const trace = telemetry.traceOf(error);
+    expect(trace?.traceId).toMatch(/^[0-9a-f]{32}$/);
+    expect(trace?.spanId).toMatch(/^[0-9a-f]{16}$/);
+    // The outer span's catch ran second and did not overwrite it.
+    expect(trace).toEqual(inner);
+    expect(telemetry.traceOf(new Error("never thrown"))).toBeNull();
+    expect(new OffTelemetry().traceOf(error)).toBeNull();
+    await telemetry.stop();
+  });
 });
 
 /**

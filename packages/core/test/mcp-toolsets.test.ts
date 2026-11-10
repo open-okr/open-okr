@@ -175,7 +175,8 @@ describe("what a connection is offered", () => {
     const offered = offeredTools(MCP_TOOLS, FULL, chosen(null)).map(
       (tool) => tool.name,
     );
-    expect(offered).toHaveLength(62);
+    // 63 since plan 0.7.0 O4 added the quick confidence update.
+    expect(offered).toHaveLength(63);
     expect(offered).toEqual(expect.arrayContaining(["search", "fetch"]));
   });
 

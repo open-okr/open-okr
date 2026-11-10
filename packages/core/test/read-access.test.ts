@@ -64,6 +64,8 @@ function ordinaryReads(): readonly { name: string; access: number }[] {
 function plausibleInput(name: string): Record<string, unknown> {
   const uuid = "00000000-0000-4000-8000-000000000000";
   const byName: Record<string, Record<string, unknown>> = {
+    "agents.instructions": { agentId: uuid },
+    "agents.planRun": { agentId: uuid },
     "agents.readRun": { id: uuid },
     "ai.readPrompt": { promptKey: "coach.rewrite" },
     "ai.readUsageSummary": { since: new Date(0).toISOString() },
@@ -79,6 +81,7 @@ function plausibleInput(name: string): Record<string, unknown> {
     "imports.proposeMapping": { entity: "goals", headers: ["title"] },
     "kpis.suggest": { description: "activation rate" },
     "sessions.managementRetro": { sessionId: uuid },
+    "webhooks.deliveries": { id: uuid },
   };
   return byName[name] ?? {};
 }

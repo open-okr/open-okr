@@ -157,11 +157,11 @@ const NO_BROWSER_PATH: Readonly<Record<string, Reason>> = {
   },
   "agents.create": {
     apiOnly: true,
-    why: "a custom agent is created over REST or the command line; a screen for it waits on how a custom agent plans its own runs, which M-11 left for a person to decide",
+    why: "a custom agent is created over REST or the command line; Admin, Agents shows it, edits its instructions and plans its runs (plan 0.7.0 A7), and has no create form yet",
   },
-  "agents.startRun": {
+  "agents.answerMention": {
     apiOnly: true,
-    why: "the REST surface, the command line and the agent endpoint submit a task list; the outbox relay carries the run from there and the agents screen shows it (M-11)",
+    why: "the outbox relay calls it as the Coach, when a comment on a goal mentions the Coach (plan 0.7.0 A8); no person calls it",
   },
   "agents.readRun": {
     apiOnly: true,

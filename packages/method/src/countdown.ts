@@ -25,7 +25,7 @@ const DAYS_PER_WEEK = 7;
 /**
  * Whether planning opens today for a cycle starting this many days out.
  *
- * §11: six weeks before an annual cycle starts, three before a quarterly.
+ * §11: six weeks before an annual cycle starts, four before a quarterly.
  * Exact rather than "at or within", because the caller runs once a local day
  * and a window would fire every day from six weeks out to day one. §6.4 calls
  * this one message, and one message is what it is.
@@ -116,7 +116,11 @@ export function cycleClosingDue(
 }
 
 /** Which of §6.4's three session messages a scheduled session has earned. */
-export type SessionLifecycleStage = "due_soon" | "open" | "missed";
+export type SessionLifecycleStage =
+  | "due_soon"
+  | "open"
+  | "missed"
+  | "left_open";
 
 /**
  * The weekly session lifecycle, from hours rather than days.
@@ -164,4 +168,36 @@ export function sessionLifecycleStage(
   }
   // The day after, and only that day.
   return hoursUntilScheduled > -48 ? "missed" : null;
+}
+
+/**
+ * A weekly session still running past its length (plan 0.7.0 A13, approved 9
+ * November 2026 as the `session.left_open` message).
+ *
+ * The length is §11's `sessions.weeklyMinutes`, whose upper bound is how long a
+ * weekly session is meant to take (§7.1, "fifteen to thirty minutes"). Past it,
+ * the room has most likely moved on and left the session open, which holds the
+ * digest back, since `digest.weekly` comes after the close.
+ *
+ * **One day wide, as `missed` is.** A session left running for a week is not
+ * news every morning: the day after the session the message has said what it
+ * had to say. Nothing here invents a threshold: the length is §11's and the day
+ * is the same day `missed` already uses.
+ *
+ * Weekly sessions only. A monthly or quarterly review can run long on purpose,
+ * and closing one is a decision about the review, not housekeeping.
+ */
+export function sessionLeftOpen(
+  minutesRunning: number,
+  kind: string,
+  state: "scheduled" | "running" | "closed" | "skipped",
+  thresholds: ResolvedThresholds,
+): "left_open" | null {
+  if (state !== "running" || kind !== "weekly") {
+    return null;
+  }
+  const length = thresholds["sessions.weeklyMinutes"].high;
+  return minutesRunning > length && minutesRunning <= length + 24 * 60
+    ? "left_open"
+    : null;
 }

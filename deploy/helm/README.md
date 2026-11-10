@@ -50,6 +50,8 @@ everything else keeps working. That is the worst way to discover the loss.
 Operators with their own secret management should set `secrets.existingSecret`
 and skip generation entirely.
 
+That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` names), the bearer Prometheus scrapes `/api/metrics` with. The chart generates one when it makes the Secret. Without the key the pod still starts and the endpoint answers a signed-in administrator only.
+
 ## Values worth knowing
 
 | Value | Default | Notes |

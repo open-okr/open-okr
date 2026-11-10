@@ -106,10 +106,10 @@
           "state"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -380,10 +380,10 @@
           "memberId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -432,10 +432,10 @@
           "memberId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
@@ -1306,7 +1306,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "question": {
@@ -1372,7 +1373,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "limit": {
@@ -1632,7 +1634,10 @@
               "mentioned",
               "role",
               "review",
-              "check_in"
+              "check_in",
+              "support_request",
+              "support_ended",
+              "connection_ended"
             ],
             "description": "One line on why, where the workspace asks for one."
           },
@@ -1798,7 +1803,10 @@
                 "mentioned",
                 "role",
                 "review",
-                "check_in"
+                "check_in",
+                "support_request",
+                "support_ended",
+                "connection_ended"
               ]
             },
             "additionalProperties": {
@@ -1836,7 +1844,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           }
         },
@@ -1853,7 +1862,7 @@
       },
       "example": {
         "subjectType": "…",
-        "subjectId": "00000000-0000-4000-8000-000000000000"
+        "subjectId": "…"
       }
     },
     {
@@ -1869,7 +1878,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "subscribe": {
@@ -1890,7 +1900,7 @@
       },
       "example": {
         "subjectType": "…",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "subscribe": false
       }
     },
@@ -1902,8 +1912,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "cursor": {
             "type": "object",
@@ -1934,7 +1945,7 @@
         "idempotentHint": true
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000"
+        "goalId": "…"
       }
     },
     {
@@ -2085,6 +2096,21 @@
       "example": {
         "passphrase": "…"
       }
+    },
+    {
+      "name": "workspace.listArchives",
+      "description": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
     },
     {
       "name": "workspace.importArchive",
@@ -2385,6 +2411,51 @@
       "example": {
         "branding": {}
       }
+    },
+    {
+      "name": "settings.updateWorkspaceLimits",
+      "description": "Change the workspace's storage quota, export and import row limits, message log retention or agent run cost cap.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "storageQuotaBytes": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "exportInlineRowLimit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "importRowLimit": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "messageLogRetentionDays": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "agentRunCostCapUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "agentToolCallRetentionDays": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        }
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {}
     },
     {
       "name": "settings.setWorkspaceBrandingImage",
@@ -3170,7 +3241,7 @@
     },
     {
       "name": "ai.updatePrompt",
-      "description": "Records a new version of a feature or agent phase's system prompt.",
+      "description": "Records a new version of a feature's system prompt, once it passes that prompt's evaluation set.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -3771,7 +3842,8 @@
           },
           "resourceId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "level": {
             "type": "integer",
@@ -3796,7 +3868,7 @@
       "example": {
         "agentId": "00000000-0000-4000-8000-000000000000",
         "resourceType": "…",
-        "resourceId": "00000000-0000-4000-8000-000000000000",
+        "resourceId": "…",
         "level": 0
       }
     },
@@ -4194,7 +4266,7 @@
     },
     {
       "name": "spaces.update",
-      "description": "Renames a space or rewrites its mission.",
+      "description": "Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -4218,6 +4290,28 @@
                 "type": "null"
               }
             ]
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "mission": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -4752,8 +4846,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -4767,7 +4862,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -4778,8 +4873,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -4793,7 +4889,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -4915,6 +5011,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 120
+          },
+          "asOf": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
           }
         },
         "required": [
@@ -4933,14 +5033,15 @@
     },
     {
       "name": "cycles.update",
-      "description": "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
+      "description": "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.list or cycles.current."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.list or cycles.current."
           },
           "phase": {
             "type": "integer",
@@ -5028,6 +5129,132 @@
                 "on"
               ]
             }
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "phase": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "sponsorId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "facilitatorId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "publicationDeadline": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "levels": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "contributingUnits": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "firstCycle": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "sessionDates": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "null"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {
+                            "type": [
+                              "string",
+                              "number",
+                              "boolean",
+                              "null"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -5041,7 +5268,39 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
+      }
+    },
+    {
+      "name": "cycles.setClosing",
+      "description": "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
+          },
+          "closing": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cycleId",
+          "closing"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "cycleId": "…",
+        "closing": false
       }
     },
     {
@@ -5052,8 +5311,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.list or cycles.current."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.list or cycles.current."
           }
         },
         "required": [
@@ -5067,7 +5327,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -5078,8 +5338,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5093,7 +5354,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -5104,11 +5365,13 @@
         "properties": {
           "fromCycleId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "toCycleId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -5123,8 +5386,8 @@
         "idempotentHint": false
       },
       "example": {
-        "fromCycleId": "00000000-0000-4000-8000-000000000000",
-        "toCycleId": "00000000-0000-4000-8000-000000000000"
+        "fromCycleId": "…",
+        "toCycleId": "…"
       }
     },
     {
@@ -5135,22 +5398,23 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
           "cycleId"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -5671,6 +5935,12 @@
             "minLength": 1,
             "maxLength": 500,
             "description": "One line on why, where the workspace asks for one."
+          },
+          "cycleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5695,8 +5965,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5710,7 +5981,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -5721,8 +5992,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "itemKey": {
             "type": "integer",
@@ -5758,7 +6030,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "itemKey": 0,
         "gathered": false
       }
@@ -5771,8 +6043,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -5786,7 +6059,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -5797,8 +6070,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "text": {
             "type": "string",
@@ -5834,7 +6108,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "text": "…"
       }
     },
@@ -5846,8 +6120,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "issueId": {
             "type": "string",
@@ -5872,7 +6147,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "issueId": "00000000-0000-4000-8000-000000000000",
         "impact": 0
       }
@@ -5885,8 +6160,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "text": {
             "type": "string",
@@ -5921,7 +6197,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "text": "…"
       }
     },
@@ -5933,8 +6209,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "holds": {
             "type": "boolean"
@@ -5964,7 +6241,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "holds": false,
         "changed": false
       }
@@ -5977,8 +6254,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "stable": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6004,7 +6282,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -6015,8 +6293,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "cuts": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -6035,7 +6314,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "cuts": {}
       }
     },
@@ -6047,15 +6326,17 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "keyResultIds": {
             "maxItems": 50,
             "type": "array",
             "items": {
               "type": "string",
-              "format": "uuid"
+              "minLength": 1,
+              "maxLength": 64
             },
             "description": "Key result ids, from the keyResults of goals.read or goals.list."
           }
@@ -6072,7 +6353,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000",
+        "cycleId": "…",
         "keyResultIds": []
       }
     },
@@ -6084,8 +6365,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "step": {
             "type": "string",
@@ -6119,7 +6401,7 @@
         "idempotentHint": false
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -6142,7 +6424,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           }
         },
@@ -6159,7 +6442,7 @@
       },
       "example": {
         "subjectType": "space",
-        "subjectId": "00000000-0000-4000-8000-000000000000"
+        "subjectId": "…"
       }
     },
     {
@@ -6170,8 +6453,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           }
         },
         "required": [
@@ -6185,7 +6469,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6196,8 +6480,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           },
           "from": {
             "type": "integer",
@@ -6221,7 +6506,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6244,7 +6529,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "title": {
@@ -6272,20 +6558,21 @@
       },
       "example": {
         "subjectType": "space",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "title": "…"
       }
     },
     {
       "name": "documents.update",
-      "description": "Edits a document. Editing a published one changes it without publishing a version.",
+      "description": "Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           },
           "title": {
             "type": "string",
@@ -6296,6 +6583,20 @@
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
             "x-openokr-rich-text": true
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -6309,7 +6610,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6320,8 +6621,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           }
         },
         "required": [
@@ -6335,7 +6637,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6346,8 +6648,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           }
         },
         "required": [
@@ -6361,7 +6664,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6372,8 +6675,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The document's id, from documents.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The document's id or short id, from documents.list."
           }
         },
         "required": [
@@ -6387,7 +6691,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6413,7 +6717,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           }
         },
@@ -6430,7 +6735,7 @@
       },
       "example": {
         "subjectType": "space",
-        "subjectId": "00000000-0000-4000-8000-000000000000"
+        "subjectId": "…"
       }
     },
     {
@@ -6456,7 +6761,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "blobId": {
@@ -6478,7 +6784,7 @@
       },
       "example": {
         "subjectType": "space",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "blobId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -6551,7 +6857,7 @@
     },
     {
       "name": "search.jump",
-      "description": "The entity one short identifier means, for the palette's jump.",
+      "description": "The thing one short identifier names, of any kind, for the palette's jump.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -6559,6 +6865,24 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 40
+          },
+          "kinds": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "goal",
+                "key_result",
+                "kpi",
+                "initiative",
+                "task",
+                "document",
+                "session",
+                "cycle"
+              ]
+            },
+            "description": "Only these kinds. Every kind when left out."
           }
         },
         "required": [
@@ -6644,8 +6968,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
@@ -6884,13 +7209,15 @@
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "limit": {
             "type": "integer",
@@ -6934,8 +7261,9 @@
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           }
         }
       },
@@ -6955,8 +7283,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -6970,7 +7299,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -6996,13 +7325,15 @@
           },
           "initiativeId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "status": {
             "type": "string",
@@ -7047,14 +7378,15 @@
     },
     {
       "name": "tasks.update",
-      "description": "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+      "description": "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "title": {
             "type": "string",
@@ -7092,25 +7424,73 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The initiative's id, from initiatives.list."
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "keyResultId": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "dueOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "initiativeId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "keyResultId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -7124,7 +7504,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7135,8 +7515,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "status": {
             "type": "string",
@@ -7152,7 +7533,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
@@ -7173,7 +7555,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "status": "backlog"
       }
     },
@@ -7185,8 +7567,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "memberId": {
             "type": "string",
@@ -7206,7 +7589,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "memberId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -7218,8 +7601,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "memberId": {
             "type": "string",
@@ -7239,7 +7623,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "memberId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -7251,8 +7635,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "title": {
             "type": "string",
@@ -7273,7 +7658,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "title": "…"
       }
     },
@@ -7285,8 +7670,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "itemId": {
             "type": "string",
@@ -7310,7 +7696,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "itemId": "00000000-0000-4000-8000-000000000000",
         "done": false
       }
@@ -7323,8 +7709,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           },
           "itemId": {
             "type": "string",
@@ -7343,7 +7730,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "itemId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -7355,8 +7742,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -7370,7 +7758,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7381,8 +7769,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The task's id, from tasks.list or tasks.board."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The task's id or short id, from tasks.list or tasks.board."
           }
         },
         "required": [
@@ -7396,7 +7785,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7407,8 +7796,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -7422,7 +7812,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -7438,8 +7828,9 @@
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "status": {
             "type": "string",
@@ -7478,8 +7869,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           }
         },
         "required": [
@@ -7493,7 +7885,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7562,7 +7954,8 @@
             "type": "array",
             "items": {
               "type": "string",
-              "format": "uuid"
+              "minLength": 1,
+              "maxLength": 64
             },
             "description": "Key result ids, from the keyResults of goals.read or goals.list."
           }
@@ -7587,14 +7980,15 @@
     },
     {
       "name": "initiatives.update",
-      "description": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+      "description": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "title": {
             "type": "string",
@@ -7673,6 +8067,68 @@
               }
             ],
             "description": "Whether the work fits the team's capacity: fits, tight or exceeds."
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ownerId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "startsOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "endsOn": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "confidence": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "capacity": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -7686,7 +8142,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7697,8 +8153,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           }
         },
         "required": [
@@ -7712,7 +8169,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7723,8 +8180,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           }
         },
         "required": [
@@ -7738,7 +8196,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7749,13 +8207,15 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -7770,8 +8230,8 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "id": "…",
+        "keyResultId": "…"
       }
     },
     {
@@ -7782,13 +8242,15 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The initiative's id, from initiatives.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -7803,8 +8265,8 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "id": "…",
+        "keyResultId": "…"
       }
     },
     {
@@ -7815,8 +8277,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -7830,7 +8293,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -7841,8 +8304,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "includeClosed": {
             "default": false,
@@ -7925,8 +8389,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -7940,7 +8405,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -7961,8 +8426,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "timeframe": {
             "type": "object",
@@ -8040,12 +8506,14 @@
           },
           "parentGoalId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The goal this one aligns up to, by id."
           },
           "parentKeyResultId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The key result this goal contributes to, by id."
           },
           "strategyId": {
@@ -8100,8 +8568,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
@@ -8145,7 +8614,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
@@ -8157,7 +8627,8 @@
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
@@ -8218,7 +8689,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8229,8 +8700,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "successStatus": {
             "type": "string",
@@ -8273,7 +8745,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "successStatus": "achieved",
         "closeDecision": "achieved",
         "retrospectiveBody": {}
@@ -8287,8 +8759,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8302,7 +8775,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8313,8 +8786,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8328,7 +8802,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8339,8 +8813,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8354,7 +8829,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8365,8 +8840,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -8380,7 +8856,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8391,8 +8867,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "reason": {
             "type": "string",
@@ -8413,7 +8890,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "reason": "…"
       }
     },
@@ -8425,8 +8902,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "role": {
             "type": "string",
@@ -8461,7 +8939,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "role": "champion",
         "memberId": {}
       }
@@ -8474,13 +8952,15 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "reason": {
             "type": "string",
@@ -8501,8 +8981,8 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "id": "…",
+        "cycleId": "…"
       }
     },
     {
@@ -8513,8 +8993,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
@@ -8622,7 +9103,7 @@
         "idempotentHint": false
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000",
+        "goalId": "…",
         "title": "…",
         "indicatorType": "leading"
       }
@@ -8635,8 +9116,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "title": {
             "type": "string",
@@ -8764,7 +9246,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -8775,8 +9257,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "scope": {
             "type": "string",
@@ -8807,7 +9290,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -8818,8 +9301,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -8833,7 +9317,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -8844,14 +9328,16 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "afterId": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
@@ -8871,7 +9357,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "afterId": {}
       }
     },
@@ -8883,14 +9369,16 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "afterId": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
@@ -8910,7 +9398,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "afterId": {}
       }
     },
@@ -8922,8 +9410,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "set": {
             "type": "object",
@@ -8967,7 +9456,8 @@
                 "boolean",
                 "null"
               ]
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -8983,7 +9473,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "set": {},
         "read": {}
       }
@@ -8996,8 +9486,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "set": {
             "type": "object",
@@ -9074,7 +9565,8 @@
                 "boolean",
                 "null"
               ]
-            }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -9090,7 +9582,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "set": {},
         "read": {}
       }
@@ -9103,8 +9595,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "targetValue": {
             "type": "number",
@@ -9129,7 +9622,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "targetValue": 0
       }
     },
@@ -9141,8 +9634,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "kind": {
             "type": "string",
@@ -9171,7 +9665,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "kind": "committed"
       }
     },
@@ -9183,8 +9677,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "spaceId": {
             "type": "string",
@@ -9204,7 +9699,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "spaceId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -9216,8 +9711,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9231,7 +9727,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9242,8 +9738,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9257,7 +9754,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9268,8 +9765,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9283,7 +9781,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9294,8 +9792,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9309,7 +9808,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9320,8 +9819,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "value": {
             "type": "number",
@@ -9345,8 +9845,43 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "value": 0
+      }
+    },
+    {
+      "name": "goals.updateConfidence",
+      "description": "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
+          },
+          "confidence": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Confidence that it will land, from 0 to 1. 7 in 10 is 0.7."
+          }
+        },
+        "required": [
+          "id",
+          "confidence"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "…",
+        "confidence": 0
       }
     },
     {
@@ -9357,8 +9892,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9372,7 +9908,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9383,8 +9919,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "kpiId": {
             "type": "string",
@@ -9404,7 +9941,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "kpiId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -9416,8 +9953,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9431,7 +9969,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -9442,8 +9980,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "limit": {
             "default": 100,
@@ -9464,7 +10003,7 @@
         "idempotentHint": true
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "keyResultId": "…"
       }
     },
     {
@@ -9513,8 +10052,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "includeDrafts": {
             "default": true,
@@ -9533,7 +10073,7 @@
         "idempotentHint": true
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000"
+        "goalId": "…"
       }
     },
     {
@@ -9544,8 +10084,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9559,7 +10100,7 @@
         "idempotentHint": false
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000"
+        "goalId": "…"
       }
     },
     {
@@ -9571,7 +10112,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9600,7 +10141,8 @@
               "properties": {
                 "keyResultId": {
                   "type": "string",
-                  "format": "uuid"
+                  "minLength": 1,
+                  "maxLength": 64
                 },
                 "value": {
                   "type": "number"
@@ -9649,8 +10191,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9679,7 +10222,8 @@
               "properties": {
                 "keyResultId": {
                   "type": "string",
-                  "format": "uuid"
+                  "minLength": 1,
+                  "maxLength": 64
                 },
                 "value": {
                   "type": "number"
@@ -9714,7 +10258,7 @@
         "idempotentHint": false
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000",
+        "goalId": "…",
         "status": "on_track",
         "confidence": 0,
         "narrative": {}
@@ -9729,7 +10273,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "status": {
             "type": "string",
@@ -9758,7 +10302,8 @@
               "properties": {
                 "keyResultId": {
                   "type": "string",
-                  "format": "uuid"
+                  "minLength": 1,
+                  "maxLength": 64
                 },
                 "value": {
                   "type": "number"
@@ -9802,7 +10347,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9828,7 +10373,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -9853,8 +10398,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
@@ -9875,7 +10421,7 @@
         "idempotentHint": false
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "keyResultId": "…",
         "confidence": 0
       }
     },
@@ -9887,8 +10433,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -9902,7 +10449,7 @@
         "idempotentHint": false
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "keyResultId": "…"
       }
     },
     {
@@ -9913,8 +10460,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -9928,7 +10476,7 @@
         "idempotentHint": true
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "keyResultId": "…"
       }
     },
     {
@@ -9939,11 +10487,13 @@
         "properties": {
           "fromGoalId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "toGoalId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "note": {
             "type": "string",
@@ -9963,8 +10513,8 @@
         "idempotentHint": false
       },
       "example": {
-        "fromGoalId": "00000000-0000-4000-8000-000000000000",
-        "toGoalId": "00000000-0000-4000-8000-000000000000"
+        "fromGoalId": "…",
+        "toGoalId": "…"
       }
     },
     {
@@ -9976,7 +10526,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -10001,8 +10551,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "providerSpaceId": {
             "type": "string",
@@ -10011,6 +10562,11 @@
           "providerText": {
             "type": "string",
             "maxLength": 200
+          },
+          "providerKeyResultId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           },
           "note": {
             "type": "string",
@@ -10033,19 +10589,24 @@
         "idempotentHint": false
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "keyResultId": "…"
       }
     },
     {
       "name": "goals.confirmDependency",
-      "description": "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
+      "description": "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
+          },
+          "providerKeyResultId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -10071,7 +10632,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "memberId": {
             "anyOf": [
@@ -10103,6 +10664,46 @@
       }
     },
     {
+      "name": "goals.setDependencyProvider",
+      "description": "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
+          },
+          "providerKeyResultId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "providerKeyResultId"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "id": "00000000-0000-4000-8000-000000000000",
+        "providerKeyResultId": {}
+      }
+    },
+    {
       "name": "goals.escalateDependency",
       "description": "Escalates an unconfirmed dependency to the cycle's sponsor, whose review inbox lists it until it is confirmed or a risk owner is named.",
       "inputSchema": {
@@ -10111,7 +10712,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -10137,7 +10738,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -10162,8 +10763,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
@@ -10186,19 +10788,25 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
-      "name": "alignment.graph",
-      "description": "The cascade as nodes and edges, for the alignment studio canvas.",
+      "name": "alignment.score",
+      "description": "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cycleId": {
             "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
+          },
+          "spaceId": {
+            "type": "string",
             "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "description": "The space's id, from spaces.list."
           }
         },
         "required": [
@@ -10212,7 +10820,34 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
+      }
+    },
+    {
+      "name": "alignment.graph",
+      "description": "The cascade as nodes and edges, for the alignment studio canvas.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cycleId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
+          }
+        },
+        "required": [
+          "cycleId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "cycleId": "…"
       }
     },
     {
@@ -10223,8 +10858,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -10238,7 +10874,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -10619,8 +11255,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "objectiveTitle": {
             "type": "string",
@@ -10641,7 +11278,7 @@
       },
       "example": {
         "kpiId": "00000000-0000-4000-8000-000000000000",
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {
@@ -10665,12 +11302,14 @@
           },
           "taskId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -10818,7 +11457,7 @@
     },
     {
       "name": "kpis.update",
-      "description": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
+      "description": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -10984,6 +11623,148 @@
                 "type": "null"
               }
             ]
+          },
+          "read": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "direction": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "targetType": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "greenLow": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "greenHigh": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "redLow": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "redHigh": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "indicatorType": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "tier": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "ownerMemberId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "targetDefault": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "parentKpiId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "treeId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "categoryId": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "healthyPct": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "watchPct": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "description": "Optional. For each field being changed, its value as last read from the matching read or list action. A field somebody else has changed since is refused as a conflict that names it. Left out, the write is made without the check."
           }
         },
         "required": [
@@ -11086,7 +11867,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           }
         },
@@ -11103,7 +11885,7 @@
       },
       "example": {
         "subjectType": "goal",
-        "subjectId": "00000000-0000-4000-8000-000000000000"
+        "subjectId": "…"
       }
     },
     {
@@ -11127,7 +11909,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "body": {
@@ -11149,7 +11932,7 @@
       },
       "example": {
         "subjectType": "goal",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "body": {}
       }
     },
@@ -11232,7 +12015,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "body": {}
@@ -11251,7 +12035,7 @@
       },
       "example": {
         "subjectType": "goal",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "body": {}
       }
     },
@@ -11441,7 +12225,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           }
         },
@@ -11458,7 +12243,7 @@
       },
       "example": {
         "subjectType": "…",
-        "subjectId": "00000000-0000-4000-8000-000000000000"
+        "subjectId": "…"
       }
     },
     {
@@ -11473,7 +12258,8 @@
           },
           "subjectId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
+            "maxLength": 64,
             "description": "The id of the item it is attached to, matching subjectType."
           },
           "emoji": {
@@ -11496,7 +12282,7 @@
       },
       "example": {
         "subjectType": "…",
-        "subjectId": "00000000-0000-4000-8000-000000000000",
+        "subjectId": "…",
         "emoji": "…"
       }
     },
@@ -11538,8 +12324,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "kind": {
             "type": "string",
@@ -11608,8 +12395,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "weekday": {
             "type": "integer",
@@ -11653,8 +12441,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -11668,7 +12457,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11679,8 +12468,14 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
+          },
+          "fromStageKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
           }
         },
         "required": [
@@ -11694,7 +12489,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11705,8 +12500,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -11720,7 +12516,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11731,22 +12527,23 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
           "id"
         ]
       },
-      "scope": "write",
+      "scope": "destructive",
       "annotations": {
         "readOnlyHint": false,
-        "destructiveHint": false,
+        "destructiveHint": true,
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11757,8 +12554,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -11772,7 +12570,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11835,8 +12633,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -11850,7 +12649,7 @@
         "idempotentHint": true
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -11861,12 +12660,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
@@ -11888,8 +12689,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "confidence": 0
       }
     },
@@ -11901,12 +12702,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -11921,8 +12724,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…",
+        "keyResultId": "…"
       }
     },
     {
@@ -11933,12 +12736,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "confidence": {
             "type": "number",
@@ -11966,8 +12771,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "confidence": 0,
         "whatChanged": "…"
       }
@@ -11980,12 +12785,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           }
         },
         "required": [
@@ -12000,8 +12807,8 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…",
+        "keyResultId": "…"
       }
     },
     {
@@ -12012,7 +12819,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12026,7 +12834,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12037,12 +12845,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "nextAction": {
             "type": "string",
@@ -12070,8 +12880,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "nextAction": "…",
         "ownerId": "00000000-0000-4000-8000-000000000000"
       }
@@ -12084,7 +12894,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "wins": {
             "maxItems": 10,
@@ -12108,7 +12919,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "wins": []
       }
     },
@@ -12120,7 +12931,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12134,7 +12946,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12145,12 +12957,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "type": {
             "type": "string",
@@ -12197,8 +13011,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "type": "resource",
         "ownerId": "00000000-0000-4000-8000-000000000000",
         "nextAction": "…"
@@ -12213,7 +13027,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -12239,7 +13053,7 @@
           "id": {
             "type": "string",
             "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "description": "The session's id or short id, from sessions.mine."
           },
           "ownerId": {
             "type": "string",
@@ -12271,7 +13085,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12285,7 +13100,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12322,8 +13137,9 @@
         "properties": {
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "type": {
             "type": "string",
@@ -12369,7 +13185,7 @@
         "idempotentHint": false
       },
       "example": {
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "keyResultId": "…",
         "type": "resource",
         "ownerId": "00000000-0000-4000-8000-000000000000",
         "nextAction": "…"
@@ -12407,8 +13223,9 @@
           },
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           },
           "spaceId": {
             "type": "string",
@@ -12504,7 +13321,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "items": {
             "type": "array",
@@ -12522,7 +13340,8 @@
                 },
                 "keyResultId": {
                   "type": "string",
-                  "format": "uuid"
+                  "minLength": 1,
+                  "maxLength": 64
                 }
               },
               "required": [
@@ -12544,7 +13363,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "items": []
       }
     },
@@ -12600,7 +13419,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12614,7 +13434,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12657,7 +13477,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12671,7 +13492,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12682,7 +13503,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "note": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -12701,7 +13523,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "note": {}
       }
     },
@@ -12713,7 +13535,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12727,7 +13550,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12764,7 +13587,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -12778,7 +13602,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -12789,8 +13613,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           }
         },
         "required": [
@@ -12804,7 +13629,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000"
+        "id": "…"
       }
     },
     {
@@ -12815,7 +13640,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "pulse": {
             "type": "integer",
@@ -12841,7 +13667,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "pulse": 0,
         "word": "…"
       }
@@ -12854,12 +13680,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "score": {
             "type": "number",
@@ -12887,8 +13715,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "score": 0,
         "reason": "…"
       }
@@ -12901,12 +13729,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -12921,8 +13751,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "goalId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…",
+        "goalId": "…"
       }
     },
     {
@@ -12933,19 +13763,21 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "anyOf": [
               {
                 "type": "string",
-                "format": "uuid"
+                "minLength": 1,
+                "maxLength": 64
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -12960,7 +13792,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "goalId": {}
       }
     },
@@ -12972,12 +13804,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "body": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -12997,8 +13831,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "goalId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "goalId": "…",
         "body": {}
       }
     },
@@ -13010,7 +13844,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13024,7 +13859,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13035,7 +13870,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "toMemberId": {
             "type": "string",
@@ -13060,7 +13896,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "toMemberId": "00000000-0000-4000-8000-000000000000",
         "text": "…"
       }
@@ -13073,7 +13909,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13087,7 +13924,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13098,7 +13935,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "columnKey": {
             "type": "string",
@@ -13130,7 +13968,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "columnKey": "worked",
         "text": "…"
       }
@@ -13143,7 +13981,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "noteId": {
             "type": "string",
@@ -13162,7 +14001,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "noteId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -13174,7 +14013,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "noteId": {
             "type": "string",
@@ -13193,7 +14033,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "noteId": "00000000-0000-4000-8000-000000000000"
       }
     },
@@ -13205,7 +14045,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13219,7 +14060,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13230,7 +14071,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "questionKey": {
             "type": "integer",
@@ -13255,7 +14097,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "questionKey": 0,
         "body": {}
       }
@@ -13268,7 +14110,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13282,7 +14125,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13293,12 +14136,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "causeKey": {
             "type": "integer",
@@ -13335,8 +14180,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "keyResultId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "keyResultId": "…",
         "causeKey": 0
       }
     },
@@ -13348,7 +14193,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13362,7 +14208,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13373,7 +14219,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "scores": {
             "minItems": 5,
@@ -13412,7 +14259,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "scores": []
       }
     },
@@ -13424,7 +14271,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13438,7 +14286,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13449,7 +14297,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13463,7 +14312,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13474,7 +14323,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13488,7 +14338,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13499,12 +14349,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "decision": {
             "type": "string",
@@ -13536,8 +14388,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "goalId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "goalId": "…",
         "decision": "achieved",
         "why": "…"
       }
@@ -13550,7 +14402,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13564,7 +14417,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13575,7 +14428,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "text": {
             "type": "string",
@@ -13604,7 +14458,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "text": "…"
       }
     },
@@ -13616,7 +14470,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "what": {
             "type": "string",
@@ -13648,7 +14503,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "what": "…",
         "ownerId": "00000000-0000-4000-8000-000000000000",
         "dueOn": "…"
@@ -13662,7 +14517,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "actionId": {
             "type": "string",
@@ -13686,7 +14542,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "actionId": "00000000-0000-4000-8000-000000000000",
         "done": false
       }
@@ -13699,7 +14555,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13713,7 +14570,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13724,7 +14581,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13738,7 +14596,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13749,7 +14607,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13763,7 +14622,33 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
+      }
+    },
+    {
+      "name": "sessions.stageCompletion",
+      "description": "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "sessionId"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "sessionId": "…"
       }
     },
     {
@@ -13774,7 +14659,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13788,7 +14674,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13799,8 +14685,9 @@
         "properties": {
           "id": {
             "type": "string",
-            "format": "uuid",
-            "description": "The session's id, from sessions.mine."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The session's id or short id, from sessions.mine."
           },
           "note": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -13819,7 +14706,7 @@
         "idempotentHint": false
       },
       "example": {
-        "id": "00000000-0000-4000-8000-000000000000",
+        "id": "…",
         "note": {}
       }
     },
@@ -13831,12 +14718,14 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "trend": {
             "type": "string",
@@ -13860,8 +14749,8 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
-        "goalId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
+        "goalId": "…",
         "trend": "improving"
       }
     },
@@ -13873,7 +14762,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "shifts": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -13892,7 +14782,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "shifts": {}
       }
     },
@@ -13904,17 +14794,20 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           },
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           },
           "keyResultId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The key result's id, from the keyResults of goals.read or goals.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The key result's id or short id, from the keyResults of goals.read or goals.list."
           },
           "text": {
             "description": "Plain text, or editor JSON: {\"type\":\"doc\",\"content\":[{\"type\":\"paragraph\",\"content\":[{\"type\":\"text\",\"text\":\"...\"}]}]}. Plain text becomes paragraphs split on blank lines; Markdown is not interpreted.",
@@ -13933,7 +14826,7 @@
         "idempotentHint": false
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000",
+        "sessionId": "…",
         "text": {}
       }
     },
@@ -13945,7 +14838,8 @@
         "properties": {
           "sessionId": {
             "type": "string",
-            "format": "uuid"
+            "minLength": 1,
+            "maxLength": 64
           }
         },
         "required": [
@@ -13959,7 +14853,7 @@
         "idempotentHint": true
       },
       "example": {
-        "sessionId": "00000000-0000-4000-8000-000000000000"
+        "sessionId": "…"
       }
     },
     {
@@ -13970,8 +14864,9 @@
         "properties": {
           "goalId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The goal's id, from goals.list, goals.due or goals.tree."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The goal's id or short id, from goals.list, goals.due or goals.tree."
           }
         },
         "required": [
@@ -13985,7 +14880,7 @@
         "idempotentHint": true
       },
       "example": {
-        "goalId": "00000000-0000-4000-8000-000000000000"
+        "goalId": "…"
       }
     },
     {
@@ -13996,8 +14891,9 @@
         "properties": {
           "cycleId": {
             "type": "string",
-            "format": "uuid",
-            "description": "The cycle's id, from cycles.current or cycles.list."
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The cycle's id or short id, from cycles.current or cycles.list."
           }
         },
         "required": [
@@ -14011,7 +14907,7 @@
         "idempotentHint": true
       },
       "example": {
-        "cycleId": "00000000-0000-4000-8000-000000000000"
+        "cycleId": "…"
       }
     },
     {

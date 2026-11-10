@@ -17,3 +17,8 @@ services:
   db:
     ports:
       - "127.0.0.1:${OPENOKR_STAGING_DB_PORT:-55434}:5432"
+  app:
+    environment:
+      # A staging instance given production's tracker DSN reports under its
+      # own name rather than mixing with production (error-reporting.md D15).
+      OPENOKR_ERROR_ENVIRONMENT: ${OPENOKR_ERROR_ENVIRONMENT:-staging}

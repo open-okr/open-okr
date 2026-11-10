@@ -128,6 +128,36 @@ interface ClosureRecipient {
 }
 
 /**
+ * Every active owner and administrator with an account: who hears what the
+ * provider does to a workspace, its closure and its trial alike. Read when a
+ * mail is sent, so somebody made an administrator in between still hears.
+ */
+export async function ownerAndAdminRecipientsInTx(
+  tx: Parameters<Parameters<typeof withWorkspace>[2]>[0],
+  workspaceId: string,
+): Promise<readonly ClosureRecipient[]> {
+  return (
+    tx
+      .select({ name: workspaceMembers.name, email: users.email })
+      // openokr:allow-raw-read: the system telling a workspace's owners and
+      // administrators what happened to it. Nobody reads on anybody's behalf.
+      .from(workspaceMembers)
+      .innerJoin(workspaceRoles, eq(workspaceRoles.id, workspaceMembers.roleId))
+      .innerJoin(users, eq(users.id, workspaceMembers.userId))
+      .where(
+        activeOnly(
+          workspaceMembers,
+          and(
+            eq(workspaceMembers.workspaceId, workspaceId),
+            eq(workspaceMembers.status, "active"),
+            inArray(workspaceRoles.builtinKey, ["owner", "admin"]),
+          ),
+        ),
+      )
+  );
+}
+
+/**
  * Who hears that a workspace closed: every active owner and administrator with an
  * account, and the name of whoever closed it.
  *
@@ -154,23 +184,7 @@ export async function readClosureNotice(
       .from(tenants)
       .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
       .limit(1);
-    const recipients = await tx
-      .select({ name: workspaceMembers.name, email: users.email })
-      // openokr:allow-raw-read: the system telling a workspace's owners and
-      // administrators that it closed. Nobody is reading on anybody's behalf.
-      .from(workspaceMembers)
-      .innerJoin(workspaceRoles, eq(workspaceRoles.id, workspaceMembers.roleId))
-      .innerJoin(users, eq(users.id, workspaceMembers.userId))
-      .where(
-        activeOnly(
-          workspaceMembers,
-          and(
-            eq(workspaceMembers.workspaceId, input.workspaceId),
-            eq(workspaceMembers.status, "active"),
-            inArray(workspaceRoles.builtinKey, ["owner", "admin"]),
-          ),
-        ),
-      );
+    const recipients = await ownerAndAdminRecipientsInTx(tx, input.workspaceId);
     const [closer] = input.byMemberId
       ? await tx
           .select({ name: workspaceMembers.name })

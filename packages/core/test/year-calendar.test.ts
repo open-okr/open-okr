@@ -6,6 +6,7 @@
  * as of each, then the ones the README lists are done and the next is not.
  * Proved in two real years, so it holds whatever year the demo runs in.
  */
+import { resolveThresholds, workingDaysBetween } from "@openokr/method";
 import { describe, expect, it } from "vitest";
 import { YEAR_EVENTS } from "../src/demo/year/build.ts";
 import { firstMondayOf, quarterOf, toReal } from "../src/demo/year/calendar.ts";
@@ -47,6 +48,41 @@ describe("the calendar", () => {
       expect(landed >= `${realYear}-07-01`).toBe(true);
     }
   });
+});
+
+// NW-P-04 says Phase 1 is complete: the pack reaches people the working days
+// ahead the practice asks for. It was distributed on 26 November for a
+// 1 December offsite, which is two working days strictly between, against a
+// default of three (plan 0.7.0, B11). Read from the seed's own events, and on
+// several real years, because the seed keeps weekdays but not dates.
+describe("the annual input pack reaches people in time (NW-P-04)", () => {
+  const stepOf = (id: string) => {
+    const found = YEAR_STEPS.find((one) => one.id === id);
+    if (!found) {
+      throw new Error(`no step ${id}`);
+    }
+    return found;
+  };
+  const distributed = YEAR_EVENTS.find(
+    (event) => event.step === "NW-P-04" && event.label.includes("distributed"),
+  )?.on;
+  const offsite = stepOf("NW-P-08").from;
+  const lead = resolveThresholds()["quality.inputPackLeadWorkingDays"];
+
+  it("distributes the pack on the day the step ends", () => {
+    expect(distributed).toBe(stepOf("NW-P-04").to);
+  });
+
+  for (const realYear of [2026, 2027, 2028, 2029, 2030, 2031]) {
+    it(`gives people the practice's lead before the offsite (${realYear})`, () => {
+      expect(
+        workingDaysBetween(
+          toReal(distributed ?? "", realYear),
+          toReal(offsite, realYear),
+        ),
+      ).toBeGreaterThanOrEqual(lead);
+    });
+  }
 });
 
 describe("the steps at the README's five demo dates (§6)", () => {

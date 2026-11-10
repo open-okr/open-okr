@@ -2,6 +2,7 @@
 
 import { Button, Card, CardBody, useTranslations } from "@openokr/ui";
 import { TriangleAlert } from "lucide-react";
+import { CopyErrorDetails } from "../lib/error-details";
 
 /**
  * The error state (UIUX-PLAN.md §4: "a surface-level error card with
@@ -43,6 +44,7 @@ export default function HomeError({
               {t("common.reference", { digest: error.digest })}
             </p>
           ) : null}
+          <CopyErrorDetails error={error} />
         </CardBody>
       </Card>
     </main>

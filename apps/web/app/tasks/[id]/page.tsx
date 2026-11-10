@@ -8,13 +8,16 @@ import {
   TextInput,
 } from "@openokr/ui";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { PreviousNext } from "../../../lib/previous-next.tsx";
+import { shortLinkPath } from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -81,14 +84,6 @@ export default async function TaskPage({
   };
   const { id } = await params;
 
-  // Whether this reader is watching this subject (P6-G07b). Read here rather
-  // than in the control, because the control is a client component and the
-  // answer is part of the page's own first paint.
-  const watch = await callAction(context, "subscriptions.read", {
-    subjectType: "task",
-    subjectId: id,
-  });
-
   const task = await callAction(context, "tasks.read", { id }).catch(
     (error: unknown) => {
       if (error instanceof OperationError && error.code === "not_found") {
@@ -97,6 +92,19 @@ export default async function TaskPage({
       throw error;
     },
   );
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (task.id !== id) {
+    redirect(`/tasks/${task.id}`);
+  }
+
+  // Whether this reader is watching this subject (P6-G07b). Read here rather
+  // than in the control, because the control is a client component and the
+  // answer is part of the page's own first paint.
+  const watch = await callAction(context, "subscriptions.read", {
+    subjectType: "task",
+    subjectId: id,
+  });
 
   const level = await resolveAccessLevelFor(
     workspace.workspaceId,
@@ -118,6 +126,18 @@ export default async function TaskPage({
   });
   const conversation = await readConversation(context, "task", id);
 
+  // The tasks either side of this one on its space's board, column by column
+  // in the board's own order, which the link above leads back to: the links
+  // and the `[` and `]` keys (plan 0.7.0, U2).
+  const board = await callAction(context, "tasks.board", {
+    spaceId: task.spaceId,
+    limit: 200,
+  });
+  const onBoard = board.columns.flatMap((column) => column.cards);
+  const at = onBoard.findIndex((one) => one.id === id);
+  const before = at > 0 ? onBoard[at - 1] : undefined;
+  const after = at >= 0 ? onBoard[at + 1] : undefined;
+
   const assigned = new Set(task.assignees.map((one) => one.id));
   const statusOptions = STATUS_OPTIONS.map((one) => ({
     value: one.value,
@@ -128,30 +148,53 @@ export default async function TaskPage({
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <Link
-                href={`/board?space=${task.spaceId}`}
-                className="text-xs text-ink-3 hover:text-brand-text"
-              >
-                {task.spaceName}
-              </Link>
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col gap-0.5">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <Link
+                  href={`/board?space=${task.spaceId}`}
+                  className="text-xs text-ink-3 hover:text-brand-text"
+                >
+                  {task.spaceName}
+                </Link>
+                <PreviousNext
+                  previous={
+                    before
+                      ? {
+                          href: `/tasks/${before.id}`,
+                          label: t("tasks.detail.previous"),
+                        }
+                      : null
+                  }
+                  next={
+                    after
+                      ? {
+                          href: `/tasks/${after.id}`,
+                          label: t("tasks.detail.next"),
+                        }
+                      : null
+                  }
+                />
+              </div>
               <h1 className="text-lg font-bold text-ink">{task.title}</h1>
             </div>
-            {canEdit ? (
-              <InlineSelect
-                label={t("checkIn.composer.status")}
-                value={task.status}
-                options={statusOptions}
-                onSave={setTaskStatusAction.bind(null, task.id)}
-              />
-            ) : (
-              <Chip tone="neutral">
-                {statusOptions.find((one) => one.value === task.status)
-                  ?.label ?? task.status}
-              </Chip>
-            )}
-            <WatchControl subjectType="task" subjectId={id} initial={watch} />
+            <div className="flex flex-wrap items-center gap-2.5">
+              {canEdit ? (
+                <InlineSelect
+                  label={t("checkIn.composer.status")}
+                  value={task.status}
+                  options={statusOptions}
+                  onSave={setTaskStatusAction.bind(null, task.id)}
+                />
+              ) : (
+                <Chip tone="neutral">
+                  {statusOptions.find((one) => one.value === task.status)
+                    ?.label ?? task.status}
+                </Chip>
+              )}
+              <WatchControl subjectType="task" subjectId={id} initial={watch} />
+              <CopyLink path={shortLinkPath("task", task)} />
+            </div>
           </CardHeader>
         </Card>
 
@@ -263,7 +306,9 @@ export default async function TaskPage({
                     </span>
                     {canEdit ? (
                       <RailButton
-                        label={t("tasks.detail.unassignName", {
+                        // Starts with the word the button shows, so a voice
+                        // command that says what it sees reaches it.
+                        label={t("tasks.detail.removeName", {
                           name: one.name,
                         })}
                         text={t("common.remove")}

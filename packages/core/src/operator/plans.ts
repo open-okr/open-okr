@@ -10,6 +10,8 @@
  * An operator may also set a seat count of their own, for a contract that
  * does not match a catalogue row. An administrator may not.
  */
+import { activeOnly, tenants } from "@openokr/db";
+import { eq } from "drizzle-orm";
 import type { Pool } from "pg";
 import { z } from "zod";
 import { OperationError, runOperation } from "../operations/operation.ts";
@@ -63,6 +65,13 @@ export async function setPlanAsOperator(
             "This workspace has no tenant record, so it has no plan to change.",
           );
         }
+        // Choosing a plan ends any trial (tenant-lifecycle.md §11 T3). A
+        // trial the operator wants kept is set again on S-46, after this.
+        // openokr:allow-mutation: this Operation's own transaction.
+        await tx
+          .update(tenants)
+          .set({ trialEndsAt: null, trialRemindedAt: null })
+          .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)));
         return {
           result: { planKey: plan?.key ?? null, seats },
           activity: {

@@ -96,12 +96,21 @@ export async function savePersonalKey(
   }
   const name = providerWord(t, provider);
   const pasted = String(form.get("apiKey") ?? "");
+  // Under the key, where it was pasted (guided-inputs §4.2, plan U1b).
   if (pasted.trim() === "") {
-    return { ok: false, message: t("account.aiKeys.actions.pasteAKey") };
+    return {
+      ok: false,
+      message: "",
+      fields: { apiKey: t("account.aiKeys.actions.pasteAKey") },
+    };
   }
   const parsed = aiApiKeySchema.safeParse(pasted);
   if (!parsed.success) {
-    return { ok: false, message: t("account.aiKeys.actions.malformed") };
+    return {
+      ok: false,
+      message: "",
+      fields: { apiKey: t("account.aiKeys.actions.malformed") },
+    };
   }
 
   try {

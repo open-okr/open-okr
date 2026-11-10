@@ -32,20 +32,28 @@ import {
 } from "@openokr/ui";
 
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { assistOffered } from "../../../lib/assists";
 import { Attachments } from "../../../lib/attachments.tsx";
 import { getPool } from "../../../lib/auth";
 import { progressCeiling } from "../../../lib/ceilings.ts";
 import { readConversation } from "../../../lib/conversation.ts";
+import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DecisionText } from "../../../lib/decision-text.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { healthWord } from "../../../lib/health-words.ts";
 import { readKpiOptions } from "../../../lib/kpi-options.ts";
 import { itemTitle } from "../../../lib/page-title.ts";
+import { PreviousNext } from "../../../lib/previous-next.tsx";
+import { ReviewerIsChampionNote } from "../../../lib/reviewer-is-champion-note.tsx";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
+import {
+  keyResultLinkPath,
+  shortLinkPath,
+  withQuery,
+} from "../../../lib/short-links.ts";
 import { SubjectComments } from "../../../lib/subject-comments.tsx";
 import { getTranslations } from "../../../lib/translations";
 import { WatchControl } from "../../../lib/watch-control.tsx";
@@ -124,6 +132,11 @@ export default async function GoalPage({
       notFound();
     }
     throw error;
+  }
+  // A short link lands on the page at its key, which every link and form on
+  // it is built from (docs/design/short-ids.md S6).
+  if (goal.id !== id) {
+    redirect(withQuery(`/goals/${goal.id}`, await searchParams));
   }
 
   const feedParams = await searchParams;
@@ -307,6 +320,22 @@ export default async function GoalPage({
       ).checkIns[0]?.status ?? null)
     : null;
 
+  // The objectives either side of this one in its cycle, in the list's own
+  // order, for the links and the `[` and `]` keys (plan 0.7.0, U2). Every
+  // one the reader may see, closed ones included, since this one may be.
+  const inCycle = goal.cycleId
+    ? (
+        await callAction(context, "goals.list", {
+          cycleId: goal.cycleId,
+          includeClosed: true,
+          limit: 500,
+        })
+      ).goals
+    : [];
+  const at = inCycle.findIndex((one) => one.id === id);
+  const before = at > 0 ? inCycle[at - 1] : undefined;
+  const after = at >= 0 ? inCycle[at + 1] : undefined;
+
   const cycles = await callAction(context, "cycles.list", {});
   const cycleEndsOn =
     cycles.find((cycle) => cycle.id === goal.cycleId)?.endsOn ?? null;
@@ -319,8 +348,29 @@ export default async function GoalPage({
     <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-4.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+          {/* The title column grows and never goes under 15rem; the controls
+           * wrap beneath it instead. Four controls beside a shrinking column
+           * squeezed the title to a sliver (s39b). */}
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col">
+              <PreviousNext
+                previous={
+                  before
+                    ? {
+                        href: `/goals/${before.id}`,
+                        label: t("goals.detail.previous"),
+                      }
+                    : null
+                }
+                next={
+                  after
+                    ? {
+                        href: `/goals/${after.id}`,
+                        label: t("goals.detail.next"),
+                      }
+                    : null
+                }
+              />
               <h1 className="text-lg font-bold text-ink">{goal.title}</h1>
               <p className="text-xs text-ink-3">
                 {goal.reviewer
@@ -336,25 +386,36 @@ export default async function GoalPage({
                       weight: goal.weight,
                     })}
               </p>
+              {/* Warned, never refused (okr-core-domain.md §4.1, plan 0.7.0
+               * O3). The Roles card below is where it is changed. */}
+              <ReviewerIsChampionNote
+                championId={goal.champion.id}
+                reviewerId={goal.reviewer?.id}
+                name={goal.champion.name}
+                className="mt-1 self-start"
+              />
             </div>
-            <Chip tone={closed ? "neutral" : "brand"}>
-              {closed
-                ? t("goals.detail.closedStatus", {
-                    status: String(goal.successStatus),
-                  })
-                : healthWord(t, goal.health)}
-            </Chip>
-            <WatchControl subjectType="goal" subjectId={id} initial={watch} />
-            {/* Check in's door on the goal itself, now that it has left the
-             * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
-            {open ? (
-              <Link
-                href={`/check-in?goal=${id}`}
-                className={buttonVariants({ size: "sm" })}
-              >
-                {t("common.checkIn")}
-              </Link>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Chip tone={closed ? "neutral" : "brand"}>
+                {closed
+                  ? t("goals.detail.closedStatus", {
+                      status: String(goal.successStatus),
+                    })
+                  : healthWord(t, goal.health)}
+              </Chip>
+              <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+              <CopyLink path={shortLinkPath("goal", goal)} />
+              {/* Check in's door on the goal itself, now that it has left the
+               * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
+              {open ? (
+                <Link
+                  href={`/check-in?goal=${id}`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {t("common.checkIn")}
+                </Link>
+              ) : null}
+            </div>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">
@@ -504,6 +565,7 @@ export default async function GoalPage({
                       <span className="text-sm font-bold text-ink">
                         {formatMeasure(keyResult.currentValue, keyResult.unit)}
                       </span>
+                      <CopyLink path={keyResultLinkPath(keyResult)} />
                       {/* The work behind this measure, as a board (M-02): the
                           tasks that name it and its initiatives' tasks. */}
                       <Link

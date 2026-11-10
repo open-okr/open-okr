@@ -46,12 +46,16 @@ database:
 publicUrl: ""
 
 secrets:
-  # A Secret holding BETTER_AUTH_SECRET and OPENOKR_ENCRYPTION_KEY. When empty,
-  # the chart generates both on first install and reads them back on upgrade,
-  # so an upgrade never rotates a key underneath stored data.
+  # A Secret holding BETTER_AUTH_SECRET, OPENOKR_ENCRYPTION_KEY and, from 0.7.0,
+  # OPENOKR_METRICS_TOKEN. When empty, the chart generates all three on first
+  # install and reads them back on upgrade, so an upgrade never rotates a key
+  # underneath stored data. With your own Secret, add the metrics token key to
+  # let Prometheus scrape /api/metrics; without it the pod still starts, and the
+  # endpoint answers a signed-in administrator only.
   existingSecret: ""
   authSecretKey: "better-auth-secret"
   encryptionKeyKey: "encryption-key"
+  metricsTokenKey: "metrics-token"
 
 # Instance settings. Every one has a working default; these bootstrap an
 # instance and are overridden by anything set later in the product.
@@ -59,7 +63,6 @@ instance:
   name: "OpenOKR"
   language: "en"
   telemetry: false
-  # auto | open | invite_only
   # auto | open | company_domains | invite_only. A choice saved on Admin >
   # General wins over this.
   registration: "auto"
@@ -202,6 +205,20 @@ scan:
   clamd:
     host: ""
     port: 3310
+
+# Error reports (docs/runbooks/observability.md, "Sending errors to a
+# tracker"). Every unexpected error is a JSON line in the pod's log and a
+# count in openokr_errors_total either way. To also send each one to a
+# tracker that speaks Sentry's protocol (Sentry, GlitchTip, Bugsink), put its
+# DSN in a Secret and name it here. Empty sends nothing anywhere. The DSN is
+# read from a Secret and never from values, because its key lets anyone write
+# into the tracker and `helm get values` would read it back.
+errors:
+  existingSecret: ""
+  dsnKey: "dsn"
+  # Which deployment a report came from, so staging can share production's
+  # tracker project without mixing with it.
+  environment: "production"
 
 serviceAccount:
   create: true

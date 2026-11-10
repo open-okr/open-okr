@@ -12,6 +12,8 @@ import {
 import {
   browserToday,
   Chip,
+  type ConfidenceDisplay,
+  ConfidenceInput,
   cn,
   DateInput,
   EntityPicker,
@@ -282,6 +284,74 @@ export function InlineNumber({
         wide ? "w-20" : "w-14",
       )}
     />
+  );
+}
+
+/**
+ * A key result's confidence, set outside a check-in (docs/design/
+ * okr-writing.md §4.2, plan 0.7.0 O4).
+ *
+ * The kit's `ConfidenceInput`, on the workspace's own scale, with the cell's
+ * behaviour round it: leaving the field commits, Enter leaves it, Escape puts
+ * the stored value back, and an unchanged value sends nothing. The field has
+ * no blur or key handlers of its own, so the box round it listens, and moving
+ * between the field and its steppers is not leaving.
+ */
+export function InlineConfidence({
+  value,
+  label,
+  display,
+  onSave,
+}: {
+  /** Nought to one; null when nobody has set one. */
+  readonly value: number | null;
+  readonly label: string;
+  readonly display: ConfidenceDisplay;
+  readonly onSave: (next: number) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!box.current?.contains(document.activeElement)) {
+      setDraft(value);
+    }
+  }, [value]);
+
+  const commit = () => {
+    if (draft === null || draft === value) {
+      setDraft(value);
+      return;
+    }
+    onSave(draft);
+  };
+
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the blur and the keys are delegated from the field inside, which is the interactive element; the kit's field takes no handlers of its own.
+    <div
+      ref={box}
+      onBlur={(event) => {
+        if (!box.current?.contains(event.relatedTarget as Node | null)) {
+          commit();
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          (event.target as HTMLElement).blur();
+        } else if (event.key === "Escape") {
+          setDraft(value);
+        }
+      }}
+    >
+      <ConfidenceInput
+        label={label}
+        hideLabel
+        value={draft}
+        onValueChange={setDraft}
+        display={display}
+        inputClassName={cn(FIELD, "h-auto w-12 text-xs")}
+      />
+    </div>
   );
 }
 

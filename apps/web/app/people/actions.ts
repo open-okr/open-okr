@@ -10,7 +10,7 @@ import {
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
 import { quietHoursFromForm } from "../../lib/quiet-hours";
-import { refusalOf } from "../../lib/refusal";
+import { refusedByField } from "../../lib/refusal";
 import { getStorage } from "../../lib/storage";
 import { getTranslations } from "../../lib/translations";
 import { getImageProcessor } from "../../lib/upload-ports";
@@ -38,6 +38,37 @@ async function actionContext() {
 export interface ProfileResult {
   readonly ok: boolean;
   readonly message: string;
+  /**
+   * Each refused field's message, shown under it (guided-inputs §4.2). The
+   * form says `message` only when there are none.
+   */
+  readonly fields?: Readonly<Record<string, string>>;
+}
+
+/** The quiet-hours pair's input paths, as the profile form names its boxes. */
+const QUIET_HOURS_FIELDS = {
+  quietHours: "quietStart",
+  "quietHours.start": "quietStart",
+  "quietHours.end": "quietEnd",
+} as const;
+
+/**
+ * A refused save as the profile's forms show it: under each field it names,
+ * which the forms wrap in `RefusedFields`, and the sentence only when it
+ * names none. Null when the error was not a refusal.
+ */
+function refusedProfile(
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+  renamed?: Readonly<Record<string, string>>,
+): ProfileResult | null {
+  const refused = refusedByField(error, t, renamed);
+  if (refused === null) {
+    return null;
+  }
+  return refused.fields
+    ? { ok: false, message: "", fields: refused.fields }
+    : { ok: false, message: refused.error ?? "" };
 }
 
 export async function updateProfile(
@@ -58,7 +89,16 @@ export async function updateProfile(
 
     const quietHours = quietHoursFromForm(form);
     if (!quietHours.ok) {
-      return { ok: false, message: t("common.quietHoursNeedBothTimes") };
+      // Under the one of the pair left empty.
+      const empty =
+        String(form.get("quietStart") ?? "").trim() === ""
+          ? "quietStart"
+          : "quietEnd";
+      return {
+        ok: false,
+        message: "",
+        fields: { [empty]: t("common.quietHoursNeedBothTimes") },
+      };
     }
     if (quietHours.value !== undefined) {
       input.quietHours = quietHours.value;
@@ -78,6 +118,11 @@ export async function updateProfile(
     revalidatePath(`/people/${memberId}`);
     return { ok: true, message: t("people.actions.profileUpdated") };
   } catch (error) {
+    // A schema's refusal is its message rather than its JSON (plan U1b).
+    const refused = refusedProfile(error, t, QUIET_HOURS_FIELDS);
+    if (refused !== null) {
+      return refused;
+    }
     return {
       ok: false,
       message:
@@ -211,13 +256,14 @@ export async function updateMemberFields(
 
     await callAction(ctx, "people.updateMember", input);
   } catch (error) {
-    // A refusal is the sentence the action wrote. Anything else, a session
-    // that has gone (which redirects) or a database that has, is thrown on.
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    // A refusal stands under the field it names, or is the sentence the
+    // action wrote. Anything else, a session that has gone (which
+    // redirects) or a database that has, is thrown on.
+    const refused = refusedProfile(error, t);
+    if (refused === null) {
       throw error;
     }
-    return { ok: false, message: refusal };
+    return refused;
   }
   revalidatePath(`/people/${memberId}`);
   return { ok: true, message: t("people.actions.memberUpdated") };

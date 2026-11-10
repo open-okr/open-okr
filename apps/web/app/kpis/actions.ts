@@ -6,13 +6,43 @@
  * One cell at a time. The period is normalised on the server from the column's
  * own period start, so a client cannot decide which bucket a value lands in.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { assistContext } from "../../lib/assists";
 import { getPool } from "../../lib/auth";
+import { conflictOf, onlyChanged, readFromForm } from "../../lib/conflict.ts";
+import {
+  refusedByField,
+  refusedSentence,
+  refusedState,
+} from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
+
+/**
+ * What a refused write says (guided-inputs §4.2): under each field it names,
+ * for the panel's and the KPI page's forms, under the suggestion card's own
+ * fields, or one sentence for a grid cell, which draws no field to put it
+ * under. Null for a failure, which goes on to the error page.
+ */
+type Answer = (
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+) => WriteState | null;
+
+/**
+ * The fields the suggestion card draws, by the names the action takes. Not
+ * the unit, whose box takes no message and holds no more than the server.
+ */
+const SUGGESTION_DRAWN = [
+  "title",
+  "frequency",
+  "direction",
+  "targetDefault",
+  "healthyPct",
+  "watchPct",
+] as const;
 
 async function run(
   fn: (context: {
@@ -20,6 +50,7 @@ async function run(
     workspaceId: string;
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
+  answer: Answer = refusedByField,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -29,10 +60,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = answer(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   // The layout, so a KPI's own page is fresh too after it is edited there.
   revalidatePath("/kpis", "layout");
@@ -48,14 +80,16 @@ export async function recordCell(
     const { t } = await getTranslations();
     return { error: t("kpis.actions.valueHasToBeANumberOrEmpty") };
   }
-  return run((context) =>
-    callAction(context, "kpis.record", {
-      kpiId,
-      // The column's own period start. Normalising it again is a no-op, and it
-      // is what stops a client naming a period the frequency does not have.
-      on: periodStart,
-      actualValue,
-    }),
+  return run(
+    (context) =>
+      callAction(context, "kpis.record", {
+        kpiId,
+        // The column's own period start. Normalising it again is a no-op, and
+        // it is what stops a client naming a period the frequency does not have.
+        on: periodStart,
+        actualValue,
+      }),
+    refusedSentence,
   );
 }
 
@@ -134,7 +168,7 @@ export async function addKpi(
   const categoryId = String(formData.get("categoryId") ?? "").trim();
   if (title === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.actions.kpiNeedsATitle") };
+    return { error: null, fields: { title: t("kpis.actions.kpiNeedsATitle") } };
   }
   return run((context) =>
     callAction(context, "kpis.create", {
@@ -168,12 +202,27 @@ export async function updateKpiRule(
   formData: FormData,
 ): Promise<WriteState> {
   const kpiId = String(formData.get("kpiId") ?? "");
-  return run((context) =>
-    callAction(context, "kpis.update", {
-      kpiId,
-      ...kpiRuleFrom(formData),
-      ...ownerAndTier(formData),
-    }),
+  // Only what the person changed, with what the page read for it, so a
+  // field somebody else changed since is refused rather than overwritten
+  // (optimistic-concurrency.md V4).
+  const { set, read } = onlyChanged(
+    { ...kpiRuleFrom(formData), ...ownerAndTier(formData) },
+    readFromForm(formData),
+  );
+  if (read && Object.keys(set).length === 0) {
+    return NO_ERROR;
+  }
+  return run(
+    (context) =>
+      callAction(context, "kpis.update", {
+        kpiId,
+        ...set,
+        ...(read ? { read } : {}),
+      }),
+    (error, t) => {
+      const conflict = conflictOf(error, set);
+      return conflict ? { error: null, conflict } : refusedByField(error, t);
+    },
   );
 }
 
@@ -216,7 +265,7 @@ export async function addSuggestedKpiAction(
   const { t } = await getTranslations();
   const title = kept.title.trim();
   if (title === "") {
-    return { error: t("kpis.actions.kpiNeedsATitle") };
+    return { error: null, fields: { title: t("kpis.actions.kpiNeedsATitle") } };
   }
   const number = (value: number | null) =>
     value !== null && Number.isFinite(value) ? value : undefined;
@@ -225,34 +274,51 @@ export async function addSuggestedKpiAction(
   const watchPct = number(kept.watchPct);
   const unit = kept.unit.trim();
 
-  return run(async (context) => {
-    const created = await callAction(context, "kpis.create", {
-      title,
-      frequency: kept.frequency,
-      direction: kept.direction,
-      // The tier the trees name for something a team can act on this week is
-      // input, and input is what a leading indicator measures.
-      indicatorType: kept.tier === "input" ? "leading" : "lagging",
-      tier: kept.tier,
-      aggregate: "sum",
-      ownerKind: "workspace",
-      ...(unit === "" ? {} : { unit }),
-      ...(targetDefault === undefined ? {} : { targetDefault }),
-      ...(healthyPct === undefined ? {} : { healthyPct }),
-      ...(watchPct === undefined ? {} : { watchPct }),
-    });
-    if (kept.formula !== null && kept.formula !== undefined) {
-      const settings = await callAction(context, "settings.readForMember", {});
-      const today = new Intl.DateTimeFormat("en-CA", {
-        timeZone: String(settings.settings.timezone ?? "UTC"),
-      }).format(new Date());
-      await callAction(context, "kpis.setFormula", {
-        kpiId: created.id,
-        formula: kept.formula,
-        on: today,
+  return run(
+    async (context) => {
+      const created = await callAction(context, "kpis.create", {
+        title,
+        frequency: kept.frequency,
+        direction: kept.direction,
+        // The tier the trees name for something a team can act on this week is
+        // input, and input is what a leading indicator measures.
+        indicatorType: kept.tier === "input" ? "leading" : "lagging",
+        tier: kept.tier,
+        aggregate: "sum",
+        ownerKind: "workspace",
+        ...(unit === "" ? {} : { unit }),
+        ...(targetDefault === undefined ? {} : { targetDefault }),
+        ...(healthyPct === undefined ? {} : { healthyPct }),
+        ...(watchPct === undefined ? {} : { watchPct }),
       });
-    }
-  });
+      if (kept.formula !== null && kept.formula !== undefined) {
+        const settings = await callAction(
+          context,
+          "settings.readForMember",
+          {},
+        );
+        const today = new Intl.DateTimeFormat("en-CA", {
+          timeZone: String(settings.settings.timezone ?? "UTC"),
+        }).format(new Date());
+        await callAction(context, "kpis.setFormula", {
+          kpiId: created.id,
+          formula: kept.formula,
+          on: today,
+        });
+      }
+    },
+    // The card draws its own fields, so it hears about those by name and
+    // about anything else, the formula among them, as its sentence.
+    (error, translate) => {
+      const refused = refusedState(error, translate, SUGGESTION_DRAWN);
+      return refused === null
+        ? null
+        : {
+            error: refused.error ?? null,
+            ...(refused.fields ? { fields: refused.fields } : {}),
+          };
+    },
+  );
 }
 
 export async function addCategory(
@@ -262,7 +328,10 @@ export async function addCategory(
   const name = String(formData.get("name") ?? "").trim();
   if (name === "") {
     const { t } = await getTranslations();
-    return { error: t("kpis.actions.categoryNeedsAName") };
+    return {
+      error: null,
+      fields: { name: t("kpis.actions.categoryNeedsAName") },
+    };
   }
   return run((context) => callAction(context, "kpis.createCategory", { name }));
 }

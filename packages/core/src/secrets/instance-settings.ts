@@ -41,7 +41,7 @@ export interface SettingWrite {
   readonly value?: unknown;
   readonly secret?: string;
   /** Recorded on the row so the admin screen can say where it came from. */
-  readonly source?: "wizard" | "environment" | "admin";
+  readonly source?: "wizard" | "environment" | "admin" | "operator";
 }
 
 interface SettingRow {

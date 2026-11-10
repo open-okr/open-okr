@@ -27,6 +27,7 @@ import {
   THREAD_SUMMARY_MINIMUM,
 } from "../ai/assist-keys.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { ADDRESS, subjectAddress } from "../ids/address.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { listCommentsAction } from "./comments.ts";
@@ -107,7 +108,7 @@ export const summariseThread = defineReadAction({
     "Summarises the discussion on a subject and lists what it left open, refusing a summary that quotes words nobody wrote.",
   input: z.object({
     subjectType: z.enum(COMMENT_SUBJECT_TYPES),
-    subjectId: z.uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z
     .object({
@@ -203,7 +204,7 @@ export const decomposeKeyResult = defineReadAction({
   agentSurface: false,
   summary:
     "Drafts initiatives and their first tasks for one key result, as plain drafts a person edits before creating any of them.",
-  input: z.object({ goalId: z.uuid(), keyResultId: z.uuid() }),
+  input: z.object({ goalId: ADDRESS.goal, keyResultId: ADDRESS.keyResult }),
   output: z.object({ initiatives: z.array(draftedOutput) }).nullable(),
   access: ACCESS_LEVELS.edit,
   async handler(context, input) {

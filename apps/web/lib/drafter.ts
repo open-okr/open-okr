@@ -14,7 +14,7 @@
  * Null means the provider is off, which is the normal case and a complete
  * product: every trigger, ladder, gate and corridor works without it.
  */
-import { createProviderDrafter } from "@openokr/agents";
+import { createProviderDrafter, workspacePrompts } from "@openokr/agents";
 import {
   type AgentDrafter,
   builtInAgentId,
@@ -84,7 +84,13 @@ export async function drafterFor(
     return null;
   }
 
+  // The workspace's own version of each editable prompt, while it passes its
+  // evaluation set (plan 0.7.0 A9, docs/design/ai-evaluation.md §6). Read
+  // after the provider check, so a workspace with AI off pays nothing for it.
+  const systemPrompts = await workspacePrompts(pool, workspaceId);
+
   return createProviderDrafter({
+    systemPrompts,
     provider: routed.provider,
     model: routed.modelId,
     // §4.14's `agentRunCostCapUsd`, read from the workspace rather than from a

@@ -1,5 +1,6 @@
 import { OutboxRelay } from "@openokr/adapters";
 import { NextResponse } from "next/server";
+import { outboxRowsPerMinute } from "../../../lib/admission";
 import { getPool } from "../../../lib/pool";
 import {
   schedulerBootedAt,
@@ -7,6 +8,7 @@ import {
   schedulerLastRunAt,
   schedulerState,
 } from "../../../lib/scheduler";
+import { statusThresholds } from "../../../lib/status-thresholds";
 
 /**
  * Public instance status, for external monitoring (P8-T06c).
@@ -41,48 +43,18 @@ interface StatusResponse {
   checked_at: string;
 }
 
-// The thresholds are read from the environment at boot for the same reason
-// the metrics toggle is: the status endpoint runs on every probe and must
-// not query `system_settings` each time. The validated environment has no
-// entry for these yet (they are settings, not build-time config), so they
-// fall back to the design's defaults. An operator who sets them as
-// environment variables gets them; the instance setting path picks them up
-// after the first restart.
-function relayDegradedSeconds(): number {
-  const raw = process.env.OPENOKR_STATUS_RELAY_DEGRADED_SECONDS;
-  if (raw) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 300;
-}
-
-function relayUnavailableSeconds(): number {
-  const raw = process.env.OPENOKR_STATUS_RELAY_UNAVAILABLE_SECONDS;
-  if (raw) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 1800;
-}
-
-function schedulerDegradedSeconds(): number {
-  const raw = process.env.OPENOKR_STATUS_SCHEDULER_DEGRADED_SECONDS;
-  if (raw) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 7200;
-}
-
-function schedulerUnavailableSeconds(): number {
-  const raw = process.env.OPENOKR_STATUS_SCHEDULER_UNAVAILABLE_SECONDS;
-  if (raw) {
-    const n = Number(raw);
-    if (Number.isFinite(n) && n > 0) return n;
-  }
-  return 14400;
-}
+// The thresholds are what boot resolved: a stored setting, then the variable,
+// then the default, validated so each "unavailable" exceeds its "degraded"
+// (docs/design/status-and-capacity.md §4, plan 0.7.0 P8). Read from memory,
+// because this endpoint answers every probe and must not query
+// `system_settings` each time.
+const relayDegradedSeconds = (): number => statusThresholds().relay.degraded;
+const relayUnavailableSeconds = (): number =>
+  statusThresholds().relay.unavailable;
+const schedulerDegradedSeconds = (): number =>
+  statusThresholds().scheduler.degraded;
+const schedulerUnavailableSeconds = (): number =>
+  statusThresholds().scheduler.unavailable;
 
 function worst(...statuses: ComponentStatus[]): ComponentStatus {
   if (statuses.includes("unavailable")) return "unavailable";
@@ -101,7 +73,12 @@ async function checkDatabase(): Promise<ComponentStatus> {
 
 async function checkRelay(): Promise<ComponentStatus> {
   try {
-    const lagSeconds = await OutboxRelay.oldestPendingSeconds(getPool());
+    // With an outbox rate set, a workspace at its rate is not lag
+    // (tenant-limits.md §10 R10): the relay is keeping up with all it may.
+    const lagSeconds = await OutboxRelay.oldestPendingSeconds(
+      getPool(),
+      outboxRowsPerMinute(),
+    );
     if (lagSeconds <= 0) return "operational";
     if (lagSeconds >= relayUnavailableSeconds()) return "unavailable";
     if (lagSeconds >= relayDegradedSeconds()) return "degraded";

@@ -176,6 +176,21 @@ describe("a key result's value and confidence", () => {
     expect(container.textContent).toContain("Choose a status.");
     expect(refresh).not.toHaveBeenCalled();
   });
+
+  test("a refusal about the status stands under the status, said once (plan U1b)", async () => {
+    updateKeyResult.mockResolvedValue({
+      error: null,
+      fields: { status: "Choose a status." },
+    });
+    await render(update(null));
+    await type(field(`Confidence for ${KR} (in 10)`) as HTMLInputElement, "8");
+    await save();
+    const status = field<HTMLSelectElement>(`Status for the check-in on ${KR}`);
+    expect(status?.getAttribute("aria-invalid")).toBe("true");
+    const alerts = [...container.querySelectorAll('[role="alert"]')];
+    expect(alerts.map((one) => one.textContent)).toEqual(["Choose a status."]);
+    expect(refresh).not.toHaveBeenCalled();
+  });
 });
 
 describe("+ Add key result", () => {
@@ -233,5 +248,22 @@ describe("+ Add key result", () => {
     expect((field("Add key result") as HTMLInputElement).value).toBe(
       "Weekly active teams from 40 to 70",
     );
+  });
+
+  test("a refused title stands under the box, and the sentence is not said again (plan U1b)", async () => {
+    addKeyResult.mockResolvedValue({
+      error: "Up to 500 characters. Shorten it to save.",
+      fields: { title: "Up to 500 characters. Shorten it to save." },
+      id: null,
+    });
+    await render(<AddKeyResult goalId="g" ownerId="m" dueOn={null} />);
+    const input = await open();
+    await type(input, "Weekly active teams from 40 to 70");
+    await press(input, "Enter");
+    const alerts = [...container.querySelectorAll('[role="alert"]')];
+    expect(alerts.map((one) => one.textContent)).toEqual([
+      "Up to 500 characters. Shorten it to save.",
+    ]);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
   });
 });

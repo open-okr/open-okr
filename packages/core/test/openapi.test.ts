@@ -52,10 +52,14 @@ describe("the document", () => {
     );
   });
 
-  it("puts a write on POST with a request body and no query parameters", () => {
+  it("puts a write on POST with a request body, and only the validate parameter in its query", () => {
     const create = operation("/goals/create", "post");
     expect(create.requestBody).toBeTruthy();
-    expect(create.parameters).toBeUndefined();
+    // `?validate=true` checks the write without committing it (plan D4); the
+    // input itself is never a query parameter on a write.
+    expect(create.parameters).toEqual([
+      { $ref: "#/components/parameters/Validate" },
+    ]);
   });
 
   it("carries the scope and the safety class the registry declares", () => {

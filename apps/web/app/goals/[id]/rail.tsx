@@ -1,5 +1,9 @@
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import Link from "next/link";
+import {
+  deliveryReading,
+  type ProviderKeyResult,
+} from "../../../lib/dependency-delivery.ts";
 import { getTranslations } from "../../../lib/translations";
 import { HealthChip } from "../health-chip.tsx";
 
@@ -47,6 +51,8 @@ export interface Relations {
     readonly confirmed: boolean;
     readonly riskOwnerName: string | null;
     readonly blocksPublish: boolean;
+    /** What delivers it, and whether it has (plan 0.7.0 O5). */
+    readonly providerKeyResult: ProviderKeyResult | null;
   }[];
 }
 
@@ -183,27 +189,47 @@ export async function Rail({
               {t("goals.detail.rail.nothingRecordedAKey")}
             </p>
           ) : (
-            relations.register.map((entry) => (
-              <div key={entry.id} className="flex flex-col gap-0.5">
-                <span className="text-sm text-ink">{entry.keyResultTitle}</span>
-                <span className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
-                  <span>{entry.provider}</span>
-                  {entry.confirmed ? (
-                    <Chip tone="ok">{t("common.confirmed")}</Chip>
-                  ) : entry.riskOwnerName ? (
-                    <Chip tone="warn">
-                      {t("goals.detail.rail.risk", {
-                        riskOwnerName: entry.riskOwnerName,
-                      })}
-                    </Chip>
-                  ) : (
-                    <Chip tone="bad">
-                      {t("goals.detail.rail.blocksPublishing")}
-                    </Chip>
-                  )}
-                </span>
-              </div>
-            ))
+            relations.register.map((entry) => {
+              const delivery = entry.providerKeyResult
+                ? deliveryReading(t, entry.providerKeyResult, entry.provider)
+                : null;
+              return (
+                <div key={entry.id} className="flex flex-col gap-0.5">
+                  <span className="text-sm text-ink">
+                    {entry.keyResultTitle}
+                  </span>
+                  <span className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
+                    <span>{entry.provider}</span>
+                    {entry.confirmed ? (
+                      <Chip tone="ok">{t("common.confirmed")}</Chip>
+                    ) : entry.riskOwnerName ? (
+                      <Chip tone="warn">
+                        {t("goals.detail.rail.risk", {
+                          riskOwnerName: entry.riskOwnerName,
+                        })}
+                      </Chip>
+                    ) : (
+                      <Chip tone="bad">
+                        {t("goals.detail.rail.blocksPublishing")}
+                      </Chip>
+                    )}
+                  </span>
+                  {delivery ? (
+                    <span
+                      className="flex flex-wrap items-center gap-1.5 text-xs text-ink-3"
+                      data-testid="dependency-delivery"
+                    >
+                      <span>{delivery.line}</span>
+                      {delivery.chip ? (
+                        <Chip tone={delivery.chip.tone}>
+                          {delivery.chip.label}
+                        </Chip>
+                      ) : null}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })
           )}
         </CardBody>
       </Card>

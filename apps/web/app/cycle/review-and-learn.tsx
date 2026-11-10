@@ -1,11 +1,13 @@
 import type { ResolvedThresholds, ScoreColoursPractice } from "@openokr/method";
 import { scoreBand, scoreBandsIn } from "@openokr/method";
 import { Button, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import Link from "next/link";
+import { dayLabel } from "../../lib/day-label.ts";
 import { groupRows } from "../../lib/group-rows.ts";
 import { getTranslations } from "../../lib/translations";
 import { verdictLabel, verdictTone } from "../../lib/verdict";
 import { ActionForm } from "./action-form.tsx";
-import { closeCycle } from "./frame-actions.ts";
+import { closeCycle, setClosing } from "./frame-actions.ts";
 
 /**
  * Phase 7, review and learn (UIUX-PLAN.md §6 S-12, P6-G16).
@@ -26,6 +28,11 @@ import { closeCycle } from "./frame-actions.ts";
  * button on the scorecard, and nothing set a cycle to closed. Now the close
  * records the result and feeds the next cycle together, and once closed this
  * card shows both: the verdict, and what the next cycle received.
+ *
+ * **A closed cycle links to its review minutes** (sessions.md §9, release
+ * 0.7.0 S3), one per review held, from `lib/cycle-review-minutes.ts`. The
+ * session page was the only way in, which meant knowing the space that held
+ * the review before you could read what it decided.
  */
 
 export interface ScoredKeyResult {
@@ -49,6 +56,14 @@ export interface Closure {
   readonly packNote: boolean;
 }
 
+/** One review whose minutes a closed cycle links to. */
+interface ReviewMinutes {
+  readonly sessionId: string;
+  readonly title: string;
+  readonly spaceName: string;
+  readonly heldOn: string;
+}
+
 /** The band names in the order §3.3 states them, worst last. */
 function bandWord(band: string, t: (key: string) => string): string {
   switch (band) {
@@ -69,7 +84,11 @@ export async function ReviewAndLearn({
   keyResults,
   cycleId,
   cycleName,
+  status,
+  endsOn,
+  ended,
   closure,
+  reviewMinutes,
   waitingFor,
   canEdit,
   thresholds,
@@ -78,8 +97,16 @@ export async function ReviewAndLearn({
   readonly keyResults: readonly ScoredKeyResult[];
   readonly cycleId: string;
   readonly cycleName: string;
+  /** The cycle's status, for the closing card (plan 0.7.0 O2). */
+  readonly status: string;
+  /** Its last day, local, `YYYY-MM-DD`. */
+  readonly endsOn: string;
+  /** Whether that day has passed, so the undo is not offered (§10 C4). */
+  readonly ended: boolean;
   /** Null while the cycle is open. */
   readonly closure: Closure | null;
+  /** The reviews held for this cycle, read only once it is closed. */
+  readonly reviewMinutes: readonly ReviewMinutes[];
   /**
    * What phase 7 still needs before the cycle can close, in the rail's own
    * words. Empty when it is complete. The server refuses on the same
@@ -100,7 +127,7 @@ export async function ReviewAndLearn({
   /** Which colours the bands are read in (§12 "Score colours"). */
   readonly practice: ScoreColoursPractice;
 }) {
-  const { t } = await getTranslations();
+  const { t, locale } = await getTranslations();
 
   const scored = keyResults.filter((one) => one.score !== null);
   const average =
@@ -357,47 +384,146 @@ export async function ReviewAndLearn({
                 {t("cycle.reviewAndLearn.close.nextNotCreated")}
               </p>
             )}
+            <div className="flex flex-col gap-1 border-t border-line pt-3">
+              <h4 className="text-xs font-semibold text-ink-2">
+                {t("cycle.reviewAndLearn.close.minutes")}
+              </h4>
+              {reviewMinutes.length === 0 ? (
+                // Said rather than left out: a closed cycle with no minutes
+                // is a fact somebody looking for them needs to know.
+                <p className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.close.noMinutes")}
+                </p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {reviewMinutes.map((review) => (
+                    <li key={review.sessionId} className="text-sm">
+                      <Link
+                        className="text-brand-text hover:underline"
+                        href={`/session/${review.sessionId}/minutes`}
+                      >
+                        {t("cycle.reviewAndLearn.close.minutesOf", {
+                          title: review.title,
+                          space: review.spaceName,
+                        })}
+                      </Link>
+                      <span className="ml-2 text-xs text-ink-3">
+                        {t("cycle.reviewAndLearn.close.heldOn", {
+                          date: dayLabel(review.heldOn, locale),
+                        })}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </CardBody>
         </Card>
       ) : canEdit ? (
-        <Card>
-          <CardHeader>
-            <div className="flex min-w-0 flex-col">
-              <h3 className="text-sm font-bold text-ink">
-                {t("cycle.reviewAndLearn.close.title")}
-              </h3>
-              <p className="text-xs text-ink-3">
-                {t("cycle.reviewAndLearn.close.explains")}
-              </p>
-            </div>
-          </CardHeader>
-          <CardBody>
-            {/* Disabled with the reason beside it, never silently inert
+        <>
+          <Card>
+            <CardHeader>
+              <div className="flex min-w-0 flex-col">
+                <h3 className="text-sm font-bold text-ink">
+                  {t("cycle.reviewAndLearn.closing.title")}
+                </h3>
+              </div>
+            </CardHeader>
+            <CardBody className="flex flex-col gap-1.5">
+              {/* Closing is a status, not a freeze (okr-core-domain.md §10 C6):
+                check-ins, edits and scores go on, and only publishing
+                stops. The date moves it on its own; this is the early
+                start, and its undo while the end has not passed. */}
+              {status === "closing" ? (
+                ended ? (
+                  <p className="text-sm text-ink-2">
+                    {t("cycle.reviewAndLearn.closing.ended", { endsOn })}
+                  </p>
+                ) : (
+                  <ActionForm
+                    action={setClosing}
+                    className="flex flex-col gap-1.5"
+                  >
+                    <input type="hidden" name="cycleId" value={cycleId} />
+                    <input type="hidden" name="closing" value="false" />
+                    <p className="text-sm text-ink-2">
+                      {t("cycle.reviewAndLearn.closing.started")}
+                    </p>
+                    {canEdit ? (
+                      <Button
+                        type="submit"
+                        variant="default"
+                        size="sm"
+                        className="w-fit"
+                      >
+                        {t("cycle.reviewAndLearn.closing.undo")}
+                      </Button>
+                    ) : null}
+                  </ActionForm>
+                )
+              ) : (
+                <ActionForm
+                  action={setClosing}
+                  className="flex flex-col gap-1.5"
+                >
+                  <input type="hidden" name="cycleId" value={cycleId} />
+                  <input type="hidden" name="closing" value="true" />
+                  <p className="text-sm text-ink-2">
+                    {t("cycle.reviewAndLearn.closing.explains")}
+                  </p>
+                  {canEdit ? (
+                    <Button
+                      type="submit"
+                      variant="default"
+                      size="sm"
+                      className="w-fit"
+                    >
+                      {t("cycle.reviewAndLearn.closing.start")}
+                    </Button>
+                  ) : null}
+                </ActionForm>
+              )}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader>
+              <div className="flex min-w-0 flex-col">
+                <h3 className="text-sm font-bold text-ink">
+                  {t("cycle.reviewAndLearn.close.title")}
+                </h3>
+                <p className="text-xs text-ink-3">
+                  {t("cycle.reviewAndLearn.close.explains")}
+                </p>
+              </div>
+            </CardHeader>
+            <CardBody>
+              {/* Disabled with the reason beside it, never silently inert
                 (UIUX-PLAN §3, the rule the publish control follows). */}
-            <ActionForm action={closeCycle} className="flex flex-col gap-1.5">
-              <input type="hidden" name="cycleId" value={cycleId} />
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                className="w-fit"
-                disabled={waitingFor.length > 0}
-              >
-                {t("cycle.reviewAndLearn.close.button", { cycleName })}
-              </Button>
-              {waitingFor.length > 0 ? (
-                <div className="flex flex-col gap-0.5 text-xs text-ink-3">
-                  <p>{t("cycle.reviewAndLearn.close.waiting")}</p>
-                  <ul className="list-disc pl-4">
-                    {waitingFor.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-            </ActionForm>
-          </CardBody>
-        </Card>
+              <ActionForm action={closeCycle} className="flex flex-col gap-1.5">
+                <input type="hidden" name="cycleId" value={cycleId} />
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  className="w-fit"
+                  disabled={waitingFor.length > 0}
+                >
+                  {t("cycle.reviewAndLearn.close.button", { cycleName })}
+                </Button>
+                {waitingFor.length > 0 ? (
+                  <div className="flex flex-col gap-0.5 text-xs text-ink-3">
+                    <p>{t("cycle.reviewAndLearn.close.waiting")}</p>
+                    <ul className="list-disc pl-4">
+                      {waitingFor.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </ActionForm>
+            </CardBody>
+          </Card>
+        </>
       ) : null}
     </div>
   );

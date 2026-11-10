@@ -265,6 +265,49 @@ const CHECKS: readonly Check[] = [
     },
   },
   {
+    // docs/design/error-reporting.md D22, plan 0.7.0 E2.
+    id: "errors-off-by-default",
+    async run() {
+      const failures: string[] = [];
+      const env = await readFile(join(ROOT, "packages/config/src/env.ts"), "utf8");
+      const dsn = /OPENOKR_ERROR_DSN:\s*optional\(([\s\S]*?)\n {4}\),/.exec(env);
+      if (!dsn) {
+        failures.push("packages/config/src/env.ts no longer declares OPENOKR_ERROR_DSN");
+      } else if (/\.default\(/.test(dsn[1] as string)) {
+        failures.push("OPENOKR_ERROR_DSN has a default, so a fresh instance would send errors somewhere");
+      }
+      // The driver that sends is built behind one branch, after the one that
+      // returns the driver that does nothing when the DSN is empty.
+      const seam = await readFile(
+        join(ROOT, "packages/adapters/src/create-error-reporter.ts"),
+        "utf8",
+      );
+      const off = seam.search(/if \(dsn === ""\) \{\s*return new OffErrorReporter\(\);/);
+      const sentry = seam.indexOf("new SentryErrorReporter(");
+      if (off < 0) {
+        failures.push("create-error-reporter.ts no longer returns the off driver for an empty DSN");
+      }
+      if (sentry < 0 || sentry < off || seam.indexOf("new SentryErrorReporter(", sentry + 1) >= 0) {
+        failures.push(
+          "create-error-reporter.ts builds the Sentry-protocol driver somewhere other than after the empty-DSN branch",
+        );
+      }
+      // Nothing outside the factory constructs the sending driver.
+      for (const file of [
+        ...(await filesUnder(join(ROOT, "apps/web"), [".ts", ".tsx"])),
+        ...(await filesUnder(join(ROOT, "packages/core/src"), [".ts"])),
+      ]) {
+        if (/[\\/](test|tests|__tests__)[\\/]/.test(file)) {
+          continue;
+        }
+        if ((await readFile(file, "utf8")).includes("SentryErrorReporter")) {
+          failures.push(`${relative(file)} names SentryErrorReporter; build it through createErrorReporter`);
+        }
+      }
+      return failures;
+    },
+  },
+  {
     id: "registries-are-build-time",
     async run() {
       const failures: string[] = [];

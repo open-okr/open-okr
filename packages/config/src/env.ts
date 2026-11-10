@@ -54,6 +54,27 @@ const processGlobal = globalThis as { [BUILD_ID_KEY]?: string };
 processGlobal[BUILD_ID_KEY] ??= crypto.randomUUID();
 const PROCESS_BUILD_ID: string = processGlobal[BUILD_ID_KEY];
 
+/**
+ * The shape of a DSN: an http or https address with a key in the user part
+ * and a project id as the last path segment. The shape only: what the
+ * protocol does with it is the error reporter's, in `packages/adapters`.
+ */
+function isDsn(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return false;
+  }
+  const project = url.pathname.split("/").filter(Boolean).pop();
+  return (
+    (url.protocol === "https:" || url.protocol === "http:") &&
+    url.username !== "" &&
+    project !== undefined &&
+    /^[A-Za-z0-9_-]+$/.test(project)
+  );
+}
+
 /** Secrets that must never reach production, whatever their source. */
 const PLACEHOLDER_SECRETS = new Set([DEVELOPMENT_AUTH_SECRET]);
 
@@ -89,6 +110,54 @@ const envSchema = z
      * first-run wizard generates a real one. */
     BETTER_AUTH_SECRET: optional(
       z.string().min(16).default(DEVELOPMENT_AUTH_SECRET),
+    ),
+
+    /**
+     * The bearer token Prometheus scrapes /api/metrics with
+     * (docs/design/metrics-scrape-token.md, plan 0.7.0 B3). Unset means the
+     * endpoint answers a signed-in session only. Never a default: a default
+     * token is a published password. At least 32 characters, because it is
+     * checked over the network. `./openokr up` and the Helm chart generate it.
+     */
+    OPENOKR_METRICS_TOKEN: optional(
+      z
+        .string()
+        .min(32, "must be at least 32 characters, so it cannot be guessed")
+        .optional(),
+    ),
+
+    /**
+     * Where error reports go, `observability.errors.dsn`
+     * (docs/design/error-reporting.md D14, plan 0.7.0 E2). A DSN from any
+     * tracker that speaks Sentry's protocol: Sentry, GlitchTip, Bugsink.
+     * Unset is the default and means nothing is sent anywhere. Never a
+     * default and never logged: its key lets anyone write into the tracker.
+     * A value that is not a DSN refuses to boot, rather than leaving an
+     * operator believing errors are going somewhere.
+     */
+    OPENOKR_ERROR_DSN: optional(
+      z
+        .string()
+        .refine(
+          isDsn,
+          "must be a DSN like https://<key>@<host>/<project id>, copied from the tracker's project settings",
+        )
+        .optional(),
+    ),
+
+    /**
+     * `observability.errors.environment`: which deployment a report came
+     * from, so a staging instance can share production's tracker project
+     * without mixing with it (D15).
+     */
+    OPENOKR_ERROR_ENVIRONMENT: optional(
+      z
+        .string()
+        .regex(
+          /^[A-Za-z0-9_.-]{1,64}$/,
+          "must be one word of letters, digits, dots, dashes or underscores, such as production or staging",
+        )
+        .default("production"),
     ),
 
     /** The instance's public origin, used to build callback and passkey origins. */

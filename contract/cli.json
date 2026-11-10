@@ -202,7 +202,7 @@
       "action": "workspace.setState",
       "method": "POST",
       "path": "/workspace/setState",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Set the workspace to active, read-only or frozen.",
       "flags": [
         {
@@ -449,7 +449,7 @@
       "action": "people.suspend",
       "method": "POST",
       "path": "/people/suspend",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Suspend a member, removing every access they had.",
       "flags": [
         {
@@ -483,7 +483,7 @@
       "action": "people.convertToGuest",
       "method": "POST",
       "path": "/people/convertToGuest",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Convert a member to a guest, stripping their prior bindings.",
       "flags": [
         {
@@ -1085,6 +1085,304 @@
           "required": true
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "connections list",
+      "action": "connections.list",
+      "method": "GET",
+      "path": "/connections/list",
+      "scope": "read",
+      "summary": "Every agent connection and agent token in the workspace, for an administrator.",
+      "flags": [
+        {
+          "name": "state",
+          "field": "state",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "live",
+            "ended",
+            "all"
+          ]
+        },
+        {
+          "name": "page",
+          "field": "page",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "connections revokeAsAdmin",
+      "action": "connections.revokeAsAdmin",
+      "method": "POST",
+      "path": "/connections/revokeAsAdmin",
+      "scope": "destructive",
+      "summary": "End a member's agent connection or agent token, as an administrator.",
+      "flags": [
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "grant",
+            "token"
+          ]
+        },
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "connections sweepToolCalls",
+      "action": "connections.sweepToolCalls",
+      "method": "POST",
+      "path": "/connections/sweepToolCalls",
+      "scope": "write",
+      "summary": "Deletes agent tool call records older than the workspace's retention window.",
+      "flags": [
+        {
+          "name": "retention-days",
+          "field": "retentionDays",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks list",
+      "action": "webhooks.list",
+      "method": "GET",
+      "path": "/webhooks/list",
+      "scope": "read",
+      "summary": "Every webhook in this workspace: its address, events, owner and state, and how its last delivery went. Never a secret.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "webhooks create",
+      "action": "webhooks.create",
+      "method": "POST",
+      "path": "/webhooks/create",
+      "scope": "write",
+      "summary": "Adds a webhook: an HTTPS address, the events it receives and, optionally, one space it is limited to. Answers with the signing secret, once.",
+      "flags": [
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "url",
+          "field": "url",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "events",
+          "field": "events",
+          "type": "array",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks update",
+      "action": "webhooks.update",
+      "method": "POST",
+      "path": "/webhooks/update",
+      "scope": "write",
+      "summary": "Changes a webhook's name, address, events or space, turns it on or off, or makes the caller its owner when its owner can no longer act.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "url",
+          "field": "url",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "events",
+          "field": "events",
+          "type": "array",
+          "required": false
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "enabled",
+          "field": "enabled",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "take-ownership",
+          "field": "takeOwnership",
+          "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks rotateSecret",
+      "action": "webhooks.rotateSecret",
+      "method": "POST",
+      "path": "/webhooks/rotateSecret",
+      "scope": "write",
+      "summary": "Gives a webhook a new signing secret, answered once. The old one keeps signing beside it for a day, so the receiver can change over without losing a delivery.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks remove",
+      "action": "webhooks.remove",
+      "method": "POST",
+      "path": "/webhooks/remove",
+      "scope": "destructive",
+      "summary": "Removes a webhook. Nothing more is sent to it, including deliveries already waiting.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks test",
+      "action": "webhooks.test",
+      "method": "POST",
+      "path": "/webhooks/test",
+      "scope": "write",
+      "summary": "Sends a signed `ping` event with an empty body to a webhook, so its receiver can be checked. The result is in its deliveries.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks deliveries",
+      "action": "webhooks.deliveries",
+      "method": "GET",
+      "path": "/webhooks/deliveries",
+      "scope": "read",
+      "summary": "A webhook's delivery attempts from the last 30 days, newest first: the event, the subject, the status, how long it took and the attempt. Never a body.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "page",
+          "field": "page",
+          "type": "integer",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "webhooks redeliver",
+      "action": "webhooks.redeliver",
+      "method": "POST",
+      "path": "/webhooks/redeliver",
+      "scope": "write",
+      "summary": "Sends a failed delivery's event again. The subject is read afresh, as the owner sees it now, and the event keeps its id.",
+      "flags": [
+        {
+          "name": "delivery-id",
+          "field": "deliveryId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "connections toolCalls",
+      "action": "connections.toolCalls",
+      "method": "GET",
+      "path": "/connections/toolCalls",
+      "scope": "read",
+      "summary": "The last calls one of your own agents made through a connection or an agent token, and this week's counts.",
+      "flags": [
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "grant",
+            "token"
+          ]
+        },
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "ai readToolCallSummary",
+      "action": "ai.readToolCallSummary",
+      "method": "GET",
+      "path": "/ai/readToolCallSummary",
+      "scope": "read",
+      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named.",
+      "flags": [],
       "pages": false
     },
     {
@@ -1738,7 +2036,10 @@
             "mentioned",
             "role",
             "review",
-            "check_in"
+            "check_in",
+            "support_request",
+            "support_ended",
+            "connection_ended"
           ]
         },
         {
@@ -1950,7 +2251,10 @@
             "mentioned",
             "role",
             "review",
-            "check_in"
+            "check_in",
+            "support_request",
+            "support_ended",
+            "connection_ended"
           ]
         }
       ],
@@ -2063,6 +2367,16 @@
           "required": true
         }
       ],
+      "pages": false
+    },
+    {
+      "name": "workspace listArchives",
+      "action": "workspace.listArchives",
+      "method": "GET",
+      "path": "/workspace/listArchives",
+      "scope": "read",
+      "summary": "Every archive taken of this workspace, newest first: who took it, when, the file's name and the rows it held. The files themselves are not kept.",
+      "flags": [],
       "pages": false
     },
     {
@@ -2294,6 +2608,53 @@
           "field": "branding",
           "type": "object",
           "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "settings updateWorkspaceLimits",
+      "action": "settings.updateWorkspaceLimits",
+      "method": "POST",
+      "path": "/settings/updateWorkspaceLimits",
+      "scope": "write",
+      "summary": "Change the workspace's storage quota, export and import row limits, message log retention or agent run cost cap.",
+      "flags": [
+        {
+          "name": "storage-quota-bytes",
+          "field": "storageQuotaBytes",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "export-inline-row-limit",
+          "field": "exportInlineRowLimit",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "import-row-limit",
+          "field": "importRowLimit",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "message-log-retention-days",
+          "field": "messageLogRetentionDays",
+          "type": "integer",
+          "required": false
+        },
+        {
+          "name": "agent-run-cost-cap-usd",
+          "field": "agentRunCostCapUsd",
+          "type": "number",
+          "required": false
+        },
+        {
+          "name": "agent-tool-call-retention-days",
+          "field": "agentToolCallRetentionDays",
+          "type": "integer",
+          "required": false
         }
       ],
       "pages": false
@@ -2930,7 +3291,7 @@
       "method": "POST",
       "path": "/ai/updatePrompt",
       "scope": "write",
-      "summary": "Records a new version of a feature or agent phase's system prompt.",
+      "summary": "Records a new version of a feature's system prompt, once it passes that prompt's evaluation set.",
       "flags": [
         {
           "name": "prompt-key",
@@ -3553,6 +3914,45 @@
       "pages": false
     },
     {
+      "name": "agents answerMention",
+      "action": "agents.answerMention",
+      "method": "POST",
+      "path": "/agents/answerMention",
+      "scope": "write",
+      "summary": "The Coach reviews the goal a comment mentioned it on, and replies in that thread.",
+      "flags": [
+        {
+          "name": "comment-id",
+          "field": "commentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "goal-id",
+          "field": "goalId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents mentionable",
+      "action": "agents.mentionable",
+      "method": "GET",
+      "path": "/agents/mentionable",
+      "scope": "read",
+      "summary": "The agents a comment can mention and get an answer from: the Coach, while it is on.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "agents listRuns",
       "action": "agents.listRuns",
       "method": "GET",
@@ -3565,6 +3965,106 @@
           "field": "limit",
           "type": "integer",
           "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents instructions",
+      "action": "agents.instructions",
+      "method": "GET",
+      "path": "/agents/instructions",
+      "scope": "read",
+      "summary": "An agent's planning and execution instructions: the version in use, the stage the cycle asks for now, and each stage's history.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents setInstructions",
+      "action": "agents.setInstructions",
+      "method": "POST",
+      "path": "/agents/setInstructions",
+      "scope": "write",
+      "summary": "Saves a new version of a custom agent's planning or execution instructions.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stage",
+          "field": "stage",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "planning",
+            "execution"
+          ]
+        },
+        {
+          "name": "text",
+          "field": "text",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents restoreInstructions",
+      "action": "agents.restoreInstructions",
+      "method": "POST",
+      "path": "/agents/restoreInstructions",
+      "scope": "write",
+      "summary": "Makes an older version of a custom agent's instructions the one in use, as a new version.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "stage",
+          "field": "stage",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "planning",
+            "execution"
+          ]
+        },
+        {
+          "name": "version",
+          "field": "version",
+          "type": "integer",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "agents planRun",
+      "action": "agents.planRun",
+      "method": "GET",
+      "path": "/agents/planRun",
+      "scope": "read",
+      "summary": "Plans a custom agent's next run from its instructions for the cycle's stage and what it can see, and checks every task. Starts nothing: agents.startRun takes the tasks.",
+      "flags": [
+        {
+          "name": "agent-id",
+          "field": "agentId",
+          "type": "string",
+          "required": true
         }
       ],
       "pages": false
@@ -3727,7 +4227,7 @@
       "method": "POST",
       "path": "/spaces/update",
       "scope": "write",
-      "summary": "Renames a space or rewrites its mission.",
+      "summary": "Renames a space or rewrites its mission. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -3745,6 +4245,12 @@
           "name": "mission",
           "field": "mission",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -4195,6 +4701,12 @@
           "field": "legacy",
           "type": "object",
           "required": false
+        },
+        {
+          "name": "as-of",
+          "field": "asOf",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -4205,7 +4717,7 @@
       "method": "POST",
       "path": "/cycles/update",
       "scope": "write",
-      "summary": "Sets a cycle's roles, phase, levels, session dates or publication deadline.",
+      "summary": "Sets a cycle's roles, phase, levels, session dates or publication deadline. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -4260,6 +4772,35 @@
           "field": "sessionDates",
           "type": "array",
           "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "cycles setClosing",
+      "action": "cycles.setClosing",
+      "method": "POST",
+      "path": "/cycles/setClosing",
+      "scope": "write",
+      "summary": "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "closing",
+          "field": "closing",
+          "type": "boolean",
+          "required": true
         }
       ],
       "pages": false
@@ -4326,7 +4867,7 @@
       "action": "cycles.close",
       "method": "POST",
       "path": "/cycles/close",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Closes a cycle once phase 7 is complete: records its result on the scorecard and feeds the next cycle its prior scores, carried work, kept objectives as drafts, learnings and improvement action.",
       "flags": [
         {
@@ -4658,6 +5199,12 @@
         {
           "name": "reason",
           "field": "reason",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
           "type": "string",
           "required": false
         }
@@ -5119,7 +5666,7 @@
       "method": "POST",
       "path": "/documents/update",
       "scope": "write",
-      "summary": "Edits a document. Editing a published one changes it without publishing a version.",
+      "summary": "Edits a document. Editing a published one changes it without publishing a version. Send read with the title you read, and a title somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -5137,6 +5684,12 @@
           "name": "body",
           "field": "body",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -5319,13 +5872,19 @@
       "method": "GET",
       "path": "/search/jump",
       "scope": "read",
-      "summary": "The entity one short identifier means, for the palette's jump.",
+      "summary": "The thing one short identifier names, of any kind, for the palette's jump.",
       "flags": [
         {
           "name": "short-id",
           "field": "shortId",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "kinds",
+          "field": "kinds",
+          "type": "array",
+          "required": false
         }
       ],
       "pages": false
@@ -5807,7 +6366,7 @@
       "method": "POST",
       "path": "/tasks/update",
       "scope": "write",
-      "summary": "Updates a task's own fields. Its position is moved with tasks.move, not here.",
+      "summary": "Updates a task's own fields. Its position is moved with tasks.move, not here. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -5855,6 +6414,12 @@
           "name": "key-result-id",
           "field": "keyResultId",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -6230,7 +6795,7 @@
       "method": "POST",
       "path": "/initiatives/update",
       "scope": "write",
-      "summary": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them.",
+      "summary": "Updates an initiative's own fields. Progress is derived from its tasks and is not one of them. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "id",
@@ -6290,6 +6855,12 @@
           "name": "capacity",
           "field": "capacity",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -7513,6 +8084,29 @@
       "pages": false
     },
     {
+      "name": "goals updateConfidence",
+      "action": "goals.updateConfidence",
+      "method": "POST",
+      "path": "/goals/updateConfidence",
+      "scope": "write",
+      "summary": "Sets a key result's confidence outside a check-in, nought to one. The change is in the goal's feed.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "confidence",
+          "field": "confidence",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "goals removeKeyResult",
       "action": "goals.removeKeyResult",
       "method": "POST",
@@ -8187,6 +8781,12 @@
           "required": false
         },
         {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
+          "type": "string",
+          "required": false
+        },
+        {
           "name": "note",
           "field": "note",
           "type": "string",
@@ -8207,13 +8807,19 @@
       "method": "POST",
       "path": "/goals/confirmDependency",
       "scope": "write",
-      "summary": "The providing team confirms a dependency. Only they can, and it clears publish gate 4.",
+      "summary": "The providing team confirms a dependency, and may name which of its key results delivers it. Only they can, and it clears publish gate 4.",
       "flags": [
         {
           "name": "id",
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -8235,6 +8841,29 @@
         {
           "name": "member-id",
           "field": "memberId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "goals setDependencyProvider",
+      "action": "goals.setDependencyProvider",
+      "method": "POST",
+      "path": "/goals/setDependencyProvider",
+      "scope": "write",
+      "summary": "Names, changes or clears the key result that delivers a dependency. Naming a different one clears the providing team's confirmation.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "provider-key-result-id",
+          "field": "providerKeyResultId",
           "type": "string",
           "required": true
         }
@@ -8299,6 +8928,29 @@
           "name": "include-dismissed",
           "field": "includeDismissed",
           "type": "boolean",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "alignment score",
+      "action": "alignment.score",
+      "method": "GET",
+      "path": "/alignment/score",
+      "scope": "read",
+      "summary": "The stored alignment health score for one cycle, with its band and what it is made of. One row, not the graph.",
+      "flags": [
+        {
+          "name": "cycle-id",
+          "field": "cycleId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "space-id",
+          "field": "spaceId",
+          "type": "string",
           "required": false
         }
       ],
@@ -8818,7 +9470,7 @@
       "method": "POST",
       "path": "/kpis/update",
       "scope": "write",
-      "summary": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
+      "summary": "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
       "flags": [
         {
           "name": "kpi-id",
@@ -8941,6 +9593,12 @@
           "name": "watch-pct",
           "field": "watchPct",
           "type": "string",
+          "required": false
+        },
+        {
+          "name": "read",
+          "field": "read",
+          "type": "object",
           "required": false
         }
       ],
@@ -9595,6 +10253,12 @@
           "field": "id",
           "type": "string",
           "required": true
+        },
+        {
+          "name": "from-stage-key",
+          "field": "fromStageKey",
+          "type": "string",
+          "required": false
         }
       ],
       "pages": false
@@ -9621,7 +10285,7 @@
       "action": "sessions.close",
       "method": "POST",
       "path": "/sessions/close",
-      "scope": "write",
+      "scope": "destructive",
       "summary": "Closes a running session.",
       "flags": [
         {
@@ -11157,6 +11821,23 @@
       "path": "/sessions/scoringStatus",
       "scope": "read",
       "summary": "Stage two's state: the evidence, the grades so far, and the scores of the objectives the room has revealed.",
+      "flags": [
+        {
+          "name": "session-id",
+          "field": "sessionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sessions stageCompletion",
+      "action": "sessions.stageCompletion",
+      "method": "GET",
+      "path": "/sessions/stageCompletion",
+      "scope": "read",
+      "summary": "Whether each stage of a quarterly review has met its completion condition, and what is missing where it has not. Shown, never enforced, except that scoring does not close on an unexplained committed miss.",
       "flags": [
         {
           "name": "session-id",

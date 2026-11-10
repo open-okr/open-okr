@@ -1,3 +1,5 @@
+import type { Conflict } from "../../lib/conflict.ts";
+
 /**
  * What a cycle workspace write reports back.
  *
@@ -9,6 +11,8 @@
 export interface WriteState {
   /** A refusal in words, or null. Never a stack trace. */
   readonly error: string | null;
+  /** Each refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   /**
    * What the write did, in words, for a screen that does not otherwise show
    * it (M-05). Closing a cycle from the scorecard feeds a cycle the scorecard
@@ -16,6 +20,12 @@ export interface WriteState {
    * the inheritance went.
    */
   readonly notice?: string | null;
+  /**
+   * Somebody changed a field this save changes since the form read it
+   * (optimistic-concurrency.md V4). Nothing was written; the screen offers
+   * keep mine and take theirs.
+   */
+  readonly conflict?: Conflict;
 }
 
 export const NO_ERROR: WriteState = { error: null };

@@ -116,6 +116,33 @@ export interface OutboxRelayOptions {
    * package knows nothing about invitations.
    */
   readonly redactOnDelivery?: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Claims one workspace may take in a sliding minute (docs/design/
+   * tenant-limits.md §10, plan 0.7.0 P6 and P7). Read on every claim, so a
+   * host that resolves its settings after starting the relay is honoured.
+   *
+   * Zero or absent is unlimited, and then the relay runs exactly as before:
+   * no claim time written, no count, today's order. With a number, each
+   * workspace is offered only what is left of its minute; its other rows wait
+   * untouched, with no attempt counted, so waiting never dead-letters them.
+   * Rows that belong to no workspace are never held.
+   */
+  readonly rowsPerMinute?: () => number;
+  /**
+   * A topic that retries on its own schedule rather than `backoffSeconds`
+   * and `maxAttempts` (docs/design/outbound-webhooks.md W9). A webhook
+   * receiver down for a deploy is retried for about a day; an email is not.
+   * The host names the topics; this package knows nothing about webhooks.
+   */
+  readonly retryPolicy?: Readonly<
+    Record<
+      string,
+      {
+        readonly maxAttempts: number;
+        readonly backoffSeconds: (attempts: number) => number;
+      }
+    >
+  >;
 }
 
 /**
@@ -157,6 +184,33 @@ const OUTBOX_DISPATCHED = "openokr_outbox_dispatched_total";
 const OUTBOX_DEAD_LETTERED = "openokr_outbox_dead_lettered_total";
 const OUTBOX_PENDING = "openokr_outbox_pending";
 const OUTBOX_OLDEST_PENDING_SECONDS = "openokr_outbox_oldest_pending_seconds";
+/** Workspaces at their outbox rate now (tenant-limits.md §10 R11). */
+const OUTBOX_RATE_HELD_WORKSPACES = "openokr_outbox_rate_held_workspaces";
+/** Due rows waiting only because their workspace is at its rate (R11). */
+const OUTBOX_RATE_HELD_ROWS = "openokr_outbox_rate_held_rows";
+
+/**
+ * Each workspace's claims in the last minute (R2, R3). The outbox already
+ * holds every claim in `claimed_at`, so this is the one record of the rate:
+ * every relay process reads the same rows and agrees. Rows with no workspace
+ * are left out, because no tenant's rate applies to them (R8).
+ */
+const CLAIMS_LAST_MINUTE = `used as (
+  select workspace_id, count(*)::int as n
+    from outbox
+   where claimed_at > now() - interval '60 seconds'
+     and workspace_id is not null
+   group by workspace_id
+)`;
+
+/** A positive whole number of claims a minute, or 0 for unlimited. */
+function rateOf(rowsPerMinute: number | undefined): number {
+  return rowsPerMinute !== undefined &&
+    Number.isFinite(rowsPerMinute) &&
+    rowsPerMinute > 0
+    ? Math.floor(rowsPerMinute)
+    : 0;
+}
 
 const DEFAULT_BATCH_SIZE = 50;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
@@ -203,12 +257,22 @@ export class OutboxRelay {
   readonly #options: Required<
     Omit<
       OutboxRelayOptions,
-      "onError" | "onDeadLetter" | "metrics" | "redactOnDelivery"
+      | "onError"
+      | "onDeadLetter"
+      | "metrics"
+      | "redactOnDelivery"
+      | "rowsPerMinute"
+      | "retryPolicy"
     >
   > &
     Pick<
       OutboxRelayOptions,
-      "onError" | "onDeadLetter" | "metrics" | "redactOnDelivery"
+      | "onError"
+      | "onDeadLetter"
+      | "metrics"
+      | "redactOnDelivery"
+      | "rowsPerMinute"
+      | "retryPolicy"
     >;
   #timer: NodeJS.Timeout | undefined;
   #running = false;
@@ -227,6 +291,8 @@ export class OutboxRelay {
       onDeadLetter: options.onDeadLetter,
       metrics: options.metrics,
       redactOnDelivery: options.redactOnDelivery,
+      rowsPerMinute: options.rowsPerMinute,
+      retryPolicy: options.retryPolicy,
     };
 
     // **Registered here, not in the drain loop, and read at scrape time.**
@@ -237,8 +303,24 @@ export class OutboxRelay {
     // that died an hour ago reports an hour of lag.
     options.metrics?.gauge(OUTBOX_PENDING, () => this.#pendingCount());
     options.metrics?.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
-      this.#oldestPendingSeconds(),
+      OutboxRelay.oldestPendingSeconds(this.#pool, this.#rate()),
     );
+    // Whether the outbox rate is engaging now, and how much it holds (R11).
+    // Each answers 0 without a query while the limit is unset.
+    options.metrics?.gauge(
+      OUTBOX_RATE_HELD_WORKSPACES,
+      async () =>
+        (await OutboxRelay.rateHeld(this.#pool, this.#rate())).workspaces,
+    );
+    options.metrics?.gauge(
+      OUTBOX_RATE_HELD_ROWS,
+      async () => (await OutboxRelay.rateHeld(this.#pool, this.#rate())).rows,
+    );
+  }
+
+  /** The outbox rate now, read on every use (R1). */
+  #rate(): number {
+    return rateOf(this.#options.rowsPerMinute?.());
   }
 
   /** Rows waiting: not delivered, not given up on, and due. */
@@ -267,17 +349,45 @@ export class OutboxRelay {
    * opposite of the signal. What an operator needs is how long the oldest
    * piece of undelivered work has been undelivered.
    */
-  async #oldestPendingSeconds(): Promise<number> {
-    const client = await this.#pool.connect();
+  /**
+   * The oldest-pending-seconds query, exposed for the status endpoint
+   * (P8-T06c). The relay registers it as a gauge at construction; the
+   * status endpoint needs the same number without constructing a relay.
+   */
+  static async oldestPendingSeconds(
+    pool: RelayPool,
+    rowsPerMinute = 0,
+  ): Promise<number> {
+    const rate = rateOf(rowsPerMinute);
+    const client = await pool.connect();
     try {
-      const result = await client.query(
-        `select coalesce(
-                  extract(epoch from (now() - min(created_at))), 0
-                )::double precision as lag
-           from outbox
-          where delivered_at is null
-            and dead_lettered_at is null`,
-      );
+      // **With an outbox rate, the rate's own work is not lag** (R10). A
+      // workspace at its rate now is left out: the relay is keeping up with
+      // everything it is allowed to deliver, and forty thousand rows at 600 a
+      // minute would otherwise read as an outage. With none, today's query.
+      const result =
+        rate === 0
+          ? await client.query(
+              `select coalesce(
+                        extract(epoch from (now() - min(created_at))), 0
+                      )::double precision as lag
+                 from outbox
+                where delivered_at is null
+                  and dead_lettered_at is null`,
+            )
+          : await client.query(
+              `with ${CLAIMS_LAST_MINUTE}
+               select coalesce(
+                        extract(epoch from (now() - min(o.created_at))), 0
+                      )::double precision as lag
+                 from outbox o
+                where o.delivered_at is null
+                  and o.dead_lettered_at is null
+                  and (o.workspace_id is null
+                       or o.workspace_id not in (
+                         select workspace_id from used where n >= $1))`,
+              [rate],
+            );
       return Math.max(0, Number(result.rows[0]?.lag ?? 0));
     } finally {
       client.release();
@@ -285,22 +395,37 @@ export class OutboxRelay {
   }
 
   /**
-   * The oldest-pending-seconds query, exposed for the status endpoint
-   * (P8-T06c). The relay registers it as a gauge at construction; the
-   * status endpoint needs the same number without constructing a relay.
+   * How much the outbox rate holds now (R11): the workspaces at their rate,
+   * and their due rows waiting only because of it. Both 0, with no query,
+   * while the limit is unset. Static, like the lag, so a scrape and the
+   * status endpoint ask without a relay.
    */
-  static async oldestPendingSeconds(pool: RelayPool): Promise<number> {
+  static async rateHeld(
+    pool: RelayPool,
+    rowsPerMinute = 0,
+  ): Promise<{ readonly workspaces: number; readonly rows: number }> {
+    const rate = rateOf(rowsPerMinute);
+    if (rate === 0) {
+      return { workspaces: 0, rows: 0 };
+    }
     const client = await pool.connect();
     try {
       const result = await client.query(
-        `select coalesce(
-                  extract(epoch from (now() - min(created_at))), 0
-                )::double precision as lag
-           from outbox
-          where delivered_at is null
-            and dead_lettered_at is null`,
+        `with ${CLAIMS_LAST_MINUTE},
+              held as (select workspace_id from used where n >= $1)
+         select count(distinct o.workspace_id)::int as workspaces,
+                count(*)::int as rows
+           from outbox o
+           join held h on h.workspace_id = o.workspace_id
+          where o.delivered_at is null
+            and o.dead_lettered_at is null
+            and o.available_at <= now()`,
+        [rate],
       );
-      return Math.max(0, Number(result.rows[0]?.lag ?? 0));
+      return {
+        workspaces: Number(result.rows[0]?.workspaces ?? 0),
+        rows: Number(result.rows[0]?.rows ?? 0),
+      };
     } finally {
       client.release();
     }
@@ -473,32 +598,65 @@ export class OutboxRelay {
       // window is wider. The claim keeps the `limit`, so a relay still takes
       // one batch; it just takes the first batch of candidates nothing else
       // is holding.
-      const fair = await client.query(
-        `select id
-           from (
-             select id, created_at,
-                    row_number() over (
-                      partition by workspace_id
-                      order by created_at, id
-                    ) as rank
-               from outbox
-              where delivered_at is null
-                and dead_lettered_at is null
-                and available_at <= now()
-           ) ranked
-          order by rank, created_at, id
-          limit $1`,
-        [this.#options.batchSize * CLAIM_CANDIDATE_BATCHES],
-      );
+      // **With an outbox rate, each workspace offers only what is left of
+      // its minute** (tenant-limits.md §10 R6, R7). The rank already orders
+      // a workspace's rows by age, so keeping the ranks up to its remaining
+      // budget removes candidates and reorders nothing. A workspace with
+      // nothing left offers none, and its rows are not touched. With no rate,
+      // today's statement, so an instance with nobody to hold pays nothing.
+      const rate = this.#rate();
+      const fair =
+        rate === 0
+          ? await client.query(
+              `select id
+                 from (
+                   select id, created_at,
+                          row_number() over (
+                            partition by workspace_id
+                            order by created_at, id
+                          ) as rank
+                     from outbox
+                    where delivered_at is null
+                      and dead_lettered_at is null
+                      and available_at <= now()
+                 ) ranked
+                order by rank, created_at, id
+                limit $1`,
+              [this.#options.batchSize * CLAIM_CANDIDATE_BATCHES],
+            )
+          : await client.query(
+              `with ${CLAIMS_LAST_MINUTE}
+               select ranked.id
+                 from (
+                   select id, created_at, workspace_id,
+                          row_number() over (
+                            partition by workspace_id
+                            order by created_at, id
+                          ) as rank
+                     from outbox
+                    where delivered_at is null
+                      and dead_lettered_at is null
+                      and available_at <= now()
+                 ) ranked
+                 left join used on used.workspace_id = ranked.workspace_id
+                where ranked.workspace_id is null
+                   or ranked.rank <= $2::int - coalesce(used.n, 0)
+                order by ranked.rank, ranked.created_at, ranked.id
+                limit $1`,
+              [this.#options.batchSize * CLAIM_CANDIDATE_BATCHES, rate],
+            );
       const ids = fair.rows.map((row) => row.id as string);
       if (ids.length === 0) {
         return [];
       }
 
+      // The claim time is what the rate counts (R3), and only written when
+      // there is a rate, so an unlimited instance writes nothing new (R5).
       const result = await client.query(
         `update outbox
             set attempts = attempts + 1,
-                available_at = now() + make_interval(secs => $2::double precision)
+                available_at = now() + make_interval(secs => $2::double precision),
+                claimed_at = case when $4::boolean then now() else claimed_at end
           where id in (
             select id
               from outbox
@@ -512,7 +670,7 @@ export class OutboxRelay {
           )
           returning id, topic, payload, idempotency_key, attempts, created_at,
                     workspace_id`,
-        [ids, this.#options.leaseSeconds, this.#options.batchSize],
+        [ids, this.#options.leaseSeconds, this.#options.batchSize, rate > 0],
       );
 
       // **The subquery's order has to be rebuilt here, and this is where the
@@ -610,9 +768,11 @@ export class OutboxRelay {
     const truncated = message.slice(0, 2000);
     const permanent =
       error instanceof Error && error.name === "PermanentDispatchError";
+    const policy = this.#options.retryPolicy?.[record.topic];
+    const maxAttempts = policy?.maxAttempts ?? this.#options.maxAttempts;
     const client = await this.#pool.connect();
     try {
-      if (permanent || record.attempts >= this.#options.maxAttempts) {
+      if (permanent || record.attempts >= maxAttempts) {
         await client.query(
           `update outbox
               set last_error = $2, dead_lettered_at = now()
@@ -623,7 +783,9 @@ export class OutboxRelay {
         return true;
       }
 
-      const backoff = this.#options.backoffSeconds(record.attempts);
+      const backoff = (policy?.backoffSeconds ?? this.#options.backoffSeconds)(
+        record.attempts,
+      );
       await client.query(
         `update outbox
             set last_error = $2,

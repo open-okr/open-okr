@@ -32,12 +32,11 @@ import { readSetupState } from "./state.ts";
 export interface CompleteSetupInput {
   /** Instance settings gathered by the wizard. */
   readonly settings: readonly SettingWrite[];
-  /**
-   * Closes registration once the instance is claimed. The wizard sets this,
-   * because "open until the first admin exists" is only true if something
-   * writes the second half.
-   */
-  readonly closeRegistration?: boolean;
+  // No registration policy is written here any more (registration-policy.md
+  // §9 D11, plan 0.7.0 B1). The computed default already closes a claimed
+  // self-hosted instance, a cloud stays open, and OPENOKR_REGISTRATION keeps
+  // working after setup. The saved `invite_only` this used to write did the
+  // opposite of all three.
   readonly now?: () => Date;
 }
 
@@ -78,14 +77,6 @@ export async function completeSetup(
         source: setting.source ?? ("wizard" as const),
       })),
     ];
-
-    if (input.closeRegistration) {
-      writes.push({
-        key: "registration.policy",
-        value: "invite_only",
-        source: "wizard",
-      });
-    }
 
     // Settings first, completion last: an interrupted wizard reopens rather
     // than locking the operator out of an unconfigured instance.

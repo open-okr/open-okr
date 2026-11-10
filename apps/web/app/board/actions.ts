@@ -7,14 +7,27 @@
  * is refused is the one `packages/core` wrote. None of them touches a key
  * result: finishing work moves no number, which is the work-layer design's §1.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { conflictOf } from "../../lib/conflict.ts";
+import { refusedByField, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
 const STATUSES = ["backlog", "todo", "in_progress", "done"] as const;
+
+/**
+ * What a refused write says (guided-inputs §4.2): one sentence by default,
+ * for a drag, a menu or a tick, none of which draws a field to put a message
+ * under; under each field it names for the add-a-task and checklist forms. A
+ * schema's refusal too, which used to reach the error page.
+ */
+type Answer = (
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+) => WriteState | null;
 
 async function run(
   fn: (context: {
@@ -23,6 +36,7 @@ async function run(
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
   paths: readonly string[] = ["/board"],
+  answer: Answer = refusedSentence,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -32,10 +46,11 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const refused = answer(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
     }
-    throw error;
+    return refused;
   }
   for (const path of paths) {
     revalidatePath(path);
@@ -57,10 +72,16 @@ export async function createTaskAction(
   const dueOn = String(formData.get("dueOn") ?? "").trim();
 
   if (title === "") {
-    return { error: t("board.actions.taskNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("board.actions.taskNeedsATitle") },
+    };
   }
   if (spaceId === "") {
-    return { error: t("board.actions.taskLivesInASpace") };
+    return {
+      error: null,
+      fields: { spaceId: t("board.actions.taskLivesInASpace") },
+    };
   }
   const column = STATUSES.find((one) => one === status) ?? "backlog";
 
@@ -78,6 +99,7 @@ export async function createTaskAction(
     initiativeId === ""
       ? ["/board"]
       : ["/board", `/initiatives/${initiativeId}`],
+    refusedByField,
   );
 }
 
@@ -150,11 +172,15 @@ export async function addChecklistItemAction(
   const title = String(formData.get("title") ?? "").trim();
   if (id === "" || title === "") {
     const { t } = await getTranslations();
-    return { error: t("board.actions.checklistLineNeedsWords") };
+    return {
+      error: null,
+      fields: { title: t("board.actions.checklistLineNeedsWords") },
+    };
   }
   return run(
     (context) => callAction(context, "tasks.addChecklistItem", { id, title }),
     ["/board", `/tasks/${id}`],
+    refusedByField,
   );
 }
 
@@ -191,13 +217,24 @@ export async function setChecklistItemAction(
 export async function setDueOnAction(
   id: string,
   dueOn: string,
+  /** The date the field was drawn with, empty for none (V4). */
+  read?: string,
 ): Promise<WriteState> {
+  const value = dueOn === "" ? null : dueOn;
   return run(
     (context) =>
       callAction(context, "tasks.update", {
         id,
-        dueOn: dueOn === "" ? null : dueOn,
+        dueOn: value,
+        ...(read === undefined
+          ? {}
+          : { read: { dueOn: read === "" ? null : read } }),
       }),
     ["/board", `/tasks/${id}`, "/review"],
+    (error, t) => {
+      // Somebody moved the date since this page read it (D3).
+      const conflict = conflictOf(error, { dueOn: value });
+      return conflict ? { error: null, conflict } : refusedSentence(error, t);
+    },
   );
 }

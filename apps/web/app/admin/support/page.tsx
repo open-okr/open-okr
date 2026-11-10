@@ -1,5 +1,6 @@
 import { ACCESS_LEVELS, listSupportSessions } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
+import Link from "next/link";
 import { requireAccessLevel } from "../../../lib/access.ts";
 import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -143,6 +144,17 @@ export default async function SupportAccessPage() {
                   </span>
                 </div>
                 <p className="text-ink text-sm">{session.reason}</p>
+                {/* support-access.md §10 D11, plan 0.7.0 P2: what the guest
+                 * did, from the audit trail, which already filters by actor.
+                 * The guest is one member across every session (§4). */}
+                {session.grantedAt !== null && session.memberId !== null ? (
+                  <Link
+                    className="w-fit text-brand-text text-xs hover:underline"
+                    href={`/admin/audit?actorMemberId=${session.memberId}`}
+                  >
+                    {t("admin.support.whatWasDone")}
+                  </Link>
+                ) : null}
               </li>
             ))}
           </ul>

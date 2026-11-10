@@ -133,7 +133,7 @@ export function CloseWorkspaceCard(
           </li>
         </ul>
         <Link
-          href="/admin/imports"
+          href="/admin/backups"
           className="text-sm font-semibold text-brand-text hover:underline"
         >
           {t("admin.close.exportFirst")}

@@ -21,6 +21,7 @@ import {
 } from "@openokr/db";
 import { levelsInUse } from "@openokr/method";
 import { and, asc, desc, eq, sql } from "drizzle-orm";
+import { freshShortId } from "../ids/short.ts";
 import type { LegacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -28,6 +29,7 @@ import {
   type CyclePeriod,
   cyclePeriodFor,
   localDateIn,
+  parseLocalDate,
   statusForDate,
 } from "./generation.ts";
 
@@ -161,6 +163,7 @@ export async function ensureCurrentCycleInTx<
     .values({
       id: newId(),
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "cycle", input.workspaceId),
       name: period.name,
       mode: period.mode,
       cadence: period.cadence,
@@ -317,13 +320,22 @@ export async function createCycleInTx<
     .values({
       id: newId(),
       workspaceId: input.workspaceId,
+      shortId: await freshShortId(tx, "cycle", input.workspaceId),
       name: input.name?.trim() || input.period.name,
       mode: input.period.mode,
       cadence: input.cadence,
       startsOn: input.period.startsOn,
       endsOn: input.period.endsOn,
-      status: "planning",
-      phase: input.period.mode === "annual" ? 0 : 1,
+      // A period that has already ended is closing, not being planned
+      // (okr-core-domain.md §10 C7). Never `active`: publication does that.
+      status: statusForDate(input.period, parseLocalDate(input.today), false),
+      phase:
+        statusForDate(input.period, parseLocalDate(input.today), false) ===
+        "closing"
+          ? 7
+          : input.period.mode === "annual"
+            ? 0
+            : 1,
       // The levels it begins with (METHOD v2 §2.7, P9-T07a-c).
       levels: levelsInUse(
         practiceFromRow(await readRhythmRow(tx, input.workspaceId)).practice,

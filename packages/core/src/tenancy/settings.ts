@@ -76,6 +76,24 @@ export async function guardsAIEndpoints(pool: Pool): Promise<boolean> {
   );
 }
 
+/**
+ * Whether a webhook may name an address inside the network
+ * (docs/design/outbound-webhooks.md Q1).
+ *
+ * The instance setting, and never with the cloud flag on: there a workspace
+ * administrator is not the operator, and a hook pointed inside the network
+ * is a request the server makes for a stranger. Read from the pool, never
+ * inside a tenant transaction, for the reason the file comment gives.
+ */
+export async function allowsPrivateWebhookTargets(
+  pool: Pool,
+): Promise<boolean> {
+  return (
+    !(await isCloudEnabled(pool)) &&
+    (await resolve<boolean>(pool, "webhooks.allowPrivateTargets"))
+  );
+}
+
 export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
   const enabled = await isCloudEnabled(pool);
   // The other two are only meaningful when the cloud is on, and asking for
@@ -98,6 +116,7 @@ export async function resolveCloudTenancy(pool: Pool): Promise<CloudTenancy> {
 // nothing imports, and it is right to.
 const CLOUD_ACTIONS_PER_MINUTE_KEY = "cloud.limits.actionsPerMinute";
 const CLOUD_CONCURRENT_ACTIONS_KEY = "cloud.limits.concurrentActions";
+const CLOUD_OUTBOX_ROWS_PER_MINUTE_KEY = "cloud.limits.outboxRowsPerMinute";
 
 /**
  * The two admission limits, resolved and validated (P8-T06a).
@@ -121,6 +140,10 @@ export async function resolveAdmissionLimits(
     concurrentActions: await resolve<number>(
       pool,
       CLOUD_CONCURRENT_ACTIONS_KEY,
+    ),
+    outboxRowsPerMinute: await resolve<number>(
+      pool,
+      CLOUD_OUTBOX_ROWS_PER_MINUTE_KEY,
     ),
   };
   validateAdmissionLimits(limits);

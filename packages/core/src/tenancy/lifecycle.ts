@@ -101,6 +101,7 @@ export async function setTenantStateInTx(
       ownerMayReopen: input.state === "closed" && input.ownerMayReopen === true,
       // A new closure is reminded afresh (workspace-erasure.md §12, decision 3).
       erasureRemindedAt: null,
+      suspendedByTrial: false, // the sweep sets it after its own move (§11 T7)
       updatedAt: now,
     })
     .where(activeOnly(tenants, eq(tenants.workspaceId, input.workspaceId)))
@@ -127,6 +128,13 @@ export interface TenantLifecycle {
   readonly ownerMayReopen: boolean;
   /** True when billing, not an operator, made it read-only. */
   readonly suspendedByBilling: boolean;
+  /**
+   * True when the trial sweep made it read-only, because its people do not
+   * fit the plan its trial ended on (tenant-lifecycle.md §11 T7, T8).
+   */
+  readonly suspendedByTrial: boolean;
+  /** When a running trial ends, for the last week's notice (§11 T10). */
+  readonly trialEndsAt: Date | null;
 }
 
 /**
@@ -144,6 +152,8 @@ export async function readLifecycleInTx(
       state: tenants.state,
       closedAt: tenants.closedAt,
       ownerMayReopen: tenants.ownerMayReopen,
+      suspendedByTrial: tenants.suspendedByTrial,
+      trialEndsAt: tenants.trialEndsAt,
     })
     .from(tenants)
     .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
@@ -163,6 +173,8 @@ export async function readLifecycleInTx(
     closedAt: tenant.closedAt,
     ownerMayReopen: tenant.ownerMayReopen,
     suspendedByBilling: account?.suspendedByBilling ?? false,
+    suspendedByTrial: tenant.suspendedByTrial,
+    trialEndsAt: tenant.trialEndsAt,
   };
 }
 
@@ -205,7 +217,13 @@ export function refuseOwnLifecycleMove(
       ? "Only the provider can reopen this workspace."
       : "Only the provider can lift a suspension.";
   }
-  if (from.state === "suspended" && !from.suspendedByBilling) {
+  // Closing is the customer's from either "you are over your plan" mode,
+  // billing's or the trial's (tenant-lifecycle.md §11 T8).
+  if (
+    from.state === "suspended" &&
+    !from.suspendedByBilling &&
+    !from.suspendedByTrial
+  ) {
     return "The provider suspended this workspace, so only the provider can close it.";
   }
   return null;
@@ -226,6 +244,9 @@ export function refuseOwnStateChange(
   }
   if (lifecycle.state === "closed") {
     return "This workspace is closed, so its state cannot change here.";
+  }
+  if (lifecycle.suspendedByTrial) {
+    return "This workspace's trial ended and its people do not fit the plan it moved to, so it is read-only until somebody chooses a plan or its people fit.";
   }
   return lifecycle.suspendedByBilling
     ? "This workspace is suspended until its subscription is paid or its people fit its plan, so its state cannot change here."

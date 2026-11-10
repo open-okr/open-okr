@@ -21,10 +21,13 @@
     "seed:large": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/seed-large.ts",
     "perf:budgets": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/perf-budgets.ts",
     "perf:load": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/perf-load.ts",
+    "alignment:fill": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/fill-alignment.ts",
     "cloud:adopt": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/cloud-adopt.ts",
     "cloud:erase": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/cloud-erase.ts",
     "cloud:operator": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/cloud-operator.ts",
+    "cloud:support-sweep": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-support.ts",
     "cloud:sweep": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-closures.ts",
+    "cloud:trials": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/sweep-trials.ts",
     "cloud:usage": "node --experimental-strip-types --no-warnings --env-file-if-exists=../../.env src/bin/measure-usage.ts"
   },
   "dependencies": {

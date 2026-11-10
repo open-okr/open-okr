@@ -10,6 +10,7 @@
  * refusing or failing. A script that retries on 1 and gives up on 2 is doing the
  * right thing, which is the point of separating them.
  */
+import type { Readable, Writable } from "node:stream";
 import {
   type CliContract,
   commandsIn,
@@ -19,6 +20,7 @@ import {
 } from "./contract.ts";
 import { openBrowser, pollDevice, startDevice } from "./device.ts";
 import { commandHelp, parseFlags } from "./flags.ts";
+import { runMcpBridge } from "./mcp-bridge.ts";
 import {
   type Config,
   configPath,
@@ -43,6 +45,9 @@ export interface RunOptions {
    * Defaults to stderr, which keeps it out of a pipe.
    */
   readonly say?: (line: string) => void;
+  /** Standard input and output for `okr mcp`, which streams rather than answers once. */
+  readonly stdin?: NodeJS.ReadableStream;
+  readonly stdout?: NodeJS.WritableStream;
   /** How the poll waits. Passed in so a test does not spend ten seconds. */
   readonly wait?: (milliseconds: number) => Promise<void>;
   /** Opens the browser. Passed in so a test does not open one. */
@@ -65,6 +70,8 @@ function topHelp(contract: CliContract): string {
     "",
     "  okr <domain> <verb> [--flag value]",
     "  okr login --url <instance> [--token <token>] [--no-browser]",
+    "  okr login --url <instance> --mcp-token <agent token>",
+    "  okr mcp [--profile name]    a desktop agent's standard input and output",
     "  okr logout [--profile name]",
     "  okr profiles",
     "",
@@ -141,6 +148,24 @@ async function login(
   }
   const name = flags.profile ?? "default";
 
+  // An agent token for `okr mcp`, kept beside the profile's REST token rather
+  // than in its place (agent-stdio.md T2).
+  if (flags["mcp-token"]) {
+    const existing = readConfig(file).profiles[name];
+    saveProfile(
+      name,
+      {
+        url,
+        token: existing?.url === url ? existing.token : "",
+        mcpToken: flags["mcp-token"],
+      },
+      file,
+    );
+    return ok(
+      `Saved the agent token for "${name}" at ${url} (${tokenHint(flags["mcp-token"])}). Point a desktop agent at \`okr mcp\`.`,
+    );
+  }
+
   if (flags.token) {
     saveProfile(name, { url, token: flags.token }, file);
     // Never the token itself: a terminal scrollback is a place secrets survive.
@@ -150,6 +175,39 @@ async function login(
   }
 
   return deviceLogin({ url, name, file, flags, options });
+}
+
+/**
+ * `okr mcp`: runs until the agent closes standard input (agent-stdio.md).
+ * Refuses before reading anything when the profile holds no agent token,
+ * because the REST token would only be refused at the endpoint.
+ */
+async function mcp(
+  argv: readonly string[],
+  file: string,
+  options: RunOptions,
+): Promise<RunResult> {
+  const flags = simpleFlags(argv);
+  const name = flags.profile ?? readConfig(file).current;
+  const profile = readConfig(file).profiles[name];
+  if (!profile) {
+    return usage(
+      `No profile called "${name}". Run \`okr login --url <instance> --mcp-token <agent token>\` first.`,
+    );
+  }
+  if (!profile.mcpToken) {
+    return usage(
+      `Profile "${name}" has no agent token. Mint one under Agent tokens in your account, then run \`okr login --url ${profile.url} --mcp-token <token>\`.`,
+    );
+  }
+  await runMcpBridge({
+    url: profile.url,
+    token: profile.mcpToken,
+    input: (options.stdin ?? process.stdin) as Readable,
+    output: (options.stdout ?? process.stdout) as Writable,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  return ok("");
 }
 
 /** The scopes a login asks for when nobody says. */
@@ -298,6 +356,10 @@ export async function run(
     return ok(`Removed profile "${name}".`);
   }
 
+  if (words[0] === "mcp") {
+    return mcp(words.slice(1), file, options);
+  }
+
   if (words[0] === "profiles") {
     return ok(profilesText(readConfig(file), file));
   }
@@ -336,6 +398,7 @@ export async function run(
   try {
     answer = await send(found.command, parsed.input, resolved.profile, {
       ...(parsed.globals.cursor ? { cursor: parsed.globals.cursor } : {}),
+      ...(parsed.globals.validate ? { validate: true } : {}),
       ...(options.fetch ? { fetch: options.fetch } : {}),
     });
   } catch (error) {

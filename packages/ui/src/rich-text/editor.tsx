@@ -268,9 +268,19 @@ export const RichTextEditor = forwardRef<
       ) : null}
       {surface}
       {counter}
+      {uploadFile && editable ? <FileHint /> : null}
     </div>
   );
 });
+
+/**
+ * That a file can go in, which nothing else on the field shows: a paste or a
+ * drop has no button (plan 0.7.0 R4).
+ */
+function FileHint() {
+  const { t } = useTranslations();
+  return <p className="text-xs text-ink-4">{t("editor.attachment.hint")}</p>;
+}
 
 /**
  * How much of a length limit is used, once it is close, and how much to take

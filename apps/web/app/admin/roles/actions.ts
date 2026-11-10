@@ -1,9 +1,11 @@
 "use server";
 
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import type { RoleDomain } from "@openokr/db";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { refusedState } from "../../../lib/refusal";
+import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 
 /**
@@ -23,6 +25,8 @@ import { requireWorkspace } from "../../../lib/workspace";
 
 export interface RoleResult {
   readonly error: string | null;
+  /** A refused new role's name, shown under its box (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
 }
 
 async function context() {
@@ -34,11 +38,24 @@ async function context() {
   };
 }
 
-const refused = (error: unknown): RoleResult => {
-  if (error instanceof OperationError) {
-    return { error: error.message };
+/**
+ * A refusal under the field a write drew when it names it, the new role's
+ * name, and as the matrix's sentence otherwise: a cell, a delete and an
+ * assignment are clicks with no box of their own. A schema's refusal too,
+ * which used to reach the error page (guided-inputs §4.2, plan U1b).
+ */
+const refused = async (
+  error: unknown,
+  drawn: readonly string[] = [],
+): Promise<RoleResult> => {
+  const state = refusedState(error, (await getTranslations()).t, drawn);
+  if (state === null) {
+    throw error;
   }
-  throw error;
+  return {
+    error: state.error ?? null,
+    ...(state.fields ? { fields: state.fields } : {}),
+  };
 };
 
 /**
@@ -71,7 +88,7 @@ export async function createRoleAction(input: {
   try {
     await callAction(await context(), "roles.create", { name: input.name });
   } catch (error) {
-    return refused(error);
+    return refused(error, ["name"]);
   }
   refresh();
   return { error: null };

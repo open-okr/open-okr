@@ -668,6 +668,22 @@ describe("brute force protection", () => {
     expect(statuses).toContain(429);
   });
 
+  it("allows five reset requests a minute from one caller, and refuses the sixth", async () => {
+    // The rule once named `/forget-password`, a path Better Auth 1.7 does not
+    // serve, so its default of three applied instead (account-lockout.md D11).
+    await register();
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const response = await post(
+        "/request-password-reset",
+        { email: EMAIL, redirectTo: `${BASE_URL}/reset-password` },
+        { "x-forwarded-for": "203.0.113.77" },
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+  });
+
   it("does not lock out a different caller", async () => {
     await register();
     await hammer("203.0.113.10", 12);

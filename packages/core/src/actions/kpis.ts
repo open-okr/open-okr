@@ -55,6 +55,8 @@ import { getAccessScoped } from "../access/reads.ts";
 import { bindAgentsToContextInTx } from "../agents/bindings.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
+import { freshShortId } from "../ids/short.ts";
 import {
   assertLegacyKeyFree,
   legacyColumns,
@@ -84,6 +86,11 @@ import {
   workspaceKpiCorridor,
 } from "../kpis/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  readOf,
+  readsEveryChange,
+  requireReadUnchanged,
+} from "../operations/unchanged.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
 
 /**
@@ -313,16 +320,6 @@ async function actingMember(
   return member.id;
 }
 
-/** A short identifier for a URL. Random, per workspace, never sequential. */
-function shortId(): string {
-  const alphabet = "123456789abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ";
-  let out = "";
-  for (let index = 0; index < 10; index += 1) {
-    out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return out;
-}
-
 export const createKpiCategory = defineWriteAction({
   name: "kpis.createCategory",
   domain: "kpi",
@@ -440,7 +437,7 @@ export const createKpi = defineWriteAction({
       const rule = ruleWrite(input, null);
 
       const id = newId();
-      const short = shortId();
+      const short = await freshShortId(tx, "kpi", workspaceId);
       // openokr:allow-mutation: same transaction.
       await tx.insert(kpis).values({
         id,
@@ -496,6 +493,10 @@ export const createKpi = defineWriteAction({
           kind: "kpi.created" as const,
           subjectType: "workspace" as const,
           subjectId: workspaceId,
+          // The activity names the workspace, where the feed shows it. The
+          // content is the KPI, so that is what retrieval embeds and search
+          // indexes (plan A10); later KPI activities name the KPI themselves.
+          embed: { entityType: "kpi", entityId: id },
           payload: { title: input.title, frequency: input.frequency },
         },
         audit: {
@@ -999,31 +1000,60 @@ export const setKpiFormulaAction = defineWriteAction({
   }),
 });
 
+/**
+ * The fields `kpis.update` compares when the caller sends `read`
+ * (optimistic-concurrency.md V4): every field it changes. A target type is
+ * compared as it reads, so a KPI written before target types compares as the
+ * type its direction implies.
+ */
+const KPI_READ = [
+  "title",
+  "unit",
+  "direction",
+  "targetType",
+  "greenLow",
+  "greenHigh",
+  "redLow",
+  "redHigh",
+  "indicatorType",
+  "tier",
+  "ownerMemberId",
+  "targetDefault",
+  "parentKpiId",
+  "treeId",
+  "categoryId",
+  "healthyPct",
+  "watchPct",
+] as const;
+
 export const updateKpi = defineWriteAction({
   name: "kpis.update",
   domain: "kpi",
   summary:
-    "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to.",
-  input: z.object({
-    kpiId: z.uuid(),
-    title: z.string().trim().min(1).max(500).optional(),
-    unit: z.string().trim().max(60).nullable().optional(),
-    direction: z.enum(KPI_DIRECTION_VALUES).optional(),
-    ...ruleFields,
-    indicatorType: z.enum(["leading", "lagging"]).optional(),
-    /** Null takes the tier away, which §6.2 allows. */
-    tier: z.enum(KPI_TIERS).nullable().optional(),
-    /** The named owner (§6.2); null leaves it unnamed. */
-    ownerMemberId: z.uuid().nullable().optional(),
-    targetDefault: z.number().nullable().optional(),
-    /** Null detaches it, which makes it a root of its own. */
-    parentKpiId: z.uuid().nullable().optional(),
-    treeId: z.uuid().nullable().optional(),
-    categoryId: z.uuid().nullable().optional(),
-    /** Null returns the line to the workspace's own (UAT BUG-011). */
-    healthyPct: z.number().min(0).max(200).nullable().optional(),
-    watchPct: z.number().min(0).max(200).nullable().optional(),
-  }),
+    "Edits a KPI's own fields, where it hangs in the tree, and which tree it belongs to. Send read, the values you read for the fields you change, and a field somebody changed since is refused as a conflict with what is stored now.",
+  input: z
+    .object({
+      kpiId: z.uuid(),
+      title: z.string().trim().min(1).max(500).optional(),
+      unit: z.string().trim().max(60).nullable().optional(),
+      direction: z.enum(KPI_DIRECTION_VALUES).optional(),
+      ...ruleFields,
+      indicatorType: z.enum(["leading", "lagging"]).optional(),
+      /** Null takes the tier away, which §6.2 allows. */
+      tier: z.enum(KPI_TIERS).nullable().optional(),
+      /** The named owner (§6.2); null leaves it unnamed. */
+      ownerMemberId: z.uuid().nullable().optional(),
+      targetDefault: z.number().nullable().optional(),
+      /** Null detaches it, which makes it a root of its own. */
+      parentKpiId: z.uuid().nullable().optional(),
+      treeId: z.uuid().nullable().optional(),
+      categoryId: z.uuid().nullable().optional(),
+      /** Null returns the line to the workspace's own (UAT BUG-011). */
+      healthyPct: z.number().min(0).max(200).nullable().optional(),
+      watchPct: z.number().min(0).max(200).nullable().optional(),
+      read: readOf(KPI_READ),
+    })
+    .refine(...readsEveryChange(KPI_READ)),
   output: z.object({
     id: z.uuid(),
     state: z.string(),
@@ -1055,6 +1085,51 @@ export const updateKpi = defineWriteAction({
       if (!existing) {
         throw new OperationError("not_found", "No such KPI.");
       }
+      await requireReadUnchanged(tx, {
+        workspaceId,
+        subjectType: "kpi",
+        subjectId: input.kpiId,
+        fields: KPI_READ,
+        given: input,
+        stored: async () => {
+          const [row] = await tx
+            .select({
+              ...KPI_RULE_COLUMNS,
+              title: kpis.title,
+              unit: kpis.unit,
+              indicatorType: kpis.indicatorType,
+              tier: kpis.tier,
+              ownerMemberId: kpis.ownerMemberId,
+              targetDefault: kpis.targetDefault,
+              parentKpiId: kpis.parentKpiId,
+              treeId: kpis.treeId,
+              categoryId: kpis.categoryId,
+            })
+            .from(kpis)
+            .where(
+              activeOnly(
+                kpis,
+                eq(kpis.workspaceId, workspaceId),
+                eq(kpis.id, input.kpiId),
+              ),
+            )
+            .for("update")
+            .limit(1);
+          if (!row) {
+            return undefined;
+          }
+          const number = (value: string | null) =>
+            value === null ? null : Number(value);
+          return {
+            ...row,
+            ...thresholdsOf(row),
+            targetType: targetTypeOf(row),
+            targetDefault: number(row.targetDefault),
+            healthyPct: number(row.healthyPct),
+            watchPct: number(row.watchPct),
+          };
+        },
+      });
 
       if (input.parentKpiId === input.kpiId) {
         // The database refuses it too. This says why rather than surfacing a
@@ -1273,7 +1348,7 @@ export const launchKpiRecovery = defineWriteAction({
   input: z.object({
     kpiId: z.uuid(),
     /** The cycle the objective lives in. The caller resolves the current one. */
-    cycleId: z.uuid(),
+    cycleId: ADDRESS.cycle,
     /**
      * A title instead of §6.5's template sentence (P4-T05c-b).
      *
@@ -1362,9 +1437,9 @@ export const recordKpiResponse = defineWriteAction({
     kpiId: z.uuid(),
     kind: z.enum(["fix_now", "key_result"]),
     /** The task that fixes it, for `fix_now`. */
-    taskId: z.uuid().optional(),
+    taskId: ADDRESS.task.optional(),
     /** The key result that answers it, for `key_result`. */
-    keyResultId: z.uuid().optional(),
+    keyResultId: ADDRESS.keyResult.optional(),
   }),
   output: z.object({
     kpiId: z.uuid(),

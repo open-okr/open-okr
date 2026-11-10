@@ -99,6 +99,8 @@ the boundary gate, and neither leaves in a workspace export.
 | Yes | It moves to the default plan |
 | No | It goes read-only through the existing `suspended` state, with `suspended_by_billing` set. Administrators can still manage members, and can move to Free once people fit, or subscribe again |
 
+**A trial ends the same way** ([tenant-lifecycle.md](tenant-lifecycle.md) §11, plan 0.7.0 P4). A trial has no billing account, so its read-only mode is `tenants.suspended_by_trial`. Subscribing lifts either flag, and Settle on S-49 accepts either. Choosing a plan, through a live subscription, an operator or Settle, clears the trial's date.
+
 `applyPlanInTx` refuses a plan smaller than the headcount, which is right for a
 choice and wrong for a subscription that has already ended. That is why this path
 checks first and suspends, rather than calling it and failing.

@@ -18,13 +18,13 @@ import {
   callAction,
   DEFAULT_IMPORT_ROW_LIMIT,
   matchHeadersByAlias,
-  OperationError,
   readBuffer,
   templateFor,
 } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
 import { drafterFor } from "../../../lib/drafter";
+import { refusalFields } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
 import { getStorage } from "../../../lib/storage";
 import { getTranslations } from "../../../lib/translations";
@@ -74,15 +74,19 @@ export interface ReportView {
 export type Answer<T> = { ok: true; value: T } | { ok: false; error: string };
 
 async function refusal(error: unknown): Promise<{ ok: false; error: string }> {
-  if (error instanceof OperationError) {
-    return { ok: false, error: error.message };
+  const { t } = await getTranslations();
+  // An operation's refusal, and a schema's as its own sentence rather than
+  // the JSON of every issue its message is (plan U1b). The wizard's refusals
+  // are about the file or the mapping as a whole, so the sentence it stays.
+  const refused = refusalFields(error, t);
+  if (refused !== null) {
+    return { ok: false, error: refused.message };
   }
   if (error instanceof Error && error.message) {
     // The engine's own refusals are plain Errors with sentences written for a
     // reader: an unreadable extension, a mapping missing a required field.
     return { ok: false, error: error.message };
   }
-  const { t } = await getTranslations();
   return { ok: false, error: t("admin.imports.actions.fileCouldNotBeRead") };
 }
 
@@ -317,6 +321,8 @@ export async function exportWorkspaceArchive(
       "workspace.exportArchive",
       { includeFiles, passphrase },
     );
+    // The Backups screen lists every archive taken (backups-screen.md U3).
+    revalidatePath("/admin/backups");
     return {
       ok: true,
       value: {

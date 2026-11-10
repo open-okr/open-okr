@@ -1,6 +1,7 @@
 "use client";
 import { useTranslations } from "@openokr/ui";
 import { useEffect, useState } from "react";
+import { PlainCopyErrorDetails } from "../lib/error-details";
 import { instanceNameForErrorPage } from "../lib/instance-name-action";
 import { useInstanceName } from "../lib/instance-name-context";
 
@@ -111,6 +112,7 @@ export default function GlobalError({
               {t("common.reference3", { digest: error.digest })}
             </p>
           ) : null}
+          <PlainCopyErrorDetails error={error} />
         </main>
       </body>
     </html>

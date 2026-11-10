@@ -3,6 +3,7 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { provisionMemberForInvite } from "../src/invitations/provisioning.ts";
+import { measureAllWorkspaces } from "../src/operator/usage.ts";
 import {
   countSeats,
   listSeatHolders,
@@ -348,5 +349,64 @@ describe("a pending invitation holds a seat", () => {
         applyPlanInTx(tx, { workspaceId, plan: null, seats: 2 }),
       ),
     ).resolves.toBe(true);
+  });
+});
+
+/**
+ * The operator's snapshot counts seats the way the limit does
+ * (docs/design/operator-console.md §11, plan 0.7.0 P3). The console showed
+ * active people against the plan's seats, so a workspace full of pending
+ * invitations looked half empty.
+ */
+describe("the operator's usage snapshot", () => {
+  const personal = async (email: string) => {
+    const wb = await workerDb();
+    return callAction(
+      {
+        pool: wb.appPool,
+        workspaceId,
+        actor: { kind: "human", userId: OWNER },
+      },
+      "invitations.createPersonalLink",
+      { email },
+    );
+  };
+
+  const snapshot = async () => {
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{
+      member_count: number;
+      seat_count: number | null;
+    }>(
+      "select member_count, seat_count from operator_workspace_usage where workspace_id = $1",
+      [workspaceId],
+    );
+    return rows[0];
+  };
+
+  it("holds the seats the limit counts, beside the people who are active", async () => {
+    const wb = await workerDb();
+    await onPlan(10);
+    await personal("first@example.com");
+    // Asked twice, one seat.
+    await personal("second@example.com");
+    await personal("second@example.com");
+    // Somebody already here holds their seat as a member, not twice.
+    await personal(`${OWNER}@example.com`);
+
+    await measureAllWorkspaces(wb.appPool);
+
+    const measured = await snapshot();
+    expect(measured).toEqual({ member_count: 1, seat_count: 3 });
+    expect((await seatState(wb.appPool, workspaceId)).used).toBe(3);
+  });
+
+  it("is null in a row no release that counts seats has measured", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into operator_workspace_usage (workspace_id, member_count) values ($1, 1)",
+      [workspaceId],
+    );
+    expect((await snapshot())?.seat_count).toBeNull();
   });
 });

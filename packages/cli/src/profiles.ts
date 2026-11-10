@@ -25,6 +25,11 @@ import { dirname, join } from "node:path";
 export interface Profile {
   readonly url: string;
   readonly token: string;
+  /**
+   * An agent token, for `okr mcp` only (agent-stdio.md T2). Kept apart from
+   * `token`, which is for the REST surface: the two audiences stay separate.
+   */
+  readonly mcpToken?: string;
 }
 
 export interface Config {

@@ -16,14 +16,11 @@
  * `intent`, as the branding card does.
  */
 
-import {
-  callAction,
-  OperationError,
-  trustedEmailDomainsSchema,
-} from "@openokr/core";
+import { callAction, trustedEmailDomainsSchema } from "@openokr/core";
 import { isFreeMailDomain, isListedTimezone } from "@openokr/formats";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/auth";
+import { refusedState } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import type { GeneralState } from "./general-state.ts";
@@ -34,6 +31,47 @@ async function context() {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
+  };
+}
+
+/** The fields the card draws, which show their own refusal (§4.2). */
+const DRAWN = ["timezone", "language", "trustedEmailDomains"] as const;
+
+/** The form's own check, said under the one field it is about. */
+const on = (field: (typeof DRAWN)[number], message: string): GeneralState => ({
+  error: null,
+  saved: null,
+  fields: { [field]: message },
+});
+
+/**
+ * A refused save under the field it names, the domain list for any entry in
+ * it, and as the card's sentence otherwise. A schema's refusal too, which
+ * used to reach the error page. Null for a failure.
+ */
+function refused(
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+  domains: readonly string[],
+): GeneralState | null {
+  const state = refusedState(
+    error,
+    t,
+    DRAWN,
+    Object.fromEntries(
+      domains.map((_, index) => [
+        `trustedEmailDomains.${index}`,
+        "trustedEmailDomains",
+      ]),
+    ),
+  );
+  if (state === null) {
+    return null;
+  }
+  return {
+    error: state.error ?? null,
+    saved: null,
+    ...(state.fields ? { fields: state.fields } : {}),
   };
 }
 
@@ -49,10 +87,11 @@ export async function submitGeneral(
         card: "general",
       });
     } catch (error) {
-      if (error instanceof OperationError) {
-        return { error: error.message, saved: null };
+      const state = refused(error, t, []);
+      if (state === null) {
+        throw error;
       }
-      throw error;
+      return state;
     }
     revalidatePath("/admin/general");
     return {
@@ -69,23 +108,19 @@ export async function submitGeneral(
     .filter((domain) => domain.length > 0);
 
   if (timezone !== "" && !isListedTimezone(timezone)) {
-    return {
-      error: t("admin.general.generalSettingsForm.unknownTimezone", {
-        timezone,
-      }),
-      saved: null,
-    };
+    return on(
+      "timezone",
+      t("admin.general.generalSettingsForm.unknownTimezone", { timezone }),
+    );
   }
   // A free mail provider is refused by the action too; said here in the
   // reader's language (docs/design/registration-policy.md D9).
   const free = trustedEmailDomains.find((domain) => isFreeMailDomain(domain));
   if (free !== undefined) {
-    return {
-      error: t("admin.general.generalSettingsForm.freeMailDomain", {
-        domain: free,
-      }),
-      saved: null,
-    };
+    return on(
+      "trustedEmailDomains",
+      t("admin.general.generalSettingsForm.freeMailDomain", { domain: free }),
+    );
   }
   const domains = trustedEmailDomainsSchema.safeParse(trustedEmailDomains);
   if (!domains.success) {
@@ -95,10 +130,10 @@ export async function submitGeneral(
       typeof index === "number"
         ? (trustedEmailDomains[index] ?? "")
         : trustedEmailDomains.join(", ");
-    return {
-      error: t("admin.general.generalSettingsForm.notADomain", { domain }),
-      saved: null,
-    };
+    return on(
+      "trustedEmailDomains",
+      t("admin.general.generalSettingsForm.notADomain", { domain }),
+    );
   }
 
   try {
@@ -111,10 +146,11 @@ export async function submitGeneral(
       requireSecondFactor: form.get("requireSecondFactor") === "on",
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message, saved: null };
+    const state = refused(error, t, trustedEmailDomains);
+    if (state === null) {
+      throw error;
     }
-    throw error;
+    return state;
   }
 
   revalidatePath("/admin/general");

@@ -3,6 +3,7 @@
 import { useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
 import type { WriteState } from "../app/cycle/write-state.ts";
+import { uploadTextFile } from "./attachment-actions.ts";
 import {
   type CommentSubjectType,
   deleteCommentAction,
@@ -97,6 +98,7 @@ export function SubjectComments({
           return result.error === null;
         }}
         searchMembers={searchMentionable}
+        storeFile={uploadTextFile}
         onEdit={async (commentId, body) => {
           said(await editComment(commentId, body));
         }}

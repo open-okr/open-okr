@@ -4,7 +4,7 @@ import { setPlanAsOperator } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../../lib/operator";
 import { getPool } from "../../../lib/pool";
-import { refusalOf } from "../../../lib/refusal";
+import { refusedState } from "../../../lib/refusal";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -18,6 +18,8 @@ import { getTranslations } from "../../../lib/translations";
  */
 export interface OperatorPlanState {
   readonly error?: string;
+  /** A refused field's message, shown under it (guided-inputs §4.2). */
+  readonly fields?: Readonly<Record<string, string>>;
   readonly done?: boolean;
 }
 
@@ -32,10 +34,10 @@ export async function setPlan(formData: FormData): Promise<OperatorPlanState> {
   // Checked here so the operator reads a sentence rather than an error page.
   // The domain door validates both again.
   if (seats !== undefined && !(Number.isInteger(seats) && seats >= 1)) {
-    return { error: t("operator.plan.seatsWhole") };
+    return { fields: { seats: t("operator.plan.seatsWhole") } };
   }
   if (reason === "") {
-    return { error: t("operator.plan.needsReason") };
+    return { fields: { reason: t("operator.plan.needsReason") } };
   }
   try {
     await setPlanAsOperator(getPool(), {
@@ -46,11 +48,11 @@ export async function setPlan(formData: FormData): Promise<OperatorPlanState> {
       reason,
     });
   } catch (error) {
-    const refusal = refusalOf(error);
-    if (refusal === null) {
+    const refused = refusedState(error, t, ["planKey", "seats", "reason"]);
+    if (refused === null) {
       throw error;
     }
-    return { error: refusal };
+    return refused;
   }
   revalidatePath(`/operator/${workspaceId}`);
   revalidatePath("/operator");

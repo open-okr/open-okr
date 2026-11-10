@@ -184,10 +184,36 @@ else
 fi
 
 if render --set instance.registration=sometimes 2>&1 \
-  | grep -q "auto, open or invite_only"; then
+  | grep -q "auto, open, company_domains or invite_only"; then
   pass "refuses an unrecognised registration policy"
 else
   fail "accepted an unrecognised registration policy"
+fi
+
+# The application accepts every policy Admin > General offers, so the chart
+# must not refuse one of them. It refused company_domains until 0.7.0.
+for policy in auto open company_domains invite_only; do
+  if render --set "instance.registration=$policy" 2>&1 \
+    | grep -A1 "name: OPENOKR_REGISTRATION" | grep -q "value: \"$policy\""; then
+    pass "accepts the $policy registration policy"
+  else
+    fail "refused the $policy registration policy"
+  fi
+done
+
+# The metrics scrape token (plan 0.7.0 B3): generated beside the other two
+# secrets, read by the pod, and optional so a release's own Secret without it
+# still starts.
+manifest=$(render)
+if echo "$manifest" | grep -q "metrics-token:"; then
+  pass "the chart generates a metrics scrape token"
+else
+  fail "the chart generates no metrics scrape token"
+fi
+if echo "$manifest" | grep -A6 "name: OPENOKR_METRICS_TOKEN" | grep -q "optional: true"; then
+  pass "the pod reads the metrics token, and starts without it"
+else
+  fail "the pod does not read the metrics token as optional"
 fi
 
 # --- migrations run in the hook, not in the pods -------------------------
@@ -396,6 +422,26 @@ if render_one deployment.yaml | grep -q "OPENOKR_CLAMD_HOST"; then
   fail "the scan is switched on although no clamd host is named"
 else
   pass "no clamd host means no scan"
+fi
+
+# Error reports (docs/design/error-reporting.md D14, D22).
+if render_one deployment.yaml | grep -q "OPENOKR_ERROR_DSN"; then
+  fail "error reports are sent somewhere although no Secret is named"
+else
+  pass "no error Secret means no error reports leave"
+fi
+if render_one deployment.yaml --set errors=null | grep -q "^kind: Deployment"; then
+  pass "a release from before the errors block still renders"
+else
+  fail "a release from before the errors block fails to render on upgrade"
+fi
+errors=$(render_one deployment.yaml --set errors.existingSecret=tracker \
+  --set errors.environment=staging)
+if echo "$errors" | grep -A3 "OPENOKR_ERROR_DSN" | grep -q "secretKeyRef" \
+  && echo "$errors" | grep -A1 "OPENOKR_ERROR_ENVIRONMENT" | grep -q '"staging"'; then
+  pass "a named error Secret gives the DSN by reference, with the environment"
+else
+  fail "a named error Secret does not reach the pod by reference"
 fi
 
 # --- the setups in PLAN.md section 5.2 -------------------------------------

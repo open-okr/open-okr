@@ -58,23 +58,41 @@ export function Topbar({
 export interface TopbarSearchProps {
   readonly placeholder?: string;
   readonly inputRef?: Ref<HTMLInputElement>;
+  /**
+   * The page Enter sends what was typed to, as `?q=` (plan 0.7.0, U2). Left
+   * out, the box searches nothing, which only a preview of the shell wants.
+   */
+  readonly action?: string;
 }
 
-/** `.searchbox`/`.kbd` from the mockups. A plain input today: it has
- * nowhere to search yet (S-32's own palette and index are unbuilt), so it
- * renders the affordance without pretending to be wired to results. */
-export function TopbarSearch({ placeholder, inputRef }: TopbarSearchProps) {
+/** `.searchbox`/`.kbd` from the mockups. With an `action`, a search form of
+ * its own: the application points it at its search page, and `/` puts the
+ * caret in it. */
+export function TopbarSearch({
+  placeholder,
+  inputRef,
+  action,
+}: TopbarSearchProps) {
   const { t } = useTranslations();
-  return (
+  const box = (
     <label className="ml-3.5 hidden h-7.75 w-75 items-center gap-1.5 rounded-[9px] border border-line bg-bg px-2.5 text-sm text-ink-4 transition-colors duration-fast ease-out hover:border-line-2 sm:flex">
       <span className="sr-only">{t("shell.search.label")}</span>
       <input
         ref={inputRef}
         type="search"
+        {...(action ? { name: "q" } : {})}
         placeholder={placeholder ?? t("shell.search.placeholder")}
         className="w-full bg-transparent text-ink outline-none placeholder:text-ink-4"
       />
       <Kbd className="ml-auto">⌘K</Kbd>
     </label>
+  );
+  // `contents`, so the form adds no box to the topbar's row.
+  return action ? (
+    <form action={action} className="contents">
+      {box}
+    </form>
+  ) : (
+    box
   );
 }

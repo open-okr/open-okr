@@ -28,6 +28,8 @@ export const REVOCATION_REASONS = {
   reuse:
     "A refresh token was presented twice, which means it was copied. Every token in this connection was revoked.",
   membership: "You are no longer an active member of this workspace.",
+  // Plan 0.7.0 A4: never naming who; the audit row does.
+  admin: "An administrator of this workspace ended this connection.",
 } as const;
 
 export type RevocationReason = keyof typeof REVOCATION_REASONS;

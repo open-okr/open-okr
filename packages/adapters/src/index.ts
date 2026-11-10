@@ -26,6 +26,10 @@ export {
   type GuardedAIProvider,
 } from "./create-ai-provider.ts";
 export { type BillingConfig, createBilling } from "./create-billing.ts";
+export {
+  createErrorReporter,
+  type ErrorReporterConfig,
+} from "./create-error-reporter.ts";
 export { createMailer, type MailerConfig } from "./create-mailer.ts";
 export {
   createTelemetry,
@@ -34,7 +38,9 @@ export {
 export { McpAgentServer } from "./drivers/agent/mcp.ts";
 // The mock driver is exported by name, the same way the socket server is:
 // infrastructure another package's own test suite constructs directly,
-// not something resolved through createAIProvider.
+// not something resolved through createAIProvider. The evaluation set runs
+// on it at run time too, to check a prompt before it is saved; it calls
+// nothing outside the process (plan 0.7.0 A9).
 export {
   MockAIProvider,
   type MockAIProviderOptions,
@@ -107,6 +113,7 @@ export {
   PgBossJobQueue,
   type PgBossJobQueueOptions,
 } from "./drivers/jobs/pg-boss.ts";
+export { consoleMailRevealsContent } from "./drivers/mail/console.ts";
 // The socket server is process infrastructure the host application mounts,
 // not a port, so it is exported by name.
 export {
@@ -143,6 +150,11 @@ export {
   AIEgressRefusedError,
   type AIEgressTarget,
   type AIUsageRecord,
+  // The detector itself, read-only: the evaluation set asks it whether a
+  // request holds an address or a number, so "no personal data in prompts"
+  // means exactly what the redaction control means (plan 0.7.0 A9).
+  type Redacted,
+  redactPersonalData,
 } from "./outbound/ai-egress.ts";
 export {
   type CheckedUrl,
@@ -201,6 +213,12 @@ export type {
   InboundRequest,
   InboundSubmission,
 } from "./ports/channel.ts";
+export type {
+  ErrorEvent,
+  ErrorEventFrame,
+  ErrorReportDropReason,
+  ErrorReporter,
+} from "./ports/errors.ts";
 export type {
   EncodedImage,
   ImageFormat,

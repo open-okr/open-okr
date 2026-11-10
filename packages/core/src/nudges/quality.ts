@@ -142,6 +142,13 @@ export async function dueQualityNudges(
      * H-04). Absent reads everything, which is what a person's own run does.
      */
     readonly scope?: AgentScope;
+    /**
+     * Whether this run's semantic review ran (plan 0.7.0 A5). `quality.conflict`
+     * is the one trigger that needs the provider (agents.md §3.2), so a
+     * conflict finding kept from an earlier run says nothing while AI is off.
+     * Absent is false.
+     */
+    readonly semanticReviewed?: boolean;
   },
 ): Promise<readonly DueNudge[]> {
   const open = await tx
@@ -167,6 +174,77 @@ export async function dueQualityNudges(
   }
   due.push(...(await findingNudges(tx, input.workspaceId, open)));
   due.push(...(await divergenceNudges(tx, input.workspaceId, open)));
+  if (input.semanticReviewed) {
+    due.push(...(await conflictNudges(tx, input.workspaceId, open)));
+  }
+  return due;
+}
+
+/**
+ * Two goals that double-count or oppose each other, as the semantic sweep
+ * found them (agents.md §3.2, AI-NATIVE-PLAN §6.4, plan 0.7.0 A5, approved by
+ * Akmal on 9 November 2026).
+ *
+ * §6.4 addresses it to both champions. Each hears about their own goal, so the
+ * message opens on something they can change, and the finding the goal shows
+ * carries the reason, as a divergence's does. Both goals must still be open
+ * and readable to this run: a conflict with a closed goal no longer shapes
+ * anything, and an agent says nothing about a goal outside its scope.
+ *
+ * Open findings only, for the reason `divergenceNudges` gives.
+ */
+async function conflictNudges(
+  tx: WorkspaceTx,
+  workspaceId: string,
+  open: readonly {
+    readonly id: string;
+    readonly championId: string | null;
+  }[],
+): Promise<readonly DueNudge[]> {
+  const rows = await tx
+    .select({
+      subjectGoalId: alignmentFindings.subjectGoalId,
+      targetGoalId: alignmentFindings.targetGoalId,
+    })
+    .from(alignmentFindings)
+    .where(
+      activeOnly(
+        alignmentFindings,
+        and(
+          eq(alignmentFindings.workspaceId, workspaceId),
+          eq(alignmentFindings.kind, "conflict"),
+          eq(alignmentFindings.state, "open"),
+        ),
+      ),
+    );
+
+  const byId = new Map(open.map((goal) => [goal.id, goal]));
+  const due: DueNudge[] = [];
+  const sent = new Set<string>();
+  for (const finding of rows) {
+    const pair = [finding.subjectGoalId, finding.targetGoalId].map((id) =>
+      id ? byId.get(id) : undefined,
+    );
+    if (pair.some((goal) => goal === undefined)) {
+      continue;
+    }
+    for (const goal of pair) {
+      // A goal with no champion has nobody to tell, and one goal in two
+      // findings is told once: the subject is the goal either way.
+      const key = `${goal?.id}:${goal?.championId}`;
+      if (!goal?.championId || sent.has(key)) {
+        continue;
+      }
+      sent.add(key);
+      due.push(
+        qualityNudge({
+          ruleKey: "quality.conflict",
+          goalId: goal.id,
+          recipientMemberId: goal.championId,
+        }),
+      );
+    }
+  }
   return due;
 }
 

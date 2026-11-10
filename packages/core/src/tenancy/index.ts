@@ -51,15 +51,18 @@ export {
   listSeatHolders,
   type Plan,
   planByKey,
+  planLimitsFor,
   readOwnPlan,
   readOwnUsage,
   readPlans,
   requireFreeWorkspaceRoom,
   resolveDefaultPlan,
+  resolveSignupTrial,
   seatState,
   seatsInUseInTx,
 } from "./plans.ts";
 export {
+  allowsPrivateWebhookTargets,
   CLOUD_CLOSURE_RETENTION_KEY,
   CLOUD_ENABLED_KEY,
   CLOUD_REGION_KEY,
@@ -70,3 +73,10 @@ export {
 } from "./settings.ts";
 export { readTenant, seedTenantInTx } from "./store.ts";
 export { sweepClosedTenants } from "./sweep.ts";
+export {
+  dueTrials,
+  readTrialNotice,
+  remindTrialsEnding,
+  startTrialInTx,
+  sweepTrials,
+} from "./trials.ts";

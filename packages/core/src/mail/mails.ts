@@ -93,6 +93,9 @@ const REASON_WORDS: Readonly<Record<string, MailWordKey>> = {
   review: "digest.reason.review",
   invited: "digest.reason.invited",
   role: "digest.reason.role",
+  support_request: "digest.reason.support_request",
+  support_ended: "digest.reason.support_ended",
+  connection_ended: "digest.reason.connection_ended",
 };
 
 /** One digest line as a row: its reason as a chip, who did it, where to go. */
@@ -356,7 +359,7 @@ export function closureMail(input: {
       {
         kind: "action",
         label: t("closed.action"),
-        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/imports`,
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/backups`,
       },
       {
         kind: "notice",
@@ -407,7 +410,7 @@ export function erasureReminderMail(input: {
       {
         kind: "action",
         label: t("closed.action"),
-        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/imports`,
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/backups`,
       },
       {
         kind: "notice",
@@ -420,4 +423,128 @@ export function erasureReminderMail(input: {
     ],
   );
   return { subject: t("reminder.subject", { workspace, date }), html, text };
+}
+
+/**
+ * Seven days before a trial ends (docs/design/tenant-lifecycle.md §11 Q2,
+ * plan 0.7.0 P4c): the day, the plan, and what happens if nobody chooses.
+ */
+export function trialReminderMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly endsAt: Date;
+  readonly planName: string;
+  readonly fallbackName: string;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const date = mailDate(mail, input.endsAt);
+  const plan = input.planName;
+  const fallback = input.fallbackName;
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("trial.preheader"),
+      footer: t("closed.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("trial.eyebrow") },
+      { kind: "heading", text: t("trial.heading", { plan, date }) },
+      {
+        kind: "paragraph",
+        parts: [t("trial.body", { workspace, fallback })],
+      },
+      {
+        kind: "action",
+        label: t("trial.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/plan`,
+      },
+    ],
+  );
+  return {
+    subject: t("trial.subject", { workspace, plan, date }),
+    html,
+    text,
+  };
+}
+
+/** What the end of a trial did (§11 Q2). */
+export function trialEndedMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly outcome: "subscribed" | "moved" | "suspended";
+  readonly fallbackName: string;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const fallback = input.fallbackName;
+  const said =
+    input.outcome === "moved"
+      ? t("trial.endedMoved", { fallback })
+      : input.outcome === "suspended"
+        ? t("trial.endedSuspended", { fallback })
+        : t("trial.endedSubscribed");
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("trial.endedPreheader"),
+      footer: t("closed.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("trial.endedEyebrow") },
+      { kind: "heading", text: t("trial.endedHeading", { workspace }) },
+      { kind: "paragraph", parts: [said] },
+      {
+        kind: "action",
+        label: t("trial.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/plan`,
+      },
+    ],
+  );
+  return { subject: t("trial.endedSubject", { workspace }), html, text };
+}
+
+/**
+ * A webhook turned itself off after a run of failed deliveries, to whoever
+ * made it (docs/design/outbound-webhooks.md W9). The host, never the address,
+ * which can carry the receiver's own token.
+ */
+export function webhookTurnedOffMail(input: {
+  readonly mail: WorkspaceMail;
+  readonly baseUrl: string;
+  readonly name: string;
+  readonly host: string;
+  readonly failures: number;
+}): BuiltMail {
+  const { mail } = input;
+  const t = mail.words;
+  const workspace = mail.name;
+  const count = String(input.failures);
+  const { html, text } = renderEmail(
+    workspaceFrame(mail, {
+      baseUrl: input.baseUrl,
+      preheader: t("webhookOff.preheader", { count }),
+      footer: t("webhookOff.footer", { workspace }),
+    }),
+    [
+      { kind: "eyebrow", text: t("webhookOff.eyebrow") },
+      { kind: "heading", text: t("webhookOff.heading", { name: input.name }) },
+      {
+        kind: "paragraph",
+        parts: [t("webhookOff.body", { count, host: input.host })],
+      },
+      {
+        kind: "action",
+        label: t("webhookOff.action"),
+        href: `${withoutTrailingSlashes(input.baseUrl)}/admin/webhooks`,
+      },
+    ],
+  );
+  return {
+    subject: t("webhookOff.subject", { workspace, name: input.name }),
+    html,
+    text,
+  };
 }

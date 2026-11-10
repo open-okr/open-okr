@@ -89,7 +89,8 @@ describe("the people lifecycle surface", () => {
   });
 
   test("a refusal is rendered as an alert rather than swallowed", () => {
-    expect(actions).toContain("error instanceof OperationError");
+    // A schema's refusal too, through the one reader of refusals (U1b).
+    expect(actions).toContain("refusalFields(error");
     expect(flat(controls)).toContain(
       'role={state.kind === "refused" ? "alert"',
     );

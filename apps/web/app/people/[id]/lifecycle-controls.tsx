@@ -41,7 +41,11 @@ import { IDLE, type LifecycleState } from "../lifecycle-state.ts";
  */
 
 function Outcome({ state }: { readonly state: LifecycleState }) {
-  if (state.kind === "idle") {
+  // A refusal about a field is shown under that field instead.
+  if (
+    state.kind === "idle" ||
+    (state.kind === "refused" && state.field !== undefined)
+  ) {
     return null;
   }
   return (
@@ -150,6 +154,12 @@ function EraseControl({
             name="confirmName"
             autoComplete="off"
             className="w-72"
+            // A name typed differently is said under the name (§4.2).
+            error={
+              state.kind === "refused" && state.field === "confirmName"
+                ? state.message
+                : null
+            }
           />
           <div className="flex items-center gap-2">
             <Button

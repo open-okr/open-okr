@@ -9,9 +9,11 @@
  * applied (P4-T06c). The studio these were written for is the OKRs screen's
  * diagram now, and `/goals/studio` sends a reader there.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { refusalFields } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
 
@@ -30,10 +32,15 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    // The sentence, always: every one of these is a click on the diagram, the
+    // drawer or a finding, none of which draws a field to put a refusal under.
+    // A schema's refusal too, such as a standalone reason longer than it
+    // takes, which used to reach the error page (plan U1b).
+    const refusal = refusalFields(error, (await getTranslations()).t);
+    if (refusal === null) {
+      throw error;
     }
-    throw error;
+    return { error: refusal.message };
   }
   // The score and the findings both move on a structural write, and so does the
   // OKRs screen's header.

@@ -142,10 +142,34 @@ describe("saving the card", () => {
       submitted({ contextEgress: "all", allowedHosts: "api openai!com" }),
     );
     expect(state.ok).toBe(false);
-    expect(state.message).toBe(
+    // Under the box it was typed in (guided-inputs §4.2, plan U1b).
+    expect(state.fields?.allowedHosts).toBe(
       "openai!com is not a host name. Write the host alone, like api.openai.com, without https:// or a path.",
     );
     expect(callAction).not.toHaveBeenCalled();
+  });
+
+  it("puts a host the action refuses under the box, whichever line it was", async () => {
+    callAction.mockRejectedValue(
+      Object.assign(new Error("[]"), {
+        name: "ZodError",
+        issues: [
+          { code: "custom", path: ["allowedHosts", 1], message: "Not a host." },
+        ],
+      }),
+    );
+    const state = await savePrivacy(
+      NOTHING,
+      submitted({
+        contextEgress: "all",
+        allowedHosts: "api.openai.com\napi.anthropic.com",
+      }),
+    );
+    expect(state).toEqual({
+      ok: false,
+      message: "",
+      fields: { allowedHosts: "Not a host." },
+    });
   });
 
   it("says why the action refused, rather than appearing to do nothing", async () => {

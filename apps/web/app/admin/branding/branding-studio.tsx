@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   initialsOf,
+  RefusedFields,
   TextInput,
   useTranslations,
 } from "@openokr/ui";
@@ -170,63 +171,67 @@ function StudioBody({
             aria-busy={pending}
             className="grid gap-5 lg:grid-cols-3 lg:gap-0"
           >
-            {/* The workspace's own name, beside the logo it sits next to in
-             * the sidebar, so the mirror shows both before either is saved.
-             * It moved here from General (owner, 4 November 2026). */}
-            <div className="flex flex-col gap-1 border-b border-line pb-5 lg:col-span-3 lg:mb-5">
-              <input type="hidden" name="storedName" value={workspaceName} />
-              <TextInput
-                key={`name-${discarded}`}
-                label={t("admin.branding.workspaceName.label")}
-                description={t("admin.branding.workspaceName.hint")}
-                name="workspaceName"
-                defaultValue={workspaceName}
-                required
-                maxLength={WORKSPACE_NAME_MAX_LENGTH}
-                autoComplete="organization"
-                disabled={pending}
-                className="max-w-sm"
-                onChange={(event) => setName(event.currentTarget.value)}
-              />
-            </div>
-            <div className="lg:pr-5">
-              <BrandingSettingsForm
-                status={status}
-                disabled={pending}
-                resetting={pending && acting === "reset"}
-                onColourChange={setColour}
-              />
-            </div>
-            <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:px-5 lg:pt-0">
-              <BrandingImageCard
-                key={`logo-${discarded}`}
-                slot="logo"
-                storedUrl={logoUrl}
-                initials={initials}
-                rules={rules}
-                disabled={pending}
-                onChosen={setLogo}
-                removal={removal?.slot === "logo" ? removal.result : null}
-                onRemoval={(result) =>
-                  onRemoval(result ? { slot: "logo", result } : null)
-                }
-              />
-            </div>
-            <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
-              <BrandingImageCard
-                key={`favicon-${discarded}`}
-                slot="favicon"
-                storedUrl={faviconUrl}
-                initials={initials}
-                rules={rules}
-                disabled={pending}
-                onChosen={setFavicon}
-                removal={removal?.slot === "favicon" ? removal.result : null}
-                onRemoval={(result) =>
-                  onRemoval(result ? { slot: "favicon", result } : null)
-                }
-              />
-            </div>
+            {/* The name and the colour show what the server refused about
+             * them (guided-inputs §4.2, plan U1b). */}
+            <RefusedFields fields={state.fields}>
+              {/* The workspace's own name, beside the logo it sits next to in
+               * the sidebar, so the mirror shows both before either is saved.
+               * It moved here from General (owner, 4 November 2026). */}
+              <div className="flex flex-col gap-1 border-b border-line pb-5 lg:col-span-3 lg:mb-5">
+                <input type="hidden" name="storedName" value={workspaceName} />
+                <TextInput
+                  key={`name-${discarded}`}
+                  label={t("admin.branding.workspaceName.label")}
+                  description={t("admin.branding.workspaceName.hint")}
+                  name="workspaceName"
+                  defaultValue={workspaceName}
+                  required
+                  maxLength={WORKSPACE_NAME_MAX_LENGTH}
+                  autoComplete="organization"
+                  disabled={pending}
+                  className="max-w-sm"
+                  onChange={(event) => setName(event.currentTarget.value)}
+                />
+              </div>
+              <div className="lg:pr-5">
+                <BrandingSettingsForm
+                  status={status}
+                  disabled={pending}
+                  resetting={pending && acting === "reset"}
+                  onColourChange={setColour}
+                />
+              </div>
+              <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:px-5 lg:pt-0">
+                <BrandingImageCard
+                  key={`logo-${discarded}`}
+                  slot="logo"
+                  storedUrl={logoUrl}
+                  initials={initials}
+                  rules={rules}
+                  disabled={pending}
+                  onChosen={setLogo}
+                  removal={removal?.slot === "logo" ? removal.result : null}
+                  onRemoval={(result) =>
+                    onRemoval(result ? { slot: "logo", result } : null)
+                  }
+                />
+              </div>
+              <div className="border-t border-line pt-5 lg:border-t-0 lg:border-l lg:pl-5 lg:pt-0">
+                <BrandingImageCard
+                  key={`favicon-${discarded}`}
+                  slot="favicon"
+                  storedUrl={faviconUrl}
+                  initials={initials}
+                  rules={rules}
+                  disabled={pending}
+                  onChosen={setFavicon}
+                  removal={removal?.slot === "favicon" ? removal.result : null}
+                  onRemoval={(result) =>
+                    onRemoval(result ? { slot: "favicon", result } : null)
+                  }
+                />
+              </div>
+            </RefusedFields>
           </form>
         </CardBody>
       </Card>
@@ -237,7 +242,8 @@ function StudioBody({
         <div className="flex min-w-0 flex-col gap-0.5">
           {unsaved.length > 0 ||
           state.saved !== null ||
-          state.error !== null ? null : (
+          state.error !== null ||
+          state.fields !== undefined ? null : (
             <p className="text-sm text-ink-3">
               {t("admin.branding.nothingChanged")}
             </p>

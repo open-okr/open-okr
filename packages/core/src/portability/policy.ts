@@ -101,6 +101,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     reason: "A cache. Rebuilt on demand, and stale the moment it is copied.",
   },
   {
+    table: "sign_in_attempts",
+    decision: "exclude",
+    reason:
+      "Failed sign-ins and the holds they caused (plan 0.7.0 P10). Keyed by account and caller rather than by workspace, and about this instance's door, not the workspace's work.",
+  },
+  {
     table: "outbox",
     decision: "exclude",
     reason:
@@ -192,6 +198,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "exclude",
     reason:
       "Vectors, derived from content and from a model this instance chose. The receiving instance may use another model, so they are recomputed.",
+  },
+  {
+    table: "alignment_scores",
+    decision: "exclude",
+    reason:
+      "The stored alignment score, a projection of the goals beside it. The import's own writes and the hourly fill store it again.",
   },
 
   // ── Identity, sessions and credentials ───────────────────────────────
@@ -307,6 +319,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "exclude",
     reason: "Sessions held open for an external agent.",
   },
+  {
+    table: "ai_tool_calls",
+    decision: "exclude",
+    reason:
+      "A record of the calls external agents made, naming grants and tokens the receiving instance does not have (agent-tool-calls.md D18).",
+  },
 
   // ── The audit chain ──────────────────────────────────────────────────
   {
@@ -359,6 +377,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     decision: "exclude",
     reason:
       "Messages already sent through a provider. Carrying them would list deliveries that never happened on the new instance.",
+  },
+  {
+    table: "webhook_deliveries",
+    decision: "exclude",
+    reason:
+      "Attempts this instance made to post to a webhook. Carrying them would list deliveries that never happened on the new instance (outbound-webhooks.md W10).",
   },
   {
     table: "notifications",
@@ -529,6 +553,13 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     // After the members it names, both of them (P9-T19b-b).
     reason:
       "Each member's leave and who stood in, which explain why an acknowledgement went to somebody else.",
+  },
+  {
+    table: "webhooks",
+    decision: "export",
+    // After the members and the space it names (outbound-webhooks.md W14).
+    reason:
+      "Where an administrator chose to send this workspace's events. Carried without its signing secrets and turned off, so it sends nothing until somebody rotates its secret and turns it on.",
   },
   {
     table: "access_groups",

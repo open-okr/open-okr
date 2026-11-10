@@ -19,6 +19,15 @@ export type LifecycleState =
       readonly message: string;
       readonly export: ErasureExport | null;
     }
-  | { readonly kind: "refused"; readonly message: string };
+  | {
+      readonly kind: "refused";
+      readonly message: string;
+      /**
+       * The field the refusal is about, when it is about one: the erasure's
+       * typed name. The control shows it under that field (guided-inputs
+       * §4.2) rather than as the outcome.
+       */
+      readonly field?: string;
+    };
 
 export const IDLE: LifecycleState = { kind: "idle" };

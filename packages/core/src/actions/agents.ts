@@ -43,7 +43,9 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { resolveSubjectContext } from "../access/reads.ts";
 import { championInTx } from "../agents/champion.ts";
 import { coachInTx } from "../agents/coach.ts";
+import { agentRunChangedEvent } from "../agents/live.ts";
 import { agentRunStep } from "../agents/run-steps.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { type NudgeCadence, runAgentNudgesInTx } from "../nudges/run.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_AGENT_RUN_COST_CAP_USD } from "../settings/registry.ts";
@@ -321,7 +323,7 @@ export const bindAgentScope = defineWriteAction({
   input: z.object({
     agentId: z.uuid(),
     resourceType: z.string().trim().min(1),
-    resourceId: z.uuid(),
+    resourceId: subjectAddress("resourceType"),
     level: z.number().int().min(ACCESS_LEVELS.view).max(ACCESS_LEVELS.full),
   }),
   output: z.object({
@@ -533,7 +535,16 @@ export const startAgentRun = defineWriteAction({
         // row with no step queued is a run that says it is running and never
         // will, which is what every run started here was until now. Each
         // step queues the next one the same way.
-        outbox: [agentRunStep({ workspaceId, runId: run.id, taskIndex: 0 })],
+        outbox: [
+          agentRunStep({ workspaceId, runId: run.id, taskIndex: 0 }),
+          // And every open agents screen hears that a run began (A11).
+          agentRunChangedEvent({
+            workspaceId,
+            runId: run.id,
+            status: run.status,
+            logLength: run.log.length,
+          }),
+        ],
       };
     },
   }),
@@ -605,14 +616,33 @@ export const cancelAgentRun = defineWriteAction({
         );
       }
       // openokr:allow-mutation: this is the operation's own execute.
-      await tx
+      //
+      // The status is checked again in the update itself (A11). The read
+      // above takes no lock, so a step can finish the run between it and
+      // here; the update waits for the step's lock, re-reads the row, and
+      // without this condition would mark a completed run cancelled. The
+      // returned row is also what the screen's version is counted from, so
+      // a line the step appended meanwhile is counted.
+      const [cancelled] = await tx
         .update(agentRuns)
         .set({
           status: "cancelled",
           finishedAt: new Date(),
           updatedAt: new Date(),
         })
-        .where(eq(agentRuns.id, existing.id));
+        .where(
+          and(
+            eq(agentRuns.id, existing.id),
+            inArray(agentRuns.status, ["planning", "running"]),
+          ),
+        )
+        .returning({ status: agentRuns.status, log: agentRuns.log });
+      if (!cancelled) {
+        throw new OperationError(
+          "not_found",
+          "No cancellable run with that id.",
+        );
+      }
 
       return {
         result: { id: existing.id, status: "cancelled" as const },
@@ -628,6 +658,14 @@ export const cancelAgentRun = defineWriteAction({
           targetId: workspaceId,
           payload: { runId: existing.id },
         },
+        outbox: [
+          agentRunChangedEvent({
+            workspaceId,
+            runId: existing.id,
+            status: cancelled.status,
+            logLength: cancelled.log.length,
+          }),
+        ],
       };
     },
   }),
@@ -983,6 +1021,14 @@ export const runChampion = defineWriteAction({
               trigger,
             },
           },
+          outbox: [
+            agentRunChangedEvent({
+              workspaceId,
+              runId: haltedId,
+              status: "cancelled",
+              logLength: log.length,
+            }),
+          ],
         };
       }
 
@@ -1116,6 +1162,16 @@ export const runChampion = defineWriteAction({
           targetId: workspaceId,
           payload: { status: "completed", recorded: run.recorded, trigger },
         },
+        // One event for the whole run: it is written and finished in this
+        // one transaction, so no reader could see it half way (A11).
+        outbox: [
+          agentRunChangedEvent({
+            workspaceId,
+            runId,
+            status: "completed",
+            logLength: log.length,
+          }),
+        ],
       };
     },
   }),
@@ -1303,6 +1359,14 @@ export const runCoach = defineWriteAction({
             trigger: RUN_TRIGGERS.quality,
           },
         },
+        outbox: [
+          agentRunChangedEvent({
+            workspaceId,
+            runId,
+            status: "completed",
+            logLength: log.length,
+          }),
+        ],
       };
     },
   }),

@@ -10,7 +10,7 @@ import { workspaces } from "./workspaces.ts";
  * content table. A scheduled job opens each workspace properly, counts, and
  * writes one row here; the operator reads this and never a content table.
  *
- * Five numbers and two timestamps. No title, name or body from anything a
+ * Six numbers and two timestamps. No title, name or body from anything a
  * member wrote.
  */
 export const operatorWorkspaceUsage = pgTable("operator_workspace_usage", {
@@ -18,6 +18,11 @@ export const operatorWorkspaceUsage = pgTable("operator_workspace_usage", {
     .primaryKey()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   memberCount: integer("member_count").notNull().default(0),
+  /**
+   * Seats held, as the plan's limit counts them (migration 0157, plan 0.7.0
+   * P3). Null until a release that counts seats has measured the row.
+   */
+  seatCount: integer("seat_count"),
   goalCount: integer("goal_count").notNull().default(0),
   checkInCount: integer("check_in_count").notNull().default(0),
   storageBytes: bigint("storage_bytes", { mode: "number" })

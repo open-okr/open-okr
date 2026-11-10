@@ -132,9 +132,10 @@ smoke test, not a blindfolded usability study).
 | 12 | Open a review session as a participant | The stage change is announced when it happens, not only on the next tab |
 | 13 | On the board, tab to a card's move handle, press `Space`, an arrow key, then `Space` (M-02) | The handle reads its instructions. Each step is spoken once: picked up, where the card is now, dropped, each with its column and its place in it. `Escape` instead of the second `Space` says it is back where it was |
 
-**Recording the result.** A run is a note in the release's own STATUS row:
-which reader, which browser, which steps failed. A step that fails becomes an
-issue with its number, never a silent retry.
+**Recording the result.** A run is a note in the release pull request's
+description, as [the release runbook](../runbooks/release.md) asks: which
+reader, which browser, which steps failed. A step that fails becomes an issue
+with its number, never a silent retry.
 
 **Known limitation.** Steps 6, 11, 12 and 13 depend on live regions, which no
 automated check in this repository verifies by ear. Step 13's wording is

@@ -12,6 +12,7 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { sentenceUnlessDrawn } from "../../../lib/drawn-refusal.ts";
 import { addKeyResult } from "../editor-actions.ts";
 import { updateKeyResult } from "./actions.ts";
 
@@ -64,6 +65,8 @@ export function KeyResultUpdate({
   const [status, setStatus] = useState<Status | "">(lastStatus ?? "");
   const [note, setNote] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // A refused value, status or line, shown under it (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
   const confidenceMoved = confidence !== null && confidence !== stored;
   const valueMoved = value !== null && value !== keyResult.currentValue;
@@ -86,11 +89,11 @@ export function KeyResultUpdate({
         : {}),
     });
     setSaving(false);
-    if (result.error) {
-      setProblem(result.error);
+    setProblem(result.error);
+    setRefused(result.fields ?? {});
+    if (result.error || result.fields) {
       return;
     }
-    setProblem(null);
     setNote("");
     router.refresh();
   };
@@ -109,6 +112,7 @@ export function KeyResultUpdate({
           hideLabel
           value={value}
           onValueChange={setValue}
+          error={refused.value}
           unit={keyResult.unit}
           baseline={keyResult.baselineValue}
           target={keyResult.targetValue}
@@ -147,6 +151,7 @@ export function KeyResultUpdate({
             label={t("goals.detail.statusFor", { title: keyResult.title })}
             hideLabel
             value={status}
+            error={refused.status}
             onChange={(event) => setStatus(event.target.value as Status | "")}
             inputClassName="h-6 w-auto px-1.5 text-xs text-ink-2"
           >
@@ -164,6 +169,7 @@ export function KeyResultUpdate({
             })}
             hideLabel
             value={note}
+            error={refused.note}
             placeholder={t("goals.detail.whyConfidenceMovedPlaceholder")}
             onChange={(event) => setNote(event.target.value)}
             className="w-64"
@@ -198,12 +204,15 @@ export function AddKeyResult({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [problem, setProblem] = useState<string | null>(null);
+  // A refused title, shown under the box (guided-inputs §4.2).
+  const [refusedTitle, setRefusedTitle] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const close = () => {
     setOpen(false);
     setTitle("");
     setProblem(null);
+    setRefusedTitle(null);
   };
 
   const commit = async () => {
@@ -220,7 +229,8 @@ export function AddKeyResult({
     });
     setSaving(false);
     if (created.error) {
-      setProblem(created.error);
+      setRefusedTitle(created.fields?.title ?? null);
+      setProblem(sentenceUnlessDrawn(created, ["title"]));
       return;
     }
     close();
@@ -256,6 +266,7 @@ export function AddKeyResult({
           maxLength={500}
           placeholder={t("goals.editor.keyResultPlaceholder")}
           disabled={saving}
+          error={refusedTitle}
           onChange={(event) => setTitle(event.target.value)}
           onKeyDown={(event) => {
             if (event.key === "Enter") {

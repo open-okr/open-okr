@@ -206,6 +206,9 @@ export const setWorkspaceState = defineWriteAction({
     state: z.enum(["active", "read_only", "frozen"]),
   }),
   access: ACCESS_LEVELS.full,
+  // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
+  // approved 9 November 2026): it freezing stops every write in the workspace, and the class is per action, so lifting it needs the scope too.
+  safety: "destructive",
   operation: (_context, input) => ({
     // On the freeze overlay's own recovery list (packages/core/src/
     // operations/freeze.ts): the one write that must survive a freeze is

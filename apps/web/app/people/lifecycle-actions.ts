@@ -15,9 +15,10 @@
  */
 
 import type { ErasureExport } from "@openokr/core";
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/pool";
+import { refusalFields } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import type { LifecycleState } from "./lifecycle-state.ts";
@@ -52,8 +53,10 @@ async function lifecycle(
     revalidatePath("/people");
     return { kind: "done", message: done, export: result.export };
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { kind: "refused", message: error.message };
+    // A schema's refusal too, which used to reach the error page (plan U1b).
+    const refusal = refusalFields(error, (await getTranslations()).t);
+    if (refusal !== null) {
+      return { kind: "refused", message: refusal.message };
     }
     throw error;
   }
@@ -120,8 +123,9 @@ export async function eraseMemberAction(
     const context = await actionContext();
     name = (await callAction(context, "people.readMember", { memberId })).name;
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { kind: "refused", message: error.message };
+    const refusal = refusalFields(error, t);
+    if (refusal !== null) {
+      return { kind: "refused", message: refusal.message };
     }
     throw error;
   }
@@ -130,6 +134,7 @@ export async function eraseMemberAction(
     return {
       kind: "refused",
       message: t("people.actions.typeTheNameExactly", { name }),
+      field: "confirmName",
     };
   }
 

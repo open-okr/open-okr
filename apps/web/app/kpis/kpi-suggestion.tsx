@@ -87,6 +87,9 @@ export function KpiSuggestion() {
   const [sentence, setSentence] = useState("");
   const [editing, setEditing] = useState<Editing | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // What adding it refused about one of the card's fields, shown under that
+  // field (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
 
   const set = (next: Partial<Editing>) =>
     setEditing((current) =>
@@ -124,6 +127,7 @@ export function KpiSuggestion() {
             pending={pending}
             onClick={() => {
               setNotice(null);
+              setRefused({});
               start(async () => {
                 try {
                   const suggested = await suggestKpiAction(sentence.trim());
@@ -160,6 +164,7 @@ export function KpiSuggestion() {
             value={editing.title}
             maxLength={500}
             disabled={pending}
+            error={refused.title}
             onChange={(event) => set({ title: event.target.value })}
           />
           <div className="flex flex-wrap items-end gap-2.5">
@@ -174,6 +179,7 @@ export function KpiSuggestion() {
               label={t("common.frequency")}
               value={editing.frequency}
               disabled={pending}
+              error={refused.frequency}
               onChange={(event) =>
                 set({
                   frequency: event.target.value as KeptKpi["frequency"],
@@ -191,6 +197,7 @@ export function KpiSuggestion() {
               label={t("common.betterWhen")}
               value={editing.direction}
               disabled={pending}
+              error={refused.direction}
               onChange={(event) =>
                 set({
                   direction: event.target.value as KeptKpi["direction"],
@@ -206,6 +213,7 @@ export function KpiSuggestion() {
             <NumberInput
               label={t("common.standingTarget")}
               value={numberOrNull(editing.target)}
+              error={refused.targetDefault}
               onValueChange={(next) =>
                 set({ target: next === null ? "" : String(next) })
               }
@@ -215,6 +223,7 @@ export function KpiSuggestion() {
             <NumberInput
               label={t("kpis.suggestion.healthyAt")}
               value={numberOrNull(editing.healthy)}
+              error={refused.healthyPct}
               onValueChange={(next) =>
                 set({ healthy: next === null ? "" : String(next) })
               }
@@ -226,6 +235,7 @@ export function KpiSuggestion() {
             <NumberInput
               label={t("kpis.suggestion.watchAt")}
               value={numberOrNull(editing.watch)}
+              error={refused.watchPct}
               onValueChange={(next) =>
                 set({ watch: next === null ? "" : String(next) })
               }
@@ -271,6 +281,7 @@ export function KpiSuggestion() {
               pending={pending}
               onClick={() => {
                 setNotice(null);
+                setRefused({});
                 start(async () => {
                   const result = await addSuggestedKpiAction({
                     title: editing.title,
@@ -283,8 +294,9 @@ export function KpiSuggestion() {
                     watchPct: numberOrNull(editing.watch),
                     formula: editing.keepFormula ? editing.formula : null,
                   });
-                  if (result.error) {
+                  if (result.error || result.fields) {
                     setNotice(result.error);
+                    setRefused(result.fields ?? {});
                     return;
                   }
                   setEditing(null);

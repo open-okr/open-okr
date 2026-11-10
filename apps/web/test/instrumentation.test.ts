@@ -3,8 +3,10 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
 import { installAdmission } from "../lib/admission";
 import { resolveSignupPolicy } from "../lib/auth";
+import { installPromptEvaluator } from "../lib/prompt-evaluation";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
+import { installStatusThresholds } from "../lib/status-thresholds";
 import { installTelemetry } from "../lib/telemetry";
 
 // Mocked rather than allowed to run: the real one opens a pool and polls
@@ -32,6 +34,11 @@ vi.mock("../lib/auth", () => ({ resolveSignupPolicy: vi.fn() }));
 // same graph. Mocked for the import cost, and the mock is what makes the two
 // ordering assertions below possible at all.
 vi.mock("../lib/admission", () => ({ installAdmission: vi.fn() }));
+// The `/api/status` thresholds resolve beside the limits (plan 0.7.0 P8),
+// and read `system_settings`, so they are mocked for the same reason.
+vi.mock("../lib/status-thresholds", () => ({
+  installStatusThresholds: vi.fn(),
+}));
 // The sixth route (P8-T07). `lib/sso` reaches the pool and the key ring
 // to decrypt SSO connections at boot. Mocked for the import cost.
 vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
@@ -39,6 +46,16 @@ vi.mock("../lib/sso", () => ({ resolveSSOProviders: vi.fn() }));
 // which role it connects as, so unmocked it would open a connection.
 vi.mock("../lib/tenant-floor", () => ({
   tenantFloor: vi.fn(async () => "enforced"),
+}));
+// The eighth (plan 0.7.0 E1). `lib/error-reporting` reaches `@openokr/core`
+// and the meter, and the real one adds process listeners that would outlive
+// the test. Mocked for both.
+vi.mock("../lib/error-reporting", () => ({ installErrorReports: vi.fn() }));
+// The ninth (plan 0.7.0 A9). `lib/prompt-evaluation` reaches the drafter and
+// the mock driver through `@openokr/agents`, which carries the adapters graph.
+// Mocked for the import cost.
+vi.mock("../lib/prompt-evaluation", () => ({
+  installPromptEvaluator: vi.fn(),
 }));
 // Not for the import cost: the real one replaces `console.error` for the
 // whole process, and the tests below spy on it (completeness review L-04).
@@ -63,6 +80,7 @@ afterEach(() => {
   vi.mocked(installTelemetry).mockClear();
   vi.mocked(resolveSignupPolicy).mockClear();
   vi.mocked(installAdmission).mockClear();
+  vi.mocked(installPromptEvaluator).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -216,6 +234,8 @@ test("admission is installed before the relay and the scheduler (P8-T06a)", asyn
   await register();
 
   expect(installAdmission).toHaveBeenCalled();
+  // And the status thresholds with them, so a bad pair stops the boot.
+  expect(installStatusThresholds).toHaveBeenCalled();
   expect(vi.mocked(installAdmission).mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(startRelay).mock.invocationCallOrder[0] as number,
   );
@@ -236,6 +256,25 @@ test("a boot that cannot resolve its limits fails, rather than serving unlimited
   );
 
   await expect(register()).rejects.toThrow(/below the floor/);
+});
+
+test("the prompt evaluation set is installed before the relay, the scheduler and the first request (plan 0.7.0 A9)", async () => {
+  // Until it is, `ai.updatePrompt` refuses every version rather than store one
+  // unchecked, so a boot that forgot it would leave S-37's Prompts card unable
+  // to save anything. Pure, so a build worker installs it too.
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+
+  await register();
+
+  expect(installPromptEvaluator).toHaveBeenCalledTimes(1);
+  expect(
+    vi.mocked(installPromptEvaluator).mock.invocationCallOrder[0],
+  ).toBeLessThan(vi.mocked(startRelay).mock.invocationCallOrder[0] as number);
+  expect(
+    vi.mocked(installPromptEvaluator).mock.invocationCallOrder[0],
+  ).toBeLessThan(
+    vi.mocked(resolveSignupPolicy).mock.invocationCallOrder[0] as number,
+  );
 });
 
 test("a build worker installs no admission, because it reaches no database", async () => {

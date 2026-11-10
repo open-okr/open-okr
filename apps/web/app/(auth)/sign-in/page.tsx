@@ -45,6 +45,13 @@ export default function SignInPage() {
 
   const router = useRouter();
   const [error, setError] = useState("");
+  // A sign-in hold, in whole minutes, kept apart from `error` because its
+  // message carries a link to the reset page (account-lockout.md D12).
+  const [heldMinutes, setHeldMinutes] = useState<number | null>(null);
+  const clearError = () => {
+    setError("");
+    setHeldMinutes(null);
+  };
   const [pending, setPending] = useState(false);
   // The passkey or provider button that started a call, so only it spins. Set
   // before the call and cleared after it: Back from a provider can restore this
@@ -131,7 +138,7 @@ export default function SignInPage() {
 
   const signIn = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setError("");
+    clearError();
     setPending(true);
     const form = new FormData(event.currentTarget);
 
@@ -142,6 +149,21 @@ export default function SignInPage() {
     setPending(false);
 
     if (failure) {
+      // Held: too many wrong passwords for this address. The wait comes in
+      // the body, and the same answer is given whether or not the account
+      // exists (account-lockout.md D12).
+      if (failure.status === 429 && failure.code === "SIGN_IN_HELD") {
+        const seconds = Number(
+          (failure as { retryAfterSeconds?: unknown }).retryAfterSeconds,
+        );
+        setHeldMinutes(
+          Math.max(
+            1,
+            Math.ceil((Number.isFinite(seconds) ? seconds : 60) / 60),
+          ),
+        );
+        return;
+      }
       // Deliberately the same message whether the address is unknown or the
       // password is wrong: saying which would confirm who has an account.
       setError(
@@ -166,7 +188,7 @@ export default function SignInPage() {
   // Called by the code field once its sixth digit is in, and by Verify.
   // A wrong code empties the cells, so the next attempt starts at the first.
   const verify = async (entered: string) => {
-    setError("");
+    clearError();
     setPending(true);
     const { error: failure } = await authClient.twoFactor.verifyTotp({
       code: entered,
@@ -182,7 +204,7 @@ export default function SignInPage() {
   };
 
   const signInWithPasskey = async () => {
-    setError("");
+    clearError();
     setActing("passkey");
     const result = await authClient.signIn.passkey();
     setActing(null);
@@ -314,7 +336,7 @@ export default function SignInPage() {
               disabled={acting !== null}
               pending={acting === `sso:${provider.id}`}
               onClick={async () => {
-                setError("");
+                clearError();
                 setActing(`sso:${provider.id}`);
                 // **Two protocols, two calls** (P8-T07c-b). SAML starts at
                 // `signIn.sso`, and sending it to `signIn.social` reached a
@@ -393,7 +415,20 @@ export default function SignInPage() {
         </div>
       )}
 
-      <FormError>{error}</FormError>
+      <FormError>
+        {heldMinutes !== null ? (
+          <>
+            {heldMinutes === 1
+              ? t("auth.signIn.heldForAMinute")
+              : t("auth.signIn.heldForMinutes", { minutes: heldMinutes })}{" "}
+            <Link href="/forgot-password" className="underline">
+              {t("auth.signIn.resetYourPassword")}
+            </Link>
+          </>
+        ) : (
+          error
+        )}
+      </FormError>
     </AuthCard>
   );
 }

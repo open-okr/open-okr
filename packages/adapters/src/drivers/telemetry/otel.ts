@@ -77,6 +77,10 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   openokr_ai_tokens_total: "Tokens spent, by provider, model and direction.",
   openokr_ai_cost_total:
     "Money spent on AI, by provider and model, in the smallest currency unit.",
+  openokr_errors_total:
+    "Unexpected errors, by where they were caught. Counted even when the caps hold a report back.",
+  openokr_error_reports_dropped_total:
+    "Error reports that did not reach the tracker, by reason. Zero with no tracker configured.",
 };
 
 function descriptionFor(name: string): string {
@@ -157,6 +161,11 @@ export class OtelTelemetry implements Telemetry {
   readonly #tracerProvider: NodeTracerProvider | undefined;
   readonly #tracer: Tracer | undefined;
   #stopped = false;
+  /**
+   * The span each error failed inside. Weak, so an error nobody holds is
+   * collected with its entry, and nothing here grows with traffic.
+   */
+  readonly #traces = new WeakMap<object, { traceId: string; spanId: string }>();
 
   constructor(options: OtelTelemetryOptions = {}) {
     this.#resource = resourceFromAttributes({
@@ -281,11 +290,29 @@ export class OtelTelemetry implements Telemetry {
           code: SpanStatusCode.ERROR,
           message: error instanceof Error ? error.name : "unknown",
         });
+        // The innermost span an error leaves is the one an operator wants,
+        // and it is the first catch to run, so a later one never overwrites
+        // it (error-reporting.md D20).
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          !this.#traces.has(error)
+        ) {
+          const { traceId, spanId } = active.spanContext();
+          this.#traces.set(error, { traceId, spanId });
+        }
         throw error;
       } finally {
         active.end();
       }
     });
+  }
+
+  traceOf(error: unknown): { traceId: string; spanId: string } | null {
+    if (typeof error !== "object" || error === null) {
+      return null;
+    }
+    return this.#traces.get(error) ?? null;
   }
 
   async scrape(): Promise<string> {

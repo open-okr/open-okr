@@ -25,6 +25,8 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getParentAccessScoped } from "../access/reads.ts";
+import { coachMentionOutboxInTx } from "../agents/coach-mention.ts";
+import { reconcileTextAttachments } from "../attachments/text.ts";
 import {
   addReaction,
   createComment,
@@ -36,11 +38,16 @@ import {
   removeReaction,
   updateComment,
 } from "../comments/service.ts";
+import { subjectAddress } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { extractMentionIds } from "../rich-text/extract.ts";
-import { markedAsRichText } from "../rich-text/field-schema.ts";
+import {
+  filesFinished,
+  markedAsRichText,
+  UPLOADING_MESSAGE,
+} from "../rich-text/field-schema.ts";
 import { RICH_TEXT_SCHEMA_VERSION } from "../rich-text/schema.ts";
 import { isValidRichText } from "../rich-text/validate.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -52,7 +59,10 @@ const richText = markedAsRichText(
     .unknown()
     .refine((value) => isValidRichText(value, RICH_TEXT_SCHEMA_VERSION), {
       message: "not valid editor JSON for the current rich text schema",
-    }),
+    })
+    // Plan 0.7.0 R1: a file still uploading is refused here as it is in
+    // every field built on `richTextSchema()`.
+    .refine(filesFinished, { message: UPLOADING_MESSAGE }),
 );
 
 function requireMemberId(memberId: string | null | undefined): string {
@@ -136,7 +146,7 @@ export const listCommentsAction = defineReadAction({
   summary: "List comments on a subject",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z.array(
     z.object({
@@ -196,7 +206,7 @@ export const listReactionsAction = defineReadAction({
   summary: "List reactions on a subject, grouped by emoji",
   input: z.object({
     subjectType: z.string(),
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
   }),
   output: z.array(
     z.object({
@@ -244,7 +254,7 @@ export const previewNotifyAction = defineReadAction({
     "Preview who would be notified by a comment with this body on this subject",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     body: z.unknown(),
   }),
   output: z.array(z.string().uuid()),
@@ -273,7 +283,7 @@ export const createCommentAction = defineWriteAction({
     "Post a comment on a goal, key result, check-in, cycle, document, initiative or task",
   input: z.object({
     subjectType: subjectTypeSchema,
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     body: richText,
   }),
   output: z.object({ id: z.string().uuid() }),
@@ -298,6 +308,15 @@ export const createCommentAction = defineWriteAction({
         authorMemberId,
         body: input.body,
       });
+      // Before anybody is told: a file the author may not share refuses the
+      // whole write, and no comment is left behind (§11 D7).
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: authorMemberId,
+        subjectType: "comment",
+        subjectId: result.id,
+        body: input.body,
+      });
       await notifyCommentInTx(tx, {
         workspaceId,
         subjectType: input.subjectType,
@@ -305,8 +324,19 @@ export const createCommentAction = defineWriteAction({
         authorMemberId,
         mentionIds: result.subscribedMemberIds,
       });
+      // A mention of the Coach on a goal asks for its review (plan 0.7.0
+      // A8). Enqueued here so it commits with the comment; the relay runs it.
+      const outbox = await coachMentionOutboxInTx(tx as WorkspaceTx, {
+        workspaceId,
+        subjectType: input.subjectType,
+        subjectId: input.subjectId,
+        commentId: result.id,
+        authorMemberId,
+        mentionIds: result.subscribedMemberIds,
+      });
       return {
         result: { id: result.id },
+        ...(outbox.length > 0 ? { outbox } : {}),
         activity: {
           kind: "comment.created" as const,
           subjectType: "comment",
@@ -323,7 +353,7 @@ export const createCommentAction = defineWriteAction({
           action: "comments.create",
           targetType: "comment",
           targetId: result.id,
-          payload: { subjectType: input.subjectType },
+          payload: { subjectType: input.subjectType, ...files },
         },
       };
     },
@@ -378,7 +408,7 @@ export const importCommentAction = defineWriteAction({
   output: z.object({ id: z.uuid() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       await assertLegacyKeyFree(
         tx,
         workspaceId,
@@ -434,6 +464,14 @@ export const importCommentAction = defineWriteAction({
         editedAt,
         legacy: { type: input.legacy.type, id: input.legacy.id },
       });
+      // Asked of whoever runs the import, who uploaded what it brought in.
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        subjectType: "comment",
+        subjectId: result.id,
+        body: input.body,
+      });
 
       return {
         result: { id: result.id },
@@ -458,6 +496,7 @@ export const importCommentAction = defineWriteAction({
             subjectType: input.subjectType,
             legacyType: input.legacy.type,
             legacyId: input.legacy.id,
+            ...files,
           },
         },
       };
@@ -496,7 +535,7 @@ export const replaceImportedBodyAction = defineWriteAction({
   output: z.object({ replaced: z.boolean() }),
   access: ACCESS_LEVELS.full,
   operation: (_context, input) => ({
-    async execute({ tx, workspaceId }) {
+    async execute({ tx, workspaceId, actor }) {
       const [comment] = await tx
         .select({
           id: comments.id,
@@ -539,6 +578,15 @@ export const replaceImportedBodyAction = defineWriteAction({
             eq(comments.workspaceId, workspaceId),
           ),
         );
+      // The images the rewrite put in become the comment's files, so every
+      // reader of the task opens them and not only whoever ran the import.
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        subjectType: "comment",
+        subjectId: comment.id,
+        body: input.body,
+      });
 
       return {
         result: { replaced: true },
@@ -555,7 +603,7 @@ export const replaceImportedBodyAction = defineWriteAction({
           action: "comments.replaceImportedBody",
           targetType: "comment",
           targetId: comment.id,
-          payload: { legacyId: comment.legacyId },
+          payload: { legacyId: comment.legacyId, ...files },
         },
       };
     },
@@ -609,6 +657,13 @@ export const updateCommentAction = defineWriteAction({
         commentId: input.commentId,
         body: input.body,
       });
+      const files = await reconcileTextAttachments(tx, {
+        workspaceId,
+        memberId: comment.authorMemberId,
+        subjectType: "comment",
+        subjectId: input.commentId,
+        body: input.body,
+      });
       // Somebody mentioned in the edit is told, once; everybody else already
       // heard about this comment when it was posted (H-13). `updateComment`
       // has subscribed them.
@@ -626,8 +681,19 @@ export const updateCommentAction = defineWriteAction({
           onlyMentions: true,
         });
       }
+      // An edit that newly mentions the Coach asks as a new comment would.
+      const outbox = await coachMentionOutboxInTx(tx as WorkspaceTx, {
+        workspaceId,
+        subjectType: comment.subjectType,
+        subjectId: comment.subjectId,
+        commentId: input.commentId,
+        authorMemberId: comment.authorMemberId,
+        mentionIds: added,
+        edited: true,
+      });
       return {
         result: {},
+        ...(outbox.length > 0 ? { outbox } : {}),
         activity: {
           kind: "comment.updated" as const,
           subjectType: "comment",
@@ -644,7 +710,7 @@ export const updateCommentAction = defineWriteAction({
           action: "comments.update",
           targetType: "comment",
           targetId: input.commentId,
-          payload: {},
+          payload: { ...files },
         },
       };
     },
@@ -727,7 +793,7 @@ export const addReactionAction = defineWriteAction({
   summary: "Add a reaction to any subject",
   input: z.object({
     subjectType: z.string(),
-    subjectId: z.string().uuid(),
+    subjectId: subjectAddress(),
     emoji: z.string().min(1).max(32),
   }),
   output: z.object({ id: z.string().uuid() }),

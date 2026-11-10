@@ -1,5 +1,6 @@
 "use client";
 
+import { RefusedFields } from "@openokr/ui";
 import { useActionState } from "react";
 import { NO_SCHEDULE, type ScheduleState } from "./schedule-state.ts";
 
@@ -24,7 +25,8 @@ export function ScheduleForm({
   const [state, formAction, pending] = useActionState(action, NO_SCHEDULE);
   return (
     <form action={formAction} className={className} aria-busy={pending}>
-      {children}
+      {/* Each field shows what the server refused about it (U1b). */}
+      <RefusedFields fields={state.fields}>{children}</RefusedFields>
       {state.error ? (
         <p
           role="alert"

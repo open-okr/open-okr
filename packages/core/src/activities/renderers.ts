@@ -19,6 +19,14 @@ const asCount = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
 /** §8.8's five decisions as a feed line says them (P9-T20e-a). */
+/** How a support session ended, in words (support-access.md §10.3). */
+const SUPPORT_END_WORDS: Readonly<Record<string, string>> = {
+  expired: "the time ran out",
+  revoked: "revoked by a member",
+  finished: "finished by support",
+  refused: "refused",
+};
+
 const CLOSE_DECISION_PHRASE: Readonly<Record<string, string>> = {
   achieved: "nothing left to carry",
   keep: "a decision to keep it",
@@ -38,9 +46,26 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     `Workspace state changed from "${asString(p.from)}" to "${asString(p.to)}"`,
   "support.granted": (p) =>
     `Support access granted for ${asCount(p.hours)} hours`,
-  "support.ended": (p) => `Support access ended (${asString(p.reason)})`,
+  "support.ended": (p) =>
+    `Support access ended: ${SUPPORT_END_WORDS[asString(p.reason)] ?? asString(p.reason)}`,
+  "support.requested": () => "Support asked to enter this workspace",
+  "workspace.limits_updated": () => "Workspace limits changed",
   "workspace.erasure_reminded": (p) =>
     `The owners and administrators were reminded that the workspace is deleted on ${asString(p.eraseOn).slice(0, 10)}`,
+  "workspace.trial_set": (p) =>
+    p.endsAt === null
+      ? "The trial was ended by the provider"
+      : p.plan
+        ? `A trial of the ${asString(p.plan)} plan runs until ${asString(p.endsAt).slice(0, 10)}`
+        : `The trial now runs until ${asString(p.endsAt).slice(0, 10)}`,
+  "workspace.trial_reminded": (p) =>
+    `The owners and administrators were reminded that the trial ends on ${asString(p.endsAt).slice(0, 10)}`,
+  "workspace.trial_ended": (p) =>
+    p.outcome === "moved"
+      ? `The trial ended and the workspace moved to the ${asString(p.plan, "free")} plan`
+      : p.outcome === "suspended"
+        ? "The trial ended and the workspace is read-only until its people fit a plan or somebody subscribes"
+        : "The trial ended; the subscription carries on",
   "workspace.lifecycle_changed": (p) =>
     `Workspace lifecycle set to "${asString(p.state)}"`,
   "billing.requested": () => "Somebody used the billing screen",
@@ -223,10 +248,20 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.outcome === "redacted"
       ? `Personal data was replaced before an AI request to ${asString(p.provider, "a provider")}`
       : `An AI request to ${asString(p.provider, "a provider")} was withheld by the privacy settings`,
+  "connection.tool_calls_swept": (p) =>
+    `Removed ${asCount(p.deleted)} agent call record(s) older than ${asCount(p.retentionDays)} days`,
+  "connection.ended_by_admin": () =>
+    "An administrator ended a member's agent connection",
+  "agent.scope_refused": (p) =>
+    `An agent connection was refused ${asString(p.tool, "a tool")}: it needs ${asString(p.needed, "more")} scope`,
   "agent.created": (p) =>
     `Agent "${asString(p.name, "New agent")}" was created`,
   "agent.enabled_changed": (p) =>
     `An agent was turned ${p.enabled ? "on" : "off"}`,
+  "agent.instructions_saved": (p) =>
+    p.restoredFrom === undefined
+      ? `An agent's ${asString(p.stage, "")} instructions were saved as version ${String(p.version)}`
+      : `An agent's ${asString(p.stage, "")} instructions went back to version ${String(p.restoredFrom)}`,
   "agent.scope_bound": (p) =>
     `An agent was granted access to a ${asString(p.resourceType, "resource")}`,
   "agent.run_started": () => "An agent run started",
@@ -260,6 +295,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `Cycle "${asString(p.name, "a new cycle")}" was created`,
   "cycle.resolved": (p) =>
     `Cycle "${asString(p.name, "the current cycle")}" was opened`,
+  "cycle.closing_started": (p) =>
+    p.by === "date"
+      ? `${asString(p.name, "The cycle")} ended and is closing: score it and close it`
+      : `${asString(p.name, "The cycle")} started closing early`,
+  "cycle.closing_undone": (p) =>
+    `${asString(p.name, "The cycle")} is no longer closing`,
   "cycle.updated": (p) => `Cycle "${asString(p.name, "a cycle")}" was updated`,
   "cycle.archived": (p) =>
     `Cycle "${asString(p.name, "a cycle")}" was archived`,
@@ -390,6 +431,10 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "key_result.updated": () => "A key result was edited",
   "key_result.value_recorded": (p) =>
     `A key result moved to ${Number(p.value ?? 0)}`,
+  // Out of ten, the way the list shows it by default; the feed has no
+  // workspace setting to hand.
+  "key_result.confidence_updated": (p) =>
+    `A key result's confidence was set to ${Math.round(Number(p.to ?? 0) * 10)} in 10`,
   "key_result.removed": (p) =>
     `Key result "${asString(p.title, "a key result")}" was removed`,
   "key_result.target_changed": (p) =>
@@ -439,6 +484,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     "A risk owner was named for an unconfirmed dependency",
   "alignment.register_escalated": () =>
     "An unconfirmed dependency was escalated to the cycle's sponsor",
+  "alignment.register_provider_named": (p) =>
+    !p.named
+      ? "The key result that delivers a dependency was cleared"
+      : p.confirmationCleared
+        ? "A different key result was named to deliver a dependency, so the providing team confirms it again"
+        : "The key result that delivers a dependency was named",
   "alignment.register_removed": () =>
     "A dependency was removed from the register",
   "alignment.finding_dismissed": (p) =>
@@ -574,6 +625,16 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "copilot.proposalApplied": () => "Applied a copilot proposal",
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
+  "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
+  "webhook.secret_rotated": (p) =>
+    `Rotated the signing secret of the webhook "${asString(p.name)}"`,
+  "webhook.removed": (p) => `Removed the webhook "${asString(p.name)}"`,
+  "webhook.tested": (p) => `Sent a test to the webhook "${asString(p.name)}"`,
+  "webhook.redelivered": (p) =>
+    `Sent ${asString(p.event, "an event")} again to the webhook "${asString(p.name)}"`,
+  "webhook.turned_off": (p) =>
+    `The webhook "${asString(p.name)}" turned off after ${asCount(p.failures)} failed deliveries in a row`,
   "channel.connected": (p) => `Connected ${p.provider}`,
   "channel.disconnected": (p) => `Disconnected ${p.provider}`,
   "channel.identity_linked": (p) => `Linked their ${p.provider} account`,

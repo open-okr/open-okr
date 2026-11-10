@@ -56,10 +56,12 @@ Three switches, each independent of the others:
 public.** With the flag on and no policy saved, sign-up is open to anybody who can
 reach the instance unless you say otherwise.
 
-**A saved policy wins over the variable, and finishing the setup wizard saves one:
-Invitation only.** After that, `OPENOKR_REGISTRATION` changes nothing. On an
-instance without the cloud flag, the Registration card on Admin, General changes
-the saved policy. With the cloud flag on, that card is hidden.
+**A saved policy wins over the variable.** The setup wizard saves none from
+0.7.0, so the variable keeps working after setup. On an instance without the
+cloud flag, the Registration card on Admin, General saves a policy. With the
+cloud flag on, that card is hidden and the operator sets the policy on the
+console's Instance screen instead. An instance set up before 0.7.0 keeps the
+Invitation only the wizard saved then, until somebody chooses again.
 
 **Where the settings go.** On one server, add them to `deploy/docker/secrets/app.env`
 and run `./openokr up`. On Kubernetes they are values in the chart:
@@ -69,7 +71,7 @@ and run `./openokr up`. On Kubernetes they are values in the chart:
 | `OPENOKR_CLOUD` | `cloud.enabled` |
 | `OPENOKR_CLOUD_PLANS` | `cloud.plans` |
 | `OPENOKR_CLOUD_DEFAULT_PLAN` | `cloud.defaultPlan` |
-| `OPENOKR_REGISTRATION` | `instance.registration`, which the chart accepts as `auto`, `open` or `invite_only` and refuses as `company_domains` |
+| `OPENOKR_REGISTRATION` | `instance.registration`: `auto`, `open`, `company_domains` or `invite_only` |
 | `OPENOKR_INSTANCE_NAME`, `OPENOKR_SOURCE_URL`, `OPENOKR_TERMS_URL`, `OPENOKR_PRIVACY_URL`, `OPENOKR_SUPPORT_EMAIL` | `instance.name`, `instance.sourceUrl`, `instance.termsUrl`, `instance.privacyUrl`, `instance.supportEmail` |
 | Anything secret, such as the Stripe keys | A Secret named in `extraEnvFrom`, never a value |
 

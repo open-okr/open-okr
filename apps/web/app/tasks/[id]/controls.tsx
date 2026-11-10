@@ -2,6 +2,8 @@
 
 import { DateInput, guardPress, Spinner, useTranslations } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import type { Conflict } from "../../../lib/conflict.ts";
+import { ConflictNotice } from "../../../lib/conflict-notice.tsx";
 import type { WriteState } from "../../cycle/write-state.ts";
 
 /**
@@ -139,6 +141,13 @@ export function RailButton({
   );
 }
 
+/**
+ * The due date, saved as it is picked.
+ *
+ * **It sends the date it was drawn with beside the new one** (D3,
+ * optimistic-concurrency.md V4), so a date somebody else changed since is
+ * refused rather than overwritten, with keep mine and take theirs.
+ */
 export function DueDateField({
   dueOn,
   disabled,
@@ -146,12 +155,37 @@ export function DueDateField({
 }: {
   readonly dueOn: string | null;
   readonly disabled: boolean;
-  readonly onSave: (dueOn: string) => Promise<WriteState>;
+  readonly onSave: (dueOn: string, read: string) => Promise<WriteState>;
 }) {
   const { t } = useTranslations();
 
   const [value, setValue] = useState(dueOn ?? "");
+  // What the field was last drawn with or saved as: the read it sends.
+  const [read, setRead] = useState(dueOn ?? "");
+  const [conflict, setConflict] = useState<Conflict | null>(null);
   const { error, pending, run } = useRun();
+
+  const save = (next: string, before: string, previous: string) => {
+    setValue(next);
+    setConflict(null);
+    run(
+      "due",
+      async () => {
+        const state = await onSave(next, before);
+        if (state.conflict) {
+          setConflict(state.conflict);
+        } else if (!state.error) {
+          setRead(next);
+        }
+        return state;
+      },
+      () => setValue(previous),
+    );
+  };
+  const stored = () => {
+    const theirs = conflict?.current.dueOn;
+    return typeof theirs === "string" ? theirs : "";
+  };
 
   return (
     <span className="flex flex-col items-end gap-1">
@@ -162,16 +196,7 @@ export function DueDateField({
           hideLabel
           value={value}
           disabled={disabled || pending}
-          onValueChange={(chosen) => {
-            const next = chosen ?? "";
-            const previous = value;
-            setValue(next);
-            run(
-              "due",
-              () => onSave(next),
-              () => setValue(previous),
-            );
-          }}
+          onValueChange={(chosen) => save(chosen ?? "", read, value)}
           inputClassName="h-auto py-1"
         />
       </span>
@@ -179,6 +204,19 @@ export function DueDateField({
         <span role="alert" className="text-xs text-bad">
           {error}
         </span>
+      ) : null}
+      {conflict ? (
+        <ConflictNotice
+          conflict={conflict}
+          pending={pending}
+          onKeepMine={() => save(value, stored(), read)}
+          onTakeTheirs={() => {
+            const theirs = stored();
+            setValue(theirs);
+            setRead(theirs);
+            setConflict(null);
+          }}
+        />
       ) : null}
     </span>
   );

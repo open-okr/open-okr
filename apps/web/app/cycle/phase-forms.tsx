@@ -85,7 +85,26 @@ export async function CycleSetup({
         </div>
       </CardHeader>
       <CardBody>
-        <ActionForm action={saveCycleSetup} className="flex flex-col gap-3">
+        <ActionForm
+          action={saveCycleSetup}
+          // What the form is drawn with, so a field somebody changed since
+          // is refused rather than overwritten (D3). The dates as stored.
+          read={{
+            sponsorId,
+            facilitatorId,
+            firstCycle,
+            sessionDates: sessionDates.map((entry) => ({ ...entry })),
+          }}
+          readLabels={{
+            ...Object.fromEntries(
+              people.map((person) => [person.id, person.name]),
+            ),
+            ...Object.fromEntries(
+              SESSIONS.map((session) => [session.key, t(session.label)]),
+            ),
+          }}
+          className="flex flex-col gap-3"
+        >
           <input type="hidden" name="cycleId" value={cycleId} />
           <div className="grid gap-2 sm:grid-cols-2">
             {picker("sponsorId", t("cycle.setup.sponsor"), sponsorId)}

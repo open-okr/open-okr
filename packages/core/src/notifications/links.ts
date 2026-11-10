@@ -46,6 +46,10 @@ const PATHS: Readonly<Record<string, (id: string) => string>> = {
   cycle: () => "/cycle",
   document: (id) => `/documents/${id}`,
   workspace: () => "/",
+  // Plan 0.7.0 P2: a request and its end are answered on Admin, Support.
+  support_session: () => "/admin/support",
+  // Plan 0.7.0 A4: an ended connection is explained on the member's own page.
+  agent_connection: () => "/account/connections",
 };
 
 /** The subject types this module knows how to address. For the tests. */

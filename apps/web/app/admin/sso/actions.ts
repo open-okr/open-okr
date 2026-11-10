@@ -1,13 +1,10 @@
 "use server";
 
 import { loadEnv } from "@openokr/config";
-import {
-  callAction,
-  OperationError,
-  SSOConnectionRejected,
-} from "@openokr/core";
+import { callAction, SSOConnectionRejected } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../../lib/pool";
+import { refusalFields } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
 import { expireSSOProviders } from "../../../lib/sso";
 import { getTranslations } from "../../../lib/translations";
@@ -50,14 +47,21 @@ async function refusal(
   if (error instanceof SSOConnectionRejected) {
     return { ok: false, message: error.message, field: error.field };
   }
-  if (error instanceof OperationError) {
-    return { ok: false, message: error.message };
+  const { t } = await getTranslations();
+  // An operation's refusal, and a schema's, which used to be logged as a
+  // fault: under the field it names when it names one (plan U1b), the first
+  // when a schema names several, as the rejection above does.
+  const refused = refusalFields(error, t);
+  if (refused !== null) {
+    const [field] = Object.keys(refused.fields);
+    return field === undefined
+      ? { ok: false, message: refused.message }
+      : { ok: false, message: refused.fields[field] ?? refused.message, field };
   }
   // Anything else is a fault, not a refusal. The log says which; the reader
   // is told only that nothing changed, because a driver message is not a
   // sentence for them.
   console.error(`${action} failed:`, error);
-  const { t } = await getTranslations();
   return { ok: false, message: t("admin.sso.actions.failed") };
 }
 

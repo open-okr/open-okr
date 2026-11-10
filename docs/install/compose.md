@@ -96,7 +96,8 @@ Run these from `deploy/docker/`.
 
 | Command | What it does |
 |---|---|
-| `./openokr status` | What is running, and whether it is healthy |
+| `./openokr status` | What is running, whether it is healthy, and which data changes are pending |
+| `./openokr data-change` | Run the data changes an upgrade brought. Batched and resumable |
 | `./openokr logs` | Follow the application log. `./openokr logs proxy` for the proxy |
 | `./openokr upgrade` | Pull the new image, restart, re-run migrations, report |
 | `./openokr backup` | An encrypted database dump and a copy of the files, with a checksum |

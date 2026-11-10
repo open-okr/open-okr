@@ -25,6 +25,7 @@ import {
   ACCESS_LEVELS,
   type AgentRunStepJob,
   type AgentRunStepOutcome,
+  agentRunChangedEvent,
   agentRunStep,
   callAction,
   defaultMetrics,
@@ -34,6 +35,7 @@ import {
   METRIC,
   OperationError,
   type OperationTx,
+  reportError,
   resolveAgentRunCostCap,
   resolveMemberAccessLevel,
   resolveSubjectContext,
@@ -313,11 +315,12 @@ export async function processNextTask(
             kind: stop.kind,
             message: stop.message,
           };
+          const log = [...run.log, logEntry];
           await tx
             .update(agentRuns)
             .set({
               status: stop.status,
-              log: [...run.log, logEntry],
+              log,
               error: stop.error ?? null,
               finishedAt: now,
               updatedAt: now,
@@ -356,6 +359,15 @@ export async function processNextTask(
                 ...(stop.reason === "budget" ? { haltedOnBudget: true } : {}),
               },
             },
+            // The screen showing the run hears it stopped (A11).
+            outbox: [
+              agentRunChangedEvent({
+                workspaceId,
+                runId: run.id,
+                status: stop.status,
+                logLength: log.length,
+              }),
+            ],
           };
         };
 
@@ -569,15 +581,25 @@ export async function processNextTask(
           // (the boundary gate's own rule). Keyed on the run and the task
           // index it is about to attempt, so a redelivered row cannot double
           // up a step that already advanced past it.
-          outbox: finished
-            ? []
-            : [
-                agentRunStep({
-                  workspaceId,
-                  runId: run.id,
-                  taskIndex: nextIndex,
-                }),
-              ],
+          outbox: [
+            ...(finished
+              ? []
+              : [
+                  agentRunStep({
+                    workspaceId,
+                    runId: run.id,
+                    taskIndex: nextIndex,
+                  }),
+                ]),
+            // Every step tells the screen showing the run, so it moves as
+            // the run does rather than on the next navigation (A11).
+            agentRunChangedEvent({
+              workspaceId,
+              runId: run.id,
+              status,
+              logLength: log.length,
+            }),
+          ],
         };
       },
     },
@@ -673,6 +695,11 @@ export async function continueAgentRun(
     if (error instanceof OperationError && error.code === "not_found") {
       return { kind: "skipped", reason: error.message };
     }
+    // An agent run that ends in error (error-reporting.md D2). Reported here,
+    // where the workspace is known, before the relay retries the step; a
+    // refusal returns from the classifier, and a dead letter, if it comes to
+    // that, is reported as its own event.
+    reportError(error, { source: "agent", workspaceId: job.workspaceId });
     throw error;
   }
   return { kind: "stepped" };

@@ -32,7 +32,13 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
+import {
+  COACH_MENTION_TOPIC,
+  parseCoachMentionJob,
+} from "../agents/coach-mention.ts";
+import { runCoachMention } from "../agents/coach-mention-run.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import { AGENT_RUN_CHANGED_TOPIC } from "../agents/live.ts";
 import {
   AGENT_RUN_STEP_TOPIC,
   type AgentRunStepJob,
@@ -66,6 +72,9 @@ import {
   notificationDigestMail,
   renderStoredEmail,
   type StoredEmail,
+  trialEndedMail,
+  trialReminderMail,
+  webhookTurnedOffMail,
 } from "../mail/mails.ts";
 import { mailWords } from "../mail/words.ts";
 import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
@@ -73,6 +82,7 @@ import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
+import type { KeyRing } from "../secrets/key-ring.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import {
   END_SUBSCRIPTION_TOPIC,
@@ -81,7 +91,25 @@ import {
   WORKSPACE_CLOSED_TOPIC,
 } from "../tenancy/closing.ts";
 import { ERASE_CUSTOMER_TOPIC, ERASE_FILES_TOPIC } from "../tenancy/erasure.ts";
+import {
+  TRIAL_ENDED_TOPIC,
+  TRIAL_REMINDER_TOPIC,
+} from "../tenancy/trial-topics.ts";
+import { readTrialNotice } from "../tenancy/trials.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
+import {
+  deliverWebhook,
+  readTurnedOff,
+  type WebhookPost,
+} from "../webhooks/deliver.ts";
+import {
+  FAILURES_BEFORE_OFF,
+  parseWebhookJob,
+  WEBHOOK_DELIVER_TOPIC,
+  WEBHOOK_MAX_ATTEMPTS,
+  WEBHOOK_TURNED_OFF_TOPIC,
+  webhookRetrySeconds,
+} from "../webhooks/jobs.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
 /** One delivered outbox row, as a handler sees it. */
@@ -221,6 +249,17 @@ export interface OutboxHandlerDeps {
    * the reason `putFile` is one. Absent means no storage, and erasure waits.
    */
   readonly deleteFiles?: (prefix: string) => Promise<void>;
+  /**
+   * The root key ring, which opens a webhook's signing secret at the moment
+   * it signs (outbound-webhooks.md W6). Absent, a webhook waits for a relay
+   * that has one rather than being skipped.
+   */
+  readonly ring?: KeyRing;
+  /**
+   * Posts one signed webhook body through the outbound guard (W7). A
+   * function rather than the guard, which lives in `packages/adapters`.
+   */
+  readonly postWebhook?: WebhookPost;
   /** The instance's own address, for links inside emails. */
   readonly baseUrl?: string;
   /**
@@ -858,6 +897,33 @@ const continueAgentRun: OutboxHandler = async (delivery, deps) => {
 };
 
 /**
+ * The Coach answers a mention on a goal (plan 0.7.0 A8).
+ *
+ * **Safe to run twice**: the action refuses a second answer to one comment, and
+ * that refusal, like every other one, is a skip with its reason rather than a
+ * retry. Nothing about it needs a provider.
+ */
+const answerCoachMention: OutboxHandler = async (delivery, deps) => {
+  const job = parseCoachMentionJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not carry a workspace, a comment and a goal, so the Coach has nothing to answer.`,
+    );
+  }
+  const outcome = await runCoachMention(
+    {
+      pool: deps.pool,
+      ...(deps.baseUrl ? { baseUrl: deps.baseUrl } : {}),
+      ...(deps.instanceName ? { instanceName: deps.instanceName } : {}),
+    },
+    job,
+  );
+  if (outcome.kind === "skipped") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+};
+
+/**
  * Stops the subscription of a workspace that closed (workspace-erasure.md §3).
  *
  * **Safe to run twice**: the provider is asked to end at the period's end, and
@@ -1005,6 +1071,168 @@ const sendErasureReminder: OutboxHandler = async (delivery, deps) => {
   }
 };
 
+/**
+ * Seven days before a trial ends, to the owners and administrators
+ * (tenant-lifecycle.md §11 Q2, plan 0.7.0 P4c). Not sent once the date has
+ * moved or the trial is over: the mail would be about a day that no longer
+ * comes.
+ */
+const sendTrialReminder: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const trialEndsAt = asString(delivery.payload.trialEndsAt);
+  if (!workspaceId || !trialEndsAt) {
+    throw new PermanentDispatchError(
+      "A trial reminder needs a workspace and the day the trial ends.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readTrialNotice(deps.pool, workspaceId);
+  if (notice.trialEndsAt?.toISOString() !== trialEndsAt) {
+    deps.onSkipped?.(delivery, "the trial no longer ends on that day");
+    return;
+  }
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...trialReminderMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        endsAt: notice.trialEndsAt,
+        planName: notice.planName ?? "",
+        fallbackName: notice.defaultPlanName ?? mail.words("trial.noPlan"),
+      }),
+    });
+  }
+};
+
+/** What the end of a trial did, to the owners and administrators (§11 Q2). */
+const sendTrialEnded: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const outcome = asString(delivery.payload.outcome);
+  if (
+    !workspaceId ||
+    (outcome !== "subscribed" && outcome !== "moved" && outcome !== "suspended")
+  ) {
+    throw new PermanentDispatchError(
+      "A trial's end needs a workspace and what the end did.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const notice = await readTrialNotice(deps.pool, workspaceId);
+  const mail = await workspaceMail(deps.pool, workspaceId);
+  const fallbackName =
+    asString(delivery.payload.defaultPlanName) ?? mail.words("trial.noPlan");
+  for (const recipient of notice.recipients) {
+    await deps.sendMail({
+      to: recipient.email,
+      ...trialEndedMail({
+        mail,
+        baseUrl: deps.baseUrl,
+        outcome,
+        fallbackName,
+      }),
+    });
+  }
+};
+
+/**
+ * Signs and posts one webhook event (docs/design/outbound-webhooks.md W8).
+ *
+ * **Safe to run twice** in the sense a receiver needs: a relay that dies
+ * after the post sends the same event again, with the same `webhook-id`, so a
+ * receiver that keeps the ids it has seen drops the copy. Every attempt is a
+ * row in the hook's log.
+ *
+ * A failure is thrown, so the relay backs off and tries again for about a day
+ * (`OUTBOX_RETRY_POLICY`). The last attempt is not thrown: a receiver that was
+ * down all day is the receiver's problem rather than a dead letter on this
+ * instance, and its log says it gave up. A refusal and a withheld subject are
+ * never retried, because waiting changes neither.
+ */
+const deliverWebhookEvent: OutboxHandler = async (delivery, deps) => {
+  const job = parseWebhookJob(delivery.payload);
+  if (!job) {
+    throw new PermanentDispatchError(
+      `${delivery.topic} does not name a workspace, a webhook and an event, so nothing can be sent.`,
+    );
+  }
+  const outcome = await deliverWebhook(job, {
+    pool: deps.pool,
+    ...(deps.ring ? { ring: deps.ring } : {}),
+    ...(deps.postWebhook ? { post: deps.postWebhook } : {}),
+    attempt: Math.max(1, delivery.attempts),
+    lastAttempt: WEBHOOK_MAX_ATTEMPTS,
+  });
+  if (outcome.kind === "failed" && outcome.retry) {
+    throw new Error(outcome.reason);
+  }
+  if (outcome.kind === "skipped" || outcome.kind === "refused") {
+    deps.onSkipped?.(delivery, outcome.reason);
+  }
+  if (outcome.kind === "withheld") {
+    deps.onSkipped?.(delivery, "the webhook's owner cannot see the subject");
+  }
+  if (outcome.kind === "failed") {
+    deps.onSkipped?.(delivery, `gave up: ${outcome.reason}`);
+  }
+};
+
+/**
+ * Tells a webhook's creator it turned itself off after a run of failures
+ * (W9). Not sent once somebody has turned it back on or removed it. Safe to
+ * run twice in the only sense mail can be, like the digest.
+ */
+const sendWebhookTurnedOff: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const webhookId = asString(delivery.payload.webhookId);
+  const failures =
+    typeof delivery.payload.failures === "number"
+      ? delivery.payload.failures
+      : FAILURES_BEFORE_OFF;
+  if (!workspaceId || !webhookId) {
+    throw new PermanentDispatchError(
+      "A webhook's turned-off mail needs a workspace and a webhook.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const hook = await readTurnedOff(deps.pool, workspaceId, webhookId);
+  if (!hook) {
+    deps.onSkipped?.(delivery, "the webhook is on again, or gone");
+    return;
+  }
+  const to = await memberEmail(deps.pool, workspaceId, hook.creatorMemberId);
+  if (!to) {
+    deps.onSkipped?.(delivery, "the webhook's creator has no address");
+    return;
+  }
+  let host = "";
+  try {
+    host = new URL(hook.url).host;
+  } catch {
+    host = "";
+  }
+  await deps.sendMail({
+    to,
+    ...webhookTurnedOffMail({
+      mail: await workspaceMail(deps.pool, workspaceId),
+      baseUrl: deps.baseUrl,
+      name: hook.name,
+      host,
+      failures,
+    }),
+  });
+};
+
 const acknowledge: OutboxHandler = async (delivery, deps) => {
   deps.onSkipped?.(delivery, "no consumer for this topic yet");
 };
@@ -1036,6 +1264,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // and no kind: each scope route decides whether to forward, and the server
   // render that follows applies the filter and can().
   "feed.added": publishEvent,
+  // Every open agents screen is told one run moved (release 0.7.0 A11). The
+  // run's id and version, never a log line: the screen re-reads.
+  [AGENT_RUN_CHANGED_TOPIC]: publishEvent,
   "content.index": indexContent,
   // The large-export path (P5-T15). The row names a run; the worker rebuilds
   // the list as the member who asked, writes the file to storage and marks the
@@ -1049,6 +1280,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // written this topic since P2-T17 and nothing read it, so a run started
   // through `agents.startRun` sat at its first task forever.
   [AGENT_RUN_STEP_TOPIC]: continueAgentRun,
+  // The Coach's reply to a mention on a goal (plan 0.7.0 A8).
+  [COACH_MENTION_TOPIC]: answerCoachMention,
   // The virus scan (completeness review M-24). Written by a claim only when a
   // scanner is configured, so an instance without one never sees this topic.
   [BLOB_SCAN_TOPIC]: scanBlob,
@@ -1058,9 +1291,37 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [END_SUBSCRIPTION_TOPIC]: endSubscription,
   [WORKSPACE_CLOSED_TOPIC]: sendClosureNotice,
   [ERASURE_REMINDER_TOPIC]: sendErasureReminder,
+  [TRIAL_REMINDER_TOPIC]: sendTrialReminder,
+  [TRIAL_ENDED_TOPIC]: sendTrialEnded,
   // Erasure's half that only the server can do (workspace-erasure.md §4).
   [ERASE_FILES_TOPIC]: eraseFiles,
   [ERASE_CUSTOMER_TOPIC]: deleteCustomer,
+  // Outbound webhooks (docs/design/outbound-webhooks.md W8, W9).
+  [WEBHOOK_DELIVER_TOPIC]: deliverWebhookEvent,
+  [WEBHOOK_TURNED_OFF_TOPIC]: sendWebhookTurnedOff,
+};
+
+/**
+ * Topics that retry on a schedule of their own rather than the relay's.
+ *
+ * The relay's default gives up after ten attempts in about a quarter of an
+ * hour, which is right for an email and wrong for a webhook receiver that is
+ * down for a deploy: W9 retries for about a day. The relay host passes this
+ * table to the relay, as it passes `OUTBOX_REDACT_ON_DELIVERY`.
+ */
+export const OUTBOX_RETRY_POLICY: Readonly<
+  Record<
+    string,
+    {
+      readonly maxAttempts: number;
+      readonly backoffSeconds: (attempts: number) => number;
+    }
+  >
+> = {
+  [WEBHOOK_DELIVER_TOPIC]: {
+    maxAttempts: WEBHOOK_MAX_ATTEMPTS,
+    backoffSeconds: webhookRetrySeconds,
+  },
 };
 
 /**

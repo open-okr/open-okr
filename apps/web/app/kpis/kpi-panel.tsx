@@ -1,7 +1,7 @@
 "use client";
 
 import { Dialog } from "@base-ui-components/react/dialog";
-import { Button, useTranslations } from "@openokr/ui";
+import { Button, RefusedFields, useTranslations } from "@openokr/ui";
 import { X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { type ReactNode, useActionState, useEffect, useRef } from "react";
@@ -19,7 +19,8 @@ import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
  * Closing takes both away and keeps the filters.
  *
  * **It closes itself when the write is accepted**, and stays open on a
- * refusal so the sentence is read beside the fields that caused it.
+ * refusal so it is read beside the fields that caused it: under the field
+ * when it names one (guided-inputs §4.2), as the sentence when it does not.
  */
 export function KpiPanel({
   which,
@@ -76,7 +77,7 @@ export function KpiPanel({
       return;
     }
     sent.current = false;
-    if (!state.error) {
+    if (!state.error && !state.fields) {
       close();
     }
   }, [pending, state]);
@@ -132,7 +133,8 @@ export function KpiPanel({
               aria-busy={pending}
               className="flex flex-col gap-3"
             >
-              {children}
+              {/* Each field shows what the server refused about it (U1b). */}
+              <RefusedFields fields={state.fields}>{children}</RefusedFields>
               {state.error ? (
                 <p
                   role="alert"

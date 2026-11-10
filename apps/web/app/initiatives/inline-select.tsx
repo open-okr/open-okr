@@ -2,6 +2,8 @@
 
 import { SelectInput, Spinner } from "@openokr/ui";
 import { useState, useTransition } from "react";
+import type { Conflict } from "../../lib/conflict.ts";
+import { ConflictNotice } from "../../lib/conflict-notice.tsx";
 import type { WriteState } from "../cycle/write-state.ts";
 
 /**
@@ -17,6 +19,11 @@ import type { WriteState } from "../cycle/write-state.ts";
  * `disabled` covers the reader who cannot edit at all. It is a separate state
  * from a refusal: one is known before the click and the other after it, and
  * showing a control somebody cannot use is worse than not showing it.
+ *
+ * **It sends the value it was drawn with beside the new one** (D3,
+ * optimistic-concurrency.md V4), so a value somebody else changed since is
+ * refused rather than overwritten, and the select offers keep mine and take
+ * theirs. A save that does not compare ignores it.
  */
 export function InlineSelect({
   label,
@@ -32,11 +39,44 @@ export function InlineSelect({
     readonly label: string;
   }[];
   readonly disabled?: boolean;
-  readonly onSave: (next: string) => Promise<WriteState>;
+  readonly onSave: (next: string, read: string) => Promise<WriteState>;
 }) {
   const [current, setCurrent] = useState(value);
+  // What the select was last drawn with or saved as: the read it sends.
+  const [read, setRead] = useState(value);
+  // A fresh value from the page, after a save or a refresh, is the new read.
+  const [drawn, setDrawn] = useState(value);
+  if (value !== drawn) {
+    setDrawn(value);
+    setCurrent(value);
+    setRead(value);
+  }
   const [error, setError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<Conflict | null>(null);
   const [pending, startTransition] = useTransition();
+
+  const save = (next: string, before: string, previous: string) => {
+    setCurrent(next);
+    setError(null);
+    setConflict(null);
+    startTransition(async () => {
+      const state = await onSave(next, before);
+      if (state.conflict) {
+        setConflict(state.conflict);
+        return;
+      }
+      if (state.error) {
+        setCurrent(previous);
+        setError(state.error);
+        return;
+      }
+      setRead(next);
+    });
+  };
+  const stored = () => {
+    const [first] = Object.values(conflict?.current ?? {});
+    return first === null || first === undefined ? "" : String(first);
+  };
 
   return (
     <span className="inline-flex flex-col gap-1">
@@ -46,19 +86,7 @@ export function InlineSelect({
           hideLabel
           value={current}
           disabled={disabled || pending}
-          onChange={(event) => {
-            const next = event.target.value;
-            const previous = current;
-            setCurrent(next);
-            setError(null);
-            startTransition(async () => {
-              const state = await onSave(next);
-              if (state.error) {
-                setCurrent(previous);
-                setError(state.error);
-              }
-            });
-          }}
+          onChange={(event) => save(event.target.value, read, current)}
           inputClassName="h-6.5 w-auto px-2 text-xs disabled:text-ink-3"
         >
           {options.map((option) => (
@@ -73,6 +101,22 @@ export function InlineSelect({
         <span role="alert" className="text-xs text-bad">
           {error}
         </span>
+      ) : null}
+      {conflict ? (
+        <ConflictNotice
+          conflict={conflict}
+          labels={Object.fromEntries(
+            options.map((option) => [option.value, option.label]),
+          )}
+          pending={pending}
+          onKeepMine={() => save(current, stored(), read)}
+          onTakeTheirs={() => {
+            const theirs = stored();
+            setCurrent(theirs);
+            setRead(theirs);
+            setConflict(null);
+          }}
+        />
       ) : null}
     </span>
   );

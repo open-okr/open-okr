@@ -183,23 +183,28 @@ describe("saving the branding card", () => {
     ["#22c55e", "reads as green, which means on track"],
     ["#f59e0b", "reads as amber, which means at risk"],
     ["#ef4444", "reads as red, which means off track"],
-  ])("refuses %s in words, and writes nothing", async (colour, reason) => {
-    const state = await submitBranding(
-      NOTHING,
-      submitted({ intent: "save", primaryColor: colour }),
-    );
-    expect(state.error).toContain(colour);
-    expect(state.error).toContain(reason);
-    expect(state.saved).toBeNull();
-    expect(callAction).not.toHaveBeenCalled();
-  });
+  ])(
+    "refuses %s in words under the colour, and writes nothing",
+    async (colour, reason) => {
+      const state = await submitBranding(
+        NOTHING,
+        submitted({ intent: "save", primaryColor: colour }),
+      );
+      // Under the colour it is about (guided-inputs §4.2, plan U1b).
+      expect(state.error).toBeNull();
+      expect(state.fields?.primaryColor).toContain(colour);
+      expect(state.fields?.primaryColor).toContain(reason);
+      expect(state.saved).toBeNull();
+      expect(callAction).not.toHaveBeenCalled();
+    },
+  );
 
   it("refuses something that is not a hex colour", async () => {
     const state = await submitBranding(
       NOTHING,
       submitted({ intent: "save", primaryColor: "blue" }),
     );
-    expect(state.error).toBe(
+    expect(state.fields?.primaryColor).toBe(
       "A hash followed by six hex digits, like #336699.",
     );
     expect(callAction).not.toHaveBeenCalled();

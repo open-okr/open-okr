@@ -20,10 +20,19 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { SEEDED_MODELS } from "../ai/model-catalog.ts";
+import {
+  defaultPromptEvaluator,
+  evaluationPasses,
+  type PromptEvaluation,
+} from "../ai/prompt-evaluation.ts";
 import { defaultPromptFor } from "../ai/prompts.ts";
 import { resolveTierRoute } from "../ai/tier-routing.ts";
 import { OperationError } from "../operations/operation.ts";
-import { defineReadAction, defineWriteAction } from "./define.ts";
+import {
+  type ActionCallContext,
+  defineReadAction,
+  defineWriteAction,
+} from "./define.ts";
 
 const providerSchema = z.enum(AI_PROVIDER_KINDS);
 const tierSchema = z.enum(MODEL_TIERS);
@@ -696,16 +705,83 @@ export const readPrompt = defineReadAction({
   },
 });
 
+/** How many failed checks a refusal names before it says how many more. */
+const FAILURES_NAMED = 3;
+
+/**
+ * The refusal for a version that fails its set, naming what failed.
+ *
+ * English, as every refusal core writes is. The checks and fixtures are named
+ * as the set names them, so the sentence can be matched to `ai:evaluate`.
+ */
+function failedSentence(evaluation: PromptEvaluation): string {
+  const named = evaluation.failures
+    .slice(0, FAILURES_NAMED)
+    .map(
+      (failure) =>
+        `${failure.check} on "${failure.fixture}" (${failure.detail})`,
+    );
+  const more = evaluation.failures.length - named.length;
+  return (
+    `Not saved. This version fails ${evaluation.fixtures - evaluation.passed} ` +
+    `of the ${evaluation.fixtures} examples in its evaluation set: ` +
+    named.join("; ") +
+    (more > 0 ? `; and ${more} more.` : ".")
+  );
+}
+
+/**
+ * The evaluation gate on a new version (plan 0.7.0 A9,
+ * docs/design/ai-evaluation.md §7).
+ *
+ * Runs before the insert and after authorisation, so somebody who may not
+ * save a prompt learns nothing about how theirs would have fared. Pure work
+ * against the mock driver: no call leaves the instance and no row is read.
+ */
+async function gatePromptVersion(
+  context: ActionCallContext,
+  promptKey: string,
+  systemPrompt: string,
+): Promise<void> {
+  const evaluate = context.evaluatePrompt ?? defaultPromptEvaluator();
+  if (!evaluate) {
+    throw new OperationError(
+      "forbidden",
+      "This server cannot run the evaluation set, so it cannot check a prompt, and an unchecked prompt is not saved.",
+      undefined,
+      "systemPrompt",
+    );
+  }
+  const evaluation = await evaluate(promptKey, systemPrompt);
+  if (!evaluation.known) {
+    throw new OperationError(
+      "forbidden",
+      "There is no evaluation set for this prompt, so a version of it cannot be checked.",
+      undefined,
+      "promptKey",
+    );
+  }
+  if (!evaluationPasses(evaluation)) {
+    throw new OperationError(
+      "forbidden",
+      failedSentence(evaluation),
+      { failures: evaluation.failures },
+      "systemPrompt",
+    );
+  }
+}
+
 export const updatePrompt = defineWriteAction({
   name: "ai.updatePrompt",
-  summary: "Records a new version of a feature or agent phase's system prompt.",
+  summary:
+    "Records a new version of a feature's system prompt, once it passes that prompt's evaluation set.",
   input: z.object({
     promptKey: z.string().trim().min(1),
     systemPrompt: z.string().trim().min(1),
   }),
   output: promptOutput,
   access: ACCESS_LEVELS.full,
-  operation: (_context, input) => ({
+  operation: (context, input) => ({
     async load({ tx, workspaceId }) {
       const [latest] = await tx
         .select({ version: aiPrompts.version })
@@ -722,6 +798,7 @@ export const updatePrompt = defineWriteAction({
       return latest?.version ?? 0;
     },
     async execute({ tx, workspaceId, actor, loaded }) {
+      await gatePromptVersion(context, input.promptKey, input.systemPrompt);
       const nextVersion = loaded + 1;
       // openokr:allow-mutation: this is the operation's own execute. A new
       // row, never an update to one already written — the old text has to

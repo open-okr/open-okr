@@ -1,8 +1,14 @@
 "use client";
 
-import { Kbd, TextInput, useTheme, useTranslations } from "@openokr/ui";
+import {
+  Kbd,
+  TextInput,
+  useKeyboardShortcut,
+  useTheme,
+  useTranslations,
+} from "@openokr/ui";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { setAppearance } from "../../lib/appearance-action.ts";
 import { paletteRelatedAction, paletteSearchAction } from "./actions.ts";
 import {
@@ -105,12 +111,20 @@ export function CommandPalette({
    */
   const latest = useRef(0);
 
+  // Through the registry, so `?` lists it beside every other key (plan 0.7.0,
+  // U2), and in a field too, because the palette is where a person types.
+  useKeyboardShortcut(
+    {
+      id: "palette.open",
+      keys: "⌘K",
+      description: t("shell.shortcuts.palette"),
+      group: "global",
+    },
+    useCallback(() => setOpen((was) => !was), []),
+    { key: "k", mod: true, allowInInputs: true },
+  );
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        setOpen((was) => !was);
-      }
       if (event.key === "Escape") {
         setOpen(false);
       }

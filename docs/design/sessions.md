@@ -68,6 +68,63 @@ scheduled -> skipped (when the Champion marks it missed)
 Transitions are facilitator-driven. The Champion opens and closes by default.
 A coordinator can override.
 
+**As built at 0.7.0 (A13): the Champion proposes, a person applies.** Akmal
+approved this on 9 November 2026 as proposals into the review queue. The
+Champion never changes a session's state. It attaches the change to the
+lifecycle message it already sends, and the person that message reaches applies
+or dismisses it on S-02. Applying runs `sessions.open` or `sessions.skip` as
+that person, through the action's own access check.
+
+| When | Message (§6.4, unchanged) | Proposal | Who decides |
+|---|---|---|---|
+| From the scheduled start until a day after it, still `scheduled` | `session.open` | `sessions.open` | The facilitator, or the space's coordinator where the session names none |
+| The day after that, still `scheduled` | `session.missed` | `sessions.skip` | The same person |
+| Still `running` past §11's `sessions.weeklyMinutes` upper bound, for one day | `session.left_open` (new, approved 9 November 2026) | `sessions.close` | The same person |
+
+Every number is already in `packages/method`: both windows are
+`sessionLifecycleStage`'s, which reads §11's `cadence.dueSoonLeadDays` and
+§6.4's "1 day after". The Champion's weekly cadence reads them every hour
+(`schedule.ts`, `:30`). Nothing new is configured.
+
+| Rule | Why |
+|---|---|
+| Weekly sessions only | This section is the weekly state machine. A monthly or quarterly review keeps its three messages and carries no proposal: opening one is the facilitator's, and skipping a review is not a decision the Champion offers |
+| One proposal per session per action, ever | The windows are a day wide and the cadence runs hourly, while the proposal path refuses only a second *pending* one. A dismissal is a decision about that session's step, so it is not asked again (`decidedSessionProposalsInTx`) |
+| The other proposal is settled when the session leaves `scheduled` | Opened or skipped, by hand or by applying a proposal, any other pending open or skip proposal on it is recorded as dismissed by whoever moved it, and the audit row names them (`settledProposalIds`). The same settling `kpis.recordResponse` does |
+| Sandbox commits nothing | The run is the Champion's ordinary run, so sandbox mode counts the proposal and rolls it back with every nudge |
+| Least privilege | The Champion reads sessions only in spaces it is bound to (`agentSeesSession`), at `view`. It needs no write grant, because it writes nothing to the session |
+| No provider needed | The proposal carries the session's id and nothing else, and is marked not AI-generated |
+
+**Closing.** A session left running had no message in the §6.4 catalogue, and a
+proposal no nudge carries falls to workspace administrators. Akmal approved
+`session.left_open` as a new message the same night, to the facilitator, once a
+running weekly session passes its §11 length (`sessionLeftOpen` in
+`packages/method`), for one day as `missed` is. It carries `sessions.close`.
+
+Given / When / Then:
+- Given a weekly session whose start passed half an hour ago, when the
+  Champion's weekly cadence runs, then its facilitator's `session.open` carries
+  one pending, not AI-generated `sessions.open` proposal, the session is still
+  `scheduled`, and a second run in the window adds none.
+- Given that proposal, when the facilitator applies it, then the session is
+  `running`, the audit row names them, and the proposal is applied with them as
+  its decider.
+- Given that proposal dismissed, when the cadence runs again in the window,
+  then nothing new is proposed.
+- Given a weekly session nobody opened the day before, when the cadence runs,
+  then `session.missed` carries a `sessions.skip` proposal, and applying it
+  skips the session and settles the open proposal as dismissed.
+- Given the Champion in sandbox mode, when the cadence runs, then no proposal,
+  no nudge and no state change remain.
+- Given a monthly review at its hour, when the cadence runs, then
+  `session.open` is sent and nothing is proposed.
+- Given a weekly session opened 45 minutes ago and still running, when the
+  cadence runs, then its facilitator's `session.left_open` carries one pending
+  `sessions.close` proposal, and the session is still running; at 20 minutes,
+  or two days on, nothing is sent.
+- Given that proposal, when the session is closed by hand, then the proposal is
+  recorded as dismissed by whoever closed it.
+
 ### 2.2 Stage 1: Confidence round
 
 Every key result in the space's active cycle gets a confidence from 0.0 to 1.0.
@@ -300,6 +357,57 @@ publishes them to the session's server-sent event stream
 | 9 | Keep, modify, abandon or defer | Reset | 8 | Every objective has a decision |
 | 10 | Learnings | Reset | 5 | At least one learning captured |
 | 11 | Decisions and actions | Reset | 5 | Every action has a name and a date |
+
+**As built at release 0.7.0 (S1): shown, not enforced.** Akmal decided on
+9 November 2026 that each condition is computed and shown, and that an
+incomplete stage never refuses the advance. METHOD.md §8.1 says the facilitator
+"lands it and moves", and makes only stage 2 a gate (§8.3), so stage 2 keeps
+its refusal in `sessions.advanceStage` and nothing else refuses.
+
+`sessions.stageCompletion { sessionId }` answers, at view access, for every
+stage the session walks (its own half where the review is held apart): `complete`
+true, false, or null where there is no condition to read; `missing`, one English
+sentence; `gap`, the same as a reason and a count for a screen to say in its own
+language; and `refusesAdvance`, true only on stage 2 while a committed miss has
+no explanation, asked of the same function the advance asks. The conditions are
+pure functions in `packages/core/src/sessions/stage-completion.ts`, and the stage
+reads' own `complete` fields call the same ones, so a panel's chip and the rail
+cannot disagree.
+
+| # | What is read | When it is not done |
+|---|---|---|
+| 1 | Each active member of the space has a pulse and a word | "3 participants have not given a pulse and a word." |
+| 2 | Each key result in the review's scope has a grade with its reason. Evidence is the key result's own figures, not recorded by the room, so it is not part of the stored check. No key results at all is not done | "2 key results have no score and reason yet." |
+| 3 | Each objective is spoken for (the mic moving on marks it). No objectives is not done | "1 objective has not been spoken for." |
+| 4 | At least one recognition | "Nobody has been recognised yet." |
+| 5 | **No condition.** Nothing records when writing or voting ended | |
+| 6 | All four questions answered. The count is shown to the whole room, never the answers: the activity feed already announces each one recorded | "3 of the 4 management questions have no answer yet." |
+| 7 | Each key result below its §11 root-cause threshold, read through the cycle's rules, has a cause. Nothing graded yet is not done; graded with nothing below the line is done. **No condition** where the workspace leaves root causes optional (METHOD.md §12) | "2 key results below their threshold have no cause." |
+| 8 | Each active member of the space has submitted, matched through the review's salt. Only the number leaves the read | "3 participants have not scored the process yet." |
+| 9 | Each objective has a decision. No objectives is not done | "1 objective has no decision yet." |
+| 10 | At least one learning | "No learning has been captured yet." |
+| 11 | Each action's owner is still an active member. Both columns are required, so a stored action always has a date and an owner; an owner suspended since is the gap `sessions.addAction` refuses at the boundary. No actions is done | "1 action has an owner who is no longer an active member." |
+
+The stage-7 read `sessions.rootCauses` changed with it: its `complete` asked for
+at least one miss, so a review where everything graded cleared its line read as
+unfinished there and nowhere else.
+
+On S-24 the rail marks each stage the room has reached "Done" or "Not done" in
+words, and a stage passed while not done keeps its number instead of a tick.
+Beside the advance, an incomplete stage says what is missing and the control
+reads "Move on anyway"; on stage 2 while the gate holds it keeps "Continue to
+next step" and says scoring does not close until each committed miss has its
+line. The last stage says the same beside "Close session", and closing is not
+refused for it.
+
+Given / When / Then:
+- Given stage 1 with one of three members' pulses in, when the facilitator
+  advances, then the session moves to stage 2.
+- Given stage 2 with an ungraded committed key result, when the room reads the
+  completion, then stage 2 refuses the advance, and grading it with a line
+  lifts the refusal while the aspirational ones are still ungraded.
+- Given a team retro, when the completion is read, then stage 5 has no
+  condition.
 
 ### 4.2 Stage 1: Open and check-in (SS8.2)
 
@@ -848,6 +956,18 @@ Minutes contain:
 
 Exportable as a Markdown document (`/session/[id]/minutes/export`) and a PDF
 (`/session/[id]/minutes/pdf`). A link from the closed cycle to its minutes.
+
+The link was built at release 0.7.0 (S3). Phase 7 of a closed cycle lists one
+link per review held for it, in every space the reader can see, oldest first
+(`apps/web/lib/cycle-review-minutes.ts`):
+
+| Case | Link |
+|---|---|
+| One session holds the whole review | That session's minutes |
+| The review and the retrospective are held apart | One link, to the review half. Either half's minutes are the whole review's |
+| Only the retrospective is visible | The retrospective's minutes |
+| A review booked and never started, or skipped | No link: its minutes would be empty |
+| No review held in a space the reader can see | A sentence saying there are no minutes, rather than nothing |
 
 ## 10. Acceptance criteria
 

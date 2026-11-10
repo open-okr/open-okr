@@ -43,8 +43,8 @@ Annual planning for 2027 opens six weeks before the year. The Champion tells Ele
 | 6 | Committed projects | SOC 2 Type II, which three enterprise prospects require |
 | 7 | Open risks and dependencies | The bulk import API Engineering owes Product |
 
-The pack is distributed on 26 November, three working days before the offsite on 1 December.
-*Test:* Given all seven items gathered and the pack distributed on 26 November, when Phase 1 is evaluated for a session on 1 December, then it is complete.
+The pack is distributed on 25 November, three working days before the offsite on 1 December: the 26th, the 27th and the 30th.
+*Test:* Given all seven items gathered and the pack distributed on 25 November, when Phase 1 is evaluated for a session on 1 December, then it is complete.
 
 **NW-P-05 · 25 Nov 2026 · Elena, Priya · S-36 `/admin/sso`, `/admin/directory`, `/admin/channels`**
 Elena prepares for the company-wide rollout:

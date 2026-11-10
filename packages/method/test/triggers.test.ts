@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { examplesFor, QUALITY_EXAMPLES } from "../src/quality.ts";
+import {
+  ALIGNMENT_CHECKS,
+  CYCLE_CHECKS,
+  examplesFor,
+  KEY_RESULT_CHECKS,
+  OBJECTIVE_CHECKS,
+  QUALITY_EXAMPLES,
+} from "../src/quality.ts";
 import {
   deterministicTriggers,
   isTriggerKey,
@@ -98,8 +105,22 @@ describe("the lookup a caller uses before writing a nudge row", () => {
 describe("METHOD.md §4.6's weak and strong pairs", () => {
   const method = readFileSync(join(docs, "METHOD.md"), "utf8");
 
-  it("carries all four, with the document's own words", () => {
-    expect(QUALITY_EXAMPLES).toHaveLength(4);
+  // The table's body rows, read from the document rather than counted here.
+  // A fixed count let the code keep four pairs after §4.6 grew a fifth, the
+  // committed-objective pair (plan 0.7.0, M1).
+  const tableRows = (() => {
+    const section = method.slice(
+      method.indexOf("### 4.6 Weak and strong examples"),
+      method.indexOf("## 5. Alignment"),
+    );
+    return section
+      .split("\n")
+      .filter((line) => line.startsWith("| ") && !line.startsWith("| Weak"));
+  })();
+
+  it("carries every pair in the table, with the document's own words", () => {
+    expect(tableRows.length).toBeGreaterThanOrEqual(5);
+    expect(QUALITY_EXAMPLES).toHaveLength(tableRows.length);
     for (const pair of QUALITY_EXAMPLES) {
       // Strip the "Objective: " and "KR: " labels the table uses inline.
       const weak = pair.weak.replace(/^(Objective|KR): /, "");
@@ -108,17 +129,34 @@ describe("METHOD.md §4.6's weak and strong pairs", () => {
     }
   });
 
-  it("names checks the catalogue actually defines", () => {
+  it("names checks and rules the catalogues actually define", () => {
+    const defined = new Set([
+      ...[
+        ...OBJECTIVE_CHECKS,
+        ...KEY_RESULT_CHECKS,
+        ...ALIGNMENT_CHECKS,
+        ...CYCLE_CHECKS,
+      ].map((check) => check.id),
+      ...TRIGGER_CATALOGUE.map((trigger) => trigger.key),
+    ]);
     for (const pair of QUALITY_EXAMPLES) {
       expect(pair.firesChecks.length).toBeGreaterThan(0);
       for (const id of pair.firesChecks) {
+        expect(defined, id).toContain(id);
         expect(examplesFor(id)).toContain(pair);
       }
     }
   });
 
+  it("shows the committed pair beside the rule a commitment nobody believes in trips", () => {
+    const pair = QUALITY_EXAMPLES.find((entry) =>
+      entry.weak.startsWith("Committed objective"),
+    );
+    expect(pair?.firesChecks).toEqual(["quality.committed_floor"]);
+  });
+
   it("returns nothing for a check §4.6 has no example for", () => {
-    // Four pairs, not twenty-six. A rule card with no example shows its prompt
+    // Five pairs, not twenty-six. A rule card with no example shows its prompt
     // and says nothing more, which is correct rather than a gap.
     expect(examplesFor("OBJ-3")).toEqual([]);
   });

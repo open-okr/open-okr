@@ -63,6 +63,12 @@ services:
       # service the product needs.
       OPENOKR_CLAMD_HOST: ${OPENOKR_CLAMD_HOST:-}
       OPENOKR_CLAMD_PORT: ${OPENOKR_CLAMD_PORT:-3310}
+      # Error reports go nowhere unless OPENOKR_ERROR_DSN names a tracker that
+      # speaks Sentry's protocol. The DSN is a credential, so it belongs in
+      # secrets/app.env and deliberately has no line here: a line here would
+      # override that file with an empty value. This only says which
+      # deployment a report came from.
+      OPENOKR_ERROR_ENVIRONMENT: ${OPENOKR_ERROR_ENVIRONMENT:-production}
     volumes:
       - storage:/app/storage
     expose:
@@ -117,10 +123,10 @@ services:
   #     docker compose --profile observability up -d
   #     open http://localhost:3001        # Grafana, admin/admin on first run
   #
-  # Prometheus needs a token to read /api/metrics, because that endpoint
-  # refuses anything without an instance-administrator session. Create one at
-  # /account/api-tokens and write it to ./secrets/observability-token before
-  # starting the profile.
+  # Prometheus reads /api/metrics with the instance's scrape token,
+  # OPENOKR_METRICS_TOKEN. `./openokr up` generates it and writes it to
+  # ./secrets/observability-token, which is mounted below, so nothing needs
+  # making by hand (docs/design/metrics-scrape-token.md).
 
   prometheus:
     image: prom/prometheus:v3.1.0

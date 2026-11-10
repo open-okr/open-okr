@@ -12,6 +12,7 @@ import {
   Compass,
   Gauge,
   Hammer,
+  HardDrive,
   Home,
   Inbox,
   KeyRound,
@@ -21,6 +22,7 @@ import {
   MessageSquare,
   Palette,
   Plug,
+  PlugZap,
   Radio,
   RefreshCw,
   ScrollText,
@@ -35,6 +37,7 @@ import {
   UserCog,
   UserPlus,
   Users,
+  Webhook,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -123,11 +126,17 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   // items is. Not a bin: nothing on the screen is thrown away.
   "admin-deleted": <ArchiveRestore className="size-full" />,
   "admin-imports": <Upload className="size-full" />,
+  // A disk: a copy kept somewhere safe (plan 0.7.0 U3).
+  "admin-backups": <HardDrive className="size-full" />,
   "admin-ai": <Sparkles className="size-full" />,
   // The general agent's own face rather than a Lucide robot, in the row's
   // text colour like every icon here. Idle, so it blinks and glances on its
   // slow loop (docs/design/agent-faces.md).
   "admin-agents": <AgentFace className="size-full" />,
+  // A plug: something from outside connected in (plan 0.7.0 A4).
+  "admin-connections": <PlugZap className="size-full" />,
+  // The hook itself: events going out to somebody else (plan 0.7.0 D5).
+  "admin-webhooks": <Webhook className="size-full" />,
 };
 
 /** The ids the map covers. Exported for the test, not for rendering. */

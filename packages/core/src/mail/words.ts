@@ -40,6 +40,21 @@ const en = {
   "verify.footer":
     "Did not sign up? Ignore this email and no account is created.",
 
+  // A run of wrong passwords began an account hold (account-lockout.md Q2).
+  "held.subject": "Somebody is trying to sign in to your {instance} account",
+  "held.preheader":
+    "Password sign-in is paused for networks you have not used lately.",
+  "held.eyebrow": "Account security",
+  "held.heading": "Somebody is trying your password",
+  "held.bodyBefore": "Many wrong passwords have been tried for ",
+  "held.bodyAfter":
+    " from networks you have not signed in from lately, so {instance} is pausing password sign-in from them a few minutes at a time. Where you usually sign in is not affected.",
+  "held.action": "Choose a new password",
+  "held.notice":
+    "If this was you, wait a few minutes or choose a new password. If it was not, a new password and a second sign-in factor keep the account yours.",
+  "held.footer":
+    "Sent by {instance} at {host} because many wrong passwords were tried for this account. Sent once for each run of attempts.",
+
   "invite.subject": "You have been invited to {workspace}",
   "invite.preheader": "Join to see your team's OKRs.",
   "invite.preheaderBy": "{inviter} added you. Join to see your team's OKRs.",
@@ -82,6 +97,36 @@ const en = {
   "reminder.body":
     "It was closed on {closed}. On {date} everything in it is deleted for good, and cannot be brought back.",
 
+  // A trial ending, and what its end did (tenant-lifecycle.md §11 Q2).
+  "trial.subject": "{workspace}: your trial of {plan} ends on {date}",
+  "trial.preheader": "Choose a plan before then to keep what you have.",
+  "trial.eyebrow": "Trial ends in seven days",
+  "trial.heading": "The trial of {plan} ends on {date}",
+  "trial.body":
+    "If nobody chooses a plan by then, {workspace} moves to {fallback}. If its people do not fit {fallback}, it becomes read-only until somebody chooses a plan or removes people. Nothing is deleted and nobody is removed.",
+  "trial.action": "Choose a plan",
+  "trial.endedSubject": "{workspace}: the trial has ended",
+  "trial.endedPreheader": "Here is what happened to the workspace.",
+  "trial.endedEyebrow": "Trial ended",
+  "trial.endedHeading": "The trial of {workspace} has ended",
+  "trial.endedMoved":
+    "It moved to {fallback}. Everything is as it was; the plan's limits now apply.",
+  "trial.endedSuspended":
+    "Its people do not fit {fallback}, so it is read-only until somebody chooses a plan, or removes people and presses Settle. Nobody was removed and nothing was deleted.",
+  "trial.endedSubscribed": "It carries on under its subscription.",
+  "trial.noPlan": "no plan, with no seat limit",
+
+  // A webhook turned itself off after a run of failures (outbound-webhooks.md W9).
+  "webhookOff.subject": "{workspace}: the webhook {name} was turned off",
+  "webhookOff.preheader": "Its last {count} deliveries all failed.",
+  "webhookOff.eyebrow": "Webhook turned off",
+  "webhookOff.heading": "The webhook {name} was turned off",
+  "webhookOff.body":
+    "Its last {count} deliveries to {host} all failed, so nothing more is sent to it. Check the receiver, then turn the webhook back on. Each failed delivery is on its page with the reason.",
+  "webhookOff.action": "Open the webhooks",
+  "webhookOff.footer":
+    "Sent to whoever made this webhook in {workspace}. Sent once each time it turns off.",
+
   "digest.subjectOne": "{workspace}: 1 update",
   "digest.subjectMany": "{workspace}: {count} updates",
   "digest.headingOne": "1 update",
@@ -97,6 +142,9 @@ const en = {
   "digest.reason.review": "To review",
   "digest.reason.invited": "Invitation",
   "digest.reason.role": "Role change",
+  "digest.reason.support_request": "Support request",
+  "digest.reason.support_ended": "Support ended",
+  "digest.reason.connection_ended": "Connection ended",
 
   "nudge.badge": "AGENT",
   "nudge.coach": "OKR Coach",
@@ -139,6 +187,20 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verify.bodyAfter": " untuk melengkapkan akaun {instance} anda.",
   "verify.action": "Sahkan e-mel",
   "verify.footer": "Tidak mendaftar? Abaikan e-mel ini dan tiada akaun dibuat.",
+
+  "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
+  "held.preheader":
+    "Log masuk dengan kata laluan dijeda bagi rangkaian yang jarang anda gunakan.",
+  "held.eyebrow": "Keselamatan akaun",
+  "held.heading": "Seseorang sedang mencuba kata laluan anda",
+  "held.bodyBefore": "Banyak kata laluan salah telah dicuba untuk ",
+  "held.bodyAfter":
+    " dari rangkaian yang tidak anda gunakan kebelakangan ini, jadi {instance} menjeda log masuk dengan kata laluan dari rangkaian itu beberapa minit pada satu masa. Tempat anda biasa log masuk tidak terjejas.",
+  "held.action": "Pilih kata laluan baharu",
+  "held.notice":
+    "Jika ini anda, tunggu beberapa minit atau pilih kata laluan baharu. Jika bukan, kata laluan baharu dan faktor log masuk kedua memastikan akaun ini kekal milik anda.",
+  "held.footer":
+    "Dihantar oleh {instance} di {host} kerana banyak kata laluan salah telah dicuba untuk akaun ini. Dihantar sekali bagi setiap siri percubaan.",
 
   "invite.subject": "Anda dijemput ke {workspace}",
   "invite.preheader": "Sertai untuk melihat OKR pasukan anda.",
@@ -183,6 +245,35 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "reminder.body":
     "Ia ditutup pada {closed}. Pada {date} semua kandungannya dipadam terus, dan tidak boleh dikembalikan.",
 
+  "trial.subject": "{workspace}: percubaan {plan} anda tamat pada {date}",
+  "trial.preheader":
+    "Pilih pelan sebelum itu untuk mengekalkan apa yang anda ada.",
+  "trial.eyebrow": "Percubaan tamat dalam tujuh hari",
+  "trial.heading": "Percubaan {plan} tamat pada {date}",
+  "trial.body":
+    "Jika tiada sesiapa memilih pelan menjelang itu, {workspace} beralih ke {fallback}. Jika orangnya tidak muat dalam {fallback}, ia menjadi baca sahaja sehingga seseorang memilih pelan atau mengeluarkan orang. Tiada apa yang dipadam dan tiada sesiapa dikeluarkan.",
+  "trial.action": "Pilih pelan",
+  "trial.endedSubject": "{workspace}: percubaan telah tamat",
+  "trial.endedPreheader": "Inilah yang berlaku kepada ruang kerja.",
+  "trial.endedEyebrow": "Percubaan tamat",
+  "trial.endedHeading": "Percubaan {workspace} telah tamat",
+  "trial.endedMoved":
+    "Ia beralih ke {fallback}. Semuanya kekal seperti biasa; had pelan itu kini terpakai.",
+  "trial.endedSuspended":
+    "Orangnya tidak muat dalam {fallback}, jadi ia baca sahaja sehingga seseorang memilih pelan, atau mengeluarkan orang dan menekan Selesaikan. Tiada sesiapa dikeluarkan dan tiada apa yang dipadam.",
+  "trial.endedSubscribed": "Ia diteruskan di bawah langganannya.",
+  "trial.noPlan": "tiada pelan, tanpa had tempat duduk",
+
+  "webhookOff.subject": "{workspace}: webhook {name} telah dimatikan",
+  "webhookOff.preheader": "{count} penghantaran terakhirnya semua gagal.",
+  "webhookOff.eyebrow": "Webhook dimatikan",
+  "webhookOff.heading": "Webhook {name} telah dimatikan",
+  "webhookOff.body":
+    "{count} penghantaran terakhirnya ke {host} semua gagal, jadi tiada apa lagi dihantar kepadanya. Semak penerima, kemudian hidupkan semula webhook itu. Setiap penghantaran yang gagal ada di halamannya bersama sebabnya.",
+  "webhookOff.action": "Buka webhook",
+  "webhookOff.footer":
+    "Dihantar kepada pembuat webhook ini dalam {workspace}. Dihantar sekali setiap kali ia dimatikan.",
+
   "digest.subjectOne": "{workspace}: 1 kemas kini",
   "digest.subjectMany": "{workspace}: {count} kemas kini",
   "digest.headingOne": "1 kemas kini",
@@ -198,6 +289,9 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "digest.reason.review": "Untuk disemak",
   "digest.reason.invited": "Jemputan",
   "digest.reason.role": "Perubahan peranan",
+  "digest.reason.support_request": "Permintaan sokongan",
+  "digest.reason.support_ended": "Sokongan tamat",
+  "digest.reason.connection_ended": "Sambungan ditamatkan",
 
   "nudge.badge": "EJEN",
   "nudge.coach": "OKR Coach",

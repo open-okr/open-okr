@@ -51,6 +51,13 @@ export interface DataChangeBatchResult {
   /** Rows this batch actually changed, for the ledger and the log — not
    * the same as "rows considered", when some considered rows are skipped. */
   readonly rowsChanged: number;
+  /**
+   * Rows this batch looked at and deliberately left, for a script whose
+   * skips an operator should hear about (0033 is the first). Reported for
+   * this run only and not kept in the ledger, like the session's own count
+   * of rows changed.
+   */
+  readonly rowsSkipped?: number;
 }
 
 export interface DataChangeScript {
@@ -167,6 +174,8 @@ export interface DataChangeOutcome {
   readonly name: string;
   readonly batches: number;
   readonly rowsChanged: number;
+  /** Present only when a batch reported skipping something. */
+  readonly rowsSkipped?: number;
 }
 
 /**
@@ -254,6 +263,7 @@ export async function runDataChanges(
       // not a total that keeps climbing across unrelated invocations.
       let sessionBatches = 0;
       let sessionRowsChanged = 0;
+      let sessionRowsSkipped = 0;
 
       for (;;) {
         await client.query("begin");
@@ -264,6 +274,7 @@ export async function runDataChanges(
           rowsChanged += result.rowsChanged;
           sessionBatches += 1;
           sessionRowsChanged += result.rowsChanged;
+          sessionRowsSkipped += result.rowsSkipped ?? 0;
           cursor = result.done ? cursor : (result.cursor ?? cursor);
           await client.query(
             `update _data_changes
@@ -290,10 +301,75 @@ export async function runDataChanges(
         name: script.name,
         batches: sessionBatches,
         rowsChanged: sessionRowsChanged,
+        ...(sessionRowsSkipped > 0 ? { rowsSkipped: sessionRowsSkipped } : {}),
       });
     }
     return outcomes;
   } finally {
     await client.query("select pg_advisory_unlock($1)", [DATA_CHANGE_LOCK_KEY]);
   }
+}
+
+/** Where one registered script stands, as `dataChangeStatus` reports it. */
+type DataChangeState = "complete" | "in progress" | "not yet run";
+
+interface DataChangeStatus {
+  readonly name: string;
+  readonly summary: string;
+  readonly state: DataChangeState;
+}
+
+/**
+ * What each registered script's ledger says, without running anything
+ * (PLAN §5.1, plan 0.7.0 P9).
+ *
+ * **Read-only, and that is the point.** It takes no lock and creates no
+ * ledger, so `./openokr status` can ask it on a live instance while a run is
+ * going: a run in progress reads as "in progress", which is what it is.
+ *
+ * A retired script whose migration has dropped its columns reads as
+ * complete, because the runner would mark it complete with nothing to do.
+ * Every other script with no ledger row has not run yet, even where it would
+ * change nothing, because that is only known by running it.
+ */
+export async function dataChangeStatus(
+  client: DataChangeClient,
+  scripts: readonly DataChangeScript[],
+): Promise<DataChangeStatus[]> {
+  const { rows: found } = await client.query<{ found: string | null }>(
+    "select to_regclass('_data_changes')::text as found",
+  );
+  const ledger = new Map<string, { completed_at: string | null }>();
+  if (found[0]?.found) {
+    const { rows } = await client.query<{
+      name: string;
+      completed_at: string | null;
+    }>("select name, completed_at from _data_changes");
+    for (const row of rows) {
+      ledger.set(row.name, row);
+    }
+  }
+
+  const status: DataChangeStatus[] = [];
+  for (const script of [...scripts].sort((a, b) =>
+    a.name < b.name ? -1 : 1,
+  )) {
+    const row = ledger.get(script.name);
+    let state: DataChangeState;
+    if (row?.completed_at) {
+      state = "complete";
+    } else if (row) {
+      state = "in progress";
+    } else if (
+      script.retiredBy !== undefined &&
+      (await anyColumnMissing(client, script)) &&
+      (await migrationApplied(client, script.retiredBy))
+    ) {
+      state = "complete";
+    } else {
+      state = "not yet run";
+    }
+    status.push({ name: script.name, summary: script.summary, state });
+  }
+  return status;
 }

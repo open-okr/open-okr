@@ -1514,7 +1514,10 @@ export interface QualityExample {
   readonly weak: string;
   readonly strong: string;
   readonly why: string;
-  /** The checks the weak version trips, by id. */
+  /**
+   * What the weak version trips: a check's id, or a rule's key where the pair
+   * belongs to a rule that is not one of the twenty-six checks.
+   */
   readonly firesChecks: readonly string[];
 }
 
@@ -1546,14 +1549,23 @@ export const QUALITY_EXAMPLES: readonly QualityExample[] = [
     why: "Measurable, but still an output. If 120 calls create no pipeline, the key result was achieved and the quarter was wasted",
     firesChecks: ["KR-5"],
   },
+  {
+    // §3.2's committed rule, which is a rule and not one of the twenty-six
+    // checks: KR-6 judges aspirational confidence only. Missing from this
+    // list until 0.7.0 (plan M1).
+    weak: "Committed objective whose key results are all at 0.4 confidence",
+    strong: "Either find the resources now, or mark it aspirational",
+    why: "A commitment nobody believes in is a risk to escalate, not a stretch",
+    firesChecks: ["quality.committed_floor"],
+  },
 ];
 
 /**
  * The pairs to show beside one check's verdict.
  *
  * Empty for most checks, and that is correct rather than a gap: §4.6 carries
- * four pairs, not twenty-six. A rule card with no example shows its prompt and
- * says nothing more.
+ * five pairs, not twenty-six. A rule card with no example shows its prompt and
+ * says nothing more. Takes a rule's key as well as a check's id.
  */
 export function examplesFor(checkId: string): readonly QualityExample[] {
   return QUALITY_EXAMPLES.filter((entry) =>

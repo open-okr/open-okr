@@ -233,7 +233,11 @@ describe("what an operator does see", () => {
         "region",
         "seats",
         "slug",
+        // A trial's end and its read-only flag (tenant-lifecycle.md §11,
+        // plan 0.7.0 P4): a date and a yes or no about the plan, no content.
+        "suspendedByTrial",
         "tenantState",
+        "trialEndsAt",
         "workspaceId",
         "workspaceState",
       ].sort(),
@@ -331,6 +335,8 @@ describe("per-tenant usage, as a snapshot", () => {
       "lastActivityAt",
       "measuredAt",
       "memberCount",
+      // A count, like the rest (operator-console.md §11 P8, plan 0.7.0 P3).
+      "seatCount",
       "storageBytes",
       "workspaceId",
     ]);

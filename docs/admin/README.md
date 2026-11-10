@@ -30,6 +30,7 @@ workspace rather than full, so on its own it does not reach these screens.
 | **Import** | Bringing history in from a spreadsheet, starting from a downloadable template, and exporting this workspace as an encrypted archive or importing one from another instance. FlowyTeam is imported from the command line. See [Importing](../import/README.md#templates) |
 | **AI** | Whether AI is on at all, whose key, which models, the cost caps, and what may leave for a provider off your network: how much context, whether addresses and phone numbers are replaced first, a no-training request, and which hosts may be reached |
 | **Agents and runs** | What the Coach and the Champion may do, and what they have done |
+| **Webhooks** | Where this workspace's events are posted as they happen, which events, and each delivery of the last 30 days. See [Webhooks](#webhooks) |
 
 ## The four decisions that matter most
 
@@ -78,6 +79,28 @@ Two limits, both deliberate:
 - **A parent comes back first.** A task on a deleted initiative, or a document
   on a deleted goal or initiative, is refused until that parent is restored,
   and the refusal names it.
+
+## Webhooks
+
+A webhook posts an event to an address you choose: an objective created,
+changed, published, closed or deleted, a key result checked in, a KPI value
+recorded, an initiative or a task created or done, a cycle moving phase. Add
+one on **Webhooks** with an `https://` address and the events it should get,
+and optionally one space to limit it to.
+
+| What | How it works |
+|---|---|
+| The secret | Shown once when the webhook is made or its secret rotated, then never again. After a rotation the old secret keeps signing beside the new one for a day |
+| The signature | The [Standard Webhooks](https://www.standardwebhooks.com/) scheme: `webhook-id`, `webhook-timestamp` and `webhook-signature` headers, so the receiver can use any of its libraries |
+| The body | `{ id, type, occurredAt, workspace, data }`, where `data` is the same summary the REST list returns. A deleted objective sends `data: null` and `deleted: true`. A test sends `ping` |
+| Whose access | The webhook's owner, whoever made it. Something the owner cannot see is not sent, and its delivery says "Withheld". A suspended owner pauses it; another administrator can take it over |
+| Failures | Retried for about a day. After 50 failures in a row the webhook turns off and whoever made it is emailed. Turn it back on from its page |
+| The log | Every attempt for 30 days: the event, the result, how long it took. Never what was sent or what came back |
+
+An address inside your own network is refused, as every address the server
+fetches for somebody else is. A self-hosted instance that needs it sets
+`OPENOKR_WEBHOOKS_ALLOW_PRIVATE=true`; see [Settings](settings.md#instance).
+Agents cannot create or change webhooks; REST and the command line can.
 
 ## What an administrator cannot do
 

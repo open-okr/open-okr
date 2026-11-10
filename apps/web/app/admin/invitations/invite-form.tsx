@@ -1,6 +1,6 @@
 "use client";
 
-import { SubmitButton, useTranslations } from "@openokr/ui";
+import { RefusedFields, SubmitButton, useTranslations } from "@openokr/ui";
 import { useActionState } from "react";
 import type { InviteResult } from "./actions";
 
@@ -43,7 +43,8 @@ export function InviteForm({
       className="flex flex-col gap-2"
       aria-busy={pending}
     >
-      {children}
+      {/* Each field shows what was refused about it (U1b). */}
+      <RefusedFields fields={state?.fields}>{children}</RefusedFields>
       <SubmitButton
         bare
         className="self-start rounded-md bg-brand px-2.5 py-1.5 text-xs font-semibold text-on-brand disabled:opacity-60 aria-disabled:opacity-60"

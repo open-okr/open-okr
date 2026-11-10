@@ -100,12 +100,37 @@ describe("the run table", () => {
   // them, has no member to act as, and a tenant should not be able to start it.
   // `cloud.remindErasure` since docs/design/workspace-erasure.md §12, for the
   // same reason: it walks every closed workspace, as the system.
+  // `support.sweepExpired` since plan 0.7.0 B2 (docs/design/support-access.md
+  // §5): it ends every expired support session on the instance, as the
+  // system, and an API caller has no business starting it.
+  // `cycles.sweepEnded` since plan 0.7.0 O2 (okr-core-domain.md §10 C2): a
+  // date passing moves a cycle to closing, as the system, and is nothing an
+  // API caller starts.
+  // `cloud.sweepTrials` since plan 0.7.0 P4 (tenant-lifecycle.md §11 T4):
+  // it walks every tenant whose trial ended, as the system, like the erasure
+  // reminder.
+  // `auth.purgeSignInAttempts` since plan 0.7.0 P10 (docs/design/
+  // account-lockout.md D16): sign-in counters belong to no workspace and no
+  // member, and letting a caller empty them would be a way to lift a hold.
+  // `alignment.fillScores` since plan 0.7.0 D2 (alignment-engine.md §10): it
+  // walks every workspace storing the scores no write has stored yet, as the
+  // system, and a reader already gets the same answer from `alignment.score`.
+  // `webhooks.purgeDeliveries` since plan 0.7.0 D5 (outbound-webhooks.md
+  // W10): it deletes delivery bookkeeping past thirty days, as the outbox
+  // purge does, and a caller emptying a hook's log would be hiding what it
+  // sent.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
     "tenancy.adopt",
     "cloud.measureUsage",
     "cloud.remindErasure",
+    "support.sweepExpired",
+    "auth.purgeSignInAttempts",
+    "cloud.sweepTrials",
+    "cycles.sweepEnded",
+    "alignment.fillScores",
+    "webhooks.purgeDeliveries",
   ]);
 
   test("names a real action for every run", () => {
@@ -133,21 +158,81 @@ describe("the run table", () => {
       "tenancy.adopt",
       "cloud.measureUsage",
       "cloud.remindErasure",
+      "support.sweepExpired",
+      "auth.purgeSignInAttempts",
+      "cloud.sweepTrials",
+      "cycles.sweepEnded",
+      "alignment.fillScores",
+      "webhooks.purgeDeliveries",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
     expect(off.map((run) => run.job).sort()).toEqual([
+      "alignment.fillScores",
       "audit.chain",
+      "auth.purgeSignInAttempts",
       "cloud.measureUsage",
       "cloud.remindErasure",
+      "cloud.sweepTrials",
+      "cycles.sweepEnded",
       "outbox.purge",
+      "support.sweepExpired",
       "tenancy.adopt",
+      "webhooks.purgeDeliveries",
     ]);
     for (const run of off) {
       expect(run.cron, run.job).toBeTruthy();
     }
+  });
+
+  // `sweepExpiredSessions` was written at P8-T04 and nothing called it, so an
+  // expired support session kept an empty `ended_at` and the owner's screen
+  // went on saying somebody was inside (plan 0.7.0, B2). Access was refused at
+  // expiry all along; this is the tidying the design asks for.
+  test("sweeps expired support sessions for the instance, every few minutes", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "support.sweepExpired",
+    );
+    expect(sweep?.instance).toBe(true);
+    expect(sweep?.cron).toBe("*/5 * * * *");
+  });
+
+  // Spraying random addresses makes sign-in counter rows, and nothing else
+  // removes one nobody comes back to (account-lockout.md D16).
+  test("moves ended cycles to closing per workspace, every hour", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "cycles.sweepEnded",
+    );
+    expect(sweep?.instance).toBeUndefined();
+    expect(sweep?.cron).toBe("35 * * * *");
+  });
+
+  test("ends trials past their date for the instance, every hour", () => {
+    const sweep = SCHEDULED_RUNS.find(
+      (run) => run.action === "cloud.sweepTrials",
+    );
+    expect(sweep?.instance).toBe(true);
+    expect(sweep?.cron).toBe("25 * * * *");
+  });
+
+  // An upgraded instance has cycles no write has scored yet. `alignment.score`
+  // computes those on read, and this stores them (alignment-engine.md §10).
+  test("fills the alignment scores no write has stored, every hour", () => {
+    const fill = SCHEDULED_RUNS.find(
+      (run) => run.action === "alignment.fillScores",
+    );
+    expect(fill?.instance).toBe(true);
+    expect(fill?.cron).toBe("35 * * * *");
+  });
+
+  test("purges stale sign-in counters for the instance, once a day", () => {
+    const purge = SCHEDULED_RUNS.find(
+      (run) => run.action === "auth.purgeSignInAttempts",
+    );
+    expect(purge?.instance).toBe(true);
+    expect(purge?.cron).toBe("30 4 * * *");
   });
 
   test("gives every Champion run one of §6.2's four cadences", () => {

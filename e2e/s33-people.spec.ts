@@ -513,7 +513,9 @@ test("a theme follows the member to another browser", async ({ browser }) => {
  * reader's own write, and a system row is nobody's.
  */
 test("the workspace feed inserts a row without a reload", async () => {
-  const MARKER = "P6-G11c live insert";
+  // Not shaped like a plan id: the accessibility scan refuses one on a page,
+  // and /activity shows this marker to every later spec in the run.
+  const MARKER = "Feed live insert marker";
 
   const member = (
     await pool.query<{ id: string; workspace_id: string }>(

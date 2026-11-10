@@ -76,6 +76,21 @@ function serverActionDone(target: Page) {
   );
 }
 
+/**
+ * The quarterly review's advance, under either of its names (plan 0.7.0, S1).
+ *
+ * A stage short of its completion condition offers "Move on anyway" and a
+ * stage that met it "Continue to next step". Several stages here depend on
+ * how many people are in the space, which other spec files on the same shard
+ * may have changed, so a step that is not about the condition presses
+ * whichever is shown. The steps that are about it name the one they expect.
+ */
+function advance(target: Page) {
+  return target.getByRole("button", {
+    name: /^(Continue to next step|Move on anyway)$/,
+  });
+}
+
 // Serial, and one shared context: these tests build on each other's state the
 // way the session specs do, and the database connection is opened once.
 test.describe.configure({ mode: "serial" });
@@ -509,7 +524,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await page.getByRole("button", { name: "+ 1 min" }).click();
   await expect(page.getByText(/of 6:00/)).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole("button", { name: "Continue to next step" }).click();
+  await advance(page).click();
   await page.waitForLoadState("networkidle");
 
   // Stage two: grading the key results (METHOD.md section 8.3, P4-T10b-a).
@@ -665,7 +680,7 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // Stage three: objective narratives (METHOD.md section 8.1 stage 3, P4-T10c)
   // ---------------------------------------------------------------------------
 
-  await page.getByRole("button", { name: "Continue to next step" }).click();
+  await advance(page).click();
   // **By name, not by text.** The stage rail is a region and it lists every
   // stage by name, so filtering a region on the words "Objective narratives"
   // matched the rail and asserted against the agenda. The panel carries
@@ -676,6 +691,23 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   });
   await expect(narratives).toHaveCount(1, { timeout: 10_000 });
   await expect(narratives).toContainText("0 of 2 spoken for");
+
+  // **The stage's condition, shown and not enforced (plan 0.7.0, S1).** Nobody
+  // has spoken, so the rail marks the stage not done in words, the advance
+  // names what is missing, and it offers to move on anyway rather than
+  // refusing.
+  const narrativesOnRail = rail
+    .getByRole("listitem")
+    .filter({ hasText: "Objective narratives" });
+  await expect(narrativesOnRail.getByText("Not done")).toBeVisible();
+  await expect(
+    page.getByText(
+      "This stage is not done yet. 2 objectives have not been spoken for.",
+    ),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Move on anyway" }),
+  ).toBeVisible();
 
   // Nobody holds it before the round starts, so nothing is marked speaking.
   await expect(narratives.getByText("speaking")).toHaveCount(0);
@@ -740,6 +772,13 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   });
   await expect(narratives.getByText("speaking")).toHaveCount(0);
   await expect(narratives).toContainText("Every objective has had its turn");
+
+  // Every objective spoken for: the rail says done, the note is gone, and the
+  // advance has its ordinary words again.
+  await expect(narrativesOnRail.getByText("Done", { exact: true })).toBeVisible(
+    { timeout: 10_000 },
+  );
+  await expect(page.getByText(/This stage is not done yet/)).toHaveCount(0);
 
   // ---------------------------------------------------------------------------
   // Stage four: recognition and wins (METHOD.md section 8.1 stage 4, P4-T10c)
@@ -897,11 +936,19 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     ),
   ).toBeVisible();
 
+  // One question of four answered: short of the stage's condition, and the
+  // facilitator may still move on (plan 0.7.0, S1).
+  await expect(
+    page.getByText(
+      "This stage is not done yet. 3 of the 4 management questions have no answer yet.",
+    ),
+  ).toBeVisible({ timeout: 10_000 });
+
   // ---------------------------------------------------------------------------
   // Stage seven: root causes (METHOD.md section 8.4, P4-T11b)
   // ---------------------------------------------------------------------------
 
-  await page.getByRole("button", { name: "Continue to next step" }).click();
+  await page.getByRole("button", { name: "Move on anyway" }).click();
   const rootCause = page.getByRole("region", { name: "Root cause" });
   await expect(rootCause).toHaveCount(1, { timeout: 10_000 });
 
@@ -1029,7 +1076,8 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   // P4-T11c-a; achieved and defer since P9-T20e-a)
   // ---------------------------------------------------------------------------
 
-  await page.getByRole("button", { name: "Continue to next step" }).click();
+  // Whether everybody in the space has answered depends on who else is in it.
+  await advance(page).click();
   const reset = page.getByRole("region", {
     name: "Keep, modify, abandon or defer",
   });
@@ -1068,12 +1116,18 @@ test("a quarterly review runs its rail, and the second client follows", async ({
   await expect(reset).toContainText("1 of 2 decided", { timeout: 10_000 });
   // The meaning comes from METHOD.md section 8.8, not from the screen.
   await expect(reset).toContainText("Adjust the target or wording");
+  // One objective left undecided, said beside the advance (plan 0.7.0, S1).
+  await expect(
+    page.getByText(
+      "This stage is not done yet. 1 objective has no decision yet.",
+    ),
+  ).toBeVisible({ timeout: 10_000 });
 
   // ---------------------------------------------------------------------------
   // Stage ten: learnings (METHOD.md section 8.9, P4-T11c-b, P9-T22d)
   // ---------------------------------------------------------------------------
 
-  await page.getByRole("button", { name: "Continue to next step" }).click();
+  await page.getByRole("button", { name: "Move on anyway" }).click();
   const forward = page.getByRole("region", {
     name: "Learnings and what happens next",
   });

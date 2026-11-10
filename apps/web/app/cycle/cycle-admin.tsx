@@ -10,8 +10,11 @@ import {
 } from "@openokr/ui";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import type { Conflict } from "../../lib/conflict.ts";
+import { ConflictNotice } from "../../lib/conflict-notice.tsx";
 import {
   archiveCycle,
+  type CycleResult,
   createCycle,
   updateCycleDates,
 } from "./admin-actions.ts";
@@ -58,19 +61,28 @@ export function CycleAdmin({
   // Which button started the write in flight, so only that one spins.
   const [acting, setActing] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // A refusal about one of the two dates, shown under it (guided-inputs §4.2).
+  const [refused, setRefused] = useState<Readonly<Record<string, string>>>({});
   const [on, setOn] = useState("");
   const [deadline, setDeadline] = useState(publicationDeadline ?? "");
+  // The deadline was changed since this card read it (D3): nothing was
+  // saved, and the card offers keep mine and take theirs.
+  const [conflict, setConflict] = useState<Conflict | null>(null);
 
-  const run = (
-    name: string,
-    work: () => Promise<{ error: string | null; id?: string }>,
-  ) => {
+  const run = (name: string, work: () => Promise<CycleResult>) => {
     setProblem(null);
+    setRefused({});
+    setConflict(null);
     setActing(name);
     start(async () => {
       const result = await work();
-      if (result.error) {
+      if (result.conflict) {
+        setConflict(result.conflict);
+        return;
+      }
+      if (result.error || result.fields) {
         setProblem(result.error);
+        setRefused(result.fields ?? {});
         return;
       }
       if (result.id) {
@@ -79,6 +91,20 @@ export function CycleAdmin({
       }
       router.refresh();
     });
+  };
+
+  /** The deadline as typed, with the one it was read as (D3). */
+  const saveDeadline = (read: string | null) => {
+    if (!currentCycleId) {
+      return;
+    }
+    run("deadline", () =>
+      updateCycleDates({
+        id: currentCycleId,
+        publicationDeadline: deadline === "" ? null : deadline,
+        read: { publicationDeadline: read },
+      }),
+    );
   };
 
   return (
@@ -102,6 +128,7 @@ export function CycleAdmin({
               hideLabel
               value={on}
               disabled={pending}
+              error={refused.on}
               onValueChange={(next) => setOn(next ?? "")}
               inputClassName="h-auto px-2 py-1 text-xs"
             />
@@ -134,6 +161,7 @@ export function CycleAdmin({
                   hideLabel
                   value={deadline === "" ? null : deadline}
                   disabled={pending}
+                  error={refused.publicationDeadline}
                   onValueChange={(next) => setDeadline(next ?? "")}
                   inputClassName="h-6.5 text-xs"
                 />
@@ -143,14 +171,7 @@ export function CycleAdmin({
                   disabled={pending}
                   pending={pending && acting === "deadline"}
                   data-testid="set-publication-deadline"
-                  onClick={() =>
-                    run("deadline", () =>
-                      updateCycleDates({
-                        id: currentCycleId,
-                        publicationDeadline: deadline === "" ? null : deadline,
-                      }),
-                    )
-                  }
+                  onClick={() => saveDeadline(publicationDeadline)}
                 >
                   {t("common.save")}
                 </Button>
@@ -158,6 +179,26 @@ export function CycleAdmin({
               <span className="text-ink-4">
                 {t("cycle.admin.deadlineHelp")}
               </span>
+              {conflict ? (
+                <ConflictNotice
+                  conflict={conflict}
+                  pending={pending}
+                  onKeepMine={() =>
+                    saveDeadline(
+                      (conflict.current.publicationDeadline as
+                        | string
+                        | null
+                        | undefined) ?? null,
+                    )
+                  }
+                  onTakeTheirs={() => {
+                    setDeadline(
+                      String(conflict.current.publicationDeadline ?? ""),
+                    );
+                    setConflict(null);
+                  }}
+                />
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-1.5">

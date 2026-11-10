@@ -24,7 +24,13 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { getAccessScoped } from "../access/reads.ts";
-import { blocksPublish, loadDependencyRegister } from "../alignment/service.ts";
+import { providingKeyResultOutput } from "../alignment/delivery.ts";
+import {
+  blocksPublish,
+  loadDependencyRegister,
+  loadProvidingKeyResults,
+} from "../alignment/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { defineReadAction } from "./define.ts";
 
@@ -32,7 +38,7 @@ export const readGoalRelations = defineReadAction({
   name: "goals.relations",
   summary:
     "The parent, children, horizontal dependencies and register entries of one goal.",
-  input: z.object({ id: z.uuid() }),
+  input: z.object({ id: ADDRESS.goal }),
   output: z.object({
     parent: z
       .object({ id: z.uuid(), title: z.string(), level: z.string() })
@@ -62,6 +68,8 @@ export const readGoalRelations = defineReadAction({
         confirmed: z.boolean(),
         riskOwnerName: z.string().nullable(),
         blocksPublish: z.boolean(),
+        /** The key result that delivers it, and whether it has (plan 0.7.0 O5). */
+        providerKeyResult: providingKeyResultOutput,
       }),
     ),
   }),
@@ -274,6 +282,11 @@ export const readGoalRelations = defineReadAction({
           context.workspaceId,
           ownKeyResults.map((entry) => entry.id),
         );
+        const providing = await loadProvidingKeyResults(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          keyResultIds: registerRows.map((entry) => entry.providerKeyResultId),
+        });
 
         const spaceNames = new Map(
           (
@@ -319,6 +332,9 @@ export const readGoalRelations = defineReadAction({
               ? (memberNames.get(entry.riskOwnerId) ?? null)
               : null,
             blocksPublish: blocksPublish(entry),
+            providerKeyResult: entry.providerKeyResultId
+              ? (providing.get(entry.providerKeyResultId) ?? null)
+              : null,
           })),
         };
       },

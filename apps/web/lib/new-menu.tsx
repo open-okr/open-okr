@@ -1,9 +1,19 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { buttonVariants, useTranslations } from "@openokr/ui";
+import {
+  buttonVariants,
+  useKeyboardShortcut,
+  useTranslations,
+} from "@openokr/ui";
 import { usePathname, useRouter } from "next/navigation";
-import { Fragment, type ReactNode, useEffect } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
 
 /**
  * The topbar's `+ New` (UIUX-PLAN §3): one menu, the same on every screen,
@@ -20,6 +30,10 @@ import { Fragment, type ReactNode, useEffect } from "react";
  * On the same screen there is no navigation at all: the field is focused at
  * once. Only a choice made here moves the focus, so a link elsewhere that
  * carries a fragment still only scrolls.
+ *
+ * **`c` opens it** (UIUX-PLAN §4, the Keyboard row; plan 0.7.0, U2), so
+ * creating starts from the keyboard on every screen. It is registered here,
+ * where the menu is, so a reader who may create nothing has no `c` either.
  */
 
 export interface NewMenuItem {
@@ -55,6 +69,18 @@ export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
   const { t } = useTranslations();
   const pathname = usePathname();
   const router = useRouter();
+  const [open, setOpen] = useState(false);
+
+  useKeyboardShortcut(
+    {
+      id: "new.open",
+      keys: "c",
+      description: t("shell.shortcuts.create"),
+      group: "global",
+    },
+    useCallback(() => setOpen(true), []),
+    { key: "c" },
+  );
 
   // A choice made on another screen focuses its field once this one draws.
   // biome-ignore lint/correctness/useExhaustiveDependencies: the path is the trigger, a new screen to look for the field on, not a value the effect reads.
@@ -93,7 +119,7 @@ export function NewMenu({ items }: { readonly items: readonly NewMenuItem[] }) {
   };
 
   return (
-    <Menu.Root>
+    <Menu.Root open={open} onOpenChange={(next) => setOpen(next)}>
       <Menu.Trigger
         aria-label={t("newMenu.trigger")}
         className={buttonVariants({ variant: "primary", size: "sm" })}

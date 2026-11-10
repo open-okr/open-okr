@@ -6,6 +6,7 @@ import {
   type ResolvedThresholds,
 } from "@openokr/method";
 import { useRef, useState } from "react";
+import { useRefusedField } from "../forms/refused-fields.tsx";
 import { useTranslations } from "../i18n/use-translations.tsx";
 import { cn } from "../lib/cn.ts";
 import {
@@ -42,6 +43,11 @@ export interface ConfidenceInputProps {
   readonly disabled?: boolean;
   readonly className?: string;
   readonly inputClassName?: string;
+  /**
+   * What the server refused about the confidence. Without it, the nearest
+   * `RefusedFields` says it by the field's `name` (guided-inputs §4.2).
+   */
+  readonly error?: string | null;
 }
 
 /**
@@ -68,7 +74,12 @@ export function ConfidenceInput({
   disabled,
   className,
   inputClassName,
+  error: givenError,
 }: ConfidenceInputProps) {
+  // The number box beside the band is unnamed, so this field claims the name
+  // its hidden input posts (guided-inputs §4.2, plan U1b).
+  const refused = useRefusedField(name);
+  const error = givenError ?? refused ?? null;
   const { t } = useTranslations();
   const [own, setOwn] = useState<number | null>(defaultValue ?? null);
   const stored = value !== undefined ? value : own;
@@ -113,6 +124,7 @@ export function ConfidenceInput({
         }
         required={required}
         disabled={disabled}
+        error={error}
         inputClassName={cn("w-16 text-right", inputClassName)}
       />
       {band ? (

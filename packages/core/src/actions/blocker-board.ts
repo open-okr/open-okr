@@ -39,6 +39,7 @@ import {
 } from "../cadence/blockers.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow, workspaceTimeZone } from "../cycles/service.ts";
+import { ADDRESS } from "../ids/address.ts";
 import { resolveRhythmWithLadders } from "../nudges/ladders.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { practiceFromRow } from "../practice/settings.ts";
@@ -317,7 +318,7 @@ export const raiseBlocker = defineWriteAction({
   summary:
     "Raises a blocker on a key result outside a session, with an owner and a next action due by the goal's next check-in.",
   input: z.object({
-    keyResultId: z.uuid(),
+    keyResultId: ADDRESS.keyResult,
     type: z.enum(BLOCKER_TYPES),
     description: z.string().max(500).optional(),
     ownerId: z.uuid(),

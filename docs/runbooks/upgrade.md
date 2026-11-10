@@ -76,15 +76,162 @@ it.
 
 ## Backfills never hold up a boot
 
-Schema migrations run on start. Data changes run separately through
-`pnpm db:change`, on your schedule: it runs every script not yet complete and
-names what it ran, or says nothing was left. An upgrade is never held open by
-a long backfill.
+Schema migrations run on start. Data changes run separately, on your
+schedule: `./openokr data-change` on Docker Compose, or `pnpm db:change` from
+a checkout. Either runs every script not yet complete and names what it ran,
+or says nothing was left. An upgrade is never held open by a long backfill.
+
+`./openokr status` names the data changes not yet complete, and
+`pnpm db:change --status` does the same from a checkout. Both only read, so
+they are safe to run while a data change is going.
 
 Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
 seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
+
+## 0.6 to 0.7
+
+Twelve migrations, **0151 to 0164** (0156 and 0160 are unused numbers), and
+two data changes, **0033 and 0034**. The migrations run on their own as the
+new version starts. Run the data changes after it is up: `./openokr
+data-change` on Compose, or `pnpm db:change`; `./openokr status` lists any
+still to run. Nothing on screen waits for them.
+
+- **A short identifier on every goal, key result, cycle, initiative, task,
+  document and session.** Migration 0163 adds a nullable `short_id` and a
+  unique index to each of the seven tables, the ten-character address KPIs
+  already have. Every write from 0.7.0 fills it. Rows written before the
+  upgrade, and any a 0.6 replica writes while a rolling upgrade is under way,
+  have none until you run the data changes (`./openokr data-change`, or
+  `pnpm db:change`): **data change 0034** fills them a thousand rows at a
+  batch and is safe to stop and run again. Nothing on screen waits for it.
+  **Run it before you upgrade to 0.8.0**, whose migration makes the column
+  not null on all seven tables and refuses to run while a row is still empty,
+  naming the table. `./openokr status` lists 0034 until it is complete.
+
+- **Outbound webhooks.** Migration 0164 adds `webhooks` and
+  `webhook_deliveries`. Nothing is sent until an administrator adds a hook,
+  so an upgrade changes nothing a receiver sees. A hook's signing secret is
+  sealed under the root key like a channel credential, and
+  `./openokr rotate-key` re-wraps it. A hook may not post inside the network
+  unless `OPENOKR_WEBHOOKS_ALLOW_PRIVATE=true` is set on a self-hosted
+  instance; it is ignored with the cloud flag on, and the cloud metadata
+  addresses are refused either way. A workspace archive taken from 0.7.0
+  carries each hook off and without its secret.
+
+- **Ended cycles move to Closing.** Within the hour after the upgrade, every
+  cycle whose last day has passed and that nobody has closed moves to
+  Closing, with an audit row each; the cycle's sponsor or facilitator may
+  then hear the daily "the cycle ends unscored" reminder. Nothing is frozen:
+  check-ins, edits and scores go on, only publishing stops. With
+  `OPENOKR_SCHEDULER=off`, `pnpm cadence:sweep` does it.
+
+- **A dependency names the key result that delivers it.** Migration 0162
+  adds `key_result_dependencies.provider_key_result_id`, with a check and a
+  partial index. It is additive and there is nothing to choose: every
+  existing entry names no key result and reads as it did. Once one is named,
+  on the cycle's dependency register or as the providing team confirms, the
+  register, the goal page and the monthly review show whether it has
+  delivered.
+
+- **The outbox rate.** Migration 0159 adds `outbox.claimed_at` and a partial
+  index on it. Nothing changes unless you set
+  `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE` (60 or more; 0, the default, is
+  unlimited). With it set, one workspace's burst of mail and nudges waits
+  its turn rather than delaying everybody else's.
+
+- **The stored alignment score.** Migration 0161 adds `alignment_scores`,
+  which every structural write now fills for its cycle. Cycles planned
+  before the upgrade have no row until something changes their structure,
+  so the Work Map computes their score as it did before, and the answer is
+  the same. An hourly job stores those rows within the hour;
+  `pnpm alignment:fill` stores them now, and is how an instance running with
+  `OPENOKR_SCHEDULER=off` gets them. Nothing to configure, and no data change
+  to run.
+
+- **Trials.** Migration 0158 adds two columns to `tenants`. Nothing changes
+  until an operator sets a trial on a workspace's console page. An hourly
+  job then ends each trial past its date: a live subscription carries on,
+  people who fit the default plan move to it, and a workspace whose people
+  do not fit goes read-only until somebody subscribes or makes them fit.
+  `pnpm cloud:trials` shows what is due; `--write` ends them now. The
+  owners and administrators are emailed seven days before a trial ends and
+  again when it ends, and see a notice in the trial's last week.
+
+- **Seats used on the operator console.** Migration 0157 adds `seat_count`
+  to the usage snapshot. The console's list now shows seats used, as the
+  plan's limit counts them, against the plan's seats, and reads "not
+  measured" until the next hourly measure or `pnpm cloud:usage`.
+
+- **Registration on a cloud.** The setup wizard no longer saves a
+  registration policy. A cloud set up before 0.7.0 still holds the Invitation
+  only the wizard saved then, so new customers cannot sign up. Open the
+  console's Instance screen: its Registration card says "Saved by the setup
+  wizard before 0.7.0", and a choice there replaces it. A self-hosted
+  instance is unaffected, except that `OPENOKR_REGISTRATION` now works after
+  setup where nothing else was saved.
+- **Every agent call is now recorded.** Migration 0153 adds `ai_tool_calls`: the tool, where the call stopped and the ids it named, never what was sent or read back. It is kept 90 days by default, set on Admin, General, Limits; 0 keeps every row. A daily sweep removes older rows.
+- **Five actions need the destructive scope.** `cycles.close`,
+  `sessions.close`, `people.suspend`, `people.convertToGuest` and
+  `workspace.setState` were plain writes; each now needs a token or agent
+  connection holding `destructive`. A script whose token has read and write is
+  refused with `insufficient_scope`, naming the scope. The command line asks
+  for read and write when nobody says, so log in with
+  `okr login --scopes read,write,destructive` to keep doing these. The
+  browser, single sign-on directory sync and the built-in agents are
+  unaffected, because they never check a scope.
+- **A file in a comment or a document opens for its readers.** Migration 0155
+  lets an attachment row hang on a comment and records who placed it. From
+  0.7 each write that saves a comment's or a document's text records a row for
+  every file the text names, so everybody who reads the comment or the
+  document can open the file, where before only its uploader could. A write
+  naming somebody else's private file is refused. Text written before 0.7 has
+  no rows until you run the data changes (`./openokr data-change`, or
+  `pnpm db:change`). **What 0033 opens:** for each file in a comment or a
+  document, a row when the file was uploaded by whoever wrote that text, or
+  when the comment came from an import, such as the inline images an import
+  stored, which until now only the person who ran the import could open. Any other file, for instance a colleague's private file named in
+  somebody's comment, is skipped and counted, and stays as closed as it was.
+  `pnpm db:change` prints the count.
+- **A file still uploading is refused.** A rich text write naming an
+  `attachment` that is still `uploading`, or `ready` with no file behind it,
+  is refused with "A file in this text is still uploading. Wait for it to
+  finish, then save." The browser already waited; a script sending its own
+  editor JSON has to send finished files.
+
+- **Repeated wrong passwords hold an account for a while.** Migration 0154
+  adds `sign_in_attempts`. After several wrong passwords in a row the next
+  attempt waits, a little longer each time, and the account holder gets one
+  email saying so. A correct sign-in, or a password reset, clears it. The
+  second factor has its own lock, recorded in the audit log. Nothing needs
+  configuring; a person locked out uses "Forgot password".
+- **Agent tokens and support access say why they ended.** Migrations 0151
+  and 0152 add the reasons behind three inbox notices and an API token's
+  revocation. Nothing to do.
+- **A token's scopes now hold for everything a call causes.** A REST or agent
+  token without the destructive scope can no longer apply an agent's or the
+  copilot's proposal whose action is destructive; it is answered
+  `insufficient_scope`, naming the action. Applying from the review inbox in
+  the browser is unchanged. An integration that applies proposals with a
+  write-only token needs a token with the destructive scope.
+- **Error reporting is off until you turn it on.** Setting
+  `OPENOKR_ERROR_DSN` to a tracker that speaks Sentry's protocol (Sentry,
+  GlitchTip, Bugsink) sends every unexpected error there as well as to the
+  log; leave it unset and nothing leaves the instance. A value that is not a
+  DSN stops the instance starting, so check it before you upgrade. See
+  [Sending errors to a tracker](observability.md#sending-errors-to-a-tracker).
+- **A saved prompt version is now the one sent.** A system prompt saved on
+  the AI console before 0.7.0 was stored but never sent; from 0.7.0 the newest
+  version is sent while it passes its evaluation examples, and the built-in
+  text goes otherwise. The usage card shows which. Check a saved version
+  still says what you want.
+- **A plan can carry its own limits** (cloud only). `limits` in the plan
+  catalogue replaces the instance's actions-a-minute and concurrent actions
+  for that plan's workspaces. Without it, nothing changes.
+- **A custom agent's instructions are versioned.** The text an agent was made
+  with is its version 0; nothing moves. "Plan a run" appears on Admin, Agents
+  where an AI provider is configured.
 
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 

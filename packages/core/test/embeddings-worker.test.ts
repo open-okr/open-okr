@@ -366,3 +366,136 @@ describe("what the worker never does", () => {
     expect(embedCalls).toHaveLength(0);
   });
 });
+
+/** A one-paragraph editor document, the shape every rich-text field stores. */
+const paragraph = (text: string) => ({
+  type: "doc",
+  content: [{ type: "paragraph", content: [{ type: "text", text }] }],
+});
+
+/** Runs every queued job for one entity, oldest first. */
+const embedQueued = async (entityId: string) => {
+  const wb = await workerDb();
+  const outcomes = [];
+  for (const job of (await queuedJobs()).filter(
+    (entry) => entry.entityId === entityId,
+  )) {
+    outcomes.push(await runEmbedJob(job, { pool: wb.appPool, embed }));
+  }
+  return outcomes;
+};
+
+describe("documents, KPIs and sessions (plan A10)", () => {
+  it("embeds a document once it is published, and never its draft", async () => {
+    const document = (await call("documents.create", {
+      subjectType: "goal",
+      subjectId: goalId,
+      title: "Why mid-market first",
+      body: paragraph("Three renewals told us the onboarding is the moat."),
+    })) as { id: string };
+
+    // The draft's own activity queued it, and the worker read nothing.
+    expect(
+      (await queuedJobs()).some(
+        (job) => job.entityType === "document" && job.entityId === document.id,
+      ),
+    ).toBe(true);
+    await embedQueued(document.id);
+    expect(await storedChunks(document.id)).toHaveLength(0);
+
+    await call("documents.publish", { id: document.id });
+    await embedQueued(document.id);
+    const chunks = await storedChunks(document.id);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.content).toContain("Why mid-market first");
+    expect(chunks[0]?.content).toContain("onboarding is the moat");
+  });
+
+  it("embeds a KPI by its title without the action asking", async () => {
+    const kpi = (await call("kpis.create", {
+      title: "Net revenue retention",
+      frequency: "monthly",
+      direction: "higher_better",
+      indicatorType: "lagging",
+      tier: "output",
+      aggregate: "sum",
+      ownerKind: "workspace",
+    })) as { id: string };
+
+    const jobs = (await queuedJobs()).filter((job) => job.entityId === kpi.id);
+    expect(jobs.map((job) => job.entityType)).toContain("kpi");
+    await embedQueued(kpi.id);
+    const chunks = await storedChunks(kpi.id);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.content).toContain("Net revenue retention");
+  });
+
+  it("embeds a session's wins as the session, and nothing of a session with no record", async () => {
+    const wb = await workerDb();
+    const session = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "weekly",
+      title: "Week 6 check-in",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: memberId,
+    })) as { id: string };
+
+    // A title and nothing else answers no question.
+    const bare = await runEmbedJob(
+      { workspaceId, entityType: "session", entityId: session.id },
+      { pool: wb.appPool, embed },
+    );
+    expect(bare).toEqual({ kind: "skipped", reason: "no text to embed" });
+
+    await call("sessions.open", { id: session.id });
+    const before = (await queuedJobs()).length;
+    await call("sessions.setWins", {
+      sessionId: session.id,
+      wins: ["Pricing page live", "Two renewals signed early"],
+    });
+    // The activity names the space; the write names the session.
+    const added = (await queuedJobs()).slice(before);
+    expect(added).toHaveLength(1);
+    expect(added[0]).toMatchObject({
+      entityType: "session",
+      entityId: session.id,
+    });
+
+    await embedQueued(session.id);
+    const chunks = await storedChunks(session.id);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.content).toContain("Week 6 check-in");
+    expect(chunks[0]?.content).toContain("Two renewals signed early");
+  });
+
+  it("never embeds the facilitator's private stage notes", async () => {
+    const wb = await workerDb();
+    const session = (await call("sessions.create", {
+      spaceId,
+      cycleId,
+      kind: "weekly",
+      title: "Week 7 check-in",
+      scheduledFor: new Date(Date.now() + 3_600_000).toISOString(),
+      facilitatorId: memberId,
+    })) as { id: string };
+    await call("sessions.open", { id: session.id });
+    await wb.admin.query(
+      `update okr_sessions set notes = $2::jsonb where id = $1`,
+      [
+        session.id,
+        JSON.stringify({ wins: "Only the facilitator reads this." }),
+      ],
+    );
+    await call("sessions.setWins", {
+      sessionId: session.id,
+      wins: ["Churn call booked"],
+    });
+
+    await embedQueued(session.id);
+    const chunks = await storedChunks(session.id);
+    expect(chunks).toHaveLength(1);
+    expect(chunks[0]?.content).toContain("Churn call booked");
+    expect(chunks[0]?.content).not.toContain("Only the facilitator");
+  });
+});

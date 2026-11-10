@@ -2,7 +2,8 @@
 # The OpenOKR lifecycle helper (P1-T09, backup/restore P6-T06, verify P8-T06d).
 #
 #   ./openokr up              start, generating every secret on first run
-#   ./openokr status          what is running, and whether it is healthy
+#   ./openokr status          what is running, whether it is healthy, and which data changes are pending
+#   ./openokr data-change     run the data changes an upgrade brought, batched and resumable
 #   ./openokr logs            follow the application log
 #   ./openokr upgrade         pull, restart, re-run migrations, report
 #   ./openokr rotate-key      re-wrap stored secrets under a new root key
@@ -142,6 +143,28 @@ EOF
 
   chmod 600 "$APP_ENV" "$DB_ENV"
   log "secrets written to $SECRETS_DIR (mode 600). Back up $APP_ENV."
+}
+
+# The token Prometheus scrapes /api/metrics with (docs/design/metrics-scrape-
+# token.md D6, plan 0.7.0 B3). Written on first run and on any later `up` that
+# finds it missing, so an instance installed before 0.7.0 gets one at its next
+# `up`. The same value goes in app.env, where the server reads it, and in
+# secrets/observability-token, which the Compose observability profile mounts.
+ensure_metrics_token() {
+  [ -f "$APP_ENV" ] || return 0
+  if ! grep -q '^OPENOKR_METRICS_TOKEN=' "$APP_ENV"; then
+    umask 077
+    printf 'OPENOKR_METRICS_TOKEN=%s\n' "$(random_password)$(random_password)" >> "$APP_ENV"
+    chmod 600 "$APP_ENV"
+    log "generated the metrics scrape token in $APP_ENV"
+  fi
+  token="$(grep '^OPENOKR_METRICS_TOKEN=' "$APP_ENV" | cut -d= -f2-)"
+  if [ ! -f "$SECRETS_DIR/observability-token" ] \
+    || [ "$(cat "$SECRETS_DIR/observability-token")" != "$token" ]; then
+    umask 077
+    printf '%s' "$token" > "$SECRETS_DIR/observability-token"
+    chmod 600 "$SECRETS_DIR/observability-token"
+  fi
 }
 
 # Moves an instance created before the split onto the application role
@@ -348,6 +371,7 @@ case "${1:-help}" in
   up)
     generate_secrets
     adopt_app_role
+    ensure_metrics_token
     reconcile_public_url
     # A bare hostname turns on automatic HTTPS; the default stays plain HTTP.
     if [ -n "${OPENOKR_DOMAIN:-}" ]; then
@@ -387,6 +411,22 @@ case "${1:-help}" in
 
   status)
     compose ps
+    # Which data changes have not run (PLAN §5.1). Read-only: it takes no
+    # lock, so it is safe while a run is going. Skipped quietly when the
+    # application is not up, because `compose ps` above already says so.
+    if compose exec -T app true >/dev/null 2>&1; then
+      compose exec -T app node --experimental-strip-types --no-warnings \
+        /app/migrator/packages/db/src/bin/data-change.ts --status \
+        || log "could not read the data-change ledger"
+    fi
+    ;;
+
+  data-change)
+    # The data changes an upgrade brought (docs/runbooks/upgrade.md), run in
+    # the application container with the owner role from app.env. Batched and
+    # resumable: stopping it loses nothing, and running it again finishes it.
+    compose exec -T app node --experimental-strip-types --no-warnings \
+      /app/migrator/packages/db/src/bin/data-change.ts
     ;;
 
   logs)

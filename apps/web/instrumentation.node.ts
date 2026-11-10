@@ -2,9 +2,12 @@ import { EnvironmentError, loadEnv } from "@openokr/config";
 import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
+import { installErrorReports } from "./lib/error-reporting";
+import { installPromptEvaluator } from "./lib/prompt-evaluation";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
 import { resolveSSOProviders } from "./lib/sso";
+import { installStatusThresholds } from "./lib/status-thresholds";
 import { installTelemetry } from "./lib/telemetry";
 import { tenantFloor } from "./lib/tenant-floor";
 
@@ -116,6 +119,42 @@ export function startTelemetry(): void {
 }
 
 /**
+ * Installs error reporting (docs/design/error-reporting.md, plan 0.7.0 E1):
+ * the release and region every report carries, and the process's own
+ * last-resort hooks. Sends nothing anywhere; the log line and the counter
+ * are local.
+ *
+ * Skipped during `next build` like the meter, and non-fatal for the meter's
+ * reason: a product that refused to serve because it could not report its
+ * errors would have made reporting the outage.
+ */
+export function startErrorReporting(): void {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    installErrorReports();
+  } catch (error) {
+    process.stderr.write(
+      `errors: could not start reporting: ${error instanceof Error ? error.name : "unknown"}\n`,
+    );
+  }
+}
+
+/**
+ * Installs the evaluation set that gates a new prompt version (plan 0.7.0 A9,
+ * docs/design/ai-evaluation.md §7).
+ *
+ * Pure: it reads nothing and opens nothing, so it is installed in every phase
+ * and cannot fail the boot. Before the first request, because until it is in
+ * place `ai.updatePrompt` refuses every version rather than store one
+ * unchecked.
+ */
+export function startPromptEvaluation(): void {
+  installPromptEvaluator();
+}
+
+/**
  * Resolves whether a sign-in must wait for a verified address (P8-T02b).
  *
  * One database read, before anything is served, because Better Auth reads the
@@ -156,6 +195,10 @@ export async function resolveAdmission(): Promise<void> {
     return;
   }
   await installAdmission();
+  // The status thresholds resolve beside the limits and fail the boot the same
+  // way: docs/design/status-and-capacity.md §4 asks for them to be checked at
+  // resolve time, like the admission floors (plan 0.7.0 P8).
+  await installStatusThresholds();
 }
 
 /**

@@ -5,6 +5,7 @@ import {
   Card,
   CardBody,
   CardHeader,
+  RefusedFields,
   RichTextField,
   useTranslations,
 } from "@openokr/ui";
@@ -64,14 +65,17 @@ export function CoordinatorNote({
               2000 (sessions.setCoordinatorNote). The card's heading names
               it, so the field draws no legend of its own. */}
           <div className="w-full max-w-prose">
-            <RichTextField
-              label={t("session.detail.coordinatorNote.theCoordinatorSNote")}
-              hideLabel
-              name="note"
-              content={note}
-              maxCharacters={2000}
-              sendUnchanged
-            />
+            {/* The note shows what was refused about it (U1b). */}
+            <RefusedFields fields={state.fields}>
+              <RichTextField
+                label={t("session.detail.coordinatorNote.theCoordinatorSNote")}
+                hideLabel
+                name="note"
+                content={note}
+                maxCharacters={2000}
+                sendUnchanged
+              />
+            </RefusedFields>
           </div>
           <Button
             type="submit"

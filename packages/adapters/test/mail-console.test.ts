@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { ConsoleMailer } from "../src/drivers/mail/console.ts";
+import {
+  ConsoleMailer,
+  consoleMailRevealsContent,
+} from "../src/drivers/mail/console.ts";
 
 /**
  * What the console mail driver puts in a log (completeness review L-12).
@@ -54,6 +57,15 @@ describe("the console mail driver's log", () => {
     } finally {
       process.env.NODE_ENV = before;
     }
+  });
+
+  // Admin > General describes the log by this same answer (plan 0.7.0, B7),
+  // so the banner and the driver cannot disagree about what is in it.
+  it("names its own rule, so the screen that describes the log can ask it", () => {
+    expect(consoleMailRevealsContent({ NODE_ENV: "production" })).toBe(false);
+    expect(consoleMailRevealsContent({ NODE_ENV: "development" })).toBe(true);
+    expect(consoleMailRevealsContent({ NODE_ENV: "test" })).toBe(true);
+    expect(consoleMailRevealsContent({})).toBe(true);
   });
 
   it("still keeps the message for a test to read, whatever it logged", async () => {

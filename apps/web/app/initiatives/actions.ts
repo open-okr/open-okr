@@ -12,12 +12,25 @@
  * initiative's progress is the share of its own tasks that are done (P5-T11),
  * and it never becomes a key result's progress.
  */
-import { callAction, OperationError } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getPool } from "../../lib/auth";
+import { conflictOf } from "../../lib/conflict.ts";
+import { refusedByField, refusedSentence } from "../../lib/refusal";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { NO_ERROR, type WriteState } from "../cycle/write-state.ts";
+
+/**
+ * What a refused write says (guided-inputs §4.2): one sentence by default,
+ * for the row's selects and the unlink button, which draw no field to put a
+ * message under; under each field it names for the two forms. A schema's
+ * refusal too, which used to reach the error page. Null for a failure.
+ */
+type Answer = (
+  error: unknown,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+) => WriteState | null;
 
 async function run(
   fn: (context: {
@@ -26,6 +39,9 @@ async function run(
     actor: { kind: "human"; userId: string };
   }) => Promise<unknown>,
   paths: readonly string[] = ["/initiatives"],
+  answer: Answer = refusedSentence,
+  /** What an edit sent, which a conflict shows beside what is stored. */
+  sent?: Readonly<Record<string, unknown>>,
 ): Promise<WriteState> {
   const { session, workspace } = await requireWorkspace();
   try {
@@ -35,10 +51,15 @@ async function run(
       actor: { kind: "human", userId: session.user.id },
     });
   } catch (error) {
-    if (error instanceof OperationError) {
-      return { error: error.message };
+    const conflict = conflictOf(error, sent);
+    if (conflict) {
+      return { error: null, conflict };
     }
-    throw error;
+    const refused = answer(error, (await getTranslations()).t);
+    if (refused === null) {
+      throw error;
+    }
+    return refused;
   }
   for (const path of paths) {
     revalidatePath(path);
@@ -71,21 +92,40 @@ export async function createInitiativeAction(
   const { t } = await getTranslations();
 
   if (title === "") {
-    return { error: t("initiatives.actions.initiativeNeedsATitle") };
+    return {
+      error: null,
+      fields: { title: t("initiatives.actions.initiativeNeedsATitle") },
+    };
   }
   if (spaceId === "" || ownerId === "") {
-    return { error: t("initiatives.actions.initiativeNeedsASpaceAndOwner") };
+    // Under whichever of the two is missing, the space first.
+    return {
+      error: null,
+      fields: {
+        [spaceId === "" ? "spaceId" : "ownerId"]: t(
+          "initiatives.actions.initiativeNeedsASpaceAndOwner",
+        ),
+      },
+    };
   }
 
-  return run((context) =>
-    callAction(context, "initiatives.create", {
-      spaceId,
-      title,
-      ownerId,
-      ...(startsOn === "" ? {} : { startsOn }),
-      ...(endsOn === "" ? {} : { endsOn }),
-      ...(keyResultId === "" ? {} : { keyResultIds: [keyResultId] }),
-    }),
+  return run(
+    (context) =>
+      callAction(context, "initiatives.create", {
+        spaceId,
+        title,
+        ownerId,
+        ...(startsOn === "" ? {} : { startsOn }),
+        ...(endsOn === "" ? {} : { endsOn }),
+        ...(keyResultId === "" ? {} : { keyResultIds: [keyResultId] }),
+      }),
+    undefined,
+    // The form names the one key result it links by itself.
+    (error, t) =>
+      refusedByField(error, t, {
+        keyResultIds: "keyResultId",
+        "keyResultIds.0": "keyResultId",
+      }),
   );
 }
 
@@ -99,6 +139,8 @@ export async function createInitiativeAction(
 export async function setStatusAction(
   id: string,
   status: string,
+  /** The status the select was drawn with (optimistic-concurrency.md V4). */
+  read?: string,
 ): Promise<WriteState> {
   const value = asStatus(status);
   if (!value) {
@@ -107,14 +149,22 @@ export async function setStatusAction(
   }
   return run(
     (context) =>
-      callAction(context, "initiatives.update", { id, status: value }),
+      callAction(context, "initiatives.update", {
+        id,
+        status: value,
+        ...(read === undefined ? {} : { read: { status: read } }),
+      }),
     ["/initiatives", `/initiatives/${id}`],
+    undefined,
+    { status: value },
   );
 }
 
 export async function setCapacityAction(
   id: string,
   capacity: string,
+  /** The verdict the select was drawn with, empty for none (V4). */
+  read?: string,
 ): Promise<WriteState> {
   // The empty string is "nobody has judged it", which is a different fact from
   // `fits` and the one gate five reads differently.
@@ -125,8 +175,16 @@ export async function setCapacityAction(
   }
   return run(
     (context) =>
-      callAction(context, "initiatives.update", { id, capacity: value }),
+      callAction(context, "initiatives.update", {
+        id,
+        capacity: value,
+        ...(read === undefined
+          ? {}
+          : { read: { capacity: read === "" ? null : read } }),
+      }),
     ["/initiatives", `/initiatives/${id}`, "/cycle"],
+    undefined,
+    { capacity: value },
   );
 }
 
@@ -138,12 +196,16 @@ export async function linkKeyResultAction(
   const keyResultId = String(formData.get("keyResultId") ?? "");
   if (id === "" || keyResultId === "") {
     const { t } = await getTranslations();
-    return { error: t("initiatives.actions.pickTheKeyResult") };
+    return {
+      error: null,
+      fields: { keyResultId: t("initiatives.actions.pickTheKeyResult") },
+    };
   }
   return run(
     (context) =>
       callAction(context, "initiatives.linkKeyResult", { id, keyResultId }),
     ["/initiatives", `/initiatives/${id}`, "/cycle"],
+    refusedByField,
   );
 }
 

@@ -47,6 +47,12 @@ An administrator sees the workspace's plan, its seats and who holds each one
 on **Admin, Plan and seats**. An operator changes the plan, on the workspace's
 page in the console.
 
+The same page sets the workspace's storage quota and agent cost cap per run,
+which on a cloud are the provider's to set. A reason is required and appears in
+the customer's own audit log. The workspace's administrators see both on their
+Limits card and cannot change them; they still set the export, import and
+message-log limits themselves.
+
 | Rule | Why |
 |---|---|
 | A seat is a person who is here or has been invited | An invitation holds a seat, so a full workspace is refused at the invitation rather than when somebody clicks the link |
@@ -61,7 +67,7 @@ needed for anything else:
 
 | Variable | What it does |
 |---|---|
-| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION`. Neither applies once a policy is saved, and finishing the setup wizard saves Invitation only ([Choose a setup](setups.md#the-settings-behind-each-setup)) |
+| `OPENOKR_CLOUD=true` | Tenant records, the operator console, and open registration unless you choose otherwise with `OPENOKR_REGISTRATION` or on the console's Instance screen. A policy saved there wins over the variable ([Choose a setup](setups.md#the-settings-behind-each-setup)) |
 | `OPENOKR_CLOUD_PLANS` | The plan catalogue. Without it nobody has a seat limit |
 
 On [one server](compose.md), add them to `secrets/app.env` and run `./openokr up`.
@@ -94,12 +100,36 @@ list such as `[{"key":"team","name":"Team","seats":20,"aiCredits":2000}]`
 a new workspace has no plan and no seat limit, so to limit a free plan, list it
 in the catalogue and name it here.
 
+**A plan can carry its own limits.** Add `"limits": {"actionsPerMinute": 1200,
+"concurrentActions": 8}` to a plan, and its workspaces are admitted by those
+numbers instead of `OPENOKR_CLOUD_ACTIONS_PER_MINUTE` and
+`OPENOKR_CLOUD_CONCURRENT_ACTIONS`. Either may be left out to use the instance's,
+zero is unlimited, and the floors are the instance settings' own (60 actions a
+minute, 2 at once), so a catalogue with a lower number is refused whole. A plan
+change reaches admission within a minute. The outbox rate stays one number for
+the instance.
+
+**Offering a trial.** Set `OPENOKR_CLOUD_TRIAL_DAYS` and `OPENOKR_CLOUD_TRIAL_PLAN`
+(a catalogue key) and a workspace somebody signs up for starts on that plan for
+that many days. Both must be set, or nobody starts a trial. An operator can
+also start, extend or remove a trial on any workspace's console page. When a
+trial ends, people who fit the default plan move to it; a workspace whose
+people do not fit goes read-only, with nobody removed, until somebody
+subscribes or makes them fit. A workspace on a trial counts as one of its
+owner's free workspaces.
+
 **An operator creates a workspace** on the console's first page, naming who will own
 it. With an account they own it straight away, and without one they get an invitation.
 The operator does not become a member. A signed-in person can also start their own,
 from the account menu, wherever sign-up is open to them. On a plan with a free tier,
 `OPENOKR_CLOUD_FREE_WORKSPACES_PER_PERSON` limits how many free ones a person may own.
 It defaults to 1, and zero means unlimited.
+
+**One tenant's burst waits its turn.** `OPENOKR_CLOUD_OUTBOX_ROWS_PER_MINUTE`
+is how many outbox rows, the mail and nudges a write sets going, the relay may
+claim for one workspace a minute. Zero, the default, is unlimited; below 60 is
+refused at boot. Over it, a workspace's rows wait without being refused or
+dropped, and `openokr_outbox_rate_held_rows` shows how many.
 
 Nobody grants the role to themselves. Once one operator exists, only an
 operator can grant another. Every grant and revocation is written to the
@@ -205,7 +235,7 @@ instance yours without changing any code:
 
 | Difference | Detail |
 |---|---|
-| Registration | Open while no policy is saved, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account. The setup wizard saves Invitation only on either, and a saved policy wins |
+| Registration | Open while no policy is saved, because a cloud belongs to nobody. A self-hosted instance closes registration behind its first account. The operator sets the policy on the console's Instance screen, and a saved policy wins. Before 0.7.0 the setup wizard saved Invitation only, which a cloud keeps until the operator chooses again |
 | Plans and seats | The cloud counts seats. Self-hosting does not |
 | Suspension and closure | A cloud workspace has a lifecycle the vendor operates. Nothing is erased without a retention window somebody set |
 

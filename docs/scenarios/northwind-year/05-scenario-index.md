@@ -140,13 +140,9 @@ Every step in the year, by ID. Use this page to choose the steps an end-to-end s
 | NW-Q4-15 | The year's workspace archive |
 | NW-Q4-16 | The year's final digest names the wins |
 
-## 3. A known gap
+## 3. Known gaps
 
-One thing a realistic year needs that the product does not do yet.
-
-| Gap | What is missing | Steps |
-|---|---|---|
-| G-5 | **A dependency that knows the key result providing it.** Today the register records the providing space and whether it confirmed, not which key result delivers, so nothing can show a dependency as delivered when a milestone is done. | NW-Q1-20 |
+None. Every step in the year is something the product does. The last gap, G-5, closed in 0.7.0 (plan O5): a dependency now names the key result that delivers it. Mei names E3.1 as she confirms P1.1's dependency on Engineering (NW-Q1-13), and the dependency reads as delivered once E3.1 is done (NW-Q1-20).
 
 ## 4. Coverage
 
