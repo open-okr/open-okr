@@ -2,7 +2,7 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds six things:
+This plan grows as changes are named for 0.8.0. So far it holds seven things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
@@ -10,6 +10,7 @@ This plan grows as changes are named for 0.8.0. So far it holds six things:
 4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Two decisions (Q7, Q8).
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
+7. **Screen layout**: layouts that waste space or squeeze content. Section 7. The first, Phase 1's Roles and Suggested timeline, asked for by Akmal on 10 November 2026.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -205,18 +206,24 @@ Out of scope, and made possible by the keys: the sentences come from the method 
 |---|---|
 | F1 | UIUX-PLAN §6, S-04: Still needed here is a list of links, and what an item the reader cannot fill shows; the table of item keys and destinations |
 
-## 7. Suggested order
+## 7. Screen layout
+
+| # | Problem | Where | Change | Size | Gate |
+|---|---|---|---|---|---|
+| L1 | **Phase 1's Roles and Suggested timeline waste one card and squeeze the other.** From the medium breakpoint up the two cards sit side by side at half the width each. Roles holds two short entries, the sponsor and the facilitator, so most of its card is empty. The timeline's When column never wraps, so its longest entry, "Weeks 1 to 2 of the quarter", sets the column's width, and Activity is left two or three words to a line | `apps/web/app/cycle/input-pack.tsx`: the `grid md:grid-cols-2` around the two cards, and `whitespace-nowrap` on the When cell | **Stack them at every width**: Roles full width on top, Suggested timeline full width below. Inside Roles, on a wide screen, the sponsor and the facilitator sit side by side, so the card stays two lines tall rather than becoming a tall narrow column. The When column gets a fixed share of the table and may wrap, and Activity takes the rest. At phone width nothing changes, because the cards already stack there. Mockup 02 (`docs/mockups/src/02-cycle-workspace.html`) draws a narrow roles column beside the timeline, and is redrawn to match in the same change | S | None |
+
+## 8. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
 3. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
-4. F1. No design, and it answers "where do I fill this in" on the screen every cycle starts on.
+4. F1 and L1. No design, and both are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read.
 5. The design for Y3 to Y6, then the code, one row each.
 6. Q6, then O2's design and code.
 7. Q7 and Q8, then V1 and V2. Both are small once decided.
 8. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 8. Build log
+## 9. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -237,6 +244,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | V1 | to do | Waits on Q7 |
 | V2 | to do | Waits on Q8 |
 | F1 | to do | |
+| L1 | to do | |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
 | Q7, Q8 | yours | Section 5.3 |
