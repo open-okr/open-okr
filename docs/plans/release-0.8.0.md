@@ -413,8 +413,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | F1 | to do | |
 | L1 | to do | |
 | L2 | to do | |
-| S1 | to do | |
-| S2 | to do | |
+| S1 | done | One commit with S2, since the sign-up form carries both. The card replaces the form when sign-up returns no session; the link's hour is now named (`EMAIL_VERIFICATION_LINK_SECONDS`) |
+| S2 | done | At `/email-confirmed`, because `/welcome` is onboarding (S-34). Until S3, an expired or broken link points to the instance's support address, or to whoever runs it |
 | S3 | to do | Design first; carries H1 |
 | T1 | to do | Q9 decided |
 | R1 | to do | Design first: access |

@@ -323,6 +323,15 @@ export interface AuthOptions {
   readonly plugins?: readonly BetterAuthPlugin[];
 }
 
+/**
+ * How long a link that confirms an email address works, in seconds.
+ *
+ * Better Auth's own default, named here so the pages that tell a person to
+ * open the link can say how long they have (plan 0.8.0 S1, S2). Plan row S3
+ * decides whether it should be longer.
+ */
+export const EMAIL_VERIFICATION_LINK_SECONDS = 60 * 60;
+
 /** Failed sign-in attempts allowed per window before the caller is refused. */
 const SIGN_IN_ATTEMPTS = 10;
 const SIGN_IN_WINDOW_SECONDS = 60;
@@ -486,6 +495,10 @@ export function createAuth(options: AuthOptions) {
     },
 
     emailVerification: {
+      // Named rather than left to Better Auth's default, which is the same
+      // hour, so the check-your-email page can say how long the link lasts
+      // and cannot drift from it (plan 0.8.0 S1).
+      expiresIn: EMAIL_VERIFICATION_LINK_SECONDS,
       // Sent on sign-up only where a link can arrive. With a console
       // transport there is no callback, so nothing is sent and nothing is
       // written to the log either.

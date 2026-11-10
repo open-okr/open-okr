@@ -1,5 +1,6 @@
 import {
   COMPANY_EMAIL_MESSAGE,
+  EMAIL_VERIFICATION_LINK_SECONDS,
   inviteTokenFromCookies,
   REGISTRATION_CLOSED_MESSAGE,
   registrationOpenOrInvited,
@@ -74,6 +75,7 @@ export default async function SignUpPage() {
     <SignUpForm
       companyOnly={companyOnly}
       legal={await resolveLegalLinks(getPool())}
+      linkHours={EMAIL_VERIFICATION_LINK_SECONDS / 3600}
     />
   );
 }

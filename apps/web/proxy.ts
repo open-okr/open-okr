@@ -33,6 +33,10 @@ const PUBLIC_PREFIXES = [
   "/forgot-password",
   "/reset-password",
   "/backup-code",
+  // Where a sign-up's confirmation link lands (plan 0.8.0 S2). Better Auth
+  // signs nobody in when it confirms an address, so the visitor has no
+  // session, and this page is what tells them it worked.
+  "/email-confirmed",
   "/api/auth",
   // The first-run wizard runs before anybody has an account, so it cannot sit
   // behind a session. Its own layout refuses once the instance is configured,

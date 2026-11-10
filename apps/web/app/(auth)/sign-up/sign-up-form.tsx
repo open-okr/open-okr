@@ -17,6 +17,7 @@ import { AuthCard, Field, FormError } from "../auth-card";
 export function SignUpForm({
   companyOnly = false,
   legal,
+  linkHours = 1,
 }: {
   readonly companyOnly?: boolean;
   /**
@@ -25,23 +26,33 @@ export function SignUpForm({
    * page that does not exist.
    */
   readonly legal: LegalLinks;
+  /** How long the confirmation link works, for the check-your-email card. */
+  readonly linkHours?: number;
 }) {
   const { t } = useTranslations();
 
   const router = useRouter();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  // The address the link went to, once the account exists and is waiting for
+  // it. Held in the page's own state, never in the address bar.
+  const [sentTo, setSentTo] = useState<string | null>(null);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setPending(true);
     const form = new FormData(event.currentTarget);
+    const email = String(form.get("email"));
 
-    const { error: failure } = await authClient.signUp.email({
-      email: String(form.get("email")),
+    const { data, error: failure } = await authClient.signUp.email({
+      email,
       password: String(form.get("password")),
       name: String(form.get("name")),
+      // Where the link in the mail lands once it is opened (plan 0.8.0 S2).
+      // Without it Better Auth returned to the home page, which sent a person
+      // with no session to sign in with no word that anything had worked.
+      callbackURL: "/email-confirmed",
     });
     setPending(false);
 
@@ -49,8 +60,50 @@ export function SignUpForm({
       setError(failure.message ?? t("auth.signUp.signUpForm.thatDidNotWork"));
       return;
     }
+    // **No session means the address must be confirmed first** (plan 0.8.0
+    // S1). The form went to the home page whatever happened, which bounced a
+    // new person to sign in with nothing said about the mail they had been
+    // sent. Where the instance cannot send mail there is a session, and they
+    // go on to onboarding as before.
+    if (data && !data.token) {
+      setSentTo(email);
+      return;
+    }
     router.push("/");
   };
+
+  if (sentTo !== null) {
+    return (
+      <AuthCard
+        title={t("auth.signUp.checkEmail.title")}
+        footer={
+          <Link
+            href="/sign-in"
+            className="font-medium text-brand-text hover:underline"
+          >
+            {t("common.backToSignIn")}
+          </Link>
+        }
+      >
+        <div
+          className="flex flex-col gap-2.5 text-sm text-ink-2"
+          data-testid="check-email"
+        >
+          <p>
+            {t("auth.signUp.checkEmail.created")}{" "}
+            <strong className="font-semibold text-ink">{sentTo}</strong>
+          </p>
+          <p>{t("auth.signUp.checkEmail.open")}</p>
+          <p>
+            {linkHours === 1
+              ? t("auth.signUp.checkEmail.lastsOneHour")
+              : t("auth.signUp.checkEmail.lastsHours", { hours: linkHours })}
+          </p>
+          <p className="text-ink-3">{t("auth.signUp.checkEmail.spam")}</p>
+        </div>
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard

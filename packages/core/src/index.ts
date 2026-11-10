@@ -507,7 +507,12 @@ export {
   verifyInstanceChain,
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
-export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
+export {
+  type Auth,
+  type AuthOptions,
+  createAuth,
+  EMAIL_VERIFICATION_LINK_SECONDS,
+} from "./auth/auth.ts";
 export { callerAddress } from "./auth/caller-address.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
