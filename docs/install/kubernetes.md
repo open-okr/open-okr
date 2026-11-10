@@ -72,6 +72,24 @@ seconds will, and every open tab reconnects each time. Do not buffer the
 responses: they are `text/event-stream`, and the server already sends
 `X-Accel-Buffering: no` for nginx.
 
+## Behind PgBouncer
+
+Point the instance at Postgres directly. A connection pooler such as PgBouncer
+in **transaction** mode hands a server connection to a client for one
+transaction only, and four things need one connection for longer than that:
+
+| What | What happens through a transaction pooler |
+|---|---|
+| Live updates (the inbox, the feed, the board) | They stop: the `LISTEN` that receives them lands on a connection that is handed to somebody else at once |
+| The first workspace on sign-up, creating another workspace, finishing setup | Two requests at once can each create one: the lock that keeps them apart is session-level, and its lock and unlock can land on different connections |
+| Background jobs | They still run, but by polling rather than being woken, so later than they would be |
+| Migrations | Not affected, as long as `DATABASE_ADMIN_URL` points at Postgres directly, which it must anyway |
+
+Session mode is safe. A setting that sends these to a direct connection while
+the rest goes through a transaction pooler is designed
+([direct-connection.md](../design/direct-connection.md)) and will be built when
+a deployment needs it.
+
 ## What to check before you call it done
 
 `sh deploy/helm/check.sh` runs the chart's own behaviour checks with no cluster
