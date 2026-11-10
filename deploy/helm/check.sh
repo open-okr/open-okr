@@ -514,6 +514,16 @@ else
   fail "the erasure CronJob does not run with the owner role from a Secret"
 fi
 
+# The command loads the server's whole environment, and in production that
+# refuses a missing auth secret. The chart gave the job the database and the
+# encryption key but not this, so every scheduled run stopped before it read
+# anything (plan 0.8.0 O3). By reference, never by value.
+if echo "$erase_job" | grep -A 4 "name: BETTER_AUTH_SECRET" | grep -q "secretKeyRef"; then
+  pass "the erasure CronJob gets the auth secret its command needs, from a Secret"
+else
+  fail "the erasure CronJob has no auth secret, so it stops before it starts"
+fi
+
 # --- values reused from an older release -------------------------------------
 # `helm upgrade --reuse-values` keeps the old release's values and adds nothing
 # from the new chart, so every key a newer release introduced is missing. A

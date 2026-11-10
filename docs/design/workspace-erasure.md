@@ -150,7 +150,7 @@ No new setting. `cloud.closureRetentionDays` is the only switch.
 | `pnpm cloud:erase --id <id> --now --write` | Erases one closed workspace before its window ends, for a customer asking for that or after a restore (§9). Refused unless the tenant is closed. The receipt says the window was skipped |
 | `pnpm cloud:sweep --erased` | Lists the receipts, which is what a written confirmation is written from |
 | `./openokr erase --write` | `pnpm cloud:erase --write` in the container, for a host cron beside the backup's. Without `--write` it is the dry run, like the command |
-| Helm `cloud.erasure.schedule` | A CronJob with the same owner secret as the migration job. Empty by default |
+| Helm `cloud.erasure.schedule` | A CronJob with the same owner secret as the migration job, and the server's `BETTER_AUTH_SECRET` by reference, because the command loads the server's whole environment and in production that refuses to start without it. Before 0.8.0 the job had no auth secret and every run stopped before it read anything (plan 0.8.0 O3). Empty by default |
 
 ## 8. Screens
 

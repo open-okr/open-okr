@@ -403,10 +403,10 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H12 | to do | |
 | H13 | to do | |
 | H14 | to do | |
-| H15 | done | Branch `fix/helm-notes-object-storage`, commit `84f85321`: `sh deploy/helm/check.sh` and `pnpm check:fast` green, not pushed |
+| H15 | done | PR #203, merged 10 November 2026 with every CI job green |
 | O1 | to do | |
 | O2 | to do | Design first; Q6 decided |
-| O3 | to do | |
+| O3 | done | The erasure CronJob gets `BETTER_AUTH_SECRET` by reference; `check.sh` asserts it, and fails without the fix |
 | D1 | to do | |
 | V1 | to do | Q7 decided |
 | V2 | to do | Q8 decided |

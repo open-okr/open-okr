@@ -62,6 +62,17 @@ spec:
               workingDir: /app
               env:
                 {{- include "openokr.commonEnv" . | nindent 16 }}
+                # The command loads the server's whole environment, which in
+                # production refuses to start without the real auth secret.
+                # Without this every run stopped on "BETTER_AUTH_SECRET: is
+                # still the development placeholder" and nothing was ever
+                # erased (plan 0.8.0 O3). The job already holds the owner
+                # role, so this secret adds little to what it can reach.
+                - name: BETTER_AUTH_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "openokr.secretName" . }}
+                      key: {{ .Values.secrets.authSecretKey | default "better-auth-secret" }}
               resources:
                 {{- toYaml .Values.migrationResources | nindent 16 }}
               volumeMounts:
