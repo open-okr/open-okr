@@ -163,18 +163,35 @@ else
   fail "refused a configuration an upgrade could already be running"
 fi
 
-if helm template openokr . --set "database.url=$DB" \
-  --set persistence.enabled=false --show-only templates/NOTES.txt 2>/dev/null \
-  | grep -q "WARNING: persistence is off"; then
+# --- what the install notes say about storage -----------------------------
+# `helm template` never renders NOTES.txt, so this used to grep the file for
+# the warning, which passed whatever the condition around it said. That is
+# how an install with a bucket came to be told its uploads go to an emptyDir.
+# A client-side dry run renders the notes and needs no cluster. An output with
+# no NOTES section fails, rather than passing on a helm that cannot render it.
+notes() {
+  helm install openokr . --dry-run=client --set "database.url=$DB" "$@" 2>&1 \
+    | sed -n '/^NOTES:/,$p'
+}
+
+emptydir_notes=$(notes --set persistence.enabled=false --set replicaCount=2)
+if [ -z "$emptydir_notes" ]; then
+  fail "this helm cannot render the install notes with --dry-run=client"
+elif printf '%s' "$emptydir_notes" | grep -q "WARNING: persistence is off" \
+  && printf '%s' "$emptydir_notes" | grep -q "invisible to the other"; then
   pass "warns when uploads are going to an emptyDir"
 else
-  # NOTES.txt is not a template helm can --show-only, on some versions. Fall
-  # back to reading the file itself, which is what the warning lives in.
-  if grep -q "WARNING: persistence is off" templates/NOTES.txt; then
-    pass "warns when uploads are going to an emptyDir"
-  else
-    fail "says nothing when uploads are going to an emptyDir"
-  fi
+  fail "says nothing when uploads are going to an emptyDir"
+fi
+
+bucket_notes=$(notes --set persistence.enabled=false --set replicaCount=2 \
+  --set storage.s3.bucket=openokr-files --set storage.s3.existingSecret=openokr-s3)
+if printf '%s' "$bucket_notes" | grep -q "WARNING: persistence is off\|invisible to the other\|pinned to one replica"; then
+  fail "tells an install with a bucket that its uploads are on a volume"
+elif printf '%s' "$bucket_notes" | grep -q "S3 bucket openokr-files"; then
+  pass "says uploads go to the bucket when one is named"
+else
+  fail "does not say where uploads go when a bucket is named"
 fi
 
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
