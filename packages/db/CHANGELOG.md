@@ -1,5 +1,12 @@
 # @openokr/db
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies []:
+  - @openokr/config@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

@@ -1,5 +1,13 @@
 # @openokr/adapters
 
+## 0.7.0
+
+### Patch Changes
+
+- [#192](https://github.com/open-okr/open-okr/pull/192) [`25447b7`](https://github.com/open-okr/open-okr/commit/25447b75e076586eda4b0320689fc747b660fb2e) Thanks [@agungksidik](https://github.com/agungksidik)! - The outbound address guard now recognises every IPv6 form of a private IPv4 address.
+- Updated dependencies []:
+  - @openokr/config@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

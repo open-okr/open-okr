@@ -1,5 +1,17 @@
 # @openokr/ui
 
+## 0.7.0
+
+### Patch Changes
+
+- [#193](https://github.com/open-okr/open-okr/pull/193) [`a402b28`](https://github.com/open-okr/open-okr/commit/a402b286aad23f315a477a60f17eafd86dbe4bdc) Thanks [@agungksidik](https://github.com/agungksidik)! - Use the shared DateInput calendar for datetime fields as well as date-only,
+  range and inline fields. Session scheduling and site messages pair it with
+  TimeInput while preserving combined form values, timezone information and
+  date/time bounds.
+- Updated dependencies []:
+  - @openokr/formats@0.7.0
+  - @openokr/method@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes

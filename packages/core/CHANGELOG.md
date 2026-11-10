@@ -1,5 +1,16 @@
 # @openokr/core
 
+## 0.7.0
+
+### Patch Changes
+
+- [#192](https://github.com/open-okr/open-okr/pull/192) [`169a41b`](https://github.com/open-okr/open-okr/commit/169a41bb20b83f1c38d31161717903ebe2f34c37) Thanks [@agungksidik](https://github.com/agungksidik)! - Single sign-on now links and enforces only for members of the connection's workspace.
+- Updated dependencies []:
+  - @openokr/config@0.7.0
+  - @openokr/db@0.7.0
+  - @openokr/formats@0.7.0
+  - @openokr/method@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
