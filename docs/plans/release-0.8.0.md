@@ -6,7 +6,7 @@ This plan grows as changes are named for 0.8.0. So far it holds ten things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3), and Y7's six (section 2.5). Nothing is built yet.
-3. **Found running OKRGoal**: three faults found on 10 November 2026 while finding out why the copilot on OKRGoal said "AI off". Section 3. Q6 decided the same day.
+3. **Found running OKRGoal**: what deploying OKRGoal on 9 and 10 November 2026 found (H1 to H15), and three faults found while finding out why its copilot said "AI off" (O1 to O3). Section 3. The H rows were a separate draft until 10 November 2026, merged here. Q6 decided the same day.
 4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Q7 and Q8 decided the same day.
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
@@ -100,9 +100,60 @@ Akmal answered all six on 10 November 2026, each as recommended. The design note
 
 ## 3. Found running OKRGoal
 
-OKRGoal runs 0.6.0 with a plan catalogue (Free, Team and Business) and the provider's own AI key. On 10 November 2026 its copilot said **AI off** although the key was set and worked. The cause was that its workspaces had no plan, and on an instance with a catalogue a workspace with no plan may not use the provider's key (`docs/design/ai-credits.md` §3). Looking into it found two more faults. Each row was checked against `main` at `8058c955`, so 0.7.0 has all three.
+OKRGoal was deployed on 9 and 10 November 2026: OpenOKR on Kubernetes (EKS), with PostgreSQL on a managed service (RDS), files on S3 and Cloudflare in front of a cloud load balancer. That was the first time the product ran with several replicas behind two proxies, on a managed database, with nothing on the host's disk. Every row in this section is a place where it did not work as shipped, or worked only because of a workaround outside the product.
 
-### 3.1 Changes
+They come from two drafts, merged here on 10 November 2026:
+
+| Rows | Where they came from |
+|---|---|
+| H1 to H14 | Deploying OKRGoal. First drafted on branch `docs/release-0.8.0-plan` (commit `db9ac099`, never pushed) and checked against `main` at `2b221bdb`, after 0.7.0. The chart changes merged since, the `--reuse-values` fallbacks of #201, touch none of them. Merged unchanged, except H1, which S3 in section 8 now carries |
+| H15 | The chart's install notes, found while upgrading OKRGoal to 0.7.0 |
+| O1 to O3 | Finding out why OKRGoal's copilot said **AI off** although its key was set and worked, checked against `main` at `8058c955` |
+
+Release 0.7.0 already fixed two of the deployment's original findings: it counts the sign-in limits in Postgres across replicas, and it no longer needs `APP_BUILD_ID` set.
+
+### 3.1 Sign-up and the first account
+
+These decide whether a stranger can create an account on a cloud instance at all.
+
+| # | Problem | Where | Proposed fix | Size | Gate |
+|---|---|---|---|---|---|
+| H1 | **A person whose verification email failed is stuck for good.** The verification mail is sent inside the sign-up request, so when the mail server refuses it the person sees an error after their account already exists. Signing up again says the address is taken, signing in says to verify first, and nothing offers the link again. Found while SES was still in its sandbox and refused every unverified recipient | `apps/web/lib/auth.ts` (`sendVerificationEmail`), `packages/core/src/auth/auth.ts` (`emailVerification`, no `sendOnSignIn`) | **Carried by S3** (section 8): the mail goes through the outbox, so a refused mail never fails sign-up and is retried, and "send the link again" is offered | See S3 | See S3 |
+| H2 | **Behind a CDN and a load balancer, every visitor shares one sign-in bucket.** `X-Forwarded-For` is trusted only when it holds one address, and a CDN followed by a load balancer always leaves a chain, so every caller resolves to `unresolved`. Cloudflare will not set `X-Real-IP` for an origin, so the second header cannot help either. Sessions record no address, and one person can use up the sign-in and sign-up limits for everybody. OKRGoal holds this off with a per-visitor rate limit at Cloudflare | `packages/core/src/auth/caller-address.ts` (`CALLER_ADDRESS_HEADERS`, no `trustedProxies`) | A setting naming the proxies in front of the instance, as address ranges, passed to Better Auth's `trustedProxies` and used by `callerAddress` the same way, so the chain is read from the right up to the first untrusted hop. Optionally a header to trust instead, such as `CF-Connecting-IP`, for an origin that only the CDN can reach. Document both for Compose, Kubernetes and a CDN | M | Design first: security |
+| H3 | **`OPENOKR_REGISTRATION=invite_only` makes an instance impossible to claim.** The variable is enforced before any account exists, so the setup wizard's sign-up is refused. The form then falls through to signing in, and the person sees "Invalid email or password" for an account that was never created | `packages/core/src/workspaces/registration.ts` (`readRegistrationPolicy`), `apps/web/app/setup/account/setup-account-form.tsx` | An unclaimed instance lets the first account through whatever the variable says, because the wizard is the claim. The wizard shows a refused sign-up as itself, and never falls through to sign-in | S | Design first: `docs/design/registration-policy.md` |
+| H4 | **An unclaimed cloud instance sends its first visitor to sign-in, not to setup.** The plain address redirects to `/sign-in`, which has no account to sign into, and nothing on it mentions `/setup` | The root redirect; seen with the cloud flag on and no account | While the instance is unclaimed, send the root to `/setup` with the cloud flag on, as without it | S | None |
+
+### 3.2 Database
+
+| # | Problem | Where | Proposed fix | Size | Gate |
+|---|---|---|---|---|---|
+| H5 | **With pgvector installed, migrations stop at 0031.** It turns `embeddings.embedding` into a `vector` with no dimensions and then builds an HNSW index on it, which pgvector refuses ("column does not have dimensions"). The test stack's Postgres has no pgvector, so CI only ever takes the other branch. OKRGoal runs with the extension removed, so search uses the full-text fallback | `packages/db/migrations/0031_embeddings.sql`, the `alter column ... type vector` and `create index ... using hnsw` statements | Build the index only once the column has the dimensions of the embedding model in use, or not at all until then; decide whether 0031 itself may change, since every instance with pgvector failed at it and none can have applied it. Add a CI leg on a Postgres image with pgvector, so the branch is tested | M | Design first: schema. Changing 0031 is Akmal's decision |
+| H6 | **A managed Postgres's certificate cannot be checked.** The pool hands `DATABASE_URL` to node-postgres, whose current connection-string parser treats `sslmode=require` as full verification against Node's own trust store, which does not hold a cloud database's authority (RDS, for one). The chart cannot mount a bundle, so the only working choice is `sslmode=no-verify`: encrypted, unchecked | `apps/web/lib/pool.ts`, `deploy/helm/templates/deployment.yaml` | A chart value that mounts a CA bundle from a Secret or ConfigMap and points `NODE_EXTRA_CA_CERTS` at it, for the server, the migration job and every job. Document `sslmode=verify-full` with it for RDS, Cloud SQL and Azure | S | Run `sh deploy/helm/check.sh` |
+| H7 | **No direct connection for what cannot sit behind a transaction pooler.** The listener for live updates, pg-boss and the session-level advisory locks taken during workspace provisioning all use `DATABASE_URL`, so PgBouncer in transaction mode breaks them. There is no read-replica routing either. Not needed until a deployment outgrows one database's connections | `apps/web/lib/realtime.ts`, `packages/adapters/src/drivers/jobs/pg-boss.ts`, `packages/core/src/workspaces/provisioning.ts` | A second connection setting for those three, defaulting to `DATABASE_URL`. Read routing is a separate, later design | L | Design first |
+
+### 3.3 The Helm chart
+
+O3, the erasure job, is in 3.5 with the other two found the same day.
+
+| # | Problem | Where | Proposed fix | Size | Gate |
+|---|---|---|---|---|---|
+| H8 | **With `database.existingSecret` set, the migration job cannot start.** `commonEnv` reads `DATABASE_ADMIN_URL` from a Secret named `<release>-database` whenever `database.adminUrl` is set, but the chart renders that Secret only when `database.existingSecret` is empty. OKRGoal supplies a Secret of that exact name itself and sets `adminUrl` to a placeholder | `deploy/helm/templates/_helpers.tpl` (`openokr.commonEnv`), `deploy/helm/templates/secrets.yaml` | `database.existingSecretAdminKey`: read the admin address from the existing Secret under that key. Refuse at render time the combination that cannot work. Add both to `deploy/helm/check.sh` | S | Run `sh deploy/helm/check.sh` |
+| H9 | **File storage on S3 needs a long-lived access key.** The schema requires both keys once a bucket is named, the driver always passes them, and the chart requires `storage.s3.existingSecret`. Workload identity (EKS Pod Identity, IRSA, an instance profile) cannot be used | `packages/config/src/env.ts`, `packages/adapters/src/drivers/storage/s3.ts`, `deploy/helm/templates/_validate.tpl` | With no key set, let the AWS SDK's default credential chain decide. Make the chart's Secret optional for S3 and document the service-account annotation | S | Run `sh deploy/helm/check.sh` |
+| H10 | **Web and background work cannot scale apart, and nothing runs the data changes.** The chart has one Deployment, no autoscaler, no pre-stop pause and no termination grace period, and the relay and the scheduler stop on SIGTERM without draining. The data-change runner is not in the chart at all, so every upgrade needs somebody to run it by hand | `deploy/helm/templates/deployment.yaml`, `apps/web/lib/relay.ts`, `apps/web/lib/scheduler.ts` | A worker Deployment running the relay and the scheduler, with the web Deployment's two flags off; an optional autoscaler on the web Deployment; a pre-stop pause and a grace period; draining on SIGTERM; a post-upgrade hook that runs the data changes. Split into rows when designed | L | Design first: deployment shape |
+| H15 | **The install notes warn that uploads go to an emptyDir when they go to S3.** With `storage.s3.bucket` set and persistence off, the notes said uploaded files go to an emptyDir, are lost on restart and are invisible across replicas, and told the operator to turn persistence on. With persistence on, they said the release is pinned to one replica, which a bucket lifts. `check.sh` never rendered the notes, because `helm template` skips them, so it grepped the file and passed whatever the condition around the warning said. Seen on every OKRGoal upgrade | `deploy/helm/templates/NOTES.txt`, `deploy/helm/check.sh` | The notes say the files are kept in the named bucket, and keep both volume notes for installs without one. `check.sh` renders the notes with a client-side dry run and checks both directions | S | Run `sh deploy/helm/check.sh`. **Done** on branch `fix/helm-notes-object-storage`, commit `84f85321`, not pushed |
+
+### 3.4 Smaller things
+
+| # | Problem | Where | Proposed fix | Size | Gate |
+|---|---|---|---|---|---|
+| H11 | **Live streams go quiet and get cut.** The inbox, feed and copilot streams send one heartbeat when they open. A load balancer's idle timeout (60 seconds on AWS) or a CDN's (about 100 on Cloudflare) then closes them, and every open tab reconnects about once a minute | `apps/web/app/api/inbox/live/route.ts`, `feed/live`, `copilot/live` | A heartbeat every 25 seconds on every stream | S | None |
+| H12 | **`/api/status` reports the scheduler of whichever pod answers.** The heartbeat lives in that process's memory, so behind a load balancer the answer depends on the pod, and a pod with the scheduler off reports it as operational. A status page reading it can be wrong either way | `apps/web/lib/scheduler.ts`, `apps/web/app/api/status/route.ts` | Store the heartbeat in Postgres and read it from there | S | None |
+| H13 | **Uploads stop at 8 MB although files may be 25 MB.** The server-action body limit is lower than the blob limit | `apps/web/next.config.ts`, `packages/core/src/blobs/validation.ts` | Make them agree, and say the real limit on the upload control | S | None |
+| H14 | **The OpenTelemetry exporter cannot send an auth header,** so it cannot reach most hosted collectors without a collector of one's own in between | `packages/adapters/src/drivers/telemetry/otel.ts`, `apps/web/lib/telemetry.ts` | Honour `OTEL_EXPORTER_OTLP_HEADERS`, as the OpenTelemetry convention names it | S | None |
+
+### 3.5 AI on a cloud with plans, and the erasure job
+
+OKRGoal ran 0.6.0 with a plan catalogue (Free, Team and Business) and the provider's own AI key. On 10 November 2026 its copilot said **AI off** although the key was set and worked. The cause was that its workspaces had no plan, and on an instance with a catalogue a workspace with no plan may not use the provider's key (`docs/design/ai-credits.md` §3). Looking into it found the erasure job's fault too.
 
 | # | Problem | Where | Proposed fix | Size | Gate |
 |---|---|---|---|---|---|
@@ -110,7 +161,7 @@ OKRGoal runs 0.6.0 with a plan catalogue (Free, Team and Business) and the provi
 | O2 | **A catalogue added after workspaces exist takes their AI away, and nobody is told.** A workspace starts on the default plan only if one is set when it is made. OKRGoal set its catalogue and Free as its default after its first workspaces existed, so every one of them has no plan and lost AI on the provider's key when the catalogue went in. The operator console can already filter to workspaces with no plan, but does not say what having none costs them | `packages/core/src/tenancy/plans.ts` (`resolveDefaultPlan`), `pnpm cloud:adopt`, `apps/web/app/operator/page.tsx` (S-45), `apps/web/app/operator/[workspaceId]/page.tsx` (S-46) | As Q6 decided: S-45 and S-46 mark a workspace with no plan, on an instance with a catalogue, as having no AI on the provider's key, and S-45 offers one audited action, "Put every workspace with no plan on the default plan". Before it runs, it lists the workspaces it would refuse because they have more people than the plan's seats | M | Design first: it changes stored tenant data |
 | O3 | **The Helm chart's erasure job fails before it starts.** `pnpm cloud:erase` loads the whole server environment, which in production refuses the development placeholder for `BETTER_AUTH_SECRET`. The chart gives the job `openokr.commonEnv`: the two database addresses, the encryption key and `NODE_ENV`, but not the auth secret. So every scheduled run stops with "BETTER_AUTH_SECRET: is still the development placeholder". OKRGoal's first run, on 10 November 2026, failed this way. Nothing is erased by mistake, but closed workspaces past their retention window are never erased at all. `deploy/helm/check.sh` checks the job's command and database address, not that the job can start. Compose is not affected, because `./openokr erase` runs in the application container with its full environment | `deploy/helm/templates/erasure-cronjob.yaml`, `deploy/helm/templates/_helpers.tpl` (`openokr.commonEnv`), `packages/core/src/bin/cloud-erase.ts` | Give the job `BETTER_AUTH_SECRET` from the Secret the web pods read it from, or have `cloud-erase.ts` check only the variables it uses. Add a check to `check.sh` that every job the chart renders gets every variable its command requires | S | Run `sh deploy/helm/check.sh` |
 
-### 3.2 Decision
+### 3.6 Decision
 
 Akmal decided Q6 on 10 November 2026, as recommended.
 
@@ -118,10 +169,14 @@ Akmal decided Q6 on 10 November 2026, as recommended.
 |---|---|---|
 | Q6 | What happens to a workspace with no plan on an instance that has a catalogue? | **Nothing automatic.** The console says what having no plan costs, and offers O2's one action. Not chosen: `pnpm cloud:adopt` putting every workspace with no plan on the default plan by itself, which would put a seat limit on workspaces that never had one without anybody choosing it; and leaving it as today, which is what left OKRGoal's workspaces without AI unnoticed |
 
-### 3.3 What the specification gains when these are built
+### 3.7 What the specification gains when these are built
+
+The H rows marked design first name their design note in the Gate column. The others:
 
 | Row | Pages |
 |---|---|
+| H6, H8, H9, H15 | `deploy/helm/README.md` and `docs/install/`: the CA bundle, the admin address key, workload identity, and what the notes say about storage |
+| H11, H12 | `docs/runbooks/observability.md`: the stream heartbeat and where `/api/status` reads the scheduler from |
 | O1 | `docs/design/ai-credits.md` §3 and §9: what a reader is shown for each reason AI is off |
 | O2 | `docs/design/ai-credits.md` §3; UIUX-PLAN §6, S-45 and S-46 |
 | O3 | `docs/design/workspace-erasure.md` §7, the environment the job needs |
@@ -242,7 +297,7 @@ On an instance that cannot send mail nothing changes: verification is not requir
 |---|---|---|---|
 | S1 | **"Check your email" after sign-up**, where verification is required. Instead of the home page, the form opens a page on the same auth card: the account is created, a link has gone to the address they typed, open it to confirm, how long the link lasts, look in spam, and a way back to sign-in. The address is carried in the page's own state, never in the address bar. Where verification is not required, sign-up goes on to onboarding as today | S | None |
 | S2 | **A welcome page when the link is opened.** Sign-up passes Better Auth a return address, a new signed-out page such as `/welcome`, which the proxy lets through without a session. With no error it says "Welcome to *instance name*. Your email is confirmed." with a Sign in button. An already confirmed address gets the same page, because Better Auth sends it there with no error. `TOKEN_EXPIRED` says the link has expired, and `INVALID_TOKEN` and the other errors say it is not valid. Both say what to do next, which is S3's "send a new link" once that is built. Links sent before 0.8.0 still lead to the home page | S | None |
-| S3 | **Send the link again**, on the check-your-email page, on S2's expired page, and beside "Confirm your email first" on sign-in. The answer is the same whether or not the address has an account, so the form cannot be used to find out who has one, and it is rate limited per address and per network. The design also decides how long a link lasts, one hour today, and the page in S1 says whatever it decides. **This is H1 of the hosting draft** (`docs/plans/release-0.8.0.md` on branch `docs/release-0.8.0-plan`, not merged), which also sends the mail through the outbox so a failed send never fails sign-up. Whichever plan merges first carries it, and the other drops its row | M | Design first: authentication and account enumeration |
+| S3 | **Send the link again**, on the check-your-email page, on S2's expired page, and beside "Confirm your email first" on sign-in. The answer is the same whether or not the address has an account, so the form cannot be used to find out who has one, and it is rate limited per address and per network. The design also decides how long a link lasts, one hour today, and the page in S1 says whatever it decides. **It carries H1** (section 3.1): the verification mail goes through the outbox, so a mail server that refuses it never fails sign-up, and the send is retried | M | Design first: authentication and account enumeration |
 
 S1 and S2 need no design and can ship first. Until S3 lands, the expired page can only say to ask the workspace's administrator or the instance's support address.
 
@@ -308,15 +363,17 @@ The specification gains it in TECHNICAL-PLAN §4.1, the role matrix's note on th
 ## 11. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
-2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
-3. S1 and S2, then S3's design. Every new person on a cloud meets them first.
+2. H15, already done, then O3, O1 and H4. All small, no design, and they fix what a running cloud instance gets wrong today.
+3. S1 and S2, then the designs for S3 (with H1), H2 and H3. Together they decide whether a stranger can sign up and sign in on a cloud instance.
 4. T1. It is what that new person sees next, and it leads them to the cycle page.
-5. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
-6. F1, L1 and L2. No design. F1 and L1 are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read. L2 makes the way there from an empty Work Map hard to miss.
-7. V1 and V2. Both are small, and Q7 and Q8 are decided.
-8. The designs for R1 and for Y3 to Y6, then the code, one row each.
-9. O2's design and code. Q6 is decided.
-10. The design for Y7, which follows the answers in section 2.5, then the code. Last, because it is the largest and the only one that cannot be undone.
+5. H8, H9 and H6, which remove the three chart workarounds OKRGoal runs with, then H11, H12, H13 and H14.
+6. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
+7. F1, L1 and L2. No design. F1 and L1 are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read. L2 makes the way there from an empty Work Map hard to miss.
+8. V1 and V2. Both are small, and Q7 and Q8 are decided.
+9. The designs for R1 and for Y3 to Y6, then the code, one row each.
+10. O2's design and code. Q6 is decided.
+11. The designs for H5, H7 and H10. H10 is split into rows once designed, and changing migration 0031 for H5 is Akmal's decision.
+12. The design for Y7, which follows the answers in section 2.5, then the code. Last, because it is the largest and the only one that cannot be undone.
 
 ## 12. Build log
 
@@ -332,6 +389,21 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Y5 | to do | |
 | Y6 | to do | |
 | Y7 | to do | Design first; Y7-1 to Y7-6 decided |
+| H1 | carried by S3 | |
+| H2 | to do | Design first: security |
+| H3 | to do | Design first: registration policy |
+| H4 | to do | |
+| H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
+| H6 | to do | |
+| H7 | to do | Design first |
+| H8 | to do | |
+| H9 | to do | |
+| H10 | to do | Design first; split into rows once designed |
+| H11 | to do | |
+| H12 | to do | |
+| H13 | to do | |
+| H14 | to do | |
+| H15 | done | Branch `fix/helm-notes-object-storage`, commit `84f85321`: `sh deploy/helm/check.sh` and `pnpm check:fast` green, not pushed |
 | O1 | to do | |
 | O2 | to do | Design first; Q6 decided |
 | O3 | to do | |
@@ -343,7 +415,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | L2 | to do | |
 | S1 | to do | |
 | S2 | to do | |
-| S3 | to do | Design first; the same as the hosting draft's H1 |
+| S3 | to do | Design first; carries H1 |
 | T1 | to do | Q9 decided |
 | R1 | to do | Design first: access |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
