@@ -1,5 +1,13 @@
 # @openokr/test-support
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [[`169a41b`](https://github.com/open-okr/open-okr/commit/169a41bb20b83f1c38d31161717903ebe2f34c37)]:
+  - @openokr/core@0.7.0
+  - @openokr/db@0.7.0
+
 ## 0.6.0
 
 ### Patch Changes
