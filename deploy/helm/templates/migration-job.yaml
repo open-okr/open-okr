@@ -60,7 +60,7 @@ spec:
           workingDir: /app
           env:
             {{- include "openokr.commonEnv" . | nindent 12 }}
-            {{- if .Values.database.adminUrl }}
+            {{- if include "openokr.adminEnabled" . }}
             # Only the hook gets the owner role, so the application role never
             # owns the tables.
             - name: OPENOKR_APP_ROLE

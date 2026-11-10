@@ -40,6 +40,11 @@ database:
   # Optional owner-role connection used only by the migration hook, so the
   # application role never owns the tables.
   adminUrl: ""
+  # With existingSecret: the key in that same Secret that holds the owner-role
+  # connection. Prefer it over adminUrl, which lands in the release's stored
+  # values; adminUrl with existingSecret reads a Secret the chart does not
+  # render (plan 0.8.0 H8), so the install notes warn about that pairing.
+  existingSecretAdminKey: ""
 
 # The instance's public origin. Passkeys are bound to it, so it must be the
 # address people actually use. Defaults to the first ingress host when unset.

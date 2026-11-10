@@ -18,6 +18,11 @@ database, or two replicas quietly corrupting each other's uploads.
 {{- fail "\n\ndatabase.url must be a postgres:// or postgresql:// connection string.\n" -}}
 {{- end -}}
 
+{{- /* A key in a Secret that is not there: the owner role would be read from nothing (plan 0.8.0 H8). */ -}}
+{{- if and (dig "existingSecretAdminKey" "" .Values.database) (not .Values.database.existingSecret) -}}
+{{- fail "\n\ndatabase.existingSecretAdminKey names a key in database.existingSecret, which is empty.\n\nPut the owner-role connection in the same Secret as the application's and name both:\n  --set database.existingSecret=my-db-secret\n  --set database.existingSecretAdminKey=database-admin-url\n" -}}
+{{- end -}}
+
 {{/*
 The one that actually bites. The local-disk storage driver writes to a
 volume, and a ReadWriteOnce claim can only be mounted by pods on one node. Two

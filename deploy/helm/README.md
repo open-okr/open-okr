@@ -58,6 +58,7 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 |---|---|---|
 | `database.url` | none | Required unless `database.existingSecret` is set |
 | `database.adminUrl` | none | Owner-role connection used only by the migration hook, so the application role never owns the tables |
+| `database.existingSecretAdminKey` | none | With `database.existingSecret`: the key in that Secret holding the owner-role connection. Prefer it to `adminUrl`, which lands in the release's stored values. Refused without `existingSecret` |
 | `publicUrl` | first ingress host | Passkeys are bound to this origin. Get it right |
 | `replicaCount` | 1 | Migrations run in a hook, so more than one is safe. One is the default because the default storage mode cannot be shared |
 | `persistence.enabled` | true | A volume for uploaded files. See below |

@@ -20,6 +20,18 @@ The instance has not been set up. The first person to open it gets the
 first-run wizard, creates the owner account, and registration closes behind
 them.
 
+{{- if and .Values.database.existingSecret .Values.database.adminUrl (not (dig "existingSecretAdminKey" "" .Values.database)) }}
+
+WARNING: database.adminUrl is set beside database.existingSecret.
+
+The migration hook then reads the owner-role connection from a Secret named
+{{ printf "%s-database" (include "openokr.fullname" .) }}, which this chart renders only when existingSecret is
+empty. It works only if you created that Secret yourself. Put the connection
+in your own Secret instead and name its key:
+
+  --set database.existingSecretAdminKey=database-admin-url --set database.adminUrl=
+{{- end }}
+
 {{- if not .Values.secrets.existingSecret }}
 
 Back this up now, before anything else:

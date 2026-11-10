@@ -194,6 +194,40 @@ else
   fail "does not say where uploads go when a bucket is named"
 fi
 
+# --- the owner role from the operator's own Secret (plan 0.8.0 H8) ---------
+# adminUrl beside existingSecret read DATABASE_ADMIN_URL from a Secret the
+# chart renders only without existingSecret, so the migration hook could not
+# start unless the operator had made a Secret of exactly that name.
+own_admin=$(render_one migration-job.yaml \
+  --set database.existingSecret=my-db \
+  --set database.existingSecretAdminKey=admin-url)
+if echo "$own_admin" | grep -A 4 "name: DATABASE_ADMIN_URL" | grep -q "name: my-db" \
+  && echo "$own_admin" | grep -A 4 "name: DATABASE_ADMIN_URL" | grep -q "key: admin-url" \
+  && echo "$own_admin" | grep -q "name: OPENOKR_APP_ROLE"; then
+  pass "reads the owner role from the operator's own Secret, by its key"
+else
+  fail "does not read the owner role from the operator's own Secret"
+fi
+
+if render_expecting_failure --set "database.url=$DB" \
+  --set database.existingSecretAdminKey=admin-url \
+  | grep -q "existingSecretAdminKey names a key"; then
+  pass "refuses an admin key with no Secret to read it from"
+else
+  fail "accepted an admin key with no Secret to read it from"
+fi
+
+old_pair=$(notes --set database.existingSecret=my-db \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr)
+new_pair=$(notes --set database.existingSecret=my-db \
+  --set database.existingSecretAdminKey=admin-url)
+if printf '%s' "$old_pair" | grep -q "WARNING: database.adminUrl is set beside" \
+  && ! printf '%s' "$new_pair" | grep -q "WARNING: database.adminUrl"; then
+  pass "warns about adminUrl beside existingSecret, and not about the key"
+else
+  fail "says nothing about adminUrl beside existingSecret"
+fi
+
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
   pass "refuses the smtp transport with no host"
 else

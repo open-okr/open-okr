@@ -133,14 +133,29 @@ is better still, because a value passed to Helm is stored in the release.
 {{/*
 Everything the application and the migration hook both need.
 */}}
+{{/*
+Whether an owner-role connection is configured: from values (adminUrl), or a
+key in the operator's own Secret (existingSecretAdminKey, plan 0.8.0 H8).
+`dig` because a release from before 0.8 reuses values without the new key.
+*/}}
+{{- define "openokr.adminEnabled" -}}
+{{- $db := .Values.database -}}
+{{- if or $db.adminUrl (and $db.existingSecret (dig "existingSecretAdminKey" "" $db)) -}}true{{- end -}}
+{{- end -}}
+
 {{- define "openokr.commonEnv" -}}
 {{ include "openokr.databaseEnv" . }}
-{{- if .Values.database.adminUrl }}
+{{- if include "openokr.adminEnabled" . }}
 - name: DATABASE_ADMIN_URL
   valueFrom:
     secretKeyRef:
+      {{- if and .Values.database.existingSecret (dig "existingSecretAdminKey" "" .Values.database) }}
+      name: {{ .Values.database.existingSecret }}
+      key: {{ .Values.database.existingSecretAdminKey }}
+      {{- else }}
       name: {{ printf "%s-database" (include "openokr.fullname" .) }}
       key: database-admin-url
+      {{- end }}
 {{- end }}
 - name: OPENOKR_ENCRYPTION_KEY
   valueFrom:

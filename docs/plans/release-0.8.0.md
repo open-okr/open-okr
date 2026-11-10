@@ -396,7 +396,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
 | H6 | to do | |
 | H7 | to do | Design first |
-| H8 | to do | |
+| H8 | done | `database.existingSecretAdminKey` reads the owner role from the operator's own Secret, and refuses without `existingSecret`. **Deviation:** adminUrl beside existingSecret is warned about in the install notes rather than refused, because it works wherever the operator made a Secret of the chart's own name, which is OKRGoal's workaround; refusing would break its next deploy. OKRGoal can move to the key and drop the workaround |
 | H9 | to do | |
 | H10 | to do | Design first; split into rows once designed |
 | H11 | to do | |
