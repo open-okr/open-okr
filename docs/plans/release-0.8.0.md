@@ -10,7 +10,7 @@ This plan grows as changes are named for 0.8.0. So far it holds nine things:
 4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Two decisions (Q7, Q8).
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
-7. **Screen layout**: layouts that waste space or squeeze content. Section 7. The first, Phase 1's Roles and Suggested timeline, asked for by Akmal on 10 November 2026.
+7. **Screen layout**: layouts that waste space, squeeze content or hide the next step. Section 7. Phase 1's Roles and Suggested timeline, and the Work Map's Start drafting, both asked for by Akmal on 10 November 2026.
 8. **After sign-up**: a page that says to check your email, and a welcome page when the link is opened. Section 8. Asked for by Akmal on 10 November 2026.
 9. **The product tour on first sign-in**: a Start tour or Skip tour dialog, then one step at a time with the step's area lit and the rest dimmed, ending with Start drafting OKRs. Section 9. Asked for by Akmal on 10 November 2026, with tour.niazmorshed.dev as the example. Q9 decided the same day.
 
@@ -213,6 +213,7 @@ Out of scope, and made possible by the keys: the sentences come from the method 
 | # | Problem | Where | Change | Size | Gate |
 |---|---|---|---|---|---|
 | L1 | **Phase 1's Roles and Suggested timeline waste one card and squeeze the other.** From the medium breakpoint up the two cards sit side by side at half the width each. Roles holds two short entries, the sponsor and the facilitator, so most of its card is empty. The timeline's When column never wraps, so its longest entry, "Weeks 1 to 2 of the quarter", sets the column's width, and Activity is left two or three words to a line | `apps/web/app/cycle/input-pack.tsx`: the `grid md:grid-cols-2` around the two cards, and `whitespace-nowrap` on the When cell | **Stack them at every width**: Roles full width on top, Suggested timeline full width below. Inside Roles, on a wide screen, the sponsor and the facilitator sit side by side, so the card stays two lines tall rather than becoming a tall narrow column. The When column gets a fixed share of the table and may wrap, and Activity takes the rest. At phone width nothing changes, because the cards already stack there. Mockup 02 (`docs/mockups/src/02-cycle-workspace.html`) draws a narrow roles column beside the timeline, and is redrawn to match in the same change | S | None |
+| L2 | **The Work Map's empty state hides its one next step in a sentence.** With nothing in the cycle, the Work Map says "Nothing in this cycle yet" and ends "...where every rule is checked as they are written. Start drafting.", with Start drafting as an underlined link in small grey text. It is the only thing to do on the page and the easiest thing on it to miss. It is also drawn for everybody, a viewer included, who cannot draft | `apps/web/app/work-map.tsx`, the `GoalTable`'s `empty` | **Start drafting becomes a primary button** under the sentence, the kit's `buttonVariants({ variant: "primary" })` on the link, keeping its target, Phase 4 of the cycle page (`/cycle?phase=4`). The sentence stays as the explanation above it. It is drawn only for a reader who can edit goals, which the component already knows (`canEdit`). Anybody else gets the sentence alone, ending at "as they are written" | S | None |
 
 ## 8. After sign-up
 
@@ -289,7 +290,7 @@ Akmal decided Q9 on 10 November 2026.
 3. S1 and S2, then S3's design. Every new person on a cloud meets them first.
 4. T1. It is what that new person sees next, and it leads them to the cycle page.
 5. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
-6. F1 and L1. No design, and both are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read.
+6. F1, L1 and L2. No design. F1 and L1 are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read. L2 makes the way there from an empty Work Map hard to miss.
 7. The design for Y3 to Y6, then the code, one row each.
 8. Q6, then O2's design and code.
 9. Q7 and Q8, then V1 and V2. Both are small once decided.
@@ -317,6 +318,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | V2 | to do | Waits on Q8 |
 | F1 | to do | |
 | L1 | to do | |
+| L2 | to do | |
 | S1 | to do | |
 | S2 | to do | |
 | S3 | to do | Design first; the same as the hosting draft's H1 |
