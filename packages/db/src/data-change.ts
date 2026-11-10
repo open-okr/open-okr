@@ -93,7 +93,7 @@ export class DataChangeError extends Error {
 
 /** Serialises concurrent runners against the same database. Distinct from
  * `migrate.ts`'s own key, so the two runners never contend with each other. */
-const DATA_CHANGE_LOCK_KEY = 761_803_3;
+export const DATA_CHANGE_LOCK_KEY = 761_803_3;
 
 const scriptChecksum = (script: DataChangeScript): string =>
   createHash("sha256")
@@ -170,6 +170,26 @@ export interface RunDataChangesOptions {
   readonly scripts: readonly DataChangeScript[];
 }
 
+export interface RunDataChangesWithinOptions extends RunDataChangesOptions {
+  /** Seconds after which the run stops, between two batches. */
+  readonly maxSeconds: number;
+}
+
+/** What a run inside a budget did. */
+export interface DataChangeRun {
+  /** False when another run held the lock, so this one ran nothing. */
+  readonly ran: boolean;
+  /** True when the budget ended the run with a script not yet complete. */
+  readonly stopped: boolean;
+  readonly outcomes: DataChangeOutcome[];
+}
+
+/** How a run takes the lock, and whether it stops on a clock. */
+interface RunControl {
+  readonly lock: "wait" | "try";
+  readonly budgetMs?: number;
+}
+
 export interface DataChangeOutcome {
   readonly name: string;
   readonly batches: number;
@@ -182,13 +202,48 @@ export interface DataChangeOutcome {
  * Runs every registered script in name order, skipping any already
  * complete. Each batch commits on its own, so a crash between batches loses
  * no progress: the next run resumes from the last committed cursor.
+ *
+ * Waits for another run to finish first, if one holds the lock.
  */
 export async function runDataChanges(
   client: DataChangeClient,
   options: RunDataChangesOptions,
 ): Promise<DataChangeOutcome[]> {
-  const names = new Set(options.scripts.map((script) => script.name));
-  if (names.size !== options.scripts.length) {
+  const run = await runUnder(client, options.scripts, { lock: "wait" });
+  return run.outcomes;
+}
+
+/**
+ * The same run, inside a time budget (plan 0.8.0 H10c,
+ * docs/design/worker-deployment.md D18), for the Helm chart's hook.
+ *
+ * **It stops between batches, never inside one.** After each batch commits it
+ * looks at the clock, and once `maxSeconds` have passed it stops there: the
+ * script keeps its cursor, a script not yet started stays not yet run, and
+ * the next run resumes. Helm's own timeout would instead cut the batch in
+ * flight and fail the release.
+ *
+ * **Another run going means nothing to do here.** The lock is tried, not
+ * waited for: whoever holds it is already finishing what is pending, and a
+ * hook that waited would spend its budget doing nothing.
+ */
+export async function runDataChangesWithin(
+  client: DataChangeClient,
+  options: RunDataChangesWithinOptions,
+): Promise<DataChangeRun> {
+  return runUnder(client, options.scripts, {
+    lock: "try",
+    budgetMs: options.maxSeconds * 1000,
+  });
+}
+
+async function runUnder(
+  client: DataChangeClient,
+  scripts: readonly DataChangeScript[],
+  control: RunControl,
+): Promise<DataChangeRun> {
+  const names = new Set(scripts.map((script) => script.name));
+  if (names.size !== scripts.length) {
     throw new DataChangeError("Duplicate data-change script name.");
   }
 
@@ -204,10 +259,24 @@ export async function runDataChanges(
     )
   `);
 
-  await client.query("select pg_advisory_lock($1)", [DATA_CHANGE_LOCK_KEY]);
+  if (control.lock === "try") {
+    const { rows } = await client.query<{ locked: boolean }>(
+      "select pg_try_advisory_lock($1) as locked",
+      [DATA_CHANGE_LOCK_KEY],
+    );
+    if (!rows[0]?.locked) {
+      return { ran: false, stopped: false, outcomes: [] };
+    }
+  } else {
+    await client.query("select pg_advisory_lock($1)", [DATA_CHANGE_LOCK_KEY]);
+  }
+  const started = Date.now();
+  const overBudget = () =>
+    control.budgetMs !== undefined && Date.now() - started >= control.budgetMs;
+  let stopped = false;
   try {
     const outcomes: DataChangeOutcome[] = [];
-    for (const script of [...options.scripts].sort((a, b) =>
+    for (const script of [...scripts].sort((a, b) =>
       a.name < b.name ? -1 : 1,
     )) {
       const checksum = scriptChecksum(script);
@@ -222,6 +291,13 @@ export async function runDataChanges(
 
       if (ledger?.completed_at) {
         continue;
+      }
+
+      // Before the ledger row, so a script the budget never reached still
+      // reads as not yet run.
+      if (overBudget()) {
+        stopped = true;
+        break;
       }
 
       if (!ledger) {
@@ -295,6 +371,11 @@ export async function runDataChanges(
         if (result.done) {
           break;
         }
+        // Between batches, after this one committed with its cursor.
+        if (overBudget()) {
+          stopped = true;
+          break;
+        }
       }
 
       outcomes.push({
@@ -303,8 +384,11 @@ export async function runDataChanges(
         rowsChanged: sessionRowsChanged,
         ...(sessionRowsSkipped > 0 ? { rowsSkipped: sessionRowsSkipped } : {}),
       });
+      if (stopped) {
+        break;
+      }
     }
-    return outcomes;
+    return { ran: true, stopped, outcomes };
   } finally {
     await client.query("select pg_advisory_unlock($1)", [DATA_CHANGE_LOCK_KEY]);
   }
@@ -313,7 +397,7 @@ export async function runDataChanges(
 /** Where one registered script stands, as `dataChangeStatus` reports it. */
 type DataChangeState = "complete" | "in progress" | "not yet run";
 
-interface DataChangeStatus {
+export interface DataChangeStatus {
   readonly name: string;
   readonly summary: string;
   readonly state: DataChangeState;

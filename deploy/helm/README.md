@@ -75,6 +75,8 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `cloud.erasure.schedule` | empty | A cron schedule for `pnpm cloud:erase --write`, which erases closed workspaces past their retention window. Runs with `database.adminUrl`, the owner role. Nothing is erased while `OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS` is 0, its default |
 | `extraEnv`, `extraEnvFrom` | empty | Anything else the application reads. Prefer `extraEnvFrom` with a Secret for a credential |
 | `shutdown.preStopSeconds` | 10 | How long a stopping pod keeps answering before it is sent SIGTERM, while the load balancer stops sending to it. 0 removes the pause. See [Stopping a pod](#stopping-a-pod) |
+| `dataChanges.enabled` | true | Runs the data changes after every install and upgrade, in a Job. See [Upgrading](#upgrading) |
+| `dataChanges.timeBudgetSeconds` | 240 | How long that Job runs before it stops between two batches and says what is left. Under Helm's default `--timeout` of 5 minutes. 0 runs to the end |
 | `shutdown.drainSeconds` | 20 | How long the server may finish its work in flight after SIGTERM (`OPENOKR_SHUTDOWN_SECONDS`, 1 to 300). The pod's grace period is the pause plus this plus 15 |
 
 ## Storage and replicas
@@ -195,6 +197,24 @@ Migrations run in a `pre-upgrade` hook before any new pod starts. They are
 forward-only and take a Postgres advisory lock, so the upgrade is safe to
 retry and safe with several replicas. A failed migration stops the release
 rather than producing pods that serve a half-migrated schema.
+
+Data changes, the batched backfills a release can bring, run in a
+`post-install` and `post-upgrade` hook, the Job `<release>-data-change-<revision>`,
+once the new pods are up (or beside the rollout without `--wait`; either is
+safe). It stops between two batches at `dataChanges.timeBudgetSeconds`, 240
+by default, and its log says what is left. The next upgrade resumes it, or
+finish it now:
+
+```sh
+kubectl -n openokr exec deploy/openokr -- \
+  node --experimental-strip-types --no-warnings \
+  /app/migrator/packages/db/src/bin/data-change.ts
+```
+
+A script that fails fails the release, and the Job is kept for its log. With
+`--atomic` Helm then rolls the pods back as well, which is safe but rolls back
+the application for a backfill's bug. A `helm rollback` runs no
+`post-upgrade` hook, so an older image never runs a newer release's scripts.
 
 `--reuse-values` keeps the old values and adds no new defaults, so an upgrade
 to a release that added a chart value can fail. Use `--reset-then-reuse-values`

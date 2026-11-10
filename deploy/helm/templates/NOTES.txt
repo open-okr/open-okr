@@ -79,6 +79,27 @@ data-loss bug for one that does. To keep files:
   --set persistence.enabled=true
 {{- end }}
 
+{{- $dataChanges := .Values.dataChanges | default dict }}
+{{- $finish := printf "kubectl --namespace %s exec deploy/%s -- node --experimental-strip-types --no-warnings /app/migrator/packages/db/src/bin/data-change.ts" .Release.Namespace (include "openokr.fullname" .) }}
+{{- if dig "enabled" true $dataChanges }}
+
+Data changes run after each install and upgrade, in the Job
+{{ printf "%s-data-change-%d" (include "openokr.fullname" .) .Release.Revision }}
+{{- $budget := dig "timeBudgetSeconds" 240 $dataChanges | int }}
+{{- if gt $budget 0 }}, for up to {{ $budget }} seconds. What is
+left runs at the next upgrade, or now with:
+{{- else }}. To run them again by hand:
+{{- end }}
+
+  {{ $finish }}
+{{- else }}
+
+dataChanges.enabled is false, so nothing runs the data changes an upgrade
+brings. Run them after each upgrade with:
+
+  {{ $finish }}
+{{- end }}
+
 {{- if eq .Values.mail.transport "console" }}
 
 Mail is written to the pod log rather than sent. That is a working default,

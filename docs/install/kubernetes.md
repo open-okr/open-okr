@@ -62,8 +62,33 @@ from a checkout with `helm install openokr ./deploy/helm` and set
 6. Open the host. The first-run wizard takes over exactly as it does on a
    single server.
 
-Migrations run as a job from the same image, before the application rolls, so
-an upgrade is `helm upgrade` and nothing else.
+Migrations run as a job from the same image, before the application rolls,
+and the data changes run as another once it has, so an upgrade is
+`helm upgrade` and nothing else.
+
+## Data changes
+
+A release can bring data changes: backfills that reshape rows already in the
+database, batched and resumable, which run while either release serves. After
+every install and upgrade the chart runs them in a Job,
+`<release>-data-change-<revision>`, for up to `dataChanges.timeBudgetSeconds`
+(240 seconds, under Helm's default `--timeout` of five minutes). At the budget
+it stops between two batches and its log names what is left; nothing is lost,
+and the next upgrade resumes it. To finish now, from the server's own pod,
+which already has the database and the secrets:
+
+```sh
+kubectl -n openokr exec deploy/openokr -- \
+  node --experimental-strip-types --no-warnings \
+  /app/migrator/packages/db/src/bin/data-change.ts
+```
+
+Add `--status` to see what is left without running anything. A script that
+fails fails the release, as a failed migration does: read
+`kubectl -n openokr logs job/<release>-data-change-<revision>` before you retry.
+With `--atomic` Helm also rolls the pods back, which is safe but rolls back the
+application for a backfill's bug. `dataChanges.enabled=false` turns the Job
+off, and then the line above is how they run.
 
 ## Behind a load balancer or a CDN
 

@@ -98,3 +98,25 @@ pnpm db:change
 Connects with `DATABASE_ADMIN_URL` when set, falling back to `DATABASE_URL` — the same convention
 `pnpm db:migrate` uses. Safe to run repeatedly: a completed script is skipped, and an in-progress
 one resumes rather than restarting.
+
+## Inside a time budget
+
+```
+pnpm db:change --max-seconds 240
+```
+
+The Helm chart runs this after every install and upgrade (plan 0.8.0 H10c,
+`docs/design/worker-deployment.md` D17 and D18). Two things change with the flag:
+
+| | Without it | With it |
+|---|---|---|
+| Another run holds the lock | Waits for it | Says so and exits 0 at once: that run finishes what is pending |
+| Time | Runs every script to the end | After each batch commits, looks at the clock; past the budget it stops there, prints what `--status` prints and exits 0 |
+| A script that throws | Exits 1 naming it | The same |
+
+**So a script may be stopped between any two of its batches**, and not only by a crash: the
+budget does it on purpose, on every large instance, at every upgrade. Nothing new is asked of a
+script for this, because resuming from the cursor is already the rule above. What it does mean is
+that the state between two batches is a state the product serves for days, not seconds, while
+either release runs. Write each batch so that the rows it has not reached yet still read
+correctly.

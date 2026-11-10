@@ -82,6 +82,27 @@ a checkout. Either runs every script not yet complete and names what it ran,
 or says nothing was left. An upgrade is never held open by a long backfill,
 with one exception.
 
+**On Kubernetes the chart runs them for you.** After each install and
+upgrade a Job, `<release>-data-change-<revision>`, runs every script not yet
+complete for up to `dataChanges.timeBudgetSeconds`, 240 by default. At the
+budget it stops between two batches, says which scripts are left, and exits
+cleanly; nothing is lost, and the next upgrade resumes them. To finish them
+now:
+
+```sh
+kubectl -n <namespace> exec deploy/<release> -- \
+  node --experimental-strip-types --no-warnings \
+  /app/migrator/packages/db/src/bin/data-change.ts
+```
+
+A script that fails fails the release, as a failed migration does, and the
+Job is kept for its log: `kubectl -n <namespace> logs job/<release>-data-change-<revision>`.
+With `--atomic` (`--rollback-on-failure` in Helm 4) Helm then rolls the pods
+back too. That is safe, because the previous release runs against the new
+schema, but it rolls back the application for a backfill's bug, so read the
+Job's log before you retry. `dataChanges.enabled=false` turns the hook off,
+and then the `kubectl exec` line above is how they run.
+
 **The exception: a backfill a migration needs.** A migration that tightens a
 column, such as 0.8.0's not-null on `short_id`, cannot apply while rows are
 still waiting for the backfill that fills it. Such a migration names that
@@ -119,7 +140,9 @@ root key, and refuses to finish without it rather than report them sealed.
   goals and a million tasks.
 
   To keep that wait out of the upgrade, run 0034 on 0.7 beforehand:
-  `./openokr data-change` on Compose, or `pnpm db:change`. On Helm the
+  `./openokr data-change` on Compose, `pnpm db:change`, or on Kubernetes the
+  `kubectl exec` line [above](#backfills-never-hold-up-a-boot), which the 0.7
+  image runs too. On Helm the
   migration hook runs it under `helm upgrade --timeout`, five minutes unless
   you set it, so give a very large instance a longer one. A hook stopped by
   the timeout loses nothing: the next attempt resumes 0034 where it stopped.

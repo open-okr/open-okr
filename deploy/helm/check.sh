@@ -704,6 +704,79 @@ else
   fail "the erasure CronJob has no auth secret, so it stops before it starts"
 fi
 
+# --- data changes after install and upgrade (plan 0.8.0 H10c) ----------------
+# docs/design/worker-deployment.md D17 and D18. A post-install, post-upgrade
+# hook runs the data-change runner inside a budget that ends it between two
+# batches, with the migration hook's environment and the auth secret its
+# command needs, by reference (the lesson of O3).
+dc_job=$(render_one data-change-job.yaml)
+dc_command() {
+  printf '%s\n' "$1" | sed -n '/^ *command:/,/^ *workingDir:/p' \
+    | sed -n 's/^ *- //p' | tr -d '"' | tr '\n' ' ' | sed 's/ $//'
+}
+if printf '%s' "$dc_job" | grep -q "^  name: openokr-data-change-1$" \
+  && printf '%s' "$dc_job" | grep -q '"helm.sh/hook": post-install,post-upgrade' \
+  && printf '%s' "$dc_job" | grep -q "^  backoffLimit: 0$" \
+  && printf '%s' "$dc_job" | grep -q "^  activeDeadlineSeconds: 360$"; then
+  pass "a post-install and post-upgrade Job runs the data changes, once, with a backstop of 360s"
+else
+  fail "no data-change hook with one attempt and a 360s backstop"
+fi
+case "$(dc_command "$dc_job")" in
+  *"/data-change.ts --max-seconds 240")
+    pass "the hook runs the data changes inside a 240-second budget" ;;
+  *) fail "the hook does not run data-change.ts --max-seconds 240 ($(dc_command "$dc_job"))" ;;
+esac
+dc_env_ok=true
+for variable in DATABASE_URL OPENOKR_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
+  if ! printf '%s' "$dc_job" | grep -A 4 "name: $variable$" | grep -q "secretKeyRef"; then
+    dc_env_ok=false
+    echo "  (the data-change hook has no $variable from a Secret)" >&2
+  fi
+done
+if $dc_env_ok && ! printf '%s' "$dc_job" | grep -q "secret@postgres"; then
+  pass "the hook gets the database, the encryption key and the auth secret, each by reference"
+else
+  fail "the hook lacks a variable its command needs, or carries one by value"
+fi
+
+if render_one data-change-job.yaml --set dataChanges.enabled=false 2>&1 | grep -q "kind: Job"; then
+  fail "the data-change hook renders although it is turned off"
+else
+  pass "dataChanges.enabled=false renders no hook"
+fi
+if render_one data-change-job.yaml --set dataChanges=null | grep -q "^  name: openokr-data-change-1$"; then
+  pass "values reused from v0.7.0 run the data-change hook, as a fresh install does"
+else
+  fail "values reused from v0.7.0 lost the data-change hook"
+fi
+unbounded=$(render_one data-change-job.yaml --set dataChanges.timeBudgetSeconds=0)
+if [ "$(dc_command "$unbounded")" = "node --experimental-strip-types --no-warnings ./migrator/packages/db/src/bin/data-change.ts" ] \
+  && ! printf '%s' "$unbounded" | grep -q "activeDeadlineSeconds"; then
+  pass "a budget of 0 runs to the end, with no flag and no deadline"
+else
+  fail "a budget of 0 still bounds the hook"
+fi
+if render_expecting_failure --set "database.url=$DB" --set dataChanges.timeBudgetSeconds=-1 \
+  | grep -q "dataChanges.timeBudgetSeconds must be a whole number of seconds, 0 or more"; then
+  pass "refuses a negative data-change budget"
+else
+  fail "accepted a negative data-change budget"
+fi
+
+dc_notes=$(notes)
+if printf '%s' "$dc_notes" | grep -q "Data changes run after each install and upgrade" \
+  && printf '%s' "$dc_notes" | grep -q "exec deploy/openokr -- node"; then
+  pass "the install notes say the data changes run, and how to finish them by hand"
+else
+  fail "the install notes do not say how the data changes run"
+fi
+if notes --set dataChanges.enabled=false | grep -q "nothing runs the data changes"; then
+  pass "the install notes say so when nothing runs the data changes"
+else
+  fail "the install notes are silent when nothing runs the data changes"
+fi
+
 # --- values reused from an older release -------------------------------------
 # `helm upgrade --reuse-values` keeps the old release's values and adds nothing
 # from the new chart, so every key a newer release introduced is missing. A

@@ -8,8 +8,17 @@ import {
   workerDb,
 } from "@openokr/test-support/db";
 import pg from "pg";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  DATA_CHANGE_LOCK_KEY,
   type DataChangeBatchResult,
   type DataChangeClient,
   DataChangeError,
@@ -17,6 +26,10 @@ import {
   dataChangeStatus,
   runDataChanges,
 } from "../src/data-change.ts";
+import {
+  dataChangeCommand,
+  parseDataChangeArgs,
+} from "../src/data-change-command.ts";
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
 import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
 import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
@@ -453,6 +466,212 @@ describe("dataChangeStatus", () => {
       ["0001_counting", "complete"],
       ["0002_counting_again", "in progress"],
     ]);
+  });
+});
+
+/**
+ * A run inside a time budget, for the Helm chart's hook (plan 0.8.0 H10c,
+ * docs/design/worker-deployment.md D18). Helm waits for a hook up to its own
+ * timeout and then fails the release, cutting the batch in flight; a budget
+ * the runner keeps ends the run cleanly between two batches instead.
+ */
+describe("the command with --max-seconds", () => {
+  const output = () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    return {
+      out,
+      err,
+      io: {
+        out: (text: string) => {
+          out.push(text);
+        },
+        err: (text: string) => {
+          err.push(text);
+        },
+      },
+    };
+  };
+
+  const fixture = async (rows: number) => {
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await client.query(
+      `insert into _counting_fixture (id) select generate_series(1, ${rows})`,
+    );
+  };
+
+  const flaggedRows = async () =>
+    (
+      await client.query(
+        "select count(*)::int as n from _counting_fixture where flagged",
+      )
+    ).rows[0]?.n;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("stops after the batch that crosses the budget, says what is left, and exits 0; the next run resumes", async () => {
+    await fixture(5);
+    // Each batch takes 600 ms by this clock, so the second batch crosses a
+    // budget of one second and the third never starts.
+    let clock = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const calls = { n: 0 };
+    const script: DataChangeScript = {
+      ...countingScript(calls),
+      async runBatch(tx, cursor) {
+        calls.n += 1;
+        clock += 600;
+        return runCountingBatch(tx, cursor);
+      },
+    };
+    const later = { ...countingScript({ n: 0 }), name: "0002_not_started" };
+    const run = output();
+
+    const code = await dataChangeCommand(
+      client,
+      [script, later],
+      { status: false, maxSeconds: 1 },
+      run.io,
+    );
+
+    expect(code).toBe(0);
+    expect(calls.n).toBe(2);
+    expect(await flaggedRows()).toBe(4);
+    const printed = run.out.join("");
+    expect(printed).toMatch(/0001_counting: 2 batch\(es\), 4 row\(s\) changed/);
+    expect(printed).toMatch(/Stopped at the 1-second budget/);
+    expect(printed).toMatch(/0001_counting: in progress\./);
+    expect(printed).toMatch(/0002_not_started: not yet run\./);
+    expect(run.err).toEqual([]);
+
+    // The cursor was kept, so the next run takes the last row and stops.
+    vi.restoreAllMocks();
+    const resumed = { n: 0 };
+    const again = output();
+    expect(
+      await dataChangeCommand(
+        client,
+        [countingScript(resumed), later],
+        { status: false, maxSeconds: 240 },
+        again.io,
+      ),
+    ).toBe(0);
+    expect(resumed.n).toBe(1);
+    expect(await flaggedRows()).toBe(5);
+    expect(again.out.join("")).toMatch(/Data changes: all 2 complete\./);
+  });
+
+  it("says another run is going and exits 0 at once when the lock is held", async () => {
+    await fixture(3);
+    const holder = await connectScratch();
+    try {
+      await holder.query("select pg_advisory_lock($1)", [DATA_CHANGE_LOCK_KEY]);
+      const calls = { n: 0 };
+      const run = output();
+      const began = Date.now();
+
+      const code = await dataChangeCommand(
+        client,
+        [countingScript(calls)],
+        { status: false, maxSeconds: 240 },
+        run.io,
+      );
+
+      expect(code).toBe(0);
+      expect(Date.now() - began).toBeLessThan(5_000);
+      expect(calls.n).toBe(0);
+      expect(run.out.join("")).toMatch(
+        /Another data-change run holds the lock/,
+      );
+      expect(await flaggedRows()).toBe(0);
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it("exits 1 naming a script that throws, and the ledger keeps its last committed batch", async () => {
+    await fixture(4);
+    let attempt = 0;
+    const flaky: DataChangeScript = {
+      ...countingScript({ n: 0 }),
+      async runBatch(tx, cursor) {
+        attempt += 1;
+        if (attempt === 2) {
+          throw new Error("simulated failure");
+        }
+        return runCountingBatch(tx, cursor);
+      },
+    };
+    const run = output();
+
+    const code = await dataChangeCommand(
+      client,
+      [flaky],
+      { status: false, maxSeconds: 240 },
+      run.io,
+    );
+
+    expect(code).toBe(1);
+    expect(run.err.join("")).toMatch(/0001_counting failed on batch 2/);
+    expect(run.err.join("")).toMatch(/simulated failure/);
+    const ledger = await client.query(
+      "select cursor, batches, completed_at from _data_changes where name = '0001_counting'",
+    );
+    expect(ledger.rows[0]).toMatchObject({
+      cursor: "2",
+      batches: 1,
+      completed_at: null,
+    });
+    expect(await flaggedRows()).toBe(2);
+  });
+
+  it("without a budget, runs to the end as before", async () => {
+    await fixture(5);
+    const calls = { n: 0 };
+    const run = output();
+
+    expect(
+      await dataChangeCommand(
+        client,
+        [countingScript(calls)],
+        { status: false },
+        run.io,
+      ),
+    ).toBe(0);
+    expect(calls.n).toBe(3);
+    expect(run.out.join("")).toMatch(
+      /Ran 1 script\(s\):\n {2}0001_counting: 3 batch\(es\), 5 row\(s\) changed\n/,
+    );
+  });
+});
+
+describe("parseDataChangeArgs", () => {
+  it("reads a run, a status and a budget", () => {
+    expect(parseDataChangeArgs([])).toEqual({ status: false });
+    expect(parseDataChangeArgs(["--status"])).toEqual({ status: true });
+    expect(parseDataChangeArgs(["--max-seconds", "240"])).toEqual({
+      status: false,
+      maxSeconds: 240,
+    });
+    expect(parseDataChangeArgs(["--max-seconds=60"])).toEqual({
+      status: false,
+      maxSeconds: 60,
+    });
+  });
+
+  it.each([
+    [["--max-seconds"]],
+    [["--max-seconds", "0"]],
+    [["--max-seconds", "soon"]],
+    [["--max-seconds", "2.5"]],
+    [["--status", "--max-seconds", "60"]],
+    [["--fast"]],
+  ])("refuses %j as a usage error", (argv) => {
+    expect(parseDataChangeArgs(argv)).toHaveProperty("usage");
   });
 });
 

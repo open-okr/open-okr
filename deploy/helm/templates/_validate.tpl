@@ -98,6 +98,12 @@ work. Annotate the service account for that (serviceAccount.annotations).
 {{- fail "\n\nshutdown.preStopSeconds must be a whole number of seconds, 0 or more.\n\n0 removes the pause. 10 is the default.\n" -}}
 {{- end -}}
 
+{{- /* The data-change hook's budget (plan 0.8.0 H10c). `dig` for values reused from before 0.8. */ -}}
+{{- $budget := dig "timeBudgetSeconds" 240 (.Values.dataChanges | default dict) -}}
+{{- if or (lt (int $budget) 0) (ne (float64 $budget) (float64 (int $budget))) -}}
+{{- fail "\n\ndataChanges.timeBudgetSeconds must be a whole number of seconds, 0 or more.\n\n0 runs the data changes to the end, under whatever --timeout Helm is given. 240 is the default.\n" -}}
+{{- end -}}
+
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}
 {{- fail "\n\ningress.enabled is true but no hosts are set.\n" -}}
 {{- end -}}

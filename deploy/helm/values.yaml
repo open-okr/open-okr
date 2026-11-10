@@ -296,6 +296,17 @@ shutdown:
   # (OPENOKR_SHUTDOWN_SECONDS, 1 to 300). Longer work is cut and retried.
   drainSeconds: 20
 
+# Runs the data changes an upgrade brings after every install and upgrade
+# (plan 0.8.0 H10), in a Job that stops cleanly at its budget and says what is
+# left. The next upgrade, or `kubectl exec` (docs/install/kubernetes.md),
+# finishes it. A script that fails fails the release, as a failed migration
+# does, and the Job is kept for its log.
+dataChanges:
+  enabled: true
+  # Under Helm's default --timeout of 5m. 0 runs to the end, under whatever
+  # --timeout you pass.
+  timeBudgetSeconds: 240
+
 # Keeps the deployment available during a rolling update and a node drain.
 podDisruptionBudget:
   enabled: true

@@ -32,6 +32,8 @@ dump() {
   kubectl get events -n "$NAMESPACE" --sort-by=.lastTimestamp 2>&1 | tail -25 >&2 || true
   echo "--- migration job ---------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=40 2>&1 >&2 || true
+  echo "--- data-change jobs -------------------------------------------" >&2
+  kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=data-change --tail=40 2>&1 >&2 || true
   echo "--- app -------------------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr --tail=40 2>&1 >&2 || true
   echo "--- request loop ----------------------------------------------" >&2
@@ -150,6 +152,14 @@ kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=50 
   || fail "the migration hook did not apply the schema"
 pass "the migration hook applied the schema before the pods started"
 
+# --- the data changes ran after the install (plan 0.8.0 H10c) ---------------
+# The post-install hook. Helm waits for it before it reports the install done,
+# so its log is complete here. Named per revision: the install is revision 1.
+kubectl logs -n "$NAMESPACE" "job/$RELEASE-openokr-data-change-1" 2>/dev/null \
+  | grep -qE "^Data changes: all [0-9]+ complete\.$" \
+  || fail "the data-change hook did not complete every registered script after the install"
+pass "the data-change hook completed every registered script after the install"
+
 # Two replicas, one schema: proof the hook is what migrates rather than the
 # pods racing for the advisory lock.
 kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr --tail=50 2>/dev/null \
@@ -219,6 +229,12 @@ kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=50 
   | grep -q "schema is up to date" \
   || fail "the second migration run did not report the schema as current"
 pass "re-running migrations is idempotent"
+
+# The upgrade is revision 2, and its hook found nothing left to do.
+kubectl logs -n "$NAMESPACE" "job/$RELEASE-openokr-data-change-2" 2>/dev/null \
+  | grep -qE "^Data changes: all [0-9]+ complete\.$" \
+  || fail "the data-change hook did not report every script complete after the upgrade"
+pass "the data-change hook ran after the upgrade and every script is complete"
 
 # --- a replica stops without failing a request (plan 0.8.0 H10b) ------------
 # docs/design/worker-deployment.md D9. A client inside the cluster asks the
