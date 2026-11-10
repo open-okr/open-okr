@@ -119,10 +119,13 @@ export function slugify(name: string): string {
     // Apostrophes disappear rather than separate: "Ada's" is one word, so
     // "adas", not "ada-s".
     .replace(/['’]/g, "")
+    // One dash per run, so each end holds at most one, and the trims below
+    // take a single character rather than a run (CodeQL js/polynomial-redos).
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-/, "")
+    .replace(/-$/, "")
     .slice(0, 40)
-    .replace(/-+$/g, "");
+    .replace(/-$/, "");
   return slug === "" ? "workspace" : slug;
 }
 

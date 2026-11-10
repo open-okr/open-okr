@@ -86,11 +86,17 @@ describe("the P0 flows", () => {
     // A conditional skip inside one test is allowed, as `s32-search` has for
     // an instance with no KPI. A whole file skipped or marked to fix would
     // leave the job green having proved nothing.
-    const wholesale =
-      /^test\.(skip|fixme)\(|test\.describe\.(skip|fixme)\(|test\.fixme\(/m;
-    const skipped = p0SpecFiles().filter((file) =>
-      wholesale.test(readFileSync(`${E2E}${file}`, "utf8")),
-    );
+    // Three patterns rather than one alternation, so the line-start anchor
+    // plainly belongs to the first alone.
+    const wholesale = [
+      /^test\.(skip|fixme)\(/m,
+      /test\.describe\.(skip|fixme)\(/,
+      /test\.fixme\(/,
+    ];
+    const skipped = p0SpecFiles().filter((file) => {
+      const text = readFileSync(`${E2E}${file}`, "utf8");
+      return wholesale.some((pattern) => pattern.test(text));
+    });
     expect(skipped).toEqual([]);
   });
 

@@ -294,7 +294,13 @@ export function scrubFile(raw: string): string {
   if (url) {
     file = url[1] ?? "/";
   }
-  file = file.replace(/[?#].*$/, "").replace(/\\/g, "/");
+  // Cut at the first `?` or `#` by position: `/[?#].*$/` rescans the rest of
+  // the string from every `#` in it, which a long run of them makes slow.
+  const query = file.search(/[?#]/);
+  if (query >= 0) {
+    file = file.slice(0, query);
+  }
+  file = file.replace(/\\/g, "/");
   const modules = file.lastIndexOf("/node_modules/");
   if (modules >= 0) {
     return file.slice(modules + 1).slice(0, NAME_LIMIT);
@@ -343,6 +349,48 @@ function frameAt(fn: string, location: string): ErrorFrame {
 }
 
 /**
+ * A V8 frame line, `at name (location)` or `at location`, read by position.
+ *
+ * The same answer as `/^at (?:(.+?) \((.+)\)|(.+))$/`, which backtracks
+ * polynomially on a line of repeated `a (` (CodeQL js/polynomial-redos). A
+ * stack is library input: a thrown value's text can be anything.
+ */
+function v8Frame(
+  line: string,
+): { readonly name?: string; readonly location: string } | null {
+  if (!line.startsWith("at ") || line.length === 3) {
+    return null;
+  }
+  const rest = line.slice(3);
+  const open = rest.indexOf(" (", 1);
+  if (rest.endsWith(")") && open > 0 && open + 2 < rest.length - 1) {
+    return { name: rest.slice(0, open), location: rest.slice(open + 2, -1) };
+  }
+  return { location: rest };
+}
+
+/**
+ * A Gecko or JavaScriptCore frame line, `name@file:line[:column]`.
+ *
+ * The same answer as `/^(.*?)@(.+:\d+(?::\d+)?)$/`, read by position for
+ * the reason `v8Frame` gives.
+ */
+function geckoFrame(
+  line: string,
+): { readonly name: string; readonly location: string } | null {
+  const at = line.indexOf("@");
+  if (at < 0) {
+    return null;
+  }
+  const location = line.slice(at + 1);
+  const colon = location.lastIndexOf(":");
+  if (colon < 1 || !/^\d+$/.test(location.slice(colon + 1))) {
+    return null;
+  }
+  return { name: line.slice(0, at), location };
+}
+
+/**
  * The frames of a stack, innermost first.
  *
  * Reads both shapes a stack comes in: V8's `at fn (file:1:2)`, which is Node
@@ -360,26 +408,22 @@ export function parseStack(stack: string | null | undefined): ErrorFrame[] {
       break;
     }
     const line = raw.trim();
-    const v8 = /^at (?:(.+?) \((.+)\)|(.+))$/.exec(line);
+    const v8 = v8Frame(line);
     if (v8) {
-      if (v8[2] !== undefined) {
+      if (v8.name !== undefined) {
         // `eval at fn (file:1:2), <anonymous>:1:1` names where the eval ran.
-        const location = (v8[2].match(/\(([^()]+)\)/)?.[1] ?? v8[2]).split(
-          ", ",
-        )[0] as string;
-        frames.push(
-          frameAt((v8[1] as string).replace(/^async /, ""), location),
-        );
+        const location = (
+          v8.location.match(/\(([^()]+)\)/)?.[1] ?? v8.location
+        ).split(", ")[0] as string;
+        frames.push(frameAt(v8.name.replace(/^async /, ""), location));
       } else {
-        frames.push(
-          frameAt("<anonymous>", (v8[3] as string).replace(/^async /, "")),
-        );
+        frames.push(frameAt("<anonymous>", v8.location.replace(/^async /, "")));
       }
       continue;
     }
-    const gecko = /^(.*?)@(.+:\d+(?::\d+)?)$/.exec(line);
+    const gecko = geckoFrame(line);
     if (gecko) {
-      frames.push(frameAt(gecko[1] || "<anonymous>", gecko[2] as string));
+      frames.push(frameAt(gecko.name || "<anonymous>", gecko.location));
     }
   }
   return frames;
