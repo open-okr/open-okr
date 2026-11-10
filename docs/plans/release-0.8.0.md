@@ -2,11 +2,12 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds three things:
+This plan grows as changes are named for 0.8.0. So far it holds four things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
 3. **Found running OKRGoal**: three faults found on 10 November 2026 while finding out why the copilot on OKRGoal said "AI off". Section 3. One waits on a decision (Q6).
+4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -117,16 +118,26 @@ OKRGoal runs 0.6.0 with a plan catalogue (Free, Team and Business) and the provi
 | O2 | `docs/design/ai-credits.md` §3; UIUX-PLAN §6, S-45 and S-46 |
 | O3 | `docs/design/workspace-erasure.md` §7, the environment the job needs |
 
-## 4. Suggested order
+## 4. A demo instance says so
+
+Today the only sign that an instance is a demonstration is the persona panel on sign-in, and that panel is hidden when no persona is listed. Once somebody is signed in, nothing on any screen says the instance is a demo that is rebuilt on a schedule. `OPENOKR_DEMO=on` already marks a demo instance (`deploy/demo/compose.demo.yaml`), and today only `/api/demo-personas` reads it.
+
+| # | Change | Size | Gate |
+|---|---|---|---|
+| D1 | **A Demo pill on sign-in and in the top bar whenever `OPENOKR_DEMO` is `on`.** A chip reading **Demo**, in the `info` tone, beside the heading of the sign-in card and in the top bar just after the breadcrumb, on every screen that has the top bar. It does not shrink with the breadcrumb, so it stays at phone width. Hovering or focusing it shows "This is a demonstration instance. It is rebuilt on a schedule and nothing in it is real.", and that sentence is its accessible name, so a screen reader hears it once. It reads the existing variable and nothing else: no new setting, and an instance with the flag off looks exactly as it does today. The sign-in page learns the flag from `/api/demo-personas`, whose answer gains `demo`, true or false. The shell reads `loadEnv()` on the server, and `packages/ui/src/shell/topbar.tsx` gains one slot for the chip. Y1's **Demo account** chip in the avatar menu stays, because it is about the account and this one is about the instance. The two comments that say nothing else reads the variable, in `deploy/demo/compose.demo.yaml` and `apps/web/app/api/demo-personas/route.ts`, are updated | S | None |
+
+The specification gains it in UIUX-PLAN §3 (the top bar) and S-35 (sign-in), and `docs/install/demo.md` says what the flag now shows.
+
+## 5. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
-3. Y1 and Y2. They need no design, and they answer "who am I signed in as" and "where do I change my details".
+3. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
 4. The design for Y3 to Y6, then the code, one row each.
 5. Q6, then O2's design and code.
 6. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 5. Build log
+## 6. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -143,5 +154,6 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | O1 | to do | |
 | O2 | to do | Design first; waits on Q6 |
 | O3 | to do | |
+| D1 | to do | |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
