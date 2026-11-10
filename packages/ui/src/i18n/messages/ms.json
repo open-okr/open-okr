@@ -2075,6 +2075,8 @@
   "cycle.inputPack.suggestedTimeline": "Garis masa yang dicadangkan",
   "cycle.inputPack.weeksBefore": "Bila",
   "cycle.inputPack.whereItIsOr": "Di mana ia berada, atau siapa yang membawanya",
+  "cycle.need.editorFills": "Ahli yang boleh menyunting kitaran mengisi bahagian ini.",
+  "cycle.need.ownerFills": "Pemilik ruang kerja mengisi bahagian ini.",
   "cycle.noAnnualCycleYet": "Belum ada {termCycleLower} tahunan",
   "cycle.noCycleYet": "Belum ada {termCycleLower}",
   "cycle.notYetCheckable": "Belum boleh disemak: {reason}",

@@ -66,7 +66,9 @@ export async function InputPack({
           {items.map((item) => (
             <div
               key={item.itemKey}
-              className="flex flex-col gap-1.5 px-3.5 py-3"
+              // Where "Input pack item n is missing" leads (plan 0.8.0 F1).
+              id={`pack-item-${item.itemKey}`}
+              className="flex scroll-mt-20 flex-col gap-1.5 px-3.5 py-3"
             >
               <div className="flex items-start gap-2.5">
                 {canEdit ? (
@@ -165,7 +167,7 @@ export async function InputPack({
         </CardBody>
       </Card>
 
-      <Card>
+      <Card id="pack-distribute" className="scroll-mt-20">
         <CardHeader className="justify-between">
           <h2 className="text-sm font-bold text-ink">
             {t("cycle.inputPack.distribution")}

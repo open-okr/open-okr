@@ -460,6 +460,15 @@ test("the planning phases complete from the browser, and the gaps clear", async 
     page.getByRole("button", { name: "Confirm distribution" }),
   ).toBeVisible({ timeout: 15_000 });
 
+  // Each gap leads to where it is filled in (plan 0.8.0 F1): the item's own
+  // row, with the keyboard already there.
+  await page
+    .getByTestId("need-link")
+    .filter({ hasText: /^Input pack item 4 is missing/ })
+    .click();
+  await expect(page).toHaveURL(/#pack-item-4$/);
+  await expect(page.locator("#pack-item-4 :focus")).toHaveCount(1);
+
   // The rest of the input pack.
   const ungathered = page.getByRole("button", { name: /^Mark ".*" as gathered$/ });
   for (let left = await ungathered.count(); left > 0; left -= 1) {

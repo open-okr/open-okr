@@ -2075,6 +2075,8 @@
   "cycle.inputPack.suggestedTimeline": "Suggested timeline",
   "cycle.inputPack.weeksBefore": "When",
   "cycle.inputPack.whereItIsOr": "Where it is, or who is bringing it",
+  "cycle.need.editorFills": "A member who can edit the cycle fills this in.",
+  "cycle.need.ownerFills": "The workspace's owner fills this in.",
   "cycle.noAnnualCycleYet": "No annual {termCycleLower} yet",
   "cycle.noCycleYet": "No {termCycleLower} yet",
   "cycle.notYetCheckable": "Not yet checkable: {reason}",

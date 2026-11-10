@@ -126,6 +126,21 @@ Format: purpose, layout, primary actions, states.
 
 **S-04 Cycle workspace.** The guided planning workflow. A left rail lists the eight phases with a completion mark, the output each produces and a progress bar. The centre shows the current phase's work. A right rail shows the facilitator guidance for this phase (METHOD.md §9), the phase's key output, and the mode note for annual versus quarterly. A header carries the cycle name, the mode toggle, the cycle's status as a chip (Planning, Active, Closing, Closed), and the countdown to the publication deadline. On phase 7 a Closing card starts closing early, takes it back while the end has not passed, and once the end has passed says the cycle has ended and what the close still needs ([okr-core-domain](../design/okr-core-domain.md) §10). Actions: load an example cycle, copy the plan as text, start the next cycle. **Mockup:** [02-cycle-workspace](../mockups/png/02-cycle-workspace.png).
 
+**Still needed here leads to the field** (plan 0.8.0 F1). Each phase's list of what is still missing is a list of links: each item carries a key from the method package (`needs`, beside the unchanged `missing` sentences), and the page leads it to the card that fills it, scrolling there, moving focus to its first field and outlining it for a moment. An item the reader cannot fill is not a link; it says who fills it, the workspace's owner or a member who can edit the cycle (`apps/web/app/cycle/need-destinations.ts`).
+
+| Items | Lead to |
+|---|---|
+| The annual frame, its mission, strategy and strategy count; a company objective (phase 0) | The annual frame or the annual objectives, the owner's |
+| No sponsor, no facilitator, no session dates, the pack too late (phase 1) | Roles and planning sessions, the owner's |
+| Input pack item *n*; the pack not distributed (phase 1) | That item's row; the distribution card |
+| Prior scores, ranked issues; baseline health (phase 2) | Diagnose; baseline health |
+| Priorities, success statements, not-doing, agreement (phase 3, annual) | Direction |
+| Revalidation, its note and outcome, focus (phase 3, quarterly) | The revalidation card |
+| The quality checks, no objective (phase 4) | The drafting surface; a failing draft leads to its own goal page |
+| A red gate, publication (phase 5) | The gates card; publication is the owner's |
+| Cadence booking, decisions (phase 6) | The running cadence |
+| Scores, the retrospective (phase 7) | Review and learn, the owner's |
+
 **S-05 Phase 0, annual strategy.** The frame (mission, vision, mid-term strategy, year, horizon), the 2 to 5 annual strategies with what each means in practice, the annual OKRs with their serving strategy, and the year's not-doing list. Each annual objective can be sent forward into drafting. The Coach flags a frame with unresolved disagreement.
 
 **S-06 Phase 1, prepare.** Scope and cadence (start date, which levels set OKRs, which units contribute instead), roles and timeline (sponsor, facilitator, session dates, publication deadline), the seven-item input pack checklist with a distribution confirmation, and the suggested timeline table for the current mode. Drafting is blocked while the pack is incomplete, with the block explained. **Mockup:** [02-cycle-workspace](../mockups/png/02-cycle-workspace.png).

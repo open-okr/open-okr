@@ -164,3 +164,15 @@
     }
   }
 }
+
+/* Where a "Still needed here" item led (plan 0.8.0 F1): outlined for a moment
+ * so the eye finds the card. The focus ring's own colour, dashed so it does
+ * not read as keyboard focus. No animation, so there is nothing for reduced
+ * motion to switch off. */
+@layer components {
+  [data-need-flash] {
+    outline: 2px dashed var(--color-brand-strong);
+    outline-offset: 4px;
+    border-radius: var(--radius-lg, 0.5rem);
+  }
+}

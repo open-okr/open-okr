@@ -39,6 +39,57 @@ import type { ResolvedThresholds } from "./thresholds.ts";
 
 export type PredicateState = "pass" | "todo" | "not_applicable";
 
+/**
+ * What each "still needed" item is about, so a screen can lead to the place it
+ * is filled in (plan 0.8.0 F1). Stable, unlike the sentence, which can change.
+ */
+export const NEED_KEYS = [
+  "frame.missing",
+  "frame.mission",
+  "frame.strategy",
+  "frame.strategyCount",
+  "company.objective",
+  "role.sponsor",
+  "role.facilitator",
+  "pack.item",
+  "pack.distribute",
+  "sessions.dates",
+  "pack.lead",
+  "prior.scores",
+  "prior.unscored",
+  "baseline.health",
+  "issues.count",
+  "priorities.count",
+  "priorities.success",
+  "frame.notDoing",
+  "frame.agreement",
+  "revalidation.missing",
+  "revalidation.note",
+  "revalidation.outcome",
+  "focus.keyResults",
+  "focus.areas",
+  "drafting.quality",
+  "drafting.none",
+  "goal.quality",
+  "gate",
+  "publish",
+  "cadence.booking",
+  "cadence.decision",
+  "scores",
+  "retrospective",
+] as const;
+
+export type NeedKey = (typeof NEED_KEYS)[number];
+
+/** One item on a phase's list: its key, its sentence, and what it names. */
+export interface PhaseNeed {
+  readonly key: NeedKey;
+  /** The same sentence `missing` holds at the same position. */
+  readonly text: string;
+  /** The input pack item's number, the gate's key, or the goal's id. */
+  readonly ref?: string;
+}
+
 export interface PhaseResult {
   /** 0 to 7, as METHOD.md §2.2 numbers them. */
   readonly phase: number;
@@ -46,6 +97,8 @@ export interface PhaseResult {
   readonly state: PredicateState;
   /** What is still missing, in words a facilitator can act on. */
   readonly missing: readonly string[];
+  /** The same items, each with its key (plan 0.8.0 F1). */
+  readonly needs: readonly PhaseNeed[];
   /**
    * Inputs this predicate could not see at all, each naming the task that
    * brings it. Present means the answer is provisional, not that anything is
@@ -376,6 +429,27 @@ const conditionsOf = (
   total,
 });
 
+/**
+ * One list of sentences and one of keys, filled together, so the two can
+ * never disagree about what is missing.
+ */
+function needList(): {
+  readonly missing: string[];
+  readonly needs: PhaseNeed[];
+  readonly need: (key: NeedKey, text: string, ref?: string) => void;
+} {
+  const missing: string[] = [];
+  const needs: PhaseNeed[] = [];
+  return {
+    missing,
+    needs,
+    need: (key, text, ref) => {
+      missing.push(text);
+      needs.push(ref === undefined ? { key, text } : { key, text, ref });
+    },
+  };
+}
+
 function phaseZero(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
@@ -387,32 +461,34 @@ function phaseZero(
       ...base,
       state: "not_applicable",
       missing: [],
+      needs: [],
       blocked: [],
       conditions: { met: 0, total: 0 },
     };
   }
 
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   const blocked: string[] = [];
   const frame = input.frame;
   let total = 0;
 
   if (!frame) {
     total += 1;
-    missing.push("No annual frame exists yet");
+    need("frame.missing", "No annual frame exists yet");
   } else {
     total += 3;
     if (!frame.hasMission) {
-      missing.push("The mission is not written");
+      need("frame.mission", "The mission is not written");
     }
     if (!frame.hasStrategy) {
-      missing.push("The mid-term strategy is not written");
+      need("frame.strategy", "The mid-term strategy is not written");
     }
     // §11's `quality.annualStrategyBounds`, not the canon's two and five
     // written here (completeness review H-17).
     const bounds = thresholds["quality.annualStrategyBounds"];
     if (frame.strategyCount < bounds.low || frame.strategyCount > bounds.high) {
-      missing.push(
+      need(
+        "frame.strategyCount",
         `${frame.strategyCount} annual strategies, and the practice asks for ${bounds.low} to ${bounds.high}`,
       );
     }
@@ -426,7 +502,10 @@ function phaseZero(
       (goal) => goal.level === "company" && goal.keyResults.length > 0,
     );
     if (anchored.length === 0) {
-      missing.push("No company objective with at least one key result");
+      need(
+        "company.objective",
+        "No company objective with at least one key result",
+      );
     }
   }
 
@@ -436,6 +515,7 @@ function phaseZero(
     ...base,
     state,
     missing,
+    needs,
     blocked,
     conditions: conditionsOf(total, missing),
   };
@@ -445,13 +525,13 @@ function phaseOne(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
 ): PhaseResult {
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
 
   if (!input.sponsorId) {
-    missing.push("No sponsor named");
+    need("role.sponsor", "No sponsor named");
   }
   if (!input.facilitatorId) {
-    missing.push("No facilitator named");
+    need("role.facilitator", "No facilitator named");
   }
 
   const gathered = new Set(
@@ -463,15 +543,20 @@ function phaseOne(
   })).filter((item) => !gathered.has(item.key));
 
   for (const item of ungathered) {
-    missing.push(`Input pack item ${item.key} is missing: ${item.label}`);
+    need(
+      "pack.item",
+      `Input pack item ${item.key} is missing: ${item.label}`,
+      String(item.key),
+    );
   }
 
   const lead = thresholds["quality.inputPackLeadWorkingDays"];
   const distributed = asDate(input.packDistributedAt);
   if (!distributed) {
-    missing.push("The input pack has not been distributed");
+    need("pack.distribute", "The input pack has not been distributed");
   } else if (!input.firstSessionOn) {
-    missing.push(
+    need(
+      "sessions.dates",
       "No session dates are booked, so the pack lead cannot be read",
     );
   } else {
@@ -480,7 +565,8 @@ function phaseOne(
       input.firstSessionOn,
     );
     if (actual < lead) {
-      missing.push(
+      need(
+        "pack.lead",
         `The pack reached people ${actual} working day(s) before session one, and the practice asks for ${lead}`,
       );
     }
@@ -491,6 +577,7 @@ function phaseOne(
     title: PHASE_TITLES[1],
     state: missing.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked: [],
     // Two roles, the seven §2.6 items, and the distribution with its lead time.
     conditions: conditionsOf(2 + INPUT_PACK_ITEMS.length + 1, missing),
@@ -501,12 +588,13 @@ function phaseTwo(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
 ): PhaseResult {
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
 
   // §2.3: "Prior cycle scored (or first cycle declared)".
   if (!input.firstCycle) {
     if (input.priorScores.length === 0) {
-      missing.push(
+      need(
+        "prior.scores",
         "The prior cycle is not scored, and this is not declared a first cycle",
       );
     } else {
@@ -514,18 +602,22 @@ function phaseTwo(
         (row) => row.score === null,
       ).length;
       if (unscored > 0) {
-        missing.push(`${unscored} prior key result(s) still have no score`);
+        need(
+          "prior.unscored",
+          `${unscored} prior key result(s) still have no score`,
+        );
       }
     }
   }
 
   if (!input.hasBaselineHealth) {
-    missing.push("Baseline health is not recorded");
+    need("baseline.health", "Baseline health is not recorded");
   }
 
   const minimum = thresholds["quality.strategicIssueMinimum"];
   if (input.issues.length < minimum) {
-    missing.push(
+    need(
+      "issues.count",
       `${input.issues.length} strategic issue(s) ranked, and the practice asks for at least ${minimum}`,
     );
   }
@@ -535,6 +627,7 @@ function phaseTwo(
     title: PHASE_TITLES[2],
     state: missing.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked: [],
     // Baseline health and the ranked issues, plus prior scoring unless this is
     // declared a first cycle, where there is nothing to score.
@@ -546,7 +639,7 @@ function phaseThree(
   input: CycleWorkflowInput,
   thresholds: ResolvedThresholds,
 ): PhaseResult {
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   const base = { phase: 3, title: PHASE_TITLES[3] } as const;
 
   if (input.mode === "annual") {
@@ -555,7 +648,8 @@ function phaseThree(
       input.priorities.length < bounds.low ||
       input.priorities.length > bounds.high
     ) {
-      missing.push(
+      need(
+        "priorities.count",
         `${input.priorities.length} priorities, and the practice asks for ${bounds.low} to ${bounds.high}`,
       );
     }
@@ -563,20 +657,25 @@ function phaseThree(
       isBlank(priority.successStatement),
     ).length;
     if (withoutSuccess > 0) {
-      missing.push(
+      need(
+        "priorities.success",
         `${withoutSuccess} priority(ies) have no 12-month success statement`,
       );
     }
     if (!input.frame?.notDoingWritten) {
-      missing.push("The not-doing list is not written");
+      need("frame.notDoing", "The not-doing list is not written");
     }
     if (!input.frame?.agreed) {
-      missing.push("Leadership agreement on the frame is not recorded");
+      need(
+        "frame.agreement",
+        "Leadership agreement on the frame is not recorded",
+      );
     }
     return {
       ...base,
       state: missing.length === 0 ? "pass" : "todo",
       missing,
+      needs,
       blocked: [],
       // The priority count, their success statements, the not-doing list and
       // the recorded agreement.
@@ -587,15 +686,17 @@ function phaseThree(
   // Quarterly: the frame is revalidated, not rewritten (§2.1).
   const revalidation = input.revalidation;
   if (!revalidation) {
-    missing.push("The annual frame has not been revalidated");
+    need("revalidation.missing", "The annual frame has not been revalidated");
   } else if (revalidation.changed) {
     if (isBlank(revalidation.changeNote)) {
-      missing.push(
+      need(
+        "revalidation.note",
         "The frame is marked as changed with no note saying what changed",
       );
     }
   } else if (!revalidation.holds) {
-    missing.push(
+    need(
+      "revalidation.outcome",
       "The revalidation records neither that the frame holds nor what changed",
     );
   }
@@ -606,9 +707,9 @@ function phaseThree(
     (input.annualKeyResultCount ?? input.frame?.annualKeyResultCount ?? 0) > 0;
   if (input.focusKeyResultCount === 0) {
     if (frameHasAnnualKeyResults) {
-      missing.push("No focus key results chosen for this quarter");
+      need("focus.keyResults", "No focus key results chosen for this quarter");
     } else if (isBlank(revalidation?.focusNote)) {
-      missing.push("No focus areas chosen for this quarter");
+      need("focus.areas", "No focus areas chosen for this quarter");
     }
   }
 
@@ -616,6 +717,7 @@ function phaseThree(
     ...base,
     state: missing.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked: [],
     // The revalidation record, and the focus areas chosen for the quarter.
     conditions: conditionsOf(2, missing),
@@ -715,13 +817,18 @@ function phaseFour(
   const base = { phase: 4, title: PHASE_TITLES[4] } as const;
   if (input.qualityChecksPass !== undefined) {
     // A caller that has already decided, which a test may be.
-    const missing = input.qualityChecksPass
-      ? []
-      : ["Some objectives or key results do not pass the quality checks"];
+    const { missing, needs, need } = needList();
+    if (!input.qualityChecksPass) {
+      need(
+        "drafting.quality",
+        "Some objectives or key results do not pass the quality checks",
+      );
+    }
     return {
       ...base,
       state: input.qualityChecksPass ? "pass" : "todo",
       missing,
+      needs,
       blocked: [],
       conditions: conditionsOf(1, missing),
     };
@@ -732,35 +839,43 @@ function phaseFour(
       ...base,
       state: "todo",
       missing: [],
+      needs: [],
       blocked: ["The quality verdicts across the set could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
   if (goals.length === 0) {
-    const missing = ["No objective is drafted yet"];
+    const { missing, needs, need } = needList();
+    need("drafting.none", "No objective is drafted yet");
     return {
       ...base,
       state: "todo",
       missing,
+      needs,
       blocked: [],
       conditions: conditionsOf(1, missing),
     };
   }
 
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   for (const goal of goals) {
     const verdicts = goalVerdicts(goal, goals, thresholds, input);
     const failing = [...verdicts.objective, ...verdicts.keyResults]
       .filter((verdict) => verdict.status === "fail")
       .map((verdict) => verdict.id);
     if (failing.length > 0) {
-      missing.push(`"${goal.title}" fails ${failing.join(", ")}`);
+      need(
+        "goal.quality",
+        `"${goal.title}" fails ${failing.join(", ")}`,
+        goal.id,
+      );
     }
   }
   return {
     ...base,
     state: missing.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked: [],
     conditions: conditionsOf(goals.length, missing),
   };
@@ -770,7 +885,7 @@ function phaseFive(
   input: CycleWorkflowInput,
   gates: readonly GateResult[],
 ): PhaseResult {
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   const blocked: string[] = [];
 
   // Phase 5 waits for the gates set to block, as publishing does (§2.3). A
@@ -783,12 +898,17 @@ function phaseFive(
       continue;
     }
     if (!gate.passed) {
-      missing.push(`Gate ${gate.gateKey} is red: ${gate.title}`);
+      need(
+        "gate",
+        `Gate ${gate.gateKey} is red: ${gate.title}`,
+        String(gate.gateKey),
+      );
     }
   }
 
   if (!asDate(input.publishedAt)) {
-    missing.push(
+    need(
+      "publish",
       asDate(input.companyPublishedAt ?? null)
         ? "The department and team sets are not published"
         : "The set is not published",
@@ -800,6 +920,7 @@ function phaseFive(
     title: PHASE_TITLES[5],
     state: missing.length === 0 && blocked.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked,
     // Every gate that could be judged, plus publication itself. A gate nobody
     // can evaluate is not in the denominator, so the bar cannot fill by having
@@ -819,27 +940,30 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
       ...base,
       state: "todo",
       missing: [],
+      needs: [],
       blocked: ["The booked sessions and the decision log could not be read"],
       conditions: { met: 0, total: 0 },
     };
   }
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   if (!input.cadence.bookedForWholeCycle) {
     // One entry, because it is one condition. The gaps say where to look.
     const gaps = input.cadence.gaps ?? [];
-    missing.push(
+    need(
+      "cadence.booking",
       gaps.length > 0
         ? `The cadence is not booked for the whole cycle. ${gaps.join(". ")}`
         : "The cadence is not booked for the whole cycle",
     );
   }
   if (input.cadence.decisionCount === 0) {
-    missing.push("No decision has been recorded");
+    need("cadence.decision", "No decision has been recorded");
   }
   return {
     ...base,
     state: missing.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked: [],
     conditions: conditionsOf(2, missing),
   };
@@ -847,7 +971,7 @@ function phaseSix(input: CycleWorkflowInput): PhaseResult {
 
 function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   const base = { phase: 7, title: PHASE_TITLES[7] } as const;
-  const missing: string[] = [];
+  const { missing, needs, need } = needList();
   const blocked: string[] = [];
 
   let total = 0;
@@ -857,7 +981,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   } else {
     total += 1;
     if (!input.allKeyResultsScored) {
-      missing.push("Not every key result is scored");
+      need("scores", "Not every key result is scored");
     }
   }
 
@@ -866,7 +990,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
   } else {
     total += 1;
     if (!input.retrospectiveWritten) {
-      missing.push("The retrospective is not written");
+      need("retrospective", "The retrospective is not written");
     }
   }
 
@@ -874,6 +998,7 @@ function phaseSeven(input: CycleWorkflowInput): PhaseResult {
     ...base,
     state: missing.length === 0 && blocked.length === 0 ? "pass" : "todo",
     missing,
+    needs,
     blocked,
     conditions: conditionsOf(total, missing),
   };

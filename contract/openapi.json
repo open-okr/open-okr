@@ -29186,6 +29186,63 @@
                                   "type": "string"
                                 }
                               },
+                              "needs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": {
+                                      "type": "string",
+                                      "enum": [
+                                        "frame.missing",
+                                        "frame.mission",
+                                        "frame.strategy",
+                                        "frame.strategyCount",
+                                        "company.objective",
+                                        "role.sponsor",
+                                        "role.facilitator",
+                                        "pack.item",
+                                        "pack.distribute",
+                                        "sessions.dates",
+                                        "pack.lead",
+                                        "prior.scores",
+                                        "prior.unscored",
+                                        "baseline.health",
+                                        "issues.count",
+                                        "priorities.count",
+                                        "priorities.success",
+                                        "frame.notDoing",
+                                        "frame.agreement",
+                                        "revalidation.missing",
+                                        "revalidation.note",
+                                        "revalidation.outcome",
+                                        "focus.keyResults",
+                                        "focus.areas",
+                                        "drafting.quality",
+                                        "drafting.none",
+                                        "goal.quality",
+                                        "gate",
+                                        "publish",
+                                        "cadence.booking",
+                                        "cadence.decision",
+                                        "scores",
+                                        "retrospective"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "ref": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
                               "blocked": {
                                 "type": "array",
                                 "items": {
@@ -29218,6 +29275,7 @@
                               "title",
                               "state",
                               "missing",
+                              "needs",
                               "blocked",
                               "conditions"
                             ],

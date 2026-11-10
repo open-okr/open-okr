@@ -27,7 +27,7 @@ import {
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { INPUT_PACK_ITEMS, publishGates } from "@openokr/method";
+import { INPUT_PACK_ITEMS, NEED_KEYS, publishGates } from "@openokr/method";
 import { asc, desc, eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
@@ -102,6 +102,18 @@ const phaseResult = z.object({
   title: z.string(),
   state: z.enum(["pass", "todo", "not_applicable"]),
   missing: z.array(z.string()),
+  /**
+   * The same items with a stable key each, and the pack item's number, the
+   * gate's key or the goal's id they name (plan 0.8.0 F1), so a screen can
+   * lead to the place each is filled in. `missing` keeps its sentences.
+   */
+  needs: z.array(
+    z.object({
+      key: z.enum(NEED_KEYS),
+      text: z.string(),
+      ref: z.string().optional(),
+    }),
+  ),
   blocked: z.array(z.string()),
   conditions: z.object({
     met: z.number().int(),
@@ -621,6 +633,7 @@ export const readWorkflow = defineReadAction({
           phases: snapshot.phases.map((result) => ({
             ...result,
             missing: [...result.missing],
+            needs: result.needs.map((need) => ({ ...need })),
             blocked: [...result.blocked],
           })),
           practice: {
