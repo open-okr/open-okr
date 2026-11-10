@@ -116,6 +116,7 @@ export async function updateProfile(
 
     await callAction(ctx, "people.updateOwnProfile", input);
     revalidatePath(`/people/${memberId}`);
+    revalidatePath("/account");
     return { ok: true, message: t("people.actions.profileUpdated") };
   } catch (error) {
     // A schema's refusal is its message rather than its JSON (plan U1b).
@@ -198,6 +199,8 @@ export async function uploadAvatar(
     };
   }
   revalidatePath(`/people/${workspace.memberId}`);
+  // Edited from Your account since plan 0.8.0 Y2.
+  revalidatePath("/account");
   return { ok: true, message: t("people.actions.pictureUpdated") };
 }
 
@@ -225,6 +228,8 @@ export async function removeAvatar(): Promise<ProfileResult> {
     };
   }
   revalidatePath(`/people/${workspace.memberId}`);
+  // Edited from Your account since plan 0.8.0 Y2.
+  revalidatePath("/account");
   return { ok: true, message: t("people.actions.pictureRemoved") };
 }
 

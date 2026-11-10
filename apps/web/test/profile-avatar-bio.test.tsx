@@ -14,7 +14,7 @@ import { readScreen, withMessages } from "./screen-text.ts";
  * with the workspace only while it is one, and that a bio is validated rich
  * text, are proved against a real database in `packages/core`
  * (`profile-avatar-bio.test.ts`). What is checked here is the screen: both
- * controls exist on your own profile and only there, the picture goes through
+ * controls exist on Your account and only there, the picture goes through
  * the one upload path, and the bio is written in the shared editor and sent
  * only when it changed.
  */
@@ -98,12 +98,16 @@ describe("the bio", () => {
 });
 
 describe("whose profile", () => {
-  test("offers the picture and the bio on your own profile only", () => {
-    const self = page.indexOf("{isSelf ? (\n        <AvatarForm");
-    expect(self).toBeGreaterThan(0);
-    expect(page).toMatch(
-      /\{isSelf \? \(\s*<ProfileForm[\s\S]*?bio=\{member\.bio\}/,
-    );
+  test("offers the picture and the bio on Your account only", () => {
+    // Plan 0.8.0 Y2 (Q5) moved both from your own profile to Your account,
+    // which is only ever your own; the profile page is what other people see,
+    // and on your own it links there instead.
+    const account = source("../app/account/page.tsx");
+    expect(account).toContain("<AvatarForm");
+    expect(account).toMatch(/<ProfileForm[\s\S]*?bio=\{member\.bio\}/);
+    expect(page).not.toContain("<AvatarForm");
+    expect(page).not.toContain("<ProfileForm");
+    expect(page).toContain('data-testid="edit-own-profile"');
     // An administrator's card on somebody else's profile edits the org
     // fields, and never the picture or the bio.
     const admin = page.slice(page.indexOf("{isAdmin && !isSelf ? ("));
