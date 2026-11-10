@@ -108,6 +108,7 @@ capacity gauge.
 | `openokr_concurrent_actions` | none |
 | `openokr_admission_refusals_total` | reason (rate, concurrency) |
 | `openokr_sign_in_held_total` | scope (pair, account). A password attempt refused by a sign-in hold. A steady `account` rate is somebody guessing one account from many networks |
+| `openokr_caller_addresses_total` | outcome (resolved, unresolved). A request whose caller address something counted: a password sign-in, a new session, a 429, or a public door. Any `unresolved` on a production instance means a request arrived that the instance could not place, so every such caller shares one count; name the proxies in front of it ([behind a CDN or a load balancer](../install/behind-a-proxy.md)). A correct deployment counts none |
 | `openokr_verification_links_total` | reason (sign_up, resend, repeat_sign_up), outcome (queued, refused, failed). A link that confirms an email address. `refused` is the per-address limit of one a minute and five a day. Any `failed` is a link that could not be queued, which the person recovers with "Send the link again"; the mail itself is the `account.verifyEmail` topic in the outbox series |
 
 **Errors**

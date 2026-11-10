@@ -239,6 +239,14 @@ export const METRIC = {
    * because one row per request would be unbounded.
    */
   verificationLinksTotal: "openokr_verification_links_total",
+  /**
+   * Callers whose address the instance could and could not place, by
+   * `outcome`, `resolved` or `unresolved` (docs/design/trusted-proxies.md
+   * D12, plan 0.8.0 H2). A correct deployment counts no unresolved caller; a
+   * steady stream of them means every per-address limit is shared, so the
+   * proxies in front of the instance need naming.
+   */
+  callerAddressesTotal: "openokr_caller_addresses_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",

@@ -120,6 +120,14 @@ Every one of these has a working default, and none of them blocks the install.
 | AI | Off. Every AI affordance is hidden | You want drafting and rewriting. Bring your own key, or a local model |
 | The setup | One organisation with one workspace | You want several workspaces, a workspace per company, or a cloud of your own. See [Choose a setup](setups.md) |
 
+**Behind a load balancer or a CDN**, tell the instance which proxies are in
+front of it, or every visitor is counted as the proxy and shares one sign-in
+limit. Add `OPENOKR_TRUSTED_PROXIES` (their addresses or ranges) or, behind a
+CDN that is the only way in, `OPENOKR_CLIENT_ADDRESS_HEADER` to
+`secrets/app.env` and run `./openokr up`, which hands the same ranges to Caddy.
+[Behind a CDN or a load balancer](behind-a-proxy.md) says which to set and how
+to check it.
+
 **Changing the address later is supported and has one consequence.**
 `./openokr up` notices a changed public URL and rewrites it, and says so.
 Passkeys registered against the old address have to be enrolled again, because

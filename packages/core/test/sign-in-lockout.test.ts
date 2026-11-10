@@ -1,5 +1,13 @@
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import { purgeStaleSignInAttempts } from "../src/auth/lockout.ts";
 
@@ -302,5 +310,55 @@ describe("the daily purge", () => {
       "select 1 from sign_in_attempts where account_key = 'stale'",
     );
     expect(stale.rows).toHaveLength(0);
+  });
+});
+
+/**
+ * Behind a CDN, every visitor arrives from a few edge addresses
+ * (docs/design/trusted-proxies.md, plan 0.8.0 H2). Named as trusted proxies,
+ * those hops are walked past, so the pair counter is keyed on the person
+ * rather than on the edge, and one person's wrong passwords hold nobody else.
+ */
+describe("behind a trusted edge", () => {
+  const EDGE = "172.70.1.2";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps one caller's pair hold from holding another caller behind the same edge", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "172.64.0.0/13");
+    const behind = build((await workerDb()).appPool);
+    for (let index = 0; index < 5; index++) {
+      await attempt(`198.51.100.7, ${EDGE}`, `wrong-${index}`, EMAIL, behind);
+    }
+    expect(
+      (await attempt(`198.51.100.7, ${EDGE}`, PASSWORD, EMAIL, behind)).status,
+    ).toBe(429);
+
+    expect(
+      (await attempt(`198.51.100.8, ${EDGE}`, PASSWORD, EMAIL, behind)).status,
+    ).toBe(200);
+  });
+
+  it("records the caller, not the edge, on the session", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "172.64.0.0/13");
+    const behind = build((await workerDb()).appPool);
+    expect(
+      (
+        await attempt(
+          `203.0.113.66, 198.51.100.9, ${EDGE}`,
+          PASSWORD,
+          EMAIL,
+          behind,
+        )
+      ).status,
+    ).toBe(200);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ ip_address: string }>(
+      "select ip_address from sessions order by created_at desc limit 1",
+    );
+    expect(rows[0]?.ip_address).toBe("198.51.100.9");
   });
 });

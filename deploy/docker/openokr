@@ -45,7 +45,26 @@ MSYS_NO_PATHCONV=1
 MSYS2_ARG_CONV_EXCL='*'
 export MSYS_NO_PATHCONV MSYS2_ARG_CONV_EXCL
 
+# The proxies in front of Caddy, as Caddy wants them (docs/design/trusted-
+# proxies.md D14). The application reads OPENOKR_TRUSTED_PROXIES from app.env,
+# commas and all; Caddy's `trusted_proxies` wants the same ranges as separate
+# words. So the list is copied from app.env, space separated, into the variable
+# compose hands the proxy container. Exported before every compose call, not
+# only `up` and `upgrade`, because any command that recreates the proxy without
+# it would put it back on loopback, and the application would then see every
+# visitor as the load balancer.
+caddy_trusted_proxies() {
+  OPENOKR_CADDY_TRUSTED_PROXIES=""
+  if [ -f "$APP_ENV" ]; then
+    OPENOKR_CADDY_TRUSTED_PROXIES="$(grep '^OPENOKR_TRUSTED_PROXIES=' "$APP_ENV" 2>/dev/null \
+      | tail -n 1 | cut -d= -f2- | tr -d "\"'" | tr ',\t' '  ' | tr -s ' ' \
+      | sed 's/^ //; s/ $//')"
+  fi
+  export OPENOKR_CADDY_TRUSTED_PROXIES
+}
+
 compose() {
+  caddy_trusted_proxies
   if docker compose version >/dev/null 2>&1; then
     docker compose "$@"
   elif command -v docker-compose >/dev/null 2>&1; then

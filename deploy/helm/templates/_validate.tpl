@@ -71,6 +71,22 @@ work. Annotate the service account for that (serviceAccount.annotations).
 {{- fail "\n\ninstance.registration must be auto, open, company_domains or invite_only.\n" -}}
 {{- end -}}
 
+{{- /* One reading of the caller's address, and never one that trusts every
+       address (docs/design/trusted-proxies.md D5, D7, D15). The application
+       refuses both at boot too; refused here, nothing reaches the cluster. */ -}}
+{{- $network := .Values.network | default dict -}}
+{{- if and $network.trustedProxies (not (kindIs "slice" $network.trustedProxies)) -}}
+{{- fail "\n\nnetwork.trustedProxies must be a list, such as --set 'network.trustedProxies={10.0.1.0/24,10.0.2.0/24}'.\n" -}}
+{{- end -}}
+{{- if and $network.trustedProxies $network.clientAddressHeader -}}
+{{- fail "\n\nnetwork.trustedProxies and network.clientAddressHeader are both set. Set one.\n\ntrustedProxies names the proxies in front of the instance, so X-Forwarded-For is read from the right past them. clientAddressHeader names the one header your CDN writes the visitor's address into. docs/install/behind-a-proxy.md says which to use.\n" -}}
+{{- end -}}
+{{- range $network.trustedProxies -}}
+{{- if or (eq (toString .) "0.0.0.0/0") (eq (toString .) "::/0") -}}
+{{- fail (printf "\n\nnetwork.trustedProxies holds %s, which trusts every address, so every caller could choose their own.\n\nName your proxies' own addresses or ranges.\n" (toString .)) -}}
+{{- end -}}
+{{- end -}}
+
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}
 {{- fail "\n\ningress.enabled is true but no hosts are set.\n" -}}
 {{- end -}}

@@ -90,6 +90,8 @@ workspace.
 | `scan.clamd.port` | `3310` | clamd's own default. Set it with `OPENOKR_CLAMD_PORT` when yours listens elsewhere |
 | `observability.errors.dsn` | Empty, meaning no error report leaves the instance | Name the DSN of a tracker that speaks Sentry's protocol (Sentry, GlitchTip, Bugsink) with `OPENOKR_ERROR_DSN`, in the deployment's secrets, and every unexpected error is also sent there. Environment only, with no screen, because its key lets anyone write into the tracker. A value that is not a DSN stops the instance starting. See [Sending errors to a tracker](../runbooks/observability.md#sending-errors-to-a-tracker) |
 | `observability.errors.environment` | `production` | Which deployment a report came from, with `OPENOKR_ERROR_ENVIRONMENT`. Set `staging` on a staging instance that shares production's tracker |
+| `network.trustedProxies` | Empty, meaning `X-Forwarded-For` is read only when it holds one address | The proxies in front of the instance, as addresses or CIDR ranges, with `OPENOKR_TRUSTED_PROXIES`, so every per-address limit counts the visitor rather than the proxy. Environment only. A malformed entry or `0.0.0.0/0` stops the instance starting. See [Behind a CDN or a load balancer](../install/behind-a-proxy.md) |
+| `network.clientAddressHeader` | Empty | Instead, the one header a CDN writes the visitor's address into, with `OPENOKR_CLIENT_ADDRESS_HEADER`, such as `cf-connecting-ip`. Only when the server is reachable through that CDN and nothing else. Setting both stops the instance starting |
 
 ## The two rules behind all of this
 

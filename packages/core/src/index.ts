@@ -512,7 +512,11 @@ export {
   type AuthOptions,
   createAuth,
 } from "./auth/auth.ts";
-export { callerAddress } from "./auth/caller-address.ts";
+export {
+  callerAddress,
+  unresolvedCallersSeen,
+} from "./auth/caller-address.ts";
+export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
 export {

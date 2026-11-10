@@ -1,6 +1,11 @@
 export const PACKAGE_NAME = "@openokr/config";
 
 export {
+  type CallerAddressReading,
+  callerAddressReading,
+  describeCallerAddressReading,
+} from "./caller-address.ts";
+export {
   type Env,
   EnvironmentError,
   loadEnv,

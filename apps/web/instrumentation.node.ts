@@ -2,6 +2,7 @@ import { EnvironmentError, loadEnv } from "@openokr/config";
 import { quietAbandonedResponses } from "./lib/abandoned-responses";
 import { installAdmission } from "./lib/admission";
 import { resolveSignupPolicy } from "./lib/auth";
+import { announceCallerAddress } from "./lib/caller-address";
 import { installErrorReports } from "./lib/error-reporting";
 import { installPromptEvaluator } from "./lib/prompt-evaluation";
 import { startRelay } from "./lib/relay";
@@ -226,6 +227,27 @@ export async function checkTenantFloor(): Promise<void> {
   } catch (error) {
     process.stderr.write(
       `database: could not check the tenant floor: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Says which reading of the caller's address is in force, and records a change
+ * of it on the instance chain (docs/design/trusted-proxies.md D10, D11).
+ *
+ * After the environment is validated, so a malformed range has already refused
+ * the boot by name. Skipped during `next build` for the relay's reason, and
+ * never fatal: the reading is in force whether or not its row was written.
+ */
+export async function recordCallerAddress(): Promise<void> {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  try {
+    await announceCallerAddress();
+  } catch (error) {
+    process.stderr.write(
+      `caller address: could not announce the reading: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
 }

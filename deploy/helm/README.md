@@ -65,6 +65,8 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `persistence.enabled` | true | A volume for uploaded files. See below |
 | `mail.transport` | console | `console` writes mail to the pod log and needs no server |
 | `instance.registration` | auto | Open until the instance is claimed, then closed |
+| `network.trustedProxies` | empty | The load balancers or CDN in front of the instance, as addresses or CIDR ranges. `X-Forwarded-For` is then read from the right past them, so every per-address limit counts people rather than proxies. Never fetched: copy your CDN's current list. See [behind a CDN or a load balancer](../../docs/install/behind-a-proxy.md) |
+| `network.clientAddressHeader` | empty | Instead of the above, the one header your CDN writes the visitor's address into, such as `cf-connecting-ip`. Safe only when the load balancer refuses every request that did not come through your CDN zone. Both set is refused |
 | `instance.sourceUrl` | upstream | Where every member is offered the source. Name your own if you changed the code |
 | `instance.termsUrl`, `instance.privacyUrl` | empty | Named on the sign-up page once set |
 | `instance.supportEmail` | empty | Who a customer writes to about their plan |

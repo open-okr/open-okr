@@ -537,6 +537,49 @@ else
   fail "a named error Secret does not reach the pod by reference"
 fi
 
+# --- whose address a request is counted under (trusted-proxies.md D15) -----
+# Both empty renders neither variable, which keeps the application's default.
+# A list reaches the pod joined by commas; both set, or a range that trusts
+# every address, is refused before anything reaches the cluster.
+if render_one deployment.yaml | grep -q "OPENOKR_TRUSTED_PROXIES\|OPENOKR_CLIENT_ADDRESS_HEADER"; then
+  fail "a caller address setting rendered although none is set"
+else
+  pass "no trusted proxies and no header means neither variable"
+fi
+if render_one deployment.yaml --set 'network.trustedProxies={10.0.1.0/24,2606:4700::/32}' \
+  | grep -A1 "name: OPENOKR_TRUSTED_PROXIES" | grep -q '"10.0.1.0/24,2606:4700::/32"'; then
+  pass "a list of trusted proxies reaches the pod joined by commas"
+else
+  fail "a list of trusted proxies did not reach the pod joined by commas"
+fi
+if render_one deployment.yaml --set network.clientAddressHeader=cf-connecting-ip \
+  | grep -A1 "name: OPENOKR_CLIENT_ADDRESS_HEADER" | grep -q '"cf-connecting-ip"'; then
+  pass "a client address header reaches the pod"
+else
+  fail "a client address header did not reach the pod"
+fi
+if render_expecting_failure --set "database.url=$DB" \
+  --set 'network.trustedProxies={10.0.1.0/24}' --set network.clientAddressHeader=cf-connecting-ip \
+  | grep -q "network.trustedProxies and network.clientAddressHeader are both set"; then
+  pass "refuses trusted proxies and a client address header together, naming both"
+else
+  fail "accepted trusted proxies and a client address header together"
+fi
+for everything in "0.0.0.0/0" "::/0"; do
+  if render_expecting_failure --set "database.url=$DB" \
+    --set "network.trustedProxies={10.0.1.0/24,$everything}" \
+    | grep -q "trusts every address"; then
+    pass "refuses $everything as a trusted proxy"
+  else
+    fail "accepted $everything as a trusted proxy"
+  fi
+done
+if render_one deployment.yaml --set network=null | grep -q "^kind: Deployment"; then
+  pass "a release from before the network block still renders"
+else
+  fail "a release from before the network block fails to render on upgrade"
+fi
+
 # --- the setups in PLAN.md section 5.2 -------------------------------------
 if render_one deployment.yaml | grep -q "OPENOKR_CLOUD"; then
   fail "an ordinary install is told it is a cloud"

@@ -9,6 +9,7 @@ import {
   readRegistrationPolicy,
   readUpdateCheck,
   resolveWorkspaceSettings,
+  unresolvedCallersSeen,
 } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { resolveAccessLevelFor } from "../../../lib/access";
@@ -146,6 +147,8 @@ export default async function GeneralSettingsPage() {
       <InstanceHealthNotice
         tenantFloorBypassed={floor === "bypassed"}
         schedulerFailed={schedulerState() === "failed"}
+        unplacedCallers={unresolvedCallersSeen()}
+        cloud={cloud}
       />
       {mail.transport === "console" ? (
         <ConsoleMailNotice revealsContent={consoleMailRevealsContent()} />

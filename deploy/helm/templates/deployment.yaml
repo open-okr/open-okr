@@ -114,6 +114,19 @@ spec:
               value: {{ . | quote }}
             {{- end }}
             {{- end }}
+            {{- /* Whose address a request is counted under
+                   (docs/design/trusted-proxies.md D15). Absent unless set, so
+                   the application keeps its default. `default dict` for the
+                   reason the scan block below gives. */}}
+            {{- $network := .Values.network | default dict }}
+            {{- with $network.trustedProxies }}
+            - name: OPENOKR_TRUSTED_PROXIES
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- with $network.clientAddressHeader }}
+            - name: OPENOKR_CLIENT_ADDRESS_HEADER
+              value: {{ . | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

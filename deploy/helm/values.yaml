@@ -131,6 +131,22 @@ mail:
   existingSecret: ""
   existingSecretKey: "mail-password"
 
+# Whose address a request is counted under (docs/design/trusted-proxies.md).
+# Every per-address limit, the sign-in hold and the session row read it. Both
+# empty is the default and reads X-Forwarded-For only when it holds one
+# address, which is right when the ingress controller writes one. Behind a
+# load balancer or a CDN that leaves a chain, set one of these, never both:
+#   trustedProxies: the proxies' own addresses or CIDR ranges, so the chain is
+#     read from the right past them. Name your proxies, not a broad private
+#     range that also holds people. The instance never fetches a list.
+#   clientAddressHeader: the one header your CDN writes the visitor's address
+#     into, such as cf-connecting-ip. Safe only when the load balancer refuses
+#     every request that did not come through your own CDN zone.
+# docs/install/behind-a-proxy.md says which to set for each setup.
+network:
+  trustedProxies: []
+  clientAddressHeader: ""
+
 service:
   type: ClusterIP
   port: 80

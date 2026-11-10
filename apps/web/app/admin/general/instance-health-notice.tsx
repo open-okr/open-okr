@@ -1,3 +1,4 @@
+import { docsUrl } from "../../../lib/app-version";
 import { getTranslations } from "../../../lib/translations";
 
 /**
@@ -11,15 +12,29 @@ import { getTranslations } from "../../../lib/translations";
  * console-mail notice and in the same shape, for the same reason that notice
  * gives: there is no instance-health screen, so this is where an
  * instance-level warning belongs until one exists.
+ *
+ * **The third is a process that cannot place its callers** (plan 0.8.0 H2,
+ * docs/design/trusted-proxies.md D12). Behind a CDN and a load balancer every
+ * visitor resolves to one shared count, and nothing on screen said so. A
+ * correct deployment never meets an unplaced caller, and the fix is a restart
+ * with a variable set, which also clears what this process has seen. Never on
+ * a managed cloud: the network in front is the operator's, who reads
+ * `openokr_caller_addresses_total` and the log, not a customer's
+ * administrator.
  */
 export async function InstanceHealthNotice({
   tenantFloorBypassed,
   schedulerFailed,
+  unplacedCallers,
+  cloud,
 }: {
   tenantFloorBypassed: boolean;
   schedulerFailed: boolean;
+  unplacedCallers: boolean;
+  cloud: boolean;
 }) {
-  if (!tenantFloorBypassed && !schedulerFailed) {
+  const callerAddress = unplacedCallers && !cloud;
+  if (!tenantFloorBypassed && !schedulerFailed && !callerAddress) {
     return null;
   }
   const { t } = await getTranslations();
@@ -55,6 +70,32 @@ export async function InstanceHealthNotice({
           </p>
           <p className="mt-1.5 text-sm text-ink-2">
             {t("admin.general.scheduler.fix")}
+          </p>
+        </section>
+      ) : null}
+      {callerAddress ? (
+        <section
+          className="rounded-md border border-warn/30 bg-warn-bg p-4.5"
+          data-testid="caller-address-notice"
+        >
+          <h2 className="text-sm font-bold text-ink">
+            {t("admin.general.callerAddress.title")}
+          </h2>
+          <p className="mt-1.5 text-sm text-ink-2">
+            {t("admin.general.callerAddress.what")}
+          </p>
+          <p className="mt-1.5 text-sm text-ink-2">
+            {t("admin.general.callerAddress.fix")}
+          </p>
+          <p className="mt-1.5 text-sm">
+            <a
+              className="font-medium text-brand-text hover:underline"
+              href={docsUrl("docs/install/behind-a-proxy.md")}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {t("admin.general.callerAddress.guide")}
+            </a>
           </p>
         </section>
       ) : null}

@@ -1,4 +1,13 @@
 import { z } from "zod";
+import {
+  BOTH_SET_PROBLEM,
+  CLIENT_ADDRESS_HEADER_VARIABLE,
+  parseClientAddressHeader,
+  parseTrustedProxies,
+} from "./caller-address.ts";
+import { EnvironmentError } from "./environment-error.ts";
+
+export { EnvironmentError };
 
 /**
  * The environment contract for every OpenOKR process: the web app, the outbox
@@ -266,8 +275,64 @@ const envSchema = z
     ),
     /** Prefix every object key, so one bucket can hold several instances. */
     OPENOKR_STORAGE_S3_KEY_PREFIX: optional(z.string().min(1).optional()),
+
+    /**
+     * `network.trustedProxies` (docs/design/trusted-proxies.md D1, D3, D6,
+     * D7): the proxies in front of the instance, as addresses or CIDR ranges,
+     * separated by commas, spaces or newlines. Unset reads `X-Forwarded-For`
+     * only when it holds one address. Environment only: a screen that could
+     * change it is a way to switch off every per-address limit from a stolen
+     * session. A bad entry refuses the boot by name, because Better Auth on
+     * its own would drop it and count every visitor through that proxy as one.
+     */
+    OPENOKR_TRUSTED_PROXIES: optional(
+      z
+        .string()
+        .superRefine((value, ctx) => {
+          for (const message of parseTrustedProxies(value).problems) {
+            ctx.addIssue({ code: "custom", message });
+          }
+        })
+        .transform((value) => {
+          const { entries } = parseTrustedProxies(value);
+          return entries.length > 0 ? entries : undefined;
+        })
+        .optional(),
+    ),
+
+    /**
+     * `network.clientAddressHeader` (D4): the one header a CDN writes the
+     * visitor's address into, such as `cf-connecting-ip`. Safe only when the
+     * origin refuses every request that did not come through your own CDN
+     * zone. Read in lower case. Never together with the ranges above (D5).
+     */
+    OPENOKR_CLIENT_ADDRESS_HEADER: optional(
+      z
+        .string()
+        .superRefine((value, ctx) => {
+          const { problem } = parseClientAddressHeader(value);
+          if (problem !== undefined) {
+            ctx.addIssue({ code: "custom", message: problem });
+          }
+        })
+        .transform((value) => parseClientAddressHeader(value).header ?? value)
+        .optional(),
+    ),
   })
   .superRefine((env, ctx) => {
+    // **One reading of the caller's address, not two** (trusted-proxies.md
+    // D5). Better Auth would apply the ranges to the header's single value,
+    // which means nothing useful.
+    if (
+      env.OPENOKR_TRUSTED_PROXIES !== undefined &&
+      env.OPENOKR_CLIENT_ADDRESS_HEADER !== undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: [CLIENT_ADDRESS_HEADER_VARIABLE],
+        message: BOTH_SET_PROBLEM,
+      });
+    }
     // **Both keys or neither** (plan 0.8.0 H9). Neither leaves the
     // credentials to the AWS SDK's default chain, which is how workload
     // identity works: EKS Pod Identity, IRSA or an instance profile gives the
@@ -294,18 +359,6 @@ const envSchema = z
   });
 
 export type Env = z.infer<typeof envSchema>;
-
-/** Thrown when the environment is invalid. Carries the offending variable names
- * so a caller can act on them without parsing the message. */
-export class EnvironmentError extends Error {
-  readonly variables: readonly string[];
-
-  constructor(variables: readonly string[], message: string) {
-    super(message);
-    this.name = "EnvironmentError";
-    this.variables = variables;
-  }
-}
 
 /**
  * Refuses to boot production with a development placeholder in place. This is

@@ -43,6 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.resetModules();
 });
 
@@ -150,15 +151,15 @@ describe("the auth route's lockout audit wrapper", () => {
     handlerMock.mockImplementation(async () => limited());
     const { POST } = await import("../app/api/auth/[...all]/route");
 
+    // X-Real-IP is no fallback (trusted-proxies.md Q1): a proxy that appends
+    // to X-Forwarded-For leaves it as the caller sent it.
     await POST(
       request("/api/auth/sign-in/email", { "x-real-ip": "198.51.100.1" }),
     );
-    expect(recordInstanceAuditEventMock).toHaveBeenLastCalledWith(
-      "fake-pool",
-      expect.objectContaining({
-        payload: expect.objectContaining({ address: "198.51.100.1" }),
-      }),
-    );
+    const realIp = recordInstanceAuditEventMock.mock.lastCall?.[1] as {
+      payload: { address: string };
+    };
+    expect(realIp.payload.address).not.toBe("198.51.100.1");
 
     // A chain's first entry is whatever the caller chose to send
     // (caller-address.ts), so it is not what the row records.
@@ -171,6 +172,24 @@ describe("the auth route's lockout audit wrapper", () => {
       payload: { address: string };
     };
     expect(last.payload.address).not.toBe("6.6.6.6");
+  });
+
+  it("records the caller behind the proxies the deployment names (trusted-proxies.md D9)", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "10.0.1.0/24");
+    handlerMock.mockImplementation(async () => limited());
+    const { POST } = await import("../app/api/auth/[...all]/route");
+
+    await POST(
+      request("/api/auth/sign-in/email", {
+        "x-forwarded-for": "203.0.113.66, 198.51.100.7, 10.0.1.9",
+      }),
+    );
+    expect(recordInstanceAuditEventMock).toHaveBeenLastCalledWith(
+      "fake-pool",
+      expect.objectContaining({
+        payload: expect.objectContaining({ address: "198.51.100.7" }),
+      }),
+    );
   });
 });
 

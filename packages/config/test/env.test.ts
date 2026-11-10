@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
+  callerAddressReading,
+  describeCallerAddressReading,
+} from "../src/caller-address";
+import {
   DEVELOPMENT_AUTH_SECRET,
   EnvironmentError,
   parseEnv,
@@ -286,5 +290,153 @@ describe("S3 storage", () => {
     } catch (error) {
       expect((error as Error).message).not.toContain("AKIAsupersecretvalue");
     }
+  });
+});
+
+/**
+ * Whose address a request is counted under (docs/design/trusted-proxies.md
+ * D1 to D8, plan 0.8.0 H2). Both variables are refused at boot when they are
+ * malformed, naming the entry, because Better Auth on its own would drop a bad
+ * range and carry on, and a dropped range turns that proxy into "the caller".
+ */
+describe("the caller address settings", () => {
+  test("nothing set reads one forwarded address only", () => {
+    const env = parseEnv(VALID);
+    expect(env.OPENOKR_TRUSTED_PROXIES).toBeUndefined();
+    expect(env.OPENOKR_CLIENT_ADDRESS_HEADER).toBeUndefined();
+    expect(callerAddressReading({})).toEqual({ mode: "single_address" });
+  });
+
+  test("ranges are split on commas, spaces and newlines", () => {
+    const env = parseEnv({
+      ...VALID,
+      OPENOKR_TRUSTED_PROXIES:
+        "10.0.1.0/24, 2606:4700::/32\n173.245.48.0/20  192.0.2.10",
+    });
+    expect(env.OPENOKR_TRUSTED_PROXIES).toEqual([
+      "10.0.1.0/24",
+      "2606:4700::/32",
+      "173.245.48.0/20",
+      "192.0.2.10",
+    ]);
+    expect(
+      callerAddressReading({ OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24" }),
+    ).toEqual({ mode: "trusted_proxies", trustedProxies: ["10.0.1.0/24"] });
+  });
+
+  test("the header is read in lower case", () => {
+    expect(
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "CF-Connecting-IP" })
+        .OPENOKR_CLIENT_ADDRESS_HEADER,
+    ).toBe("cf-connecting-ip");
+    expect(
+      callerAddressReading({ OPENOKR_CLIENT_ADDRESS_HEADER: "X-Real-IP" }),
+    ).toEqual({ mode: "header", header: "x-real-ip" });
+  });
+
+  test("a host name is refused, naming the variable and the entry", () => {
+    const error = captureError(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24, cloudflare",
+      }),
+    );
+    expect(error).toBeInstanceOf(EnvironmentError);
+    expect((error as EnvironmentError).variables).toContain(
+      "OPENOKR_TRUSTED_PROXIES",
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toMatch(/cloudflare/);
+  });
+
+  test.each([
+    ["0.0.0.0/0", /every address/],
+    ["::/0", /every address/],
+    ["::ffff:10.0.0.0/104", /as IPv4/],
+    ["::ffff:10.0.1.5", /as IPv4/],
+    ["10.0.1.0/33", /not an IP address or a CIDR range/],
+    ["10.0.1.0/", /not an IP address or a CIDR range/],
+    ["10.0.1.0/2x", /not an IP address or a CIDR range/],
+    ["198.51.100.7:51234", /not an IP address or a CIDR range/],
+  ])("%s is refused and the message says why", (entry, why) => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_TRUSTED_PROXIES: entry }),
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toContain(entry);
+    expect(error.message).toMatch(why);
+  });
+
+  test("both set is refused, naming both", () => {
+    const error = captureError(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip",
+      }),
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+  });
+
+  test("X-Forwarded-For as the header points to the ranges instead", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "X-Forwarded-For" }),
+    );
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+  });
+
+  test("a header name that is not an HTTP token is refused", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "cf connecting ip" }),
+    );
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+    expect(error.message).toMatch(/header name/);
+  });
+
+  test("the running reading refuses what the boot refuses", () => {
+    expect(() =>
+      callerAddressReading({ OPENOKR_TRUSTED_PROXIES: "cloudflare" }),
+    ).toThrow(EnvironmentError);
+    expect(() =>
+      callerAddressReading({
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip",
+      }),
+    ).toThrow(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+  });
+
+  test("blank means unset, as for every other variable", () => {
+    expect(
+      callerAddressReading({
+        OPENOKR_TRUSTED_PROXIES: "  ",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "",
+      }),
+    ).toEqual({ mode: "single_address" });
+  });
+
+  test("the reading is described in one line for the boot log", () => {
+    expect(describeCallerAddressReading({ mode: "single_address" })).toBe(
+      "caller address: one forwarded address only",
+    );
+    expect(
+      describeCallerAddressReading({
+        mode: "trusted_proxies",
+        trustedProxies: ["10.0.1.0/24", "10.0.2.0/24"],
+      }),
+    ).toBe("caller address: X-Forwarded-For, trusting 2 ranges");
+    expect(
+      describeCallerAddressReading({
+        mode: "trusted_proxies",
+        trustedProxies: ["10.0.1.0/24"],
+      }),
+    ).toBe("caller address: X-Forwarded-For, trusting 1 range");
+    expect(
+      describeCallerAddressReading({
+        mode: "header",
+        header: "cf-connecting-ip",
+      }),
+    ).toBe("caller address: the cf-connecting-ip header only");
   });
 });

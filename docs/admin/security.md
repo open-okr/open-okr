@@ -31,7 +31,10 @@ a hold ends on its own.
   the instance audit chain records when it begins.
 - **Per network**: ten sign-in attempts a minute from one network address,
   and five reset requests. The count is kept in the database, so every
-  replica shares it. A refusal writes `auth.rate_limited`.
+  replica shares it. A refusal writes `auth.rate_limited`. The count is per
+  caller only when the instance can place callers: behind a CDN or a load
+  balancer, name it, or every visitor shares one count
+  ([behind a CDN or a load balancer](../install/behind-a-proxy.md)).
 - The answer is the same whether or not an account exists, so a hold tells
   nobody who has one. The counts are kept as keyed hashes, never as addresses.
 

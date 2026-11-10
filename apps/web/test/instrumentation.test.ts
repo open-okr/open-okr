@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { register } from "../instrumentation";
 import { installAdmission } from "../lib/admission";
 import { resolveSignupPolicy } from "../lib/auth";
+import { announceCallerAddress } from "../lib/caller-address";
 import { installPromptEvaluator } from "../lib/prompt-evaluation";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
@@ -57,6 +58,9 @@ vi.mock("../lib/error-reporting", () => ({ installErrorReports: vi.fn() }));
 vi.mock("../lib/prompt-evaluation", () => ({
   installPromptEvaluator: vi.fn(),
 }));
+// The tenth (plan 0.8.0 H2). `lib/caller-address` writes the reading to the
+// instance chain through `@openokr/core` and the pool. Mocked for both.
+vi.mock("../lib/caller-address", () => ({ announceCallerAddress: vi.fn() }));
 // Not for the import cost: the real one replaces `console.error` for the
 // whole process, and the tests below spy on it (completeness review L-04).
 vi.mock("../lib/abandoned-responses", () => ({
@@ -81,6 +85,7 @@ afterEach(() => {
   vi.mocked(resolveSignupPolicy).mockClear();
   vi.mocked(installAdmission).mockClear();
   vi.mocked(installPromptEvaluator).mockClear();
+  vi.mocked(announceCallerAddress).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -284,4 +289,48 @@ test("a build worker installs no admission, because it reaches no database", asy
   await register();
 
   expect(installAdmission).not.toHaveBeenCalled();
+});
+
+test("a malformed trusted proxy refuses the boot, naming the entry (trusted-proxies.md D7)", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.OPENOKR_TRUSTED_PROXIES = "10.0.1.0/24, cloudflare";
+  const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  const exit = vi
+    .spyOn(process, "exit")
+    .mockImplementation(() => undefined as never);
+
+  await register();
+
+  expect(exit).toHaveBeenCalledWith(1);
+  expect(stderr.mock.calls.join()).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+  expect(stderr.mock.calls.join()).toMatch(/cloudflare/);
+});
+
+test("boot announces the caller address reading before anything is served (trusted-proxies.md D10)", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+
+  await register();
+
+  expect(announceCallerAddress).toHaveBeenCalledTimes(1);
+});
+
+test("a build worker announces no reading, because it writes to no database", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.NEXT_PHASE = "phase-production-build";
+
+  await register();
+
+  expect(announceCallerAddress).not.toHaveBeenCalled();
+});
+
+test("a reading that cannot be announced is logged, not fatal", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  vi.mocked(announceCallerAddress).mockRejectedValueOnce(
+    new Error("the instance chain is not reachable"),
+  );
+  const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+  await expect(register()).resolves.toBeUndefined();
+
+  expect(stderr.mock.calls.join()).toMatch(/instance chain is not reachable/);
 });

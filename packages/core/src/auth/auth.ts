@@ -43,7 +43,7 @@ import {
   processOnlyKeyRing,
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
-import { CALLER_ADDRESS_HEADERS, callerAddress } from "./caller-address.ts";
+import { callerAddress, callerAddressOptions } from "./caller-address.ts";
 import { DISABLED_AUTH_PATHS } from "./endpoints.ts";
 import {
   type AuthLimiterStorage,
@@ -660,14 +660,14 @@ export function createAuth(options: AuthOptions) {
         httpOnly: true,
         sameSite: "lax",
       },
-      ipAddress: {
-        // Every deployment target puts a reverse proxy in front of the app
-        // (deploy/docker ships one), so the socket address is the proxy and
-        // the caller's address is in this header. Rate limits are keyed on
-        // it, which is why it has to be read rather than ignored. Every other
-        // per-address limit reads the same list (`caller-address.ts`).
-        ipAddressHeaders: [...CALLER_ADDRESS_HEADERS],
-      },
+      // Every deployment target puts a reverse proxy in front of the app
+      // (deploy/docker ships one), so the socket address is the proxy and the
+      // caller's address is in a header. Rate limits and the session row are
+      // keyed on it, which is why it has to be read rather than ignored.
+      // Which header, and which proxies are walked past, is the deployment's
+      // choice (docs/design/trusted-proxies.md). Every other per-address
+      // limit reads the same block through `callerAddress()`.
+      ipAddress: callerAddressOptions(),
     },
 
     rateLimit: {

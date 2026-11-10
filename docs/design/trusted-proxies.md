@@ -1,6 +1,6 @@
 # Trusted proxies: whose address a request is counted under
 
-Status: proposed 10 November 2026 for release 0.8.0 (plan H2, section 3.1). **Approved by Akmal on 11 November 2026, Q1 to Q3 as recommended.** It changes how every per-address limit and the sign-in hold identify a caller, so it is designed first (CLAUDE.md: security).
+Status: proposed 10 November 2026 for release 0.8.0 (plan H2, section 3.1). **Approved by Akmal on 11 November 2026, Q1 to Q3 as recommended.** Built on 11 November 2026; §9 lists where the build differs. It changes how every per-address limit and the sign-in hold identify a caller, so it is designed first (CLAUDE.md: security).
 
 Behind a CDN and a load balancer the instance cannot tell one caller from another. This design lets an operator name the proxies in front of the instance, or the one header their CDN writes, so the caller's address is read the way Better Auth already knows how to read it, and every limit counts people rather than proxies.
 
@@ -273,3 +273,19 @@ Deployment:
 - No change to the limits' numbers or the hold's curve.
 - No change to `X-Forwarded-Host` or `X-Forwarded-Proto`, which Caddy and the application already handle (`Caddyfile:45-60`).
 - No check that the origin is locked to the CDN. The product cannot see it; the guide and the deployment check carry it.
+
+## 9. As built
+
+| Where | Differs from the design | Why |
+|---|---|---|
+| §7, the install guides | The topology table, the address check, the Cloudflare lock and the deployment check live on one page, `docs/install/behind-a-proxy.md`. `compose.md`, `kubernetes.md` and `cloud.md` each carry a short section that says what to set on that target and links to it | The notice on Admin, General (D12) links to one page, and one copy of the table cannot drift from another |
+| D14, the Compose helper | `./openokr` copies the list before every compose call, not only `up` and `upgrade`, into `OPENOKR_CADDY_TRUSTED_PROXIES`, which `compose.yaml` hands the proxy as `OPENOKR_TRUSTED_PROXIES` with `127.0.0.1/32` as the default | `rotate-key` also runs `compose up`, and a recreate without the list would put Caddy back on loopback. A name of its own keeps a comma list exported in an operator's shell from reaching Caddy, which wants words |
+| D7 | Any IPv4-mapped IPv6 entry is refused, a single address as well as a range | Better Auth reads both as IPv4, so the IPv4 spelling is the one that means what it says |
+| D15 | The chart also refuses `network.trustedProxies` given as a string rather than a list | `--set network.trustedProxies=10.0.1.0/24` is the easy mistake, and a template ranging over a string fails with a message nobody can act on |
+| D8 | `callerAddress()` takes an optional reading, for tests only. Everything in the product reads the environment's | The resolution rows of §1.1 are tested per mode without changing the process environment |
+| D12, the boot order | The reading is announced and recorded after the tenant-floor check and before the relay starts | After the environment is validated, so a bad range has already refused the boot, and before anything is served |
+| §5, the tests | In development and test Better Auth answers `127.0.0.1` for a caller it cannot place, so the unit tests read "unresolved" as what a request with no header gets, and the count of an unresolved caller is tested with Better Auth's reader stood in. The end-to-end server runs as production, so the real path is covered there | Better Auth fixes its environment when it loads |
+| §5, the end-to-end run | The suite's server has no proxy in front, so every request without `X-Forwarded-For` is unresolved and the notice is up from the claim onward on every shard, not only after `s36-caller-address-notice.spec.ts` | That is what an instance with nothing in front of it and nothing set does. No spec reads the instance notices |
+
+**OKRGoal's move to header mode (Q3) is an operations step.** In order: add a request header Transform Rule in the Cloudflare zone that sets a long random secret header on every request; add an ALB listener rule that forwards only requests carrying that header and make the default action a fixed 403; set `network.clientAddressHeader: cf-connecting-ip` and `helm upgrade`; run the deployment check in `docs/install/behind-a-proxy.md` against the ALB's own hostname; then remove the per-visitor rate limit at Cloudflare.
+

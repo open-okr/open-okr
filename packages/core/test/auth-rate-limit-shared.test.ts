@@ -1,5 +1,13 @@
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import { authLimiterStorage } from "../src/auth/limiter-storage.ts";
 
@@ -194,5 +202,41 @@ describe("the storage's answer", () => {
       allowed: false,
       retryAfter: 1,
     });
+  });
+});
+
+/**
+ * Two people behind one CDN edge (docs/design/trusted-proxies.md, plan 0.8.0
+ * H2). With nothing set, a chain places nobody, so both share one count; with
+ * the edge's range named, each is counted as themselves.
+ */
+describe("two callers behind one edge", () => {
+  const EDGE = "172.70.1.2";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const tenFrom = async (
+    auth: Awaited<ReturnType<typeof build>>,
+    chain: string,
+  ) => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      expect((await signIn(auth, chain, attempt)).status).toBe(401);
+    }
+    expect((await signIn(auth, chain, 10)).status).toBe(429);
+  };
+
+  it("share one count when nothing names the edge", async () => {
+    const auth = await build();
+    await tenFrom(auth, `198.51.100.7, ${EDGE}`);
+    expect((await signIn(auth, `198.51.100.8, ${EDGE}`, 0)).status).toBe(429);
+  });
+
+  it("get a count each when the edge's range is trusted", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "172.64.0.0/13");
+    const auth = await build();
+    await tenFrom(auth, `198.51.100.7, ${EDGE}`);
+    expect((await signIn(auth, `198.51.100.8, ${EDGE}`, 0)).status).toBe(401);
   });
 });

@@ -63,6 +63,22 @@ app_exec() {
 }
 db_query() { db_exec psql -U openokr -d openokr -tAc "$1"; }
 
+# The ranges the running proxy container trusts, as compose handed them to it.
+proxy_trusts() {
+  if docker compose version >/dev/null 2>&1; then
+    id="$(docker compose -p "$PROJECT" ps -q proxy)"
+  else
+    id="$(docker-compose -p "$PROJECT" ps -q proxy)"
+  fi
+  docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$id" \
+    | sed -n 's/^OPENOKR_TRUSTED_PROXIES=//p'
+}
+
+# How many times the reading of the caller's address was recorded.
+caller_address_rows() {
+  db_query "select count(*) from instance_audit_events where action = 'instance.caller_address_configured'"
+}
+
 # Waits until the proxy stops answering 502, which is what it says while the
 # application container it fronts has been recreated and has not opened its
 # port yet. Every command that restarts the app returns before that: upgrade,
@@ -267,6 +283,39 @@ written="$(grep '^BETTER_AUTH_URL=' secrets/app.env | cut -d= -f2-)"
   || fail "a second up rewrote BETTER_AUTH_URL to '$written'"
 pass "a second up leaves the public address alone"
 
+# --- the proxies in front of this one (docs/design/trusted-proxies.md D14) --
+# Nothing set is today's rule: Caddy trusts only loopback, so it replaces any
+# X-Forwarded-For with the one address it saw, and the application reads that.
+# A list in app.env reaches both: the application reads it there, and every
+# compose call the helper makes hands Caddy the same ranges, space separated.
+[ "$(proxy_trusts)" = "127.0.0.1/32" ] \
+  || fail "with nothing set the proxy trusts '$(proxy_trusts)', not loopback"
+app_log | grep -q "caller address: one forwarded address only" \
+  || fail "the application did not say which caller address it reads"
+[ "$(caller_address_rows)" = "1" ] \
+  || fail "the starting reading was not recorded once on the instance chain"
+pass "with nothing set, the proxy trusts loopback and the reading is recorded"
+
+cp secrets/app.env secrets/app.env.before-proxies
+echo "OPENOKR_TRUSTED_PROXIES=10.0.1.0/24,2606:4700::/32" >> secrets/app.env
+./openokr up >/dev/null 2>&1 || fail "up with a list of trusted proxies failed"
+wait_until_serving "after naming the trusted proxies"
+[ "$(proxy_trusts)" = "10.0.1.0/24 2606:4700::/32" ] \
+  || fail "the proxy trusts '$(proxy_trusts)', not the list in app.env"
+app_log | grep -q "caller address: X-Forwarded-For, trusting 2 ranges" \
+  || fail "the application did not read the list in app.env"
+[ "$(caller_address_rows)" = "2" ] \
+  || fail "the changed reading was not recorded once on the instance chain"
+pass "a list in app.env reaches the proxy and the application, and is recorded"
+
+mv secrets/app.env.before-proxies secrets/app.env
+chmod 600 secrets/app.env
+./openokr up >/dev/null 2>&1 || fail "up after removing the trusted proxies failed"
+wait_until_serving "after removing the trusted proxies"
+[ "$(proxy_trusts)" = "127.0.0.1/32" ] \
+  || fail "removing the list left the proxy trusting '$(proxy_trusts)'"
+pass "removing the list puts the proxy back on loopback"
+
 # --- the proxy forwards the host with its port --------------------------
 # **A configuration assertion, and it says so** (P8-G07). Caddy's `{host}` is
 # the hostname with the port stripped, so an instance on any port but 80 sent
@@ -295,6 +344,13 @@ pass "the first account was created"
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the admin could not reach a provisioned workspace"
 pass "the admin reached a provisioned workspace"
+
+# The session records the address Caddy saw, as it did before 0.8.0: with
+# nothing set, one forwarded address is read as the caller.
+session_address="$(db_query "select ip_address from sessions order by created_at desc limit 1")"
+[ -n "$session_address" ] \
+  || fail "the first session recorded no address, so callers behind Caddy are not placed"
+pass "a request through the proxy resolves to the client ($session_address)"
 
 # --- the upgrade path takes a backup, then re-runs migrations -------------
 # Idempotence is what makes an upgrade safe to repeat, so it is checked rather

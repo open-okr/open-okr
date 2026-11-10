@@ -67,6 +67,17 @@ an upgrade is `helm upgrade` and nothing else.
 
 ## Behind a load balancer or a CDN
 
+**Name what is in front of the instance.** Every per-address limit, the
+sign-in hold and the session list read the visitor's address from a header. With
+nothing set, `X-Forwarded-For` is believed only when it holds one address, so a
+layer-7 load balancer or a CDN, which leave a chain, make every visitor one.
+Set `network.trustedProxies` to the proxies' own addresses or ranges, or, behind
+a CDN that is the only way to reach the load balancer,
+`network.clientAddressHeader` to the header it writes. Never both: the chart
+refuses that, and `0.0.0.0/0`. [Behind a CDN or a load balancer](behind-a-proxy.md)
+has the table per setup, the ingress-controller settings that go with it, and
+the check to run afterwards.
+
 The inbox, the feed, the board, the agents screen and the copilot each hold a
 live stream open. Every one sends a comment line every 25 seconds when nothing
 else is said, so an idle timeout of 60 seconds or more (AWS load balancers

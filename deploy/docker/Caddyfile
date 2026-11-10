@@ -21,6 +21,18 @@
 	# and an open admin socket inside the network is a way to reconfigure the
 	# proxy from a compromised container.
 	admin off
+
+	# Whose X-Forwarded-For Caddy keeps (docs/design/trusted-proxies.md D14).
+	# From anyone else it replaces the header with the one address it saw,
+	# which is what the application reads when nothing is set. Behind a load
+	# balancer or a CDN, name its addresses as OPENOKR_TRUSTED_PROXIES in
+	# secrets/app.env: `./openokr up` hands the same list to this container,
+	# space separated, so Caddy keeps the chain from those hops and adds to it,
+	# and the application walks back past them to the visitor. The loopback
+	# default trusts nothing that can reach this proxy.
+	servers {
+		trusted_proxies static {$OPENOKR_TRUSTED_PROXIES:127.0.0.1/32}
+	}
 }
 
 {$OPENOKR_SITE} {

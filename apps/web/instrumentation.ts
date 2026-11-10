@@ -23,6 +23,7 @@ export async function register(): Promise<void> {
     resolveAuthPolicy,
     resolveSSO,
     checkTenantFloor,
+    recordCallerAddress,
   } = await import("./instrumentation.node");
   // First, before anything can log: a filter installed halfway through boot
   // would leave the log judged by two rules.
@@ -42,6 +43,9 @@ export async function register(): Promise<void> {
   // unlimited first minute is the minute a burst arrives in (P8-T06a).
   await resolveAdmission();
   await checkTenantFloor();
+  // Which caller address every per-address limit counts, in the log and, when
+  // it changed, on the instance chain (docs/design/trusted-proxies.md D10).
+  await recordCallerAddress();
   startOutboxRelay();
   startRecurringWork();
   // Before the first request, so the first sign-in finds the SSO providers
