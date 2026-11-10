@@ -9,9 +9,41 @@
  * message under that field, exactly as the add form does with the answer
  * from `POST /api/v1/admin/sso`.
  */
-export type SSOWriteResult =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly message: string; readonly field?: string };
+export type SSOWriteResult = { readonly ok: true } | SSOFailure;
+
+/** A refusal, or a sentence saying nothing changed. */
+export interface SSOFailure {
+  readonly ok: false;
+  readonly message: string;
+  readonly field?: string;
+}
+
+/** What starting a domain's verification hands back: the record, shown once. */
+export type SSODomainStartResult =
+  | {
+      readonly ok: true;
+      readonly record: {
+        readonly type: "TXT";
+        readonly name: string;
+        readonly value: string;
+      };
+    }
+  | SSOFailure;
+
+/** Why a DNS check did not verify the domain. */
+export type SSODomainCheckReason =
+  | "record_missing"
+  | "record_mismatch"
+  | "lookup_failed";
+
+/** What one DNS check found. `reason` is null when the domain verified. */
+export type SSODomainCheckResult =
+  | {
+      readonly ok: true;
+      readonly verified: boolean;
+      readonly reason: SSODomainCheckReason | null;
+    }
+  | SSOFailure;
 
 /** What the edit form sends. Blank text clears an optional field. */
 export interface SSOEditInput {
