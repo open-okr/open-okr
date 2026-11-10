@@ -197,6 +197,45 @@ else
   fail "does not say where uploads go when a bucket is named"
 fi
 
+# --- the database's CA bundle (plan 0.8.0 H6) ------------------------------
+# A managed Postgres signs with an authority Node does not hold, so without a
+# bundle the only working connection was sslmode=no-verify. With one, every
+# workload mounts it and points Node and libpq (the backup jobs) at it.
+ca_all=$(render --set database.caBundle.configMap=rds-ca \
+  --set database.caBundle.key=global-bundle.pem \
+  --set backup.enabled=true --set cloud.erasure.schedule="0 3 * * *" \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr)
+ca_ok=true
+for workload in deployment.yaml migration-job.yaml erasure-cronjob.yaml backup-cronjob.yaml backup-verify-job.yaml; do
+  doc=$(printf '%s' "$ca_all" | awk -v src="# Source: openokr/templates/$workload" '
+    $0 == src { on = 1; next } /^# Source:/ { on = 0 } on')
+  if ! printf '%s' "$doc" | grep -A 1 "name: NODE_EXTRA_CA_CERTS" | grep -q "/etc/openokr/db-ca/global-bundle.pem" \
+    || ! printf '%s' "$doc" | grep -q "name: PGSSLROOTCERT" \
+    || ! printf '%s' "$doc" | grep -A 1 "name: db-ca" | grep -q "mountPath: /etc/openokr/db-ca\|configMap:"; then
+    ca_ok=false
+    echo "  ($workload has no CA bundle)" >&2
+  fi
+done
+if $ca_ok; then
+  pass "a named CA bundle reaches the server and every job"
+else
+  fail "a named CA bundle did not reach every workload"
+fi
+
+if ! printf '%s' "$defaults" | grep -q "NODE_EXTRA_CA_CERTS\|name: db-ca"; then
+  pass "no CA bundle unless one is named"
+else
+  fail "a CA bundle appeared with none named"
+fi
+
+if render_expecting_failure --set "database.url=$DB" \
+  --set database.caBundle.configMap=a --set database.caBundle.existingSecret=b \
+  | grep -q "names both a Secret and a ConfigMap"; then
+  pass "refuses a CA bundle named in two places"
+else
+  fail "accepted a CA bundle named in two places"
+fi
+
 # --- the owner role from the operator's own Secret (plan 0.8.0 H8) ---------
 # adminUrl beside existingSecret read DATABASE_ADMIN_URL from a Secret the
 # chart renders only without existingSecret, so the migration hook could not

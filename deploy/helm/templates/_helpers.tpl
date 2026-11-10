@@ -143,6 +143,53 @@ key in the operator's own Secret (existingSecretAdminKey, plan 0.8.0 H8).
 {{- if or $db.adminUrl (and $db.existingSecret (dig "existingSecretAdminKey" "" $db)) -}}true{{- end -}}
 {{- end -}}
 
+{{/*
+The database's CA bundle (plan 0.8.0 H6). A managed Postgres (RDS, Cloud SQL,
+Azure) signs its certificate with an authority Node's own store does not hold,
+so `sslmode=verify-full` failed and the only working choice was `no-verify`:
+encrypted, unchecked. With a bundle named, every workload mounts it and points
+Node (NODE_EXTRA_CA_CERTS) and libpq, which the backup jobs' pg_dump and
+pg_restore use (PGSSLROOTCERT), at it. `dig` because a release from before 0.8
+reuses values without `caBundle`.
+*/}}
+{{- define "openokr.dbCa" -}}
+{{- if or (dig "caBundle" "existingSecret" "" .Values.database) (dig "caBundle" "configMap" "" .Values.database) -}}true{{- end -}}
+{{- end -}}
+
+{{- define "openokr.dbCaPath" -}}
+/etc/openokr/db-ca/{{ dig "caBundle" "key" "ca.pem" .Values.database | default "ca.pem" }}
+{{- end -}}
+
+{{- define "openokr.dbCaEnv" -}}
+{{- if include "openokr.dbCa" . -}}
+- name: NODE_EXTRA_CA_CERTS
+  value: {{ include "openokr.dbCaPath" . | quote }}
+- name: PGSSLROOTCERT
+  value: {{ include "openokr.dbCaPath" . | quote }}
+{{- end -}}
+{{- end -}}
+
+{{- define "openokr.dbCaMount" -}}
+{{- if include "openokr.dbCa" . -}}
+- name: db-ca
+  mountPath: /etc/openokr/db-ca
+  readOnly: true
+{{- end -}}
+{{- end -}}
+
+{{- define "openokr.dbCaVolume" -}}
+{{- if include "openokr.dbCa" . -}}
+- name: db-ca
+  {{- with dig "caBundle" "existingSecret" "" .Values.database }}
+  secret:
+    secretName: {{ . }}
+  {{- else }}
+  configMap:
+    name: {{ dig "caBundle" "configMap" "" .Values.database }}
+  {{- end }}
+{{- end -}}
+{{- end -}}
+
 {{- define "openokr.commonEnv" -}}
 {{ include "openokr.databaseEnv" . }}
 {{- if include "openokr.adminEnabled" . }}
@@ -164,4 +211,7 @@ key in the operator's own Secret (existingSecretAdminKey, plan 0.8.0 H8).
       key: {{ .Values.secrets.encryptionKeyKey }}
 - name: NODE_ENV
   value: production
+{{- with (include "openokr.dbCaEnv" .) }}
+{{ . }}
+{{- end }}
 {{- end -}}

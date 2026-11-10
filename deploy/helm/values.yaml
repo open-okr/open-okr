@@ -45,6 +45,16 @@ database:
   # values; adminUrl with existingSecret reads a Secret the chart does not
   # render (plan 0.8.0 H8), so the install notes warn about that pairing.
   existingSecretAdminKey: ""
+  # A CA bundle that signs the database's certificate, from a Secret or a
+  # ConfigMap (not both), under `key`. A managed Postgres (RDS, Cloud SQL,
+  # Azure) signs with an authority Node does not hold, so without this the
+  # only connection that works is `sslmode=no-verify`. With it, use
+  # `sslmode=verify-full` (plan 0.8.0 H6). Mounted read-only in every
+  # workload, the server and each job.
+  caBundle:
+    existingSecret: ""
+    configMap: ""
+    key: "ca.pem"
 
 # The instance's public origin. Passkeys are bound to it, so it must be the
 # address people actually use. Defaults to the first ingress host when unset.

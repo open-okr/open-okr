@@ -249,6 +249,9 @@ spec:
               mountPath: /app/apps/web/.next/cache
             - name: storage
               mountPath: /app/storage
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -261,6 +264,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

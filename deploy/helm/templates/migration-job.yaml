@@ -71,9 +71,15 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

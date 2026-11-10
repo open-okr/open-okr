@@ -59,6 +59,7 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `database.url` | none | Required unless `database.existingSecret` is set |
 | `database.adminUrl` | none | Owner-role connection used only by the migration hook, so the application role never owns the tables |
 | `database.existingSecretAdminKey` | none | With `database.existingSecret`: the key in that Secret holding the owner-role connection. Prefer it to `adminUrl`, which lands in the release's stored values. Refused without `existingSecret` |
+| `database.caBundle.configMap` or `.existingSecret`, and `.key` | none, `ca.pem` | A CA bundle that signs your database's certificate, mounted in every workload. With it, connect with `sslmode=verify-full` |
 | `publicUrl` | first ingress host | Passkeys are bound to this origin. Get it right |
 | `replicaCount` | 1 | Migrations run in a hook, so more than one is safe. One is the default because the default storage mode cannot be shared |
 | `persistence.enabled` | true | A volume for uploaded files. See below |
@@ -141,6 +142,28 @@ unused, which costs nothing and means turning S3 off again needs no new claim.
 | `storage.s3.forcePathStyle` | none | `on`, `off`, or empty to let the driver decide |
 | `storage.s3.keyPrefix` | none | So one bucket can hold several instances |
 | `storage.s3.existingSecret` | none | A Secret holding a key pair. Empty means no key: the AWS SDK finds the pod's own credentials (IRSA, EKS Pod Identity, an instance profile) |
+
+## A managed Postgres's certificate
+
+RDS, Cloud SQL and Azure Database sign their certificates with an authority
+Node does not carry, so `sslmode=require` or `verify-full` fails to connect
+and `sslmode=no-verify` connects without checking who answered. Give the chart
+the provider's bundle and check it:
+
+```sh
+curl -fsSLo global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+kubectl create configmap rds-ca --from-file=global-bundle.pem
+
+helm upgrade openokr . \
+  --set database.caBundle.configMap=rds-ca \
+  --set database.caBundle.key=global-bundle.pem
+```
+
+and end the connection string with `?sslmode=verify-full`. The bundle is
+mounted read-only in the server, the migration hook and every job, as
+`NODE_EXTRA_CA_CERTS` for Node and `PGSSLROOTCERT` for the backups'
+`pg_dump` and `pg_restore`. A Secret works the same way through
+`database.caBundle.existingSecret`; naming both is refused.
 
 ## Upgrading
 
