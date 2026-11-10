@@ -18,6 +18,7 @@ import {
   type FileKind,
   fileKind,
 } from "./attachment-preview.tsx";
+import { UPLOAD_LIMIT_BYTES } from "./upload-limit";
 
 /**
  * Files on a subject (P6-G27b).
@@ -90,7 +91,9 @@ const readableSize = (bytes: number): string => {
   if (bytes < 1024 * 1024) {
     return `${Math.round(bytes / 1024)} KB`;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const megabytes = bytes / (1024 * 1024);
+  // "25 MB" rather than "25.0 MB" for a whole number, as the limit is.
+  return `${Number.isInteger(megabytes) ? megabytes : megabytes.toFixed(1)} MB`;
 };
 
 /**
@@ -260,6 +263,17 @@ export function Attachments({
                   setProblem(t("attachments.chooseFirst"));
                   return;
                 }
+                // Said here rather than after a 25 MB upload the server
+                // would refuse anyway (plan 0.8.0 H13).
+                if (chosen.size > UPLOAD_LIMIT_BYTES) {
+                  setProblem(
+                    t("attachments.tooLarge", {
+                      size: readableSize(chosen.size),
+                      limit: readableSize(UPLOAD_LIMIT_BYTES),
+                    }),
+                  );
+                  return;
+                }
                 const form = new FormData();
                 form.set("file", chosen);
                 form.set("subjectType", subjectType);
@@ -279,6 +293,11 @@ export function Attachments({
             >
               {uploading ? t("attachments.uploading") : t("attachments.attach")}
             </Button>
+            <span className="text-xs text-ink-3" data-testid="attachment-limit">
+              {t("attachments.limit", {
+                limit: readableSize(UPLOAD_LIMIT_BYTES),
+              })}
+            </span>
           </div>
         ) : null}
 

@@ -401,7 +401,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H10 | to do | Design first; split into rows once designed |
 | H11 | done | `apps/web/lib/keep-alive.ts`: a heartbeat every 25 seconds on all five live routes (inbox, feed, board, agents, copilot), stopping when the request ends or a write fails. A test refuses a live route without it. `docs/install/kubernetes.md` says what idle timeout a proxy needs |
 | H12 | done | The pod that completes a run also writes `scheduler.last_run_at` to `system_settings`; `/api/status` judges the newer of that and its own (`apps/web/lib/scheduler-health.ts`). A pod with the scheduler off still answers operational, so an instance running its sweeps by hand is not reported down; H10 is where that changes. `status-and-capacity.md` §2.6 |
-| H13 | to do | |
+| H13 | done | The server-action body limit is 27 MB, above `MAX_BLOB_BYTES` (25 MiB) with room for the form; the control says "Up to 25 MB a file" and refuses a larger file before uploading it. `apps/web/lib/upload-limit.ts` gives the browser the number, and a test holds it equal to core's and below the body limit. Browser spec run with the batch |
 | H14 | to do | |
 | H15 | done | PR #203, merged 10 November 2026 with every CI job green |
 | O1 | done | The provider chain names its step (`resolveProviderForTier`, `resolveDrafterFor`), core turns it into one sentence (`ai/off-reason.ts`) on the copilot's footer, answer and stream; Admin, AI says a plan has no credits. `docs/design/ai-credits.md` §9.1 |

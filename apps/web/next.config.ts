@@ -52,8 +52,14 @@ const nextConfig: NextConfig = {
        * unexplained failure rather than as the wizard's own refusal naming the
        * bound. The row limit is the control; this only has to be comfortably
        * above what that limit can produce.
+       *
+       * **And above the largest attachment** (plan 0.8.0 H13). A file is
+       * uploaded through a server action too, and at 8 MB a file between 8
+       * and 25 MB was cut off with a generic failure before core's own check
+       * could say the real limit, `MAX_BLOB_BYTES`, 25 MiB. 27 leaves room for
+       * the form's other fields; a test holds it above that limit.
        */
-      bodySizeLimit: "8mb",
+      bodySizeLimit: "27mb",
     },
   },
   // Next's own dev-only overlay (route/bundler info, preferences), never
