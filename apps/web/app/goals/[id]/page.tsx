@@ -348,8 +348,11 @@ export default async function GoalPage({
     <div className="flex w-full flex-col gap-4.5 lg:flex-row lg:items-start">
       <div className="flex min-w-0 flex-1 flex-col gap-4.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col">
+          {/* The title column grows and never goes under 15rem; the controls
+           * wrap beneath it instead. Four controls beside a shrinking column
+           * squeezed the title to a sliver (s39b). */}
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col">
               <PreviousNext
                 previous={
                   before
@@ -392,25 +395,27 @@ export default async function GoalPage({
                 className="mt-1 self-start"
               />
             </div>
-            <Chip tone={closed ? "neutral" : "brand"}>
-              {closed
-                ? t("goals.detail.closedStatus", {
-                    status: String(goal.successStatus),
-                  })
-                : healthWord(t, goal.health)}
-            </Chip>
-            <WatchControl subjectType="goal" subjectId={id} initial={watch} />
-            <CopyLink path={shortLinkPath("goal", goal)} />
-            {/* Check in's door on the goal itself, now that it has left the
-             * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
-            {open ? (
-              <Link
-                href={`/check-in?goal=${id}`}
-                className={buttonVariants({ size: "sm" })}
-              >
-                {t("common.checkIn")}
-              </Link>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Chip tone={closed ? "neutral" : "brand"}>
+                {closed
+                  ? t("goals.detail.closedStatus", {
+                      status: String(goal.successStatus),
+                    })
+                  : healthWord(t, goal.health)}
+              </Chip>
+              <WatchControl subjectType="goal" subjectId={id} initial={watch} />
+              <CopyLink path={shortLinkPath("goal", goal)} />
+              {/* Check in's door on the goal itself, now that it has left the
+               * sidebar (P9-T07a-b, okr-entry-points.md §3.1). */}
+              {open ? (
+                <Link
+                  href={`/check-in?goal=${id}`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {t("common.checkIn")}
+                </Link>
+              ) : null}
+            </div>
           </CardHeader>
           <CardBody className="flex flex-col gap-3">
             <div className="flex items-center gap-2.5">

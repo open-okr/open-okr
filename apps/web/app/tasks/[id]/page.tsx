@@ -148,8 +148,8 @@ export default async function TaskPage({
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col gap-0.5">
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col gap-0.5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
                 <Link
                   href={`/board?space=${task.spaceId}`}
@@ -178,21 +178,23 @@ export default async function TaskPage({
               </div>
               <h1 className="text-lg font-bold text-ink">{task.title}</h1>
             </div>
-            {canEdit ? (
-              <InlineSelect
-                label={t("checkIn.composer.status")}
-                value={task.status}
-                options={statusOptions}
-                onSave={setTaskStatusAction.bind(null, task.id)}
-              />
-            ) : (
-              <Chip tone="neutral">
-                {statusOptions.find((one) => one.value === task.status)
-                  ?.label ?? task.status}
-              </Chip>
-            )}
-            <WatchControl subjectType="task" subjectId={id} initial={watch} />
-            <CopyLink path={shortLinkPath("task", task)} />
+            <div className="flex flex-wrap items-center gap-2.5">
+              {canEdit ? (
+                <InlineSelect
+                  label={t("checkIn.composer.status")}
+                  value={task.status}
+                  options={statusOptions}
+                  onSave={setTaskStatusAction.bind(null, task.id)}
+                />
+              ) : (
+                <Chip tone="neutral">
+                  {statusOptions.find((one) => one.value === task.status)
+                    ?.label ?? task.status}
+                </Chip>
+              )}
+              <WatchControl subjectType="task" subjectId={id} initial={watch} />
+              <CopyLink path={shortLinkPath("task", task)} />
+            </div>
           </CardHeader>
         </Card>
 

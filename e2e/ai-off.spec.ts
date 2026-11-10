@@ -151,6 +151,15 @@ test("a goal's page draws none either, and its close form is whole", async () =>
   await expect(page.locator(AI_AFFORDANCE)).toHaveCount(0);
   // The deterministic path the retrospective draft would sit beside.
   await expect(page.getByLabel("The retrospective")).toBeVisible();
+
+  // Taken away again through the page's own control. `reviews.spec.ts` can
+  // share this instance on a shard and counts the objectives in this cycle's
+  // first space, so an objective left here changes its review.
+  await page.locator("details summary").filter({ hasText: "Manage this goal" }).click();
+  await page.getByRole("button", { name: "Delete this goal" }).click();
+  await expect(page.getByText("Goal deleted")).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test("the Champion and the Coach run, deterministically", async () => {

@@ -121,8 +121,8 @@ export default async function DocumentPage({
     <div className="flex w-full flex-col gap-4.5 xl:flex-row">
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
         <Card>
-          <CardHeader className="justify-between">
-            <div className="flex min-w-0 flex-col gap-0.5">
+          <CardHeader className="flex-wrap justify-between">
+            <div className="flex min-w-0 flex-1 basis-60 flex-col gap-0.5">
               {back ? (
                 <Link
                   href={back}
@@ -149,17 +149,19 @@ export default async function DocumentPage({
                   : document.authorName}
               </p>
             </div>
-            <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
-              {document.state === "draft"
-                ? t("documents.detail.draft")
-                : t("documents.detail.published")}
-            </Chip>
-            <WatchControl
-              subjectType="document"
-              subjectId={id}
-              initial={watch}
-            />
-            <CopyLink path={shortLinkPath("document", document)} />
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Chip tone={document.state === "draft" ? "warn" : "ok"} dot>
+                {document.state === "draft"
+                  ? t("documents.detail.draft")
+                  : t("documents.detail.published")}
+              </Chip>
+              <WatchControl
+                subjectType="document"
+                subjectId={id}
+                initial={watch}
+              />
+              <CopyLink path={shortLinkPath("document", document)} />
+            </div>
           </CardHeader>
           {document.state === "draft" ? (
             <CardBody>
