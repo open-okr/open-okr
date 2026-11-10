@@ -190,6 +190,30 @@ reuses values without `caBundle`.
 {{- end -}}
 {{- end -}}
 
+{{/*
+How a pod stops (plan 0.8.0 H10b, docs/design/worker-deployment.md D9): a
+pause before SIGTERM, the server's drain, and a grace period derived from
+both. `dig` with the values.yaml defaults, because a release from before 0.8
+reuses values without `shutdown`; never `| default` on a number, which would
+read a pause of 0 as unset and put the pause back.
+*/}}
+{{- define "openokr.preStopSeconds" -}}
+{{- dig "preStopSeconds" 10 (.Values.shutdown | default dict) | int -}}
+{{- end -}}
+
+{{- define "openokr.drainSeconds" -}}
+{{- dig "drainSeconds" 20 (.Values.shutdown | default dict) | int -}}
+{{- end -}}
+
+{{/*
+The pause, the drain, and 15 seconds for the error flush (2 s), the span
+flush (5 s) and slack. Kubernetes counts the grace period from the deletion,
+pause included, and kills the pod when it ends.
+*/}}
+{{- define "openokr.terminationGraceSeconds" -}}
+{{- add (include "openokr.preStopSeconds" . | int) (include "openokr.drainSeconds" . | int) 15 -}}
+{{- end -}}
+
 {{- define "openokr.commonEnv" -}}
 {{ include "openokr.databaseEnv" . }}
 {{- if include "openokr.adminEnabled" . }}

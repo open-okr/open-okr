@@ -87,6 +87,17 @@ work. Annotate the service account for that (serviceAccount.annotations).
 {{- end -}}
 {{- end -}}
 
+{{- /* How a pod stops (plan 0.8.0 H10b). The server refuses a drain outside 1 to 300 at boot, so the chart says so first rather than leaving pods crash-looping. `dig` for a release from before 0.8 that reuses values without `shutdown`. */ -}}
+{{- $shutdown := .Values.shutdown | default dict -}}
+{{- $drain := dig "drainSeconds" 20 $shutdown -}}
+{{- if or (lt (int $drain) 1) (gt (int $drain) 300) (ne (float64 $drain) (float64 (int $drain))) -}}
+{{- fail "\n\nshutdown.drainSeconds must be a whole number of seconds from 1 to 300.\n\nIt becomes OPENOKR_SHUTDOWN_SECONDS, which the server refuses outside that range. 20 is the default.\n" -}}
+{{- end -}}
+{{- $pause := dig "preStopSeconds" 10 $shutdown -}}
+{{- if or (lt (int $pause) 0) (ne (float64 $pause) (float64 (int $pause))) -}}
+{{- fail "\n\nshutdown.preStopSeconds must be a whole number of seconds, 0 or more.\n\n0 removes the pause. 10 is the default.\n" -}}
+{{- end -}}
+
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}
 {{- fail "\n\ningress.enabled is true but no hosts are set.\n" -}}
 {{- end -}}

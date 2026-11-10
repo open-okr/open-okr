@@ -34,6 +34,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "openokr.serviceAccountName" . }}
+      # The pause, the drain and 15 seconds for the flushes (plan 0.8.0 H10b).
+      # Derived rather than a value of its own, so it cannot be shorter than
+      # what it has to cover.
+      terminationGracePeriodSeconds: {{ include "openokr.terminationGraceSeconds" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -46,6 +50,18 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+          {{- if gt (include "openokr.preStopSeconds" . | int) 0 }}
+          # Keeps answering while the endpoint change travels to kube-proxy,
+          # the ingress controller or a cloud load balancer, which still send
+          # requests for a few seconds after the pod is marked for deletion.
+          # Without it a rollout fails those requests (plan 0.8.0 H10b). `exec`
+          # with `sleep` rather than the native sleep action, which Kubernetes
+          # 1.27, the chart's floor, may not have.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ include "openokr.preStopSeconds" . }}"]
+          {{- end }}
           {{- with .Values.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
@@ -58,6 +74,10 @@ spec:
             # should not depend on it.
             - name: OPENOKR_SKIP_MIGRATIONS
               value: "1"
+            # How long the server may finish its work in flight once SIGTERM
+            # arrives. The grace period above is derived from it.
+            - name: OPENOKR_SHUTDOWN_SECONDS
+              value: {{ include "openokr.drainSeconds" . | quote }}
             - name: BETTER_AUTH_SECRET
               valueFrom:
                 secretKeyRef:

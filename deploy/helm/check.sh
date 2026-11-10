@@ -407,6 +407,67 @@ else
   fail "a Kubernetes API token is mounted for no reason"
 fi
 
+# --- how a pod stops (plan 0.8.0 H10b) ---------------------------------------
+# docs/design/worker-deployment.md D9. A pause before SIGTERM, so the pod keeps
+# answering while the endpoint change reaches whatever sends it traffic, the
+# drain's bound in the pod, and a grace period derived from both plus 15
+# seconds for the flushes, so the three cannot disagree.
+stop_shape() {
+  doc=$(render_one deployment.yaml "$@")
+  pause=$(printf '%s\n' "$doc" | sed -n 's/.*command: \["sleep", "\([0-9]*\)"\].*/\1/p')
+  grace=$(printf '%s\n' "$doc" | sed -n 's/^ *terminationGracePeriodSeconds: \([0-9]*\)$/\1/p')
+  drain=$(printf '%s\n' "$doc" | grep -A 1 "name: OPENOKR_SHUTDOWN_SECONDS" \
+    | sed -n 's/^ *value: "\([0-9]*\)"$/\1/p')
+  echo "pause=${pause:-none} grace=${grace:-none} drain=${drain:-none}"
+}
+
+shape=$(stop_shape)
+if [ "$shape" = "pause=10 grace=45 drain=20" ]; then
+  pass "a pod pauses 10s before SIGTERM, drains for 20s and is killed only at 45s"
+else
+  fail "the default stop is not a 10s pause, a 20s drain and a 45s grace period ($shape)"
+fi
+
+shape=$(stop_shape --set shutdown.preStopSeconds=0)
+if [ "$shape" = "pause=none grace=35 drain=20" ] \
+  && ! render_one deployment.yaml --set shutdown.preStopSeconds=0 | grep -q "lifecycle:"; then
+  pass "a pause of 0 removes the pre-stop hook and takes 10s off the grace period"
+else
+  fail "a pause of 0 did not remove the hook or shorten the grace period ($shape)"
+fi
+
+shape=$(stop_shape --set shutdown.drainSeconds=40)
+if [ "$shape" = "pause=10 grace=65 drain=40" ]; then
+  pass "a longer drain reaches the pod and lengthens the grace period with it"
+else
+  fail "a longer drain did not reach the pod and the grace period together ($shape)"
+fi
+
+# Values reused from 0.7.0 have no `shutdown` at all (helm upgrade
+# --reuse-values), and must stop the way a fresh install does.
+shape=$(stop_shape --set shutdown=null)
+if [ "$shape" = "pause=10 grace=45 drain=20" ]; then
+  pass "values reused from v0.7.0 stop the way a fresh install does"
+else
+  fail "values reused from v0.7.0 stop differently from a fresh install ($shape)"
+fi
+
+for bad in "shutdown.drainSeconds=0" "shutdown.drainSeconds=301" "shutdown.drainSeconds=2.5"; do
+  if render_expecting_failure --set "database.url=$DB" --set "$bad" \
+    | grep -q "shutdown.drainSeconds must be a whole number of seconds from 1 to 300"; then
+    pass "refuses $bad, which the server would refuse at boot"
+  else
+    fail "accepted $bad, which the server refuses at boot"
+  fi
+done
+
+if render_expecting_failure --set "database.url=$DB" --set shutdown.preStopSeconds=-1 \
+  | grep -q "shutdown.preStopSeconds must be a whole number of seconds, 0 or more"; then
+  pass "refuses a negative pause"
+else
+  fail "accepted a negative pause"
+fi
+
 # --- the optional pieces render ------------------------------------------
 if render --set ingress.enabled=true --set ingress.hosts[0].host=okr.example.com \
   --set ingress.hosts[0].paths[0].path=/ \

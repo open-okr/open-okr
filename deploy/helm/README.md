@@ -74,6 +74,8 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `cloud.plans`, `cloud.defaultPlan`, `cloud.region` | empty | The plan catalogue as JSON, the plan a new workspace starts on, and the region recorded on each tenant |
 | `cloud.erasure.schedule` | empty | A cron schedule for `pnpm cloud:erase --write`, which erases closed workspaces past their retention window. Runs with `database.adminUrl`, the owner role. Nothing is erased while `OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS` is 0, its default |
 | `extraEnv`, `extraEnvFrom` | empty | Anything else the application reads. Prefer `extraEnvFrom` with a Secret for a credential |
+| `shutdown.preStopSeconds` | 10 | How long a stopping pod keeps answering before it is sent SIGTERM, while the load balancer stops sending to it. 0 removes the pause. See [Stopping a pod](#stopping-a-pod) |
+| `shutdown.drainSeconds` | 20 | How long the server may finish its work in flight after SIGTERM (`OPENOKR_SHUTDOWN_SECONDS`, 1 to 300). The pod's grace period is the pause plus this plus 15 |
 
 ## Storage and replicas
 
@@ -166,6 +168,22 @@ mounted read-only in the server, the migration hook and every job, as
 `NODE_EXTRA_CA_CERTS` for Node and `PGSSLROOTCERT` for the backups'
 `pg_dump` and `pg_restore`. A Secret works the same way through
 `database.caBundle.existingSecret`; naming both is refused.
+
+## Stopping a pod
+
+A rollout, a scale-down or a node drain stops pods, and none of them should
+fail a request or lose work. Each stop has three parts:
+
+| Part | Default | What happens |
+|---|---|---|
+| The pause | `shutdown.preStopSeconds`, 10 | The pod has been taken out of the Service's endpoints but keeps answering, because kube-proxy, an ingress controller or a cloud load balancer goes on sending to it for a few seconds while the change reaches it |
+| The drain | `shutdown.drainSeconds`, 20 | SIGTERM. The server finishes the delivery it is sending and hands the rest of its batch back, lets a scheduled run finish or hands it back three seconds before the end, and waits for actions in flight. Then it sends the error reports and spans it holds, writes `shutdown: stopped after ...` and exits |
+| The grace period | The two above plus 15, so 45 | Kubernetes kills the pod only if something above hung. It is derived, so raising either value raises it too |
+
+Behind the AWS Load Balancer Controller a target is deregistered only after the
+controller has seen the endpoint change and called AWS, which is slower than
+kube-proxy. Start `shutdown.preStopSeconds` at 20 there and watch the load
+balancer's 5xx count during a rollout.
 
 ## Upgrading
 

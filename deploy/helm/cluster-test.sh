@@ -34,6 +34,8 @@ dump() {
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=40 2>&1 >&2 || true
   echo "--- app -------------------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr --tail=40 2>&1 >&2 || true
+  echo "--- request loop ----------------------------------------------" >&2
+  kubectl logs -n "$NAMESPACE" pod/probe-loop --tail=10 2>&1 >&2 || true
   echo "---------------------------------------------------------------" >&2
 }
 
@@ -217,6 +219,87 @@ kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=migration --tail=50 
   | grep -q "schema is up to date" \
   || fail "the second migration run did not report the schema as current"
 pass "re-running migrations is idempotent"
+
+# --- a replica stops without failing a request (plan 0.8.0 H10b) ------------
+# docs/design/worker-deployment.md D9. A client inside the cluster asks the
+# Service for /api/health every 100 milliseconds, each time on a new
+# connection, which is what kube-proxy routes, while one of the two replicas is
+# deleted. The pre-stop pause keeps the deleted pod answering until the
+# endpoint change has reached kube-proxy, and the drain lets what it already
+# took finish, so nothing fails. Without the pause, the requests that arrive
+# in the second after SIGTERM are refused. The image is the one under test,
+# because it is already loaded and carries Node.
+PROBE_SCRIPT='
+const http = require("node:http");
+const until = Date.now() + 45000;
+const failures = [];
+let sent = 0;
+const once = () =>
+  new Promise((done) => {
+    const request = http.get(
+      { host: process.env.TARGET, port: 80, path: "/api/health", agent: false, timeout: 5000 },
+      (response) => {
+        response.resume();
+        if (response.statusCode !== 200) failures.push(`status ${response.statusCode}`);
+        response.on("end", done);
+        response.on("error", (error) => { failures.push(error.code || error.message); done(); });
+      },
+    );
+    request.on("timeout", () => request.destroy(new Error("timeout")));
+    request.on("error", (error) => { failures.push(error.code || error.message); done(); });
+  });
+(async () => {
+  const pending = [];
+  while (Date.now() < until) {
+    sent += 1;
+    pending.push(once());
+    await new Promise((wait) => setTimeout(wait, 100));
+  }
+  await Promise.all(pending);
+  console.log(`probe: sent ${sent}, failed ${failures.length}${failures.length ? ": " + failures.slice(0, 5).join(", ") : ""}`);
+})();
+'
+kubectl run probe-loop -n "$NAMESPACE" --restart=Never \
+  --image="$OPENOKR_IMAGE_REPO:$OPENOKR_IMAGE_TAG" --image-pull-policy=Never \
+  --env="TARGET=$RELEASE-openokr" \
+  --command -- node -e "$PROBE_SCRIPT" >/dev/null \
+  || fail "the request loop could not be started"
+kubectl wait -n "$NAMESPACE" --for=condition=Ready pod/probe-loop --timeout=120s >/dev/null \
+  || fail "the request loop never started"
+
+# A few seconds of requests against both replicas first. The web pods are the
+# ones with the release's labels and no component: the hook Jobs' pods carry
+# one.
+sleep 5
+victim=$(kubectl get pods -n "$NAMESPACE" \
+  -l "app.kubernetes.io/name=openokr,app.kubernetes.io/instance=$RELEASE,!app.kubernetes.io/component" \
+  --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
+[ -n "$victim" ] || fail "found no serving replica to delete"
+kubectl delete pod -n "$NAMESPACE" "$victim" --wait=false >/dev/null
+echo "openokr: deleted $victim under a request every 100ms"
+
+waited=0
+while :; do
+  phase=$(kubectl get pod probe-loop -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+  case "$phase" in Succeeded | Failed) break ;; esac
+  waited=$((waited + 2))
+  [ "$waited" -lt 120 ] || fail "the request loop did not finish"
+  sleep 2
+done
+probe=$(kubectl logs -n "$NAMESPACE" pod/probe-loop 2>&1 | grep "^probe:" || true)
+sent=$(printf '%s' "$probe" | sed -n 's/^probe: sent \([0-9]*\), .*/\1/p')
+case "$probe" in
+  "probe: sent "*", failed 0")
+    [ "${sent:-0}" -ge 100 ] || fail "the request loop sent only ${sent:-no} requests"
+    pass "a replica was deleted under $sent requests and none of them failed"
+    ;;
+  *) fail "requests failed while a replica stopped: ${probe:-the loop printed nothing}" ;;
+esac
+kubectl delete pod probe-loop -n "$NAMESPACE" --wait=false >/dev/null 2>&1 || true
+
+kubectl rollout status -n "$NAMESPACE" "deployment/$RELEASE-openokr" --timeout=180s >/dev/null \
+  || fail "the deleted replica was not replaced"
+pass "the deleted replica was replaced"
 
 # --- a backup runs, and verifies (completeness review H-19) ---------------
 # With backups enabled the CronJob failed at once, `secret "okr-openokr" not

@@ -86,6 +86,26 @@ seconds will, and every open tab reconnects each time. Do not buffer the
 responses: they are `text/event-stream`, and the server already sends
 `X-Accel-Buffering: no` for nginx.
 
+## Stopping a pod
+
+Every rollout, scale-down and node drain stops pods. A stopping pod first
+pauses for `shutdown.preStopSeconds` (10 seconds) while it keeps answering,
+because whatever sends it traffic learns that it is leaving a few seconds after
+Kubernetes does. Then the server drains for up to `shutdown.drainSeconds` (20):
+it finishes the delivery it is sending, hands back the rest of its work for
+another pod to pick up, and waits for the actions in flight. Kubernetes kills
+it only at the grace period, the two added together plus 15 seconds.
+
+| In front of the pods | What the pause has to cover |
+|---|---|
+| kube-proxy alone, or an ingress controller in the cluster | A second or two. The default is generous |
+| The AWS Load Balancer Controller | The controller seeing the change and calling AWS. Start at 20 seconds and watch the load balancer's 5xx count during a rollout |
+| A CDN in front of a load balancer | Whatever the load balancer needs; the CDN reconnects on its own |
+
+A long live stream, such as an open inbox, closes when the pod exits, and the
+browser reconnects to another pod by itself. The chart's README has
+[the whole sequence](../../deploy/helm/README.md#stopping-a-pod).
+
 ## Behind PgBouncer
 
 Point the instance at Postgres directly. A connection pooler such as PgBouncer
