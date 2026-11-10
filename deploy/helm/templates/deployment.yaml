@@ -71,7 +71,8 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: {{ include "openokr.secretName" . }}
-                  key: {{ .Values.secrets.metricsTokenKey }}
+                  {{- /* Absent from values reused from a release older than 0.7 (helm upgrade --reuse-values). */}}
+                  key: {{ .Values.secrets.metricsTokenKey | default "metrics-token" }}
                   optional: true
             - name: OPENOKR_INSTANCE_NAME
               value: {{ .Values.instance.name | quote }}

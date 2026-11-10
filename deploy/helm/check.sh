@@ -163,18 +163,35 @@ else
   fail "refused a configuration an upgrade could already be running"
 fi
 
-if helm template openokr . --set "database.url=$DB" \
-  --set persistence.enabled=false --show-only templates/NOTES.txt 2>/dev/null \
-  | grep -q "WARNING: persistence is off"; then
+# --- what the install notes say about storage -----------------------------
+# `helm template` never renders NOTES.txt, so this used to grep the file for
+# the warning, which passed whatever the condition around it said. That is
+# how an install with a bucket came to be told its uploads go to an emptyDir.
+# A client-side dry run renders the notes and needs no cluster. An output with
+# no NOTES section fails, rather than passing on a helm that cannot render it.
+notes() {
+  helm install openokr . --dry-run=client --set "database.url=$DB" "$@" 2>&1 \
+    | sed -n '/^NOTES:/,$p'
+}
+
+emptydir_notes=$(notes --set persistence.enabled=false --set replicaCount=2)
+if [ -z "$emptydir_notes" ]; then
+  fail "this helm cannot render the install notes with --dry-run=client"
+elif printf '%s' "$emptydir_notes" | grep -q "WARNING: persistence is off" \
+  && printf '%s' "$emptydir_notes" | grep -q "invisible to the other"; then
   pass "warns when uploads are going to an emptyDir"
 else
-  # NOTES.txt is not a template helm can --show-only, on some versions. Fall
-  # back to reading the file itself, which is what the warning lives in.
-  if grep -q "WARNING: persistence is off" templates/NOTES.txt; then
-    pass "warns when uploads are going to an emptyDir"
-  else
-    fail "says nothing when uploads are going to an emptyDir"
-  fi
+  fail "says nothing when uploads are going to an emptyDir"
+fi
+
+bucket_notes=$(notes --set persistence.enabled=false --set replicaCount=2 \
+  --set storage.s3.bucket=openokr-files --set storage.s3.existingSecret=openokr-s3)
+if printf '%s' "$bucket_notes" | grep -q "WARNING: persistence is off\|invisible to the other\|pinned to one replica"; then
+  fail "tells an install with a bucket that its uploads are on a volume"
+elif printf '%s' "$bucket_notes" | grep -q "S3 bucket openokr-files"; then
+  pass "says uploads go to the bucket when one is named"
+else
+  fail "does not say where uploads go when a bucket is named"
 fi
 
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
@@ -498,20 +515,91 @@ else
 fi
 
 # --- values reused from an older release -------------------------------------
-# `helm upgrade --reuse-values` from 0.5 carries no `cloud`, `extraEnv` or
-# `extraEnvFrom` keys. Setting a key to null makes Helm delete it, which is the
-# same shape.
-if render --set cloud=null >/dev/null 2>&1; then
-  pass "renders when the cloud settings are missing from reused values"
-else
-  fail "does not render when the cloud settings are missing from reused values"
-fi
+# `helm upgrade --reuse-values` keeps the old release's values and adds nothing
+# from the new chart, so every key a newer release introduced is missing. A
+# template that reads such a key without a default fails the upgrade (it did
+# for `cloud` in 0.6 and `secrets.metricsTokenKey` in 0.7). Setting a key to
+# null makes Helm delete it, which is the same shape.
+#
+# For each earlier release this finds the keys present in values.yaml and
+# absent from that release's values.yaml, then renders with all of them
+# deleted at once. A key that no template reads costs nothing, so the check
+# needs no list of its own to keep current.
+#
+# Reads only the key structure: mappings by indentation, ignoring comments,
+# list items and anything nested under a list item. Reports the shallowest
+# missing key, because that is what an older release lacks entirely.
+missing_keys() {
+  python3 -I -c '
+import re, subprocess, sys
 
-if render --set cloud=null --set extraEnv=null --set extraEnvFrom=null >/dev/null 2>&1; then
-  pass "renders when cloud, extraEnv and extraEnvFrom are all missing"
-else
-  fail "does not render when cloud, extraEnv and extraEnvFrom are all missing"
-fi
+def paths(text):
+    found, stack, skip = set(), [], None
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if skip is not None:
+            if indent > skip:
+                continue
+            skip = None
+        if line.lstrip().startswith("-"):
+            skip = indent
+            continue
+        m = re.match(r"^\s*([A-Za-z0-9_-]+):", line)
+        if not m:
+            continue
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, m.group(1)))
+        found.add(".".join(k for _, k in stack))
+    return found
+
+old = subprocess.run(["git", "show", sys.argv[1] + ":deploy/helm/values.yaml"],
+                     capture_output=True, text=True)
+if old.returncode != 0:
+    sys.exit(3)
+new = paths(open("values.yaml").read())
+gone = new - paths(old.stdout)
+# Keep a key only when its parent exists in the old release.
+for p in sorted(gone):
+    if "." not in p or p.rsplit(".", 1)[0] not in gone:
+        print(p)
+' "$1"
+}
+
+previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || true)
+for tag in $(printf '%s\n' "v0.5.0" "$previous" | sort -u | grep .); do
+  status=0
+  keys=$(missing_keys "$tag") || status=$?
+  if [ "$status" -ne 0 ]; then
+    # In CI a missing tag means the checkout is shallow and the check would
+    # silently test nothing, so it fails there. Locally it is skipped.
+    if [ -n "${CI:-}" ]; then
+      fail "values reused from $tag: tag not available in this checkout (CI needs full history, fetch-depth: 0)"
+    else
+      echo "  skip  values reused from $tag (tag not available in this checkout)"
+    fi
+    continue
+  fi
+  if [ -z "$keys" ]; then
+    pass "no values added since $tag"
+    continue
+  fi
+  nulled=""
+  for key in $keys; do
+    nulled="$nulled --set $key=null"
+  done
+  echo "  keys missing from $tag values, set to null: $(echo $keys)"
+  # shellcheck disable=SC2086
+  if render $nulled >/dev/null 2>&1; then
+    pass "renders with every value added since $tag missing (helm upgrade --reuse-values)"
+  else
+    fail "does not render with values added since $tag missing; first error:"
+    # shellcheck disable=SC2086
+    render $nulled | head -5 >&2
+  fi
+done
 
 # --- proxies in front of the application --------------------------------------
 # The sign-in limits count the caller this many entries from the right of

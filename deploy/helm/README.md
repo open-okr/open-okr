@@ -139,6 +139,11 @@ forward-only and take a Postgres advisory lock, so the upgrade is safe to
 retry and safe with several replicas. A failed migration stops the release
 rather than producing pods that serve a half-migrated schema.
 
+`--reuse-values` keeps the old values and adds no new defaults, so an upgrade
+to a release that added a chart value can fail. Use `--reset-then-reuse-values`
+(Helm 3.14 or later) there; see
+[the upgrade runbook](../../docs/runbooks/upgrade.md#helm-coming-from-05).
+
 Roll back with `helm rollback openokr`. Note that this rolls back the
 application, not the schema: migrations are forward-only by design, and a
 schema change that has to be undone is a new migration.

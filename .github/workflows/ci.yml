@@ -318,6 +318,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The values check reads values.yaml from earlier release tags.
+          fetch-depth: 0
       - uses: azure/setup-helm@v5
 
       - name: Chart checks

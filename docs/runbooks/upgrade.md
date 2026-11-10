@@ -233,6 +233,30 @@ still to run. Nothing on screen waits for them.
   with is its version 0; nothing moves. "Plan a run" appears on Admin, Agents
   where an AI provider is configured.
 
+### Helm: coming from 0.5
+
+`helm upgrade --reuse-values` keeps the values your release was installed
+with and adds nothing. When a release adds a chart value, the new templates
+read a key your old values lack, and Helm stops with a nil pointer error.
+`--reset-then-reuse-values` (Helm 3.14 or later) keeps your settings and adds
+the new chart's defaults, so use it for any upgrade that crosses a release.
+
+Two upgrades hit this:
+
+- **To 0.6.0.** The templates read `cloud.erasure.schedule` and
+  `cloud.enabled`, which 0.5 values do not have:
+  `nil pointer evaluating interface {}.erasure`.
+- **To 0.7.0, from 0.5 or 0.6.0.** The secrets template reads
+  `secrets.metricsTokenKey`, new in 0.7: `index $existing.data .key: value is
+  nil`.
+
+Upgrade to 0.7.0 with `--reset-then-reuse-values` in place of
+`--reuse-values`, straight from 0.5 if you like. 0.7.1 is expected to make
+`--reuse-values` work again. If an upgrade already failed, run
+`helm history <release>` and `helm status <release>`: Helm rolls a failed
+upgrade back only with `--atomic`, so confirm which revision is running before
+you retry. Compose is not affected.
+
 ## 0.5 to 0.6: one AI key for every workspace, and budgets that hold
 
 0.6 adds six migrations, 0145 to 0150, and no data change. They add tables
@@ -242,6 +266,10 @@ Every other route to an audit row is still refused. None of them refuses to
 run, so `./openokr upgrade` is the whole upgrade, and no setting needs
 choosing. An instance coming from an older release still meets the sections
 below, and the one that can stop an upgrade is 0.3 to 0.4.
+
+On Helm, upgrade with `--reset-then-reuse-values`: the 0.6.0 chart fails on
+the values of a 0.5 release under `--reuse-values`. See
+[Helm: coming from 0.5](#helm-coming-from-05).
 
 Look at these before you upgrade.
 

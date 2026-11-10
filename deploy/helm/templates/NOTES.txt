@@ -33,7 +33,15 @@ Lose it and mail passwords, channel credentials and provider keys become
 unreadable.
 {{- end }}
 
-{{- if and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce") }}
+{{- /* A named bucket is where uploads go, whatever persistence says, so the
+       volume notes below are about a store the release is not using. */}}
+{{- $bucket := dig "s3" "bucket" "" (.Values.storage | default dict) }}
+
+{{- if $bucket }}
+
+Uploaded files are kept in the S3 bucket {{ $bucket }}, so every pod reads the
+same files and the replica count can change freely.
+{{- else if and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteOnce") }}
 
 Uploaded files are kept on a {{ .Values.persistence.size }} ReadWriteOnce
 volume, mounted at /app/storage. That volume cannot be shared across nodes, so
@@ -43,7 +51,7 @@ ReadWriteMany class:
   --set persistence.accessMode=ReadWriteMany --set replicaCount=3
 {{- end }}
 
-{{- if not .Values.persistence.enabled }}
+{{- if and (not $bucket) (not .Values.persistence.enabled) }}
 
 WARNING: persistence is off, so uploaded files go to an emptyDir.
 

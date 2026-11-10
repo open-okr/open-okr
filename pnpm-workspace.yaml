@@ -64,7 +64,7 @@ catalog:
   # so one client covers four of the six real drivers.
   "@anthropic-ai/sdk": ^1.6.0
   openai: ^7.53.0
-  "@google/genai": ^2.32.0
+  "@google/genai": ^3.0.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
@@ -93,7 +93,7 @@ catalog:
   # human's UI-dependency approval rather than asked separately, because
   # without a DOM testing seam those acceptance tests cannot exist at all.
   # Dev-only, never shipped.
-  jsdom: ^30.1.3
+  jsdom: ^31.0.0
   "@testing-library/react": ^16.3.3
   "@testing-library/user-event": ^14.6.8
   # The rich text editor (P2-T11), approved by the human alongside P2-T10's
