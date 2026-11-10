@@ -164,20 +164,21 @@ pass "the server's role cannot bypass row-level security"
 # --- the scheduler starts under that role ----------------------------------
 # Completeness review H-02. Under a restricted role pg-boss used to fail to
 # create its schema, the scheduler logged one line and the product went
-# quiet while the health check stayed green. The health check says so now.
-health=""
+# quiet while the health check stayed green. The status endpoint says so; the
+# floor was checked above, because the public health answer no longer carries it.
+status=""
 for _ in $(seq 1 30); do
-  health="$(curl -s "$BASE/api/health" || true)"
-  case "$health" in
-    *'"scheduler":"running"'*) break ;;
+  status="$(curl -s "$BASE/api/status" || true)"
+  case "$status" in
+    *'"scheduler":{"status":"operational"}'*) break ;;
   esac
   sleep 2
 done
-case "$health" in
-  *'"scheduler":"running"'*'"tenantFloor":"enforced"'*) ;;
-  *) fail "expected a running scheduler and an enforced floor, got: $health" ;;
+case "$status" in
+  *'"scheduler":{"status":"operational"}'*) ;;
+  *) fail "expected an operational scheduler, got: $status" ;;
 esac
-pass "the scheduler is running and the tenant floor is enforced"
+pass "the scheduler is operational"
 
 # --- the operator command runs inside the image -----------------------------
 # A provider on this target has no checkout, so `pnpm cloud:operator` is not there
