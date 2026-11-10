@@ -2,13 +2,14 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds five things:
+This plan grows as changes are named for 0.8.0. So far it holds six things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
 3. **Found running OKRGoal**: three faults found on 10 November 2026 while finding out why the copilot on OKRGoal said "AI off". Section 3. One waits on a decision (Q6).
 4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Two decisions (Q7, Q8).
+6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -163,17 +164,59 @@ The footer reads `apps/web/lib/version-footer.tsx` (the `full` gate and the clou
 | V1 | `docs/design/version-footer.md` §1 and §3; UIUX-PLAN §3, the footer band |
 | V2 | `docs/design/version-footer.md` §1; UIUX-PLAN §6, S-47; TECHNICAL-PLAN §4.14, what `instance.updateCheck` switches on a cloud |
 
-## 6. Suggested order
+## 6. "Still needed here" leads to the field
+
+### 6.1 What happens today
+
+Each phase on the cycle screen (S-04 to S-08 and the phases after them) lists what the phase still needs under **Still needed here**: "No sponsor named", "Input pack item 3 is missing: KPI dashboard or baseline health metrics", "The input pack has not been distributed". The list is plain text. Nothing says where each item is filled in, and some are filled further down the same page, some on another screen, and some only by somebody else.
+
+Why it is plain text:
+
+| Fact | Where |
+|---|---|
+| Each item is a sentence and nothing more. The method package builds the list per phase as strings, and the workflow action passes them on as `missing: string[]` | `packages/method/src/workflow.ts` (`phaseZero` to `phaseSeven`), `packages/core/src/actions/cycle-workflow.ts` |
+| The page prints the sentences and cannot tell which field each belongs to | `apps/web/app/cycle/page.tsx`, the `phase.missing` list |
+| No card on the cycle page has an anchor to link to | `apps/web/app/cycle/input-pack.tsx`, `apps/web/app/cycle/phase-forms.tsx` and the other phase cards |
+| Some items can only be filled by somebody else. On Phase 1, the Roles and planning sessions card, which names the sponsor and the facilitator, is drawn only for a member with Full on the workspace, which with the built-in roles is the Owner alone. Everybody else sees "No sponsor named" and has nowhere to go | `apps/web/app/cycle/page.tsx` (`canPublish`), `packages/core/src/access/roles.ts` |
+
+### 6.2 Change
+
+| # | Change | Size | Gate |
+|---|---|---|---|
+| F1 | **Every item under Still needed here is a link to the place that fills it.** Each item gains a stable key beside its sentence, from the method package, for every phase from 0 to 7. The workflow action returns the keys as a new field next to `missing`, which keeps its sentences unchanged for API clients. The cycle page maps each key to its destination. Clicking an item scrolls to the card, focuses the field and outlines it briefly. Where the field is on another screen, such as a goal whose draft fails a rule, the item links to that screen. **An item the reader cannot fill is not a link.** It says who can instead, for example "The workspace owner names the sponsor", so nobody is sent to a card they cannot see. The sentences, the rules behind them and METHOD.md do not change. The contract is regenerated, since the action gains a field | M | None |
+
+Phase 1, the screen in the request, as an example:
+
+| Item | Goes to |
+|---|---|
+| No sponsor named, No facilitator named | Roles and planning sessions: the Sponsor or Facilitator picker. For a reader without Full on the workspace, "The workspace owner names the sponsor" (or facilitator) instead of a link |
+| Input pack item *n* is missing | Input pack: item *n*'s row |
+| The input pack has not been distributed | Input pack: the Distribute button |
+| No session dates are booked | Roles and planning sessions: the session dates |
+| The pack reached people too late | Roles and planning sessions: the session dates, the one thing that can still change |
+
+The other phases follow the same rule. The table of every item, its key and its destination is written as the first part of the change, under UIUX-PLAN S-04, since no design document covers the cycle workspace.
+
+Out of scope, and made possible by the keys: the sentences come from the method package in English only, so the Malay interface shows them in English today. With a key per item, the screen could translate them.
+
+### 6.3 What the specification gains
+
+| Row | Pages |
+|---|---|
+| F1 | UIUX-PLAN §6, S-04: Still needed here is a list of links, and what an item the reader cannot fill shows; the table of item keys and destinations |
+
+## 7. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
 3. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
-4. The design for Y3 to Y6, then the code, one row each.
-5. Q6, then O2's design and code.
-6. Q7 and Q8, then V1 and V2. Both are small once decided.
-7. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
+4. F1. No design, and it answers "where do I fill this in" on the screen every cycle starts on.
+5. The design for Y3 to Y6, then the code, one row each.
+6. Q6, then O2's design and code.
+7. Q7 and Q8, then V1 and V2. Both are small once decided.
+8. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 7. Build log
+## 8. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -193,6 +236,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | D1 | to do | |
 | V1 | to do | Waits on Q7 |
 | V2 | to do | Waits on Q8 |
+| F1 | to do | |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
 | Q7, Q8 | yours | Section 5.3 |
