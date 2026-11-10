@@ -390,7 +390,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Y6 | to do | |
 | Y7 | to do | Design first; Y7-1 to Y7-6 decided |
 | H1 | carried by S3 | |
-| H2 | to do | Design first: security |
+| H2 | design written | `docs/design/trusted-proxies.md`: `OPENOKR_TRUSTED_PROXIES` or `OPENOKR_CLIENT_ADDRESS_HEADER`, environment only, empty keeps today's rule. Found that `X-Real-IP`, read as a fallback, lets a caller who reaches a load balancer directly choose their own address. Q1 to Q3; waits for "design approved" |
 | H3 | design written | `docs/design/registration-policy.md` §10: an unclaimed instance admits its first account whatever the policy says. H3-Q1 (a setup code) recommended for a later release. Waits for "design approved" |
 | H4 | no change | Not reproducible on `main`, nor on 0.6.0: the proxy sends a signed-out visitor to `/sign-in`, and the auth layout sends sign-in to `/setup` while no account exists and setup is unfinished (`apps/web/app/(auth)/layout.tsx`, `readSetupState`). Nothing on that path reads the cloud flag, and `e2e/first-run-wizard.spec.ts` asserts it. What OKRGoal saw needs an account to exist before setup finished, which is the deliberate recovery path, and most likely came from H3's broken wizard sign-up. H3's fix covers it |
 | H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
@@ -415,7 +415,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | L2 | done | A primary button under the sentence, `data-testid="start-drafting"`, drawn only for `canEdit` (the same `edit` the cycle page drafts with). Unit test both readers |
 | S1 | done | One commit with S2, since the sign-up form carries both. The card replaces the form when sign-up returns no session; the link's hour is now named (`EMAIL_VERIFICATION_LINK_SECONDS`) |
 | S2 | done | At `/email-confirmed`, because `/welcome` is onboarding (S-34). Until S3, an expired or broken link points to the instance's support address, or to whoever runs it |
-| S3 | to do | Design first; carries H1 |
+| S3 | design written | `docs/design/email-verification.md`: the mail through the outbox, Better Auth's own resend endpoint on all three surfaces, limits per address and network, a 24-hour link recommended. Found a refused mail no longer fails sign-up on Better Auth 1.7. Q1 to Q3; waits for "design approved" |
 | T1 | to do | Q9 decided |
 | R1 | to do | Design first: access |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
