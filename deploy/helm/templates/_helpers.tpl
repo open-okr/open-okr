@@ -78,7 +78,8 @@ Call with a dict: (dict "ctx" $ "key" "encryption-key" "value" (randBytes 32))
 {{- $ctx := .ctx -}}
 {{- $name := printf "%s-secrets" (include "openokr.fullname" $ctx) -}}
 {{- $existing := lookup "v1" "Secret" $ctx.Release.Namespace $name -}}
-{{- if and $existing (index $existing.data .key) -}}
+{{- /* A key can be nil when values reused from an older release lack the setting that names it. */ -}}
+{{- if and $existing .key (index $existing.data .key) -}}
 {{- index $existing.data .key -}}
 {{- else -}}
 {{- .value | b64enc -}}
