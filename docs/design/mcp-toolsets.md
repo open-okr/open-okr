@@ -85,7 +85,7 @@ A toolset is a named slice of the catalogue, cut by the job a person does.
 | `facilitation` | Running the rhythm: preparing, running remotely and following up sessions, the planning workflow, cycles, alignment, dependencies, decisions, closing | 91 |
 | `room` | The live room's own moves: private votes and their reveal, the mic, pulse, kudos, retro notes, anonymous process-health answers | 16 |
 | `admin` | Workspace, people, spaces, roles, invitations, settings, audit, agents, practice, nudges, exports | 83 |
-| `integrations` | AI providers, chat channels, single sign-on, spreadsheet imports | 50 |
+| `integrations` | AI providers, chat channels, single sign-on, spreadsheet imports | 53 |
 | `all` | Every agent-surface tool | 380 |
 
 Chosen in the address the client is configured with, so it works with every
