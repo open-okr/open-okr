@@ -511,7 +511,6 @@ export {
   type Auth,
   type AuthOptions,
   createAuth,
-  EMAIL_VERIFICATION_LINK_SECONDS,
 } from "./auth/auth.ts";
 export { callerAddress } from "./auth/caller-address.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
@@ -571,6 +570,7 @@ export {
   type SSOProviderTracker,
   trackSSOProviders,
 } from "./auth/sso-refresh.ts";
+export { EMAIL_VERIFICATION_LINK_SECONDS } from "./auth/verification-links.ts";
 export {
   applyBillingEvent,
   type BillingGateway,

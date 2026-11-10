@@ -231,6 +231,14 @@ export const METRIC = {
    * own typing and one row each would be unbounded.
    */
   signInHeldTotal: "openokr_sign_in_held_total",
+  /**
+   * Links that confirm an email address, by why they were asked for
+   * (`sign_up`, `resend`, `repeat_sign_up`) and what became of the request:
+   * `queued`, `refused` by the per-address limit, or `failed` to queue
+   * (email-verification.md D17, plan 0.8.0 S3). Counted rather than audited,
+   * because one row per request would be unbounded.
+   */
+  verificationLinksTotal: "openokr_verification_links_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",

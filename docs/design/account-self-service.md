@@ -267,7 +267,7 @@ Every field is the kit's (`PasswordInput`, `EmailInput`, `TextInput`), every ans
 | Email changes per account | 3 a day | `account-self-service.ts` |
 | Email changes per target address | 3 a day | `account-self-service.ts` |
 | Answer floor | 500 ms | `account-self-service.ts` |
-| Change link lifetime | `EMAIL_VERIFICATION_LINK_SECONDS` | `auth.ts`. Better Auth has one `expiresIn` for both kinds of link, so S3's Q1 sets this too |
+| Change link lifetime | `EMAIL_VERIFICATION_LINK_SECONDS` | `verification-links.ts`, where S3 moved it. Better Auth has one `expiresIn` for both kinds of link, so S3's Q1 sets this too: 24 hours |
 
 ## 8. Acceptance criteria
 

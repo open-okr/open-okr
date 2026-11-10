@@ -76,6 +76,42 @@ describe("the auth route's lockout audit wrapper", () => {
     );
   });
 
+  it("records the limiter's refusal of a new confirmation link too (email-verification.md D10)", async () => {
+    handlerMock.mockResolvedValue(limited());
+    const { POST } = await import("../app/api/auth/[...all]/route");
+
+    await POST(
+      request("/api/auth/send-verification-email", {
+        "x-forwarded-for": "203.0.113.9",
+      }),
+    );
+
+    expect(recordInstanceAuditEventMock).toHaveBeenCalledWith(
+      "fake-pool",
+      expect.objectContaining({
+        action: "auth.rate_limited",
+        payload: expect.objectContaining({
+          path: "/api/auth/send-verification-email",
+        }),
+      }),
+    );
+  });
+
+  it("records nothing for one address's allowance, which is counted, not audited (D17)", async () => {
+    handlerMock.mockResolvedValue(
+      new Response(JSON.stringify({ code: "VERIFICATION_RESEND_HELD" }), {
+        status: 429,
+        headers: { "Retry-After": "60" },
+      }),
+    );
+    const { POST } = await import("../app/api/auth/[...all]/route");
+
+    const response = await POST(request("/api/auth/send-verification-email"));
+
+    expect(response.status).toBe(429);
+    expect(recordInstanceAuditEventMock).not.toHaveBeenCalled();
+  });
+
   it("records nothing for a sign-in hold, which its own hook audits", async () => {
     handlerMock.mockResolvedValue(
       new Response(JSON.stringify({ code: "SIGN_IN_HELD" }), {

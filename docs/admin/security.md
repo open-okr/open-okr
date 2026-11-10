@@ -35,6 +35,22 @@ a hold ends on its own.
 - The answer is the same whether or not an account exists, so a hold tells
   nobody who has one. The counts are kept as keyed hashes, never as addresses.
 
+### Confirming email addresses
+
+| Question | Answer |
+|---|---|
+| When is it required? | Only when the instance can send mail, which is when its mail transport is SMTP. It is read when the server starts, so changing it needs a restart. With the console transport, a new account is signed in straight away |
+| How does the link travel? | It is queued on the outbox and the relay sends it, usually within a second. A mail server that refuses it never fails the sign-up: the relay retries ten times over about a quarter of an hour, then gives up and counts it in `openokr_outbox_dead_lettered_total` |
+| How long does a link work? | 24 hours. It confirms the address and signs nobody in. A newer link does not cancel an older one |
+| What does somebody whose mail never came do? | Press **Send the link again** on the check-your-email card, beside "Confirm your email first" on sign-in, or on the page an expired link opens. Signing up again with the same address sends a fresh link too. Completing a password reset also confirms the address, and signs every device out |
+| What stops this being abused? | One link a minute and five a day for any one address, whatever network asks, and five requests a minute from one network. The answer is the same whether or not the address has an account, so the button tells nobody who has one |
+| What is recorded? | `auth.email_verified` on the instance audit chain when an address is confirmed, by a link or by a reset, once per account. Links queued and refused count in `openokr_verification_links_total` ([observability](../runbooks/observability.md)). The outbox row holds the address and the link until it is delivered, then both are removed |
+
+**Behind a CDN and a load balancer**, every caller can look like one network
+until the instance is told which proxies to trust, so the five a minute is
+then shared by everybody. The per-address limit is not affected. A per-visitor
+rate limit at the CDN holds it off meanwhile.
+
 ### Authentication endpoints that are off
 
 Everything under `/api/auth` is Better Auth, the sign-in library. It serves

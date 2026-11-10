@@ -14,6 +14,7 @@ import { authClient } from "../../../lib/auth-client";
 import { DemoPill } from "../../../lib/demo-pill";
 import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, FormError } from "../auth-card";
+import { ResendLink, useLinkHours } from "../resend-link";
 
 interface SSOProvider {
   id: string;
@@ -49,9 +50,15 @@ export default function SignInPage() {
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
   const [heldMinutes, setHeldMinutes] = useState<number | null>(null);
+  // The address Better Auth said waits to be confirmed, which it says only
+  // after the password matched, so a new link can be offered for it
+  // (plan 0.8.0 S3).
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
+  const linkHours = useLinkHours();
   const clearError = () => {
     setError("");
     setHeldMinutes(null);
+    setUnconfirmed(null);
   };
   const [pending, setPending] = useState(false);
   // The passkey or provider button that started a call, so only it spins. Set
@@ -146,9 +153,10 @@ export default function SignInPage() {
     clearError();
     setPending(true);
     const form = new FormData(event.currentTarget);
+    const email = String(form.get("email"));
 
     const { data, error: failure } = await authClient.signIn.email({
-      email: String(form.get("email")),
+      email,
       password: String(form.get("password")),
     });
     setPending(false);
@@ -168,6 +176,9 @@ export default function SignInPage() {
           ),
         );
         return;
+      }
+      if (failure.code === "EMAIL_NOT_VERIFIED") {
+        setUnconfirmed(email);
       }
       // Deliberately the same message whether the address is unknown or the
       // password is wrong: saying which would confirm who has an account.
@@ -435,6 +446,9 @@ export default function SignInPage() {
           error
         )}
       </FormError>
+      {unconfirmed !== null && linkHours !== null ? (
+        <ResendLink email={unconfirmed} hours={linkHours} wording="direct" />
+      ) : null}
     </AuthCard>
   );
 }

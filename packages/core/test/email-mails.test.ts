@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { verifyEmailMail } from "../src/mail/account.ts";
 import {
   invitationMail,
   notificationDigestMail,
@@ -169,5 +170,57 @@ describe("a nudge", () => {
     expect(html).toContain("Held back this week");
     expect(html).toContain(`${BASE}/goals/g2`);
     expect(html).toContain(`href="${BASE}/inbox"`);
+  });
+});
+
+/**
+ * The mail that confirms an address (email-verification.md D6, D18), built
+ * here since plan 0.8.0 S3 so the relay can send it. It was built in the web
+ * app while it was sent from inside the sign-up request.
+ */
+describe("the confirmation mail", () => {
+  const VERIFY = `${BASE}/api/auth/verify-email?token=tok456&callbackURL=%2Femail-confirmed`;
+
+  it("names the instance and the address, and carries Better Auth's link in both parts", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.subject).toBe("Confirm your email address for Northwind OKR");
+    expect(built.html).toContain("<b>amara@example.com</b>");
+    // The button and the raw link under it, both the url as given.
+    expect(hrefs(built.html)).toEqual([VERIFY, VERIFY]);
+    expect(built.text).toContain(`Confirm email: ${VERIFY}`);
+  });
+
+  it("says how long the link works, and never that no account was made", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.text).toContain("The link works for 24 hours.");
+    expect(built.text).toContain(
+      "Nothing is confirmed unless the link is opened.",
+    );
+    expect(built.text).not.toContain("no account is created");
+  });
+
+  it("is written in the instance's language", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "ms",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.subject).toBe("Sahkan alamat e-mel anda untuk Northwind OKR");
+    expect(built.html).toContain('<html lang="ms">');
+    expect(built.text).toContain("Pautan ini berfungsi selama 24 jam.");
   });
 });

@@ -9,6 +9,7 @@ import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
+import { ResendForm } from "../resend-link";
 
 export const generateMetadata = pageTitle("pageTitle.emailConfirmed");
 
@@ -31,8 +32,10 @@ export const dynamic = "force-dynamic";
  * before reaches the same page with no error, which is the right answer for
  * it too.
  *
- * Until plan row S3 offers "send the link again", an expired or broken link
- * can only send somebody to whoever runs the instance.
+ * **An expired or broken link offers a new one** (plan 0.8.0 S3): type the
+ * address and Better Auth's own resend sends a link to it if it waits to be
+ * confirmed, with the same answer whether or not it has an account. Whoever
+ * runs the instance is named below, for somebody still stuck.
  */
 export default async function EmailConfirmedPage({
   searchParams,
@@ -97,7 +100,9 @@ export default async function EmailConfirmedPage({
               : t("auth.emailConfirmed.expiredHours", { hours })
             : t("auth.emailConfirmed.invalidBody")}
         </p>
-        <p>
+        <p>{t("auth.emailConfirmed.typeYourEmail")}</p>
+        <ResendForm hours={hours} />
+        <p className="text-ink-3">
           {support ? (
             <>
               {t("auth.emailConfirmed.writeTo")}{" "}

@@ -63,6 +63,15 @@ import {
   isSSOCallbackPath,
 } from "./sso-enforcement.ts";
 import { ssoLinkAllowed } from "./sso-linking.ts";
+import {
+  countVerificationLink,
+  EMAIL_VERIFICATION_LINK_SECONDS,
+  queueVerificationLink,
+  resendAllowance,
+  resendHeldMessage,
+  verificationReason,
+  withVerificationReason,
+} from "./verification-links.ts";
 
 /**
  * The paths that establish or recover a local credential (P8-T07a).
@@ -96,6 +105,24 @@ function heldRefusal(retryAfterSeconds: number): APIError {
     {
       message: `Too many attempts for this address. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}, or reset your password.`,
       code: "SIGN_IN_HELD",
+      retryAfterSeconds,
+    },
+    { "Retry-After": String(retryAfterSeconds) },
+  );
+}
+
+/**
+ * The answer to a request for a link that this address's allowance refuses
+ * (email-verification.md D9). The same words and the same shape for every
+ * address, with the wait in the body as well as the header, as a sign-in
+ * hold gives it.
+ */
+function resendHeldRefusal(retryAfterSeconds: number): APIError {
+  return new APIError(
+    "TOO_MANY_REQUESTS",
+    {
+      message: resendHeldMessage(retryAfterSeconds),
+      code: "VERIFICATION_RESEND_HELD",
       retryAfterSeconds,
     },
     { "Retry-After": String(retryAfterSeconds) },
@@ -247,7 +274,8 @@ export interface AuthOptions {
     resetUrl: string;
   }) => Promise<void>;
   /**
-   * Whether a sign-in must wait for a verified address (P8-T02b).
+   * Whether a sign-in must wait for a verified address (P8-T02b), and with it
+   * whether a confirmation link is queued at all (email-verification.md D6).
    *
    * Resolved by the caller from `mail.transport`, because Better Auth reads
    * this off an options object built once per process and the resolution is
@@ -257,16 +285,13 @@ export interface AuthOptions {
    * Defaults to false, which is what every instance did before this option
    * existed. A caller that forgets it gets the old behaviour rather than a
    * locked-out instance.
+   *
+   * The link is queued on the outbox, which the relay sends through whatever
+   * mail is configured. There is no send function to pass any more: the mail
+   * used to go out inside the sign-up request, and a refused one left an
+   * account nobody could confirm (plan 0.8.0 H1).
    */
   readonly requireEmailVerification?: boolean;
-  /**
-   * Sends the verification link. Absent means no verification mail is ever
-   * sent, which is the right pairing for a console transport.
-   */
-  readonly sendVerificationEmail?: (message: {
-    to: string;
-    url: string;
-  }) => Promise<void>;
   /**
    * SSO provider configurations loaded from `sso_connections` (P8-T07). Each
    * OIDC entry becomes a genericOAuth provider that appears on the sign-in
@@ -324,15 +349,6 @@ export interface AuthOptions {
   readonly plugins?: readonly BetterAuthPlugin[];
 }
 
-/**
- * How long a link that confirms an email address works, in seconds.
- *
- * Better Auth's own default, named here so the pages that tell a person to
- * open the link can say how long they have (plan 0.8.0 S1, S2). Plan row S3
- * decides whether it should be longer.
- */
-export const EMAIL_VERIFICATION_LINK_SECONDS = 60 * 60;
-
 /** Failed sign-in attempts allowed per window before the caller is refused. */
 const SIGN_IN_ATTEMPTS = 10;
 const SIGN_IN_WINDOW_SECONDS = 60;
@@ -357,6 +373,11 @@ const LIMIT_RULES = {
   // `/forget-password`, which no longer exists, so Better Auth's own default
   // of 3 applied rather than this 5 (account-lockout.md D11).
   "/request-password-reset": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+  // Asking for a new confirmation link, per network (email-verification.md
+  // D10). Five, as for a reset request, and in the shared count, where
+  // Better Auth's own default was three in each process. The per-address
+  // allowance is counted separately, in the hook below (D9).
+  "/send-verification-email": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
 } as const;
 
 export function createAuth(options: AuthOptions) {
@@ -443,8 +464,31 @@ export function createAuth(options: AuthOptions) {
   });
   const keyRing = options.keyRing ?? processOnlyKeyRing();
   const lockoutEnabled = options.lockout?.enabled ?? true;
+  const requireEmailVerification = options.requireEmailVerification ?? false;
+  const rateLimitEnabled = options.rateLimit?.enabled ?? true;
+  // Where each address's allowance of confirmation links is counted (D9):
+  // the shared storage when there is one, so every replica sees one count.
+  const resendStorage = options.rateLimitStorage ?? inProcessLimiter();
 
-  return betterAuth({
+  /**
+   * Two callbacks below need the instance they belong to: a completed reset
+   * confirms the address through Better Auth's own adapter (D14), and a
+   * repeat sign-up asks for a link the way the resend does (D12). Both run
+   * long after the instance is built, so these are filled in once it is.
+   */
+  let contextOf:
+    | (() => Promise<{
+        internalAdapter: {
+          updateUser(
+            userId: string,
+            data: Record<string, unknown>,
+          ): Promise<unknown>;
+        };
+      }>)
+    | undefined;
+  let resendFromServer: ((email: string) => Promise<unknown>) | undefined;
+
+  const auth = betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
       withSecondFactorLockAudit(
         withSealedAccountTokens(
@@ -479,8 +523,13 @@ export function createAuth(options: AuthOptions) {
       // the product unusable out of the box. `mail.transport` is what
       // decides, resolved by the caller at boot (P8-T02b): the question is
       // whether a link can arrive, not whether this is a managed cloud.
-      requireEmailVerification: options.requireEmailVerification ?? false,
+      requireEmailVerification,
       minPasswordLength: 12,
+      // A completed reset signs every device out (email-verification.md
+      // D15). With D14 below it is what lets the owner of an address take it
+      // back from somebody who signed up with it first: their reset confirms
+      // the address and ends the other person's sessions.
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         // openokr:allow-side-effect: Better Auth owns this request's
         // transaction and calls back outside the Operation pipeline, so
@@ -499,30 +548,102 @@ export function createAuth(options: AuthOptions) {
             email: user.email,
           });
         }
+        // **A completed reset confirms the address** (email-verification.md
+        // D14). The reset link reached the mailbox, which is the same proof a
+        // confirmation link gives, and it is the second way out for an
+        // account whose first mail never arrived. Through Better Auth's own
+        // adapter, so its user-update hooks run, and never by direct SQL.
+        if (!user.emailVerified) {
+          try {
+            const context = await contextOf?.();
+            await context?.internalAdapter.updateUser(user.id, {
+              emailVerified: true,
+            });
+            await recordInstanceAuditEvent(options.pool, {
+              action: "auth.email_verified",
+              payload: { userId: user.id, via: "reset" },
+            });
+          } catch (error) {
+            // The password is already changed; this never undoes it. The
+            // next reset, or a confirmation link, confirms the address.
+            process.stderr.write(
+              `auth: could not confirm an address after a reset: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          }
+        }
+      },
+      /**
+       * **Signing up again with an unconfirmed address queues a fresh link**
+       * (email-verification.md D12). It is what a person whose first mail
+       * never came does first, and the check-your-email card they see says a
+       * link was sent. Not awaited, so a repeat takes no longer for having an
+       * account, and drawn on the same per-address allowance as the button:
+       * a spent allowance queues nothing, silently. A confirmed address gets
+       * nothing (Q3), and the answer to the sign-up is Better Auth's generic
+       * success either way.
+       */
+      onExistingUserSignUp: async ({ user }) => {
+        const resend = resendFromServer;
+        if (!requireEmailVerification || user.emailVerified || !resend) {
+          return;
+        }
+        void withVerificationReason("repeat_sign_up", () =>
+          resend(user.email),
+        ).catch(() => undefined);
       },
     },
 
     emailVerification: {
-      // Named rather than left to Better Auth's default, which is the same
-      // hour, so the check-your-email page can say how long the link lasts
-      // and cannot drift from it (plan 0.8.0 S1).
+      // A day (email-verification.md D13). Every page that tells a person to
+      // open the link reads the same constant.
       expiresIn: EMAIL_VERIFICATION_LINK_SECONDS,
-      // Sent on sign-up only where a link can arrive. With a console
-      // transport there is no callback, so nothing is sent and nothing is
-      // written to the log either.
-      sendOnSignUp: Boolean(options.sendVerificationEmail),
-      sendVerificationEmail: async ({ user, url }) => {
-        // openokr:allow-side-effect: the same arrangement `sendResetPassword`
-        // has above. Better Auth owns this request's transaction and calls
-        // back outside the Operation pipeline, so there is no outbox row to
-        // attach the mail to. The link is sent in response to a request, not
-        // as a consequence of a domain write.
+      // Queued on sign-up only where a link can arrive. With a console
+      // transport nothing is queued and nothing is written to the log.
+      sendOnSignUp: requireEmailVerification,
+      /**
+       * **Queued on the outbox, never sent here** (email-verification.md D1
+       * to D4, plan 0.8.0 H1). The row is written on the pool in its own
+       * statement rather than inside a domain transaction, because Better
+       * Auth committed the user row before calling back and hands this no
+       * transaction to join (D2). It never throws (D3).
+       *
+       * Always present, so the resend endpoint answers on every instance;
+       * with a console transport it queues nothing.
+       */
+      sendVerificationEmail: async ({ user, url, token }, request) => {
         // The account that claims the instance is created verified, and a
         // link asking it to confirm again would only confuse (BUG-028).
-        if (user.emailVerified) {
+        if (!requireEmailVerification || user.emailVerified) {
           return;
         }
-        await options.sendVerificationEmail?.({ to: user.email, url });
+        await queueVerificationLink(options.pool, {
+          userId: user.id,
+          to: user.email,
+          url,
+          token,
+          lifetimeSeconds: EMAIL_VERIFICATION_LINK_SECONDS,
+          reason: verificationReason("sign_up", request),
+        });
+      },
+      /**
+       * One instance audit row when an address is confirmed by its link
+       * (D17). Better Auth calls this only on the change from unconfirmed to
+       * confirmed, so an old link opened again writes nothing. Y4's change of
+       * address reaches this callback too, and adds its own branch when it
+       * lands (account-self-service.md D20).
+       */
+      afterEmailVerification: async (user) => {
+        try {
+          await recordInstanceAuditEvent(options.pool, {
+            action: "auth.email_verified",
+            payload: { userId: user.id, via: "link" },
+          });
+        } catch (error) {
+          // The address is confirmed already; a missing row never undoes it.
+          process.stderr.write(
+            `auth: could not record a confirmed address: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
       },
     },
 
@@ -585,6 +706,30 @@ export function createAuth(options: AuthOptions) {
        * no address.
        */
       before: createAuthMiddleware(async (hookContext) => {
+        /**
+         * **Each address's allowance of confirmation links** (email-
+         * verification.md D9): one a minute and five a day, whatever network
+         * asks. Counted for every address before Better Auth looks it up, so
+         * the refusal is the same whether or not it has an account.
+         */
+        if (hookContext.path === "/send-verification-email") {
+          const email = (hookContext.body as { email?: unknown } | undefined)
+            ?.email;
+          if (!rateLimitEnabled || typeof email !== "string" || email === "") {
+            return;
+          }
+          const verdict = await resendAllowance(
+            resendStorage,
+            options.secret,
+            email,
+          );
+          if (!verdict.allowed) {
+            countVerificationLink(verificationReason("resend"), "refused");
+            throw resendHeldRefusal(verdict.retryAfterSeconds);
+          }
+          return;
+        }
+
         if (!CREDENTIAL_PATHS.has(hookContext.path)) {
           return;
         }
@@ -1084,6 +1229,13 @@ export function createAuth(options: AuthOptions) {
       ...(options.plugins ?? []),
     ],
   });
+
+  contextOf = () => auth.$context;
+  resendFromServer = (email) =>
+    auth.api.sendVerificationEmail({
+      body: { email, callbackURL: "/email-confirmed" },
+    });
+  return auth;
 }
 
 export type Auth = ReturnType<typeof createAuth>;

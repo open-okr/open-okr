@@ -3,10 +3,12 @@ import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import { agentRunChangedEvent } from "../agents/live.ts";
 import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
+import { VERIFY_EMAIL_TOPIC } from "../auth/verification-links.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
   dispatchOutbox,
   OUTBOX_HANDLERS,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandlerDeps,
 } from "./handlers.ts";
@@ -195,6 +197,58 @@ describe("invitation email", () => {
   });
 });
 
+/**
+ * The link that confirms an address (email-verification.md D5). The checks
+ * that read the account need a database and are in
+ * `packages/core/test/email-verification.test.ts`; these are the ones that
+ * must be decided before anything is read.
+ */
+describe("a confirmation link", () => {
+  const link = (over: Record<string, unknown> = {}) =>
+    delivery(VERIFY_EMAIL_TOPIC, {
+      userId: "u1",
+      to: "amara@example.com",
+      url: "https://okr.example.com/api/auth/verify-email?token=t",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      reason: "sign_up",
+      ...over,
+    });
+
+  it("fails permanently when the row has no link, because no retry will add one", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(link({ url: undefined }), deps),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+
+  it("skips when no mail is configured, before reading anything", async () => {
+    const { skipped, sent, deps } = recorder();
+    const { sendMail: _sendMail, ...withoutMail } = deps;
+    await dispatchOutbox(link(), withoutMail);
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([
+      [VERIFY_EMAIL_TOPIC, "no mail transport is configured"],
+    ]);
+  });
+
+  it("skips a link that has expired, because nobody could use it", async () => {
+    const { skipped, sent, deps } = recorder();
+    await dispatchOutbox(
+      link({ expiresAt: new Date(Date.now() - 1000).toISOString() }),
+      deps,
+    );
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([[VERIFY_EMAIL_TOPIC, "the link has expired"]]);
+  });
+
+  it("loses the address and the link once delivered", () => {
+    expect(OUTBOX_REDACT_ON_DELIVERY[VERIFY_EMAIL_TOPIC]).toEqual([
+      "to",
+      "url",
+    ]);
+  });
+});
+
 describe("topics with no consumer yet", () => {
   it("acknowledges a rename rather than dead-lettering every one of them", async () => {
     const { skipped, deps } = recorder();
@@ -316,5 +370,7 @@ describe("the table against the code that enqueues", () => {
     // `packages/agents`, which this scan does not read (M-11). The executor
     // wrote it from P2-T17 with nothing to read it.
     expect(AGENT_RUN_STEP_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Queued by the confirmation callback in `createAuth` (S3).
+    expect(VERIFY_EMAIL_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

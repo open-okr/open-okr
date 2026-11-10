@@ -46,6 +46,10 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  EMAIL_VERIFICATION_LINK_SECONDS,
+  VERIFY_EMAIL_TOPIC,
+} from "../auth/verification-links.ts";
+import {
   endSubscriptionOnClosing,
   type SubscriptionEnder,
 } from "../billing/closing.ts";
@@ -65,6 +69,7 @@ import {
   parseExportJob,
   runExportJob,
 } from "../exports/worker.ts";
+import { verifyEmailMail } from "../mail/account.ts";
 import {
   closureMail,
   erasureReminderMail,
@@ -76,13 +81,14 @@ import {
   trialReminderMail,
   webhookTurnedOffMail,
 } from "../mail/mails.ts";
-import { mailWords } from "../mail/words.ts";
+import { mailLocale, mailWords } from "../mail/words.ts";
 import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import {
   END_SUBSCRIPTION_TOPIC,
@@ -426,6 +432,72 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
     link,
     inviterName: context?.invite?.inviterName ?? null,
     expiresAt: context?.invite?.expiresAt ?? null,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Sends one link that confirms an email address (docs/design/
+ * email-verification.md D5, plan 0.8.0 S3).
+ *
+ * **Checks before it sends, and skips rather than fails.** A link nobody can
+ * use is not worth a mail: no mail configured, the link expired, the account
+ * gone, the address already confirmed, or the account's address changed
+ * since. A refusal that lasts, such as a mail service still in its sandbox,
+ * is retried on the relay's default policy and then dead-lettered; the person
+ * asks for another link once the operator has fixed it.
+ *
+ * **Safe to run twice** in the sense mail can be: a second delivery sends the
+ * same link again, which works the same as the first.
+ */
+const sendVerificationLink: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const url = asString(delivery.payload.url);
+  const expiresAt = Date.parse(asString(delivery.payload.expiresAt) ?? "");
+  if (!userId || !to || !url || Number.isNaN(expiresAt)) {
+    throw new PermanentDispatchError(
+      "A confirmation link needs an account, an address, a link and when it expires, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  if (expiresAt <= Date.now()) {
+    deps.onSkipped?.(delivery, "the link has expired");
+    return;
+  }
+
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{
+    email: string;
+    email_verified: boolean;
+  }>("select email, email_verified from users where id = $1", [userId]);
+  const account = rows[0];
+  if (!account) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+  if (account.email_verified) {
+    deps.onSkipped?.(delivery, "the address is already confirmed");
+    return;
+  }
+  if (account.email.toLowerCase() !== to.toLowerCase()) {
+    deps.onSkipped?.(delivery, "the account's address has changed");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = verifyEmailMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    url,
+    hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
   });
   await deps.sendMail({ to, ...built });
 };
@@ -1248,6 +1320,9 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [EMBED_TOPIC]: embedContent,
   [CHANNEL_MESSAGE_TOPIC]: deliverChannelMessage,
   "invitation.email": sendInvitation,
+  // The link that confirms an address, queued by `createAuth` rather than
+  // sent inside the sign-up request (email-verification.md D1, S3).
+  [VERIFY_EMAIL_TOPIC]: sendVerificationLink,
   // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
   // outside the package barrel from P2-T06 until this row existed.
   [DIGEST_TOPIC]: sendDigest,
@@ -1339,6 +1414,10 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   Record<string, readonly string[]>
 > = {
   "invitation.email": ["to", "token"],
+  // The address and the link, which confirms an account to whoever opens it
+  // (email-verification.md D4). A dead-lettered row keeps both until the
+  // daily purge, by which time the link has expired.
+  [VERIFY_EMAIL_TOPIC]: ["to", "url"],
   // Of a customer the provider no longer has. Nothing needs it once it is gone.
   [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };

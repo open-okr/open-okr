@@ -129,17 +129,10 @@ function buildAuth(
       await sendMail({ to, ...(await signInHeldMail(to, resetUrl)) });
     },
     // Resolved at boot from `mail.transport`: the question is whether a
-    // link can arrive, not whether this is a managed cloud (P8-T02b).
+    // link can arrive, not whether this is a managed cloud (P8-T02b). The
+    // link itself is queued on the outbox and sent by the relay, so nothing
+    // here waits on a mail server (email-verification.md D1, D6).
     requireEmailVerification: globals.openokrRequireEmailVerification ?? false,
-    sendVerificationEmail: globals.openokrRequireEmailVerification
-      ? async ({ to, url }) => {
-          const [{ sendMail }, { verifyEmailMail }] = await Promise.all([
-            import("./mail"),
-            import("./account-mail"),
-          ]);
-          await sendMail({ to, ...(await verifyEmailMail(to, url)) });
-        }
-      : undefined,
     // From sso_connections, as last read (P8-T07, L-15).
     ssoProviders: providers,
     // Lets a server action set and clear the session cookie. Framework glue,

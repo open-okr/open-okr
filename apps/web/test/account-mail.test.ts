@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The two account mails in the shared layout (docs/design/email-templates.md).
+ * The two account mails sent from inside a request, in the shared layout
+ * (docs/design/email-templates.md). The confirmation mail moved to
+ * packages/core with the relay that sends it (email-verification.md D6), and
+ * its test is `packages/core/test/email-mails.test.ts`.
  *
  * The layout itself is proved in packages/core. What is proved here is the
  * wiring: the instance's name and language, both parts, and that the button
@@ -19,14 +22,12 @@ vi.mock("@openokr/core", async (importOriginal) => ({
   resolveInstanceDefaultLanguage: async () => language,
 }));
 
-const { resetPasswordMail, signInHeldMail, verifyEmailMail } = await import(
+const { resetPasswordMail, signInHeldMail } = await import(
   "../lib/account-mail"
 );
 
 const RESET =
   "https://okr.example.com/api/auth/reset-password/tok123?callbackURL=%2Freset-password";
-const VERIFY =
-  "https://okr.example.com/api/auth/verify-email?token=tok456&callbackURL=%2F";
 
 beforeEach(() => {
   language = "en";
@@ -50,15 +51,6 @@ describe("the password reset mail", () => {
     const mail = await resetPasswordMail("sara@example.com", RESET);
     expect(mail.subject).toBe("Tetapkan semula kata laluan Northwind OKR anda");
     expect(mail.html).toContain('<html lang="ms">');
-  });
-});
-
-describe("the confirmation mail", () => {
-  it("names the instance in the subject and carries the confirmation link", async () => {
-    const mail = await verifyEmailMail("amara@example.com", VERIFY);
-    expect(mail.subject).toBe("Confirm your email address for Northwind OKR");
-    expect(mail.html).toContain("Confirm email");
-    expect(mail.text).toContain(`Confirm email: ${VERIFY}`);
   });
 });
 

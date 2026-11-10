@@ -77,8 +77,8 @@ So an account whose first mail never arrived is stuck: no page offers a link, a 
 
 | Number | Value | Home |
 |---|---|---|
-| Link lifetime | 24 hours | `EMAIL_VERIFICATION_LINK_SECONDS`, `packages/core/src/auth/auth.ts` (exists, value changes) |
-| Per address | 1 a minute, 5 a day | New constants beside the D9 hook in `packages/core/src/auth/` |
+| Link lifetime | 24 hours | `EMAIL_VERIFICATION_LINK_SECONDS`, moved to `packages/core/src/auth/verification-links.ts` so the relay's handler can read it without importing the Better Auth instance |
+| Per address | 1 a minute, 5 a day | `packages/core/src/auth/verification-links.ts`, beside the code that counts them |
 | Per network | 5 a minute | `LIMIT_RULES` in `auth.ts` |
 | Timing floor | 500 ms | Better Auth's own, `email-verification.mjs:105` |
 | Retries | 10 attempts, backoff to 5 minutes | The relay's defaults, `packages/adapters/src/relay.ts:218`, `:247-248`. No entry in `OUTBOX_RETRY_POLICY` |
@@ -203,3 +203,20 @@ Every resend button is the kit's `Button`; the address on S2 is the kit's `Email
 - No change to how the caller's address is read. That is H2.
 - No change to Better Auth's change-of-email flow, which OpenOKR does not enable.
 - `auth.rate_limited` still writes one row per limiter refusal, as account-lockout.md §7 notes.
+
+## 10. As built
+
+Built on 11 November 2026 as plan row S3, carrying H1. Where the build reads the design more narrowly or adds a detail it did not say:
+
+| Point | As built |
+|---|---|
+| Where the pieces live | `packages/core/src/auth/verification-links.ts` holds the topic, the lifetime, the per-address count and the queueing; `createAuth` calls it. The handler is `sendVerificationLink` in `packages/core/src/outbox/handlers.ts`, the mail `verifyEmailMail` in `packages/core/src/mail/account.ts` |
+| Two links in the same second | A token is signed to the second, so two asked for in one second are the same link. The second insert meets the first row's idempotency key and is treated as already queued, not as a failure (D4) |
+| The day's count | The minute is counted first, and the day only for a request the minute let through, so pressing the button in a hurry does not use up the address's day |
+| D9 with the limiter off | The per-address count is part of the brute-force protection, so it is off when `createAuth` is built with `rateLimit: { enabled: false }`, as most tests that are about something else do. Every deployment runs with it on |
+| The reason on a repeat sign-up | Better Auth hands the callback no request when the resend is called from server code, so the reason `repeat_sign_up` travels in an async-local store around that call (D12) |
+| The button after a press | An accepted request replaces the button with the answer for a minute. A refusal or a failure leaves the button where it is, with the sentence under it |
+| The sign-in page's lifetime | Sign-in is a client component, and `packages/core` must not reach a client bundle, so its layout reads the lifetime on the server and provides it to the page |
+| The expired page's support line | "Still stuck? Write to *address*", or, with no support address, "Still stuck? Ask whoever runs this instance." |
+| The first account | The account that claims the instance arrives confirmed (BUG-028), so nothing is queued for it |
+| Y4's change of address | Better Auth calls the same `afterEmailVerification` for a completed change of address. Y4 adds its branch there, so a change writes its own row rather than `auth.email_verified` (account-self-service.md D20) |

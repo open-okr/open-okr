@@ -37,8 +37,11 @@ const en = {
   "verify.bodyBefore": "Confirm ",
   "verify.bodyAfter": " to finish setting up your {instance} account.",
   "verify.action": "Confirm email",
+  // The link's lifetime, and a footer that is true: the account exists
+  // already, unconfirmed (email-verification.md D18).
+  "verify.notice": "The link works for {hours} hours.",
   "verify.footer":
-    "Did not sign up? Ignore this email and no account is created.",
+    "Did not sign up? Ignore this email. Nothing is confirmed unless the link is opened.",
 
   // A run of wrong passwords began an account hold (account-lockout.md Q2).
   "held.subject": "Somebody is trying to sign in to your {instance} account",
@@ -186,7 +189,9 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verify.bodyBefore": "Sahkan ",
   "verify.bodyAfter": " untuk melengkapkan akaun {instance} anda.",
   "verify.action": "Sahkan e-mel",
-  "verify.footer": "Tidak mendaftar? Abaikan e-mel ini dan tiada akaun dibuat.",
+  "verify.notice": "Pautan ini berfungsi selama {hours} jam.",
+  "verify.footer":
+    "Tidak mendaftar? Abaikan e-mel ini. Tiada apa yang disahkan melainkan pautan ini dibuka.",
 
   "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
   "held.preheader":

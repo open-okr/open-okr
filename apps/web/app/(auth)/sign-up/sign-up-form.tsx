@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { AuthCard, Field, FormError } from "../auth-card";
+import { ResendLink } from "../resend-link";
 
 /**
  * The registration form (screen S-35). Rendered only when registration is
@@ -100,6 +101,9 @@ export function SignUpForm({
               : t("auth.signUp.checkEmail.lastsHours", { hours: linkHours })}
           </p>
           <p className="text-ink-3">{t("auth.signUp.checkEmail.spam")}</p>
+          {/* For a mail that never came (plan 0.8.0 S3). The same answer
+              whether or not the address has an account. */}
+          <ResendLink email={sentTo} hours={linkHours} wording="neutral" />
         </div>
       </AuthCard>
     );

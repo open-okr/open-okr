@@ -6,13 +6,20 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Plan 0.8.0 S1 and S2: after sign-up on an instance that must confirm the
 // address, the form says to check the email rather than bouncing the person
-// to sign in, and the link in the mail lands on /email-confirmed.
+// to sign in, and the link in the mail lands on /email-confirmed. S3 adds
+// "Send the link again" to the card.
 
-const auth = vi.hoisted(() => ({ signUp: vi.fn() }));
+const auth = vi.hoisted(() => ({
+  signUp: vi.fn(),
+  sendVerificationEmail: vi.fn(),
+}));
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("../lib/auth-client", () => ({
-  authClient: { signUp: { email: auth.signUp } },
+  authClient: {
+    signUp: { email: auth.signUp },
+    sendVerificationEmail: auth.sendVerificationEmail,
+  },
 }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
@@ -110,6 +117,32 @@ describe("sign-up", () => {
     expect(router.push).not.toHaveBeenCalled();
     // The address is shown, never put in the address bar.
     expect(window.location.search).not.toContain("priya");
+  });
+
+  test("offers the link again for the address it was sent to", async () => {
+    auth.signUp.mockResolvedValue({
+      data: { token: null, user: {} },
+      error: null,
+    });
+    auth.sendVerificationEmail.mockResolvedValue({
+      data: { status: true },
+      error: null,
+    });
+    await render();
+    await submit();
+    const again = [...host.querySelectorAll("button")].find(
+      (button) => button.textContent === "Send the link again",
+    );
+    await act(async () => {
+      again?.click();
+    });
+    expect(auth.sendVerificationEmail).toHaveBeenCalledWith({
+      email: "priya@northwind.example",
+      callbackURL: "/email-confirmed",
+    });
+    expect(
+      host.querySelector('[data-testid="resend-answer"]')?.textContent,
+    ).toContain("If priya@northwind.example has an account waiting");
   });
 
   test("goes on as before when there is a session", async () => {

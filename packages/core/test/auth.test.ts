@@ -704,7 +704,6 @@ describe("the first account where mail is configured (UAT BUG-028)", () => {
       baseUrl: BASE_URL,
       rateLimit: { enabled: false },
       requireEmailVerification: true,
-      sendVerificationEmail: async () => {},
     });
   });
 
