@@ -24,6 +24,7 @@
  * are through it. The flag and the grant are both undone in `afterAll`, and
  * the suspension this file makes is lifted by the operator in its last step.
  */
+import { readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
@@ -341,6 +342,17 @@ test("the instance page says what is true of the deployment", async () => {
   await expect(
     operatorPage.getByRole("heading", { name: "Messages" }),
   ).toBeVisible();
+
+  // Plan 0.8.0 V2: the operator is told which release runs. The suite turns
+  // the update check off so CI never calls GitHub, and the card says so
+  // rather than claiming nothing is newer.
+  const { version } = JSON.parse(
+    readFileSync(new URL("../apps/web/package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  await expect(operatorPage.getByTestId("operator-version-running")).toHaveText(
+    `This instance runs v${version}.`,
+  );
+  await expect(operatorPage.getByTestId("operator-version-off")).toBeVisible();
 });
 
 /**

@@ -409,7 +409,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | O3 | done | The erasure CronJob gets `BETTER_AUTH_SECRET` by reference; `check.sh` asserts it, and fails without the fix |
 | D1 | done | `apps/web/lib/demo-pill.tsx`: an `info` chip reading Demo, focusable, the sentence in a tooltip and in hidden text. A `badge` slot on the top bar and on the auth card; `/api/demo-personas` answers `demo`. Unit tests; the suite's instance is not a demo, so no browser spec |
 | V1 | done | Every member sees the version; the notice stays with `full` |
-| V2 | to do | Q8 decided |
+| V2 | done | The console's Instance screen has a Version card |
 | F1 | done | `packages/method` gives every item a key (`NEED_KEYS`, `needs` beside `missing`, from one call so they cannot disagree); `cycle.workflow` returns them; the cycle page links each to its card or row (`need-destinations.ts`, a record over every key) or says who fills it. UIUX-PLAN S-04 has the table. Method, unit and browser tests |
 | L1 | done | Stacked at every width; the two roles side by side inside Roles from `sm`; When takes a quarter of the table and wraps. Mockup 02 redrawn. `e2e/s06-prepare-layout.spec.ts` |
 | L2 | done | A primary button under the sentence, `data-testid="start-drafting"`, drawn only for `canEdit` (the same `edit` the cycle page drafts with). Unit test both readers |

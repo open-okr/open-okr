@@ -8,6 +8,8 @@ import {
 } from "@openokr/core";
 import { Chip, type ChipProps } from "@openokr/ui";
 import Link from "next/link";
+import { RUNNING_VERSION } from "../../../lib/app-version.ts";
+import { releaseCheck } from "../../../lib/newest-release.ts";
 import { requireOperator } from "../../../lib/operator";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
@@ -15,6 +17,7 @@ import { getTranslations } from "../../../lib/translations";
 import { OperatorRegistrationCard } from "./registration-card";
 import { publishSiteMessage } from "./site-message-actions";
 import { SiteMessageForm } from "./site-message-form";
+import { OperatorVersionCard } from "./version-card";
 
 export const generateMetadata = pageTitle("pageTitle.operatorInstance");
 
@@ -22,7 +25,10 @@ export const generateMetadata = pageTitle("pageTitle.operatorInstance");
  * S-47 Operator instance: what is true of the deployment rather than of one
  * customer (P8-T03c).
  *
- * Two things live here and they are different in kind, so they read
+ * The Version card says which release runs and whether a newer one exists
+ * (plan 0.8.0 V2), because on a cloud the operator is the one who upgrades.
+ *
+ * Two more things live here and they are different in kind, so they read
  * differently. **Flags are what the instance is**, and they are read-only on
  * this screen: every one is declared in `INSTANCE_SETTINGS` with a default
  * and a summary, and changing a mail host or a root key from a console is a
@@ -51,13 +57,17 @@ export default async function OperatorInstancePage() {
   const operator = await requireOperator();
   const pool = getPool();
 
-  const [flags, messages, tenants, registration, origin] = await Promise.all([
-    readInstanceFlags(pool),
-    listSiteMessages(pool),
-    listTenantsAsOperator(pool, operator.userId),
-    readRegistrationPolicy(pool),
-    registrationPolicyOrigin(pool),
-  ]);
+  const [flags, messages, tenants, registration, origin, check] =
+    await Promise.all([
+      readInstanceFlags(pool),
+      listSiteMessages(pool),
+      listTenantsAsOperator(pool, operator.userId),
+      readRegistrationPolicy(pool),
+      registrationPolicyOrigin(pool),
+      // The cloud flag does not stop it here, unlike the footer: the operator
+      // is the one person on a cloud who can act on it (plan 0.8.0 V2).
+      releaseCheck(pool),
+    ]);
   // On a cloud with nothing chosen, sign-up is open, whatever the computed
   // default for a self-hosted instance would say (registration-policy.md D5).
   const policyInForce = origin === "default" ? "open" : registration.value;
@@ -80,6 +90,8 @@ export default async function OperatorInstancePage() {
         </h1>
         <p className="text-ink-2 text-sm">{t("operator.instance.intro")}</p>
       </header>
+
+      <OperatorVersionCard running={RUNNING_VERSION} check={check} />
 
       {/* Plan 0.7.0 B1: the policy is the operator's on a cloud. */}
       <OperatorRegistrationCard policy={policyInForce} origin={origin} />

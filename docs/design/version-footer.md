@@ -23,7 +23,8 @@ operation), TECHNICAL-PLAN.md §4.14 (instance settings), UIUX-PLAN.md §3.
 | On by default | Yes. An administrator turns it off in Admin, General, or the operator with `OPENOKR_UPDATE_CHECK=off` | Product owner, 2 Nov 2026 |
 | Who sees the version | Every signed-in member. Signed-out pages show none, because there it would tell anybody scanning for instances behind a known fault which ones are. Until 0.8.0 only members holding `full` saw it, which hid it on every OKRGoal instance from the people reporting a problem | Akmal, 10 Nov 2026 (plan 0.8.0 V1, Q7), replacing the owner's decision of 2 Nov 2026 |
 | Who sees the notice | Members holding `full` on the workspace (the admin screens' own gate), because only they can act on it | Product owner, 2 Nov 2026 |
-| Managed cloud | The running version only. No check and no notice: the operator upgrades, not the customer | Product owner, 2 Nov 2026 |
+| Managed cloud | A customer sees the running version only, with no notice: the operator upgrades, not the customer | Product owner, 2 Nov 2026 |
+| The cloud's operator | Told on the console's Instance screen (S-47) when a newer release exists, with links to the release and its upgrade notes (§9). The switch decides whether the operator's check runs, where on a cloud it used to be ignored | Akmal, 10 Nov 2026 (plan 0.8.0 V2, Q8) |
 | Source | GitHub Releases, `releases/latest` | Product owner, 2 Nov 2026 |
 | Is it telemetry | No. The request carries no instance data: no version, no name, no identifier, and the `User-Agent` is the fixed `OpenOKR-update-check`. GitHub sees only the server's address. REQUIREMENTS §7 makes telemetry opt-in; this is recorded here as the reading taken | This design. **Risk:** a reader of §7 may take any default outbound call as telemetry |
 
@@ -83,8 +84,12 @@ the running version shows.
 **Given** GitHub does not answer, **then** the page renders at its usual speed
 with the running version only, and the next attempt waits an hour.
 
-**Given** a managed cloud, **then** no request is made and only the running
-version shows.
+**Given** a managed cloud, **then** no customer's footer names a newer release,
+and no request is made on a customer's behalf.
+
+**Given** a cloud's operator on the console's Instance screen with the check on
+and a newer release, **then** the Version card names it and links the release
+and its upgrade notes (§9).
 
 ## 6. Tests
 
@@ -95,6 +100,8 @@ version shows.
 | The setting resolves to on with nothing configured, and to off from the environment | Unit, `packages/core` instance-registry tests |
 | The version for every member, the notice for an administrator only | Unit, `apps/web/test/version-footer.test.ts` |
 | The footer for an administrator | End to end, `e2e/s36q-version-footer.spec.ts` (the check off, so CI makes no outbound call) |
+| The operator's Version card: running, newer with upgrade notes, check off | Unit, `apps/web/test/operator-version-card.test.ts` |
+| The operator sees the running version, and that the check is off | End to end, `e2e/s45-operator-console.spec.ts` |
 | `check:air-gap`: the new connection row is listed | The existing gate |
 
 ## 7. What this change does not do
@@ -119,4 +126,22 @@ The owner asked for the footer to be separated from the content by a rule and a 
 | Phone | Two lines, left aligned, above the tab bar |
 
 The footer is therefore shown to every member; only the notice is gated as §3 says. `apps/web/lib/app-footer.tsx` draws the band, `version-footer.tsx` the version and the notice, and `newest-release.ts` holds the one checker per process.
+
+## 9. The operator's notice (plan 0.8.0 V2)
+
+Until 0.8.0 a managed cloud asked nothing and told nobody, so the operator, the
+one person who upgrades it, learned of a release some other way. The console's
+Instance screen (S-47) now carries a Version card, above Registration.
+
+| State | The card says |
+|---|---|
+| Behind | "This instance runs v0.7.0.", a brand chip "v0.8.0 available" linking to the release, and "Upgrade notes" linking to `docs/runbooks/upgrade.md` at the newer release's tag, because that release's procedure is the one for reaching it |
+| Up to date, or not answered yet | "This instance runs v0.7.0." and "No newer release is known. GitHub is asked once a day." |
+| Check off | "This instance runs v0.7.0." and that the check is off, pointing at `instance.updateCheck` under Flags, which says where the value comes from |
+
+| Rule | Value |
+|---|---|
+| The switch | `instance.updateCheck`, as §4. On a cloud it now switches the operator's check rather than being ignored. The operator changes it with `OPENOKR_UPDATE_CHECK`, since Admin, General has no Update check card on a cloud |
+| The checker | The same one per process as the footer (`apps/web/lib/newest-release.ts`), so the footer and the console share one cache and one request a day |
+| Customers | Still told nothing. The footer's cloud rule (§3) is unchanged |
 

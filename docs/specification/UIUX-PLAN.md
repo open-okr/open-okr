@@ -310,7 +310,10 @@ small aside. **A fact with no value is absent**, so there is no row reading
 like it changes somebody else's day, and it names the workspace inside its
 own button.
 
-**S-47 Operator instance.** Instance feature flags, the plan catalogue
+**S-47 Operator instance.** A Version card (from 0.8.0): the running
+version and, when the update check is on and a newer release exists, a chip
+linking to it and to its upgrade notes, which no customer on a cloud is shown
+([version-footer.md](../design/version-footer.md) §9). Instance feature flags, the plan catalogue
 (`cloud.plans`), the registration policy (a Registration card with the three
 choices of Admin, General and a line saying who chose it, from 0.7.0), and
 site messages. A site message carries its body, its

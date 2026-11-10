@@ -27,3 +27,12 @@ export function methodDocumentUrl(section?: string): string {
 export function docsUrl(path: string): string {
   return `https://github.com/open-okr/open-okr/blob/v${RUNNING_VERSION}/${path}`;
 }
+
+/**
+ * The upgrade runbook as a newer release shipped it, for the operator's notice
+ * (plan 0.8.0 V2): that release's procedure is the one for reaching it. The
+ * version comes from `parseRelease`, which accepts digits and dots only.
+ */
+export function upgradeNotesUrl(version: string): string {
+  return `https://github.com/open-okr/open-okr/blob/v${version}/docs/runbooks/upgrade.md`;
+}
