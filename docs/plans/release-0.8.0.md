@@ -388,7 +388,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Y4 | to do | |
 | Y5 | to do | |
 | Y6 | to do | |
-| Y7 | to do | Design first; Y7-1 to Y7-6 decided |
+| Y7 | design written | `docs/design/account-deletion.md`: request, 14 days, a run per workspace through the function `people.erase` shares, a ledger, the new notice. A refusal that appears during the wait cancels rather than half-erases. Adds `account_deletions`, a migration. Y7-Q1 to Q4; waits for "design approved" |
 | H1 | carried by S3 | |
 | H2 | design written | `docs/design/trusted-proxies.md`: `OPENOKR_TRUSTED_PROXIES` or `OPENOKR_CLIENT_ADDRESS_HEADER`, environment only, empty keeps today's rule. Found that `X-Real-IP`, read as a fallback, lets a caller who reaches a load balancer directly choose their own address. Q1 to Q3; waits for "design approved" |
 | H3 | design written | `docs/design/registration-policy.md` §10: an unclaimed instance admits its first account whatever the policy says. H3-Q1 (a setup code) recommended for a later release. Waits for "design approved" |
