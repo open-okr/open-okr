@@ -2,10 +2,11 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds two things:
+This plan grows as changes are named for 0.8.0. So far it holds three things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
+3. **Found running OKRGoal**: three faults found on 10 November 2026 while finding out why the copilot on OKRGoal said "AI off". Section 3. One waits on a decision (Q6).
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -90,14 +91,42 @@ These are for the design note, not decided here. Each needs Akmal's answer befor
 | Y7-5 | Goals they champion and reviews they owe pass to the placeholder, as an administrator's erase leaves them today. Are the workspace's administrators told, and is anything handed to their manager? |
 | Y7-6 | Is an administrator told when a member deletes their own account, and does the inbox carry it? |
 
-## 3. Suggested order
+## 3. Found running OKRGoal
+
+OKRGoal runs 0.6.0 with a plan catalogue (Free, Team and Business) and the provider's own AI key. On 10 November 2026 its copilot said **AI off** although the key was set and worked. The cause was that its workspaces had no plan, and on an instance with a catalogue a workspace with no plan may not use the provider's key (`docs/design/ai-credits.md` §3). Looking into it found two more faults. Each row was checked against `main` at `8058c955`, so 0.7.0 has all three.
+
+### 3.1 Changes
+
+| # | Problem | Where | Proposed fix | Size | Gate |
+|---|---|---|---|---|---|
+| O1 | **"AI off" gives the wrong reason.** A workspace that may not use the provider's key gets no drafter, so the copilot shows **AI off** and says "No AI provider is configured", the AI settings page shows **Not configured**, and every assist button disappears without a word. The provider is configured. The real cause is the workspace's plan, which only an operator or a purchase can change, and nobody in the workspace is told what to ask for. The copilot already names one plan reason, credits used up for the month, through `creditsPausedReason`, but not this one | `packages/core/src/actions/copilot.ts` (`copilot.availability`), `packages/core/src/copilot/answer.ts`, `packages/core/src/tenancy/credits.ts`, `apps/web/app/admin/ai/page.tsx` | One function in `packages/core` that says why AI is off for a workspace, checked in this order: no provider at all; the provider's key is set but this workspace's plan includes no AI credits; the month's credits are used up (today's sentence, unchanged); the workspace's egress controls let nothing reach the provider; the routed model has no price. The copilot's chip and sentence, the copilot's answer and the AI settings page all show it, with what to do: choose a plan on the Plan page, or add the workspace's own key | S | None |
+| O2 | **A catalogue added after workspaces exist takes their AI away, and nobody is told.** A workspace starts on the default plan only if one is set when it is made. OKRGoal set its catalogue and Free as its default after its first workspaces existed, so every one of them has no plan and lost AI on the provider's key when the catalogue went in. The operator console can already filter to workspaces with no plan, but does not say what having none costs them | `packages/core/src/tenancy/plans.ts` (`resolveDefaultPlan`), `pnpm cloud:adopt`, `apps/web/app/operator/page.tsx` (S-45), `apps/web/app/operator/[workspaceId]/page.tsx` (S-46) | Whatever Q6 decides. Recommended: S-45 and S-46 mark a workspace with no plan, on an instance with a catalogue, as having no AI on the provider's key, and S-45 offers one audited action, "Put every workspace with no plan on the default plan". Before it runs, it lists the workspaces it would refuse because they have more people than the plan's seats | M | Design first: it changes stored tenant data. Waits on Q6 |
+| O3 | **The Helm chart's erasure job fails before it starts.** `pnpm cloud:erase` loads the whole server environment, which in production refuses the development placeholder for `BETTER_AUTH_SECRET`. The chart gives the job `openokr.commonEnv`: the two database addresses, the encryption key and `NODE_ENV`, but not the auth secret. So every scheduled run stops with "BETTER_AUTH_SECRET: is still the development placeholder". OKRGoal's first run, on 10 November 2026, failed this way. Nothing is erased by mistake, but closed workspaces past their retention window are never erased at all. `deploy/helm/check.sh` checks the job's command and database address, not that the job can start. Compose is not affected, because `./openokr erase` runs in the application container with its full environment | `deploy/helm/templates/erasure-cronjob.yaml`, `deploy/helm/templates/_helpers.tpl` (`openokr.commonEnv`), `packages/core/src/bin/cloud-erase.ts` | Give the job `BETTER_AUTH_SECRET` from the Secret the web pods read it from, or have `cloud-erase.ts` check only the variables it uses. Add a check to `check.sh` that every job the chart renders gets every variable its command requires | S | Run `sh deploy/helm/check.sh` |
+
+### 3.2 Decision
+
+| # | Question | Options | Recommended |
+|---|---|---|---|
+| Q6 | What happens to a workspace with no plan on an instance that has a catalogue? | **(a)** Nothing automatic. The console says what having no plan costs, and offers O2's one action. **(b)** `pnpm cloud:adopt`, which the scheduler runs hourly, puts every workspace with no plan on the default plan by itself. **(c)** As today: the operator sets plans one at a time on S-46 | **(a).** (b) puts a seat limit on workspaces that never had one without anybody choosing it, and has to decide what to do with a workspace that already has more people than the plan allows. (c) is what left OKRGoal's workspaces without AI unnoticed |
+
+### 3.3 What the specification gains when these are built
+
+| Row | Pages |
+|---|---|
+| O1 | `docs/design/ai-credits.md` §3 and §9: what a reader is shown for each reason AI is off |
+| O2 | `docs/design/ai-credits.md` §3; UIUX-PLAN §6, S-45 and S-46 |
+| O3 | `docs/design/workspace-erasure.md` §7, the environment the job needs |
+
+## 4. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
-2. Y1 and Y2. They need no design, and they answer "who am I signed in as" and "where do I change my details".
-3. The design for Y3 to Y6, then the code, one row each.
-4. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
+2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
+3. Y1 and Y2. They need no design, and they answer "who am I signed in as" and "where do I change my details".
+4. The design for Y3 to Y6, then the code, one row each.
+5. Q6, then O2's design and code.
+6. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 4. Build log
+## 5. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -111,4 +140,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Y5 | to do | |
 | Y6 | to do | |
 | Y7 | to do | Design first; questions Y7-1 to Y7-6 |
+| O1 | to do | |
+| O2 | to do | Design first; waits on Q6 |
+| O3 | to do | |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
+| Q6 | yours | Section 3.2 |
