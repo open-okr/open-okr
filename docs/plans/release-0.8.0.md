@@ -384,10 +384,10 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | C1 | design written | Building it found that the refusal as written strands an operator who skipped data change 0034 and fails the nightly upgrade rehearsal. `docs/design/short-ids.md`, "The 0.8.0 step": options A, B, C, recommended A (the migrator runs a data change a migration names, first). Waits for C1-Q1 and "design approved" |
 | Y1 | done | The circle is the person's picture or initials and its name theirs; the menu opens with their name, email and role (`people.readMember` gains `roleName`), with Guest, Demo account or Support access, linking to Your account. Unit, core and browser tests (`s03b-account-menu.spec.ts`) |
 | Y2 | done | `/account`, screen S-51, first in the avatar menu (registry `account-profile`). The picture, profile and appearance forms moved from the person's own `/people/<id>`, which gains Edit your profile. Name, title and manager read only until Y5; email shown, password via Security until Y3 and Y4. `s33-people.spec.ts` follows the forms |
-| Y3 | to do | |
-| Y4 | to do | |
-| Y5 | to do | |
-| Y6 | to do | |
+| Y3 | design written | `docs/design/account-self-service.md`, one design for Y3 to Y6, no migration unless AS-Q3 picks (b). AS-Q1 to Q8; waits for "design approved" |
+| Y4 | design written | `docs/design/account-self-service.md`, one design for Y3 to Y6, no migration unless AS-Q3 picks (b). AS-Q1 to Q8; waits for "design approved" |
+| Y5 | design written | As Y3. Found that SCIM's PATCH and PUT change only `active`, so the plan's reason for refusing a directory-managed member's name change does not hold (AS-Q1) |
+| Y6 | design written | As Y3, with the inventory of every endpoint the catch-all answers. Found endpoints answering today that no screen uses, `/sso/register` among them for any signed-in person once SAML is configured |
 | Y7 | design written | `docs/design/account-deletion.md`: request, 14 days, a run per workspace through the function `people.erase` shares, a ledger, the new notice. A refusal that appears during the wait cancels rather than half-erases. Adds `account_deletions`, a migration. Y7-Q1 to Q4; waits for "design approved" |
 | H1 | carried by S3 | |
 | H2 | design written | `docs/design/trusted-proxies.md`: `OPENOKR_TRUSTED_PROXIES` or `OPENOKR_CLIENT_ADDRESS_HEADER`, environment only, empty keeps today's rule. Found that `X-Real-IP`, read as a fallback, lets a caller who reaches a load balancer directly choose their own address. Q1 to Q3; waits for "design approved" |
