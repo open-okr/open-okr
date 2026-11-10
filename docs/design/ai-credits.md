@@ -52,6 +52,8 @@ as Notion does, and by showing a usage log.
 | A plan with `aiCredits` above zero | Available, spending credits |
 | A plan with `aiCredits` at zero or absent, or no plan when there is a catalogue | Not available. The workspace brings its own key. A workspace adopted from before the flag has no plan, and must not spend a provider's key without limit |
 
+What the operator console shows about a workspace with no plan, and its one move onto the default plan, is [workspaces-without-a-plan.md](workspaces-without-a-plan.md) (plan 0.8.0 O2).
+
 **Routing changes for everybody:** a workspace with no provider of its own routes to
 the deployment's provider, with the catalogue's default model for each tier. This
 fixes the first finding, and it fixes a group wanting one key for all its companies.

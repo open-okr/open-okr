@@ -32,6 +32,14 @@ export interface OperatorPlanInput {
   readonly seats?: number | null;
   /** Shown in the customer's own audit log, like a lifecycle reason. */
   readonly reason: string;
+  /**
+   * Part of the console's move of every workspace with no plan onto the
+   * default plan (docs/design/workspaces-without-a-plan.md §3, plan 0.8.0
+   * O2). Checked again inside the transaction: a workspace that was given a
+   * plan since the operator reviewed the list is refused with "Already on",
+   * not moved. The audit row says `bulk: true`.
+   */
+  readonly bulk?: true;
 }
 
 export async function setPlanAsOperator(
@@ -58,6 +66,19 @@ export async function setPlanAsOperator(
       workspaceId: input.workspaceId,
       actor: { kind: "operator", userId: input.operatorUserId },
       async execute({ tx, workspaceId }) {
+        if (input.bulk) {
+          const [current] = await tx
+            .select({ planKey: tenants.planKey })
+            .from(tenants)
+            .where(activeOnly(tenants, eq(tenants.workspaceId, workspaceId)))
+            .limit(1);
+          if (current?.planKey) {
+            throw new OperationError(
+              "conflict",
+              `Already on ${current.planKey}.`,
+            );
+          }
+        }
         const moved = await applyPlanInTx(tx, { workspaceId, plan, seats });
         if (!moved) {
           throw new OperationError(
@@ -89,6 +110,7 @@ export async function setPlanAsOperator(
               seats,
               reason: parsed.reason,
               by: "operator",
+              ...(input.bulk ? { bulk: true } : {}),
             },
           },
         };

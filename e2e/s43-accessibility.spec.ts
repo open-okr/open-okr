@@ -80,6 +80,8 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
     "an operator route, and not-found to everybody on a self-hosted instance",
   "/operator/instance":
     "an operator route, and not-found to everybody on a self-hosted instance",
+  "/operator/default-plan":
+    "an operator route, and not-found to everybody on a self-hosted instance",
   // docs/design/hosting-profiles.md §3: starting another workspace is open only
   // where sign-up is, and this claimed instance is invitation-only.
   "/workspaces/new":

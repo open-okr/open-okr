@@ -281,10 +281,10 @@ by plan, search by name or slug. No content of any kind: the design behind
 this is `docs/design/operator-console.md`, and the counts come
 from the per-tenant snapshot in `operator_workspace_usage`, refreshed by a
 scheduled job, rather than from a policy on any content table. Row click opens S-46. Empty state on a fresh instance reads as a
-statement rather than an error.
+statement rather than an error. **With a plan catalogue, a workspace with no plan is marked** "No plan" and "No AI on the provider's key", and a notice above the list counts them and links to a review page, `/operator/default-plan`, that lists which would move onto the default plan and which its seats would refuse, says first when that plan has no AI credits, and confirms with a reason (plan 0.8.0 O2, [workspaces-without-a-plan.md](../design/workspaces-without-a-plan.md)).
 
 **S-46 Operator workspace detail.** One tenant. Header with name, slug,
-state and plan. Panels: metadata (region, created, trial end), usage
+state and plan; with a plan catalogue and no plan, a fact saying the provider's AI key is not available to it (plan 0.8.0 O2). Panels: metadata (region, created, trial end), usage
 (member count, seats used as the plan counts them, goal count, check-in count,
 storage bytes, last activity),
 lifecycle actions (suspend, reactivate, close, change plan or seats), the

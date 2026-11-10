@@ -465,3 +465,65 @@ test("an operator is told what is overdue for erasure, and sees one being erased
     );
   }
 });
+
+/**
+ * Workspaces with no plan (plan 0.8.0 O2,
+ * docs/design/workspaces-without-a-plan.md §5).
+ *
+ * The catalogue above holds Team with no AI credits, so the review warns that
+ * moving gives no AI back. Whatever this moves is put back afterwards, so no
+ * later spec meets a plan it did not choose.
+ */
+test("workspaces with no plan are marked, reviewed and moved onto the default plan", async () => {
+  const before = await pool.query<{ workspace_id: string }>(
+    "select workspace_id from tenants where plan_key is null and deleted_at is null",
+  );
+  const unplanned = before.rows.map((row) => row.workspace_id);
+  try {
+    // No default plan yet: the console says what having none costs, and
+    // what to set.
+    await goTo(operatorPage, "/operator");
+    const notice = operatorPage.getByTestId("no-plan-notice");
+    await expect(notice).toContainText("no AI on the provider's key");
+    await expect(notice).toContainText("Set cloud.defaultPlan");
+    await expect(operatorPage.getByText("No plan").first()).toBeVisible();
+
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('cloud.defaultPlan', '"team"'::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+    );
+    await goTo(operatorPage, "/operator");
+    await operatorPage
+      .getByRole("link", { name: "Review putting them on Team" })
+      .click();
+    await expect(
+      operatorPage.getByRole("heading", { name: "Workspaces with no plan" }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      operatorPage.getByTestId("default-plan-no-credits"),
+    ).toContainText("Team includes no AI credits");
+    await expect(
+      operatorPage.getByTestId("default-plan-will-move"),
+    ).toContainText(CUSTOMER_WORKSPACE);
+
+    await operatorPage.getByTestId("default-plan-confirm").click();
+    await expect(operatorPage.getByTestId("default-plan-result")).toContainText(
+      "moved to Team",
+      { timeout: 15_000 },
+    );
+    const after = await pool.query<{ plan_key: string | null }>(
+      "select plan_key from tenants where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(after.rows[0]?.plan_key).toBe("team");
+  } finally {
+    await pool.query(
+      "update tenants set plan_key = null, seats = null where workspace_id = any($1)",
+      [unplanned],
+    );
+    await pool.query(
+      "delete from system_settings where key = 'cloud.defaultPlan'",
+    );
+  }
+});

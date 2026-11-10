@@ -374,6 +374,14 @@ export default async function OperatorWorkspacePage({
             label={t("operator.workspace.factPlan")}
             value={tenant.planKey ?? t("operator.workspace.planFree")}
           />
+          {/* With a catalogue, no plan means no AI on the provider's key
+           * (ai-credits.md §3, plan 0.8.0 O2). */}
+          {tenant.planKey === null && plans.length > 0 ? (
+            <Fact
+              label={t("operator.workspace.factAI")}
+              value={t("operator.workspace.noPlanNoAI")}
+            />
+          ) : null}
           <Fact
             label={t("operator.workspace.factSeats")}
             value={
