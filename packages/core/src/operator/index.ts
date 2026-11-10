@@ -21,6 +21,7 @@ export {
   setWorkspaceLimitsAsOperator,
 } from "./limits.ts";
 export { setPlanAsOperator } from "./plans.ts";
+export { type CloudPreflightWarning, readCloudPreflight } from "./preflight.ts";
 export {
   endSupportSession,
   grantSupportSession,
