@@ -100,6 +100,16 @@ export interface GoogleGenAIClient {
  */
 export const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/";
 
+/**
+ * The Gemini API version every request uses, named for the same reason as
+ * the base URL. SDK 3.0 moved its default from `v1beta` to `v1` and reads
+ * `GOOGLE_GENAI_API_VERSION` from the environment. System instructions,
+ * function tools and `responseJsonSchema` were built and shipped against
+ * `v1beta`, so moving off it is a change of its own, not a side effect of
+ * an SDK upgrade.
+ */
+const GOOGLE_API_VERSION = "v1beta";
+
 export interface GoogleProviderOptions {
   readonly apiKey?: string;
   /** Injected for contract tests in place of a real client. */
@@ -155,6 +165,7 @@ export class GoogleProvider implements AIProvider {
       new GoogleGenAI({
         apiKey: options.apiKey,
         vertexai: false,
+        apiVersion: GOOGLE_API_VERSION,
         httpOptions: { baseUrl: GOOGLE_BASE_URL },
       });
     this.#defaultContextWindow = options.defaultContextWindow ?? 1_000_000;
