@@ -2,7 +2,7 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds seven things:
+This plan grows as changes are named for 0.8.0. So far it holds eight things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
@@ -11,6 +11,7 @@ This plan grows as changes are named for 0.8.0. So far it holds seven things:
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Two decisions (Q7, Q8).
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
 7. **Screen layout**: layouts that waste space or squeeze content. Section 7. The first, Phase 1's Roles and Suggested timeline, asked for by Akmal on 10 November 2026.
+8. **After sign-up**: a page that says to check your email, and a welcome page when the link is opened. Section 8. Asked for by Akmal on 10 November 2026.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -212,18 +213,52 @@ Out of scope, and made possible by the keys: the sentences come from the method 
 |---|---|---|---|---|---|
 | L1 | **Phase 1's Roles and Suggested timeline waste one card and squeeze the other.** From the medium breakpoint up the two cards sit side by side at half the width each. Roles holds two short entries, the sponsor and the facilitator, so most of its card is empty. The timeline's When column never wraps, so its longest entry, "Weeks 1 to 2 of the quarter", sets the column's width, and Activity is left two or three words to a line | `apps/web/app/cycle/input-pack.tsx`: the `grid md:grid-cols-2` around the two cards, and `whitespace-nowrap` on the When cell | **Stack them at every width**: Roles full width on top, Suggested timeline full width below. Inside Roles, on a wide screen, the sponsor and the facilitator sit side by side, so the card stays two lines tall rather than becoming a tall narrow column. The When column gets a fixed share of the table and may wrap, and Activity takes the rest. At phone width nothing changes, because the cards already stack there. Mockup 02 (`docs/mockups/src/02-cycle-workspace.html`) draws a narrow roles column beside the timeline, and is redrawn to match in the same change | S | None |
 
-## 8. Suggested order
+## 8. After sign-up
+
+### 8.1 What happens today
+
+On an instance that can send mail, a new account must confirm its email before it can sign in. Read from the code on `main` and Better Auth 1.7, not tried on a running instance:
+
+| Step | Today | Where |
+|---|---|---|
+| The person presses Create account | The account is made and the verification mail is sent, but the form sends everybody to the home page whatever happened. With verification required there is no session, so they bounce to sign-in with no word about the mail | `apps/web/app/(auth)/sign-up/sign-up-form.tsx` (`router.push("/")`) |
+| They try to sign in before confirming | "Confirm your email first". The only hint anywhere that a mail was sent | `apps/web/app/(auth)/sign-in/page.tsx` (`EMAIL_NOT_VERIFIED`) |
+| They open the link | Better Auth confirms the address and redirects to the address sign-up gave it. Sign-up gives none, so it is the home page, then sign-in again, with no welcome and no sign that anything worked | Better Auth's `/api/auth/verify-email`; `signUp.email` is called with no `callbackURL` |
+| The link has expired or is not valid | Better Auth adds `?error=TOKEN_EXPIRED` or `INVALID_TOKEN` to that same home page address, and nothing reads it. The link lasts one hour, Better Auth's default, because OpenOKR sets none | `emailVerification` in `packages/core/src/auth/auth.ts` (no `expiresIn`) |
+| They want a new link | Nothing offers one. The address is taken, so signing up again is refused, and the account stays unconfirmed for good | |
+
+On an instance that cannot send mail nothing changes: verification is not required, sign-up signs the person in, and they go straight to onboarding.
+
+### 8.2 Changes
+
+| # | Change | Size | Gate |
+|---|---|---|---|
+| S1 | **"Check your email" after sign-up**, where verification is required. Instead of the home page, the form opens a page on the same auth card: the account is created, a link has gone to the address they typed, open it to confirm, how long the link lasts, look in spam, and a way back to sign-in. The address is carried in the page's own state, never in the address bar. Where verification is not required, sign-up goes on to onboarding as today | S | None |
+| S2 | **A welcome page when the link is opened.** Sign-up passes Better Auth a return address, a new signed-out page such as `/welcome`, which the proxy lets through without a session. With no error it says "Welcome to *instance name*. Your email is confirmed." with a Sign in button. An already confirmed address gets the same page, because Better Auth sends it there with no error. `TOKEN_EXPIRED` says the link has expired, and `INVALID_TOKEN` and the other errors say it is not valid. Both say what to do next, which is S3's "send a new link" once that is built. Links sent before 0.8.0 still lead to the home page | S | None |
+| S3 | **Send the link again**, on the check-your-email page, on S2's expired page, and beside "Confirm your email first" on sign-in. The answer is the same whether or not the address has an account, so the form cannot be used to find out who has one, and it is rate limited per address and per network. The design also decides how long a link lasts, one hour today, and the page in S1 says whatever it decides. **This is H1 of the hosting draft** (`docs/plans/release-0.8.0.md` on branch `docs/release-0.8.0-plan`, not merged), which also sends the mail through the outbox so a failed send never fails sign-up. Whichever plan merges first carries it, and the other drops its row | M | Design first: authentication and account enumeration |
+
+S1 and S2 need no design and can ship first. Until S3 lands, the expired page can only say to ask the workspace's administrator or the instance's support address.
+
+### 8.3 What the specification gains
+
+| Row | Pages |
+|---|---|
+| S1, S2 | UIUX-PLAN §6, S-35: the check-your-email card and the welcome page with its error states |
+| S3 | TECHNICAL-PLAN §8, the resend endpoint and the link lifetime; S-35 |
+
+## 9. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
-3. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
-4. F1 and L1. No design, and both are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read.
-5. The design for Y3 to Y6, then the code, one row each.
-6. Q6, then O2's design and code.
-7. Q7 and Q8, then V1 and V2. Both are small once decided.
-8. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
+3. S1 and S2, then S3's design. Every new person on a cloud meets them first.
+4. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
+5. F1 and L1. No design, and both are on Phase 1, the screen every cycle starts on: F1 answers "where do I fill this in", L1 makes the page easier to read.
+6. The design for Y3 to Y6, then the code, one row each.
+7. Q6, then O2's design and code.
+8. Q7 and Q8, then V1 and V2. Both are small once decided.
+9. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 9. Build log
+## 10. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -245,6 +280,9 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | V2 | to do | Waits on Q8 |
 | F1 | to do | |
 | L1 | to do | |
+| S1 | to do | |
+| S2 | to do | |
+| S3 | to do | Design first; the same as the hosting draft's H1 |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
 | Q7, Q8 | yours | Section 5.3 |
