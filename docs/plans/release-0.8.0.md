@@ -392,7 +392,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | H1 | carried by S3 | |
 | H2 | to do | Design first: security |
 | H3 | to do | Design first: registration policy |
-| H4 | to do | |
+| H4 | no change | Not reproducible on `main`, nor on 0.6.0: the proxy sends a signed-out visitor to `/sign-in`, and the auth layout sends sign-in to `/setup` while no account exists and setup is unfinished (`apps/web/app/(auth)/layout.tsx`, `readSetupState`). Nothing on that path reads the cloud flag, and `e2e/first-run-wizard.spec.ts` asserts it. What OKRGoal saw needs an account to exist before setup finished, which is the deliberate recovery path, and most likely came from H3's broken wizard sign-up. H3's fix covers it |
 | H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
 | H6 | to do | |
 | H7 | to do | Design first |
