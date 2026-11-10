@@ -53,5 +53,9 @@ process.stdout.write(
 process.stdout.write(
   shipped.tag === null
     ? "Shipped migrations not compared: no release tag in this checkout. Fetch the tags (git fetch --tags) to run that check.\n"
-    : `Shipped migrations unchanged since ${shipped.tag}: ${shipped.compared} compared.\n`,
+    : `Shipped migrations unchanged since ${shipped.tag}: ${shipped.compared} compared` +
+        (shipped.sanctioned.length > 0
+          ? `, with the sanctioned rewrite of ${shipped.sanctioned.join(", ")}`
+          : "") +
+        ".\n",
 );

@@ -42,7 +42,10 @@ from a checkout with `helm install openokr ./deploy/helm` and set
 
 1. Have a PostgreSQL and a database for OpenOKR. The `pgvector` extension is
    optional: with it, semantic search uses embeddings; without it, search falls
-   back to full text.
+   back to full text. It is not a trusted extension, so the migration hook can
+   create it only if its role is a superuser (on RDS, a member of
+   `rds_superuser`). Otherwise run `create extension vector` in the database
+   first.
 2. **Connect as a role that is not a superuser and has no `BYPASSRLS`.** Row
    level security is what keeps one workspace out of another's rows, and
    Postgres never applies it to either kind of role. A role that owns the

@@ -105,6 +105,60 @@ const legacyChecksums = (content: string): string[] => {
   ];
 };
 
+/** One shipped migration whose SQL changed on purpose. */
+export interface SanctionedRewrite {
+  /** The checksum every instance that ran the shipped file recorded. */
+  readonly from: readonly string[];
+  /** The checksum of the rewrite: the one content the sanction covers. */
+  readonly to: string;
+  readonly reason: string;
+}
+
+/**
+ * Shipped migrations whose SQL changed on purpose, with the checksum every
+ * instance that ran them recorded (plan 0.8.0 H5,
+ * docs/design/pgvector-migration.md, H5-Q1 option A, decided by Akmal on 11
+ * November 2026). A rewrite belongs here only when no instance can have run
+ * the part that changed.
+ *
+ * **Pinned at both ends.** The runner accepts a recorded `from` only while
+ * the file on disk is the `to`, and the shipped-migration gate the same, so
+ * any further edit to the file is refused exactly as an edit to any other
+ * shipped migration is. A recorded checksum is healed to `to`, once, like a
+ * line-ending variant.
+ */
+export const SANCTIONED_REWRITES: Readonly<Record<string, SanctionedRewrite>> =
+  {
+    "0031_embeddings.sql": {
+      // The same file from v0.1.0 to v0.7.0.
+      from: [
+        "3e821a9ce37a3d2bb6ecfd249dcb2217a252db44a1ccff63d079feef5d6734f6",
+      ],
+      to: "cd1d1f4bcb83ec0f424e28ecc53f870f9928b9cd3cb132f98f3e97aaf7315048",
+      reason:
+        "The pgvector branch built an hnsw index on a column with no dimensions, which pgvector refuses, so it never succeeded anywhere and every instance that recorded 0031 ran the branch without the extension. The rewrite drops the index and leaves that branch as it was.",
+    },
+  };
+
+/**
+ * Whether `current` is the sanctioned rewrite of `name` over a copy whose
+ * checksum was `recorded`. Shared by the runner and the shipped gate, so the
+ * two cannot disagree about what a sanction allows.
+ */
+export function isSanctionedRewrite(
+  name: string,
+  recorded: string,
+  current: string,
+  sanctions: Readonly<Record<string, SanctionedRewrite>> = SANCTIONED_REWRITES,
+): boolean {
+  const sanction = sanctions[name];
+  return (
+    sanction !== undefined &&
+    sanction.to === current &&
+    sanction.from.includes(recorded)
+  );
+}
+
 interface MigrationFile {
   readonly name: string;
   readonly path: string;
@@ -262,7 +316,8 @@ export async function runMigrations(
       rows.map((row) => [row.name as string, row.checksum as string]),
     );
 
-    /** Ledger rows written by the pre-normalisation runner, healed below. */
+    /** Ledger rows written by the pre-normalisation runner, or over a
+     * sanctioned rewrite, healed below. */
     const stale: string[] = [];
 
     for (const [name, recorded] of applied) {
@@ -277,6 +332,10 @@ export async function runMigrations(
         continue;
       }
       if (file.legacyChecksums.includes(recorded)) {
+        stale.push(name);
+        continue;
+      }
+      if (isSanctionedRewrite(name, recorded, file.checksum)) {
         stale.push(name);
         continue;
       }

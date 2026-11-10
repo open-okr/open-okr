@@ -1,6 +1,6 @@
 # Migrating with pgvector installed
 
-**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended. **Built the same day**; §8 records where the build moved from what is written here, and §3.3 the measurement.
 
 Plan 0.8.0 row H5. With the pgvector extension available, migrations stop at
 `0031_embeddings.sql` and the instance cannot be installed or upgraded. Fixing it
@@ -88,6 +88,46 @@ vector path to measure it. So before H5 is called done, the pgvector leg runs
 `pnpm db:seed:large --scale 0.1` and `pnpm perf:budgets` once, and the result is
 written here. Over budget means H5-Q3's second option.
 
+**What was measured, 11 November 2026.** The run named above cannot answer the
+question, so it was not used. The performance dataset writes no embeddings, and
+`perf:budgets` calls `search.query` with no embedding function, so the semantic
+half is never asked and the vector query never runs: the number would be the
+full-text figure that already exists.
+
+Measured instead: the retrieval query `EmbeddingService` sends, timed through the
+real service by wrapping the pool it is handed, as the application role under the
+tenant floor. One workspace on `pgvector/pgvector:pg17` (pgvector 0.8.7), no
+vector index, chunks with random vectors, after `ANALYZE`. 20,000 chunks is what
+`--scale 0.1` would give in goals and key results (10,000 of each). 1536 is the
+mock provider's size and OpenAI's small model; 3072 is OpenAI's default
+(`text-embedding-3-large`). A laptop shared with other builds, so the runs are
+noisy; every run is listed.
+
+| Chunks | Size | p50 | p95 | Runs |
+|---|---|---|---|---|
+| 20,000 | 1536 | 116 ms, 114 ms | 138 ms, 121 ms | 30 each |
+| 20,000 | 3072 | 184 ms, 191 ms, 179 ms | 340 ms, 206 ms, 191 ms | 30 each |
+| 60,000 | 1536 | 239 ms | 292 ms | 20 |
+
+`EXPLAIN ANALYZE` puts nearly all of it in the vector half (about 100 ms at
+20,000 by 1536 and 190 ms at 20,000 by 3072; the full-text half took 1 ms), and it
+grows with the chunk count: about 5 microseconds a chunk at 1536 and 9 at 3072.
+So the §13.1 dataset's 200,000 goals and key results would take roughly one to
+two seconds.
+
+**Against §13.1's 300 ms for search suggestions:** under at the scale named, with
+1536; at the line with 3072 (one run of three over); well over at full scale by
+that arithmetic. Two things the number leaves out: the semantic half of
+`search.query` runs only when exact matches fall short of the limit, and it waits
+for the provider to embed the question first, a network round trip the budget
+cannot hold either way.
+
+**So no index is built in H5.** At the size the decision named, the measurement is
+not plainly over. What it does show is that a large workspace will be, and that
+the second option is bigger than written: pgvector's hnsw takes at most 2,000
+dimensions on `vector`, so a 3072 model's index needs `halfvec`. That is
+H5-Q4 in §7, for Akmal.
+
 ### 3.4 The two neighbouring faults
 
 | Fix | Rule |
@@ -158,3 +198,17 @@ Then only chunks of the query's size are compared, and nothing raises
 | H5-Q1 | May 0031 change? | A, B or C in §2 | **A.** It is the only option that fixes a fresh install on managed Postgres without breaking an instance that already upgraded, and the sanction is one named file with its reason |
 | H5-Q2 | Convert the column for an instance that adds pgvector later? | A new migration plus a runbook step; the runbook step only; nothing | **A new migration plus the runbook step.** The migration covers the common case, the step covers adding it later, and §3.4 keeps both safe meanwhile |
 | H5-Q3 | Build an approximate index now? | None, unless the measurement in §3.3 is over budget; partial HNSW indexes on `embedding::vector(n)` for the configured model's size, built by an operator command | **None unless the measurement says otherwise.** An index needs the model's size, which migrations cannot know, and an exact search is correct |
+| H5-Q4 | Opened by the build, not decided. §3.3 measured the vector query under budget at the decided scale for 1536 and at the line for 3072, and about one to two seconds by extrapolation for the full §13.1 dataset. Build the index option, and when? | Leave it until a deployment is near the size that needs it; or design H5-Q3's second option now, with `halfvec` for models over 2,000 dimensions | Akmal's |
+
+## 8. As built
+
+| # | Written | Built | Why |
+|---|---|---|---|
+| B1 | `SANCTIONED_REWRITES` holds the file and its old checksum | It holds `from` (the shipped checksum, the same file from v0.1.0 to v0.7.0) **and** `to` (the rewrite's checksum), with the reason. `isSanctionedRewrite` is shared by the runner and `compareShipped` | With only the old checksum, any later edit to 0031 would also pass until 0.8.0 is tagged. Pinning the rewrite is what makes "any other edit to 0031 is refused as today" true |
+| B2 | §1 names two neighbouring faults | A third: the vector query passed `3` or `4` where it meant `$3` or `$4`, so it called `plainto_tsquery('english', 3)` and sent the question as a parameter it never used. It raised "function plainto_tsquery(unknown, integer) does not exist" every time. Fixed with the other two | Found the first time a test ran the vector path, which is what §3.6 was for |
+| B3 | §5: `hasPgvector()` with the extension and a text column runs on the default stack | It runs on the pgvector leg. On the default stack the same test proves the text column with no extension | The extension cannot exist on a server that does not have it |
+| B4 | §3.6 runs "the migrations and the embedding tests" | The `pgvector` job in `ci.yml` runs `packages/db/test/migrate.test.ts` and `pgvector.test.ts`, and the three `embeddings-*` tests in core, with `TEST_PGVECTOR=1`. That makes the harness create the extension in the test template as the superuser before migrations, and every pgvector test fail rather than skip without it. It is one of the jobs the `CI` check needs | pgvector 0.8.7 is not a trusted extension, so the owner role the harness migrates as cannot create it, and the leg would quietly have taken the text branch |
+| B5 | Not in the design | `embeddings-retrieval.test.ts` builds its service with no model, so it proves the full-text path on every stack | On the leg its service would take the vector path, where every chunk is some distance from every question |
+| B6 | §3.5's new migration | `0166_embeddings_vector.sql`: converts the column when the extension exists and the column's type is `text`, keeping each value | As designed. Proved through v0.7.0's own files: migrated by an owner that could not create the extension, the operator then adds it, and the upgrade heals 0031's checksum and converts the column |
+| B7 | §3.3's run | Not run as written, because it cannot reach the vector path; measured directly instead, recorded in §3.3 | A number that measured nothing would have read as an answer |
+

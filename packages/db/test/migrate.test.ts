@@ -8,7 +8,12 @@ import pg from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type DataChangeScript, runDataChanges } from "../src/data-change.ts";
 import { registeredDataChanges } from "../src/data-changes/registry.ts";
-import { requiredDataChanges, runMigrations } from "../src/migrate.ts";
+import {
+  checksum,
+  requiredDataChanges,
+  runMigrations,
+  SANCTIONED_REWRITES,
+} from "../src/migrate.ts";
 
 /**
  * The forward-only migration runner. Editing or reordering an applied
@@ -203,6 +208,81 @@ describe("runMigrations", () => {
     } finally {
       await rm(other, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * A shipped migration rewritten on purpose (plan 0.8.0 H5,
+ * docs/design/pgvector-migration.md, H5-Q1 option A). 0031's pgvector branch
+ * never succeeded anywhere, so every instance that recorded 0031 ran the
+ * other branch, and the rewrite changes nothing any of them has. The runner
+ * is told the old checksum is still that migration, for that one file and
+ * that one rewrite, and every other edit is refused as before.
+ */
+describe("a shipped migration rewritten on purpose", () => {
+  /** What every instance recorded for 0031, from v0.1.0 to v0.7.0. */
+  const SHIPPED_0031 =
+    "3e821a9ce37a3d2bb6ecfd249dcb2217a252db44a1ccff63d079feef5d6734f6";
+  const current0031 = readFileSync(
+    join(import.meta.dirname, "../migrations/0031_embeddings.sql"),
+    "utf8",
+  );
+
+  /** A ledger that recorded `name` with `recorded`, as an upgraded instance holds it. */
+  const recordedAs = async (name: string, recorded: string) => {
+    await runMigrations(client, { dirs: [dir] });
+    await client.query(
+      "insert into _migrations (name, checksum) values ($1, $2)",
+      [name, recorded],
+    );
+  };
+
+  it("sanctions 0031 alone, from the shipped checksum to the file on disk", () => {
+    expect(Object.keys(SANCTIONED_REWRITES)).toEqual(["0031_embeddings.sql"]);
+    const sanction = SANCTIONED_REWRITES["0031_embeddings.sql"];
+    expect(sanction?.from).toEqual([SHIPPED_0031]);
+    // Pinned to the rewrite: a later edit to 0031 breaks this, and the runner
+    // and the shipped gate refuse it.
+    expect(sanction?.to).toBe(checksum(current0031));
+  });
+
+  it("accepts the checksum the shipped 0031 recorded, and heals the ledger once", async () => {
+    await recordedAs("0031_embeddings.sql", SHIPPED_0031);
+    await write("0031_embeddings.sql", current0031);
+
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
+    const healed = await client.query(
+      "select checksum from _migrations where name = '0031_embeddings.sql'",
+    );
+    expect(healed.rows[0]?.checksum).toBe(checksum(current0031));
+    expect(await runMigrations(client, { dirs: [dir] })).toEqual([]);
+  });
+
+  it("refuses any other edit to 0031 on an instance that recorded the shipped file", async () => {
+    await recordedAs("0031_embeddings.sql", SHIPPED_0031);
+    await write("0031_embeddings.sql", `${current0031}\n-- Another edit.\n`);
+
+    await expect(runMigrations(client, { dirs: [dir] })).rejects.toThrow(
+      /0031_embeddings\.sql was edited after it ran/,
+    );
+  });
+
+  it("refuses the rewrite over a checksum the shipped file never had", async () => {
+    await recordedAs("0031_embeddings.sql", checksum("select 1;"));
+    await write("0031_embeddings.sql", current0031);
+
+    await expect(runMigrations(client, { dirs: [dir] })).rejects.toThrow(
+      /was edited after it ran/,
+    );
+  });
+
+  it("sanctions nothing under another name", async () => {
+    await recordedAs("0030_other.sql", SHIPPED_0031);
+    await write("0030_other.sql", current0031);
+
+    await expect(runMigrations(client, { dirs: [dir] })).rejects.toThrow(
+      /0030_other\.sql was edited after it ran/,
+    );
   });
 });
 

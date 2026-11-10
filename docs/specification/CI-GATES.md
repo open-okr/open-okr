@@ -42,9 +42,13 @@ somebody asks: `pnpm test:ci --shard=i/4` and `pnpm test:e2e --shard=i/4` run
 exactly what one CI machine runs.
 
 **`pnpm test` needs a PostgreSQL.** `pgvector` is optional: migration 0031
-creates it only when it is available, and search falls back to full text.
+creates it only when it can, and search falls back to full text.
 `pnpm db:up` starts a plain `postgres:17-alpine` in Docker, with PgBouncer and
-the MySQL the FlowyTeam connector's suites read.
+the MySQL the FlowyTeam connector's suites read. CI's pgvector job runs the
+migrations and the embedding tests on `pgvector/pgvector:pg17` with
+`TEST_PGVECTOR=1`, which gives the test template the extension before the
+migrations run and makes a missing one a failure. Set the same against a
+Postgres with pgvector to run those files locally.
 `TEST_DB_PORT` points the suite at a PostgreSQL you already run instead. Never
 run two suites against the same database at once: the harness creates and
 drops a database per worker, so a second run tears the first one's out from
@@ -75,6 +79,7 @@ fix it and push again. A pull request merges only when CI is green.
 |---|---|---|
 | Types, lint and dead code | `turbo run typecheck --affected`, `pnpm lint`, `pnpm dead-code`, `pnpm db:lint`, `pnpm check:boundaries`, `pnpm check:air-gap`, `pnpm check:docs`, `pnpm method:check`, `pnpm check:contract` | The push changed no code |
 | Tests | `pnpm test:ci`, four shards, each against its own Postgres | The push changed no code |
+| Migrations and retrieval on pgvector | The runner's suite, `packages/db/test/pgvector.test.ts` and the three `embeddings-*` suites in core, on `pgvector/pgvector:pg17` with `TEST_PGVECTOR=1` (plan 0.8.0 H5). The only place migration 0031's pgvector branch and the vector query run | The push changed no code |
 | End to end, AI off | `pnpm db:up`, Chromium, `pnpm build`, `pnpm test:e2e`, four shards. Each runs the `claim` project, then its share of the specs. **This is the AI-off leg** (`docs/design/ai-off-leg.md`): the servers boot with every deployment AI variable empty, every test carries `@ai-off`, `e2e/ai-off.spec.ts` fails if the copilot has a provider or any main screen draws an AI affordance, and `e2e/p0-flows.ts` names the P0 flows the run contains | The push changed no code |
 | Accessibility and web vitals | Part of the same end-to-end job. `s43-accessibility.spec.ts` scans every screen the route tree lists and fails on a `serious` or `critical` axe finding; `s43b-accessibility-keyboard.spec.ts` drives the primary flows with no mouse; `s44-web-vitals.spec.ts` fails on a TECHNICAL-PLAN §13.1 paint or interaction budget. A screen added with no coverage is scanned anyway, because the list is derived rather than maintained | With the end-to-end job |
 | Compose target | Builds the Docker image and drives the first-run wizard | The push changed no code |
@@ -145,6 +150,14 @@ create policy tenant_isolation on t
 a checksum per file, and an edit raises "Applied migration X was edited after
 it ran" on every database that applied it. Migrations are forward-only: fix
 forward with a new one.
+
+The one exception is a rewrite named in `SANCTIONED_REWRITES` in
+`packages/db/src/migrate.ts`, with the checksum the shipped file recorded and
+the checksum of the rewrite. The runner and this gate both accept that file
+over that copy to that rewrite only, and heal the ledger row once. It belongs
+there only when no instance can have run the part that changed, and only by a
+maintainer's decision. 0031's pgvector branch is the one entry (plan 0.8.0
+H5): it had never succeeded anywhere.
 
 ### `pnpm check:docs`
 

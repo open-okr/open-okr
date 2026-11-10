@@ -130,6 +130,32 @@ root key, and refuses to finish without it rather than report them sealed.
   (`delete from _data_changes where name = '0034_short_ids'`) and start
   again, and the migrator runs 0034 before the migration.
 
+- **Installing and upgrading with pgvector.** Until 0.8.0, migration 0031
+  stopped every database where the `vector` extension was installed: it built
+  an index pgvector refuses. 0.8.0 rewrites that part of 0031 and builds no
+  index. An instance that already applied 0031 did so without the extension,
+  so nothing it has changes; the migrator accepts the checksum it recorded
+  and updates it, once. Any other edit to a shipped migration is still
+  refused.
+
+  Migration 0166 makes `embeddings.embedding` a vector when the extension is
+  there and the column is still text, which is the case for an instance whose
+  migrations could not create it. pgvector is not a trusted extension: only a
+  superuser can create it (on RDS, a member of `rds_superuser`), so create it
+  before you upgrade if the role that runs migrations cannot. Until the column
+  is a vector, semantic search keeps to full text, and nothing raises.
+
+  **Adding pgvector after upgrading to 0.8.** Create the extension as a
+  superuser, then convert the column yourself as the owner of the tables:
+
+  ```sql
+  create extension if not exists vector;
+  alter table embeddings alter column embedding type vector using embedding::vector;
+  ```
+
+  Chunks written before have no vector, and get one when their text next
+  changes; until then the full-text half of search finds them.
+
 ## 0.6 to 0.7
 
 Twelve migrations, **0151 to 0164** (0156 and 0160 are unused numbers), and
