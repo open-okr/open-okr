@@ -5,7 +5,6 @@ import { workspaceReaderLevel } from "../lib/access";
 import { getPool } from "../lib/auth";
 import { getTranslations } from "../lib/translations";
 import { requireWorkspace } from "../lib/workspace";
-import { FirstVisitTour } from "./first-visit-tour.tsx";
 import { goalTreeNodes } from "./goal-nodes.ts";
 import { WorkMap } from "./work-map.tsx";
 import {
@@ -59,9 +58,6 @@ export async function WorkMapScreen({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
-  // The first-visit tour's first stop outlines this tree, so it is drawn
-  // wherever the tree is (UIUX-PLAN S-34, L-08).
-  const tour = await callAction(context, "people.readOwnTour", {});
 
   const cycles = await callAction(context, "cycles.list", {});
   const current = await callAction(context, "cycles.current", {
@@ -211,12 +207,6 @@ export async function WorkMapScreen({
         scopeLabel={scopeLabel}
         stats={stats}
       />
-
-      {/* Under the page's own heading, so the outline reads Work map and then
-          the tour, and above the tree its first stop outlines, so a keyboard
-          meets the card before the rows it introduces. Gone for good once
-          finished or ended. */}
-      {tour.finished ? null : <FirstVisitTour />}
 
       <WorkMapScopeTabs
         tabs={scopeTabs}

@@ -54,6 +54,7 @@ import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
 import { NewMenu } from "./new-menu.tsx";
 import { getPool } from "./pool";
+import { ProductTour } from "./product-tour.tsx";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
 import { SidebarToggle } from "./sidebar-toggle.tsx";
@@ -558,6 +559,29 @@ export async function AppShellLayout({
          * screen shows the bar without each form remembering to (UIUX-PLAN
          * §4, "Acting"). */}
         <ActivityIndicator />
+        {/* The product tour on a first sign-in, on whatever screen it lands
+         * (plan 0.8.0 T1). Beside the shell because it dims all of it.
+         * Onboarding (S-34) is outside the shell, so the tour comes after it,
+         * never on top of it. */}
+        <ProductTour
+          offered={
+            !(
+              await callAction(
+                {
+                  pool: getPool(),
+                  workspaceId: workspace.workspaceId,
+                  actor: { kind: "human" as const, userId: session.user.id },
+                },
+                "people.readOwnTour",
+                {},
+              ).catch(() => ({ finished: true }))
+            ).finished
+          }
+          demo={loadEnv().OPENOKR_DEMO === "on"}
+          canDraft={level >= ACCESS_LEVELS.edit}
+          askAvailable={copilot.available}
+          instanceName={await getInstanceName()}
+        />
         {/*
          * Beside the shell rather than inside the topbar, because the palette is
          * an overlay over the whole page. Mounted once here, so ⌘K works on every

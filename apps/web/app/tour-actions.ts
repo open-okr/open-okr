@@ -30,8 +30,9 @@ export async function finishTour(): Promise<{ error: string | null }> {
     }
     throw error;
   }
-  // The Work Map is the one screen that draws the tour, and a copy of it held
-  // by the router would draw it again on the way back.
-  revalidatePath("/");
+  // The shell offers the tour on every screen (plan 0.8.0 T1), so every copy
+  // the router holds is stale once it ends. The browser also remembers, so a
+  // stale copy would not offer it again in any case.
+  revalidatePath("/", "layout");
   return { error: null };
 }

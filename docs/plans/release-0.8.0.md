@@ -416,7 +416,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S1 | done | One commit with S2, since the sign-up form carries both. The card replaces the form when sign-up returns no session; the link's hour is now named (`EMAIL_VERIFICATION_LINK_SECONDS`) |
 | S2 | done | At `/email-confirmed`, because `/welcome` is onboarding (S-34). Until S3, an expired or broken link points to the instance's support address, or to whoever runs it |
 | S3 | design written | `docs/design/email-verification.md`: the mail through the outbox, Better Auth's own resend endpoint on all three surfaces, limits per address and network, a 24-hour link recommended. Found a refused mail no longer fails sign-up on Better Auth 1.7. Q1 to Q3; waits for "design approved" |
-| T1 | to do | Q9 decided |
+| T1 | done | `apps/web/lib/product-tour.tsx`, mounted by the shell; the Work Map card and its CSS removed. Browser memory under `openokr.tour.ended`; the suite's contexts start with it set (`TOUR_COOKIE` opts back in). Unit tests for every step and ending; the claim spec walks it with the keyboard and scans both dialogs |
 | R1 | to do | Design first: access |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Y7-1 to Y7-6 | decided | 10 November 2026, section 2.5 |

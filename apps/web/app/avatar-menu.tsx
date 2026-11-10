@@ -5,6 +5,7 @@ import { Avatar, initialsOf, useTranslations } from "@openokr/ui";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { startTourAgain } from "../lib/product-tour.tsx";
 import { menuRowClass } from "./menu-row-class.ts";
 
 /**
@@ -87,6 +88,15 @@ export function AvatarMenu({
              * close the menu on the first click. */}
             {appearance}
             <Menu.Separator className="my-1 h-px bg-line" />
+            {/* So an early Skip is never final (plan 0.8.0 T1). The menu
+             * closes and the tour starts over from its first step. */}
+            <Menu.Item
+              onClick={startTourAgain}
+              className={menuRowClass}
+              data-testid="tour-again"
+            >
+              {t("tour.again")}
+            </Menu.Item>
             <Menu.Item
               render={<a href={sourceUrl} target="_blank" rel="noreferrer" />}
               className={`${menuRowClass} flex items-center justify-between gap-3`}

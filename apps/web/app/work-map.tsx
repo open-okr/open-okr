@@ -382,8 +382,7 @@ export async function WorkMap({
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
-      {/* The first stop of the first-visit tour (L-08) outlines this. */}
-      <div className="min-w-0 flex-1" data-tour-target="work-map">
+      <div className="min-w-0 flex-1">
         <GoalTable
           nodes={nodes}
           selected={selected}

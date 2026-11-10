@@ -24,8 +24,7 @@ const page = at("../app/welcome/page.tsx");
 const wizard = at("../app/welcome/wizard.tsx");
 const actions = at("../app/welcome/actions.ts");
 const home = at("../app/(home)/page.tsx");
-// The tour's first stop outlines the tree, so it is drawn wherever the tree
-// is: Home's cockpit and the Map tab since the role homes.
+// The Work Map no longer draws the tour; the shell offers it (plan 0.8.0 T1).
 const workMapScreen = at("../app/work-map-screen.tsx");
 
 describe("the setting", () => {
@@ -176,39 +175,47 @@ describe("resumable from admin (L-08)", () => {
   });
 });
 
-describe("the first-visit tour (L-08)", () => {
-  const tour = at("../app/first-visit-tour.tsx");
+describe("the product tour on a first sign-in (L-08, plan 0.8.0 T1)", () => {
+  const tour = at("../lib/product-tour.tsx");
   const tourActions = at("../app/tour-actions.ts");
-  const css = at("../app/globals.css");
+  const shell = at("../lib/app-shell.tsx");
 
-  test("is drawn on the Work Map, only for a member who has not finished it", () => {
-    expect(workMapScreen).toContain(
-      'callAction(context, "people.readOwnTour", {})',
-    );
-    expect(workMapScreen).toContain(
-      "{tour.finished ? null : <FirstVisitTour />}",
-    );
-    // After the setup redirect, so an owner meets the setup first.
-    expect(home.indexOf("<WorkMapScreen")).toBeGreaterThan(
-      home.indexOf('redirect("/welcome")'),
-    );
+  test("is offered by the shell on every screen, not by the Work Map", () => {
+    expect(shell).toContain('"people.readOwnTour"');
+    expect(shell).toContain("<ProductTour");
+    expect(workMapScreen).not.toContain("readOwnTour");
+    // Onboarding sits outside the shell, so an owner meets the setup first
+    // and the tour after it, never on top of it.
+    expect(page).not.toContain("AppShell");
   });
 
-  test("is ended by the member's own registered write", () => {
+  test("is ended by the member's own registered write, except on a demo", () => {
     expect(tourActions).toContain('"people.finishOwnTour"');
-    expect(tour).toContain("finishTour()");
+    expect(tour).toContain("await finishTour()");
+    expect(tour).toContain("if (!demo)");
   });
 
-  test("outlines every stop that has something on screen to outline", () => {
-    // A check-in is a composer, not a thing on the Work Map, so it is the
-    // one stop that explains without pointing.
-    for (const stop of ["work-map", "review", "cycle-strip", "search"]) {
-      expect(css, stop).toContain(`:root[data-tour-stop="${stop}"]`);
+  test("points at what the shell shows on every screen (Q9)", () => {
+    for (const selector of [
+      'nav a[href="/"]',
+      'nav a[href="/review"]',
+      'nav a[href="/goals"]',
+      '[data-tour-target="cycle-strip"]',
+      'label:has(input[type="search"])',
+      '[data-tour-target="ask-ai"]',
+    ]) {
+      expect(tour, selector).toContain(selector);
     }
-    expect(at("../app/work-map.tsx")).toContain('data-tour-target="work-map"');
     expect(at("../app/work-map-header.tsx")).toContain(
       'data-tour-target="cycle-strip"',
     );
+    expect(at("../app/copilot/copilot-panel.tsx")).toContain(
+      'data-tour-target="ask-ai"',
+    );
+  });
+
+  test("can be taken again from the avatar menu", () => {
+    expect(at("../app/avatar-menu.tsx")).toContain("startTourAgain");
   });
 });
 
