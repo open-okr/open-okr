@@ -1323,7 +1323,7 @@
   "auth.emailConfirmed.expiredHours": "Pautan untuk mengesahkan e-mel berfungsi selama {hours} jam, dan pautan ini telah tamat tempoh.",
   "auth.emailConfirmed.expiredOneHour": "Pautan untuk mengesahkan e-mel berfungsi selama satu jam, dan pautan ini telah tamat tempoh.",
   "auth.emailConfirmed.expiredTitle": "Pautan ini telah tamat tempoh",
-  "auth.emailConfirmed.invalidBody": "Ia mungkin disalin separuh sahaja, atau telah digantikan oleh pautan yang lebih baharu.",
+  "auth.emailConfirmed.invalidBody": "Ia mungkin disalin separuh sahaja, atau akaun yang dimaksudkan tidak lagi wujud.",
   "auth.emailConfirmed.invalidTitle": "Pautan ini tidak sah",
   "auth.emailConfirmed.signIn": "Log masuk",
   "auth.emailConfirmed.welcome": "Selamat datang ke {instance}",

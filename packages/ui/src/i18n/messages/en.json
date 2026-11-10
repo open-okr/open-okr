@@ -1323,7 +1323,7 @@
   "auth.emailConfirmed.expiredHours": "A link to confirm an email works for {hours} hours, and this one has run out.",
   "auth.emailConfirmed.expiredOneHour": "A link to confirm an email works for one hour, and this one has run out.",
   "auth.emailConfirmed.expiredTitle": "This link has expired",
-  "auth.emailConfirmed.invalidBody": "It may have been copied only in part, or replaced by a newer link.",
+  "auth.emailConfirmed.invalidBody": "It may have been copied only in part, or the account it was for no longer exists.",
   "auth.emailConfirmed.invalidTitle": "This link is not valid",
   "auth.emailConfirmed.signIn": "Sign in",
   "auth.emailConfirmed.welcome": "Welcome to {instance}",
