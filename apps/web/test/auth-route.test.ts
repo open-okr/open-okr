@@ -28,10 +28,11 @@ vi.mock("../lib/auth", () => ({
 }));
 
 vi.mock("@openokr/core", async () => {
-  const { callerAddress } =
+  const { callerAddress, createAuth } =
     await vi.importActual<typeof import("@openokr/core")>("@openokr/core");
   return {
     callerAddress,
+    createAuth,
     recordInstanceAuditEvent: recordInstanceAuditEventMock,
   };
 });
@@ -134,5 +135,52 @@ describe("the auth route's lockout audit wrapper", () => {
       payload: { address: string };
     };
     expect(last.payload.address).not.toBe("6.6.6.6");
+  });
+});
+
+/**
+ * The endpoints no screen uses, through the route with a real instance
+ * (account-self-service.md D26, plan 0.8.0 Y6). Better Auth refuses an off
+ * path before the limiter and before reading anything, so the instance needs
+ * no database to answer, and a stand-in pool proves it never asked.
+ */
+describe("a path that is off, through the route", () => {
+  const realHandler = async () => {
+    const { createAuth } = await import("@openokr/core");
+    const auth = createAuth({
+      pool: {} as never,
+      secret: "a-test-secret-of-sufficient-length-for-signing",
+      baseUrl: "http://localhost:3000",
+    });
+    handlerMock.mockImplementation((incoming: Request) =>
+      auth.handler(incoming),
+    );
+  };
+
+  it.each([
+    ["POST", "/api/auth/update-user"],
+    ["POST", "/api/auth/change-email"],
+    ["POST", "/api/auth/verify-password"],
+    ["GET", "/api/auth/list-sessions"],
+    ["POST", "/api/auth/get-access-token"],
+    ["POST", "/api/auth/sso/register"],
+    ["POST", "/api/auth/update-user/"],
+  ])("%s %s answers 404 and writes no audit row", async (method, path) => {
+    await realHandler();
+    const route = await import("../app/api/auth/[...all]/route");
+
+    const response = await route[method as "GET" | "POST"](
+      new Request(`http://localhost:3000${path}`, {
+        method,
+        headers: {
+          "content-type": "application/json",
+          cookie: "better-auth.session_token=anything",
+        },
+        ...(method === "POST" ? { body: JSON.stringify({ name: "X" }) } : {}),
+      }),
+    );
+
+    expect(response.status).toBe(404);
+    expect(recordInstanceAuditEventMock).not.toHaveBeenCalled();
   });
 });

@@ -35,6 +35,28 @@ a hold ends on its own.
 - The answer is the same whether or not an account exists, so a hold tells
   nobody who has one. The counts are kept as keyed hashes, never as addresses.
 
+### Authentication endpoints that are off
+
+Everything under `/api/auth` is Better Auth, the sign-in library. It serves
+more endpoints than any screen uses, and the ones nothing uses answer 404.
+You do not need to configure this, and nothing in the product stops working.
+
+| Off | Why |
+|---|---|
+| `/update-user`, `/update-session` | Changed the account's name or picture with no record |
+| `/change-email`, `/verify-password` | Asked for no password, or checked one without counting it toward the hold |
+| `/delete-user`, `/delete-user/callback` | Deleting your own account has its own flow |
+| `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions` | Security lists and ends sessions from the server. A stolen cookie could have signed the owner out everywhere |
+| `/list-accounts`, `/link-social`, `/unlink-account` | Unlinking removed a password or a provider link with no record |
+| `/get-access-token`, `/refresh-token`, `/account-info` | Handed the identity provider's tokens to anybody holding the session cookie |
+| `/two-factor/get-totp-uri`, `/two-factor/send-otp`, `/two-factor/verify-otp`, `/passkey/update-passkey`, `/ok` | No screen uses them |
+| `/sso/register`, `/sso/providers`, `/sso/get-provider`, `/sso/update-provider`, `/sso/delete-provider`, `/sso/callback` | Single sign-on connections are managed on Admin, Single sign-on. Registering a provider is refused from server code as well |
+
+The full list, with every endpoint that stays on, is in
+[account-self-service.md](../design/account-self-service.md) §3. A test fails
+the build when Better Auth adds an endpoint the list does not name, so an
+upgrade cannot quietly switch one on.
+
 ## Agent connections
 
 Admin, then **Agent connections**. Every external agent a member connected to

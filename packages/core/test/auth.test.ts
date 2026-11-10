@@ -231,13 +231,22 @@ describe("listing and revoking sessions (P2-T09)", () => {
     return session as NonNullable<typeof session>;
   };
 
+  /**
+   * Security revokes from a server action through `auth.api`, because the
+   * HTTP path is off (account-self-service.md §3). This is that call.
+   */
+  const revokeFrom = (cookie: string, token: string | undefined) =>
+    auth.api.revokeSession({
+      headers: new Headers({ cookie }),
+      body: { token: token ?? "" },
+    });
+
   it("lists every active session for the signed-in user", async () => {
     const firstDevice = cookieFrom(await register());
     await post("/sign-in/email", { email: EMAIL, password: PASSWORD });
 
-    const listed = await get("/list-sessions", { cookie: firstDevice });
-    expect(listed.status).toBe(200);
-    const sessions = (await listed.json()) as Array<{ token: string }>;
+    const current = await currentSessionFor(firstDevice);
+    const sessions = await listUserSessions(auth, current.user.id);
     expect(sessions.length).toBe(2);
   });
 
@@ -247,14 +256,6 @@ describe("listing and revoking sessions (P2-T09)", () => {
       await post("/sign-in/email", { email: EMAIL, password: PASSWORD }),
     );
 
-    const listed = await get("/list-sessions", { cookie: firstDevice });
-    const sessions = (await listed.json()) as Array<{
-      token: string;
-      // Better Auth's own field name for which device issued a request last.
-      userAgent?: string;
-    }>;
-    expect(sessions).toHaveLength(2);
-
     // Revoke the session behind `secondDevice`'s cookie by asking for it by
     // token, from the *other* device — this is what an admin's "revoke this
     // device" action does, not a self-revoke.
@@ -263,12 +264,9 @@ describe("listing and revoking sessions (P2-T09)", () => {
       session: { token: string };
     };
 
-    const revoke = await post(
-      "/revoke-session",
-      { token: secondBody.session.token },
-      { cookie: firstDevice },
-    );
-    expect(revoke.status).toBe(200);
+    await expect(
+      revokeFrom(firstDevice, secondBody.session.token),
+    ).resolves.toEqual({ status: true });
 
     const after = await get("/get-session", { cookie: secondDevice });
     expect(await after.json()).toBeNull();
@@ -282,19 +280,22 @@ describe("listing and revoking sessions (P2-T09)", () => {
   });
 
   /**
-   * The freshness rule, pinned as the reason the security page cannot read
-   * its list through the endpoint. Better Auth gates `/list-sessions` on a
+   * The freshness rule, pinned as the reason the security page never read
+   * its list through Better Auth's endpoint. It gates `/list-sessions` on a
    * session having been created within `freshAge` (one day), so a month-long
-   * session answers 403 for its remaining twenty-nine days. Raising
+   * session is refused for its remaining twenty-nine days. Raising
    * `freshAge` is not the answer: the same setting decides whether deleting
-   * an account still demands the password.
+   * an account still demands the password. The HTTP path is off as well
+   * (account-self-service.md §3); the server call shows the rule.
    */
-  it("refuses the /list-sessions endpoint once the session is no longer fresh", async () => {
+  it("refuses Better Auth's own session list once the session is no longer fresh", async () => {
     const cookie = cookieFrom(await register());
     await ageEverySession();
 
-    const listed = await get("/list-sessions", { cookie });
-    expect(listed.status).toBe(403);
+    expect((await get("/list-sessions", { cookie })).status).toBe(404);
+    await expect(
+      auth.api.listSessions({ headers: new Headers({ cookie }) }),
+    ).rejects.toMatchObject({ statusCode: 403 });
   });
 
   it("lists sessions for a signed-in user whose session is no longer fresh", async () => {
@@ -331,12 +332,9 @@ describe("listing and revoking sessions (P2-T09)", () => {
     const other = sessions.find((session) => session.id !== current.session.id);
     expect(other).toBeDefined();
 
-    const revoke = await post(
-      "/revoke-session",
-      { token: other?.token },
-      { cookie: firstDevice },
-    );
-    expect(revoke.status).toBe(200);
+    await expect(revokeFrom(firstDevice, other?.token)).resolves.toEqual({
+      status: true,
+    });
 
     expect(
       await (await get("/get-session", { cookie: secondDevice })).json(),

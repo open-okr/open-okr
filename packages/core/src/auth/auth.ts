@@ -44,6 +44,7 @@ import {
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
 import { CALLER_ADDRESS_HEADERS, callerAddress } from "./caller-address.ts";
+import { DISABLED_AUTH_PATHS } from "./endpoints.ts";
 import {
   type AuthLimiterStorage,
   inProcessLimiter,
@@ -462,6 +463,13 @@ export function createAuth(options: AuthOptions) {
     secret: options.secret,
     baseURL: options.baseUrl,
     basePath: "/api/auth",
+
+    // The endpoints no screen uses answer 404 over HTTP
+    // (account-self-service.md D26, plan 0.8.0 Y6). Built from the inventory
+    // in `endpoints.ts`, whose test fails when Better Auth serves a path the
+    // inventory does not classify. A server call through `auth.api` never
+    // meets this list.
+    disabledPaths: [...DISABLED_AUTH_PATHS],
 
     emailAndPassword: {
       enabled: true,
@@ -1062,6 +1070,14 @@ export function createAuth(options: AuthOptions) {
                * product uses for membership; `provisionUser` above is.
                */
               organizationProvisioning: { disabled: true },
+              /**
+               * **No provider is ever registered through the plugin**
+               * (account-self-service.md D26). Its rows are derived from
+               * `sso_connections` by `saml-sync.ts`, which writes them
+               * itself. The HTTP path is off as well; this refuses a server
+               * call too, which `disabledPaths` never sees.
+               */
+              providersLimit: 0,
             }),
           ]
         : []),

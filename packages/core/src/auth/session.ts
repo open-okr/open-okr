@@ -54,7 +54,9 @@ export interface UserSession {
  * Raising `freshAge` is the wrong lever: the same number decides whether
  * deleting an account still demands the password. So this reads through
  * Better Auth's own adapter instead, which keeps the token hashing wrapper
- * and leaves freshness guarding the endpoints that change something.
+ * and leaves freshness guarding the endpoints that change something. The
+ * endpoint's HTTP path is off as well (docs/design/account-self-service.md
+ * §3).
  *
  * That the list is unauthenticated here is the caller's business: pass the
  * identifier of the user who is asking, never one taken from a request.

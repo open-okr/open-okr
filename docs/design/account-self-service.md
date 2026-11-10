@@ -43,7 +43,7 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 | Y4: answered the same way whether or not the address is taken | The body is the same, but a free address waits for the mail callback inside the request and a taken one does not. With today's direct SMTP send, the time taken tells. D17 |
 | Y4 names SCIM as the organisation's reason to refuse | **SSO enforcement is keyed on the address's domain.** Moving off the claimed domain would make a password and passkeys work again for somebody the organisation signs in. Refused too (D16) |
 | Y3: "after a recent sign-in" | `setPassword` checks no freshness, and Better Auth's `freshAge` (one day by default) is not what recent should mean here. D2 |
-| Y6: "starting with `/update-user`" | Twenty-eight more endpoints no screen uses answer today, sixteen of Better Auth's own and twelve from its plugins, several of them worse (§3, §6) |
+| Y6: "starting with `/update-user`" | Twenty-six more endpoints no screen uses answer today, sixteen of Better Auth's own and ten from its plugins, several of them worse (§3, §6) |
 
 ## 1. Decisions already made
 
@@ -112,7 +112,9 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 
 ## 3. The endpoint inventory
 
-59 paths when every plugin is mounted: 30 stay on, 29 go off. "Today" is on for all of them; `/change-email` and `/delete-user` answer an error from their handler rather than 404.
+57 paths when every plugin is mounted: 30 stay on, 27 go off. "Today" is on for all of them; `/change-email` and `/delete-user` answer an error from their handler rather than 404.
+
+**Built (Y6, 11 November 2026), with one change from the table as first written.** It listed 59 paths, two of them `/sso/request-domain-verification` and `/sso/verify-domain`. The SSO plugin mounts those only when its `domainVerification` option is on, and `createAuth` never sets it, so they are not served and the inventory test (D27) refused them as listed in vain. They are left out. If a later change turns domain verification on, the same test fails naming both, and they are classified then. The inventory is `AUTH_ENDPOINTS` in `packages/core/src/auth/endpoints.ts`. Until Y3 lands, `/change-password` stays on without its guard, as it was before Y6.
 
 | Path | Method | After Y6 | Why |
 |---|---|---|---|
@@ -173,8 +175,6 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 | `/sso/get-provider` | GET | off | The same |
 | `/sso/update-provider` | POST | off | The same |
 | `/sso/delete-provider` | POST | off | The same |
-| `/sso/request-domain-verification` | POST | off | The same |
-| `/sso/verify-domain` | POST | off | The same |
 
 `setPassword`, `generateTOTP` and `viewBackupCodes` are server only and never served; D12 calls the first.
 
