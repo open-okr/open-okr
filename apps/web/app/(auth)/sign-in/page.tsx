@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
+import { DemoPill } from "../../../lib/demo-pill";
 import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, FormError } from "../auth-card";
 
@@ -62,6 +63,9 @@ export default function SignInPage() {
   const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
   const [personas, setPersonas] = useState<DemoPersona[]>([]);
   const [demoPassword, setDemoPassword] = useState<string | null>(null);
+  // The instance says it is a demonstration, whether or not it lists anybody
+  // to sign in as (plan 0.8.0 D1).
+  const [demo, setDemo] = useState(false);
 
   // Load SSO providers for buttons. Non-blocking: the password form renders
   // immediately and the buttons appear when the fetch completes.
@@ -100,6 +104,7 @@ export default function SignInPage() {
     fetch("/api/demo-personas")
       .then((r) => r.json())
       .then((data) => {
+        setDemo(data?.demo === true);
         if (Array.isArray(data?.personas) && data.personas.length > 0) {
           setPersonas(data.personas);
           setDemoPassword(
@@ -266,6 +271,7 @@ export default function SignInPage() {
   return (
     <AuthCard
       title={t("auth.signIn.heading", { instanceName })}
+      badge={demo ? <DemoPill /> : undefined}
       footer={
         <>
           <Link

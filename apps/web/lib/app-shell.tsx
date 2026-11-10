@@ -44,6 +44,7 @@ import { brandingImageUrl } from "./branding-image.ts";
 import { CreditsBanner } from "./credits-banner.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
+import { DemoPill } from "./demo-pill.tsx";
 import { embedFor } from "./embedder";
 import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
@@ -387,6 +388,10 @@ export async function AppShellLayout({
           topbar={
             <Topbar
               breadcrumb={workspace.name}
+              // A demonstration instance says so on every screen, not only on
+              // sign-in (plan 0.8.0 D1). The same variable the persona panel
+              // reads, and nothing else.
+              badge={loadEnv().OPENOKR_DEMO === "on" ? <DemoPill /> : undefined}
               search={<TopbarSearchField />}
               // UIUX-PLAN §3's `+ New`: a menu of what this member may
               // create, the same on every screen (lib/new-menu.tsx). Somebody

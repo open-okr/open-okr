@@ -4100,6 +4100,8 @@
   "shell.cycleStrip.overdueOther": "Lewat {count} hari",
   "shell.cycleStrip.toPublishOne": "{count} hari lagi untuk diterbitkan",
   "shell.cycleStrip.toPublishOther": "{count} hari lagi untuk diterbitkan",
+  "shell.demo.explain": "Ini ialah instans demonstrasi. Ia dibina semula mengikut jadual dan tiada apa-apa di dalamnya yang benar.",
+  "shell.demo.label": "Demo",
   "shell.footer.ask": "Tanya",
   "shell.footer.search": "Cari",
   "shell.mobile.more": "Lagi",

@@ -407,7 +407,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | O1 | done | The provider chain names its step (`resolveProviderForTier`, `resolveDrafterFor`), core turns it into one sentence (`ai/off-reason.ts`) on the copilot's footer, answer and stream; Admin, AI says a plan has no credits. `docs/design/ai-credits.md` §9.1 |
 | O2 | to do | Design first; Q6 decided |
 | O3 | done | The erasure CronJob gets `BETTER_AUTH_SECRET` by reference; `check.sh` asserts it, and fails without the fix |
-| D1 | to do | |
+| D1 | done | `apps/web/lib/demo-pill.tsx`: an `info` chip reading Demo, focusable, the sentence in a tooltip and in hidden text. A `badge` slot on the top bar and on the auth card; `/api/demo-personas` answers `demo`. Unit tests; the suite's instance is not a demo, so no browser spec |
 | V1 | to do | Q7 decided |
 | V2 | to do | Q8 decided |
 | F1 | to do | |

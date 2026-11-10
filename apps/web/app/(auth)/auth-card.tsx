@@ -26,17 +26,23 @@ export function AuthCard({
   description,
   children,
   footer,
+  badge,
 }: {
   title: string;
   description?: string;
   children: ReactNode;
   footer?: ReactNode;
+  /** A mark beside the heading, such as the demo pill (plan 0.8.0 D1). */
+  badge?: ReactNode;
 }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-4.5">
       <Card className="w-full max-w-sm">
         <CardBody className="flex flex-col gap-1">
-          <h1 className="text-lg font-bold text-ink">{title}</h1>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-bold text-ink">{title}</h1>
+            {badge}
+          </div>
           {description ? (
             <p className="text-sm text-ink-3">{description}</p>
           ) : null}

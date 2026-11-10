@@ -4100,6 +4100,8 @@
   "shell.cycleStrip.overdueOther": "{count} days overdue",
   "shell.cycleStrip.toPublishOne": "{count} day to publish",
   "shell.cycleStrip.toPublishOther": "{count} days to publish",
+  "shell.demo.explain": "This is a demonstration instance. It is rebuilt on a schedule and nothing in it is real.",
+  "shell.demo.label": "Demo",
   "shell.footer.ask": "Ask",
   "shell.footer.search": "Search",
   "shell.mobile.more": "More",
