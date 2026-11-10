@@ -62,6 +62,24 @@ from a checkout with `helm install openokr ./deploy/helm` and set
 Migrations run as a job from the same image, before the application rolls, so
 an upgrade is `helm upgrade` and nothing else.
 
+## Proxies in front of the application
+
+The sign-in limits count each caller by address. The address is the
+`X-Forwarded-For` entry that many places from the right as there are reverse
+proxies in front of the pods, because the entry the nearest proxy wrote is the
+one a caller cannot forge. Set `instance.trustedProxyHops` to match:
+
+| What sits in front of the pods | `instance.trustedProxyHops` |
+|---|---|
+| One ingress controller (the default) | 1 |
+| A cloud load balancer in front of the ingress controller | 2 |
+| Nothing, pods reached directly | 0, which ignores the header and gives every caller one shared limit |
+
+Too low and callers share one limit, so a few bad attempts block everyone.
+Too high and the entry is one the caller wrote, so a caller can pick its own
+limit. Check it once with the address your own request shows in the ingress
+controller's access log.
+
 ## What to check before you call it done
 
 `sh deploy/helm/check.sh` runs the chart's own behaviour checks with no cluster

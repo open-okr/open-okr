@@ -451,12 +451,14 @@ describe("an address a caller wrote for itself", () => {
 
     // A chain is what a proxy that appends leaves behind, and its first entry
     // is whatever the caller sent. Counting under it would give a caller a
-    // fresh window for every address it cared to invent.
+    // fresh window for every address it cared to invent. With the default of
+    // one proxy the rightmost entry, which that proxy wrote, is the caller.
     await knock({ "x-forwarded-for": "203.0.113.9, 10.0.0.1" });
-    const spoofed = rateLimit.mock.lastCall?.[0] as string;
-    expect(spoofed).not.toContain("203.0.113.9");
+    const counted = rateLimit.mock.lastCall?.[0] as string;
+    expect(counted).not.toContain("203.0.113.9");
+    expect(counted).toContain("10.0.0.1");
 
-    await knock({});
-    expect(rateLimit.mock.lastCall?.[0]).toBe(spoofed);
+    await knock({ "x-forwarded-for": "198.51.100.7, 10.0.0.1" });
+    expect(rateLimit.mock.lastCall?.[0]).toBe(counted);
   });
 });

@@ -74,6 +74,11 @@ instance:
   privacyUrl: ""
   # Who a customer writes to about their plan.
   supportEmail: ""
+  # Reverse proxies in front of the application: one ingress controller is 1.
+  # A cloud load balancer in front of the ingress is 2. 0 ignores
+  # X-Forwarded-For. The caller's address, which the sign-in limits count, is
+  # the entry that many places from the right.
+  trustedProxyHops: 1
 
 # Running this instance for other people, or for several companies of your own
 # (PLAN.md section 5.2). Off is the ordinary self-hosted instance. On brings

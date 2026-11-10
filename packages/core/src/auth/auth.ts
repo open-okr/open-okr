@@ -43,7 +43,11 @@ import {
   processOnlyKeyRing,
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
-import { CALLER_ADDRESS_HEADERS, callerAddress } from "./caller-address.ts";
+import {
+  authCallerAddress,
+  CALLER_ADDRESS_HEADERS,
+  withResolvedCaller,
+} from "./caller-address.ts";
 import {
   type AuthLimiterStorage,
   inProcessLimiter,
@@ -435,7 +439,7 @@ export function createAuth(options: AuthOptions) {
   const keyRing = options.keyRing ?? processOnlyKeyRing();
   const lockoutEnabled = options.lockout?.enabled ?? true;
 
-  return betterAuth({
+  const auth = betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
       withSecondFactorLockAudit(
         withSealedAccountTokens(
@@ -520,11 +524,10 @@ export function createAuth(options: AuthOptions) {
         sameSite: "lax",
       },
       ipAddress: {
-        // Every deployment target puts a reverse proxy in front of the app
-        // (deploy/docker ships one), so the socket address is the proxy and
-        // the caller's address is in this header. Rate limits are keyed on
-        // it, which is why it has to be read rather than ignored. Every other
-        // per-address limit reads the same list (`caller-address.ts`).
+        // Better Auth reads only the private header `withResolvedCaller`
+        // writes below, because it can count trusted networks but not trusted
+        // hops. The address is decided once, from OPENOKR_TRUSTED_PROXY_HOPS,
+        // in `caller-address.ts`, so every per-address limit agrees.
         ipAddressHeaders: [...CALLER_ADDRESS_HEADERS],
       },
     },
@@ -606,7 +609,9 @@ export function createAuth(options: AuthOptions) {
         const verdict = await recordPasswordAttempt(options.pool, {
           secret: options.secret,
           email,
-          callerAddress: callerAddress(hookContext.headers ?? new Headers()),
+          callerAddress: authCallerAddress(
+            hookContext.headers ?? new Headers(),
+          ),
         });
         if (verdict.held) {
           defaultMetrics().count(METRIC.signInHeldTotal, {
@@ -719,7 +724,7 @@ export function createAuth(options: AuthOptions) {
                 secret: options.secret,
                 email,
                 ...(hookContext?.headers
-                  ? { callerAddress: callerAddress(hookContext.headers) }
+                  ? { callerAddress: authCallerAddress(hookContext.headers) }
                   : {}),
               });
             } catch (error) {
@@ -1072,6 +1077,13 @@ export function createAuth(options: AuthOptions) {
       ...(options.plugins ?? []),
     ],
   });
+
+  // The caller's address is decided here, once, before the router's limiter
+  // reads it (caller-address.ts). Server-side `auth.api` calls skip the router
+  // and resolve from their own headers in the hooks.
+  const routed = auth.handler;
+  auth.handler = (request) => routed(withResolvedCaller(request));
+  return auth;
 }
 
 export type Auth = ReturnType<typeof createAuth>;

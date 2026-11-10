@@ -75,6 +75,11 @@ spec:
                   optional: true
             - name: OPENOKR_INSTANCE_NAME
               value: {{ .Values.instance.name | quote }}
+            # `hasKey`, not `default`: 0 is a real answer, and a release
+            # upgraded with --reuse-values from before this key existed has
+            # none, which must read as 1.
+            - name: OPENOKR_TRUSTED_PROXY_HOPS
+              value: {{ ternary (.Values.instance.trustedProxyHops | int) 1 (hasKey .Values.instance "trustedProxyHops") | quote }}
             - name: OPENOKR_DEFAULT_LANGUAGE
               value: {{ .Values.instance.language | quote }}
             - name: OPENOKR_TELEMETRY
