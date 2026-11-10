@@ -498,20 +498,91 @@ else
 fi
 
 # --- values reused from an older release -------------------------------------
-# `helm upgrade --reuse-values` from 0.5 carries no `cloud`, `extraEnv` or
-# `extraEnvFrom` keys. Setting a key to null makes Helm delete it, which is the
-# same shape.
-if render --set cloud=null >/dev/null 2>&1; then
-  pass "renders when the cloud settings are missing from reused values"
-else
-  fail "does not render when the cloud settings are missing from reused values"
-fi
+# `helm upgrade --reuse-values` keeps the old release's values and adds nothing
+# from the new chart, so every key a newer release introduced is missing. A
+# template that reads such a key without a default fails the upgrade (it did
+# for `cloud` in 0.6 and `secrets.metricsTokenKey` in 0.7). Setting a key to
+# null makes Helm delete it, which is the same shape.
+#
+# For each earlier release this finds the keys present in values.yaml and
+# absent from that release's values.yaml, then renders with all of them
+# deleted at once. A key that no template reads costs nothing, so the check
+# needs no list of its own to keep current.
+#
+# Reads only the key structure: mappings by indentation, ignoring comments,
+# list items and anything nested under a list item. Reports the shallowest
+# missing key, because that is what an older release lacks entirely.
+missing_keys() {
+  python3 -I -c '
+import re, subprocess, sys
 
-if render --set cloud=null --set extraEnv=null --set extraEnvFrom=null >/dev/null 2>&1; then
-  pass "renders when cloud, extraEnv and extraEnvFrom are all missing"
-else
-  fail "does not render when cloud, extraEnv and extraEnvFrom are all missing"
-fi
+def paths(text):
+    found, stack, skip = set(), [], None
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip())
+        if skip is not None:
+            if indent > skip:
+                continue
+            skip = None
+        if line.lstrip().startswith("-"):
+            skip = indent
+            continue
+        m = re.match(r"^\s*([A-Za-z0-9_-]+):", line)
+        if not m:
+            continue
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        stack.append((indent, m.group(1)))
+        found.add(".".join(k for _, k in stack))
+    return found
+
+old = subprocess.run(["git", "show", sys.argv[1] + ":deploy/helm/values.yaml"],
+                     capture_output=True, text=True)
+if old.returncode != 0:
+    sys.exit(3)
+new = paths(open("values.yaml").read())
+gone = new - paths(old.stdout)
+# Keep a key only when its parent exists in the old release.
+for p in sorted(gone):
+    if "." not in p or p.rsplit(".", 1)[0] not in gone:
+        print(p)
+' "$1"
+}
+
+previous=$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' 2>/dev/null || true)
+for tag in $(printf '%s\n' "v0.5.0" "$previous" | sort -u | grep .); do
+  status=0
+  keys=$(missing_keys "$tag") || status=$?
+  if [ "$status" -ne 0 ]; then
+    # In CI a missing tag means the checkout is shallow and the check would
+    # silently test nothing, so it fails there. Locally it is skipped.
+    if [ -n "${CI:-}" ]; then
+      fail "values reused from $tag: tag not available in this checkout (CI needs full history, fetch-depth: 0)"
+    else
+      echo "  skip  values reused from $tag (tag not available in this checkout)"
+    fi
+    continue
+  fi
+  if [ -z "$keys" ]; then
+    pass "no values added since $tag"
+    continue
+  fi
+  nulled=""
+  for key in $keys; do
+    nulled="$nulled --set $key=null"
+  done
+  echo "  keys missing from $tag values, set to null: $(echo $keys)"
+  # shellcheck disable=SC2086
+  if render $nulled >/dev/null 2>&1; then
+    pass "renders with every value added since $tag missing (helm upgrade --reuse-values)"
+  else
+    fail "does not render with values added since $tag missing; first error:"
+    # shellcheck disable=SC2086
+    render $nulled | head -5 >&2
+  fi
+done
 
 echo ""
 if [ "$FAILURES" -gt 0 ]; then

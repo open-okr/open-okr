@@ -27,7 +27,7 @@ on:
   workflow_dispatch:
     inputs:
       baseline:
-        description: "The commit or tag to upgrade from. Defaults to the pinned baseline below."
+        description: "The commit or tag to upgrade from. When given, only that baseline runs. Defaults to the pinned baseline and the latest release, both below."
         required: false
         type: string
 
@@ -35,20 +35,79 @@ permissions:
   contents: read
 
 env:
-  # **The oldest supported release** (PLAN.md §5.1), v0.1.2 since P9-T22a.
+  # **Two baselines, because they catch different things.**
   #
-  # Until then this was a pinned commit standing in for a release that did
-  # not exist. 0.2.0 is the first release that changes how the practice
-  # behaves for an instance already running, so the upgrade it has to prove
-  # is the one a 0.1.2 operator makes. Never `main`, which would make this
-  # job compare a commit against itself and pass for free.
+  # `UPGRADE_BASELINE` is **the oldest supported release** (PLAN.md §5.1),
+  # v0.1.2 since P9-T22a. 0.2.0 is the first release that changes how the
+  # practice behaves for an instance already running, so the upgrade it has
+  # to prove is the one a 0.1.2 operator makes. Never `main`, which would
+  # make this job compare a commit against itself and pass for free.
+  #
+  # `latest` is **the newest release tag**, resolved by the `plan` job at run
+  # time. It is the upgrade most operators make next, and the pin alone
+  # missed it: the 0.6.0 Helm chart failed on a release installed with
+  # `--reuse-values`, and only a manual run from v0.5.0 found it. Pre-release
+  # tags (`-rc.1`) are ignored. Right after a release the newest tag is the
+  # commit under test, an upgrade from itself proves nothing, and that
+  # baseline is left out of the run with a notice instead of failing.
+  #
+  # A baseline given to a manual run replaces both and always runs, so a
+  # requested baseline equal to the commit under test still fails.
   UPGRADE_BASELINE: v0.1.2
 
 jobs:
+  plan:
+    name: Choose the baselines
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      baselines: ${{ steps.plan.outputs.baselines }}
+    steps:
+      - name: Check out the commit under test
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Work out the baselines
+        id: plan
+        env:
+          REQUESTED: ${{ inputs.baseline }}
+        run: |
+          set -euo pipefail
+          if [ -n "$REQUESTED" ]; then
+            echo "baselines=$(jq -cn --arg b "$REQUESTED" '[$b]')" >> "$GITHUB_OUTPUT"
+            echo "Requested baseline only: $REQUESTED"
+            exit 0
+          fi
+
+          # The newest release by version, read from the tags the checkout
+          # already fetched. `gh release view` would also work but needs a
+          # token and an API call; this needs neither. A tag with a hyphen is
+          # a pre-release and is skipped.
+          latest="$(git tag --list 'v[0-9]*' --sort=-v:refname | grep -v -- '-' | head -1 || true)"
+          list="$(jq -cn --arg b "$UPGRADE_BASELINE" '[$b]')"
+          if [ -z "$latest" ]; then
+            echo "::notice::No release tag found, running the pinned baseline only."
+          elif [ "$latest" = "$UPGRADE_BASELINE" ]; then
+            echo "The latest release is the pinned baseline, so it runs once."
+          elif [ "$(git rev-parse "${latest}^{commit}")" = "$(git rev-parse HEAD)" ]; then
+            echo "::notice::The latest release ($latest) is the commit under test, so that baseline is skipped."
+          else
+            list="$(jq -cn --arg a "$UPGRADE_BASELINE" --arg b "$latest" '[$a,$b]')"
+          fi
+          echo "baselines=$list" >> "$GITHUB_OUTPUT"
+          echo "Baselines: $list"
+
   compose:
-    name: Upgrade on Compose
+    name: Upgrade on Compose (from ${{ matrix.baseline }})
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      # One baseline failing must not hide the other's result.
+      fail-fast: false
+      matrix:
+        baseline: ${{ fromJSON(needs.plan.outputs.baselines) }}
     steps:
       - name: Check out the commit under test
         uses: actions/checkout@v7
@@ -58,17 +117,17 @@ jobs:
       - name: Work out the baseline
         id: baseline
         env:
-          REQUESTED: ${{ inputs.baseline }}
+          BASELINE: ${{ matrix.baseline }}
         run: |
           set -euo pipefail
-          ref="${REQUESTED:-$UPGRADE_BASELINE}"
+          ref="$BASELINE"
           # Refuse a baseline that is the commit under test. An upgrade from
           # a commit to itself proves nothing and would pass every time,
           # which is worse than not running: a green job nobody can trust is
           # a green job everybody stops reading.
           if [ "$(git rev-parse "$ref")" = "$(git rev-parse HEAD)" ]; then
             echo "The baseline and the commit under test are the same." >&2
-            echo "This job would prove nothing. Move UPGRADE_BASELINE." >&2
+            echo "This job would prove nothing. Move the baseline." >&2
             exit 1
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
@@ -240,9 +299,14 @@ jobs:
         run: ./openokr down || true
 
   helm:
-    name: Upgrade on the Helm chart
+    name: Upgrade on the Helm chart (from ${{ matrix.baseline }})
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        baseline: ${{ fromJSON(needs.plan.outputs.baselines) }}
     steps:
       - name: Check out the commit under test
         uses: actions/checkout@v7
@@ -252,10 +316,10 @@ jobs:
       - name: Work out the baseline
         id: baseline
         env:
-          REQUESTED: ${{ inputs.baseline }}
+          BASELINE: ${{ matrix.baseline }}
         run: |
           set -euo pipefail
-          ref="${REQUESTED:-$UPGRADE_BASELINE}"
+          ref="$BASELINE"
           if [ "$(git rev-parse "$ref")" = "$(git rev-parse HEAD)" ]; then
             echo "The baseline and the commit under test are the same." >&2
             exit 1

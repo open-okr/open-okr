@@ -110,6 +110,10 @@ them again:
 helm upgrade <release> deploy/helm --reuse-values
 ```
 
+If the checkout is a newer chart than the installed release, use
+`--reset-then-reuse-values` instead; see
+[the upgrade runbook](upgrade.md#helm-coming-from-05).
+
 The Job is named `<fullname>-migrate-<revision>`, where `<fullname>` is the
 chart's full name (the release name when it already contains `openokr`), one
 per revision, because a hook Job cannot be patched. There is no CronJob to copy it from.
