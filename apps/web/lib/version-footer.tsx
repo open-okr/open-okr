@@ -1,41 +1,33 @@
-import { outboundFetch } from "@openokr/adapters";
-import { ACCESS_LEVELS, isCloudEnabled, readUpdateCheck } from "@openokr/core";
+import { ACCESS_LEVELS, isCloudEnabled } from "@openokr/core";
 import { RUNNING_VERSION } from "./app-version.ts";
+import { releaseCheck } from "./newest-release.ts";
 import { getPool } from "./pool";
 import { getTranslations } from "./translations";
-import { createUpdateChecker, isBehind } from "./update-check.ts";
 
 /**
  * The content footer, on the right: the running version, and the newest
  * release when this instance is behind it (docs/design/version-footer.md §3).
  *
- * **Administrators only.** A version string is reconnaissance, which is why
- * `/api/app-version` sits behind a session; here it sits behind `full` as
- * well, the admin screens' own gate, because only an administrator can act
- * on it.
+ * **The version is for every signed-in member** (plan 0.8.0 V1, Q7). It was
+ * administrators only, which hid it on every OKRGoal instance from the people
+ * reporting a problem and the people reading the release notes. It is still
+ * never shown signed out, where it would tell anybody scanning for instances
+ * behind a known fault which ones are.
  *
- * **One checker per process**, so the cache is shared by every request.
+ * **The notice is for administrators only**, because only they can act on it,
+ * and never on a managed cloud, where the operator upgrades and is told on the
+ * console instead (V2).
  */
-const checker = createUpdateChecker({
-  fetch: (url, options) => outboundFetch(url, options),
-  now: () => Date.now(),
-});
-
 export async function VersionFooter({ level }: { readonly level: number }) {
-  if (level < ACCESS_LEVELS.full) {
-    return null;
-  }
   const { t } = await getTranslations();
-  const pool = getPool();
 
-  // A managed cloud is upgraded by its operator, so it never asks; a read
-  // that fails is treated as off, which sends nothing.
-  const cloud = await isCloudEnabled(pool).catch(() => true);
-  const enabled =
-    !cloud && (await readUpdateCheck(pool).catch(() => null))?.value === true;
-  const latest = enabled ? checker.latest() : null;
-  const newer =
-    latest && isBehind(RUNNING_VERSION, latest.version) ? latest : null;
+  let newer = null;
+  if (level >= ACCESS_LEVELS.full) {
+    const pool = getPool();
+    // A read that fails is treated as a cloud, which sends nothing.
+    const cloud = await isCloudEnabled(pool).catch(() => true);
+    newer = cloud ? null : (await releaseCheck(pool)).newer;
+  }
 
   const running = t("shell.version.running", { version: RUNNING_VERSION });
   const available = newer
