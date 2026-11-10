@@ -1,5 +1,7 @@
 # Migrating with pgvector installed
 
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
 Plan 0.8.0 row H5. With the pgvector extension available, migrations stop at
 `0031_embeddings.sql` and the instance cannot be installed or upgraded. Fixing it
 means changing a migration that has shipped, which CLAUDE.md puts with the

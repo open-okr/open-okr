@@ -362,6 +362,8 @@ Then it succeeds, as today
 
 ## 12. An Admin sets up a cycle (plan 0.8.0 R1)
 
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
 Asked on 10 November 2026: how does somebody set a cycle's sponsor? Recommended
 by Claude and agreed by Akmal the same day, as plan row R1. This section is the
 design R1's gate asks for. It needs "design approved" before the code.

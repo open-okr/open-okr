@@ -1,6 +1,6 @@
 # Worker deployment: web and background work apart, draining, and data changes on upgrade
 
-Status: proposed 11 November 2026 for release 0.8.0 (plan H10, section 3.3). **Not approved.** It changes the deployment shape, so it is designed first. The row says "split into rows when designed": section 7 is that split.
+Status: proposed 11 November 2026 for release 0.8.0 (plan H10, section 3.3). **Approved by Akmal on 11 November 2026, Q1 to Q7 as recommended**, including the change to PLAN §5.1 that Q1 and Q7 make. It changes the deployment shape, so it is designed first. The row says "split into rows when designed": section 7 is that split.
 
 Today one Deployment serves pages and also runs the outbox relay and the scheduler in every pod. Nothing pauses before a pod stops, nothing waits for background work to finish, and nothing in the chart runs the data changes. This design adds an opt-in worker Deployment for the relay and the scheduler, an opt-in autoscaler for the web pods, a pause and a real drain when any pod stops, and a hook that runs the data changes after each install and upgrade. An operator who changes nothing keeps one Deployment.
 

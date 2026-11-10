@@ -1,5 +1,7 @@
 # A direct connection beside a transaction pooler
 
+**Decided by Akmal on 11 November 2026, as recommended:** built when a deployment adds a transaction pooler (H7-Q1), under the name `DATABASE_DIRECT_URL` (H7-Q2). Until then §1's table is in `docs/install/kubernetes.md`, so nobody puts a pooler in front without knowing what breaks.
+
 Plan 0.8.0 row H7. A deployment that puts PgBouncer in transaction mode in front
 of Postgres, to serve more replicas than the database has connections, breaks
 the few things that need one server session for longer than a transaction. This

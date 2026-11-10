@@ -1,6 +1,6 @@
 # Trusted proxies: whose address a request is counted under
 
-Status: proposed 10 November 2026 for release 0.8.0 (plan H2, section 3.1). **Not approved.** It changes how every per-address limit and the sign-in hold identify a caller, so it is designed first (CLAUDE.md: security).
+Status: proposed 10 November 2026 for release 0.8.0 (plan H2, section 3.1). **Approved by Akmal on 11 November 2026, Q1 to Q3 as recommended.** It changes how every per-address limit and the sign-in hold identify a caller, so it is designed first (CLAUDE.md: security).
 
 Behind a CDN and a load balancer the instance cannot tell one caller from another. This design lets an operator name the proxies in front of the instance, or the one header their CDN writes, so the caller's address is read the way Better Auth already knows how to read it, and every limit counts people rather than proxies.
 

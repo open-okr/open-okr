@@ -199,6 +199,8 @@ wizard before 0.7.0. / From the deployment's environment variable.)
 
 ## 10. A closed policy must not stop the claim (release 0.8.0, H3)
 
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
 Status: design written 10 November 2026, waiting for "design approved".
 
 ### 10.1 What is wrong

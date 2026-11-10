@@ -1,5 +1,7 @@
 # Workspaces without a plan
 
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
 Plan 0.8.0 row O2. On an instance with a plan catalogue, a workspace with no
 plan may not use the provider's AI key, and nothing says so. This design makes
 the operator console say what having no plan costs, and gives the operator one

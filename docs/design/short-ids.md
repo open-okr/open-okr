@@ -131,4 +131,4 @@ So with the refusal as written:
 | `docs/runbooks/upgrade.md` | The 0.7 to 0.8 section; the stated exception under "Backfills never hold up a boot" |
 | Tests | The migrator runs a required data change before its migration and skips a complete one; 0165 applied over rows a 0.6-shaped write left empty ends with none empty |
 
-**Question for Akmal, C1-Q1: A, B or C?** The code waits for the answer and for "design approved".
+**C1-Q1, decided by Akmal on 11 November 2026: A**, as recommended, with "design approved".

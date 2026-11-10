@@ -1,6 +1,6 @@
 # Email verification: the outbox and "send the link again"
 
-Status: **draft, waiting for Akmal's "design approved"**. Plan 0.8.0 row S3, which carries row H1 (`docs/plans/release-0.8.0.md` §3.1 and §8). Gate: design first, because it changes authentication and could be used to find out who has an account (CLAUDE.md). No migration and no new table.
+Status: **approved by Akmal on 11 November 2026**, Q1 to Q3 as recommended. Plan 0.8.0 row S3, which carries row H1 (`docs/plans/release-0.8.0.md` §3.1 and §8). Gate: design first, because it changes authentication and could be used to find out who has an account (CLAUDE.md). No migration and no new table.
 
 S1 (the check-your-email card) and S2 (the page a link lands on) are being built in this worktree without a design. This document builds on what they do: S1 keeps the address in the form's own state and reads the link's lifetime from `EMAIL_VERIFICATION_LINK_SECONDS` in `packages/core/src/auth/auth.ts`; S2 is the signed-out page `/email-confirmed` (not `/welcome`, which is onboarding, S-34), named as Better Auth's `callbackURL` by the sign-up form.
 

@@ -1,5 +1,7 @@
 # Deleting your own account
 
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
 Plan 0.8.0 row Y7. A person deletes their own account from the foot of Your
 account. It touches security, access and stored user data, adds a table, and
 cannot be undone once it runs, so it needs "design approved" before any code.

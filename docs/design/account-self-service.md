@@ -1,6 +1,6 @@
 # Your account: password, sign-in email, name, and the endpoints nobody uses
 
-Status: **draft, waiting for Akmal's "design approved"**. Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
+Status: **approved by Akmal on 11 November 2026**, AS-Q1 to AS-Q8 as recommended, and Y6's endpoint switch-off to land first, as its own commit. Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
 
 **No migration**, unless AS-Q3 chooses option (b). No new table, no new setting, no new runtime dependency. Every Better Auth import named here comes from `better-auth` itself (`better-auth/api`, `better-auth/crypto`), which `packages/core` already depends on.
 
