@@ -53,7 +53,7 @@ A partial unique index on `domain` where `verified_at is not null and deleted_at
 
 ## Screens
 
-On the SSO connection screen (S-30 admin, single sign-on), each domain gets a status chip (Not verified, Verified, Check failing) and a **Verify** action that shows the record to add and copies it. No new screen.
+On the SSO connection screen (S-30 admin, single sign-on), each domain gets a status chip (Not verified, Verified, Check failing) and a **Verify** action that shows the record to add and copies it. No new screen. A domain in Check failing has a **Check now** button that looks the record up again: a match clears the failed count (audited as a recovery), a miss changes nothing, so only the daily job counts toward unverifying.
 
 ## Acceptance criteria
 

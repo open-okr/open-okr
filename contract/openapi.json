@@ -19926,7 +19926,7 @@
     "/sso/verifyDomain": {
       "post": {
         "operationId": "sso.verifyDomain",
-        "summary": "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
+        "summary": "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. On a verified domain whose daily check is failing, a match clears the failure and a miss changes nothing. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
         "tags": [
           "sso"
         ],

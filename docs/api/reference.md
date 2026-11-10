@@ -652,7 +652,7 @@ the machine-readable document.
 | `sso.setConnectionEnabled`<br/>Turns a single sign-on connection off, so nobody signs in through it and it leaves the sign-in page, or on again. | `POST /api/v1/sso/setConnectionEnabled` | writes |
 | `sso.startDomainVerification`<br/>Starts proving that this workspace owns an email domain. Returns the DNS TXT record to publish, including a token that is shown this once. Calling it again for an unverified domain issues a new token. | `POST /api/v1/sso/startDomainVerification` | writes |
 | `sso.updateConnection`<br/>Changes a single sign-on connection's name, email domains, enforcement and protocol settings. A blank client secret keeps the stored one. | `POST /api/v1/sso/updateConnection` | writes |
-| `sso.verifyDomain`<br/>Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified. | `POST /api/v1/sso/verifyDomain` | writes |
+| `sso.verifyDomain`<br/>Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. On a verified domain whose daily check is failing, a match clears the failure and a miss changes nothing. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified. | `POST /api/v1/sso/verifyDomain` | writes |
 
 ## subscriptions
 

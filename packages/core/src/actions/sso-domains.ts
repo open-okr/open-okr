@@ -268,7 +268,7 @@ const verifyOutput = z.object({
 export const verifySSODomain = defineWriteAction({
   name: "sso.verifyDomain",
   summary:
-    "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
+    "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. On a verified domain whose daily check is failing, a match clears the failure and a miss changes nothing. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
   input: domainInput,
   output: verifyOutput,
   access: ACCESS_LEVELS.full,
@@ -307,7 +307,10 @@ export const verifySSODomain = defineWriteAction({
         payload: { domain },
       });
 
-      if (row.verifiedAt) {
+      // A verified domain whose daily check is failing may be looked up again
+      // by hand. A verified one with nothing failing needs nothing.
+      const recovering = row.verifiedAt !== null && row.failedChecks > 0;
+      if (row.verifiedAt && !recovering) {
         return {
           result: { domain, verified: true, reason: null },
           activity: activity("sso.domain_checked"),
@@ -324,11 +327,16 @@ export const verifySSODomain = defineWriteAction({
       const now = new Date();
       const check = await checkDomainRecord(context.dns, domain, row.tokenHash);
       if (check !== "match") {
-        // openokr:allow-mutation: this is the operation's own execute.
-        await tx
-          .update(ssoDomains)
-          .set({ lastCheckedAt: now, updatedAt: now })
-          .where(activeOnly(ssoDomains, eq(ssoDomains.id, row.id)));
+        // A miss on a domain that is verified already leaves the row alone:
+        // only the daily job counts toward unverifying it, so pressing the
+        // button cannot speed that up.
+        if (!recovering) {
+          // openokr:allow-mutation: this is the operation's own execute.
+          await tx
+            .update(ssoDomains)
+            .set({ lastCheckedAt: now, updatedAt: now })
+            .where(activeOnly(ssoDomains, eq(ssoDomains.id, row.id)));
+        }
         return {
           result: {
             domain,
@@ -342,6 +350,22 @@ export const verifySSODomain = defineWriteAction({
           },
           activity: activity("sso.domain_checked"),
           audit: audit(check),
+        };
+      }
+
+      if (recovering) {
+        // openokr:allow-mutation: this is the operation's own execute.
+        await tx
+          .update(ssoDomains)
+          .set({ failedChecks: 0, lastCheckedAt: now, updatedAt: now })
+          .where(activeOnly(ssoDomains, eq(ssoDomains.id, row.id)));
+        return {
+          result: { domain, verified: true, reason: null },
+          activity: activity("sso.domain_check_recovered"),
+          audit: {
+            ...audit("recovered", { failedChecksBefore: row.failedChecks }),
+            action: "sso.domainCheckRecovered",
+          },
         };
       }
 

@@ -34,9 +34,9 @@ interface DomainRecord {
  * proved it owns it (docs/design/sso-domain-verification.md, "Screens").
  *
  * A domain that is not verified has a Verify action. A verified one has the
- * chip and nothing to press: a domain whose daily check is failing is
- * verified still, and looks again on its own, so there is nothing for a
- * person to do about it here beyond publishing the record again.
+ * chip and nothing to press. One whose daily check is failing is verified
+ * still, and has a Check now button that looks the record up again without
+ * waiting for the daily job.
  */
 export function ConnectionDomains({
   domains,
@@ -199,18 +199,30 @@ function DomainRow({
             {t("admin.sso.domains.verify")}
           </Button>
         ) : null}
+        {domain.status === "failing" ? (
+          <Button
+            size="sm"
+            pending={busy === "check"}
+            disabled={pending}
+            aria-label={t("admin.sso.domains.checkDomainNow", {
+              domain: domain.domain,
+            })}
+            onClick={check}
+          >
+            {busy === "check"
+              ? t("admin.sso.domains.checking")
+              : t("admin.sso.domains.checkNow")}
+          </Button>
+        ) : null}
       </div>
       {domain.freeMail && !verified ? (
         <p id={freeMailId} className="text-xs text-ink-3">
           {t("admin.sso.domains.freeMail")}
         </p>
       ) : null}
-      {domain.status === "failing" ? (
-        <p className="text-xs text-ink-3">
-          {t("admin.sso.domains.failingNote", {
-            count: String(domain.failedChecks),
-            name: domain.recordName,
-          })}
+      {domain.status === "failing" && checkError ? (
+        <p role="alert" className="text-xs text-bad">
+          {checkError}
         </p>
       ) : null}
       {verified && domain.verifiedBy === "administrator" ? (
