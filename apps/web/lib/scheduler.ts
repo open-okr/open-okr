@@ -66,6 +66,7 @@ import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
+import { onShutdown } from "./shutdown";
 import { getStorage } from "./storage";
 
 const log = (message: string): void => {
@@ -75,6 +76,16 @@ const log = (message: string): void => {
 const logError = (message: string): void => {
   process.stderr.write(`scheduler: ${message}\n`);
 };
+
+/**
+ * How long before the drain's bound pg-boss hands back the jobs still
+ * running (docs/design/worker-deployment.md D7): time for it to fail them and
+ * close its pool before the process exits.
+ */
+const HAND_BACK_BEFORE_MS = 3_000;
+
+/** pg-boss's own floor for a stop's timeout. */
+const MIN_HAND_BACK_MS = 1_000;
 
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -913,12 +924,28 @@ export function startScheduler(): PgBossJobQueue | null {
   })();
 
   // Lets a job already running finish rather than orphaning it as an active
-  // row that only expires on a timeout.
-  const stop = () => {
-    void queue.stop();
-  };
-  process.once("SIGTERM", stop);
-  process.once("SIGINT", stop);
+  // row that only expires on a timeout, within the drain: three seconds
+  // before its bound, pg-boss hands back whatever is still running, and
+  // another scheduler retries it at once (plan 0.8.0 H10a,
+  // docs/design/worker-deployment.md D7). A Champion or Coach run retried this
+  // way starts again from its first workspace; nudges are deduplicated per
+  // subject per member per day, so the repeat sends nothing twice.
+  onShutdown({
+    name: "scheduler",
+    phase: "drain",
+    async stop(deadline) {
+      await queue.stop({
+        timeoutMs: Math.max(
+          MIN_HAND_BACK_MS,
+          deadline - Date.now() - HAND_BACK_BEFORE_MS,
+        ),
+      });
+      const handedBack = queue.running;
+      return handedBack === 0
+        ? "scheduler idle"
+        : `${handedBack} scheduled job${handedBack === 1 ? "" : "s"} handed back`;
+    },
+  });
 
   return queue;
 }

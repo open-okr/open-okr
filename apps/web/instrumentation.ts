@@ -12,6 +12,7 @@ export async function register(): Promise<void> {
   }
 
   const {
+    takeSignals,
     quietCancelledResponses,
     validateEnvironment,
     startTelemetry,
@@ -25,7 +26,12 @@ export async function register(): Promise<void> {
     checkTenantFloor,
     recordCallerAddress,
   } = await import("./instrumentation.node");
-  // First, before anything can log: a filter installed halfway through boot
+  // First of all, before any step that can fail (plan 0.8.0 H10a). The image
+  // sets NEXT_MANUAL_SIG_HANDLE, so Next registers no handler, and a Node
+  // process that is PID 1 ignores SIGTERM unless something handles it. A boot
+  // that stopped before this would leave a container only SIGKILL can stop.
+  takeSignals();
+  // Then, before anything can log: a filter installed halfway through boot
   // would leave the log judged by two rules.
   quietCancelledResponses();
   validateEnvironment();

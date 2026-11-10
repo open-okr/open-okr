@@ -446,3 +446,21 @@ Every row runs `sh deploy/helm/check.sh` when it touches the chart, and the depl
 - `docs/runbooks/upgrade.md`: the Helm half of "Backfills never hold up a boot". `docs/runbooks/observability.md`: scrape every pod; which series live on the worker. `docs/runbooks/incident.md`, row 9: where the scheduler runs.
 - `docs/admin/operations.md`: `elsewhere` beside `off`.
 - REQUIREMENTS.md, METHOD.md, DATABASE.md and TECHNICAL-PLAN §7.2: nothing. No table, rule or import mapping changes.
+
+## 10. As built
+
+Where the build moved from the sections above, and why.
+
+### H10a, draining on SIGTERM
+
+| # | Written | Built | Why |
+|---|---|---|---|
+| H10a-B1 | The coordinator logs `stopping: draining for up to 20s` and `stopped after 4.2s: ...` | `shutdown: SIGTERM, draining for up to 20s` and `shutdown: stopped after 1.4s: relay idle, scheduler idle, 0 actions in flight, error reports flushed, telemetry flushed`, on standard output. Each step's own words, the drain steps first, then the flush steps | Every other line the server writes names its part (`relay:`, `scheduler:`). The flush steps are named too, because D5's line names what was waited for |
+| H10a-B2 | Installed first thing in `register()` | `takeSignals()` in `instrumentation.node.ts`, called first after that module loads and before the environment is checked. Skipped during `next build` | A build worker is stopped by its parent with a signal, and the build sets no `NEXT_MANUAL_SIG_HANDLE`, so a handler that does not exit would keep it alive |
+| H10a-B3 | The coordinator waits for `currentConcurrentActions()` to reach none | `waitForActions()` in `lib/shutdown.ts`, registered by `lib/telemetry.ts` beside the span flush | `shutdown.ts` imports only the environment schema, so it stays light enough to install before anything else. `telemetry.ts` already reads the same count for its gauge |
+| H10a-B4 | Steps, then exit | Drain steps run together within the budget; then flush steps run together within 10 seconds of their own; then the line and the exit. A step that throws is named with its reason, one still going at its bound as `still running at the bound`; neither stops the others. A second signal joins the first stop | The flushes send what the drain reported. Their own bound is inside D9's 15 seconds |
+| H10a-B5 | `NEXT_MANUAL_SIG_HANDLE` decides the exit | Any non-empty value counts, as in Next's own test (`!process.env.NEXT_MANUAL_SIG_HANDLE`) | Whenever Next registered nothing, something has to exit |
+| H10a-B6 | The relay releases the rest | `OutboxRelay.stop()` takes the unstarted rows of the batch in one synchronous splice and hands them back (`available_at = now()`, `attempts = greatest(attempts - 1, 0)`) before it waits for the row in flight. It answers `{ released, waited }`. `drainOnce()` holds itself as the drain in flight, and claims nothing once stopped until `start()` | A dispatch that outlives the bound then strands only itself. Releasing first is what the third H10a criterion needs |
+| H10a-B7 | pg-boss gets the budget less three seconds | The jobs port's `stop` takes `{ timeoutMs }`. The pg-boss driver counts the jobs whose handler is running as `running`, so after a stop it says how many it handed back. The floor is pg-boss's own one second | The scheduler's line says `1 scheduled job handed back` from that count |
+| H10a-B8 | `OPENOKR_SHUTDOWN_SECONDS`, 1 to 300 | Checked as text, then turned into a number | A coerced `soon` or `2.5` fails as a type error with no input, which `parseEnv` reads as "is missing" |
+| H10a-B9 | The smoke test checks the stop line | After its `docker compose restart app`: the variable is `true` in the container, and the log holds the drain line and the `stopped` line | The restart is the one stop the smoke test already makes |

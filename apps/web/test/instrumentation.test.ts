@@ -7,6 +7,7 @@ import { announceCallerAddress } from "../lib/caller-address";
 import { installPromptEvaluator } from "../lib/prompt-evaluation";
 import { startRelay } from "../lib/relay";
 import { startScheduler } from "../lib/scheduler";
+import { installShutdown } from "../lib/shutdown";
 import { installStatusThresholds } from "../lib/status-thresholds";
 import { installTelemetry } from "../lib/telemetry";
 
@@ -66,6 +67,9 @@ vi.mock("../lib/caller-address", () => ({ announceCallerAddress: vi.fn() }));
 vi.mock("../lib/abandoned-responses", () => ({
   quietAbandonedResponses: vi.fn(),
 }));
+// Not for the import cost either: the real one adds SIGTERM and SIGINT
+// listeners to the test's own process (plan 0.8.0 H10a).
+vi.mock("../lib/shutdown", () => ({ installShutdown: vi.fn() }));
 
 const original = { ...process.env };
 
@@ -86,6 +90,7 @@ afterEach(() => {
   vi.mocked(installAdmission).mockClear();
   vi.mocked(installPromptEvaluator).mockClear();
   vi.mocked(announceCallerAddress).mockClear();
+  vi.mocked(installShutdown).mockClear();
 });
 
 test("boot fails with a clear error naming the variable when it is missing", async () => {
@@ -333,4 +338,33 @@ test("a reading that cannot be announced is logged, not fatal", async () => {
   await expect(register()).resolves.toBeUndefined();
 
   expect(stderr.mock.calls.join()).toMatch(/instance chain is not reachable/);
+});
+
+test("the shutdown coordinator is installed first, before anything that can fail (plan 0.8.0 H10a)", async () => {
+  // docs/design/worker-deployment.md D4. A Node process that is PID 1
+  // ignores SIGTERM unless something handles it, and the image sets
+  // NEXT_MANUAL_SIG_HANDLE so Next registers nothing. A boot that failed
+  // before the coordinator was installed would leave a container that only
+  // SIGKILL can stop.
+  process.env.DATABASE_URL = "";
+  vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  const exit = vi
+    .spyOn(process, "exit")
+    .mockImplementation(() => undefined as never);
+
+  await register();
+
+  expect(installShutdown).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(installShutdown).mock.invocationCallOrder[0]).toBeLessThan(
+    exit.mock.invocationCallOrder[0] as number,
+  );
+});
+
+test("a build worker installs no coordinator, because it has to be able to exit", async () => {
+  process.env.DATABASE_URL = "postgres://openokr:secret@localhost:5432/openokr";
+  process.env.NEXT_PHASE = "phase-production-build";
+
+  await register();
+
+  expect(installShutdown).not.toHaveBeenCalled();
 });

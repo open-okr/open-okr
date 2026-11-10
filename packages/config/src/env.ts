@@ -216,6 +216,29 @@ const envSchema = z
      * so no single workspace can hold every slot. */
     OPENOKR_DB_POOL_MAX: optional(z.coerce.number().int().min(1).default(20)),
 
+    /** How long a stopping process may finish the work in flight, in seconds
+     * (plan 0.8.0 H10a, docs/design/worker-deployment.md D8). On SIGTERM the
+     * relay finishes its row and releases the rest, the scheduler hands back
+     * any job still running three seconds before this, and the actions in
+     * flight are waited for. Whatever is still running at this bound is cut
+     * and retried, which is what a crash does. Twenty fits a mail, a webhook
+     * or a short AI step. The Helm chart derives its grace period from it,
+     * and Compose stops the container after 30 seconds.
+     *
+     * Checked as text rather than coerced: a coerced `soon` or `2.5` fails
+     * as a type error with no input, which the message below reads as
+     * "is missing". */
+    OPENOKR_SHUTDOWN_SECONDS: optional(
+      z
+        .string()
+        .default("20")
+        .refine((value) => {
+          const seconds = Number(value.trim());
+          return /^\d+$/.test(value.trim()) && seconds >= 1 && seconds <= 300;
+        }, "must be a whole number of seconds from 1 to 300")
+        .transform((value) => Number(value.trim())),
+    ),
+
     /** Whether this process runs the recurring work (P6-G01a). On by default,
      * because a deployment that schedules nothing never chases a check-in, never
      * sends a morning summary, never ages a blocker and never flips a neglected

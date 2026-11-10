@@ -421,6 +421,19 @@ until app_log | grep -q "schema is up to date"; do
 done
 pass "re-running migrations is idempotent"
 
+# --- a stop drains rather than being killed (plan 0.8.0 H10a) ---------------
+# The restart above sent SIGTERM. The image sets NEXT_MANUAL_SIG_HANDLE, so the
+# server owns the signal rather than Next: it drains the work in flight, writes
+# one line saying what it waited for and exits. A stop that ran into Compose's
+# kill, or one Next's handler cut short, writes no `stopped` line.
+[ "$(app_exec printenv NEXT_MANUAL_SIG_HANDLE 2>/dev/null)" = "true" ] \
+  || fail "the image does not set NEXT_MANUAL_SIG_HANDLE, so Next owns SIGTERM"
+app_log | grep -q "shutdown: SIGTERM, draining for up to 20s" \
+  || fail "the restart's stop did not start a drain"
+app_log | grep -q "shutdown: stopped after" \
+  || fail "the restart's stop was killed before its drain finished"
+pass "a stop drains the work in flight and exits on its own"
+
 # **"Migrations are current" is not "the server is listening".** The entrypoint
 # prints that line and then execs the server, so the check below used to race a
 # process that had not opened its port yet: the proxy answered 502 with

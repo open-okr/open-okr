@@ -227,7 +227,12 @@ export type {
   ImageProcessResult,
   UnreadableReason,
 } from "./ports/image.ts";
-export type { JobHandler, JobOptions, JobQueue } from "./ports/jobs.ts";
+export type {
+  JobHandler,
+  JobOptions,
+  JobQueue,
+  JobStopOptions,
+} from "./ports/jobs.ts";
 export type {
   Mailer,
   MailMessage,

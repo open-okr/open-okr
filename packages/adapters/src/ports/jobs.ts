@@ -16,6 +16,15 @@ export interface JobOptions {
   readonly retryLimit?: number;
 }
 
+export interface JobStopOptions {
+  /**
+   * How long jobs already running may take to finish before they are handed
+   * back as failed, for another worker to retry (plan 0.8.0 H10a). The
+   * driver's own default when absent.
+   */
+  readonly timeoutMs?: number;
+}
+
 export type JobHandler<TPayload = unknown> = (
   payload: TPayload,
 ) => Promise<void>;
@@ -42,5 +51,5 @@ export interface JobQueue {
   ): Promise<void>;
 
   start(): Promise<void>;
-  stop(): Promise<void>;
+  stop(options?: JobStopOptions): Promise<void>;
 }

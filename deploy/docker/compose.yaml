@@ -49,6 +49,10 @@ services:
   app:
     image: ${OPENOKR_IMAGE:-ghcr.io/open-okr/open-okr:latest}
     restart: unless-stopped
+    # A stop drains the work in flight for up to OPENOKR_SHUTDOWN_SECONDS (20
+    # by default) and then flushes error reports and spans. Docker's own 10
+    # seconds would kill it partway (plan 0.8.0 H10a).
+    stop_grace_period: 30s
     depends_on:
       db:
         condition: service_healthy

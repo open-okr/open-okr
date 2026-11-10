@@ -7,10 +7,27 @@ import { installErrorReports } from "./lib/error-reporting";
 import { installPromptEvaluator } from "./lib/prompt-evaluation";
 import { startRelay } from "./lib/relay";
 import { startScheduler } from "./lib/scheduler";
+import { installShutdown } from "./lib/shutdown";
 import { resolveSSOProviders } from "./lib/sso";
 import { installStatusThresholds } from "./lib/status-thresholds";
 import { installTelemetry } from "./lib/telemetry";
 import { tenantFloor } from "./lib/tenant-floor";
+
+/**
+ * Takes SIGTERM and SIGINT, so a stop drains the work in flight rather than
+ * dropping it (plan 0.8.0 H10a, docs/design/worker-deployment.md D4).
+ * `lib/shutdown.ts` says why the server owns the signal rather than Next.
+ *
+ * Skipped during `next build`: a build worker is stopped by its parent with a
+ * signal, and a handler that does not exit there (the build sets no
+ * NEXT_MANUAL_SIG_HANDLE) would keep it alive. It has nothing to drain anyway.
+ */
+export function takeSignals(): void {
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return;
+  }
+  installShutdown();
+}
 
 /**
  * Keeps responses the browser cancelled out of the error log (completeness

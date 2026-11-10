@@ -94,4 +94,56 @@ describe("PgBossJobQueue", () => {
     await expect(queue?.stop()).resolves.toBeUndefined();
     queue = undefined;
   });
+
+  /**
+   * A stop inside the drain's budget (plan 0.8.0 H10a,
+   * docs/design/worker-deployment.md D7). A job still running when the
+   * timeout passes is handed back as failed, so another scheduler retries it
+   * at once rather than finding it `active` for the fifteen minutes it takes
+   * to expire.
+   */
+  it("hands a job still running at the timeout back, and another queue runs it", async () => {
+    const wb = await workerDb();
+    const connectionString =
+      `postgres://${testDbEnv.superuser}:${testDbEnv.password}` +
+      `@${testDbEnv.host}:${testDbEnv.port}/${wb.databaseName}`;
+
+    const stopping = new PgBossJobQueue({ connectionString });
+    const taking = new PgBossJobQueue({ connectionString });
+    try {
+      await stopping.start();
+      let entered = false;
+      // Never settles: the job outlives the stop's timeout.
+      await stopping.work("slow.run", async () => {
+        entered = true;
+        await new Promise(() => undefined);
+      });
+      const id = await stopping.enqueue("slow.run", { run: 1 });
+      await waitFor(() => (entered ? true : undefined));
+      expect(stopping.running).toBe(1);
+
+      const began = Date.now();
+      await stopping.stop({ timeoutMs: 1_000 });
+      expect(Date.now() - began).toBeLessThan(10_000);
+      // Still running in memory, and no longer this queue's: handed back.
+      expect(stopping.running).toBe(1);
+
+      const state = await wb.admin.query(
+        "select state from pgboss.job where id = $1",
+        [id],
+      );
+      expect(state.rows[0]?.state).toBe("retry");
+
+      await taking.start();
+      const ran: unknown[] = [];
+      await taking.work("slow.run", async (payload) => {
+        ran.push(payload);
+      });
+      await waitFor(() => (ran.length > 0 ? ran : undefined));
+      expect(ran[0]).toMatchObject({ run: 1 });
+    } finally {
+      await taking.stop();
+      await stopping.stop();
+    }
+  });
 });

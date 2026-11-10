@@ -440,3 +440,39 @@ describe("the caller address settings", () => {
     ).toBe("caller address: the cf-connecting-ip header only");
   });
 });
+
+// docs/design/worker-deployment.md D8, plan 0.8.0 H10a.
+describe("how long a stopping process may drain", () => {
+  test("defaults to twenty seconds, so nothing has to be set", () => {
+    expect(parseEnv(VALID).OPENOKR_SHUTDOWN_SECONDS).toBe(20);
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(20);
+  });
+
+  test("takes a whole number of seconds from 1 to 300", () => {
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "1" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(1);
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "300" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(300);
+  });
+
+  test.each(["0", "301", "soon", "2.5"])(
+    "refuses %s, naming the variable",
+    (value) => {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: value }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toEqual([
+        "OPENOKR_SHUTDOWN_SECONDS",
+      ]);
+      expect(error.message).toMatch(/whole number of seconds from 1 to 300/);
+    },
+  );
+});

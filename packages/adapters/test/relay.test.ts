@@ -430,6 +430,165 @@ describe("OutboxRelay", () => {
 });
 
 /**
+ * Stopping between rows (plan 0.8.0 H10a, docs/design/worker-deployment.md D6).
+ *
+ * A stop used to wait for the whole batch, up to fifty rows, which does not
+ * fit a drain of seconds; and a process that exited first left every row of
+ * the batch claimed for the full lease, each with an attempt counted for
+ * nothing. Now the row in flight finishes and the rest go back at once.
+ */
+describe("a relay stopped mid-batch", () => {
+  /** A dispatcher that holds the first row until the test lets it go. */
+  const heldFirst = () => {
+    const delivered: string[] = [];
+    let entered!: () => void;
+    let letGo!: () => void;
+    const started = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const gate = new Promise<void>((resolve) => {
+      letGo = resolve;
+    });
+    return {
+      delivered,
+      started,
+      letGo: () => letGo(),
+      dispatch: async (message: { idempotencyKey: string }) => {
+        if (delivered.length === 0) {
+          delivered.push(message.idempotencyKey);
+          entered();
+          await gate;
+          return;
+        }
+        delivered.push(message.idempotencyKey);
+      },
+    };
+  };
+
+  const fiveRows = async (admin: {
+    query: (text: string, values?: unknown[]) => Promise<unknown>;
+  }) => {
+    // Aged so the first is known: the relay delivers oldest first here.
+    for (let row = 1; row <= 5; row++) {
+      await enqueue(admin, "t", `stop-${row}`, {}, 60 - row);
+    }
+  };
+
+  it("finishes the row in flight and releases the other four with their attempt back", async () => {
+    const wb = await workerDb();
+    await fiveRows(wb.admin);
+    const sink = heldFirst();
+    const relay = new OutboxRelay(wb.admin, { dispatch: sink.dispatch });
+
+    const draining = relay.drainOnce();
+    await sink.started;
+    const stopping = relay.stop();
+    sink.letGo();
+
+    expect(await stopping).toEqual({ released: 4, waited: true });
+    expect(await draining).toBe(1);
+    expect(sink.delivered).toEqual(["stop-1"]);
+
+    const rows = await wb.admin.query(
+      `select idempotency_key, delivered_at, attempts,
+              available_at <= now() as due
+         from outbox order by idempotency_key`,
+    );
+    expect(rows.rows[0]).toMatchObject({
+      idempotency_key: "stop-1",
+      attempts: 1,
+    });
+    expect(rows.rows[0].delivered_at).toBeInstanceOf(Date);
+    for (const row of rows.rows.slice(1)) {
+      // The attempt count the row had before the claim, so a deploy never
+      // counts toward dead-lettering it.
+      expect(row).toMatchObject({ delivered_at: null, attempts: 0, due: true });
+    }
+  });
+
+  it("hands the released rows to the next relay at once, not after the lease", async () => {
+    const wb = await workerDb();
+    await fiveRows(wb.admin);
+    const sink = heldFirst();
+    const first = new OutboxRelay(wb.admin, {
+      dispatch: sink.dispatch,
+      leaseSeconds: 120,
+    });
+
+    const draining = first.drainOnce();
+    await sink.started;
+    const stopping = first.stop();
+    sink.letGo();
+    await stopping;
+    await draining;
+
+    const next = collector();
+    const second = new OutboxRelay(wb.admin, { dispatch: next.dispatch });
+    expect(await second.drainOnce()).toBe(4);
+    expect(next.delivered.map((row) => row.idempotencyKey)).toEqual([
+      "stop-2",
+      "stop-3",
+      "stop-4",
+      "stop-5",
+    ]);
+  });
+
+  it("releases the rest before the row in flight ends, and leaves that row to its lease", async () => {
+    const wb = await workerDb();
+    await fiveRows(wb.admin);
+    const sink = heldFirst();
+    const relay = new OutboxRelay(wb.admin, {
+      dispatch: sink.dispatch,
+      leaseSeconds: 120,
+    });
+
+    const draining = relay.drainOnce();
+    await sink.started;
+    // A dispatch that outlives the drain's bound: the process exits while
+    // this is still waiting, so nothing here awaits it yet.
+    const stopping = relay.stop();
+
+    await expect
+      .poll(async () => {
+        const due = await wb.admin.query(
+          "select count(*)::int as n from outbox where available_at <= now() and delivered_at is null",
+        );
+        return due.rows[0].n;
+      })
+      .toBe(4);
+
+    // The held row is still leased, so a second relay takes only the four.
+    const next = collector();
+    const second = new OutboxRelay(wb.admin, { dispatch: next.dispatch });
+    expect(await second.drainOnce()).toBe(4);
+    expect(next.delivered.map((row) => row.idempotencyKey)).not.toContain(
+      "stop-1",
+    );
+    const held = await wb.admin.query(
+      "select available_at > now() + interval '60 seconds' as leased from outbox where idempotency_key = 'stop-1'",
+    );
+    expect(held.rows[0].leased).toBe(true);
+
+    sink.letGo();
+    await stopping;
+    await draining;
+  });
+
+  it("claims nothing once stopped", async () => {
+    const wb = await workerDb();
+    await enqueue(wb.admin, "t", "after-stop");
+    const sink = collector();
+    const relay = new OutboxRelay(wb.admin, { dispatch: sink.dispatch });
+
+    expect(await relay.stop()).toEqual({ released: 0, waited: false });
+    expect(await relay.drainOnce()).toBe(0);
+    expect(sink.delivered).toEqual([]);
+    const row = await wb.admin.query("select attempts from outbox");
+    expect(row.rows[0].attempts).toBe(0);
+  });
+});
+
+/**
  * The fair read (P8-T06b). Design: `tenant-limits.md` §5 and §8
  * criteria 4 and 7.
  *

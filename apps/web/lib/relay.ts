@@ -64,6 +64,7 @@ import { postWebhook } from "./outbound";
 import { getPool } from "./pool";
 import { getRealtime } from "./realtime";
 import { getKeyRing } from "./secrets";
+import { onShutdown } from "./shutdown";
 import { getStorage, readStoredFile } from "./storage";
 import { getTelemetry } from "./telemetry";
 import { getFileScanner } from "./upload-ports";
@@ -522,13 +523,24 @@ export function startRelay(): OutboxRelay | null {
   relay.start();
   log("started");
 
-  // Finishes the drain in flight rather than cutting it off, so a deploy does
-  // not turn an in-flight delivery into a retry.
-  const stop = () => {
-    void relay.stop();
-  };
-  process.once("SIGTERM", stop);
-  process.once("SIGINT", stop);
+  // Finishes the row in flight and hands the rest of its batch back, so a
+  // deploy neither repeats a delivery nor holds the batch for the lease
+  // (plan 0.8.0 H10a, docs/design/worker-deployment.md D6). Through the
+  // coordinator, which waits for it; a listener of its own was not waited for.
+  onShutdown({
+    name: "relay",
+    phase: "drain",
+    async stop() {
+      const { released, waited } = await relay.stop();
+      const rows = `${released} row${released === 1 ? "" : "s"}`;
+      if (!waited) {
+        return released === 0 ? "relay idle" : `relay released ${rows}`;
+      }
+      return released === 0
+        ? "relay finished the row in flight"
+        : `relay finished the row in flight and released ${rows}`;
+    },
+  });
 
   return relay;
 }

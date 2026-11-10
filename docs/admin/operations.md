@@ -108,6 +108,30 @@ support sessions, and `pnpm alignment:fill` stores the missing alignment
 scores. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox
 window from the environment.
 
+## Stopping and restarting
+
+A stop is a drain, not a cut. When the container or pod is told to stop, the
+server finishes what it is doing for up to `OPENOKR_SHUTDOWN_SECONDS` (20 by
+default), then sends the error reports and spans it holds, writes one line and
+exits:
+
+```
+shutdown: SIGTERM, draining for up to 20s
+shutdown: stopped after 1.4s: relay finished the row in flight and released 3 rows, scheduler idle, 0 actions in flight, error reports flushed, telemetry flushed
+```
+
+| Work in flight | What a stop does with it |
+|---|---|
+| The delivery being sent | Finished and recorded |
+| The rest of the relay's batch | Handed back at once, with no attempt counted, for the next relay or the next start |
+| A scheduled run | Allowed to finish until three seconds before the bound, then handed back, and another scheduler runs it again from the start. Nudges are deduplicated, so a repeated run sends nothing twice |
+| An action somebody started | Waited for |
+
+Anything still running at the bound is cut and retried, as after a crash.
+Compose waits 30 seconds before it kills the container, which covers the
+default. If you raise the variable, raise `stop_grace_period` on the `app`
+service with it.
+
 ## If something is wrong now
 
 The [incident runbook](../runbooks/incident.md) is written for that moment.

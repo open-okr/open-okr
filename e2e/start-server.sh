@@ -78,4 +78,8 @@ else
   done
 fi
 
+# The server owns SIGTERM, as it does in the image (plan 0.8.0 H10a), so the
+# suite runs the shutdown the image runs.
+export NEXT_MANUAL_SIG_HANDLE=true
+
 exec node "$STANDALONE/server.js"
