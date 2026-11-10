@@ -45,6 +45,9 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.branding.mirror.part.logo",
   // A version number and nothing else (docs/design/version-footer.md).
   "shell.version.running",
+  // "Demo" is the word Malay uses, as for logo and favicon above; the pill's
+  // full sentence is translated (plan 0.8.0 D1).
+  "shell.demo.label",
   "method.detail.okrChampion",
   "method.detail.okrCoach",
   "admin.ai.providerAnthropic",
