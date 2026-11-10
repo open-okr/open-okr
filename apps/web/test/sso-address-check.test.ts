@@ -46,7 +46,11 @@ it("takes a name that does not resolve only when asked to", async () => {
     false,
   );
   expect(
-    (await checkOutboundUrl(name, { allowPrivate: false, allowUnresolved: true }))
-      .ok,
+    (
+      await checkOutboundUrl(name, {
+        allowPrivate: false,
+        allowUnresolved: true,
+      })
+    ).ok,
   ).toBe(true);
 });
