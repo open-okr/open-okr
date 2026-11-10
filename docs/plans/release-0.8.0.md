@@ -381,7 +381,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 
 | Row | Status | Note |
 |---|---|---|
-| C1 | to do | |
+| C1 | design written | Building it found that the refusal as written strands an operator who skipped data change 0034 and fails the nightly upgrade rehearsal. `docs/design/short-ids.md`, "The 0.8.0 step": options A, B, C, recommended A (the migrator runs a data change a migration names, first). Waits for C1-Q1 and "design approved" |
 | Y1 | to do | |
 | Y2 | to do | |
 | Y3 | to do | |
@@ -391,7 +391,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Y7 | to do | Design first; Y7-1 to Y7-6 decided |
 | H1 | carried by S3 | |
 | H2 | to do | Design first: security |
-| H3 | to do | Design first: registration policy |
+| H3 | design written | `docs/design/registration-policy.md` §10: an unclaimed instance admits its first account whatever the policy says. H3-Q1 (a setup code) recommended for a later release. Waits for "design approved" |
 | H4 | no change | Not reproducible on `main`, nor on 0.6.0: the proxy sends a signed-out visitor to `/sign-in`, and the auth layout sends sign-in to `/setup` while no account exists and setup is unfinished (`apps/web/app/(auth)/layout.tsx`, `readSetupState`). Nothing on that path reads the cloud flag, and `e2e/first-run-wizard.spec.ts` asserts it. What OKRGoal saw needs an account to exist before setup finished, which is the deliberate recovery path, and most likely came from H3's broken wizard sign-up. H3's fix covers it |
 | H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
 | H6 | to do | |
