@@ -321,6 +321,23 @@ or echo a provider's body, and a span leaves the host.
 With it empty, no tracer provider is constructed, no exporter object exists,
 and no socket is opened.
 
+**A hosted collector that wants a key** (Grafana Cloud, Honeycomb, Datadog's
+OTLP intake and most others) takes it in a header. Name it the way the
+OpenTelemetry convention does, and the exporter sends it with every request:
+
+```
+OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <token>
+```
+
+Several headers are comma-separated, `name=value,name=value`;
+`OTEL_EXPORTER_OTLP_TRACES_HEADERS` applies to traces alone. The value is a
+credential, so put it where the instance's other secrets are: the
+`secrets/app.env` file on Compose, or a Secret named in `extraEnvFrom` with
+Helm, never in the chart's values, which `helm get values` reads back. A test
+(`packages/adapters/test/otlp-headers.test.ts`) sends a span to a local
+listener and checks the header arrives, so an upgrade of the exporter that
+stops reading it fails there (plan 0.8.0 H14).
+
 ## What is kept, and for how long
 
 By default, everything anybody wrote. Two kinds of bookkeeping are cleared on
