@@ -15,6 +15,7 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { seedVerifiedDomain } from "./sso-domain-fixtures.ts";
 
 /**
  * Changing, turning off and removing a single sign-on connection from the
@@ -140,6 +141,9 @@ beforeEach(async () => {
   otherWorkspaceId = (
     await provisionWorkspaceForUser(wb.appPool, { id: OTHER, name: "Other" })
   ).workspaceId;
+  // Enforcement is only allowed over a domain the workspace has proved
+  // (sso-domain-verification.md, rule 3), and these tests enforce this one.
+  await seedVerifiedDomain(workspaceId, "acme.example");
 });
 
 afterAll(async () => {

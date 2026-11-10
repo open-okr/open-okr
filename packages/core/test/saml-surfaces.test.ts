@@ -15,6 +15,7 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { seedVerifiedDomain } from "./sso-domain-fixtures.ts";
 
 /**
  * The surfaces around SAML (P8-T07c-b).
@@ -68,6 +69,9 @@ beforeAll(async () => {
       name: "SAML Surfaces",
     })
   ).workspaceId;
+  // The enforcing connection below is only allowed over a domain this
+  // workspace has proved (sso-domain-verification.md, rule 3).
+  await seedVerifiedDomain(workspaceId, "acme.example");
 }, 60_000);
 
 afterAll(async () => {

@@ -60,6 +60,7 @@ import {
   enforcementMessage,
   isProviderSignInPath,
   isSSOCallbackPath,
+  verifiedEnforcedProviderForSignUp,
 } from "./sso-enforcement.ts";
 import { ssoLinkAllowed } from "./sso-linking.ts";
 
@@ -577,6 +578,22 @@ export function createAuth(options: AuthOptions) {
           throw new APIError("FORBIDDEN", {
             message: enforcementMessage(provider),
           });
+        }
+
+        // A new password sign-up on a domain a workspace has proved it owns
+        // and enforces goes to that workspace's provider instead
+        // (docs/design/sso-domain-verification.md, rule 4). An unverified
+        // claim does not refuse a stranger's sign-up.
+        if (hookContext.path === "/sign-up/email") {
+          const claimed = await verifiedEnforcedProviderForSignUp(
+            options.pool,
+            email,
+          );
+          if (claimed) {
+            throw new APIError("FORBIDDEN", {
+              message: enforcementMessage(claimed),
+            });
+          }
         }
 
         // **The hold** (account-lockout.md D6). After enforcement, so an

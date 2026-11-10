@@ -517,6 +517,12 @@ import {
   updateSSOConnection,
 } from "./sso.ts";
 import {
+  listSSODomains,
+  markSSODomainVerified,
+  startSSODomainVerification,
+  verifySSODomain,
+} from "./sso-domains.ts";
+import {
   addChecklistItem,
   assignTask,
   createTask,
@@ -726,6 +732,10 @@ export const ACTION_MAP = {
   "sso.updateConnection": updateSSOConnection,
   "sso.setConnectionEnabled": setSSOConnectionEnabled,
   "sso.removeConnection": removeSSOConnection,
+  "sso.listDomains": listSSODomains,
+  "sso.startDomainVerification": startSSODomainVerification,
+  "sso.verifyDomain": verifySSODomain,
+  "sso.markDomainVerified": markSSODomainVerified,
   "agents.list": readAgents,
   "agents.create": createAgent,
   "agents.setAutonomy": setAgentAutonomy,

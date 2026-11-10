@@ -170,6 +170,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     enabled: z.boolean(),
   }),
   "sso.connection_removed": z.object({ name: z.string() }),
+  // A single sign-on domain's proof (docs/design/sso-domain-verification.md).
+  // The domain only: never a token, its hash or a record's value.
+  "sso.domain_verification_started": z.object({ domain: z.string() }),
+  "sso.domain_checked": z.object({ domain: z.string() }),
+  "sso.domain_verified": z.object({
+    domain: z.string(),
+    by: z.enum(["administrator"]).optional(),
+  }),
+  "sso.domain_check_failed": z.object({ domain: z.string() }),
+  "sso.domain_check_recovered": z.object({ domain: z.string() }),
+  "sso.domain_unverified": z.object({ domain: z.string() }),
   // Channels (P5-T01b-a). The provider, never a credential and never a
   // message body: an activity row is read by people.
   "channel.connected": z.object({ provider: z.string() }),

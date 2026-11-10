@@ -4,6 +4,10 @@
  * One of the two directories the boundary gate lets touch `tenants`. Design:
  * `docs/design/operator-console.md`.
  */
+export {
+  type MarkDomainVerifiedInput,
+  markDomainVerifiedAsOperator,
+} from "./domains.ts";
 export { readInstanceFlags } from "./flags.ts";
 export {
   type GrantOutcome,

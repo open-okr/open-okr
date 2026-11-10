@@ -34,11 +34,13 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { removeSamlProvider, writeSamlProvider } from "../auth/saml-sync.ts";
 import {
+  assertDomainsVerified,
   type CreateSSOConnectionInput,
   derivedProviderId,
   normaliseCertificate,
   SSOConnectionRejected,
   type SSOProviderConfig,
+  splitDomains,
   validateSSOConnectionInput,
 } from "../auth/sso.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -373,6 +375,20 @@ export const updateSSOConnection = defineWriteAction({
       });
       if (problem) {
         throw new SSOConnectionRejected(problem);
+      }
+
+      // **Rule 3 of docs/design/sso-domain-verification.md.** Turning
+      // enforcement on needs every domain verified. A connection that already
+      // enforced keeps doing so (decision 2), so on one of those only a domain
+      // added by this edit has to be.
+      if (next.enforce) {
+        const before = new Set(splitDomains(loaded.emailDomains));
+        const now = splitDomains(next.emailDomains);
+        await assertDomainsVerified(
+          tx,
+          workspaceId,
+          loaded.enforce ? now.filter((domain) => !before.has(domain)) : now,
+        );
       }
 
       const certificate =

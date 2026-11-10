@@ -11,9 +11,15 @@
  * instead, and decrypts only when it changed.
  */
 import { X509Certificate } from "node:crypto";
-import { withSSOLookup, withWorkspace } from "@openokr/db";
+import {
+  activeOnly,
+  ssoDomains,
+  type WorkspaceTx,
+  withSSOLookup,
+  withWorkspace,
+} from "@openokr/db";
 import { isDomain, isSlug, isWebUrl } from "@openokr/formats";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
@@ -677,6 +683,15 @@ export async function createSSOConnection(
     kind === "saml" ? normaliseCertificate(input.samlCertificate ?? "") : null;
 
   const row = await withWorkspace(drizzle(pool), workspaceId, async (tx) => {
+    // Rule 3 of docs/design/sso-domain-verification.md: a new connection
+    // enforces only domains this workspace has verified.
+    if (input.enforce) {
+      await assertDomainsVerified(
+        tx,
+        workspaceId,
+        splitDomains(input.emailDomains ?? ""),
+      );
+    }
     // openokr:allow-mutation: an instance configuration write with no acting
     // member, the same arrangement `createSCIMToken` uses. The admin endpoint
     // that calls this is access-checked before it is reached.
@@ -736,4 +751,48 @@ export async function createSSOConnection(
   }
 
   return { id: row.id, providerId };
+}
+
+/** The domains in a connection's comma-separated list. */
+export function splitDomains(list: string): string[] {
+  return list
+    .split(",")
+    .map((one) => one.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/**
+ * Rule 3: `enforce` needs every domain verified, said at the moment somebody
+ * can still fix it. Runs in the transaction that would store the change.
+ */
+export async function assertDomainsVerified(
+  tx: Pick<WorkspaceTx, "select">,
+  workspaceId: string,
+  domains: readonly string[],
+): Promise<void> {
+  if (domains.length === 0) {
+    return;
+  }
+  const rows = await tx
+    .select({ domain: ssoDomains.domain })
+    .from(ssoDomains)
+    .where(
+      activeOnly(
+        ssoDomains,
+        and(
+          eq(ssoDomains.workspaceId, workspaceId),
+          sql`${ssoDomains.verifiedAt} is not null`,
+        ),
+      ),
+    );
+  const verified = new Set(rows.map((row) => row.domain));
+  const missing = domains.filter((domain) => !verified.has(domain));
+  if (missing.length > 0) {
+    throw new SSOConnectionRejected({
+      field: "enforce",
+      message:
+        `Verify ${missing.join(", ")} before enforcing. Enforcement is ` +
+        "available for domains this workspace has proved it owns.",
+    });
+  }
 }

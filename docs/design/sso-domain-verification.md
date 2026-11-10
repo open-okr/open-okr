@@ -1,6 +1,6 @@
 # Single sign-on: proving a domain with DNS
 
-Status: proposed 2026-11-10, waiting for "design approved". Follows `docs/design/sso-account-trust.md`.
+Status: design approved 2026-11-10. Follows `docs/design/sso-account-trust.md`.
 
 Since 0.7.0 a single sign-on connection links and enforces only for members of its own workspace. What it cannot do yet is refuse a password sign-up on its domain, because nothing proves the workspace owns that domain. This document adds that proof: a DNS TXT record (a text entry in the domain's DNS settings) that only the domain's owner can publish.
 
@@ -31,7 +31,7 @@ The admin adds the record, then presses **Verify**. The server looks up the TXT 
 | 3 | `enforce` can be turned on only when every domain on the connection is verified. Saving an unverified domain is allowed, it simply does not enforce |
 | 4 | A new password sign-up on a verified, enforced domain is refused with the existing enforcement message, which names the provider |
 | 5 | The lookup goes through a DNS port in `packages/adapters`, not `node:dns` in core, so it can be faked in tests and stays visible to the air-gap checklist |
-| 6 | **Air-gapped or no public DNS:** an instance administrator may mark a domain verified by hand. The action is audited with who did it and why |
+| 6 | **Air-gapped or no public DNS:** an instance administrator may mark a domain verified by hand. The action is audited with who did it, which authority they used and why. The administrator of a self-hosted instance may (the same rule the instance name and the AI endpoint guard use); on a managed cloud only the operator may |
 | 7 | Verifying, failing a re-check, losing verification and an administrator override each write an audit row through the Operation pipeline |
 
 ## Data
@@ -64,8 +64,33 @@ On the SSO connection screen (S-30 admin, single sign-on), each domain gets a st
 - Given the TXT record is removed, When three daily checks fail, Then the domain becomes unverified and enforcement on it stops.
 - Given an air-gapped instance, When an instance administrator marks a domain verified, Then it is verified and the audit row names the administrator.
 
-## Open questions for the owner
+## Decisions (2026-11-10)
 
-1. Should **trusted email domains** (join a workspace by email domain, `trustedEmailDomains`) also require verification? It has the same weakness in a milder form: a workspace can offer itself to everybody on `gmail.com`. Recommended: yes, same table, in a second change.
-2. Existing connections on upgrade: keep enforcing for members until the domain is verified (recommended, no lockout surprise), or stop enforcing until verified?
-3. Re-check every 24 hours and unverify after three failures: acceptable?
+| # | Question | Decision |
+|---|---|---|
+| 1 | Should trusted email domains also require verification? | No. This change covers single sign-on only |
+| 2 | Existing connections on upgrade | Keep enforcing for members as in 0.7.0. Only the sign-up refusal (rule 4) waits for verification |
+| 3 | Re-check every 24 hours, unverify after three failures | Accepted |
+
+## Delivery
+
+Two changes, one commit each:
+
+| Change | Contents |
+|---|---|
+| A. Data and rules | Migration with RLS, DNS port and driver, verify and override actions through the registry, rule 2 and 3 checks, sign-up refusal, daily re-check job, tests |
+| B. Screen | Status chip, Verify dialog with the record to copy, administrator override, catalogue keys in every locale, end-to-end spec |
+
+## Implementation notes (change A)
+
+Where the code is exact about something the sections above leave open.
+
+| Topic | What the code does |
+|---|---|
+| Rule 3 on an existing enforcing connection | Decision 2 keeps it enforcing. An edit that leaves its domain list alone is not refused. A domain the edit adds must be verified |
+| Re-check scope | Only domains verified by `dns` are looked up. A domain an administrator marked by hand is not, because an instance with no public DNS would fail every check and lose the thing the override grants |
+| A resolver that does not answer | Not a failed check. It says nothing about the domain, so it neither adds to the count nor resets it |
+| "Enforcement on it stops" | The refusal of a new password sign-up (rule 4) stops, because it needs a verified domain. Refusing a member's local sign-in does not depend on verification (decision 2), so it carries on |
+| Rule 6 | Two ways in, both with a required reason and an audit row naming the person and the authority (`instance_admin` or `operator`). On a self-hosted instance the administrator of the workspace uses `sso.markDomainVerified`, which is "instance administrator" as the instance name card and the AI endpoint guard already read it (cloud flag off, workspace `full`). On a managed cloud that action refuses, and only a live operator may, through `markDomainVerifiedAsOperator` (not a registry action). A free-mail domain is refused either way |
+| Rule 2 at start | Not checked. Another workspace's row is behind row-level security, so the refusal comes at verify, from the unique index |
+| Daily job | `sso.recheckDomains`, 05:10 UTC, per workspace, as the system. Each failed check, the third that unverifies and a recovery write an audit row. A clean pass writes only `last_checked_at` |

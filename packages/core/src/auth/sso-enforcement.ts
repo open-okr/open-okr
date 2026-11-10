@@ -33,6 +33,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { emailDomain } from "../invitations/tokens.ts";
 import { derivedProviderId } from "./sso.ts";
+import { listVerifiedDomainKeys, verifiedKey } from "./sso-domains.ts";
 
 /** A provider that claims the address somebody is trying to sign in with. */
 export interface EnforcingProvider {
@@ -167,6 +168,40 @@ export async function enforcedProviderForEmail(
     return null;
   }
   return enforcedProviderForUserWith(pool, id, connections);
+}
+
+/**
+ * The provider that claims this address for a *new* password sign-up, if a
+ * workspace has proved it owns the domain (docs/design/
+ * sso-domain-verification.md, rule 4).
+ *
+ * Only a verified domain of an enforcing connection counts, and the proof must
+ * belong to that connection's own workspace. An unverified domain is a claim
+ * somebody typed, and refusing a stranger's sign-up on it is the thing
+ * `sso-account-trust.md` removed. Members are not this function's concern:
+ * `enforcedProviderForEmail` already refuses their local sign-in.
+ */
+export async function verifiedEnforcedProviderForSignUp(
+  pool: Pool,
+  email: string,
+): Promise<EnforcingProvider | null> {
+  const connections = await listEnforcingConnections(pool);
+  if (connections.length === 0) {
+    return null;
+  }
+  const verified = await listVerifiedDomainKeys(pool);
+  if (verified.size === 0) {
+    return null;
+  }
+  return enforcingProviderFor(
+    email,
+    connections.map((connection) => ({
+      ...connection,
+      domains: connection.domains.filter((domain) =>
+        verified.has(verifiedKey(connection.workspaceId, domain)),
+      ),
+    })),
+  );
 }
 
 /**

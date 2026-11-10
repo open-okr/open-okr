@@ -3643,6 +3643,73 @@
       }
     },
     {
+      "name": "sso.listDomains",
+      "description": "The email domains this workspace's single sign-on connections list or have started to verify, each with its verification state and the DNS record name.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "sso.startDomainVerification",
+      "description": "Starts proving that this workspace owns an email domain. Returns the DNS TXT record to publish, including a token that is shown this once. Calling it again for an unverified domain issues a new token.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "domain": "…"
+      }
+    },
+    {
+      "name": "sso.verifyDomain",
+      "description": "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "domain": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "domain"
+        ]
+      },
+      "scope": "write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      },
+      "example": {
+        "domain": "…"
+      }
+    },
+    {
       "name": "agents.list",
       "description": "Every agent this workspace has, seeded or custom.",
       "inputSchema": {
