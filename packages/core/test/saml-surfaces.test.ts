@@ -3,7 +3,6 @@ import * as saml from "samlify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import {
-  createSSOConnection,
   loadSSOConnections,
   samlServiceProviderUrls,
   validateSSOConnectionInput,
@@ -15,6 +14,7 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
 import { seedVerifiedDomain } from "./sso-domain-fixtures.ts";
 
 /**

@@ -4,6 +4,7 @@ import { loadEnv } from "@openokr/config";
 import { callAction, SSOConnectionRejected } from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { getDns } from "../../../lib/dns";
+import { checkOutboundUrl } from "../../../lib/outbound";
 import { getPool } from "../../../lib/pool";
 import { refusalFields } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
@@ -45,6 +46,9 @@ async function context() {
     baseUrl: loadEnv().BETTER_AUTH_URL,
     // Checking a domain looks its record up. Only `sso.verifyDomain` reads it.
     dns: getDns(),
+    // A changed discovery, token or user-info address is checked by the
+    // outbound guard before it is stored.
+    checkOutboundUrl,
   };
 }
 

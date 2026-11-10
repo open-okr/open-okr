@@ -101,6 +101,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "channel.templateUnmapped": z.object({ ruleKey: z.string() }),
   "connection.revoked": z.object({ grantId: z.string() }),
+  // A directory-sync token was minted. The label only: never the token or its
+  // digest.
+  "directory.token_created": z.object({ label: z.string() }),
   "api_token.created": z.object({
     name: z.string(),
     audience: z.string(),
@@ -164,6 +167,7 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // name people see on the sign-in button, snapshotted because a removed
   // connection has no row left to look it up in. Never a client id, a domain
   // or a secret: the audit row carries what an administrator needs.
+  "sso.connection_created": z.object({ name: z.string() }),
   "sso.connection_updated": z.object({ name: z.string() }),
   "sso.connection_switched": z.object({
     name: z.string(),

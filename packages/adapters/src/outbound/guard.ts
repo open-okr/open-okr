@@ -19,7 +19,9 @@
  *
  * Checking the name alone is defeated by DNS. Checking the address alone is
  * defeated by a name that resolves differently the second time, which is why the
- * request is made against the address that was checked rather than re-resolved.
+ * request is made against the address that was checked rather than re-resolved:
+ * the default transport (`createPinnedFetch`) connects only to the addresses
+ * `checkUrl` approved, and keeps the hostname for the Host header and TLS.
  * Following one redirect is enough to reach anything, which is why none are.
  *
  * **This is the port's own module rather than a driver**, because there is no
@@ -28,7 +30,10 @@
  * metadata document is the first address a stranger chooses.
  */
 import { lookup } from "node:dns/promises";
+import http from "node:http";
+import https from "node:https";
 import { isIP } from "node:net";
+import { Readable } from "node:stream";
 
 /** Why a URL was refused, in words the caller can show or log. */
 export type OutboundRefusal =
@@ -297,6 +302,118 @@ function isBlockedV6(address: string): boolean {
   return false;
 }
 
+/**
+ * A `lookup` for `http.request` that answers only with addresses already
+ * checked, whatever name it is asked about.
+ *
+ * Node's runtime `fetch` resolves the name again when it connects, so a name
+ * that answers public for the check and private for the connection would get
+ * past a check made beforehand. Taking the resolver out of the connection
+ * closes that gap. Exposed for the test that proves it.
+ */
+export function pinnedLookup(addresses: readonly string[]) {
+  const entries = addresses.map((address) => ({
+    address,
+    family: isIP(address) === 6 ? 6 : 4,
+  }));
+  return (
+    _hostname: string,
+    options: { all?: boolean } | number | undefined,
+    callback: (
+      error: Error | null,
+      address: string | { address: string; family: number }[],
+      family?: number,
+    ) => void,
+  ): void => {
+    const first = entries[0];
+    if (!first) {
+      callback(new Error("No checked address to connect to."), "", 4);
+      return;
+    }
+    if (typeof options === "object" && options?.all) {
+      callback(null, entries);
+      return;
+    }
+    callback(null, first.address, first.family);
+  };
+}
+
+/**
+ * A `fetch` that connects only to `addresses`, which the caller has already
+ * checked, and sends the original hostname as the Host header and the TLS
+ * server name. No redirect is followed and every connection is new, so no
+ * socket from an earlier request is reused.
+ *
+ * Built on `node:http` and `node:https`, because the bundled `undici` is not a
+ * package this repository may import and a new dependency here is the thing
+ * the guard least wants. The body of a request is buffered, which is right for
+ * the small JSON bodies this guard carries; the answer streams.
+ */
+function createPinnedFetch(addresses: readonly string[]): typeof fetch {
+  const lookupChecked = pinnedLookup(addresses);
+  return async (input, init) => {
+    const request = new Request(input as string | URL | Request, init);
+    const url = new URL(request.url);
+    const transport = url.protocol === "https:" ? https : http;
+    const body =
+      request.method === "GET" || request.method === "HEAD"
+        ? null
+        : Buffer.from(await request.arrayBuffer());
+    const headers: Record<string, string> = {};
+    request.headers.forEach((value, key) => {
+      headers[key] = value;
+    });
+    if (body && !headers["content-length"]) {
+      headers["content-length"] = String(body.length);
+    }
+
+    return new Promise<Response>((resolve, reject) => {
+      const outgoing = transport.request(
+        {
+          hostname: url.hostname.replace(/^\[|\]$/g, ""),
+          port: url.port || undefined,
+          path: `${url.pathname}${url.search}`,
+          method: request.method,
+          headers,
+          agent: false,
+          lookup: lookupChecked as never,
+          signal: request.signal,
+        },
+        (incoming) => {
+          const answer = new Headers();
+          for (let i = 0; i + 1 < incoming.rawHeaders.length; i += 2) {
+            answer.append(
+              incoming.rawHeaders[i] as string,
+              incoming.rawHeaders[i + 1] as string,
+            );
+          }
+          const status = incoming.statusCode ?? 200;
+          const bodyless = status === 204 || status === 205 || status === 304;
+          if (bodyless) {
+            incoming.resume();
+          }
+          resolve(
+            new Response(
+              bodyless
+                ? null
+                : (Readable.toWeb(incoming) as unknown as ReadableStream),
+              {
+                status,
+                ...(incoming.statusMessage
+                  ? { statusText: incoming.statusMessage }
+                  : {}),
+                headers: answer,
+              },
+            ),
+          );
+        },
+      );
+      outgoing.on("error", reject);
+      outgoing.end(body ?? undefined);
+    });
+  };
+}
+
 /** The addresses a name points at, or an empty list when it points nowhere. */
 async function resolveHost(host: string): Promise<readonly string[]> {
   try {
@@ -413,7 +530,8 @@ export async function outboundFetch(
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
-  const doFetch = options.fetchImpl ?? fetch;
+  const doFetch =
+    options.fetchImpl ?? createPinnedFetch(checked.checked.addresses);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -565,9 +683,8 @@ export class OutboundRefusedError extends Error {
  * that is where a local model runs.
  */
 export function createGuardedFetch(
-  options: Pick<OutboundOptions, "fetchImpl" | "resolve"> = {},
+  options: Pick<OutboundOptions, "fetchImpl" | "resolve" | "allowPrivate"> = {},
 ): typeof fetch {
-  const doFetch = options.fetchImpl ?? fetch;
   return async (input, init) => {
     const candidate =
       typeof input === "string"
@@ -579,6 +696,8 @@ export function createGuardedFetch(
     if (!checked.ok) {
       throw new OutboundRefusedError(checked.refusal, checked.detail);
     }
+    const doFetch =
+      options.fetchImpl ?? createPinnedFetch(checked.checked.addresses);
     const response = await doFetch(input, { ...init, redirect: "manual" });
     if (response.status >= 300 && response.status < 400) {
       throw new OutboundRefusedError(

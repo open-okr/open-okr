@@ -126,6 +126,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     (payload as { via: string }).via === "sso"
       ? "Someone joined by signing in through the identity provider"
       : "The directory added someone",
+  "sso.connection_created": (p) =>
+    `Single sign-on through "${asString(p.name, "a provider")}" was added`,
+  "directory.token_created": () => "A directory-sync token was created",
   "sso.connection_updated": (p) =>
     `Single sign-on through "${asString(p.name, "a provider")}" was changed`,
   "sso.connection_switched": (p) =>

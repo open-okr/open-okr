@@ -7,9 +7,9 @@
  * sign-in page or retiring one all meant somebody running SQL on
  * `sso_connections`. These four actions are what replace that.
  *
- * **Adding one is still the older route**, `POST /api/v1/admin/sso`, which
- * calls `createSSOConnection` outside the pipeline and writes no audit row. It
- * predates these and is left as it is here; moving it is its own change.
+ * **Adding one is `sso.createConnection`**, which `POST /api/v1/admin/sso`
+ * calls. It runs through the pipeline like the others, so adding a provider
+ * leaves an audit row naming the actor.
  *
  * **A change reaches every process without a restart** (completeness review
  * L-15). Each process watches a stamp of the enabled, not-deleted rows and
@@ -45,6 +45,7 @@ import {
 } from "../auth/sso.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { encryptSecret, type KeyRing } from "../secrets/key-ring.ts";
+import { isCloudEnabled } from "../tenancy/settings.ts";
 import {
   type ActionCallContext,
   defineReadAction,
@@ -225,6 +226,213 @@ async function loadConnection(
   return row;
 }
 
+/** An optional text field an edit may clear by sending null or "". */
+const clearable = z.string().nullable().optional();
+
+/**
+ * The addresses this server itself fetches from the provider: the discovery
+ * document, the token endpoint and the user-info endpoint. The authorisation
+ * address is where the browser is sent, so the server never calls it.
+ */
+const SERVER_FETCHED = ["discoveryUrl", "tokenUrl", "userInfoUrl"] as const;
+
+/**
+ * Refuses a provider address the outbound guard would not let this server
+ * fetch, at the moment somebody can still fix it (docs/design/
+ * hardening-batch-2026-11.md H-C).
+ *
+ * Only an address that is new or changed is checked, so editing a display
+ * name never waits on a name server and never fails over an address saved
+ * before this check existed. A private address is accepted on a self-hosted
+ * instance, where the identity provider is often inside the network, and
+ * refused on the managed cloud, where the administrator is not the operator.
+ * The cloud metadata addresses are refused everywhere.
+ *
+ * **This is the save-time half.** Better Auth fetches the discovery document
+ * and the user-info endpoint with its own client and takes no custom `fetch`,
+ * so a name that changes its answer after saving is not caught at sign-in.
+ */
+async function refuseUnsafeAddresses(
+  context: ActionCallContext,
+  next: Partial<Record<(typeof SERVER_FETCHED)[number], string | null>>,
+  stored: Partial<Record<(typeof SERVER_FETCHED)[number], string | null>> = {},
+): Promise<void> {
+  const changed = SERVER_FETCHED.filter((field) => {
+    const value = next[field];
+    return said(value) && value !== stored[field];
+  });
+  if (changed.length === 0) {
+    return;
+  }
+  if (!context.checkOutboundUrl) {
+    throw new Error(
+      "This host built an ActionCallContext with no outbound check, but reached " +
+        "a single sign-on action that stores an address this server will fetch.",
+    );
+  }
+  const allowPrivate = !(await isCloudEnabled(context.pool));
+  for (const field of changed) {
+    const checked = await context.checkOutboundUrl(next[field] as string, {
+      allowPrivate,
+    });
+    if (!checked.ok) {
+      throw new SSOConnectionRejected({ field, message: checked.detail });
+    }
+  }
+}
+
+const createInput = z.object({
+  kind: z.enum(["oidc", "saml"]).optional(),
+  providerId: z.string(),
+  displayName: z.string(),
+  clientId: z.string().optional(),
+  /** Sealed on the way in and never read back out. */
+  clientSecret: z.string().optional(),
+  discoveryUrl: clearable,
+  authorizationUrl: clearable,
+  tokenUrl: clearable,
+  userInfoUrl: clearable,
+  scopes: z.string().optional(),
+  emailDomains: z.string().optional(),
+  enforce: z.boolean().optional(),
+  samlEntryPoint: clearable,
+  samlIssuer: clearable,
+  samlCertificate: clearable,
+  samlAudience: clearable,
+});
+
+/**
+ * Adds a connection for a workspace, whichever protocol it speaks.
+ *
+ * **This exists because the route that used to do it could never work**
+ * (audit, 18 September 2026): it asked the database for the workspace with
+ * `current_setting` on a bare pool, which raises, so no provider could be
+ * configured on any instance. It then lived outside the pipeline and wrote no
+ * audit row. Both are fixed by being an action: the workspace comes from the
+ * call, and the change, the activity and the audit row commit together.
+ *
+ * **A SAML row's derived provider row is written in the same transaction**
+ * (P8-T07c-b), so a provider configured today works at the next sign-in
+ * rather than after somebody notices (L-15).
+ *
+ * The audit payload names the provider and the protocol. It never carries a
+ * secret, a certificate or an address.
+ */
+export const createSSOConnectionAction = defineWriteAction({
+  name: "sso.createConnection",
+  agentSurface: false,
+  summary:
+    "Adds a single sign-on connection, OIDC or SAML, to this workspace. The client secret is sealed on the way in and never shown again.",
+  input: createInput,
+  output: z.object({ id: z.string(), providerId: z.string() }),
+  access: ACCESS_LEVELS.full,
+  operation: (context, input) => ({
+    async execute({ tx, workspaceId }) {
+      const given = input as CreateSSOConnectionInput;
+      const problem = validateSSOConnectionInput(given);
+      if (problem) {
+        throw new SSOConnectionRejected(problem);
+      }
+      await refuseUnsafeAddresses(context, given);
+
+      const kind = given.kind === "saml" ? "saml" : "oidc";
+      // A SAML provider has no client secret. The three secret columns are
+      // not null from 0091, so an empty one is sealed and stored: nothing
+      // reads it, and making them nullable would mean every OIDC read had to
+      // handle a null only SAML can produce.
+      const sealed = encryptSecret(
+        requireRing(context),
+        given.clientSecret ?? "",
+      );
+      const certificate =
+        kind === "saml"
+          ? normaliseCertificate(given.samlCertificate ?? "")
+          : null;
+
+      // Rule 3 of docs/design/sso-domain-verification.md: a new connection
+      // enforces only domains this workspace has verified.
+      if (given.enforce) {
+        await assertDomainsVerified(
+          tx,
+          workspaceId,
+          splitDomains(given.emailDomains ?? ""),
+        );
+      }
+
+      let row: SSOConnection | undefined;
+      try {
+        // openokr:allow-mutation: this is the operation's own execute, on the
+        // transaction runOperation opened. The change, the activity and the
+        // audit row commit together.
+        [row] = await tx
+          .insert(ssoConnections)
+          .values({
+            workspaceId,
+            kind,
+            providerId: given.providerId,
+            displayName: given.displayName,
+            discoveryUrl: given.discoveryUrl ?? null,
+            authorizationUrl: given.authorizationUrl ?? null,
+            tokenUrl: given.tokenUrl ?? null,
+            userInfoUrl: given.userInfoUrl ?? null,
+            clientId: given.clientId ?? "",
+            secretCiphertext: sealed.ciphertext,
+            secretDataKey: sealed.dataKey,
+            secretKeyId: sealed.keyId,
+            scopes: given.scopes ?? "openid email profile",
+            emailDomains: given.emailDomains ?? "",
+            enforce: given.enforce ?? false,
+            samlEntryPoint: given.samlEntryPoint ?? null,
+            samlIssuer: given.samlIssuer ?? null,
+            samlCertificate: certificate,
+            samlAudience: given.samlAudience ?? null,
+          })
+          .returning();
+      } catch (error) {
+        // The unique index on (workspace, provider ID). The driver wraps the
+        // database's message, so the constraint name may be on the cause.
+        const text = `${error instanceof Error ? error.message : ""} ${
+          error instanceof Error && error.cause instanceof Error
+            ? error.cause.message
+            : ""
+        }`;
+        if (text.includes("sso_connections_provider")) {
+          throw new OperationError(
+            "conflict",
+            "A provider with that ID already exists in this workspace",
+            undefined,
+            "providerId",
+          );
+        }
+        throw error;
+      }
+      if (!row) {
+        throw new Error("The SSO connection insert returned no row");
+      }
+      await keepPluginInStep(tx, row, context.baseUrl);
+
+      return {
+        result: {
+          id: row.id,
+          providerId: derivedProviderId(row.providerId, workspaceId),
+        },
+        activity: {
+          kind: "sso.connection_created",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { name: row.displayName },
+        },
+        audit: {
+          action: "sso.createConnection",
+          targetType: "sso_connection",
+          targetId: row.id,
+          payload: { providerId: row.providerId, protocol: kind },
+        },
+      };
+    },
+  }),
+});
+
 export const listSSOConnections = defineReadAction({
   name: "sso.listConnections",
   summary:
@@ -268,9 +476,6 @@ const SAML_ONLY = [
   "samlCertificate",
   "samlAudience",
 ] as const;
-
-/** An optional text field an edit may clear by sending null or "". */
-const clearable = z.string().nullable().optional();
 
 const updateInput = z.object({
   id: z.uuid(),
@@ -376,6 +581,7 @@ export const updateSSOConnection = defineWriteAction({
       if (problem) {
         throw new SSOConnectionRejected(problem);
       }
+      await refuseUnsafeAddresses(context, next, loaded);
 
       // **Rule 3 of docs/design/sso-domain-verification.md.** Turning
       // enforcement on needs every domain verified. A connection that already

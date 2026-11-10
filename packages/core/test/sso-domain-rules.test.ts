@@ -1,13 +1,14 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
-import { createSSOConnection, SSOConnectionRejected } from "../src/auth/sso.ts";
+import { SSOConnectionRejected } from "../src/auth/sso.ts";
 import {
   checkDomainRecord,
   hashVerificationToken,
   normaliseDomain,
   recordFor,
 } from "../src/auth/sso-domains.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
 import {
   asOwner,
   auditActions,

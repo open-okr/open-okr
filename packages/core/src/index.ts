@@ -531,7 +531,6 @@ export {
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   type CreateSSOConnectionInput,
-  createSSOConnection,
   derivedProviderId,
   listSSOProviders,
   loadSSOConnections,
@@ -821,10 +820,7 @@ export {
   scimList,
   scimUserResource,
 } from "./directory-sync/scim.ts";
-export {
-  createSCIMToken,
-  resolveToken as resolveSCIMToken,
-} from "./directory-sync/tokens.ts";
+export { resolveToken as resolveSCIMToken } from "./directory-sync/tokens.ts";
 export {
   type DirectoryDeps,
   type DirectoryMember,
@@ -1077,6 +1073,7 @@ export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
+  type CloudPreflightWarning,
   createSiteMessage,
   createWorkspaceAsOperator,
   deleteSiteMessage,
@@ -1096,6 +1093,7 @@ export {
   measureAllWorkspaces,
   OperatorGrantError,
   readBillingAsOperator,
+  readCloudPreflight,
   readInstanceFlags,
   readUsageAsOperator,
   readWorkspaceLimitsAsOperator,
