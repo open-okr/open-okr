@@ -234,7 +234,11 @@ export interface ActionCallContext {
    */
   readonly checkOutboundUrl?: (
     url: string,
-    options: { readonly allowPrivate: boolean },
+    options: {
+      readonly allowPrivate: boolean;
+      /** Accept a name that does not resolve yet. Save-time checks only. */
+      readonly allowUnresolved?: boolean;
+    },
   ) => Promise<
     { readonly ok: true } | { readonly ok: false; readonly detail: string }
   >;

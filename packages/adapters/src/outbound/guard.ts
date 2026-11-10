@@ -439,7 +439,15 @@ export interface CheckedUrl {
  */
 export async function checkUrl(
   candidate: string,
-  options: Pick<OutboundOptions, "resolve" | "allowPrivate"> = {},
+  options: Pick<OutboundOptions, "resolve" | "allowPrivate"> & {
+    /**
+     * Accept a name that resolves to nothing. For a save-time check on an
+     * address that is not fetched yet (an identity provider's, configured
+     * before its DNS exists). A name that resolves to a private address is
+     * still refused, and the fetch-time check keeps refusing an unresolved name.
+     */
+    readonly allowUnresolved?: boolean;
+  } = {},
 ): Promise<
   | { readonly ok: true; readonly checked: CheckedUrl }
   | {
@@ -490,6 +498,9 @@ export async function checkUrl(
   const resolver = options.resolve ?? resolveHost;
   const addresses = await resolver(host);
   if (addresses.length === 0) {
+    if (options.allowUnresolved === true) {
+      return { ok: true, checked: { url, addresses: [] } };
+    }
     return {
       ok: false,
       refusal: "unreachable",

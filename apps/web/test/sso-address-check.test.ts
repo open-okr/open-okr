@@ -39,3 +39,14 @@ it("refuses a private address on a cloud and takes it on a self-hosted instance"
     ).ok,
   ).toBe(true);
 });
+
+it("takes a name that does not resolve only when asked to", async () => {
+  const name = "https://no-such-idp.invalid/sso";
+  expect((await checkOutboundUrl(name, { allowPrivate: false })).ok).toBe(
+    false,
+  );
+  expect(
+    (await checkOutboundUrl(name, { allowPrivate: false, allowUnresolved: true }))
+      .ok,
+  ).toBe(true);
+});

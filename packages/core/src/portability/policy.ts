@@ -258,6 +258,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "SSO provider configuration with envelope-encrypted client secrets. An export never carries secrets, and the connection is between this instance and a specific identity provider.",
   },
   {
+    table: "sso_domains",
+    decision: "exclude",
+    reason:
+      "An email domain a workspace proved it owns, with the hash of its verification token. A verified domain belongs to one workspace on one instance, so a copy elsewhere would claim a domain nobody proved there, and an export never carries tokens.",
+  },
+  {
     table: "directory_sync_tokens",
     decision: "exclude",
     reason:

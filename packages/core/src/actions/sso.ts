@@ -243,7 +243,7 @@ const SERVER_FETCHED = ["discoveryUrl", "tokenUrl", "userInfoUrl"] as const;
  *
  * Only an address that is new or changed is checked, so editing a display
  * name never waits on a name server and never fails over an address saved
- * before this check existed. A private address is accepted on a self-hosted
+ * before this check existed. A name that does not resolve yet is accepted. A private address is accepted on a self-hosted
  * instance, where the identity provider is often inside the network, and
  * refused on the managed cloud, where the administrator is not the operator.
  * The cloud metadata addresses are refused everywhere.
@@ -272,8 +272,12 @@ async function refuseUnsafeAddresses(
   }
   const allowPrivate = !(await isCloudEnabled(context.pool));
   for (const field of changed) {
+    // A name that does not resolve yet is accepted: an administrator may
+    // configure the provider before its DNS exists, and the fetch-time check
+    // still refuses it until it does.
     const checked = await context.checkOutboundUrl(next[field] as string, {
       allowPrivate,
+      allowUnresolved: true,
     });
     if (!checked.ok) {
       throw new SSOConnectionRejected({ field, message: checked.detail });

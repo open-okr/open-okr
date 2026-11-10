@@ -127,6 +127,31 @@ describe("checking a URL before fetching it", () => {
     }
   });
 
+  it("accepts a name that does not resolve only when asked to, and still refuses a private answer", async () => {
+    const none = async () => [];
+    const strict = await checkUrl("https://idp.example/sso", { resolve: none });
+    expect(strict.ok).toBe(false);
+    if (!strict.ok) {
+      expect(strict.refusal).toBe("unreachable");
+    }
+
+    const lenient = await checkUrl("https://idp.example/sso", {
+      resolve: none,
+      allowUnresolved: true,
+    });
+    expect(lenient.ok).toBe(true);
+
+    const privateAnswer = await checkUrl("https://idp.example/sso", {
+      resolve: async () => ["10.0.0.5"],
+      allowUnresolved: true,
+    });
+    expect(privateAnswer.ok).toBe(false);
+    const literal = await checkUrl("https://10.0.0.5/sso", {
+      allowUnresolved: true,
+    });
+    expect(literal.ok).toBe(false);
+  });
+
   it("refuses a literal IPv6 address that embeds a private IPv4 address", async () => {
     const outcome = await checkUrl("http://[::ffff:169.254.169.254]/", {
       resolve: async () => ["1.1.1.1"],

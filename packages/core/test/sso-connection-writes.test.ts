@@ -713,6 +713,22 @@ describe("adding a connection and minting a directory token are audited", () => 
       }),
     ).rejects.toMatchObject({ field: "tokenUrl" });
 
+    // A name that does not resolve yet must not block saving, so the check
+    // is asked to accept it.
+    const seen: boolean[] = [];
+    await callAction(
+      {
+        ...(await owner()),
+        checkOutboundUrl: async (_url, options) => {
+          seen.push(options.allowUnresolved === true);
+          return { ok: true } as const;
+        },
+      },
+      "sso.updateConnection",
+      { id: created.id, tokenUrl: "https://idp.example/token" },
+    );
+    expect(seen).toEqual([true]);
+
     // An edit that leaves the addresses alone never asks the guard.
     const renamed = await callAction(
       {
