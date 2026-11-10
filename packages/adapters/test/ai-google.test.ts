@@ -253,3 +253,40 @@ describe("capabilities and stop", () => {
     await expect(provider.stop()).resolves.toBeUndefined();
   });
 });
+
+describe("the real client", () => {
+  /**
+   * SDK 3.0 moved the Gemini API's default from `v1beta` to `v1` and lets
+   * `GOOGLE_GENAI_API_VERSION` choose it. System instructions, function
+   * tools and `responseJsonSchema` were built and shipped against `v1beta`,
+   * so the driver names it, and an environment variable cannot move it.
+   */
+  it("calls v1beta on the Gemini API whatever the environment says", async () => {
+    vi.stubEnv("GOOGLE_GENAI_API_VERSION", "v1");
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          candidates: [{ content: { role: "model", parts: [{ text: "ok" }] } }],
+          usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetch);
+    try {
+      const provider = new GoogleProvider({ apiKey: "test-key" });
+      await provider.chat({
+        model: "gemini-2.5-flash",
+        messages: [{ role: "user", content: "hi" }],
+      });
+
+      const url = String(fetch.mock.calls[0]?.[0]);
+      expect(url).toMatch(
+        /^https:\/\/generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-2\.5-flash:generateContent/,
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+    }
+  });
+});
