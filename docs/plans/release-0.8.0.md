@@ -2,12 +2,13 @@
 
 Owner: Akmal. Started 10 November 2026, the day 0.7.0 was published, against `main` at `8058c955`.
 
-This plan grows as changes are named for 0.8.0. So far it holds four things:
+This plan grows as changes are named for 0.8.0. So far it holds five things:
 
 1. **Carried from 0.7.0**: the second half of a change that has to span two releases. Section 1.
 2. **Your account**: a page where a person sees and changes what is theirs, and an avatar menu that says who is signed in. Section 2. Asked for by Akmal on 10 November 2026: name, email, username, password and timezone in one place, and the menu naming the person and their role. Akmal answered its five questions the same day (section 2.3). Nothing is built yet.
 3. **Found running OKRGoal**: three faults found on 10 November 2026 while finding out why the copilot on OKRGoal said "AI off". Section 3. One waits on a decision (Q6).
 4. **A demo instance says so**: a Demo pill on sign-in and in the top bar. Section 4. Asked for by Akmal on 10 November 2026.
+5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Two decisions (Q7, Q8).
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. A row marked **design first** needs its design note written or updated, and approved with "design approved", before any code, because it touches security, access, tenant isolation, a new engine or the schema.
 
@@ -128,16 +129,51 @@ Today the only sign that an instance is a demonstration is the persona panel on 
 
 The specification gains it in UIUX-PLAN §3 (the top bar) and S-35 (sign-in), and `docs/install/demo.md` says what the flag now shows.
 
-## 5. Suggested order
+## 5. Which version is running, and whether a newer one exists
+
+### 5.1 What exists
+
+The version footer shipped in 0.5.0 (`docs/design/version-footer.md`). The footer band at the foot of every signed-in screen shows `vX.Y.Z` on the right, and beside it a "vX.Y.Z available" link to the GitHub release when the instance is behind. Two decisions of 2 November 2026 decide who sees it, and between them they hide it on all three OKRGoal instances:
+
+| Decision (design §1) | Effect |
+|---|---|
+| Only members with `full` on the workspace see a version. A version string is reconnaissance, so nobody else sees one | A member, a viewer or a guest sees no version. On a demo nobody sees one, because every persona is a member and only the demo's owner account is an administrator |
+| A managed cloud shows the running version only, with no check and no notice, because the operator upgrades, not the customer | Nobody on a cloud is ever told a newer release exists, the operator included. The operator console shows no version at all |
+
+The footer reads `apps/web/lib/version-footer.tsx` (the `full` gate and the cloud rule) and `apps/web/lib/update-check.ts` (one request a day to GitHub's public release API, carrying nothing about the instance).
+
+### 5.2 Changes
+
+| # | Change | Size | Gate |
+|---|---|---|---|
+| V1 | **Every signed-in member sees the running version** in the footer band, as `vX.Y.Z`. The "vX.Y.Z available" link stays for administrators only, because only they can act on it. Signed-out pages still show no version. The unit test that asserts a member sees none (`apps/web/test/version-footer.test.ts`, "is nothing for a member without full access") changes with it | S | Q7 |
+| V2 | **A cloud's operator sees which release is newest.** The operator console's Instance screen (S-47) shows the running version and, when a newer release exists, a chip linking to the release and to the upgrade notes in `docs/runbooks/upgrade.md`. The check runs for the operator only: a customer on a cloud still sees no notice. `instance.updateCheck` and `OPENOKR_UPDATE_CHECK` keep their meaning, and on a cloud they now switch the operator's check rather than being ignored | S | Q8 |
+
+### 5.3 Decisions
+
+| # | Question | Options | Recommended |
+|---|---|---|---|
+| Q7 | Who sees the running version? | **(a)** Every signed-in member, the update link for administrators only (V1). **(b)** As today, administrators only. **(c)** Everybody, signed-out pages included | **(a).** A signed-in member already knows which product they are using, and "which version are we on" is a fair question from anyone reporting a problem. (c) gives the version to anybody scanning for instances behind a known fault, which is why it was hidden in the first place |
+| Q8 | Should a cloud's operator be told a newer release exists? | **(a)** Yes, on the console's Instance screen (V2). **(b)** As today, nobody on a cloud | **(a).** The design kept the notice from customers because they cannot upgrade; the operator can, and today learns of a release only from GitHub |
+
+### 5.4 What the specification gains when these are built
+
+| Row | Pages |
+|---|---|
+| V1 | `docs/design/version-footer.md` §1 and §3; UIUX-PLAN §3, the footer band |
+| V2 | `docs/design/version-footer.md` §1; UIUX-PLAN §6, S-47; TECHNICAL-PLAN §4.14, what `instance.updateCheck` switches on a cloud |
+
+## 6. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. O3 and O1. Both are small, need no design, and fix what a running cloud instance gets wrong today.
 3. Y1, Y2 and D1. They need no design, and they answer "who am I signed in as", "where do I change my details" and "is this a demo".
 4. The design for Y3 to Y6, then the code, one row each.
 5. Q6, then O2's design and code.
-6. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
+6. Q7 and Q8, then V1 and V2. Both are small once decided.
+7. The design for Y7 and Akmal's answers to its questions, then the code. Last, because it is the largest and the only one that cannot be undone.
 
-## 6. Build log
+## 7. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -155,5 +191,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | O2 | to do | Design first; waits on Q6 |
 | O3 | to do | |
 | D1 | to do | |
+| V1 | to do | Waits on Q7 |
+| V2 | to do | Waits on Q8 |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Q6 | yours | Section 3.2 |
+| Q7, Q8 | yours | Section 5.3 |
