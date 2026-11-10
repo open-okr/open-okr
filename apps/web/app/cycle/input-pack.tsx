@@ -201,12 +201,17 @@ export async function InputPack({
         </CardBody>
       </Card>
 
-      <div className="grid gap-4.5 md:grid-cols-2">
+      {/* Stacked at every width (plan 0.8.0 L1). Side by side, Roles held two
+          short entries in half the width and stood mostly empty, while the
+          timeline's Activity column was squeezed to two or three words a
+          line. Full width, the two roles sit side by side inside their card
+          and the timeline gets the room it needs. */}
+      <div className="grid gap-4.5" data-testid="roles-and-timeline">
         <Card>
           <CardHeader>
             <h2 className="text-sm font-bold text-ink">{t("common.roles")}</h2>
           </CardHeader>
-          <CardBody className="flex flex-col gap-2.5 text-sm">
+          <CardBody className="grid gap-2.5 text-sm sm:grid-cols-2">
             <div className="flex flex-col">
               <span className="font-semibold text-ink">
                 {sponsor?.name ?? t("cycle.inputPack.noSponsorNamed")}
@@ -236,7 +241,10 @@ export async function InputPack({
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-line border-b">
-                  <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
+                  {/* A fixed share that may wrap, so the longest entry ("Weeks
+                      1 to 2 of the quarter") no longer sets the width and
+                      Activity takes the rest. */}
+                  <th className="w-1/4 px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
                     {t("cycle.inputPack.weeksBefore")}
                   </th>
                   <th className="px-3.5 py-1.5 text-left text-xs font-bold tracking-wide text-ink-3 uppercase">
@@ -250,7 +258,7 @@ export async function InputPack({
                     key={row.weeksBefore}
                     className="border-line border-b last:border-0"
                   >
-                    <td className="px-3.5 py-2 align-top whitespace-nowrap text-xs font-semibold text-ink-3">
+                    <td className="px-3.5 py-2 align-top text-xs font-semibold text-ink-3">
                       {row.weeksBefore}
                     </td>
                     <td className="px-3.5 py-2 text-ink-2">{row.activity}</td>
