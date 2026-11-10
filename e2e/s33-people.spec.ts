@@ -493,10 +493,8 @@ test("a theme follows the member to another browser", async ({ browser }) => {
   await second.close();
 
   // Back to following the system, so every spec after this one meets the
-  // instance it expects.
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // instance it expects. On Your account, where Y2 moved the control.
+  await goTo(page, "/account");
   await page.getByTestId("theme-system").first().click();
   await expect(page.getByTestId("theme-system").first()).toHaveAttribute(
     "aria-pressed",
@@ -617,10 +615,9 @@ test("a member's language reaches the document", async () => {
   await goTo(page, "/");
   await expect(page.locator("html")).toHaveAttribute("lang", "ms");
 
-  // And back, so the instance is as it was for whatever spec runs next.
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // And back, so the instance is as it was for whatever spec runs next. Left
+  // in Malay, every later spec that finds a field by its English label fails.
+  await goTo(page, "/account");
   await page.getByTestId("language-en").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en", {
     timeout: 15_000,

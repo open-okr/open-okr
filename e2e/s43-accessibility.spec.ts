@@ -141,12 +141,17 @@ const DETAIL: Readonly<Record<string, string>> = {
 };
 
 /**
- * The two screens a visitor meets before signing in, scanned signed out.
+ * The screens a visitor meets before signing in, scanned signed out.
  *
  * Every spec signs in through `/sign-in`, which made it the most visited page
- * in the suite and one this file never scanned.
+ * in the suite and one this file never scanned. `/email-confirmed` is where a
+ * sign-up's confirmation link lands, with no session (plan 0.8.0 S2).
  */
-const SIGNED_OUT: readonly string[] = ["/sign-in", "/forgot-password"];
+const SIGNED_OUT: readonly string[] = [
+  "/sign-in",
+  "/forgot-password",
+  "/email-confirmed",
+];
 
 /** Screens drawn without the application shell, for a room rather than a desk. */
 const FOCUS_SCREENS: readonly string[] = ["/session/"];
