@@ -22,6 +22,7 @@ import {
   withContext,
   withWorkspace,
   workspaceMembers,
+  workspaceRoles,
 } from "@openokr/db";
 import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
 import {
@@ -1127,6 +1128,13 @@ const memberProfile = z.object({
    * text is rendered there.
    */
   language: z.enum(["en", "ms"]).nullable(),
+  /**
+   * The name of this member's workspace role: Owner, Admin, Member, Viewer or
+   * one the workspace made (plan 0.8.0 Y1). Null for a guest, an agent and a
+   * placeholder, which hold no workspace-wide role. The avatar menu says it
+   * beside the person's name, so they know what they should expect to do.
+   */
+  roleName: z.string().nullable(),
 });
 
 /**
@@ -1169,8 +1177,17 @@ export const readMember = defineReadAction({
             theme: workspaceMembers.theme,
             density: workspaceMembers.density,
             language: workspaceMembers.language,
+            roleName: workspaceRoles.name,
           })
           .from(workspaceMembers)
+          // A removed role names nothing, as no role does.
+          .leftJoin(
+            workspaceRoles,
+            and(
+              eq(workspaceRoles.id, workspaceMembers.roleId),
+              isNull(workspaceRoles.deletedAt),
+            ),
+          )
           .where(
             activeOnly(
               workspaceMembers,

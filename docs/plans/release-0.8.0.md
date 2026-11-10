@@ -382,7 +382,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | Row | Status | Note |
 |---|---|---|
 | C1 | design written | Building it found that the refusal as written strands an operator who skipped data change 0034 and fails the nightly upgrade rehearsal. `docs/design/short-ids.md`, "The 0.8.0 step": options A, B, C, recommended A (the migrator runs a data change a migration names, first). Waits for C1-Q1 and "design approved" |
-| Y1 | to do | |
+| Y1 | done | The circle is the person's picture or initials and its name theirs; the menu opens with their name, email and role (`people.readMember` gains `roleName`), with Guest, Demo account or Support access, linking to Your account. Unit, core and browser tests (`s03b-account-menu.spec.ts`) |
 | Y2 | done | `/account`, screen S-51, first in the avatar menu (registry `account-profile`). The picture, profile and appearance forms moved from the person's own `/people/<id>`, which gains Edit your profile. Name, title and manager read only until Y5; email shown, password via Security until Y3 and Y4. `s33-people.spec.ts` follows the forms |
 | Y3 | to do | |
 | Y4 | to do | |

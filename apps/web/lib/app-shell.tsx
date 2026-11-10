@@ -2,7 +2,9 @@ import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
   callAction,
+  DEMO_PERSONAS,
   hasPlanScreen,
+  liveSupportSession,
   mayCreateOwnWorkspace,
   navigationFor,
   OperationError,
@@ -26,7 +28,7 @@ import { Ellipsis } from "lucide-react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { AvatarMenu } from "../app/avatar-menu.tsx";
+import { type AccountBadge, AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
 import {
@@ -111,6 +113,33 @@ function activeItemId(
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * The mark beside the role in the avatar menu (plan 0.8.0 Y1), where it changes
+ * what the person should expect: an operator inside a support session, a
+ * guest, or an account `pnpm demo:prepare` made, whose address is one of the
+ * personas' and can belong to nobody else (`@northwind.example`, RFC 2606).
+ */
+async function accountBadge(
+  workspaceId: string,
+  userId: string,
+  email: string,
+  kind: string,
+): Promise<AccountBadge | null> {
+  const support = await liveSupportSession(getPool(), workspaceId).catch(
+    () => null,
+  );
+  if (support?.operatorUserId === userId) {
+    return "support";
+  }
+  if (kind === "guest") {
+    return "guest";
+  }
+  if (DEMO_PERSONAS.some((persona) => persona.email === email)) {
+    return "demo";
+  }
+  return null;
 }
 
 export async function AppShellLayout({
@@ -461,7 +490,25 @@ export async function AppShellLayout({
               askAi={<CopilotPanel initialAvailability={copilot} />}
               avatarMenu={
                 <AvatarMenu
-                  name={workspace.name}
+                  // The person, not the workspace (plan 0.8.0 Y1): the circle
+                  // drew the workspace's initials and nothing said who was
+                  // signed in. The workspace's name stays in the breadcrumb.
+                  name={me.name}
+                  avatarUrl={
+                    me.avatarBlobId
+                      ? `/api/blobs/${me.avatarBlobId}/thumbnail`
+                      : null
+                  }
+                  email={session.user.email}
+                  roleName={me.roleName}
+                  badge={
+                    await accountBadge(
+                      workspace.workspaceId,
+                      session.user.id,
+                      session.user.email,
+                      me.kind,
+                    )
+                  }
                   sourceUrl={await resolveSourceUrl(getPool())}
                   // From the registry rather than a literal list. A literal one
                   // is how /account/channels shipped unlinked at P5-T02c and how

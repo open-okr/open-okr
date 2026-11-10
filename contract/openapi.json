@@ -3710,6 +3710,12 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "roleName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -3726,7 +3732,8 @@
                         "primaryChannel",
                         "theme",
                         "density",
-                        "language"
+                        "language",
+                        "roleName"
                       ],
                       "additionalProperties": false
                     }

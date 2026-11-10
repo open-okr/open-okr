@@ -254,6 +254,32 @@ describe("suspend and restore", () => {
   });
 });
 
+describe("reading a member's profile", () => {
+  // Plan 0.8.0 Y1: the avatar menu names the person's role beside them.
+  it("names the member's workspace role, and none once they are a guest", async () => {
+    const wb = await workerDb();
+    const owner = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: ownerMemberId },
+    );
+    expect(owner.roleName).toBe("Owner");
+
+    const member = await addMember("Member");
+    await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.convertToGuest",
+      { memberId: member },
+    );
+    const guest = await callAction(
+      { pool: wb.appPool, ...context(OWNER) },
+      "people.readMember",
+      { memberId: member },
+    );
+    expect(guest.roleName).toBeNull();
+  });
+});
+
 describe("converting to guest", () => {
   it("leaves no stale binding", async () => {
     const wb = await workerDb();
