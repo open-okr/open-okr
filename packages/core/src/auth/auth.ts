@@ -920,6 +920,29 @@ export function createAuth(options: AuthOptions) {
            * registration by not knowing about the rule.
            */
           before: async (user, hookContext) => {
+            // **The account that claims the instance is admitted whatever
+            // the policy says** (docs/design/registration-policy.md §10 D17,
+            // plan 0.8.0 H3). Unclaimed is setup unfinished and no account,
+            // the same test the wizard's own guard reads. The setup wizard's
+            // sign-up is the claim, so a policy that refused it, such as
+            // `OPENOKR_REGISTRATION=invite_only` set before the first run,
+            // left an instance nobody could ever claim. A closed policy means
+            // closed behind the owner, and governs every account after this
+            // one. Whoever reaches an unclaimed instance first claims it,
+            // which is the rule with no policy too (D18).
+            //
+            // **And it arrives verified** (UAT BUG-028). The setup wizard
+            // signs up and finishes setup in one go, which needs a session.
+            // With mail configured before the first run, verification is
+            // required, so the sign-up gave no session, setup could not
+            // finish, and every later sign-in was refused as unverified.
+            // Whoever runs the wizard is the operator who deployed it, so
+            // there is nobody to prove the address to.
+            const setup = await readSetupState(options.pool);
+            if (!setup.configured && !setup.hasUser) {
+              return { data: { ...user, emailVerified: true } };
+            }
+
             // **An invitation is the exception, and the only one** (P6-G06b).
             // A closed instance was closed to everybody, including the person
             // an administrator had just invited, so every invitation issued
@@ -991,17 +1014,6 @@ export function createAuth(options: AuthOptions) {
             );
             if (refusal !== null) {
               throw new APIError("FORBIDDEN", { message: refusal });
-            }
-            // **The account that claims the instance arrives verified** (UAT
-            // BUG-028). The setup wizard signs up and finishes setup in one
-            // go, which needs a session. With mail configured before the
-            // first run, verification is required, so the sign-up gave no
-            // session, setup could not finish, and every later sign-in was
-            // refused as unverified. Whoever runs the wizard is the operator
-            // who deployed it, so there is nobody to prove the address to.
-            const setup = await readSetupState(options.pool);
-            if (!setup.configured && !setup.hasUser) {
-              return { data: { ...user, emailVerified: true } };
             }
             return;
           },

@@ -180,6 +180,12 @@ export default defineConfig({
         DATABASE_URL: databaseUrl("openokr_e2e_wizard"),
         // The whole point of this instance: never set up.
         E2E_MARK_CONFIGURED: "0",
+        // Closed before the first run, as an operator who wants a private
+        // instance sets it. The wizard's own sign-up is the claim and is
+        // admitted whatever this says (registration-policy.md §10 D17, plan
+        // 0.8.0 H3); everybody after it needs an invitation, which the spec's
+        // "registration is closed" step reads.
+        OPENOKR_REGISTRATION: "invite_only",
         // Named by its deployment, as the public demo is (completeness review
         // M-33). Only the wizard spec runs against this server, so the name
         // changes what that spec reads and nothing else: every other spec

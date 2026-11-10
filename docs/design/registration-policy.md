@@ -199,9 +199,7 @@ wizard before 0.7.0. / From the deployment's environment variable.)
 
 ## 10. A closed policy must not stop the claim (release 0.8.0, H3)
 
-**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
-
-Status: design written 10 November 2026, waiting for "design approved".
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended. Built on 11 November 2026 as designed: the unclaimed check is the first thing `user.create.before` does, ahead of the directory, identity-provider and invitation exceptions as well as the policy, and D19's pin is `apps/web/test/setup-account-form.test.tsx`. Beyond §10.4, the end-to-end wizard server now runs with `OPENOKR_REGISTRATION=invite_only`, so `e2e/first-run-wizard.spec.ts` claims a closed instance in a browser and still finds sign-up closed behind the owner.
 
 ### 10.1 What is wrong
 
@@ -240,4 +238,4 @@ A variable that closes registration means "closed behind the owner", which is wh
 
 ### 10.5 Question for Akmal
 
-**H3-Q1. Should claiming an instance need a one-time setup code from the deployment?** Today the first person to reach `/setup` owns the instance, and certificate transparency logs publish a new hostname within minutes, which is why OKRGoal kept its new instances behind Cloudflare until claimed. A code printed by `./openokr up` and the Helm notes, asked for by the wizard, would close that. **Recommended: not in 0.8.0.** It is a new security mechanism with its own design, and D17 does not widen the exposure that exists today. Record it as a row for the next release.
+**H3-Q1. Should claiming an instance need a one-time setup code from the deployment?** Answered 11 November 2026: not in 0.8.0; a row for a later release. Today the first person to reach `/setup` owns the instance, and certificate transparency logs publish a new hostname within minutes, which is why OKRGoal kept its new instances behind Cloudflare until claimed. A code printed by `./openokr up` and the Helm notes, asked for by the wizard, would close that. **Recommended: not in 0.8.0.** It is a new security mechanism with its own design, and D17 does not widen the exposure that exists today. Record it as a row for the next release.

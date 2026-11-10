@@ -13,7 +13,7 @@ Install on [one server](compose.md) or [Kubernetes](kubernetes.md) as usual, the
 | Setting | Value | Why |
 |---|---|---|
 | `OPENOKR_CLOUD` | `true` | Brings the operator console, and keeps instance-wide settings away from each company's administrators |
-| `OPENOKR_REGISTRATION` | `invite_only` | Without it, and with no policy saved, turning the flag on opens sign-up to anybody who can reach the instance. Finishing the setup wizard saves Invitation only, which then wins over the variable |
+| `OPENOKR_REGISTRATION` | `invite_only` | Without it, and with no policy saved, turning the flag on opens sign-up to anybody who can reach the instance. Set it before the first run: the setup wizard's own account is admitted whatever it says, and everybody after needs an invitation |
 | `OPENOKR_CLOUD_PLANS` | Leave it unset | No plans means no seat limit and no plan screen |
 
 On one server, add these to `secrets/app.env` and run `./openokr up`. On Kubernetes,

@@ -79,7 +79,8 @@ instance:
   language: "en"
   telemetry: false
   # auto | open | company_domains | invite_only. A choice saved on Admin >
-  # General wins over this.
+  # General wins over this. The account the setup wizard creates is admitted
+  # whatever this says, so a closed policy closes behind the owner.
   registration: "auto"
   # Where every member is offered the source (AGPL-3.0 section 13). Empty means
   # upstream. If you changed the code and offer it over a network, name your own.
