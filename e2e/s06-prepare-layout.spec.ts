@@ -6,12 +6,14 @@
  * take the full width at every size.
  */
 import { expect, test } from "./fixtures.ts";
+import { goTo, signIn } from "./instance-account.ts";
 
 test("Roles sits above the Suggested timeline, both full width", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/cycle?phase=1");
+  await signIn(page);
+  await goTo(page, "/cycle?phase=1");
   const pair = page.getByTestId("roles-and-timeline");
   await expect(pair).toBeVisible();
 
