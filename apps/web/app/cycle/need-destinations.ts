@@ -5,24 +5,25 @@ import type { NeedKey, PhaseNeed } from "@openokr/method";
  *
  * A record over every key, so a key the method package adds without a place
  * here is a type error rather than an item that leads nowhere. `level` is what
- * the destination card is drawn with on the cycle page: `full` for the cards
- * only an owner sees or can change, `edit` for the rest.
+ * the destination card is drawn with on the cycle page: `setup` for the cards
+ * only somebody who can set up the cycle, an Owner or an Admin, sees or can
+ * change (plan 0.8.0 R1), `edit` for the rest.
  */
 const DESTINATIONS: Record<
   NeedKey,
-  { readonly anchor: string; readonly level: "edit" | "full" }
+  { readonly anchor: string; readonly level: "edit" | "setup" }
 > = {
-  "frame.missing": { anchor: "need-frame", level: "full" },
-  "frame.mission": { anchor: "need-frame", level: "full" },
-  "frame.strategy": { anchor: "need-frame", level: "full" },
-  "frame.strategyCount": { anchor: "need-frame", level: "full" },
-  "company.objective": { anchor: "need-annual-objectives", level: "full" },
-  "role.sponsor": { anchor: "need-roles", level: "full" },
-  "role.facilitator": { anchor: "need-roles", level: "full" },
+  "frame.missing": { anchor: "need-frame", level: "setup" },
+  "frame.mission": { anchor: "need-frame", level: "setup" },
+  "frame.strategy": { anchor: "need-frame", level: "setup" },
+  "frame.strategyCount": { anchor: "need-frame", level: "setup" },
+  "company.objective": { anchor: "need-annual-objectives", level: "setup" },
+  "role.sponsor": { anchor: "need-roles", level: "setup" },
+  "role.facilitator": { anchor: "need-roles", level: "setup" },
   "pack.item": { anchor: "need-input-pack", level: "edit" },
   "pack.distribute": { anchor: "pack-distribute", level: "edit" },
-  "sessions.dates": { anchor: "need-roles", level: "full" },
-  "pack.lead": { anchor: "need-roles", level: "full" },
+  "sessions.dates": { anchor: "need-roles", level: "setup" },
+  "pack.lead": { anchor: "need-roles", level: "setup" },
   "prior.scores": { anchor: "need-diagnose", level: "edit" },
   "prior.unscored": { anchor: "need-diagnose", level: "edit" },
   "baseline.health": { anchor: "need-baseline", level: "edit" },
@@ -40,23 +41,23 @@ const DESTINATIONS: Record<
   "drafting.none": { anchor: "need-drafting", level: "edit" },
   "goal.quality": { anchor: "need-drafting", level: "edit" },
   gate: { anchor: "need-gates", level: "edit" },
-  publish: { anchor: "need-gates", level: "full" },
+  publish: { anchor: "need-gates", level: "setup" },
   "cadence.booking": { anchor: "need-cadence", level: "edit" },
   "cadence.decision": { anchor: "need-cadence", level: "edit" },
-  scores: { anchor: "need-review", level: "full" },
-  retrospective: { anchor: "need-review", level: "full" },
+  scores: { anchor: "need-review", level: "setup" },
+  retrospective: { anchor: "need-review", level: "setup" },
 };
 
 export type NeedDestination =
   | {
       readonly kind: "anchor";
       readonly anchor: string;
-      readonly level: "edit" | "full";
+      readonly level: "edit" | "setup";
     }
   | {
       readonly kind: "page";
       readonly href: string;
-      readonly level: "edit" | "full";
+      readonly level: "edit" | "setup";
     };
 
 /** Where this item is filled in: a card on the cycle page, or another page. */

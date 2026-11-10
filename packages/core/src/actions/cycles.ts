@@ -74,7 +74,11 @@ import {
 import { ADDRESS } from "../ids/address.ts";
 import { assertLegacyKeyFree, legacyKey } from "../imports/legacy.ts";
 import { recomputeKpisFollowingWorkspace } from "../kpis/service.ts";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  OperationError,
+  type OperationTx,
+  writeFloorFor,
+} from "../operations/operation.ts";
 import {
   readOf,
   readsEveryChange,
@@ -427,6 +431,40 @@ export const readCurrentCycle = defineReadAction({
   },
 });
 
+/**
+ * Whether the caller may set up and run a cycle: create it, name its roles,
+ * book its sessions, set the annual frame, publish and close
+ * (docs/design/workspace-roles.md §12, plan 0.8.0 R1).
+ *
+ * The cycle page draws those controls on this rather than on its own level,
+ * because the page's level comes from the workspace context, where every
+ * member holds `edit` for self-service. The answer comes from the floor the
+ * writes themselves run, so the two cannot disagree.
+ */
+export const readCycleSetupAccess = defineReadAction({
+  name: "cycles.setupAccess",
+  summary:
+    "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+  input: z.object({}),
+  output: z.object({ canSetUp: z.boolean() }),
+  async handler(context) {
+    const level = await withContext(
+      drizzle(context.pool),
+      {
+        workspaceId: context.workspaceId,
+        ...(context.actor.userId ? { userId: context.actor.userId } : {}),
+      },
+      (tx) =>
+        writeFloorFor(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          actor: context.actor,
+          domain: "workspace",
+        }),
+    );
+    return { canSetUp: level >= ACCESS_LEVELS.edit };
+  },
+});
+
 export const ensureCurrentCycle = defineWriteAction({
   name: "cycles.ensureCurrent",
   summary:
@@ -554,7 +592,11 @@ export const createCycle = defineWriteAction({
     asOf: z.string().regex(LOCAL_DATE_PATTERN).optional(),
   }),
   output: cycleOutput,
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       await assertLegacyKeyFree(tx, workspaceId, cycles, input.legacy, "cycle");
@@ -674,7 +716,11 @@ export const setCycleClosing = defineWriteAction({
     "Starts closing a cycle before its end, or takes that back while the end has not passed. Closing moves the phase pointer to 7.",
   input: z.object({ cycleId: ADDRESS.cycle, closing: z.boolean() }),
   output: z.object({ id: z.uuid(), status: z.string(), phase: z.number() }),
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       const [cycle] = await tx
@@ -812,7 +858,11 @@ export const updateCycle = defineWriteAction({
     })
     .refine(...readsEveryChange(CYCLE_READ)),
   output: cycleOutput,
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId }) {
       if (input.sponsorId) {
@@ -1552,7 +1602,11 @@ export const setAnnualFrame = defineWriteAction({
     cycleId: ADDRESS.cycle.optional(),
   }),
   output: frameOutput,
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   operation: (_context, input) => ({
     async execute({ tx, workspaceId, actor }) {
       if (input.cycleId) {
@@ -2175,7 +2229,11 @@ export const closeCycle = defineWriteAction({
       .extend({ cycleId: z.uuid(), name: z.string() })
       .nullable(),
   }),
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   // Destructive scope (docs/design/irreversible-scope.md, plan 0.7.0 O6,
   // approved 9 November 2026): it fixes every space's result for good.
   safety: "destructive",

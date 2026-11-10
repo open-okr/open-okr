@@ -398,11 +398,15 @@ the workspace domain, and the self-service binding is not consulted for them.
 workspace row stays `edit`, so an Admin still cannot reach the settings, the
 plan, the roles or the handover, which ask `full`.
 
-**The screen asks core, not the level.** `workflow.read` gains `canSetUp`,
-computed by the same floor function the write runs (`floorLevel` in
-`packages/core/src/operations/operation.ts`, exported for this). The cycle page
-draws the Roles and planning sessions card and the create and deadline card on
-it, in place of `level >= full`, so the page and the server cannot disagree. F1's
+**The screen asks core, not the level.** A read of its own, `cycles.setupAccess`,
+answers `canSetUp` from the same floor the writes run (`writeFloorFor` in
+`packages/core/src/operations/operation.ts`, beside `floorLevel`). It is its own
+read rather than a field on `workflow.read`, as first proposed, because the page
+needs the answer before any cycle exists, to draw the create. The cycle page
+draws the Roles and planning sessions card, the annual frame and objectives, the
+publish and close controls, and the create and deadline card on it, in place of
+`level >= full`, so the page and the server cannot disagree. The archive control
+is drawn on `full`, as R1-Q3 decided. F1's
 destinations at `full` read it too, and its sentence for a reader who cannot act
 becomes "An Owner or an Admin fills this in."
 
@@ -451,7 +455,7 @@ And for the Member it is not drawn, and "Still needed here" says
 | Test | Kind |
 |---|---|
 | Every actor in the table above, for each action that moves, allowed or refused | Core, against a real database, `packages/core/test/cycle-setup-access.test.ts` |
-| `canSetUp` from `workflow.read` agrees with the write for every actor in the table | Same file |
+| `canSetUp` from `cycles.setupAccess` agrees with the write for every actor in the table | Same file |
 | The moved actions are listed under the `workspace` domain | `write-floor-classification.test.ts`, the existing walk of the registry |
 | The page draws the setup cards on `canSetUp`, and F1's sentence | Unit, `apps/web/test` |
 | An Admin made through the suite's helpers (`joinAsNewcomer`, `makeAdministrator` in `e2e/hosting.ts`) names a sponsor on `/cycle` | End to end, `e2e/s04b-admin-sets-up-cycle.spec.ts` |

@@ -4918,6 +4918,21 @@
       "example": {}
     },
     {
+      "name": "cycles.setupAccess",
+      "description": "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "cycles.ensureCurrent",
       "description": "Creates the cycle containing today if the workspace has none. Idempotent.",
       "inputSchema": {

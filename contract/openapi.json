@@ -25141,6 +25141,73 @@
         ]
       }
     },
+    "/cycles/setupAccess": {
+      "get": {
+        "operationId": "cycles.setupAccess",
+        "summary": "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+        "tags": [
+          "cycles"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "canSetUp": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "canSetUp"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
     "/cycles/ensureCurrent": {
       "post": {
         "operationId": "cycles.ensureCurrent",

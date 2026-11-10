@@ -28,9 +28,9 @@ describe("needDestination", () => {
     ).toEqual({ kind: "page", href: "/goals/g-1", level: "edit" });
   });
 
-  test("the roles are the owner's to fill", () => {
+  test("the roles are for whoever can set up the cycle (plan 0.8.0 R1)", () => {
     expect(needDestination({ key: "role.sponsor", text: "x" }).level).toBe(
-      "full",
+      "setup",
     );
   });
 });

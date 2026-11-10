@@ -1368,7 +1368,11 @@ export const publishCycle = defineWriteAction({
     /** Gates at warn that were not green, shown and not held to. */
     warnedGates: z.array(z.number().int()),
   }),
-  access: ACCESS_LEVELS.full,
+  // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+  // plan 0.8.0 R1). Measured on the role's workspace level, not on the
+  // workspace context, where every member holds edit for self-service.
+  access: ACCESS_LEVELS.edit,
+  domain: "workspace",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       // Re-evaluated, never read from `cycle_gate_state`. A stored gate row is a

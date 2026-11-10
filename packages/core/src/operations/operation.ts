@@ -307,6 +307,38 @@ export interface OperationDeps {
  * kind of check that gets forgotten exactly once.
  */
 /**
+ * The level a write declaring `domain` and naming no subject would be measured
+ * at for this actor (docs/design/workspace-roles.md §12, plan 0.8.0 R1).
+ *
+ * For a screen that draws a control only when the write behind it would pass,
+ * so the screen and the write answer with one rule rather than two. Zero for
+ * anybody `resolveActor` refuses.
+ */
+export async function writeFloorFor(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly actor: ActorInput;
+    readonly domain: RoleDomain;
+  },
+): Promise<number> {
+  let actor: ResolvedActor;
+  try {
+    actor = await resolveActor(tx, input.workspaceId, input.actor);
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return 0;
+    }
+    throw error;
+  }
+  return floorLevel(
+    tx,
+    { workspaceId: input.workspaceId, domain: input.domain },
+    actor,
+  );
+}
+
+/**
  * The level the floor compares against (P6-G13c).
  *
  * The actor's own resolved level is the workspace one and stays on

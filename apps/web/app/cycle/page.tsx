@@ -115,7 +115,12 @@ export default async function CyclePage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
-  const canPublish = level >= ACCESS_LEVELS.full;
+  // Archiving a cycle stays with the Owner (workspace-roles.md §12, R1-Q3).
+  const canArchive = level >= ACCESS_LEVELS.full;
+  // Setting up and running a cycle is the Owner's and an Admin's (plan 0.8.0
+  // R1). Asked of the server, because the page's own level comes from the
+  // workspace context, where every member holds edit for self-service.
+  const { canSetUp } = await callAction(context, "cycles.setupAccess", {});
 
   const query = await searchParams;
   const everyCycle = await callAction(context, "cycles.list", {});
@@ -162,9 +167,9 @@ export default async function CyclePage({
                 ? t("cycle.theAnnualCycleHolds")
                 : t("cycle.thisWorkspaceHasNo")}
             </p>
-            {canPublish ? null : (
+            {canSetUp ? null : (
               <p className="text-xs text-ink-3">
-                {t("cycle.creatingACycleNeedsFullAccess")}
+                {t("cycle.creatingACycleNeedsSetUp")}
               </p>
             )}
           </CardBody>
@@ -177,8 +182,9 @@ export default async function CyclePage({
          * is no cycle already is (P6-G27b), and it makes the horizon the
          * reader is looking at (M-06).
          */}
-        {canPublish ? (
+        {canSetUp ? (
           <CycleAdmin
+            canArchive={canArchive}
             mode={mode}
             currentCycleId={null}
             currentName={null}
@@ -417,7 +423,7 @@ export default async function CyclePage({
   // The people a phase 1 role can name, read only there. Agents and
   // placeholders are not people who can sponsor or facilitate (H-09).
   const people =
-    viewing === 1 && canPublish
+    viewing === 1 && canSetUp
       ? (await callAction(context, "people.directory", {}))
           .filter(
             (member) => member.kind === "human" || member.kind === "guest",
@@ -583,14 +589,14 @@ export default async function CyclePage({
                     // can fill it when this reader cannot (plan 0.8.0 F1).
                     const place = needDestination(need);
                     const permitted =
-                      place.level === "full" ? canPublish : canEdit;
+                      place.level === "setup" ? canSetUp : canEdit;
                     return (
                       <li key={reason}>
                         {!permitted ? (
                           <>
                             {text}{" "}
                             <span className="text-ink-3">
-                              {place.level === "full"
+                              {place.level === "setup"
                                 ? t("cycle.need.ownerFills")
                                 : t("cycle.need.editorFills")}
                             </span>
@@ -635,7 +641,7 @@ export default async function CyclePage({
             </div>
           ) : null}
 
-          {viewing === 1 && canPublish ? (
+          {viewing === 1 && canSetUp ? (
             <div id="need-roles" className="scroll-mt-20">
               <CycleSetup
                 cycleId={workflow.cycleId}
@@ -750,7 +756,7 @@ export default async function CyclePage({
                 publishable={workflow.publishable}
                 publishedAt={workflow.publishedAt}
                 companyPublishedAt={workflow.companyPublishedAt}
-                canPublish={canPublish}
+                canPublish={canSetUp}
                 pinnedCycleId={pinnedCycleId}
               />
             </div>
@@ -791,7 +797,7 @@ export default async function CyclePage({
             <div id="need-frame" className="scroll-mt-20">
               <AnnualFrame
                 frame={frame}
-                canEdit={canPublish}
+                canEdit={canSetUp}
                 cycle={{ id: cycle.id, mode: workflow.mode }}
               />
             </div>
@@ -802,7 +808,7 @@ export default async function CyclePage({
               <AnnualObjectives
                 strategies={frame?.strategies ?? []}
                 objectives={annualObjectives}
-                canEdit={canPublish}
+                canEdit={canSetUp}
                 // The reader champions and reviews what they send forward. A
                 // picker here would be a second drafting form on a phase that
                 // is not the drafting phase; the goal page is where either is
@@ -883,8 +889,9 @@ export default async function CyclePage({
                   ...(phase?.missing ?? []),
                   ...(phase?.blocked ?? []),
                 ]}
-                // `full`, which is what `cycles.close` requires.
-                canEdit={canPublish}
+                // Whoever can set up the cycle, which is what `cycles.close`
+                // requires (plan 0.8.0 R1).
+                canEdit={canSetUp}
                 thresholds={reviewThresholds}
                 practice={reviewPractice ?? defaultPractice()}
               />
@@ -983,8 +990,9 @@ export default async function CyclePage({
            * the column beside it, which is the defect P6-G11b shipped on the
            * goal page and P6-G24b's own suite caught here within the hour.
            */}
-          {canPublish ? (
+          {canSetUp ? (
             <CycleAdmin
+              canArchive={canArchive}
               mode={workflow.mode}
               currentCycleId={cycle.id}
               currentName={cycle.name}

@@ -4608,6 +4608,16 @@
       "pages": false
     },
     {
+      "name": "cycles setupAccess",
+      "action": "cycles.setupAccess",
+      "method": "GET",
+      "path": "/cycles/setupAccess",
+      "scope": "read",
+      "summary": "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "cycles ensureCurrent",
       "action": "cycles.ensureCurrent",
       "method": "POST",

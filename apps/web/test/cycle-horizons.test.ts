@@ -55,7 +55,9 @@ describe("opening a cycle", () => {
   test("an empty horizon says so and offers the create", () => {
     expect(page).toContain("No annual cycle yet");
     // The create in an empty horizon makes that horizon's cycle.
-    expect(page).toMatch(/<CycleAdmin\s+mode=\{mode\}/);
+    expect(page).toMatch(
+      /<CycleAdmin\s+canArchive=\{canArchive\}\s+mode=\{mode\}/,
+    );
   });
 });
 

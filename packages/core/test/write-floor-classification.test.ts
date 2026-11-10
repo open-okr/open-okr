@@ -200,7 +200,7 @@ describe("writes below full", () => {
     expect(stale).toEqual([]);
   });
 
-  it("the comment, KPI and initiative writes measure their domain", () => {
+  it("the comment, KPI, initiative and cycle-setup writes measure their domain", () => {
     const declared = Object.fromEntries(
       writesBelowFull
         .filter((action) => action.domain)
@@ -209,6 +209,14 @@ describe("writes below full", () => {
     expect(declared).toEqual({
       "comments.create": "comment",
       "comments.update": "comment",
+      // Running a cycle is the Owner's and an Admin's (workspace-roles.md §12,
+      // plan 0.8.0 R1): the role's workspace level, not the self-service
+      // binding every member holds on the workspace context.
+      "cycles.close": "workspace",
+      "cycles.create": "workspace",
+      "cycles.setClosing": "workspace",
+      "cycles.update": "workspace",
+      "frame.set": "workspace",
       "initiatives.create": "initiative",
       "initiatives.linkKeyResult": "initiative",
       "initiatives.unlinkKeyResult": "initiative",
@@ -221,6 +229,7 @@ describe("writes below full", () => {
       "kpis.setFormula": "kpi",
       "kpis.update": "kpi",
       "reactions.add": "comment",
+      "workflow.publish": "workspace",
     });
   });
 });
