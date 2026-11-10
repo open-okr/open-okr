@@ -13,6 +13,7 @@
  * eleven. Both sessions are this spec's own and are deleted afterwards.
  */
 import type { BrowserContext, Page } from "@playwright/test";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
@@ -82,11 +83,11 @@ test("sign in, with a review and its retrospective held apart", async () => {
       `insert into okr_sessions
          (id, workspace_id, space_id, kind, title, scheduled_for,
           facilitator_id, state, started_at, stage_key, stage_started_at,
-          review_part)
+          review_part, short_id)
        values (gen_random_uuid(), $1, $2, 'quarterly', 'Quarterly review',
-               now(), $3, 'running', now(), 'recognition', now(), 'review')
+               now(), $3, 'running', now(), 'recognition', now(), 'review', $4)
        returning id`,
-      [member.workspace_id, space.id, member.id],
+      [member.workspace_id, space.id, member.id, newShortId()],
     )
   ).rows[0]?.id as string;
   retrospectiveId = (
@@ -94,12 +95,12 @@ test("sign in, with a review and its retrospective held apart", async () => {
       `insert into okr_sessions
          (id, workspace_id, space_id, kind, title, scheduled_for,
           facilitator_id, state, started_at, stage_key, stage_started_at,
-          review_part, review_session_id)
+          review_part, review_session_id, short_id)
        values (gen_random_uuid(), $1, $2, 'quarterly',
                'Quarterly retrospective', now() + interval '2 days', $3,
-               'running', now(), 'team_retro', now(), 'retrospective', $4)
+               'running', now(), 'team_retro', now(), 'retrospective', $4, $5)
        returning id`,
-      [member.workspace_id, space.id, member.id, reviewId],
+      [member.workspace_id, space.id, member.id, reviewId, newShortId()],
     )
   ).rows[0]?.id as string;
 });

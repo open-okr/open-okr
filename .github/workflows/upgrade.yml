@@ -266,6 +266,19 @@ jobs:
           }
           echo "every workspace on the recommended profile"
 
+          # **The migrator ran the short-id backfill on its way** (plan 0.8.0
+          # C1). The baseline never runs a data change, so migration 0165
+          # found 0034 unfinished and ran it before making the column not
+          # null. Every row has one now or the migration would have refused,
+          # so the ledger is what shows the path was taken.
+          ran="$(docker compose -p openokr exec -T db psql -U openokr -d openokr -tAc \
+            "select count(*) from _data_changes where name = '0034_short_ids' and completed_at is not null")"
+          [ "$ran" = "1" ] || {
+            echo "data change 0034 did not finish during the upgrade" >&2
+            exit 1
+          }
+          echo "data change 0034 finished on the way, and short ids are required"
+
           # **The audit trail may only grow.** It is append-only by design and
           # the upgrade itself writes to it, so equality would be the wrong
           # assertion here and shrinkage is the failure worth catching.
@@ -414,6 +427,14 @@ jobs:
             "select count(*) from workspaces w left join rhythm_settings r on r.workspace_id = w.id where coalesce(r.profile, 'recommended') <> 'recommended'" | tr -d ' ')"
           [ "$off" = "0" ] || {
             echo "${off} workspace(s) upgraded onto a profile other than recommended" >&2
+            exit 1
+          }
+          # The migration hook ran the short-id backfill first (plan 0.8.0
+          # C1), as on Compose.
+          ran="$(kubectl exec -n openokr-test "$pod" -- psql -U openokr -d openokr -tAc \
+            "select count(*) from _data_changes where name = '0034_short_ids' and completed_at is not null" | tr -d ' ')"
+          [ "$ran" = "1" ] || {
+            echo "data change 0034 did not finish during the upgrade" >&2
             exit 1
           }
           # Append-only, so it may grow and must not shrink.

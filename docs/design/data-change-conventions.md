@@ -64,10 +64,30 @@ rather than only here.
 
 ## Registering a script
 
-Add it to the `scripts` array `packages/db/src/bin/data-change.ts` passes to `runDataChanges`.
-There is no separate registry file the way `packages/core/src/actions/registry.ts` has one — a
-short, growing list in the one binary that runs them is enough at this scale, and if that changes
-it is easy to extract later without touching any script's own file.
+Add it to the list `registeredDataChanges` returns in `packages/db/src/data-changes/registry.ts`.
+`pnpm db:change`, its `--status` mode and the migrator all read that one list, so they cannot
+disagree about what is registered.
+
+## When a migration needs a data change first
+
+Some migrations cannot apply until a backfill has finished: making a column not null, for one
+(plan 0.8.0 C1). Such a migration names the data change on a comment line of its own:
+
+```sql
+-- openokr:requires-data-change: 0034_short_ids
+```
+
+Before applying it, the migrator asks the ledger, and when that script has not finished it runs
+it alone through `runDataChanges`, then applies the migration. The script keeps its own batches,
+transactions and ledger row, so schema and data still never share a statement. The start is held
+for as long as the script takes, which is the one exception to PLAN §5.1's "an upgrade is never
+held open by a long backfill", so the log names it with its batches, rows and seconds.
+
+Name one only when the migration would otherwise refuse. A name the release does not register is
+refused before any migration applies, and `packages/db/test/migrate.test.ts` checks every shipped
+migration's names against the registry. Keep a guard in the migration as well, as 0165 does, so a
+row that arrived after the script finished is refused with its table and count rather than with
+the constraint's own error.
 
 ## Running it
 

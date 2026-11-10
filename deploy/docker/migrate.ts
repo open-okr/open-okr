@@ -19,6 +19,7 @@ import pg from "pg";
 // nothing but Node built-ins and each other, so a path import needs no
 // workspace linking at all, and the migration runner stays the same code the
 // tests exercise.
+import { registeredDataChanges } from "../../packages/db/src/data-changes/registry.ts";
 import { grantAppPrivileges } from "../../packages/db/src/grants.ts";
 import { runMigrations } from "../../packages/db/src/migrate.ts";
 import { ensureLoginRole } from "../../packages/db/src/roles.ts";
@@ -66,8 +67,13 @@ const client = new pg.Client({ connectionString: url });
 await client.connect();
 
 try {
+  // A migration may name a data change it needs first (plan 0.8.0 C1). The
+  // migrator runs it here, in its own batches, and the start log says which
+  // and how long it took: the one backfill that holds a start open.
   const applied = await runMigrations(client, {
     dirs: [join(import.meta.dirname, "../../packages/db/migrations")],
+    dataChanges: registeredDataChanges(process.env.OPENOKR_ENCRYPTION_KEY),
+    log: (line) => process.stdout.write(`openokr: ${line}\n`),
   });
 
   process.stdout.write(

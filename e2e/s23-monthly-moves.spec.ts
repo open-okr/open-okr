@@ -11,6 +11,7 @@
  * as the specs after this one expect it.
  */
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
@@ -122,11 +123,11 @@ test("sign in, with an objective in a running monthly review", async () => {
     await pool.query<{ id: string }>(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          facilitator_id, state, started_at)
+          facilitator_id, state, started_at, short_id)
        values (gen_random_uuid(), $1, $2, $3, 'monthly', 'Monthly moves QA',
-               now(), $4, 'running', now())
+               now(), $4, 'running', now(), $5)
        returning id`,
-      [member.workspace_id, space.id, cycle.id, member.id],
+      [member.workspace_id, space.id, cycle.id, member.id, newShortId()],
     )
   ).rows[0]?.id as string;
 });

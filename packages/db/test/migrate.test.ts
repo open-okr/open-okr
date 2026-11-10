@@ -1,11 +1,14 @@
 import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { workerDb } from "@openokr/test-support/db";
 import pg from "pg";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runMigrations } from "../src/migrate.ts";
+import { type DataChangeScript, runDataChanges } from "../src/data-change.ts";
+import { registeredDataChanges } from "../src/data-changes/registry.ts";
+import { requiredDataChanges, runMigrations } from "../src/migrate.ts";
 
 /**
  * The forward-only migration runner. Editing or reordering an applied
@@ -200,5 +203,173 @@ describe("runMigrations", () => {
     } finally {
       await rm(other, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * A migration that needs a backfill first (docs/design/short-ids.md, "The
+ * 0.8.0 step", option A). The migration names the data change; the runner
+ * runs it through the data-change runner, in its own batches, and only then
+ * applies the migration. So schema and data still never share a statement,
+ * and an instance that skipped the backfill is not stranded.
+ */
+describe("a migration that declares a data change it needs", () => {
+  /** Fills `t.filled` two rows a batch, counting each batch it runs. */
+  function fillScript(calls: { n: number }, fail = false): DataChangeScript {
+    return {
+      name: "0001_fill",
+      summary: "Fills t.filled.",
+      expects: [{ table: "t", column: "filled", dataType: "text" }],
+      async runBatch(tx) {
+        calls.n += 1;
+        if (fail) {
+          throw new Error("the batch broke");
+        }
+        const { rows } = await tx.query(
+          `update t set filled = 'yes'
+            where id in (select id from t where filled is null order by id limit 2)
+            returning id`,
+        );
+        return { done: rows.length < 2, rowsChanged: rows.length };
+      },
+    };
+  }
+
+  const NEEDS_FILL =
+    "-- Makes the column not null.\n" +
+    "-- openokr:requires-data-change: 0001_fill\n" +
+    "alter table t alter column filled set not null;\n";
+
+  beforeEach(async () => {
+    await write(
+      "0001_table.sql",
+      "create table t (id int primary key, filled text);\n" +
+        "insert into t (id) select generate_series(1, 5);",
+    );
+  });
+
+  it("reads the declaration, and only a line that is one", () => {
+    expect(requiredDataChanges(NEEDS_FILL)).toEqual(["0001_fill"]);
+    expect(
+      requiredDataChanges(
+        "-- openokr:requires-data-change: 0001_a\n" +
+          "--   openokr:requires-data-change:   0002_b  \n" +
+          "-- It says openokr:requires-data-change: 0003_c in prose.\n" +
+          "select 1;",
+      ),
+    ).toEqual(["0001_a", "0002_b"]);
+    expect(requiredDataChanges("select 1;")).toEqual([]);
+  });
+
+  it("runs the data change first, in its own batches, then applies the migration", async () => {
+    await write("0002_not_null.sql", NEEDS_FILL);
+    const calls = { n: 0 };
+    const lines: string[] = [];
+
+    const applied = await runMigrations(client, {
+      dirs: [dir],
+      dataChanges: [fillScript(calls)],
+      log: (line) => lines.push(line),
+    });
+
+    expect(applied).toEqual(["0001_table.sql", "0002_not_null.sql"]);
+    // Five rows, two a batch: three batches, each its own transaction.
+    expect(calls.n).toBe(3);
+    const empty = await client.query("select 1 from t where filled is null");
+    expect(empty.rowCount).toBe(0);
+    const ledger = await client.query(
+      "select completed_at from _data_changes where name = '0001_fill'",
+    );
+    expect(ledger.rows[0]?.completed_at).not.toBeNull();
+    // The start log names what held it, and how long that took.
+    expect(lines.join("\n")).toMatch(
+      /0002_not_null\.sql needs data change 0001_fill/,
+    );
+    expect(lines.join("\n")).toMatch(
+      /0001_fill finished: 3 batch\(es\), 5 row\(s\) changed, in \d/,
+    );
+  });
+
+  it("skips a data change the ledger records as complete, and says nothing", async () => {
+    const calls = { n: 0 };
+    await runMigrations(client, { dirs: [dir] });
+    await runDataChanges(client, { scripts: [fillScript(calls)] });
+    expect(calls.n).toBe(3);
+
+    await write("0002_not_null.sql", NEEDS_FILL);
+    const lines: string[] = [];
+    const applied = await runMigrations(client, {
+      dirs: [dir],
+      dataChanges: [fillScript(calls)],
+      log: (line) => lines.push(line),
+    });
+
+    expect(applied).toEqual(["0002_not_null.sql"]);
+    expect(calls.n).toBe(3);
+    expect(lines).toEqual([]);
+  });
+
+  it("refuses, before applying anything, a migration naming a data change the release does not carry", async () => {
+    await write("0002_not_null.sql", NEEDS_FILL);
+    await expect(
+      runMigrations(client, { dirs: [dir], dataChanges: [] }),
+    ).rejects.toThrow(
+      /0002_not_null\.sql needs data change 0001_fill, which this release does not carry/,
+    );
+
+    // A fault in the release, so not even the migrations before it move.
+    const recorded = await client.query("select name from _migrations");
+    expect(recorded.rows).toEqual([]);
+  });
+
+  it("applies nothing of the migration when its data change fails, and keeps the data change's progress", async () => {
+    await write("0002_not_null.sql", NEEDS_FILL);
+    await expect(
+      runMigrations(client, {
+        dirs: [dir],
+        dataChanges: [fillScript({ n: 0 }, true)],
+      }),
+    ).rejects.toThrow(
+      /0002_not_null\.sql needs data change 0001_fill, which failed/,
+    );
+
+    const recorded = await client.query("select name from _migrations");
+    expect(recorded.rows.map((row) => row.name)).toEqual(["0001_table.sql"]);
+    const nullable = await client.query(
+      "select is_nullable from information_schema.columns where table_name = 't' and column_name = 'filled'",
+    );
+    expect(nullable.rows[0]?.is_nullable).toBe("YES");
+
+    // Starting again resumes and finishes, as the message says it will.
+    const applied = await runMigrations(client, {
+      dirs: [dir],
+      dataChanges: [fillScript({ n: 0 })],
+    });
+    expect(applied).toEqual(["0002_not_null.sql"]);
+  });
+
+  it("names only data changes this release registers, in the migrations it ships", () => {
+    const migrations = join(import.meta.dirname, "../migrations");
+    const registered = new Set(
+      registeredDataChanges(undefined).map((script) => script.name),
+    );
+    const declared = new Map<string, string[]>();
+    for (const name of readdirSync(migrations).filter((file) =>
+      file.endsWith(".sql"),
+    )) {
+      const needs = requiredDataChanges(
+        readFileSync(join(migrations, name), "utf8"),
+      );
+      if (needs.length > 0) {
+        declared.set(name, needs);
+      }
+      for (const need of needs) {
+        expect(registered.has(need), `${name} needs ${need}`).toBe(true);
+      }
+    }
+    // 0.8.0's not-null waits for 0.7.0's backfill (plan 0.8.0 C1).
+    expect(declared.get("0165_short_ids_not_null.sql")).toEqual([
+      "0034_short_ids",
+    ]);
   });
 });

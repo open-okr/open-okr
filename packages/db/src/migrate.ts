@@ -5,10 +5,27 @@
  * that was edited, removed, or overtaken by a new file sorting before it is a
  * hard error, never a silent re-run. Data reshaping belongs to the separate
  * data-change runner (P2-T12), so migrations stay pure schema.
+ *
+ * **A migration may name a data change it needs first** (plan 0.8.0 C1,
+ * docs/design/short-ids.md, "The 0.8.0 step", option A), with a line of its
+ * own: `-- openokr:requires-data-change: 0034_short_ids`. Before applying it,
+ * the runner asks the data-change ledger, and when that script is not
+ * complete it runs it through the data-change runner, batched and resumable
+ * as always, then applies the migration. The backfill still runs in its own
+ * transactions, so schema and data never share a statement. Without this, a
+ * migration that tightens a column refuses on an instance that skipped the
+ * backfill, and on Compose the container that would run the backfill is the
+ * one that refuses to start.
  */
 import { createHash } from "node:crypto";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  type DataChangeClient,
+  type DataChangeScript,
+  runDataChanges,
+} from "./data-change.ts";
+import { registeredDataChanges } from "./data-changes/registry.ts";
 
 /** A dedicated connection (not a pool): migrations use transaction control. */
 export interface MigrationClient {
@@ -21,6 +38,15 @@ export interface MigrationClient {
 export interface RunMigrationsOptions {
   /** Directories scanned for `*.sql`, merged into one name-ordered stream. */
   readonly dirs: readonly string[];
+  /**
+   * The data changes a migration may name as needed first. Every registered
+   * script when omitted, without the root key: the one script that needs it
+   * seals tokens, and no migration names it. A deployment's own migrator
+   * passes the registry with its key, so a later migration may.
+   */
+  readonly dataChanges?: readonly DataChangeScript[];
+  /** Where the runner says what it ran first, and how long that took. */
+  readonly log?: (line: string) => void;
 }
 
 export class MigrationError extends Error {
@@ -120,6 +146,88 @@ const loadFiles = async (dirs: readonly string[]): Promise<MigrationFile[]> => {
   return files.sort((a, b) => (a.name < b.name ? -1 : 1));
 };
 
+/** The declaration a migration makes, one name per line of its own. */
+const REQUIRES_DATA_CHANGE =
+  /^[ \t]*--[ \t]*openokr:requires-data-change:[ \t]*(\S+)[ \t]*$/gm;
+
+/**
+ * The data changes a migration names as needed before it, in the order
+ * written. Only a comment line that is the declaration counts: the same
+ * words inside a sentence are prose.
+ */
+export function requiredDataChanges(sql: string): string[] {
+  return [...sql.replaceAll("\r\n", "\n").matchAll(REQUIRES_DATA_CHANGE)].map(
+    (match) => match[1] as string,
+  );
+}
+
+/** Whether the data-change ledger records this script as complete. */
+async function dataChangeComplete(
+  client: MigrationClient,
+  name: string,
+): Promise<boolean> {
+  const { rows } = await client.query(
+    "select to_regclass('_data_changes')::text as found",
+  );
+  if (!rows[0]?.found) {
+    return false;
+  }
+  const ledger = await client.query(
+    "select 1 from _data_changes where name = $1 and completed_at is not null",
+    [name],
+  );
+  return ledger.rows.length > 0;
+}
+
+/**
+ * Runs, through the data-change runner, each data change `file` names that
+ * the ledger does not record as complete. Its batches commit on their own, so
+ * a failure keeps their progress and the next start resumes it.
+ */
+async function runRequiredDataChanges(
+  client: MigrationClient,
+  file: MigrationFile,
+  scripts: ReadonlyMap<string, DataChangeScript>,
+  log: (line: string) => void,
+): Promise<void> {
+  for (const name of requiredDataChanges(file.content)) {
+    if (await dataChangeComplete(client, name)) {
+      continue;
+    }
+    // Present: `runMigrations` refused every missing name before anything ran.
+    const script = scripts.get(name) as DataChangeScript;
+    log(
+      `${file.name} needs data change ${name} first, which has not run here. ` +
+        `Running it now: ${script.summary}`,
+    );
+    const started = Date.now();
+    try {
+      const [outcome] = await runDataChanges(
+        // The two runners declare the same `query` with different generics;
+        // a pg client satisfies both.
+        client as unknown as DataChangeClient,
+        { scripts: [script] },
+      );
+      const seconds = ((Date.now() - started) / 1000).toFixed(1);
+      log(
+        `${name} finished: ${outcome?.batches ?? 0} batch(es), ` +
+          `${outcome?.rowsChanged ?? 0} row(s) changed, in ${seconds}s.`,
+      );
+    } catch (error) {
+      const reason =
+        error instanceof Error
+          ? ` ${error.message}${error.cause instanceof Error ? ` ${error.cause.message}` : ""}`
+          : "";
+      throw new MigrationError(
+        `Migration ${file.name} needs data change ${name}, which failed. ` +
+          `Nothing of ${file.name} was applied. The data change keeps the ` +
+          `batches it finished, and the next start resumes it.${reason}`,
+        { cause: error },
+      );
+    }
+  }
+}
+
 /**
  * Applies every pending migration in name order, each in its own
  * transaction, and records it in `_migrations`. Returns the applied names.
@@ -129,6 +237,13 @@ export async function runMigrations(
   options: RunMigrationsOptions,
 ): Promise<string[]> {
   const files = await loadFiles(options.dirs);
+  const scripts = new Map(
+    (options.dataChanges ?? registeredDataChanges(undefined)).map((script) => [
+      script.name,
+      script,
+    ]),
+  );
+  const log = options.log ?? (() => {});
 
   await client.query(`
     create table if not exists _migrations (
@@ -195,8 +310,22 @@ export async function runMigrations(
       );
     }
 
+    // A name the release does not carry is a fault in the release, so it is
+    // refused before anything moves rather than half way through.
+    for (const file of pending) {
+      for (const name of requiredDataChanges(file.content)) {
+        if (!scripts.has(name)) {
+          throw new MigrationError(
+            `Migration ${file.name} needs data change ${name}, which this ` +
+              `release does not carry. Nothing was applied.`,
+          );
+        }
+      }
+    }
+
     const appliedNow: string[] = [];
     for (const file of pending) {
+      await runRequiredDataChanges(client, file, scripts, log);
       await client.query("begin");
       try {
         await client.query(file.content);

@@ -79,7 +79,23 @@ it.
 Schema migrations run on start. Data changes run separately, on your
 schedule: `./openokr data-change` on Docker Compose, or `pnpm db:change` from
 a checkout. Either runs every script not yet complete and names what it ran,
-or says nothing was left. An upgrade is never held open by a long backfill.
+or says nothing was left. An upgrade is never held open by a long backfill,
+with one exception.
+
+**The exception: a backfill a migration needs.** A migration that tightens a
+column, such as 0.8.0's not-null on `short_id`, cannot apply while rows are
+still waiting for the backfill that fills it. Such a migration names that
+data change, and when this instance has not finished it, the migrator runs it
+first, in its own batches, then applies the migration. Only then, and only on
+an instance that skipped that data change. The start log names it, with its
+batches, rows and seconds:
+
+```
+openokr: 0165_short_ids_not_null.sql needs data change 0034_short_ids first, which has not run here. Running it now: ...
+openokr: 0034_short_ids finished: 3 batch(es), 2412 row(s) changed, in 1.8s.
+```
+
+Stopping it part way loses nothing: the next start resumes it.
 
 `./openokr status` names the data changes not yet complete, and
 `pnpm db:change --status` does the same from a checkout. Both only read, so
@@ -89,6 +105,30 @@ Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
 seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
+
+## 0.7 to 0.8
+
+- **Every short identifier is now required.** Migration 0165 makes
+  `short_id` not null on cycles, goals, key results, initiatives, tasks,
+  documents and sessions, the seven tables 0.7.0 gave one. Nothing to do if
+  you ran the data changes after upgrading to 0.7: data change 0034 is
+  complete and the migration applies in a moment. If you did not, or you are
+  coming straight from 0.6 or earlier, the migrator runs 0034 first and the
+  start waits for it ([the exception](#backfills-never-hold-up-a-boot)):
+  seconds for an ordinary instance, a minute or two for a hundred thousand
+  goals and a million tasks.
+
+  To keep that wait out of the upgrade, run 0034 on 0.7 beforehand:
+  `./openokr data-change` on Compose, or `pnpm db:change`. On Helm the
+  migration hook runs it under `helm upgrade --timeout`, five minutes unless
+  you set it, so give a very large instance a longer one. A hook stopped by
+  the timeout loses nothing: the next attempt resumes 0034 where it stopped.
+
+  The migration also counts any row still empty after 0034 finished, which
+  should never happen, and refuses with the table and the count. Its message
+  says what to do: remove 0034's ledger row
+  (`delete from _data_changes where name = '0034_short_ids'`) and start
+  again, and the migrator runs 0034 before the migration.
 
 ## 0.6 to 0.7
 
@@ -106,9 +146,11 @@ still to run. Nothing on screen waits for them.
   have none until you run the data changes (`./openokr data-change`, or
   `pnpm db:change`): **data change 0034** fills them a thousand rows at a
   batch and is safe to stop and run again. Nothing on screen waits for it.
-  **Run it before you upgrade to 0.8.0**, whose migration makes the column
-  not null on all seven tables and refuses to run while a row is still empty,
-  naming the table. `./openokr status` lists 0034 until it is complete.
+  **Run it before you upgrade to 0.8.0** if you can: 0.8.0's migration makes
+  the column not null on all seven tables, and on an instance that has not
+  run 0034 it runs it first, which holds that start until it finishes
+  ([0.7 to 0.8](#07-to-08)). `./openokr status` lists 0034 until it is
+  complete.
 
 - **Outbound webhooks.** Migration 0164 adds `webhooks` and
   `webhook_deliveries`. Nothing is sent until an administrator adds a hook,

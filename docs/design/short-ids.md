@@ -1,6 +1,6 @@
 # Short identifiers on every addressable aggregate
 
-Status: approved 10 November 2026 for release 0.7.0 (plan D1), Q1 and Q2 answered as proposed. A schema change on seven tables, so it was designed first (CLAUDE.md). Built in three commits; §6 records where the build moved from what was written here.
+Status: approved 10 November 2026 for release 0.7.0 (plan D1), Q1 and Q2 answered as proposed. A schema change on seven tables, so it was designed first (CLAUDE.md). Built in three commits; §6 records where the build moved from what was written here. The not-null half, plan 0.8.0 C1, is "The 0.8.0 step" at the end of §6, built 11 November 2026.
 
 Authority: TECHNICAL-PLAN §3 ("Public identifiers are separate") and DATABASE.md §1.
 
@@ -132,3 +132,17 @@ So with the refusal as written:
 | Tests | The migrator runs a required data change before its migration and skips a complete one; 0165 applied over rows a 0.6-shaped write left empty ends with none empty |
 
 **C1-Q1, decided by Akmal on 11 November 2026: A**, as recommended, with "design approved".
+
+#### As built (C1)
+
+| # | Written | Built | Why |
+|---|---|---|---|
+| C1-B1 | Migration 0165 | `0165_short_ids_not_null.sql`. The declaration is a comment line of its own, `-- openokr:requires-data-change: 0034_short_ids`; the same words inside a sentence are prose | One shape a reader and the runner both see |
+| C1-B2 | The migrator reads the declaration | `runMigrations` takes `dataChanges` (the registry by default, without the root key; both migrators pass it with the key) and `log`. Before any migration applies, it refuses a pending one that names a script the release does not carry. Before each migration that names one, it asks `_data_changes` and, when the script is not complete, runs it alone through `runDataChanges`, logging the start, the batches, the rows and the seconds. A failure applies nothing of the migration and keeps the finished batches | A name the release lacks is a fault in the release, so nothing moves. The data change keeps its own lock, ledger and transactions, so it is the runner an operator already knows |
+| C1-B3 | The guard names the table and the count | It does, and says what to do: 0034 is recorded complete, so remove its ledger row and start again, and the migrator runs it first. It lifts FORCE on the seven tables for its own transaction, as 0144's did | It fires only when rows arrived after 0034 finished, and then the ledger is what stops 0034 coming back |
+| C1-B4 | Not in the design | The Drizzle columns are `.notNull()` beside the default | The types say what the database now guarantees |
+| C1-B5 | Not in the design | Data change 0004 writes the cycle's short id when it creates one. Its `expects` is unchanged | 0004 inserts a cycle by hand. After the migrator has run 0034, a cycle 0004 writes later with none would be refused. Adding the column to `expects` would change 0004's checksum for no gain |
+| C1-B6 | Not in the design | Every hand-written insert into the seven tables in tests gives a short id: `cycle-closing.test.ts` and eleven session inserts in nine browser specs. The data-change tests that write rows as an older release did run on the migrations before 0165 | The column refuses them otherwise |
+| C1-B7 | The runbook gains the exception | So does PLAN §5.1's "Backfills never block a boot", which the runbook repeats; `data-change-conventions.md` says how a migration declares one | One rule, said the same way in both places |
+
+**A rollout straight from 0.6 to 0.8 on Kubernetes.** PLAN §5.1's rolling rule covers release N serving beside N+1. Upgrading straight from 0.6, its pods serve beside 0.8's for the length of the rollout, and an insert they make into one of the seven tables names no short id, so 0165 refuses it until the old pods are gone. Every change spread over two releases behaves this way on a jump over the first. Compose stops one container before it starts the next, so it never meets this. Left as it is; a database-side default would be a second copy of the generator (B1).

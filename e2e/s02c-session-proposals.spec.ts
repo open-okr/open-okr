@@ -18,6 +18,7 @@
  * lifecycle" button, the same `agents.runChampion` the scheduler calls, and
  * the proposals are the Champion's own, which is what only a server can show.
  */
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
@@ -51,18 +52,19 @@ async function weeklySession(title: string, hoursAgo: number): Promise<string> {
   const { rows } = await pool.query<{ id: string }>(
     `insert into okr_sessions
        (id, workspace_id, space_id, kind, title, scheduled_for,
-        facilitator_id, state)
+        facilitator_id, state, short_id)
      select gen_random_uuid(), m.workspace_id,
             (select s.id from spaces s
               where s.workspace_id = m.workspace_id and s.deleted_at is null
               order by s.created_at limit 1),
-            'weekly', $2, now() - ($3 || ' hours')::interval, m.id, 'scheduled'
+            'weekly', $2, now() - ($3 || ' hours')::interval, m.id, 'scheduled',
+            $4
        from workspace_members m
        join users u on u.id = m.user_id
       where u.email = $1 and m.deleted_at is null
       limit 1
      returning id`,
-    [INSTANCE_ACCOUNT.email, title, String(hoursAgo)],
+    [INSTANCE_ACCOUNT.email, title, String(hoursAgo), newShortId()],
   );
   const id = rows[0]?.id;
   if (!id) {

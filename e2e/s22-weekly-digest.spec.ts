@@ -24,6 +24,7 @@
  */
 import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
@@ -97,11 +98,11 @@ test("a weekly session has reached step 4", async () => {
     await pool.query<{ id: string }>(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          facilitator_id, state, stage_key)
+          facilitator_id, state, stage_key, short_id)
        values (gen_random_uuid(), $1, $2, $3, 'weekly', 'Digest QA',
-               now() - interval '1 hour', $4, 'running', 'digest')
+               now() - interval '1 hour', $4, 'running', 'digest', $5)
        returning id`,
-      [workspaceId, space.id, cycle.id, memberId],
+      [workspaceId, space.id, cycle.id, memberId, newShortId()],
     )
   ).rows[0];
   sessionId = session?.id as string;
