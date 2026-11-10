@@ -64,7 +64,7 @@ catalog:
   # so one client covers four of the six real drivers.
   "@anthropic-ai/sdk": ^1.6.0
   openai: ^7.53.0
-  "@google/genai": ^2.32.0
+  "@google/genai": ^3.0.0
   # The design system (P2-T10), approved by the human alongside P2-T11's
   # TipTap. CLAUDE.md's locked stack already names Tailwind, Base UI and
   # SmoothUI on Motion; these are the concrete packages that stack resolves
