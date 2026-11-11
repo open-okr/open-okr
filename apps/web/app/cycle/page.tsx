@@ -121,6 +121,14 @@ export default async function CyclePage({
   // R1). Asked of the server, because the page's own level comes from the
   // workspace context, where every member holds edit for self-service.
   const { canSetUp } = await callAction(context, "cycles.setupAccess", {});
+  // Phase 4 is goal work, so it asks the role's goal level, which a Viewer
+  // lacks although `canEdit` above is `edit` for every member
+  // (workspace-roles.md §13, UAT 0.8.0 F-04).
+  const { canCreate: draftsGoals } = await callAction(
+    context,
+    "goals.createAccess",
+    {},
+  );
 
   const query = await searchParams;
   const everyCycle = await callAction(context, "cycles.list", {});
@@ -772,7 +780,7 @@ export default async function CyclePage({
                 goals={draft.goals}
                 members={draft.members}
                 kpis={draft.kpis}
-                canEdit={canEdit}
+                canEdit={draftsGoals}
                 thresholds={draft.thresholds}
                 practice={draft.practice}
                 checkTitles={draft.checkTitles}

@@ -8011,6 +8011,16 @@
       "pages": false
     },
     {
+      "name": "goals createAccess",
+      "action": "goals.createAccess",
+      "method": "GET",
+      "path": "/goals/createAccess",
+      "scope": "read",
+      "summary": "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
+      "flags": [],
+      "pages": false
+    },
+    {
       "name": "goals place",
       "action": "goals.place",
       "method": "POST",

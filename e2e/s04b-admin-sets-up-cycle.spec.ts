@@ -7,6 +7,9 @@
  *   Given the Owner gives them the Admin role, when they open Phase 1 again,
  *   then the card is drawn and the sponsor they choose is saved, and the
  *   archive control, which stays with the Owner, is not drawn.
+ *   Given the Owner gives them the Viewer role, then Goals offers neither
+ *   "Add objective" nor "New objective", and Phase 4 offers no "Add
+ *   objective" (UAT 0.8.0 F-04, workspace-roles.md §13).
  *
  * "Make administrator" on a person's page is not used here: it grants `full`
  * on the workspace, the Owner's level, so it would prove nothing about the
@@ -93,4 +96,34 @@ test("given the Admin role, they name the sponsor", async () => {
     INSTANCE_ACCOUNT.name,
     { timeout: 15_000 },
   );
+});
+
+// UAT 0.8.0 F-04 (workspace-roles.md §13): a Viewer holds `edit` on the
+// workspace through self-service, and was offered every way of adding an
+// objective, which the server then accepted.
+test("given the Viewer role, nothing offers to add an objective", async () => {
+  await goTo(owner, "/admin/roles");
+  const assign = owner.getByRole("combobox", {
+    name: `Role for ${person.name}`,
+    exact: true,
+  });
+  await choose(assign, "Viewer");
+  await expect(assign).toHaveValue("Viewer", { timeout: 15_000 });
+
+  await goTo(admin, "/goals");
+  const main = admin.getByRole("main");
+  await expect(main.getByRole("heading").first()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(main.getByRole("button", { name: "Add objective" })).toHaveCount(
+    0,
+  );
+  await expect(main.getByRole("button", { name: "New objective" })).toHaveCount(
+    0,
+  );
+
+  await goTo(admin, "/cycle?phase=4");
+  await expect(
+    admin.getByRole("main").getByRole("button", { name: "Add objective" }),
+  ).toHaveCount(0);
 });

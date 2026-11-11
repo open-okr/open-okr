@@ -9410,6 +9410,21 @@
       }
     },
     {
+      "name": "goals.createAccess",
+      "description": "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
       "name": "goals.place",
       "description": "Puts an objective straight after another in its cycle, or first, and renumbers the cycle's whole order so a row a filter hides keeps its place.",
       "inputSchema": {

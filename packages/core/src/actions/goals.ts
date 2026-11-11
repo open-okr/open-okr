@@ -1178,6 +1178,11 @@ export const createGoal = defineWriteAction({
     }),
   output: z.object({ id: z.uuid(), title: z.string() }),
   access: ACCESS_LEVELS.edit,
+  // A company or a member's own objective names no subject, so without this
+  // the floor was the self-service binding every member holds on the
+  // workspace, and a Viewer could create one (workspace-roles.md §13, UAT
+  // 0.8.0 F-04). A goal filed under a space still asks the space below.
+  domain: "goal",
   operation: (context, input) => ({
     async execute({ tx, workspaceId }) {
       const memberId = await actingMember(

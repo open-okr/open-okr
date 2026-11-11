@@ -278,6 +278,7 @@ import {
   placeGoal,
   placeKeyResult,
   readCreationPolicy,
+  readGoalCreateAccess,
   readGoalTree,
 } from "./goal-tree.ts";
 import {
@@ -878,6 +879,7 @@ export const ACTION_MAP = {
   "goals.updateKeyResult": updateKeyResult,
   "goals.tree": readGoalTree,
   "goals.creationPolicy": readCreationPolicy,
+  "goals.createAccess": readGoalCreateAccess,
   "goals.place": placeGoal,
   "goals.placeKeyResult": placeKeyResult,
   "goals.patch": patchGoal,

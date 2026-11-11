@@ -60,7 +60,11 @@ import {
 } from "../goals/service.ts";
 import { weightSchema } from "../goals/weight.ts";
 import { ADDRESS } from "../ids/address.ts";
-import { OperationError, type OperationTx } from "../operations/operation.ts";
+import {
+  OperationError,
+  type OperationTx,
+  writeFloorFor,
+} from "../operations/operation.ts";
 import { requireUnchanged } from "../operations/unchanged.ts";
 import {
   midCycleInTx,
@@ -823,6 +827,41 @@ export const readGoalTree = defineReadAction({
         };
       },
     );
+  },
+});
+
+/**
+ * Whether the caller may create an objective at all (workspace-roles.md §13,
+ * UAT 0.8.0 F-04).
+ *
+ * Every screen that offers "Start drafting", "Add objective" or "New
+ * objective" draws it on this rather than on its own level, which comes from
+ * the workspace context where every member holds `edit` for self-service. The
+ * answer is the floor `goals.create` itself runs, so the two cannot disagree.
+ * `goals.creationPolicy` below is the other question: whether this cycle takes
+ * a new objective now.
+ */
+export const readGoalCreateAccess = defineReadAction({
+  name: "goals.createAccess",
+  summary:
+    "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
+  input: z.object({}),
+  output: z.object({ canCreate: z.boolean() }),
+  async handler(context) {
+    const level = await withContext(
+      drizzle(context.pool),
+      {
+        workspaceId: context.workspaceId,
+        ...(context.actor.userId ? { userId: context.actor.userId } : {}),
+      },
+      (tx) =>
+        writeFloorFor(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          actor: context.actor,
+          domain: "goal",
+        }),
+    );
+    return { canCreate: level >= ACCESS_LEVELS.edit };
   },
 });
 

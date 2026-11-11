@@ -477,3 +477,60 @@ S-04 and S-06: the setup cards are drawn for whoever can set up the cycle.
 | R1-Q2 | Do publishing and closing move? | Move; or stay with the Owner | **Move.** Leaving them with the Owner makes the Owner a step in every quarter, and the gates, not the role, decide whether the set is ready |
 | R1-Q3 | Does archiving a cycle stay with the Owner? | Stay; or move | **Stay.** It changes what every member's lists show and is not part of running a cycle |
 | R1-Q4 | A support session the owner granted at `edit` can now set up a cycle. Accept? | Accept; or measure a support guest by the role it carries | **Accept.** The owner chose the level, and every write in the session is audited under the operator's own member row, like any member's |
+
+## 13. A new objective asks the goal role (UAT 0.8.0 F-04)
+
+Found by the 0.8.0 acceptance test and approved by Akmal on 11 November 2026
+("design approved"). A completion of §11, not a new rule.
+
+**What the test found.** A member holding Viewer saw "Start drafting" on the
+Work Map and "Add objective" on Phase 4, and the server created the objective.
+§11 says creating a goal was refused; that held only for a goal filed under a
+space, where `goals.create` checks `edit` on the space itself. A company-level
+or a member's own objective names no subject, so it was measured on the
+workspace context, where every member holds `edit` for self-service, and the
+role was never read. The write-floor walk listed `goals.create` under "checks
+its own subject", which was true for one owner kind of three.
+
+### The change
+
+| Where | Today | Changed |
+|---|---|---|
+| `goals.create` | No `domain`; measured on the workspace context unless the goal names a space | `domain: "goal"`, so the floor is the role's goal level, as `kpis.create` and `comments.create` are (§11). The space check stays for a goal filed under a space |
+| A screen that offers to create an objective | Drawn on the workspace level, which is `edit` for everybody | Drawn on `goals.createAccess`, a read answered by the floor the write runs (`writeFloorFor`, as `cycles.setupAccess` does in §12), so the two cannot disagree |
+
+The screens: the Work Map's "Start drafting" (plan 0.8.0 L2, whose sentence for
+a reader who cannot draft becomes reachable), Phase 4's drafting, "+ New
+objective" on Goals, "+ New, Objective" in the top bar, the product tour's
+"Start drafting OKRs" step and the command palette's "Create objective".
+
+**Who is affected.** Only a Viewer, and any custom role below `edit` on goals.
+Owner and Admin hold `manage` and Member holds `edit` on the goal domain, so
+they create as before. Actors with no role, an agent or a guest, keep §11's
+rule for actors without one. No binding changes, so nothing stored changes.
+
+### Acceptance criteria
+
+```
+Given a member holding Viewer
+When they call goals.create for a company objective or their own
+Then it is refused with "goals.create needs a higher access level than you hold."
+And no goal is written
+
+Given a member holding Member
+When they create a company objective
+Then it is created, as today
+
+Given a member holding Viewer
+When they open the Work Map of a cycle with no objectives
+Then they see the sentence and no "Start drafting" button
+And goals.createAccess answers canCreate false, and true for a Member
+```
+
+### Tests
+
+| Test | Kind |
+|---|---|
+| Viewer refused and Member allowed for `goals.create`; `goals.createAccess` agrees with the write | Core, `packages/core/test/role-domain-floor.test.ts` |
+| `goals.create` is listed under the `goal` domain | `write-floor-classification.test.ts` |
+| A Viewer sees no "Start drafting" on the Work Map | End to end, `e2e/s04b-admin-sets-up-cycle.spec.ts`, which already makes members of each role |

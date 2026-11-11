@@ -71,7 +71,6 @@ const OWN_CHECK = new Set([
   "goals.changeTarget",
   "goals.close",
   "goals.confirmDependency",
-  "goals.create",
   "goals.deleteCheckIn",
   "goals.editCheckIn",
   "goals.escalateDependency",
@@ -217,6 +216,10 @@ describe("writes below full", () => {
       "cycles.setClosing": "workspace",
       "cycles.update": "workspace",
       "frame.set": "workspace",
+      // A company or personal objective names no subject, so without the
+      // domain it was measured on the self-service binding and a Viewer could
+      // create one (workspace-roles.md §13, UAT 0.8.0 F-04).
+      "goals.create": "goal",
       "initiatives.create": "initiative",
       "initiatives.linkKeyResult": "initiative",
       "initiatives.unlinkKeyResult": "initiative",

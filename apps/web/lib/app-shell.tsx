@@ -261,6 +261,25 @@ export async function AppShellLayout({
       }
       throw error;
     });
+  // Whether this member may create an objective at all, the floor
+  // `goals.create` runs (workspace-roles.md §13, UAT 0.8.0 F-04). The
+  // workspace level below is `edit` for everybody, a Viewer included.
+  const createsGoals = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "goals.createAccess",
+    {},
+  )
+    .then((access) => access.canCreate)
+    .catch((error: unknown) => {
+      if (error instanceof OperationError) {
+        return false;
+      }
+      throw error;
+    });
   const runsCycle = seesCycle({
     administers: adminItems.length > 0,
     setsUpCycle,
@@ -458,13 +477,17 @@ export async function AppShellLayout({
                 level >= ACCESS_LEVELS.edit ? (
                   <NewMenu
                     items={[
-                      {
-                        key: "objective",
-                        label: t("newMenu.objective"),
-                        icon: iconFor("goals"),
-                        href: "/goals?new=objective",
-                        screens: ["/goals", "/cycle", "/map"],
-                      },
+                      ...(createsGoals
+                        ? [
+                            {
+                              key: "objective",
+                              label: t("newMenu.objective"),
+                              icon: iconFor("goals"),
+                              href: "/goals?new=objective",
+                              screens: ["/goals", "/cycle", "/map"],
+                            },
+                          ]
+                        : []),
                       {
                         key: "initiative",
                         label: t("newMenu.initiative"),
@@ -653,7 +676,7 @@ export async function AppShellLayout({
             ).finished
           }
           demo={loadEnv().OPENOKR_DEMO === "on"}
-          canDraft={level >= ACCESS_LEVELS.edit}
+          canDraft={createsGoals}
           askAvailable={copilot.available}
           instanceName={await getInstanceName()}
         />
@@ -664,7 +687,7 @@ export async function AppShellLayout({
          */}
         <CommandPalette
           destinations={paletteDestinations}
-          canCreateObjective={level >= ACCESS_LEVELS.edit}
+          canCreateObjective={createsGoals}
           semantic={semantic}
         />
         {/* The Review count, kept current by the workspace's own feed

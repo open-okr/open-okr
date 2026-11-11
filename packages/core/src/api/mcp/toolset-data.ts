@@ -178,6 +178,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "cycles.rules",
     "cycles.ensureCurrent",
     "cycles.setupAccess",
+    "goals.createAccess",
     "cycles.create",
     "cycles.update",
     "cycles.archive",

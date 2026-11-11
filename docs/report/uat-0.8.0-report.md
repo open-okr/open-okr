@@ -32,7 +32,7 @@ Fixed on `release-0.8.0` on 11 November 2026, one commit per finding, each with 
 | F-01 Uploads above 10 MB | `700c2584` | A 24 MB file attaches |
 | F-02 Tour card off screen on a phone | `4cbaf8ed` | All three phone steps show the card above the lit tab, finished by tapping |
 | F-03 Admin has no way to the cycle page | `edd81ba9` | An Admin sees Cycle and the phase strip; a Member still does not |
-| F-04 Viewer role cannot lower an invited member's Edit | Open | Left for Akmal (Q-1). `cycles.setupAccess` records the Edit binding as deliberate ("every member holds `edit` for self-service"), which points at L2's `canEdit` reading the workspace level |
+| F-04 Viewer role cannot lower an invited member's Edit | Fixed after the report | Akmal's answer to Q-1: the Edit binding stays, as `workspace-roles.md` §11 says, and creating an objective asks the role's goal level (§13). `goals.create` declares the `goal` domain, and the Work Map, Phase 4, Goals, `+ New`, the tour and the command palette ask `goals.createAccess`. Checked by `role-domain-floor.test.ts` and `s04b-admin-sets-up-cycle.spec.ts`, not yet in the browser on an image |
 | F-05 "No plan" shown as "Free" | `ae15cbde` | S-46, the console filter and the Plan page say "No plan" with a catalogue |
 | F-06 Facilitator item focuses the Sponsor picker | `33951929` | Each item focuses its own picker |
 | F-07 Focus lost after Take the tour again | `081468d9` | Escape returns focus to the account menu button |

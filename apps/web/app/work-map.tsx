@@ -369,11 +369,18 @@ export async function WorkMap({
   nodes,
   selected,
   canEdit,
+  canDraft,
   hrefFor,
 }: {
   readonly nodes: readonly MapNode[];
   readonly selected: MapNode | null;
   readonly canEdit: boolean;
+  /**
+   * Whether the reader may create an objective: `goals.createAccess`, the
+   * role's goal level, not `canEdit`, which every member holds through the
+   * workspace's self-service binding (workspace-roles.md §13, F-04).
+   */
+  readonly canDraft: boolean;
   /** Deep links every node, so a row is a URL somebody can send. */
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
@@ -397,10 +404,10 @@ export async function WorkMap({
               </p>
               {/* The one thing to do on an empty map, so it is a button
                   rather than a link at the end of a grey sentence (plan
-                  0.8.0 L2). Drawn only for a reader who can draft, with the
-                  same `edit` the cycle page drafts with; anybody else gets
-                  the explanation alone. */}
-              {canEdit ? (
+                  0.8.0 L2). Drawn only for a reader who can draft, by the
+                  rule `goals.create` itself runs (workspace-roles.md §13);
+                  anybody else gets the explanation alone. */}
+              {canDraft ? (
                 <Link
                   className={`${buttonVariants({ variant: "primary" })} mt-1.5`}
                   href="/cycle?phase=4"

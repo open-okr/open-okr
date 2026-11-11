@@ -40,11 +40,12 @@ const { WorkMap } = await import("../app/work-map");
 
 // The goal table inside is an async server component, so the page is
 // streamed to the end rather than rendered in one synchronous pass.
-const render = async (canEdit: boolean) => {
+const render = async (canEdit: boolean, canDraft = canEdit) => {
   const element = (await WorkMap({
     nodes: [],
     selected: null,
     canEdit,
+    canDraft,
     hrefFor: () => "/map",
   })) as ReactNode;
   const stream = await renderToReadableStream(element);
@@ -58,6 +59,14 @@ describe("an empty Work Map", () => {
     expect(html).toContain('data-testid="start-drafting"');
     expect(html).toContain('href="/cycle?phase=4"');
     expect(html).toContain("Start drafting");
+  });
+
+  // UAT 0.8.0 F-04 (workspace-roles.md §13): a Viewer holds `edit` on the
+  // workspace through self-service, and only the role's goal level decides.
+  it("offers nothing to a Viewer, whose workspace level is edit", async () => {
+    const html = await render(true, false);
+    expect(html).toContain("Objectives are drafted in phase 4");
+    expect(html).not.toContain('data-testid="start-drafting"');
   });
 
   it("explains, and offers nothing, to a reader who cannot draft", async () => {

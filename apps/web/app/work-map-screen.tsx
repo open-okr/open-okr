@@ -58,6 +58,13 @@ export async function WorkMapScreen({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  // Drafting asks the role's goal level, which a Viewer lacks although the
+  // level above is `edit` for every member (workspace-roles.md §13, F-04).
+  const { canCreate: canDraft } = await callAction(
+    context,
+    "goals.createAccess",
+    {},
+  );
 
   const cycles = await callAction(context, "cycles.list", {});
   const current = await callAction(context, "cycles.current", {
@@ -221,6 +228,7 @@ export async function WorkMapScreen({
         nodes={nodes}
         selected={selected}
         canEdit={canEdit}
+        canDraft={canDraft}
         hrefFor={hrefFor}
       />
 
