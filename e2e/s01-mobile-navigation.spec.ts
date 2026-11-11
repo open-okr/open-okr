@@ -46,3 +46,17 @@ test("the More tab reaches every screen the hidden sidebar would", async ({
   // On the screen it opened, More is where the reader is.
   await expect(more).toHaveClass(/text-brand-text/);
 });
+
+// Q-10b (0.8.0 acceptance test): the footer band was sticky on a phone too, so
+// its two lines took 63px of every screen on top of the tab bar. On a phone
+// it ends the page; on a wide screen it still stays put
+// (s36q-version-footer.spec.ts).
+test("on a phone the footer ends the page rather than staying on screen", async ({
+  page,
+}) => {
+  await signIn(page);
+  await goTo(page, "/");
+  const footer = page.getByTestId("app-footer");
+  await expect(footer).toBeAttached();
+  await expect(footer).toHaveCSS("position", "static");
+});

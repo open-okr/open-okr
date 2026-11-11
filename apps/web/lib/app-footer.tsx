@@ -15,11 +15,14 @@ import { VersionFooter } from "./version-footer.tsx";
  * copilot can answer, since an AI affordance is hidden when the provider is
  * off); the running version; and, for an administrator, a newer release.
  *
- * **Always in view.** Sticky to the foot of the content pane, so it stays put
- * while the page scrolls under it (the owner's choice). A sticky offset is
- * measured from inside `main`'s padding, so it is the padding taken back: 18px
- * on a wide screen, and on a phone 24px of the 80px kept for the fixed 56px
- * tab bar, which leaves the band sitting on the tab bar.
+ * **Always in view on a wide screen.** Sticky to the foot of the content pane,
+ * so it stays put while the page scrolls under it (the owner's choice). A
+ * sticky offset is measured from inside `main`'s padding, so it is the padding
+ * taken back: 18px.
+ *
+ * **Not on a phone.** Below the phone breakpoint it ends the page instead. Its
+ * two lines took 63px of a phone's height on every screen, on top of the 56px
+ * tab bar (Q-10b, 0.8.0 acceptance test).
  *
  * **Pulled out to the pane's edges.** `main` pads its content, so the band
  * takes that padding back as negative margins. On a phone `main` leaves 80px
@@ -41,7 +44,7 @@ export async function AppFooter({
   return (
     <footer
       data-testid="app-footer"
-      className="sticky -bottom-6 z-[5] -mx-4.5 mt-6 -mb-6 flex flex-col items-start gap-x-4 gap-y-1.5 border-t border-line bg-surface px-4.5 py-3 text-xs text-ink-3 md:-bottom-4.5 md:-mb-4.5 md:flex-row md:flex-wrap md:items-center"
+      className="z-[5] -mx-4.5 mt-6 -mb-6 flex flex-col items-start gap-x-4 gap-y-1.5 border-t border-line bg-surface px-4.5 py-3 text-xs text-ink-3 md:sticky md:-bottom-4.5 md:-mb-4.5 md:flex-row md:flex-wrap md:items-center"
     >
       {/* An instance nobody has named shows nothing here. The "Built on
           OpenOKR" credit was removed at the owner's request (4 November
