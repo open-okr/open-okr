@@ -222,6 +222,13 @@ const withStep = (steps: readonly Step[], step: Step): readonly Step[] =>
 /** How long a stopped run is given to record what it kept. */
 const STOPPED_RECORDED_AFTER_MS = 1_500;
 
+/**
+ * How long Stop waits for a background run to end on its own before it
+ * cancels the request (plan 0.8.1 W4). The run checks between pieces every
+ * 750 ms, so this is room for a slow piece, not the usual wait.
+ */
+const STOP_GIVES_UP_AFTER_MS = 5_000;
+
 /** The recorded words of the answer to one question, or "" for none yet. */
 const recordedAnswer = (
   messages: readonly {
@@ -683,12 +690,19 @@ export function CopilotPanel({
 
   const stop = useCallback(() => {
     // A background run is not this request, so cancelling the request alone
-    // would only stop listening (plan 0.8.1 W4). The run is told first.
+    // would only stop listening (plan 0.8.1 W4). The run is told instead, and
+    // the panel keeps listening: the run ends at its next piece and sends
+    // `done`, which closes this stream with what it kept already recorded.
+    // Cancelling at once re-read the thread before the run had saved it.
     const answerId = runningAnswer.current;
-    if (answerId) {
-      void stopCopilotRunAction(answerId).catch(() => undefined);
+    const controller = abort.current;
+    if (answerId && controller) {
+      void stopCopilotRunAction(answerId).catch(() => controller.abort());
+      // Nothing answering is no reason to keep the reader waiting.
+      setTimeout(() => controller.abort(), STOP_GIVES_UP_AFTER_MS);
+      return;
     }
-    abort.current?.abort();
+    controller?.abort();
   }, []);
 
   const send = useCallback(
@@ -781,7 +795,7 @@ export function CopilotPanel({
               | ({ kind: "step" } & Step)
               | { kind: "unavailable"; reason: string }
               | { kind: "text"; text: string }
-              | { kind: "done" };
+              | { kind: "done"; stopped?: boolean };
             if (event.kind === "thread") {
               landedThreadId = event.threadId;
               questionId = event.questionMessageId;
@@ -815,6 +829,10 @@ export function CopilotPanel({
             } else if (event.kind === "text") {
               text += event.text;
               update({ text });
+            } else if (event.kind === "done" && event.stopped) {
+              // The run stopped where the member pressed Stop (W4), and
+              // what it kept is recorded by now.
+              stopped = true;
             }
           }
         }

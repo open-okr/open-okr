@@ -797,7 +797,72 @@ describe("the composer (plan 0.8.1 CP6)", () => {
     expect(byName("Stop the answer")).toBeDefined();
   });
 
-  test("Stop tells a background run to stop, then lets go of the request", async () => {
+  test("Stop tells a background run to stop and waits for it to end there (W4)", async () => {
+    const encoder = new TextEncoder();
+    let aborted = false;
+    let stream: ReadableStreamDefaultController<Uint8Array> | null = null;
+    const frame = (event: Record<string, unknown>) =>
+      encoder.encode(
+        `event: ${String(event.kind)}\ndata: ${JSON.stringify(event)}\n\n`,
+      );
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      init.signal?.addEventListener("abort", () => {
+        aborted = true;
+      });
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            stream = controller;
+            controller.enqueue(
+              frame({
+                kind: "thread",
+                threadId: THREAD,
+                questionMessageId: QUESTION_ID,
+                answerMessageId: "00000000-0000-4000-8000-0000000000aa",
+              }),
+            );
+            init.signal?.addEventListener("abort", () =>
+              controller.error(new DOMException("aborted", "AbortError")),
+            );
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    });
+    // The run hears the stop, records what it kept, and closes the stream.
+    actions.stopCopilotRunAction.mockImplementationOnce(async () => {
+      stream?.enqueue(
+        frame({ kind: "done", answerMessageId: "a", stopped: true }),
+      );
+      stream?.close();
+      return {
+        messageId: "00000000-0000-4000-8000-0000000000aa",
+        stopped: true,
+      };
+    });
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Long one",
+      messages: [],
+    });
+    await render(AVAILABLE);
+    await open();
+    await ask("A long question");
+    await settle();
+
+    await act(async () => byName("Stop the answer").click());
+    await settle();
+    expect(actions.stopCopilotRunAction).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-0000000000aa",
+    );
+    // Not cancelled: the run's own `done` ended the stream, after it saved.
+    expect(aborted).toBe(false);
+    expect(panel()?.textContent).toContain("Stopped");
+  });
+
+  test("Stop lets go of the request when the run cannot be told", async () => {
     const encoder = new TextEncoder();
     let aborted = false;
     fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
@@ -825,6 +890,7 @@ describe("the composer (plan 0.8.1 CP6)", () => {
         { headers: { "Content-Type": "text/event-stream" } },
       );
     });
+    actions.stopCopilotRunAction.mockRejectedValueOnce(new Error("offline"));
     actions.readCopilotThreadAction.mockResolvedValue({
       id: THREAD,
       subjectType: null,
@@ -839,9 +905,6 @@ describe("the composer (plan 0.8.1 CP6)", () => {
 
     await act(async () => byName("Stop the answer").click());
     await settle();
-    expect(actions.stopCopilotRunAction).toHaveBeenCalledWith(
-      "00000000-0000-4000-8000-0000000000aa",
-    );
     expect(aborted).toBe(true);
   });
 
@@ -1171,7 +1234,9 @@ describe("a stopped answer (plan 0.8.1 CP9 with W4)", () => {
           { headers: { "Content-Type": "text/event-stream" } },
         ),
     );
-    // The run has been told to stop and has not written its words yet.
+    // The stop could not reach the run, so the request was let go, and the
+    // run has not written its words yet.
+    actions.stopCopilotRunAction.mockRejectedValueOnce(new Error("offline"));
     actions.readCopilotThreadAction.mockResolvedValue({
       id: THREAD,
       subjectType: null,
