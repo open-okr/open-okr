@@ -61,6 +61,15 @@ const nextConfig: NextConfig = {
        */
       bodySizeLimit: "27mb",
     },
+    /**
+     * The proxy clones and buffers every request body so both it and the
+     * route can read it, and stops buffering at 10 MB by default. An upload
+     * above that reached the server action cut short and failed as
+     * "Unexpected end of form", a 500 page, although `bodySizeLimit` above
+     * allows 27 (UAT 0.8.0, F-01). Kept equal to it; a test holds both above
+     * `MAX_BLOB_BYTES`.
+     */
+    proxyClientMaxBodySize: "27mb",
   },
   // Next's own dev-only overlay (route/bundler info, preferences), never
   // shipped to production. Off by explicit request: its own UI is not

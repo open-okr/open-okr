@@ -23,4 +23,15 @@ describe("the upload limit", () => {
     const bodyBytes = Number(match?.[1]) * 1024 * 1024;
     expect(bodyBytes).toBeGreaterThanOrEqual(MAX_BLOB_BYTES + 1024 * 1024);
   });
+
+  // The proxy buffers every request body before the action sees it, and cuts
+  // it at 10 MB unless told otherwise. A 24 MB file then reached the action
+  // truncated, which failed as "Unexpected end of form" and a 500 page
+  // (UAT 0.8.0, F-01).
+  test("the proxy buffers the largest file too", () => {
+    const match = /proxyClientMaxBodySize:\s*"(\d+)mb"/.exec(config);
+    expect(match).not.toBeNull();
+    const proxyBytes = Number(match?.[1]) * 1024 * 1024;
+    expect(proxyBytes).toBeGreaterThanOrEqual(MAX_BLOB_BYTES + 1024 * 1024);
+  });
 });
