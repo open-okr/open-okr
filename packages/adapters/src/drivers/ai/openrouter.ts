@@ -1,13 +1,15 @@
 import { OpenAiCompatibleProvider } from "./openai-compatible.ts";
 import type { TierModelMap } from "./tier-map.ts";
 
-/** A seed, not a catalogue: refined per model once P2-T15's catalogue exists.
+/** A seed, not a catalogue: the routing defaults are the first entries of
+ * core's `SEEDED_MODELS` per tier, and this says the same so the two do not
+ * disagree (11 November 2026: GPT-6 Luna for fast and balanced).
  * No `embed` entry — OpenRouter's own model list is chat-completion models;
  * an embedding call routes to a provider that actually has one instead. */
 export const OPENROUTER_DEFAULT_TIER_MODELS: TierModelMap = {
-  fast: "openai/gpt-4.1-mini",
-  balanced: "anthropic/claude-sonnet-4",
-  deep: "anthropic/claude-opus-4",
+  fast: "openai/gpt-6-luna",
+  balanced: "openai/gpt-6-luna",
+  deep: "anthropic/claude-sonnet-4.5",
 };
 
 /** Where every request goes. Named so the egress guard reads the same one. */

@@ -1213,7 +1213,11 @@ export function createProviderDrafter(
           model: options.model,
           schema: TITLE_SHAPE,
           jsonSchema: TITLE_JSON_SCHEMA,
-          maxTokens: 80,
+          // A ceiling, not a charge. 80 fitted the title, but a reasoning
+          // model such as GPT-6 Luna spends its thinking from the same budget,
+          // ran out twice and returned nothing the schema accepted (live, 11
+          // November 2026). Every other assist already allows 200 or more.
+          maxTokens: 400,
           onUsage: charge,
           messages: [
             { role: "system", content: TITLE_SYSTEM },
