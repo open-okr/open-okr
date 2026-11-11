@@ -241,6 +241,27 @@ afterAll(async () => {
   await wb.close();
 });
 
+describe("a sign-up the registration policy refuses, where mail can arrive", () => {
+  it("is told why, not that an account was made", async () => {
+    // Better Auth answers a refusal raised as 403 with its generic success
+    // whenever confirmation is required, so the form said "your account is
+    // created, we sent a link" for an account that was never made. The
+    // refusal is about the address's domain or the policy, never about
+    // whether an account exists, so it is safe to say (plan 0.8.0 S4).
+    const wb = await workerDb();
+    await wb.admin.query(
+      "update system_settings set value = '\"company_domains\"'::jsonb where key = 'registration.policy'",
+    );
+    const response = await signUp("somebody@gmail.com");
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(((await response.json()) as { message?: string }).message).toMatch(
+      /company email address/i,
+    );
+    expect(await userRow("somebody@gmail.com")).toBeUndefined();
+    expect(await queued()).toEqual([]);
+  });
+});
+
 describe("a sign-up where mail can arrive", () => {
   it("queues exactly one link and answers as before", async () => {
     // The account that claimed the instance was queued nothing.

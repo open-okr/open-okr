@@ -1229,7 +1229,14 @@ export function createAuth(options: AuthOptions) {
               user.email,
             );
             if (refusal !== null) {
-              throw new APIError("FORBIDDEN", { message: refusal });
+              // **Not 403.** Better Auth turns a 403 from this hook into its
+              // generic sign-up success whenever confirmation is required, to
+              // keep an existing address secret, so the form said "your
+              // account is created, we sent a link" for an account that was
+              // never made (found with plan 0.8.0 S4). This refusal is about
+              // the address's domain or the policy, never about whether an
+              // account exists, so saying it hides nothing worth hiding.
+              throw new APIError("UNPROCESSABLE_ENTITY", { message: refusal });
             }
             return;
           },
