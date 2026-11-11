@@ -2208,6 +2208,8 @@
   "cycle.inputPack.recordANewSend": "Rekod penghantaran baharu",
   "cycle.inputPack.sponsorDecidesAndUnblocks": "Penaja · membuat keputusan dan membuka halangan. Eskalasi sampai di sini",
   "cycle.inputPack.suggestedTimeline": "Garis masa yang dicadangkan",
+  "cycle.inputPack.tickGathered": "Tandakan sebagai sudah dikumpul",
+  "cycle.inputPack.tickNotGathered": "Tandakan sebagai belum dikumpul",
   "cycle.inputPack.weeksBefore": "Bila",
   "cycle.inputPack.whereItIsOr": "Di mana ia berada, atau siapa yang membawanya",
   "cycle.need.editorFills": "Ahli yang boleh menyunting kitaran mengisi bahagian ini.",

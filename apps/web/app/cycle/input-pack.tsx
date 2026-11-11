@@ -5,9 +5,12 @@ import {
   CardBody,
   CardHeader,
   Chip,
+  cn,
   SubmitButton,
   TextInput,
+  Tooltip,
 } from "@openokr/ui";
+import { Check } from "lucide-react";
 import { getTranslations } from "../../lib/translations";
 import { ActionForm } from "./action-form.tsx";
 import { distributePack, savePackNote, togglePackItem } from "./actions.ts";
@@ -20,7 +23,8 @@ import { distributePack, savePackNote, togglePackItem } from "./actions.ts";
  * METHOD.md §2.6 calls the incomplete pack "the single most common failure point
  * in an OKR programme", which is why this is a checklist somebody has to tick
  * item by item rather than one "we are ready" switch. The seven labels come from
- * the method package, so the list cannot drift from the document.
+ * the method package, so the list cannot drift from the document. The first
+ * note saved into an empty item ticks it too; after that only the box does.
  */
 
 export interface PackItem {
@@ -83,37 +87,63 @@ export async function InputPack({
                       name="gathered"
                       value={String(item.gathered)}
                     />
-                    <SubmitButton
-                      bare
-                      aria-pressed={item.gathered}
-                      aria-label={
+                    {/* A checkbox to look at (11 November 2026). The dashed
+                        red outline read as a status mark, not a control, so
+                        nobody pressed it: the red now stays on the chip. The
+                        box is 24px for the pointer target, shows a faint tick
+                        on hover and says what pressing it does. */}
+                    <Tooltip
+                      label={
                         item.gathered
-                          ? t("cycle.inputPack.markNotGathered", {
-                              label: item.label,
-                            })
-                          : t("cycle.inputPack.markGathered", {
-                              label: item.label,
-                            })
-                      }
-                      className={
-                        item.gathered
-                          ? "flex size-5 items-center justify-center rounded-md bg-ok text-xs text-white"
-                          : "flex size-5 items-center justify-center rounded-md border border-dashed border-bad-dot text-xs text-transparent"
+                          ? t("cycle.inputPack.tickNotGathered")
+                          : t("cycle.inputPack.tickGathered")
                       }
                     >
-                      ✓
-                    </SubmitButton>
+                      <SubmitButton
+                        bare
+                        aria-pressed={item.gathered}
+                        aria-label={
+                          item.gathered
+                            ? t("cycle.inputPack.markNotGathered", {
+                                label: item.label,
+                              })
+                            : t("cycle.inputPack.markGathered", {
+                                label: item.label,
+                              })
+                        }
+                        className={cn(
+                          "size-6 cursor-pointer rounded-md border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-line motion-reduce:transition-none [&[aria-busy]>.lucide-check]:hidden",
+                          item.gathered
+                            ? "border-ok bg-ok text-on-ok hover:opacity-85"
+                            : "border-line-2 bg-surface text-transparent hover:border-brand hover:bg-brand-weak hover:text-brand-text aria-busy:text-ink-3",
+                        )}
+                      >
+                        <Check
+                          aria-hidden="true"
+                          strokeWidth={3}
+                          className="size-3.5"
+                        />
+                      </SubmitButton>
+                    </Tooltip>
                   </ActionForm>
                 ) : (
+                  // Read only: the same box with nothing to press, so the
+                  // outline is dashed rather than drawn like a control.
                   <span
                     aria-hidden="true"
                     className={
                       item.gathered
-                        ? "mt-0.5 flex size-5 flex-none items-center justify-center rounded-md bg-ok text-xs text-white"
-                        : "mt-0.5 flex size-5 flex-none items-center justify-center rounded-md border border-dashed border-bad-dot"
+                        ? "mt-0.5 flex size-6 flex-none items-center justify-center rounded-md bg-ok text-on-ok"
+                        : "mt-0.5 flex size-6 flex-none items-center justify-center rounded-md border-2 border-dashed border-line-2"
                     }
                   >
-                    {item.gathered ? "✓" : ""}
+                    {item.gathered ? (
+                      <Check
+                        aria-hidden="true"
+                        strokeWidth={3}
+                        className="size-3.5"
+                      />
+                    ) : null}
                   </span>
                 )}
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -135,6 +165,13 @@ export async function InputPack({
                         type="hidden"
                         name="gathered"
                         value={String(item.gathered)}
+                      />
+                      {/* Whether the field was drawn empty: the first note
+                          saved into an empty item gathers it. */}
+                      <input
+                        type="hidden"
+                        name="hadNote"
+                        value={String(Boolean(item.note))}
                       />
                       <TextInput
                         name="note"
