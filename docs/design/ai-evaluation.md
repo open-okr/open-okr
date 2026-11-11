@@ -137,7 +137,7 @@ Restoring the default needs no check: the built-in text passes by construction, 
 |---|---|---|
 | The unit suite, so CI | `packages/agents/test/evaluation.test.ts`: every set against the built-in prompts, and prompts made to fail each check | The build, when a built-in prompt or the code around it regresses a set |
 | `pnpm ai:evaluate` | Every set, printed per capability with its fixture count. Reads no database. Exit 1 on a failure | Nothing: it is for a person |
-| `pnpm ai:evaluate --provider <p> --model <id>`, with `OPENOKR_AI_API_KEY` | **The live smoke test.** Each fixture that expects an answer is sent to a real model. A live reply cannot be compared word for word, so it checks what a live model can be held to: it gave an answer the schema accepted, nothing personal was sent, the budget held, and it prints the time each took. Costs real money, usually a few cents. Never in CI | Nothing: it is for a person to read, like `pnpm ai:measure` |
+| `pnpm ai:evaluate --provider <p> --model <id>`, with `OPENOKR_AI_API_KEY`; `<p>` is anthropic, openai, google or openrouter | **The live smoke test.** Each fixture that expects an answer is sent to a real model. A live reply cannot be compared word for word, so it checks what a live model can be held to: it gave an answer the schema accepted, nothing personal was sent, the budget held, and it prints the time each took. Costs real money, usually a few cents. Never in CI | Nothing: it is for a person to read, like `pnpm ai:measure` |
 | Saving a version, on the server | §7 | The save |
 | Building a drafter, on the server | §6 | Nothing: the built-in text is sent instead |
 | The AI console | §9 | Nothing |

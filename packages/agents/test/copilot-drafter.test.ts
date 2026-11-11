@@ -343,15 +343,76 @@ describe("the whole answer, not streamed", () => {
  * cannot judge is worse than none.
  */
 describe("proposing an action", () => {
+  // The two shapes core offers (packages/core/src/copilot/proposals.ts): a
+  // required set, an optional field, an enum and a number pointing into a list.
   const OPTIONS: ProposalRequestContext["options"] = [
     {
       action: "goals.create",
       label: "Create an objective",
       whatItDoes: "Adds a new objective to the current quarterly cycle.",
-      fields: { type: "object", properties: { title: { type: "string" } } },
+      fields: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "level", "spaceNumber"],
+        properties: {
+          title: { type: "string", maxLength: 500 },
+          description: { type: "string", maxLength: 2000 },
+          level: {
+            type: "string",
+            enum: ["company", "department", "team", "individual"],
+          },
+          spaceNumber: { type: "integer", minimum: 1 },
+        },
+      },
       choices: { spaces: ["Product", "Sales"] },
     },
+    {
+      action: "tasks.create",
+      label: "Add a task",
+      whatItDoes: "Adds a task behind one key result.",
+      fields: {
+        type: "object",
+        additionalProperties: false,
+        required: ["title", "keyResultNumber"],
+        properties: {
+          title: { type: "string", maxLength: 500 },
+          keyResultNumber: { type: "integer", minimum: 1 },
+        },
+      },
+      choices: { keyResults: ["Raise activation from 41% to 60%"] },
+    },
   ];
+
+  /** Every object in a JSON Schema that strict structured output would refuse. */
+  const notStrict = (schema: unknown, path = "$"): string[] => {
+    if (typeof schema !== "object" || schema === null) {
+      return [];
+    }
+    const node = schema as Record<string, unknown>;
+    const problems: string[] = [];
+    const types = ([] as unknown[]).concat(node.type ?? []);
+    if (types.includes("object")) {
+      const properties = (node.properties ?? {}) as Record<string, unknown>;
+      const keys = Object.keys(properties);
+      if (keys.length === 0) {
+        problems.push(`${path} declares no properties`);
+      }
+      if (node.additionalProperties !== false) {
+        problems.push(`${path} is open to other properties`);
+      }
+      const required = (node.required ?? []) as string[];
+      for (const key of keys) {
+        if (!required.includes(key)) {
+          problems.push(`${path}.${key} is not required`);
+        }
+        problems.push(...notStrict(properties[key], `${path}.${key}`));
+      }
+    }
+    for (const branch of (node.anyOf ?? []) as unknown[]) {
+      problems.push(...notStrict(branch, path));
+    }
+    return problems;
+  };
 
   const request = (
     reply: unknown,
@@ -396,6 +457,97 @@ describe("proposing an action", () => {
     expect(sent).toContain("2. Sales");
   });
 
+  it("asks for a reply strict structured output can fill, naming every field the offered actions take", async () => {
+    // Found live on 11 November 2026: `fields` was a bare `{type: object}`,
+    // and under OpenRouter's strict JSON schema an object with no properties
+    // comes back empty. Every proposal then failed core's own check and the
+    // copilot proposed nothing, silently, for every request.
+    const { provider, drafter } = request({
+      propose: false,
+      action: "none",
+      fields: {},
+      why: "",
+    });
+    await ask(drafter);
+    const schema = (provider.requests[0] as unknown as { schema: unknown })
+      .schema as {
+      properties: {
+        action: { enum: string[] };
+        fields: {
+          properties: Record<
+            string,
+            { type?: unknown; anyOf?: Record<string, unknown>[] }
+          >;
+        };
+      };
+    };
+
+    expect(notStrict(schema)).toEqual([]);
+    expect(schema.properties.action.enum).toEqual([
+      "goals.create",
+      "tasks.create",
+      "none",
+    ]);
+    const fields = schema.properties.fields.properties;
+    expect(Object.keys(fields).sort()).toEqual([
+      "description",
+      "keyResultNumber",
+      "level",
+      "spaceNumber",
+      "title",
+    ]);
+    // Any field may be null, because each one belongs to only some actions,
+    // and said as a null branch rather than a type list: Anthropic's strict
+    // output refuses `type: ["string", "null"]` beside an enum, which made
+    // every Claude request through OpenRouter a 400 (found live).
+    for (const field of Object.values(fields)) {
+      expect(field.type).toBeUndefined();
+      expect(field.anyOf).toContainEqual({ type: "null" });
+    }
+    expect(fields.level?.anyOf).toContainEqual({
+      type: "string",
+      enum: ["company", "department", "team", "individual"],
+    });
+  });
+
+  it("keeps only the chosen action's fields, without the nulls", async () => {
+    const { drafter } = request({
+      propose: true,
+      action: "tasks.create",
+      fields: {
+        title: "Draft the setup checklist copy",
+        keyResultNumber: 1,
+        description: null,
+        level: null,
+        spaceNumber: null,
+      },
+      why: "You asked for this task on the activation key result.",
+    });
+    expect(await ask(drafter)).toEqual({
+      action: "tasks.create",
+      fields: { title: "Draft the setup checklist copy", keyResultNumber: 1 },
+      why: "You asked for this task on the activation key result.",
+    });
+  });
+
+  it("proposes nothing when a field the action requires came back empty", async () => {
+    // What the strict schema bug looked like from here: a proposal with a
+    // reason and an action and nothing in it.
+    const { drafter } = request({
+      propose: true,
+      action: "goals.create",
+      fields: {
+        title: null,
+        level: null,
+        spaceNumber: null,
+        description: null,
+        keyResultNumber: null,
+      },
+      why: "You asked for an objective.",
+    });
+    expect(await ask(drafter)).toBeNull();
+  });
+
   it("proposes nothing when the model declines", async () => {
     const { drafter } = request({
       propose: false,
@@ -420,7 +572,7 @@ describe("proposing an action", () => {
     const { drafter } = request({
       propose: true,
       action: "goals.create",
-      fields: { title: "Raise activation" },
+      fields: { title: "Raise activation", level: "team", spaceNumber: 1 },
       why: "   ",
     });
     expect(await ask(drafter)).toBeNull();

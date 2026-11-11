@@ -5,6 +5,7 @@
  *
  *   pnpm ai:evaluate
  *   OPENOKR_AI_API_KEY=... pnpm ai:evaluate --provider anthropic --model <id>
+ *   OPENOKR_AI_API_KEY=... pnpm ai:evaluate --provider openrouter --model anthropic/claude-sonnet-4.5
  *
  * With no provider it runs against the mock: it reads no database, sends
  * nothing anywhere, and exits 1 when a set fails, naming the capability, the
@@ -31,15 +32,19 @@ const wantsLive = provider !== undefined || model !== undefined;
 
 if (
   wantsLive &&
+  // OpenRouter too, because it is what a hosted instance runs, and its
+  // OpenAI-shaped driver sends strict structured output where the Anthropic
+  // driver sends a tool call: a schema can pass on one and fail on the other.
   ((provider !== "anthropic" &&
     provider !== "openai" &&
-    provider !== "google") ||
+    provider !== "google" &&
+    provider !== "openrouter") ||
     model === undefined ||
     apiKey === "")
 ) {
   process.stderr.write(
     "Usage: pnpm ai:evaluate\n" +
-      "       OPENOKR_AI_API_KEY=... pnpm ai:evaluate --provider anthropic|openai|google --model <id>\n",
+      "       OPENOKR_AI_API_KEY=... pnpm ai:evaluate --provider anthropic|openai|google|openrouter --model <id>\n",
   );
   process.exit(2);
 }
@@ -48,7 +53,11 @@ const client =
   wantsLive && provider !== undefined
     ? createAIProvider(
         {
-          provider: provider as "anthropic" | "openai" | "google",
+          provider: provider as
+            | "anthropic"
+            | "openai"
+            | "google"
+            | "openrouter",
           apiKey,
         },
         {

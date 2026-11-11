@@ -14,6 +14,7 @@
  * `extractStructured` validates with one repair attempt and then fails, and a
  * failure here means no draft rather than an unvalidated one.
  */
+import { isDeepStrictEqual } from "node:util";
 import type { AIProvider } from "@openokr/adapters";
 import type {
   AgentDrafter,
@@ -237,10 +238,11 @@ function splitAnswer(raw: string): {
  * often than it returns null. Asked whether to propose at all, it answers the
  * question. Declining is the common case: most sentences are questions.
  *
- * `fields` is deliberately untyped here. Its shape belongs to the action, and
- * core validates it against that action's own schema before anything is stored,
- * so a second copy of the shape in this file would be a second thing to keep in
- * step.
+ * `fields` is untyped in this shape. Its shape belongs to the action, and core
+ * validates it against that action's own schema before anything is stored, so a
+ * second copy of the shape in this file would be a second thing to keep in step.
+ * What the model is *sent* is built from the offered actions' own field schemas
+ * instead, below.
  */
 const PROPOSAL_SHAPE = z.object({
   propose: z.boolean(),
@@ -249,25 +251,116 @@ const PROPOSAL_SHAPE = z.object({
   why: z.string().trim().max(1000),
 });
 
-const PROPOSAL_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["propose", "action", "fields", "why"],
-  properties: {
-    propose: { type: "boolean" },
-    action: { type: "string" },
-    fields: { type: "object" },
-    why: { type: "string", maxLength: 1000 },
-  },
-} as const;
+/** What `action` says when nothing is proposed. Never an action's name. */
+const NO_ACTION = "none";
+
+type JsonSchema = Record<string, unknown>;
+
+/**
+ * Any of these shapes, or null.
+ *
+ * **`anyOf` with a null branch, never a type list.** Anthropic's structured
+ * output refuses `type: ["string", "null"]` beside an `enum` ("Enum value
+ * 'team' does not match declared type"), and every request through OpenRouter
+ * to a Claude model failed with a 400 until this was the form. OpenAI and
+ * Gemini accept it too (checked live, 11 November 2026).
+ */
+function nullable(shapes: readonly JsonSchema[]): JsonSchema {
+  return { anyOf: [...shapes, { type: "null" }] };
+}
+
+/**
+ * The reply's schema, built from the actions on offer.
+ *
+ * **Every object closed and every property required**, because that is the
+ * only shape strict structured output accepts and fills. The OpenAI-shaped
+ * drivers, OpenRouter's among them, send `strict: true`. An earlier version
+ * sent `fields` as a bare `{type: object}`, and under strict decoding that
+ * comes back empty: every proposal then failed core's check and the copilot
+ * proposed nothing, without a word to anybody (found live, 11 November 2026).
+ *
+ * **One `fields` object with every offered field in it, each nullable.** A
+ * field belongs to some actions and not others, and strict output has no
+ * optional property, so a field the chosen action does not take is null and is
+ * dropped by `fieldsFor` below. A union per action would say the same thing in
+ * a form fewer providers accept. Two actions whose same-named fields differ
+ * are offered either shape.
+ *
+ * The shapes come from the offer, which core builds from each action, so this
+ * file still holds no copy of any of them.
+ */
+function proposalJsonSchema(options: ProposalRequestContext["options"]) {
+  const fields: Record<string, JsonSchema[]> = {};
+  for (const option of options) {
+    const properties = (option.fields.properties ?? {}) as Record<
+      string,
+      JsonSchema
+    >;
+    for (const [name, field] of Object.entries(properties)) {
+      const seen = fields[name] ?? [];
+      if (!seen.some((known) => isDeepStrictEqual(known, field))) {
+        seen.push(field);
+      }
+      fields[name] = seen;
+    }
+  }
+  const names = Object.keys(fields).sort();
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["propose", "action", "fields", "why"],
+    properties: {
+      propose: { type: "boolean" },
+      action: {
+        type: "string",
+        enum: [...options.map((option) => option.action), NO_ACTION],
+      },
+      fields: {
+        type: "object",
+        additionalProperties: false,
+        required: names,
+        properties: Object.fromEntries(
+          names.map((name) => [name, nullable(fields[name] ?? [])]),
+        ),
+      },
+      why: { type: "string", maxLength: 1000 },
+    },
+  };
+}
+
+/**
+ * The chosen action's own fields, without the nulls, or null when one it
+ * requires is missing.
+ *
+ * Refused here as well as in core, so that a reply with nothing in it is no
+ * proposal at this layer too, and the live evaluation sees it as one.
+ */
+function fieldsFor(
+  option: ProposalRequestContext["options"][number],
+  authored: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const properties = (option.fields.properties ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const kept = Object.fromEntries(
+    Object.entries(authored).filter(
+      ([name, value]) =>
+        Object.hasOwn(properties, name) && value !== null && value !== "",
+    ),
+  );
+  const required = (option.fields.required ?? []) as string[];
+  return required.every((name) => Object.hasOwn(kept, name)) ? kept : null;
+}
 
 const PROPOSAL_SYSTEM =
   "You decide whether what somebody asked for is a request to change " +
   "something in this workspace, and if it is, you fill in one of the actions " +
   "you are offered. Propose nothing unless the request plainly asks for that " +
   "exact change: a question is not a request. Choose a list item by its " +
-  "number, never by inventing a name or an identifier. Write only the fields " +
-  "the action asks for. Say in one sentence why this change, now.";
+  "number, never by inventing a name or an identifier. Fill in the fields the " +
+  "action you chose takes, and set every other field to null. Say in one " +
+  `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */
 const optionsFor = (context: ProposalRequestContext): string =>
@@ -1278,7 +1371,7 @@ export function createProviderDrafter(
           purpose: "assist",
           model: options.model,
           schema: PROPOSAL_SHAPE,
-          jsonSchema: PROPOSAL_JSON_SCHEMA,
+          jsonSchema: proposalJsonSchema(context.options),
           maxTokens: 500,
           onUsage: charge,
           messages: [
@@ -1301,7 +1394,7 @@ export function createProviderDrafter(
         // The action name is checked against the offered list here as well as in
         // core, so a model naming something it was not offered never becomes a
         // call at all.
-        const offered = context.options.some(
+        const offered = context.options.find(
           (option) => option.action === reply.action,
         );
         if (!offered) {
@@ -1312,9 +1405,13 @@ export function createProviderDrafter(
           // judge. Refused rather than shown with a blank line.
           return null;
         }
+        const fields = fieldsFor(offered, reply.fields);
+        if (!fields) {
+          return null;
+        }
         return {
           action: reply.action,
-          fields: reply.fields,
+          fields,
           why: reply.why,
         };
       } catch {
