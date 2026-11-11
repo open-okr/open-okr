@@ -232,6 +232,52 @@ column. A key result's board can hold cards from several spaces, and a card
 dropped after a card from another space lands at the end of its own space's
 column, which is where a drag has always put it.
 
+### 3.6 A task joins an initiative, and what a task may name (plan 0.8.0 I2)
+
+Asked for by Akmal on 11 November 2026: an existing task can be moved into an
+initiative, which until now happened only by creating the task on that
+initiative's board. Building it found a gap in what is already there, so this
+section needs "design approved" before the code: it changes access.
+
+**The gap.** `tasks.create` and `tasks.update` write `initiative_id` and
+`key_result_id` as given. Nothing checks that the initiative or key result is
+in this workspace, that the actor can see it, or, for an initiative, that it
+is in the task's space. The foreign keys do not help: they are checked past
+row-level security, so a task can name a row of another workspace. Within one
+workspace a member can put a task on the board of an initiative they cannot
+open.
+
+| Rule | Create and update | Refused with |
+|---|---|---|
+| An initiative a task names is in this workspace and visible to the actor at **edit**, the level adding work to it takes | Read through `requireInitiative` | Not found, as for any initiative the reader cannot reach |
+| It is in the **task's own space**, as a task made on its board is | Compared with the task's space | "A task joins an initiative in its own space. {initiative} is in {space}." |
+| A key result a task names is in this workspace and its objective visible to the actor at **view**, as the Board's picker offers it | Read through the goal getter | Not found |
+| Clearing either, `null` | Nothing to check | |
+
+**The screen** (UIUX-PLAN S-28). The task page's rail shows **Initiative** as a
+picker for anybody who can edit the task: the initiatives of the task's space
+they can see, and None. Choosing one moves the task into it, so it is on that
+initiative's board and counts toward its progress; None takes it out. A
+reader who cannot edit sees the initiative as a link, as today.
+
+**Imports.** They run through the same actions, so the same rules apply. The
+FlowyTeam importer already files a task in its initiative's space. A
+spreadsheet row naming an initiative in another space is refused with the
+sentence above and named in the import report, never dropped.
+
+**Given** a task in space A and an initiative in space A the member can edit,
+**when** they choose the initiative on the task's page,
+**then** the task is on the initiative's board and counted in its progress.
+
+**Given** an initiative in space B,
+**when** `tasks.update` names it for a task in space A,
+**then** it is refused with the sentence, and nothing is written.
+
+**Given** an initiative or key result of another workspace, or one the actor
+cannot see,
+**when** `tasks.create` or `tasks.update` names it,
+**then** the answer is not found, and nothing is written.
+
 ## 4. Documents and attachments (P5-T12)
 
 ### 4.1 Tables

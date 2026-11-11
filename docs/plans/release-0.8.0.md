@@ -399,6 +399,12 @@ Asked for by Akmal on 11 November 2026, after checking whether an initiative can
 
 The specification gains it in UIUX-PLAN S-13 (the row menu and the drawer), S-14 (the key result row), S-26 (the list per key result and the add form's key result) and S-27 (which key results the add form offers).
 
+| # | What | Where | Change | Size | Design |
+|---|---|---|---|---|---|
+| I2 | **An existing task can move into an initiative**, from the task page's rail, and a task may name only an initiative in its own space and a key result the actor can see. Building it found that `tasks.create` and `tasks.update` checked neither, across workspaces too | `packages/core/src/actions/tasks.ts`, `apps/web/app/tasks/[id]/page.tsx` | The rail's Initiative becomes a picker; create and update check what a task names | S | Design first: access. `docs/design/work-layer.md` §3.6 |
+
+**Follow-up after 0.8.0, Akmal's decision on 11 November 2026:** S5-Q2 confirms an address only on the join page. Accepting a personal invitation through REST, the command line or an agent joins without confirming it (Obed's report, `docs/report/s5-invited-address-confirmed-report.md`). The fix is to confirm inside `invitations.acceptLink`, with its own short design.
+
 ## 12. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
@@ -461,6 +467,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S4 | done | `auth.emailVerification` (`auto` or `off`, `OPENOKR_EMAIL_VERIFICATION`), on Admin, General or, on a cloud, only the operator's S-47; refused under `company_domains`; followed without a restart. With nothing waiting, sign-up ends on the welcome card with Get started and nothing about confirming; where mail works, the link goes worded as optional. As built in the design's §11.7. `e2e/s35g-confirmation-off.spec.ts` |
 | S5 | done | Built on 11 November 2026 on `release-0.8.0` rather than by Obed, who ran the acceptance test that day (Akmal's choice). `docs/design/email-verification.md` §12.6 As built: a personal invitation to the sign-up's own address creates the account confirmed in the user-create hook, `auth.email_verified` with `via: "invitation"`, and S5-Q2 on the join page. The form signs in after such a sign-up, because Better Auth signs nobody in at sign-up while confirmation is required. Answers the acceptance test's Q-3 |
 | I1 | done | Built on 11 November 2026. One rule for every key result picker in `apps/web/lib/linkable-key-results.ts`: open objectives in every cycle being planned or running, the running quarter first, then the running year, then cycles being planned (the order keeps the current quarter's key results at the top, where `cycles.list` put next quarter's). The objective page's key result rows (`goals/[id]/key-result-initiatives.tsx`) reuse the initiative's own link and unlink actions, which now refresh objective pages too. The drawer reads one key result's initiatives under its own query key. New read `initiatives.keyResults`, in the MCP `work` toolset. `e2e/s26-initiatives.spec.ts` walks the menu, the prefilled form, the objective page and the drawer |
+| I2 | design written | Added on 11 November 2026 by Akmal. `docs/design/work-layer.md` §3.6; waits for "design approved" |
 | T1 | done | `apps/web/lib/product-tour.tsx`, mounted by the shell; the Work Map card and its CSS removed. Browser memory under `openokr.tour.ended`; the suite's contexts start with it set (`TOUR_COOKIE` opts back in). Unit tests for every step and ending; the claim spec walks it with the keyboard and scans both dialogs |
 | R1 | done | Setup writes (`cycles.create`, `cycles.update`, `frame.set`, `workflow.publish`, `cycles.setClosing`, `cycles.close`) ask `edit` on the `workspace` domain; archive and `rhythm.update` stay `full`. The page asks `cycles.setupAccess`, its own read rather than a `workflow.read` field so the create shows before any cycle exists (design updated). Core, unit and browser tests (`s04b-admin-sets-up-cycle.spec.ts`) |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
