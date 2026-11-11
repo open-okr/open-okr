@@ -32,6 +32,7 @@ import {
   RichTextEditor,
   useTranslations,
 } from "@openokr/ui";
+import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, useTransition } from "react";
 import { addMinuteAction, setStageNoteAction } from "./actions";
@@ -322,7 +323,31 @@ export function QuarterlyReview({
                                     : "bg-raised text-ink-3",
                             ].join(" ")}
                           >
-                            {ticked ? "✓" : stage.stage}
+                            {/* lucide's Check on the ok token, as the input
+                             * pack's (K1): a text "✓" is drawn by whichever
+                             * font has the glyph, in that font's colours, and
+                             * dark mode drew it wrong (K2, plan 0.8.1). */}
+                            {ticked ? (
+                              <>
+                                <Check
+                                  aria-hidden="true"
+                                  strokeWidth={3}
+                                  className="size-3"
+                                />
+                                {/* The glyph was read out; the icon is not.
+                                 * Where the words below say nothing, these
+                                 * say what the tick does. */}
+                                {met === null ? (
+                                  <span className="sr-only">
+                                    {t(
+                                      "session.detail.quarterlyReview.stageDone",
+                                    )}
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              stage.stage
+                            )}
                           </span>
                           <span className="flex flex-1 flex-col">
                             <span className="text-sm text-ink">
