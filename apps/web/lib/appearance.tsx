@@ -1,6 +1,7 @@
 "use client";
 
-import { useTheme, useTranslations } from "@openokr/ui";
+import { Tooltip, useTheme, useTranslations } from "@openokr/ui";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { setAppearance } from "./appearance-action.ts";
 
@@ -20,10 +21,11 @@ import { setAppearance } from "./appearance-action.ts";
  * write would flash, and a browser-only write is what this task exists to fix.
  */
 
+/** Each theme as an icon, its word its name and tooltip (Akmal, 11 November 2026). */
 const THEMES = [
-  { value: "light", label: "appearance.light" },
-  { value: "dark", label: "appearance.dark" },
-  { value: "system", label: "appearance.system" },
+  { value: "light", label: "appearance.light", icon: <Sun /> },
+  { value: "dark", label: "appearance.dark", icon: <Moon /> },
+  { value: "system", label: "appearance.system", icon: <Monitor /> },
 ] as const;
 
 const DENSITIES = [
@@ -81,23 +83,25 @@ export function AppearanceControl({
         </legend>
         <div className="flex gap-1.5">
           {THEMES.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              data-testid={`theme-${option.value}`}
-              aria-pressed={theme === option.value}
-              onClick={() => {
-                setTheme(option.value);
-                remember({ theme: option.value });
-              }}
-              className={
-                theme === option.value
-                  ? "rounded-md border border-brand-600 bg-brand px-2 py-1 text-xs font-semibold text-on-brand"
-                  : "rounded-md border border-line px-2 py-1 text-xs font-semibold text-ink-2 hover:border-ink-4"
-              }
-            >
-              {t(option.label)}
-            </button>
+            <Tooltip key={option.value} label={t(option.label)}>
+              <button
+                type="button"
+                data-testid={`theme-${option.value}`}
+                aria-label={t(option.label)}
+                aria-pressed={theme === option.value}
+                onClick={() => {
+                  setTheme(option.value);
+                  remember({ theme: option.value });
+                }}
+                className={
+                  theme === option.value
+                    ? "flex size-8 items-center justify-center rounded-md border border-brand-600 bg-brand text-on-brand [&>svg]:size-4"
+                    : "flex size-8 items-center justify-center rounded-md border border-line text-ink-2 hover:border-ink-4 [&>svg]:size-4"
+                }
+              >
+                {option.icon}
+              </button>
+            </Tooltip>
           ))}
         </div>
       </fieldset>
