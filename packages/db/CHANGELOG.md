@@ -1,5 +1,15 @@
 # @openokr/db
 
+## 0.8.1
+
+### Patch Changes
+
+- [#212](https://github.com/open-okr/open-okr/pull/212) [`2402aca`](https://github.com/open-okr/open-okr/commit/2402acae10d5434d7af6f4addf9e02ffc254b57d) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - `pnpm db:change run` works again. 0.8.0 refused `run` as an argument it did not know, so an upgrade script written for an earlier version, which needed it, stopped halfway at the data changes. `run` is now accepted as the name of the default, which runs every script not yet complete, and the usage line says so. `run --status` is refused as a usage error, since the two ask for opposite things.
+
+- [#210](https://github.com/open-okr/open-okr/pull/210) [`bf4ae58`](https://github.com/open-okr/open-okr/commit/bf4ae5818f1d97dff8f1e42a10192e3d56d75593) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Check-ins, key results and blockers now reach search and the copilot. Each of these writes recorded its activity against the objective or the space, and only that was indexed, so no check-in, and no key result or blocker after it was created, could be found by search or used by the copilot to answer a question. Objectives and key results created by carrying kept objectives into the next cycle, or by launching a KPI's recovery, are indexed too. After upgrading, run the data changes (`./openokr data-change`, or `pnpm db:change`) to queue what was written before: data change 0035 queues every check-in, key result, blocker and objective that neither index holds, and the relay indexes them in the background. An instance whose AI provider can embed text pays for those embeddings once.
+- Updated dependencies []:
+  - @openokr/config@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes

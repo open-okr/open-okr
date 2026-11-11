@@ -1,5 +1,15 @@
 # @openokr/importer
 
+## 0.8.1
+
+### Patch Changes
+
+- Updated dependencies [[`7ddce9e`](https://github.com/open-okr/open-okr/commit/7ddce9e0b383bd781f36acf52f7543abf4b80edd), [`bc0333f`](https://github.com/open-okr/open-okr/commit/bc0333f3f1405fcb97e1775b331ced5191c3a484), [`63503f4`](https://github.com/open-okr/open-okr/commit/63503f410785091bd6a340d676a46aa74df8e545), [`3f45fd5`](https://github.com/open-okr/open-okr/commit/3f45fd5bfd167b4e975bb7bb6228b0f31668d8b6), [`98c1521`](https://github.com/open-okr/open-okr/commit/98c1521b97b43d52dab0b1b02ff5b250ccdc1c8b), [`a27b0ef`](https://github.com/open-okr/open-okr/commit/a27b0efe89dd76d213c7f97d1cb8742938e60002), [`d73d263`](https://github.com/open-okr/open-okr/commit/d73d26331471fcfa42cca2617a91c70ddd28e7b0), [`419cd46`](https://github.com/open-okr/open-okr/commit/419cd4685a9f0f0eed92fc9eec9bc30c05ab559d), [`d92761b`](https://github.com/open-okr/open-okr/commit/d92761b08e69372496d2efdedb197d29b40ce94c), [`b61a93a`](https://github.com/open-okr/open-okr/commit/b61a93aa81a899b6fbf506c5ca379e89602b7578), [`4e5d2e4`](https://github.com/open-okr/open-okr/commit/4e5d2e4002cc66f6a890fa5cdb0b96f3721c7578), [`bf4ae58`](https://github.com/open-okr/open-okr/commit/bf4ae5818f1d97dff8f1e42a10192e3d56d75593), [`6150a62`](https://github.com/open-okr/open-okr/commit/6150a626c35b4674e0413affba1441f4004b9bc7), [`b30346d`](https://github.com/open-okr/open-okr/commit/b30346db74bdc5cd87d6d920224f915ce466023e), [`964c39c`](https://github.com/open-okr/open-okr/commit/964c39cf144eb10b44cf0df6bedd52a9d4a958d9), [`ec29e46`](https://github.com/open-okr/open-okr/commit/ec29e468c70a516e2f119b48a5be2382f9f46596)]:
+  - @openokr/core@0.8.1
+  - @openokr/adapters@0.8.1
+  - @openokr/config@0.8.1
+  - @openokr/method@0.8.1
+
 ## 0.8.0
 
 ### Patch Changes
