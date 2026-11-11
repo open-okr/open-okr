@@ -68,10 +68,10 @@ export async function WorkMapContextStrip({
 
   return (
     <div
-      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-line border-b pb-2.5 text-xs"
       // The Work Map's own cycle strip, which stays after publishing when the
-      // shell's goes. The tour's cycle stop outlines both (L-08).
-      data-tour-target="cycle-strip"
+      // shell's goes. Not the tour's cycle stop: that is the shell's strip
+      // under the top bar, which the step's words describe (plan 0.8.0 T1).
+      className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-line border-b pb-2.5 text-xs"
     >
       <Link
         href={cycleHref}

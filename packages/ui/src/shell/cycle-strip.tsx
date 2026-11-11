@@ -42,6 +42,9 @@ export function CycleStrip({
         "cycle-strip flex flex-none items-center gap-3 border-b border-brand-line bg-gradient-to-r from-brand-weak to-surface px-4.5 py-1.5 text-sm text-brand-text",
         className,
       )}
+      // The product tour's cycle stop (plan 0.8.0 T1): this strip, under the
+      // top bar while a cycle is being planned, and nothing else.
+      data-tour-target="cycle-strip"
     >
       <span className="rounded-full border border-brand-line bg-surface/80 px-2.5 py-px font-bold shadow-control">
         {phase}

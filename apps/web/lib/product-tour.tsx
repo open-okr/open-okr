@@ -77,7 +77,11 @@ const STEPS: readonly Step[] = [
   },
   {
     id: "cycle-strip",
-    selector: '.cycle-strip, [data-tour-target="cycle-strip"]',
+    // The shell's strip under the top bar alone, drawn while a cycle is being
+    // planned. The Work Map's phase strip stays after publishing, further
+    // down the page, and lit under these words it was out of place (Akmal,
+    // 11 November 2026); outside planning the step is left out, as T1 says.
+    selector: '[data-tour-target="cycle-strip"]',
     title: "tour.cycleStrip.title",
     body: "tour.cycleStrip.body",
   },
@@ -455,11 +459,23 @@ export function ProductTour({
             {t("tour.stepOf", { step: index + 1, count: steps.length })}
           </span>
         </p>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <Button variant="ghost" onClick={() => end()} data-testid="tour-skip">
-            {t("tour.skip")}
-          </Button>
-          <div className="flex items-center gap-2">
+        {/* Wraps rather than running past the card, whatever the language.
+         * On the last step there is nothing left to skip, so the next
+         * button's longer words have the row; Escape still ends the tour
+         * (Akmal, 11 November 2026). */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          {last ? (
+            <span />
+          ) : (
+            <Button
+              variant="ghost"
+              onClick={() => end()}
+              data-testid="tour-skip"
+            >
+              {t("tour.skip")}
+            </Button>
+          )}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
             {index > 0 ? (
               <Button variant="ghost" onClick={back} data-testid="tour-back">
                 {t("tour.back")}

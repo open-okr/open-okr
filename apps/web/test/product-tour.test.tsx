@@ -23,7 +23,7 @@ let root: Root;
 let shell: HTMLDivElement;
 
 /** The shell's pieces the steps point at, with a size jsdom will not give. */
-const drawShell = (withAsk: boolean) => {
+const drawShell = (withAsk: boolean, withStrip = false) => {
   shell = document.createElement("div");
   shell.innerHTML = `
     <nav>
@@ -33,6 +33,7 @@ const drawShell = (withAsk: boolean) => {
     </nav>
     <header class="topbar-shell"><label><input type="search" /></label></header>
     ${withAsk ? '<span data-tour-target="ask-ai">Ask AI</span>' : ""}
+    ${withStrip ? '<span data-tour-target="cycle-strip">Phase 2</span>' : ""}
   `;
   document.body.appendChild(shell);
   for (const element of shell.querySelectorAll<HTMLElement>("a, label, span")) {
@@ -204,6 +205,33 @@ describe("the steps", () => {
     expect(router.push).not.toHaveBeenCalled();
     expect(actions.finishTour).not.toHaveBeenCalled();
     expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
+  // Akmal, 11 November 2026: "Start drafting OKRs" ran past the card beside
+  // Skip tour and Back. On the last step there is nothing left to skip, and
+  // Escape still ends it.
+  test("the last step offers no Skip tour", async () => {
+    await render();
+    await press("tour-start");
+    expect(host.querySelector('[data-testid="tour-skip"]')).not.toBeNull();
+    for (let step = 0; step < 4; step += 1) {
+      await press("tour-next");
+    }
+    expect(host.querySelector('[data-testid="tour-next"]')?.textContent).toBe(
+      "Start drafting OKRs",
+    );
+    expect(host.querySelector('[data-testid="tour-skip"]')).toBeNull();
+    expect(host.querySelector('[data-testid="tour-back"]')).not.toBeNull();
+  });
+
+  test("stops at the cycle strip only while the shell draws it", async () => {
+    shell.remove();
+    drawShell(true, true);
+    await render();
+    await press("tour-start");
+    expect(host.querySelector('[data-testid="tour-count"]')?.textContent).toBe(
+      "1 of 6",
+    );
   });
 
   test("end with Finish for somebody who cannot draft, and stay put", async () => {
