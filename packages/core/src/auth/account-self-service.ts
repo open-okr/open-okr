@@ -78,9 +78,10 @@ export type PasswordCard =
 
 /**
  * The identity providers this account is linked to and this instance still
- * offers, by name, for "Sign in again with ..." (D2).
+ * offers, by name, for "Sign in again with ..." (D2). Deleting your own
+ * account offers the same (account-deletion.md §3.1).
  */
-async function linkedProviders(
+export async function linkedProviders(
   pool: Pool,
   userId: string,
 ): Promise<readonly SignInAgainProvider[]> {

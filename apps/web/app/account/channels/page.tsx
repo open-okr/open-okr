@@ -53,6 +53,7 @@ const REASON_LABELS: Readonly<Record<string, string>> = {
   support_request: "account.channels.reasonSupportRequest",
   support_ended: "account.channels.reasonSupportEnded",
   connection_ended: "account.channels.reasonConnectionEnded",
+  self_deleted: "account.channels.reasonSelfDeleted",
 };
 
 const CHOICES = [

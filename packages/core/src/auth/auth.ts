@@ -45,6 +45,10 @@ import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import { registrationRefusal } from "../workspaces/registration.ts";
 import {
+  accountBeingDeletedError,
+  cancelDeletionOnSignIn,
+} from "./account-deletion.ts";
+import {
   processOnlyKeyRing,
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
@@ -1198,6 +1202,17 @@ export function createAuth(options: AuthOptions) {
               throw new APIError("FORBIDDEN", {
                 message: enforcementMessage(provider),
               });
+            }
+            // Deleting your own account (account-deletion.md §3.2, §3.3,
+            // plan 0.8.0 Y7). Every sign-in ends in a session row, whatever
+            // factor produced it, so this is where a sign-in cancels an open
+            // request, and where one is refused while the run is erasing the
+            // account. After the enforcement check, so a refused sign-in
+            // never cancels anything.
+            if (
+              (await cancelDeletionOnSignIn(options.pool, userId)) === "running"
+            ) {
+              throw accountBeingDeletedError();
             }
           },
           /**

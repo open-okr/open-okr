@@ -2045,7 +2045,8 @@
             "check_in",
             "support_request",
             "support_ended",
-            "connection_ended"
+            "connection_ended",
+            "self_deleted"
           ]
         },
         {
@@ -2260,7 +2261,8 @@
             "check_in",
             "support_request",
             "support_ended",
-            "connection_ended"
+            "connection_ended",
+            "self_deleted"
           ]
         }
       ],

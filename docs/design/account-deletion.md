@@ -188,3 +188,41 @@ Then they see the refusal and no confirmation form
 | Y7-Q2 | Offer deletion to the command line or an agent token? | Screen only; also REST | **Screen only.** A token is the one credential most likely to be held by something other than the person |
 | Y7-Q3 | Keep mailing them the usual notices during the 14 days? | Keep; stop | **Keep.** Stopping would hide work that is still theirs, and they can still come back |
 | Y7-Q4 | Is the notice outside CLAUDE.md's rule that a proactive message carries a rule key? | Outside: it reports an event; inside: give it a rule key and a nudge row | **Outside.** It is sent once because something happened, like a mention's notice, not because an agent decided to nudge |
+
+## 12. As built
+
+Built on 11 November 2026 (plan 0.8.0 Y7), on the branch `feat/y7-account-deletion`. The plan named `agung/y7-account-deletion`, which Git cannot create while a branch called `agung` exists, locally and on GitHub.
+
+| Piece | Where |
+|---|---|
+| The request, the cancel, the run, the ledger | `packages/core/src/auth/account-deletion.ts` (`deletionBlock`, `deletionCardFor`, `requestOwnDeletion`, `cancelDeletionOnSignIn`, `deletionJustCancelled`, `runDueDeletions`) |
+| The one body both erasures run | `packages/core/src/people/erase-member.ts` (`loadMemberForErasure`, `eraseMemberInTx`), called by `people.erase` and by the run |
+| The table and the new inbox reason | Migration 0167, `packages/db/src/schema/account-deletions.ts` |
+| The four mails | `packages/core/src/mail/account.ts`, words in `mail/words.ts`, sent from `outbox/handlers.ts`, each address removed once delivered |
+| The scheduler and the command | `account.runDeletions` at minute 45 of every hour in `apps/web/lib/scheduler.ts`; `pnpm account:delete-due` (`packages/core/src/bin/delete-due-accounts.ts`), exit 1 when an account failed partway |
+| The card | `apps/web/app/account/delete-card.tsx` and `delete-actions.ts`, at the foot of `/account` |
+| The workspace archive | `account_deletions` is excluded in `packages/core/src/portability/policy.ts`: it is about the account across workspaces, and restored elsewhere it would delete somebody who never asked there |
+| Tests | `packages/core/test/account-deletion.test.ts` (13 cases, fake clock), `e2e/s51-account-deletion.spec.ts` |
+
+**Where Y7 hooks into code it does not own**, each a few lines:
+
+| File | Change |
+|---|---|
+| `packages/core/src/auth/auth.ts` | The session-create `before` hook calls `cancelDeletionOnSignIn` after the single sign-on enforcement check, and throws `ACCOUNT_BEING_DELETED` while the run is erasing |
+| `packages/core/src/auth/account-self-service.ts` | `linkedProviders` is exported, so the card offers the same "Sign in again with ..." buttons as the email card |
+| `apps/web/app/(auth)/sign-in/page.tsx` and `sign-in/deletion-actions.ts` | The date notice after a request, the being-deleted sentence for a password, a passkey and a one-time code, and the landing on `/account?deletion=kept` |
+| `packages/core/src/people/erasure.ts` | `eraseAccountIfAlone` takes its workspace as optional, so an account that belongs to no workspace when the run starts is still anonymised |
+
+**Deviations and readings**
+
+| # | Design said | Built | Why |
+|---|---|---|---|
+| AB1 | §3.2: "Nothing is mailed to them but the two mails above" | The usual notices keep reaching them by mail as well as in the inbox | Y7-Q3, answered "Keep" and approved; the §3.2 sentence predates it (Agung, 11 November 2026) |
+| AB2 | §5: the notice lists the goals, key results and reviews, "each a link" | The activity `member.self_deleted` carries three counts, and the notice links to the erased member's profile, which lists the goals they championed, each a link, through the reader's own access | The activity is on the feed every member reads, and a private goal's title is not theirs to see. Counts name nothing |
+| AB3 | §5: kind `member.self_deleted` | Activity kind `member.self_deleted` (feed: "A member deleted their account. 1 goal now need an owner"), inbox reason `self_deleted` ("Account deleted"), subject `workspace_member` | A notice is a notification row pointing at the write's activity, as a support request's is |
+| AB4 | §3.1: "every session of the account revoked" | Sessions end; API tokens, device tokens and connected apps keep working until the run, which removes them through `sweepPersonalData`. The first mail says so | The design names sessions only. The person still owns their work for 14 days |
+| AB5 | §3.2: "the page says so once" | After a password, passkey or one-time-code sign-in within 10 minutes of the cancellation, the browser lands on `/account?deletion=kept`. A single sign-on sign-in lands where its callback says and is told by the mail | The provider's callback is not this page's to steer |
+| AB6 | §4: the last owner's refusal links to the handover and the close | The links (Admin, Roles; on a cloud, Admin, General) show when the workspace is the one the page is open in; for another workspace the sentence says to switch first | Those screens act on the open workspace |
+| AB7 | §3.3: per workspace | Every membership the account still has, suspended ones included, since each holds what identifies the person; a removed (soft-deleted) membership is skipped, as `eraseAccountIfAlone` already counts it | The account is anonymised only when no live membership is left |
+| AB8 | §3.3: the instance chain | `account.deletion_requested`, `account.deletion_cancelled` (`reason`: `signed_in` or `refused`, with the refusal's kind) and `account.deletion_completed` (the number of workspaces) | The plan row asks for the instance chain too |
+| AB9 | §3.3: the late refusal | Checked only before the first erasure. A run that already erased a workspace and then meets a refusal records the error and is retried every hour | Nothing is ever half done because of a refusal, and nothing erased can be restored |

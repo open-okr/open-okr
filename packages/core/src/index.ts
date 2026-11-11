@@ -509,6 +509,18 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export {
+  ACCOUNT_BEING_DELETED_CODE,
+  ACCOUNT_DELETION_WAIT_DAYS,
+  type DeletionBlock,
+  type DeletionCard,
+  type DeletionPass,
+  type DeletionRequestOutcome,
+  deletionCardFor,
+  deletionJustCancelled,
+  requestOwnDeletion,
+  runDueDeletions,
+} from "./auth/account-deletion.ts";
+export {
   changeOwnEmail,
   type EmailCard,
   type EmailChangeOutcome,

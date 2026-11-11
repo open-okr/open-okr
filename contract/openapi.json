@@ -11793,7 +11793,8 @@
                               "check_in",
                               "support_request",
                               "support_ended",
-                              "connection_ended"
+                              "connection_ended",
+                              "self_deleted"
                             ]
                           },
                           "channel": {
@@ -11939,7 +11940,8 @@
                 "check_in",
                 "support_request",
                 "support_ended",
-                "connection_ended"
+                "connection_ended",
+                "self_deleted"
               ]
             }
           },
@@ -12554,7 +12556,8 @@
                         "check_in",
                         "support_request",
                         "support_ended",
-                        "connection_ended"
+                        "connection_ended",
+                        "self_deleted"
                       ]
                     },
                     "additionalProperties": {
@@ -12617,7 +12620,8 @@
                                 "check_in",
                                 "support_request",
                                 "support_ended",
-                                "connection_ended"
+                                "connection_ended",
+                                "self_deleted"
                               ]
                             },
                             {
@@ -12900,7 +12904,8 @@
                       "check_in",
                       "support_request",
                       "support_ended",
-                      "connection_ended"
+                      "connection_ended",
+                      "self_deleted"
                     ]
                   }
                 },

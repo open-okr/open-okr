@@ -230,6 +230,7 @@ const en = {
   "digest.reason.support_request": "Support request",
   "digest.reason.support_ended": "Support ended",
   "digest.reason.connection_ended": "Connection ended",
+  "digest.reason.self_deleted": "Account deleted",
 
   "nudge.badge": "AGENT",
   "nudge.coach": "OKR Coach",
@@ -240,6 +241,55 @@ const en = {
     "Every message names the rule it follows: {rule}. Quiet hours are respected. ",
   "nudge.summaryHeading": "Since you last looked",
   "nudge.summaryHeld": "Held back this week, past your limit",
+  // Deleting your own account (account-deletion.md §7, plan 0.8.0 Y7): when
+  // it is asked for, the day before it runs, when it is cancelled, and when
+  // it is done. Each says how to keep the account while that is still
+  // possible, and none is a credential.
+  "deletion.eyebrow": "Your account",
+  "deletion.signIn": "Sign in to keep it",
+  "deletion.requestedSubject":
+    "Your {instance} account will be deleted on {date}",
+  "deletion.requestedPreheader": "Sign in before then to keep it.",
+  "deletion.requestedHeading": "Your account will be deleted",
+  "deletion.requestedBefore": "You asked to delete the account ",
+  "deletion.requestedAfter":
+    ". It will be deleted on {date}, and every device was signed out. API tokens and connected apps keep working until then.",
+  "deletion.requestedKeep":
+    "Changed your mind? Sign in before then and nothing is deleted.",
+  "deletion.requestedNotYou":
+    "If you did not ask for this, sign in now to cancel it, then change your password.",
+  "deletion.tomorrowSubject":
+    "Your {instance} account will be deleted tomorrow",
+  "deletion.tomorrowPreheader": "Sign in to keep it.",
+  "deletion.tomorrowHeading": "Your account will be deleted tomorrow",
+  "deletion.tomorrowBefore": "The account ",
+  "deletion.tomorrowAfter":
+    " will be deleted on {date}. What you wrote stays, under a placeholder name, and what identifies you goes.",
+  "deletion.tomorrowKeep": "Sign in before then to keep it.",
+  "deletion.cancelledSubject": "Your {instance} account is kept",
+  "deletion.cancelledPreheader": "Nothing was deleted.",
+  "deletion.cancelledHeading": "Your account is kept",
+  "deletion.cancelledSignedIn":
+    "You signed in, so the deletion you asked for is cancelled. Nothing was deleted.",
+  "deletion.cancelledLastOwner":
+    "The deletion you asked for is cancelled and nothing was deleted, because you are now the only owner of {workspace}. Hand it over or close it, then ask again.",
+  "deletion.cancelledDirectory":
+    "The deletion you asked for is cancelled and nothing was deleted, because your organisation's directory now manages this account. Ask your administrator.",
+  "deletion.cancelledOther":
+    "The deletion you asked for is cancelled and nothing was deleted. You can ask again from Your account.",
+  "deletion.cancelledNotYou":
+    "If you did not sign in, change your password now.",
+  "deletion.openAccount": "Open your account",
+  "deletion.doneSubject": "Your {instance} account is deleted",
+  "deletion.donePreheader": "This is the last mail to this address.",
+  "deletion.doneHeading": "Your account is deleted",
+  "deletion.doneBefore": "The account ",
+  "deletion.doneAfter":
+    " is deleted. What you wrote stays, under a placeholder name, and everything that identified you is gone.",
+  "deletion.footer":
+    "Sent by {instance} at {host} because a deletion of this account was asked for.",
+  "deletion.doneFooter":
+    "Sent by {instance} at {host}. No more mail will come to this address from {instance}.",
 } as const;
 
 export type MailWordKey = keyof typeof en;
@@ -459,6 +509,7 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "digest.reason.support_request": "Permintaan sokongan",
   "digest.reason.support_ended": "Sokongan tamat",
   "digest.reason.connection_ended": "Sambungan ditamatkan",
+  "digest.reason.self_deleted": "Akaun dipadam",
 
   "nudge.badge": "EJEN",
   "nudge.coach": "OKR Coach",
@@ -469,6 +520,50 @@ const ms: Readonly<Record<MailWordKey, string>> = {
     "Setiap mesej menamakan peraturan yang diikutinya: {rule}. Waktu senyap dihormati. ",
   "nudge.summaryHeading": "Sejak anda terakhir melihat",
   "nudge.summaryHeld": "Ditahan minggu ini, melebihi had anda",
+
+  "deletion.eyebrow": "Akaun anda",
+  "deletion.signIn": "Log masuk untuk mengekalkannya",
+  "deletion.requestedSubject": "Akaun {instance} anda akan dipadam pada {date}",
+  "deletion.requestedPreheader": "Log masuk sebelum itu untuk mengekalkannya.",
+  "deletion.requestedHeading": "Akaun anda akan dipadam",
+  "deletion.requestedBefore": "Anda meminta untuk memadam akaun ",
+  "deletion.requestedAfter":
+    ". Ia akan dipadam pada {date}, dan setiap peranti telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi sehingga itu.",
+  "deletion.requestedKeep":
+    "Berubah fikiran? Log masuk sebelum itu dan tiada apa yang dipadam.",
+  "deletion.requestedNotYou":
+    "Jika anda tidak memintanya, log masuk sekarang untuk membatalkannya, kemudian tukar kata laluan anda.",
+  "deletion.tomorrowSubject": "Akaun {instance} anda akan dipadam esok",
+  "deletion.tomorrowPreheader": "Log masuk untuk mengekalkannya.",
+  "deletion.tomorrowHeading": "Akaun anda akan dipadam esok",
+  "deletion.tomorrowBefore": "Akaun ",
+  "deletion.tomorrowAfter":
+    " akan dipadam pada {date}. Apa yang anda tulis kekal, di bawah nama pengganti, dan apa yang mengenal pasti anda dibuang.",
+  "deletion.tomorrowKeep": "Log masuk sebelum itu untuk mengekalkannya.",
+  "deletion.cancelledSubject": "Akaun {instance} anda dikekalkan",
+  "deletion.cancelledPreheader": "Tiada apa yang dipadam.",
+  "deletion.cancelledHeading": "Akaun anda dikekalkan",
+  "deletion.cancelledSignedIn":
+    "Anda telah log masuk, jadi pemadaman yang anda minta dibatalkan. Tiada apa yang dipadam.",
+  "deletion.cancelledLastOwner":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam, kerana anda kini satu-satunya pemilik {workspace}. Serahkannya atau tutupnya, kemudian minta semula.",
+  "deletion.cancelledDirectory":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam, kerana direktori organisasi anda kini mengurus akaun ini. Tanya pentadbir anda.",
+  "deletion.cancelledOther":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam. Anda boleh meminta semula dari Akaun anda.",
+  "deletion.cancelledNotYou":
+    "Jika anda tidak log masuk, tukar kata laluan anda sekarang.",
+  "deletion.openAccount": "Buka akaun anda",
+  "deletion.doneSubject": "Akaun {instance} anda telah dipadam",
+  "deletion.donePreheader": "Ini e-mel terakhir ke alamat ini.",
+  "deletion.doneHeading": "Akaun anda telah dipadam",
+  "deletion.doneBefore": "Akaun ",
+  "deletion.doneAfter":
+    " telah dipadam. Apa yang anda tulis kekal, di bawah nama pengganti, dan semua yang mengenal pasti anda telah dibuang.",
+  "deletion.footer":
+    "Dihantar oleh {instance} di {host} kerana pemadaman akaun ini telah diminta.",
+  "deletion.doneFooter":
+    "Dihantar oleh {instance} di {host}. Tiada lagi e-mel akan dihantar ke alamat ini daripada {instance}.",
 };
 
 const WORDS: Readonly<

@@ -62,6 +62,10 @@ export {
   accessGroups,
 } from "./schema/access.ts";
 export {
+  type AccountDeletion,
+  accountDeletions,
+} from "./schema/account-deletions.ts";
+export {
   AGENT_AUTONOMIES,
   AGENT_KINDS,
   AGENT_RUN_STATUSES,

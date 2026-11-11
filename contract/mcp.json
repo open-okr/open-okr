@@ -1642,7 +1642,8 @@
               "check_in",
               "support_request",
               "support_ended",
-              "connection_ended"
+              "connection_ended",
+              "self_deleted"
             ],
             "description": "One line on why, where the workspace asks for one."
           },
@@ -1811,7 +1812,8 @@
                 "check_in",
                 "support_request",
                 "support_ended",
-                "connection_ended"
+                "connection_ended",
+                "self_deleted"
               ]
             },
             "additionalProperties": {
