@@ -82,6 +82,20 @@ const signUp = async (email: string) => {
 const signIn = (email: string) =>
   send("/sign-in/email", { email, password: PASSWORD });
 
+/**
+ * A sign-in through an identity provider, as Better Auth's callback makes it:
+ * the session hook with the provider's path. Driving the hook rather than a
+ * provider round trip, because what is under test is that the hook asks the
+ * same question whatever the path.
+ */
+const providerSignIn = async (userId: string, path: string) => {
+  const before = auth.options.databaseHooks?.session?.create?.before as (
+    session: { userId: string },
+    context: { path: string },
+  ) => Promise<unknown>;
+  return before({ userId }, { path });
+};
+
 const admin = async () => (await workerDb()).admin;
 
 const userIdOf = async (email: string) => {
@@ -393,6 +407,22 @@ describe("waiting", () => {
     expect(await membershipsOf(personId)).toHaveLength(2);
   });
 
+  // Every factor meets the hook (design §3.2). A person with no password
+  // signs in only this way, so skipping it here would erase an account that
+  // came back.
+  it.each([
+    "/callback/google",
+    "/sign-in/sso",
+    "/sso/saml2/sp/acs/sso-adfs-abc12345",
+  ])(
+    "is cancelled by an identity provider's sign-in too, at %s",
+    async (path) => {
+      await ask();
+      await providerSignIn(personId, path);
+      expect(await request()).toMatchObject({ cancel_reason: "signed_in" });
+    },
+  );
+
   it("mails the day before, once", async () => {
     await ask();
     const runsAt = (await request())?.runs_at as Date;
@@ -501,6 +531,17 @@ describe("running", () => {
       code: ACCOUNT_BEING_DELETED_CODE,
     });
     // And the request is not cancelled by it.
+    expect(await request()).toMatchObject({ cancelled_at: null });
+  });
+
+  it("refuses an identity provider's sign-in while the run is erasing", async () => {
+    await ask();
+    await (await admin()).query(
+      "update account_deletions set started_at = now()",
+    );
+    await expect(
+      providerSignIn(personId, "/callback/google"),
+    ).rejects.toMatchObject({ body: { code: ACCOUNT_BEING_DELETED_CODE } });
     expect(await request()).toMatchObject({ cancelled_at: null });
   });
 

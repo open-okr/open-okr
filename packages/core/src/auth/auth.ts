@@ -1187,28 +1187,30 @@ export function createAuth(options: AuthOptions) {
            * account is ever read.
            */
           before: async (session, hookContext) => {
-            if (isProviderSignInPath(hookContext?.path)) {
-              return;
-            }
             const userId = (session as { userId?: unknown }).userId;
             if (typeof userId !== "string") {
               return;
             }
-            const provider = await enforcedProviderForUser(
-              options.pool,
-              userId,
-            );
-            if (provider) {
-              throw new APIError("FORBIDDEN", {
-                message: enforcementMessage(provider),
-              });
+            // The provider's own callback is what enforcement asks for, so
+            // only that check skips it. The deletion check below must not:
+            // an account with no password signs in only this way.
+            if (!isProviderSignInPath(hookContext?.path)) {
+              const provider = await enforcedProviderForUser(
+                options.pool,
+                userId,
+              );
+              if (provider) {
+                throw new APIError("FORBIDDEN", {
+                  message: enforcementMessage(provider),
+                });
+              }
             }
             // Deleting your own account (account-deletion.md §3.2, §3.3,
             // plan 0.8.0 Y7). Every sign-in ends in a session row, whatever
-            // factor produced it, so this is where a sign-in cancels an open
-            // request, and where one is refused while the run is erasing the
-            // account. After the enforcement check, so a refused sign-in
-            // never cancels anything.
+            // factor produced it, a provider's callback included, so this is
+            // where a sign-in cancels an open request, and where one is
+            // refused while the run is erasing the account. After the
+            // enforcement check, so a refused sign-in never cancels anything.
             if (
               (await cancelDeletionOnSignIn(options.pool, userId)) === "running"
             ) {
