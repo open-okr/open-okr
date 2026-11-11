@@ -2,12 +2,7 @@ import { OutboxRelay } from "@openokr/adapters";
 import { NextResponse } from "next/server";
 import { outboxRowsPerMinute } from "../../../lib/admission";
 import { getPool } from "../../../lib/pool";
-import {
-  schedulerBootedAt,
-  schedulerEnabled,
-  schedulerLastRunAt,
-  schedulerState,
-} from "../../../lib/scheduler";
+import { schedulerStatus } from "../../../lib/scheduler-status";
 import { statusThresholds } from "../../../lib/status-thresholds";
 
 /**
@@ -51,10 +46,6 @@ interface StatusResponse {
 const relayDegradedSeconds = (): number => statusThresholds().relay.degraded;
 const relayUnavailableSeconds = (): number =>
   statusThresholds().relay.unavailable;
-const schedulerDegradedSeconds = (): number =>
-  statusThresholds().scheduler.degraded;
-const schedulerUnavailableSeconds = (): number =>
-  statusThresholds().scheduler.unavailable;
 
 function worst(...statuses: ComponentStatus[]): ComponentStatus {
   if (statuses.includes("unavailable")) return "unavailable";
@@ -89,43 +80,15 @@ async function checkRelay(): Promise<ComponentStatus> {
   }
 }
 
-function checkScheduler(): ComponentStatus {
-  // If the scheduler is disabled by configuration, it is not a component
-  // that can be unhealthy. Report operational so the overall status does
-  // not degrade for a deliberate choice.
-  if (!schedulerEnabled()) return "operational";
-  // A scheduler that could not start is unavailable now, not in two hours
-  // when the heartbeat would have gone stale (completeness review H-02).
-  if (schedulerState() === "failed") return "unavailable";
-
-  const lastRun = schedulerLastRunAt();
-  const booted = schedulerBootedAt();
-  const now = Date.now();
-
-  if (lastRun !== null) {
-    const ageSec = (now - lastRun) / 1000;
-    if (ageSec >= schedulerUnavailableSeconds()) return "unavailable";
-    if (ageSec >= schedulerDegradedSeconds()) return "degraded";
-    return "operational";
-  }
-
-  // No run yet. If the process just booted, give it grace: report
-  // operational until the degraded threshold has passed since boot.
-  if (booted !== null) {
-    const sinceBoot = (now - booted) / 1000;
-    if (sinceBoot >= schedulerUnavailableSeconds()) return "unavailable";
-    if (sinceBoot >= schedulerDegradedSeconds()) return "degraded";
-    return "operational";
-  }
-
-  // Scheduler never started (should not happen if schedulerEnabled() is
-  // true, but handle it).
-  return "unavailable";
-}
-
 export async function GET(): Promise<NextResponse<StatusResponse>> {
-  const [database, relay] = await Promise.all([checkDatabase(), checkRelay()]);
-  const scheduler = checkScheduler();
+  // The scheduler is judged by the shared stamp, so every pod answers the
+  // same (plan 0.8.0 H12), including a pod whose scheduler runs on the worker
+  // (H10d). `lib/scheduler-status.ts` gathers the reading.
+  const [database, relay, scheduler] = await Promise.all([
+    checkDatabase(),
+    checkRelay(),
+    schedulerStatus(),
+  ]);
 
   const overall = worst(database, relay, scheduler);
   const body: StatusResponse = {

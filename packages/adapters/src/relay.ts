@@ -277,6 +277,21 @@ export class OutboxRelay {
   #timer: NodeJS.Timeout | undefined;
   #running = false;
   #draining: Promise<number> | undefined;
+  /**
+   * Set by `stop`, cleared by `start`. A drain checks it before each row, so
+   * a stop takes effect between rows rather than after the whole batch.
+   */
+  #stopping = false;
+  /**
+   * The claimed rows of the drain in flight that have not been started yet.
+   * The same array the drain takes its next row from, so `stop` can take the
+   * rest in one synchronous splice and no row is both released and sent.
+   */
+  #rest: OutboxRecord[] | undefined;
+  /** Whether a row is being dispatched now. */
+  #dispatching = false;
+  /** Rows handed back since the last `stop` began. */
+  #released = 0;
 
   constructor(pool: RelayPool, options: OutboxRelayOptions) {
     this.#pool = pool;
@@ -298,23 +313,42 @@ export class OutboxRelay {
     // **Registered here, not in the drain loop, and read at scrape time.**
     // This is what makes a stopped relay legible. Counters written during a
     // drain say nothing once draining stops, so the series goes flat at
-    // whatever it last reported and the outage looks like quiet. These two
-    // are queries against the world as it is when somebody asks, so a relay
+    // whatever it last reported and the outage looks like quiet. These are
+    // queries against the world as it is when somebody asks, so a relay
     // that died an hour ago reports an hour of lag.
-    options.metrics?.gauge(OUTBOX_PENDING, () => this.#pendingCount());
-    options.metrics?.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
-      OutboxRelay.oldestPendingSeconds(this.#pool, this.#rate()),
+    if (options.metrics) {
+      OutboxRelay.registerGauges(pool, options.metrics, options.rowsPerMinute);
+    }
+  }
+
+  /**
+   * Registers the queue's gauges, with or without a relay (plan 0.8.0 H10d,
+   * docs/design/worker-deployment.md §1.3).
+   *
+   * A relay registers them when it is built. A process with the relay on
+   * another pod (`OPENOKR_RELAY=elsewhere`) calls this instead, so a scrape
+   * of the Service still shows how far behind the queue is: every number
+   * here is a query against the shared outbox, the same from any process.
+   */
+  static registerGauges(
+    pool: RelayPool,
+    metrics: Pick<MetricRecorder, "gauge">,
+    rowsPerMinute?: () => number,
+  ): void {
+    const rate = (): number => rateOf(rowsPerMinute?.());
+    metrics.gauge(OUTBOX_PENDING, () => OutboxRelay.pendingCount(pool));
+    metrics.gauge(OUTBOX_OLDEST_PENDING_SECONDS, () =>
+      OutboxRelay.oldestPendingSeconds(pool, rate()),
     );
     // Whether the outbox rate is engaging now, and how much it holds (R11).
     // Each answers 0 without a query while the limit is unset.
-    options.metrics?.gauge(
+    metrics.gauge(
       OUTBOX_RATE_HELD_WORKSPACES,
-      async () =>
-        (await OutboxRelay.rateHeld(this.#pool, this.#rate())).workspaces,
+      async () => (await OutboxRelay.rateHeld(pool, rate())).workspaces,
     );
-    options.metrics?.gauge(
+    metrics.gauge(
       OUTBOX_RATE_HELD_ROWS,
-      async () => (await OutboxRelay.rateHeld(this.#pool, this.#rate())).rows,
+      async () => (await OutboxRelay.rateHeld(pool, rate())).rows,
     );
   }
 
@@ -323,9 +357,9 @@ export class OutboxRelay {
     return rateOf(this.#options.rowsPerMinute?.());
   }
 
-  /** Rows waiting: not delivered, not given up on, and due. */
-  async #pendingCount(): Promise<number> {
-    const client = await this.#pool.connect();
+  /** Rows waiting: not delivered and not given up on. */
+  static async pendingCount(pool: RelayPool): Promise<number> {
+    const client = await pool.connect();
     try {
       const result = await client.query(
         `select count(*)::bigint as pending
@@ -467,34 +501,75 @@ export class OutboxRelay {
   /**
    * Claims one batch and dispatches it. Returns how many rows were delivered
    * successfully; failed rows stay pending with their attempt count raised.
+   *
+   * Held as the drain in flight, whoever calls it, so `stop` waits for this
+   * one too and not only for the loop's.
    */
-  async drainOnce(): Promise<number> {
+  drainOnce(): Promise<number> {
+    const run = this.#drain();
+    this.#draining = run;
+    return run.finally(() => {
+      if (this.#draining === run) {
+        this.#draining = undefined;
+      }
+    });
+  }
+
+  async #drain(): Promise<number> {
+    if (this.#stopping) {
+      return 0;
+    }
     const claimed = await this.#claim();
     let delivered = 0;
+    // A stop that arrived during the claim finds this array empty, so the
+    // check after the loop is what hands those rows back.
+    const rest = claimed.slice();
+    this.#rest = rest;
 
-    for (const record of claimed) {
-      try {
-        await this.#options.dispatch(record);
-        await this.#markDelivered(record);
-        delivered++;
-        this.#count(OUTBOX_DISPATCHED, { topic: record.topic, outcome: "ok" });
-      } catch (error) {
-        const deadLettered = await this.#markFailed(record, error);
-        // Counted apart because they mean different things to whoever is
-        // watching. A failure is a provider having a bad minute and the row
-        // will be tried again. A dead letter is work this instance has given
-        // up on, and somebody has to look at it.
-        this.#count(OUTBOX_DISPATCHED, {
-          topic: record.topic,
-          outcome: deadLettered ? "dead_lettered" : "failed",
-        });
-        if (deadLettered) {
-          this.#count(OUTBOX_DEAD_LETTERED, { topic: record.topic });
+    try {
+      while (rest.length > 0 && !this.#stopping) {
+        const record = rest.shift() as OutboxRecord;
+        this.#dispatching = true;
+        try {
+          delivered += await this.#deliver(record);
+        } finally {
+          this.#dispatching = false;
         }
+      }
+      if (rest.length > 0) {
+        await this.#release(rest.splice(0));
+      }
+    } finally {
+      if (this.#rest === rest) {
+        this.#rest = undefined;
       }
     }
 
     return delivered;
+  }
+
+  /** One row: dispatched and marked. 1 when it was delivered. */
+  async #deliver(record: OutboxRecord): Promise<number> {
+    try {
+      await this.#options.dispatch(record);
+      await this.#markDelivered(record);
+      this.#count(OUTBOX_DISPATCHED, { topic: record.topic, outcome: "ok" });
+      return 1;
+    } catch (error) {
+      const deadLettered = await this.#markFailed(record, error);
+      // Counted apart because they mean different things to whoever is
+      // watching. A failure is a provider having a bad minute and the row
+      // will be tried again. A dead letter is work this instance has given
+      // up on, and somebody has to look at it.
+      this.#count(OUTBOX_DISPATCHED, {
+        topic: record.topic,
+        outcome: deadLettered ? "dead_lettered" : "failed",
+      });
+      if (deadLettered) {
+        this.#count(OUTBOX_DEAD_LETTERED, { topic: record.topic });
+      }
+      return 0;
+    }
   }
 
   /** Starts the drain loop. Safe to call twice; the second call is ignored. */
@@ -503,20 +578,18 @@ export class OutboxRelay {
       return;
     }
     this.#running = true;
+    this.#stopping = false;
 
     const tick = async () => {
       if (!this.#running) {
         return;
       }
       try {
-        // Held so `stop` can wait for an in-flight drain rather than cutting
-        // it off mid-dispatch.
-        this.#draining = this.drainOnce();
-        await this.#draining;
+        // `drainOnce` holds itself as the drain in flight, so `stop` can
+        // wait for it rather than cutting it off mid-dispatch.
+        await this.drainOnce();
       } catch (error) {
         this.#options.onError?.(error);
-      } finally {
-        this.#draining = undefined;
       }
       if (this.#running) {
         this.#timer = setTimeout(tick, this.#options.pollIntervalMs);
@@ -526,14 +599,69 @@ export class OutboxRelay {
     this.#timer = setTimeout(tick, 0);
   }
 
-  /** Stops the loop and waits for any drain already in flight. */
-  async stop(): Promise<void> {
+  /**
+   * Stops the loop between rows (plan 0.8.0 H10a,
+   * docs/design/worker-deployment.md D6).
+   *
+   * The row being dispatched finishes and is marked. The rest of its batch
+   * goes back at once, due now and with the attempt the claim counted taken
+   * off again, so another relay takes them on its next poll and a deploy
+   * never counts toward dead-lettering a row. Waiting for the whole batch, up
+   * to fifty rows and any of them a copilot run, does not fit a drain of
+   * seconds; leaving them claimed cost each one the full lease.
+   *
+   * The rest are released before the row in flight is waited for, so a
+   * dispatch that outlives the process's bound strands only itself, and that
+   * one is delivered again after its lease, as after a crash.
+   */
+  async stop(): Promise<{
+    /** Rows of the batch handed back without being sent. */
+    readonly released: number;
+    /** Whether a row was being dispatched when the stop began. */
+    readonly waited: boolean;
+  }> {
     this.#running = false;
+    this.#stopping = true;
+    this.#released = 0;
     if (this.#timer) {
       clearTimeout(this.#timer);
       this.#timer = undefined;
     }
+    const waited = this.#dispatching;
+    const rest = this.#rest?.splice(0) ?? [];
+    if (rest.length > 0) {
+      try {
+        await this.#release(rest);
+      } catch (error) {
+        // They wait out their lease instead, as they did before this existed.
+        this.#options.onError?.(error);
+      }
+    }
     await this.#draining?.catch(() => undefined);
+    return { released: this.#released, waited };
+  }
+
+  /**
+   * Hands claimed rows back unsent: due now, and with the attempt their
+   * claim counted taken off. A row something else has settled since is left
+   * alone.
+   */
+  async #release(records: readonly OutboxRecord[]): Promise<void> {
+    const client = await this.#pool.connect();
+    try {
+      const result = await client.query(
+        `update outbox
+            set available_at = now(),
+                attempts = greatest(attempts - 1, 0)
+          where id = any($1::uuid[])
+            and delivered_at is null
+            and dead_lettered_at is null`,
+        [records.map((record) => record.id)],
+      );
+      this.#released += result.rowCount ?? 0;
+    } finally {
+      client.release();
+    }
   }
 
   /**

@@ -18,13 +18,18 @@ import { authSchema } from "@openokr/db";
 import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
 import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
+import { isDemoAccount } from "../demo/persona-list.ts";
 import {
   cookieHeaderFrom,
   inviteTokenFromCookies,
@@ -40,6 +45,10 @@ import { tryJoinWorkspaceForIdentity } from "../workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../workspaces/provisioning.ts";
 import { registrationRefusal } from "../workspaces/registration.ts";
 import {
+  accountBeingDeletedError,
+  cancelDeletionOnSignIn,
+} from "./account-deletion.ts";
+import {
   processOnlyKeyRing,
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
@@ -49,16 +58,36 @@ import {
   withResolvedCaller,
 } from "./caller-address.ts";
 import {
+  completionRefusal,
+  EMAIL_CHANGE_SIGN_IN,
+  queueChangeLink,
+  readChangeLink,
+  recordEmailChanged,
+  tokenOfRequest,
+} from "./email-change.ts";
+import { DISABLED_AUTH_PATHS } from "./endpoints.ts";
+import {
+  invitationInCookieConfirms,
+  recordConfirmedByInvitation,
+} from "./invited-address.ts";
+import {
   type AuthLimiterStorage,
   inProcessLimiter,
   routedByPath,
 } from "./limiter-storage.ts";
 import { clearSignInAttempts, recordPasswordAttempt } from "./lockout.ts";
+import {
+  accountHasPassword,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  recordPasswordChange,
+} from "./password-change.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withSecondFactorLockAudit } from "./second-factor-lock.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
 import {
+  type EnforcingProvider,
   enforcedProviderForEmail,
   enforcedProviderForUser,
   enforcementMessage,
@@ -67,6 +96,15 @@ import {
   verifiedEnforcedProviderForSignUp,
 } from "./sso-enforcement.ts";
 import { ssoLinkAllowed } from "./sso-linking.ts";
+import {
+  countVerificationLink,
+  EMAIL_VERIFICATION_LINK_SECONDS,
+  queueVerificationLink,
+  resendAllowance,
+  resendHeldMessage,
+  verificationReason,
+  withVerificationReason,
+} from "./verification-links.ts";
 
 /**
  * The paths that establish or recover a local credential (P8-T07a).
@@ -88,6 +126,78 @@ const CREDENTIAL_PATHS = new Set([
 ]);
 
 /**
+ * **Every password check behind a session** (docs/design/
+ * account-self-service.md D3, plan 0.8.0 Y3). Each counts toward the same
+ * hold a sign-in does, and a success clears it. Counting only the password
+ * change would leave four uncounted ways to test a password with a stolen
+ * session cookie. `/verify-password` is off over HTTP, so what reaches it is
+ * a server call (`auth.api.verifyPassword`), which runs these hooks too.
+ *
+ * This changes account-lockout.md §7, which said such checks were not
+ * counted.
+ */
+const SESSION_PASSWORD_PATHS = new Set([
+  "/change-password",
+  "/verify-password",
+  "/two-factor/enable",
+  "/two-factor/disable",
+  "/two-factor/generate-backup-codes",
+]);
+
+/**
+ * **What a demonstration account may not change** (account-self-service.md
+ * D1, D8 and AS-Q8). Its password is published, so one visitor changing it,
+ * or turning a one-time code on, would lock every other visitor out until
+ * the nightly rebuild.
+ */
+const DEMO_REFUSALS: Readonly<Record<string, string>> = {
+  "/change-password":
+    "Demonstration accounts keep their password. Anyone can sign in to them, so anyone could change it.",
+  "/two-factor/enable":
+    "Demonstration accounts keep their sign-in as it is. Anyone can sign in to them.",
+  "/two-factor/disable":
+    "Demonstration accounts keep their sign-in as it is. Anyone can sign in to them.",
+};
+
+/**
+ * The password a session path checks, or null when Better Auth would refuse
+ * the request before checking anything (D3). A malformed request is never
+ * counted: a new password outside 12 to 128 characters, or a checked one
+ * that is missing or past the maximum.
+ */
+function checkedPassword(path: string, body: unknown): string | null {
+  const fields = (body ?? {}) as Record<string, unknown>;
+  const checked =
+    path === "/change-password" ? fields.currentPassword : fields.password;
+  if (
+    typeof checked !== "string" ||
+    checked === "" ||
+    checked.length > MAX_PASSWORD_LENGTH
+  ) {
+    return null;
+  }
+  if (path === "/change-password") {
+    const next = fields.newPassword;
+    if (
+      typeof next !== "string" ||
+      next.length < MIN_PASSWORD_LENGTH ||
+      next.length > MAX_PASSWORD_LENGTH
+    ) {
+      return null;
+    }
+  }
+  return checked;
+}
+
+/** The refusal for an account single sign-on claims (D8). */
+function enforcedRefusal(provider: EnforcingProvider): APIError {
+  return new APIError("FORBIDDEN", {
+    message: enforcementMessage(provider),
+    code: "SSO_ENFORCED",
+  });
+}
+
+/**
  * The answer to a held attempt (account-lockout.md D12). The same words for
  * every address, so a hold says nothing about who has an account. The
  * seconds travel in the body as well as the header, because the browser
@@ -100,6 +210,24 @@ function heldRefusal(retryAfterSeconds: number): APIError {
     {
       message: `Too many attempts for this address. Try again in ${minutes} ${minutes === 1 ? "minute" : "minutes"}, or reset your password.`,
       code: "SIGN_IN_HELD",
+      retryAfterSeconds,
+    },
+    { "Retry-After": String(retryAfterSeconds) },
+  );
+}
+
+/**
+ * The answer to a request for a link that this address's allowance refuses
+ * (email-verification.md D9). The same words and the same shape for every
+ * address, with the wait in the body as well as the header, as a sign-in
+ * hold gives it.
+ */
+function resendHeldRefusal(retryAfterSeconds: number): APIError {
+  return new APIError(
+    "TOO_MANY_REQUESTS",
+    {
+      message: resendHeldMessage(retryAfterSeconds),
+      code: "VERIFICATION_RESEND_HELD",
       retryAfterSeconds,
     },
     { "Retry-After": String(retryAfterSeconds) },
@@ -251,7 +379,8 @@ export interface AuthOptions {
     resetUrl: string;
   }) => Promise<void>;
   /**
-   * Whether a sign-in must wait for a verified address (P8-T02b).
+   * Whether a sign-in must wait for a verified address (P8-T02b), and with it
+   * whether a confirmation link is queued at all (email-verification.md D6).
    *
    * Resolved by the caller from `mail.transport`, because Better Auth reads
    * this off an options object built once per process and the resolution is
@@ -261,16 +390,33 @@ export interface AuthOptions {
    * Defaults to false, which is what every instance did before this option
    * existed. A caller that forgets it gets the old behaviour rather than a
    * locked-out instance.
+   *
+   * The link is queued on the outbox, which the relay sends through whatever
+   * mail is configured. There is no send function to pass any more: the mail
+   * used to go out inside the sign-up request, and a refused one left an
+   * account nobody could confirm (plan 0.8.0 H1).
    */
   readonly requireEmailVerification?: boolean;
   /**
-   * Sends the verification link. Absent means no verification mail is ever
-   * sent, which is the right pairing for a console transport.
+   * A link may be sent without anything waiting for it (plan 0.8.0 S4,
+   * email-verification.md §11.3): confirmation is off, and the instance can
+   * deliver mail. The account works at once; the link, worded as optional,
+   * confirms the address for what still needs one, joining by trusted domain.
    */
-  readonly sendVerificationEmail?: (message: {
-    to: string;
-    url: string;
-  }) => Promise<void>;
+  readonly optionalVerificationLinks?: boolean;
+  /**
+   * Whether this instance can send mail (docs/design/account-self-service.md
+   * D14, plan 0.8.0 Y4), which turns on Better Auth's change of sign-in
+   * email. The new address has to be proved by a link, so with no mail the
+   * change is not offered at all.
+   *
+   * Resolved by the caller at boot with `resolveCanSendMail`, and the web app
+   * hands Your account the same stored answer, so the page and the endpoint
+   * never disagree. A separate answer from `requireEmailVerification`,
+   * because whether to confirm an address at sign-up may be decided on more
+   * than the transport (plan 0.8.0 S4). Defaults to false: off.
+   */
+  readonly canSendMail?: boolean;
   /**
    * SSO provider configurations loaded from `sso_connections` (P8-T07). Each
    * OIDC entry becomes a genericOAuth provider that appears on the sign-in
@@ -352,6 +498,19 @@ const LIMIT_RULES = {
   // `/forget-password`, which no longer exists, so Better Auth's own default
   // of 3 applied rather than this 5 (account-lockout.md D11).
   "/request-password-reset": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+  // Asking for a new confirmation link, per network (email-verification.md
+  // D10). Five, as for a reset request, and in the shared count, where
+  // Better Auth's own default was three in each process. The per-address
+  // allowance is counted separately, in the hook below (D9).
+  "/send-verification-email": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+  // Changing a password while signed in (account-self-service.md D11). Ten a
+  // minute per network, in the shared count, where it fell under the
+  // hundred-a-minute catch-all counted in each process. The hold counts each
+  // wrong current password on top (D3).
+  "/change-password": {
+    window: SIGN_IN_WINDOW_SECONDS,
+    max: SIGN_IN_ATTEMPTS,
+  },
 } as const;
 
 export function createAuth(options: AuthOptions) {
@@ -438,6 +597,32 @@ export function createAuth(options: AuthOptions) {
   });
   const keyRing = options.keyRing ?? processOnlyKeyRing();
   const lockoutEnabled = options.lockout?.enabled ?? true;
+  const requireEmailVerification = options.requireEmailVerification ?? false;
+  const optionalVerificationLinks =
+    !requireEmailVerification && (options.optionalVerificationLinks ?? false);
+  const canSendMail = options.canSendMail ?? false;
+  const rateLimitEnabled = options.rateLimit?.enabled ?? true;
+  // Where each address's allowance of confirmation links is counted (D9):
+  // the shared storage when there is one, so every replica sees one count.
+  const resendStorage = options.rateLimitStorage ?? inProcessLimiter();
+
+  /**
+   * Two callbacks below need the instance they belong to: a completed reset
+   * confirms the address through Better Auth's own adapter (D14), and a
+   * repeat sign-up asks for a link the way the resend does (D12). Both run
+   * long after the instance is built, so these are filled in once it is.
+   */
+  let contextOf:
+    | (() => Promise<{
+        internalAdapter: {
+          updateUser(
+            userId: string,
+            data: Record<string, unknown>,
+          ): Promise<unknown>;
+        };
+      }>)
+    | undefined;
+  let resendFromServer: ((email: string) => Promise<unknown>) | undefined;
 
   const auth = betterAuth({
     database: (betterAuthOptions: Parameters<typeof adapterFactory>[0]) =>
@@ -459,6 +644,24 @@ export function createAuth(options: AuthOptions) {
     baseURL: options.baseUrl,
     basePath: "/api/auth",
 
+    // The endpoints no screen uses answer 404 over HTTP
+    // (account-self-service.md D26, plan 0.8.0 Y6). Built from the inventory
+    // in `endpoints.ts`, whose test fails when Better Auth serves a path the
+    // inventory does not classify. A server call through `auth.api` never
+    // meets this list.
+    disabledPaths: [...DISABLED_AUTH_PATHS],
+
+    /**
+     * **Changing the sign-in email** (account-self-service.md D14, D15, plan
+     * 0.8.0 Y4): on only where mail can be sent, because nothing changes
+     * until the new address's link is opened. `/change-email` stays off over
+     * HTTP; Your account's server action calls `auth.api.changeEmail` after
+     * its own refusals and the password. No confirmation by the old address
+     * first (AS-Q4 (a)): it is told instead, and an unopened link stops
+     * working once the owner signs every other device out (D19).
+     */
+    user: { changeEmail: { enabled: canSendMail } },
+
     emailAndPassword: {
       enabled: true,
       // Verification is not required to sign in unless the instance can
@@ -467,8 +670,14 @@ export function createAuth(options: AuthOptions) {
       // the product unusable out of the box. `mail.transport` is what
       // decides, resolved by the caller at boot (P8-T02b): the question is
       // whether a link can arrive, not whether this is a managed cloud.
-      requireEmailVerification: options.requireEmailVerification ?? false,
-      minPasswordLength: 12,
+      requireEmailVerification,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
+      // A completed reset signs every device out (email-verification.md
+      // D15). With D14 below it is what lets the owner of an address take it
+      // back from somebody who signed up with it first: their reset confirms
+      // the address and ends the other person's sessions.
+      revokeSessionsOnPasswordReset: true,
       sendResetPassword: async ({ user, url }) => {
         // openokr:allow-side-effect: Better Auth owns this request's
         // transaction and calls back outside the Operation pipeline, so
@@ -480,33 +689,150 @@ export function createAuth(options: AuthOptions) {
       // A completed reset ends any hold on the account at once
       // (account-lockout.md D7). No caller is marked as known: whoever opens
       // a reset link has proved the mailbox, not the network.
-      onPasswordReset: async ({ user }) => {
+      onPasswordReset: async ({ user }, request) => {
         if (lockoutEnabled) {
           await clearSignInAttempts(options.pool, {
             secret: options.secret,
             email: user.email,
           });
         }
+        // **A completed reset is a password change** (account-self-service.md
+        // D9, D13): one audit row, and a mail to the account's address.
+        // Somebody with brief access to the mailbox should not be able to
+        // take the account in silence. Every session ended with it (D15 of
+        // email-verification.md). Never throws.
+        await recordPasswordChange(options.pool, {
+          userId: user.id,
+          via: "reset",
+          otherSessionsEnded: true,
+          address: authCallerAddress(request?.headers ?? new Headers()),
+        });
+        // **A completed reset confirms the address** (email-verification.md
+        // D14). The reset link reached the mailbox, which is the same proof a
+        // confirmation link gives, and it is the second way out for an
+        // account whose first mail never arrived. Through Better Auth's own
+        // adapter, so its user-update hooks run, and never by direct SQL.
+        if (!user.emailVerified) {
+          try {
+            const context = await contextOf?.();
+            await context?.internalAdapter.updateUser(user.id, {
+              emailVerified: true,
+            });
+            await recordInstanceAuditEvent(options.pool, {
+              action: "auth.email_verified",
+              payload: { userId: user.id, via: "reset" },
+            });
+          } catch (error) {
+            // The password is already changed; this never undoes it. The
+            // next reset, or a confirmation link, confirms the address.
+            process.stderr.write(
+              `auth: could not confirm an address after a reset: ${error instanceof Error ? error.message : String(error)}\n`,
+            );
+          }
+        }
+      },
+      /**
+       * **Signing up again with an unconfirmed address queues a fresh link**
+       * (email-verification.md D12). It is what a person whose first mail
+       * never came does first, and the check-your-email card they see says a
+       * link was sent. Not awaited, so a repeat takes no longer for having an
+       * account, and drawn on the same per-address allowance as the button:
+       * a spent allowance queues nothing, silently. A confirmed address gets
+       * nothing (Q3), and the answer to the sign-up is Better Auth's generic
+       * success either way.
+       */
+      onExistingUserSignUp: async ({ user }) => {
+        const resend = resendFromServer;
+        if (!requireEmailVerification || user.emailVerified || !resend) {
+          return;
+        }
+        void withVerificationReason("repeat_sign_up", () =>
+          resend(user.email),
+        ).catch(() => undefined);
       },
     },
 
     emailVerification: {
-      // Sent on sign-up only where a link can arrive. With a console
-      // transport there is no callback, so nothing is sent and nothing is
-      // written to the log either.
-      sendOnSignUp: Boolean(options.sendVerificationEmail),
-      sendVerificationEmail: async ({ user, url }) => {
-        // openokr:allow-side-effect: the same arrangement `sendResetPassword`
-        // has above. Better Auth owns this request's transaction and calls
-        // back outside the Operation pipeline, so there is no outbox row to
-        // attach the mail to. The link is sent in response to a request, not
-        // as a consequence of a domain write.
-        // The account that claims the instance is created verified, and a
-        // link asking it to confirm again would only confuse (BUG-028).
-        if (user.emailVerified) {
+      // A day (email-verification.md D13). Every page that tells a person to
+      // open the link reads the same constant.
+      expiresIn: EMAIL_VERIFICATION_LINK_SECONDS,
+      // Queued on sign-up only where a link can arrive. With a console
+      // transport nothing is queued and nothing is written to the log.
+      sendOnSignUp: requireEmailVerification || optionalVerificationLinks,
+      /**
+       * **Queued on the outbox, never sent here** (email-verification.md D1
+       * to D4, plan 0.8.0 H1). The row is written on the pool in its own
+       * statement rather than inside a domain transaction, because Better
+       * Auth committed the user row before calling back and hands this no
+       * transaction to join (D2). It never throws (D3).
+       *
+       * Always present, so the resend endpoint answers on every instance;
+       * with a console transport it queues nothing.
+       */
+      sendVerificationEmail: async ({ user, url, token }, request) => {
+        // **A change of sign-in email comes through here too** (account-
+        // self-service.md D18, plan 0.8.0 Y4). Better Auth hands its link to
+        // this callback with the new address as `user.email`, which the
+        // confirmation branch below would skip as an address already
+        // confirmed. Its signed token says which kind it is, and the old and
+        // new addresses come from the token rather than from `user`.
+        const change = await readChangeLink(options.secret, token);
+        if (change) {
+          if (canSendMail) {
+            await queueChangeLink(options.pool, {
+              ...change,
+              url,
+              token,
+              lifetimeSeconds: EMAIL_VERIFICATION_LINK_SECONDS,
+            });
+          }
           return;
         }
-        await options.sendVerificationEmail?.({ to: user.email, url });
+        // The account that claims the instance is created verified, and a
+        // link asking it to confirm again would only confuse (BUG-028).
+        if (
+          (!requireEmailVerification && !optionalVerificationLinks) ||
+          user.emailVerified
+        ) {
+          return;
+        }
+        await queueVerificationLink(options.pool, {
+          optional: optionalVerificationLinks,
+          userId: user.id,
+          to: user.email,
+          url,
+          token,
+          lifetimeSeconds: EMAIL_VERIFICATION_LINK_SECONDS,
+          reason: verificationReason("sign_up", request),
+        });
+      },
+      /**
+       * One instance audit row when an address is confirmed by its link
+       * (D17). Better Auth calls this only on the change from unconfirmed to
+       * confirmed, so an old link opened again writes nothing.
+       *
+       * **A completed change of sign-in email reaches this callback too**,
+       * for an account whose old address was confirmed (account-self-
+       * service.md D20, plan 0.8.0 Y4). A change is not a first
+       * confirmation, so it writes no `auth.email_verified` row here; the
+       * user-update hook below records it as `auth.email_changed`, for a
+       * confirmed account and an unconfirmed one alike.
+       */
+      afterEmailVerification: async (user, request) => {
+        if (await readChangeLink(options.secret, tokenOfRequest(request))) {
+          return;
+        }
+        try {
+          await recordInstanceAuditEvent(options.pool, {
+            action: "auth.email_verified",
+            payload: { userId: user.id, via: "link" },
+          });
+        } catch (error) {
+          // The address is confirmed already; a missing row never undoes it.
+          process.stderr.write(
+            `auth: could not record a confirmed address: ${error instanceof Error ? error.message : String(error)}\n`,
+          );
+        }
       },
     },
 
@@ -568,6 +894,144 @@ export function createAuth(options: AuthOptions) {
        * no address.
        */
       before: createAuthMiddleware(async (hookContext) => {
+        /**
+         * **A change link is completed only inside a live session of the
+         * same account** (account-self-service.md D19, plan 0.8.0 Y4).
+         * Better Auth accepts one opened with no session at all, so a thief
+         * who opened their own link would win even after the owner changed
+         * the password and signed every device out. With this, that change
+         * cancels every unopened link.
+         *
+         * Signed out, the link sends the person to sign in and open it
+         * again. A session of another account is left to Better Auth, which
+         * refuses it as `INVALID_USER`, and so is a link that is expired,
+         * forged or already used. For the right account, what refused a
+         * request refuses the change too, checked again now, and so does an
+         * address somebody else signed up with since: each lands on Your
+         * account with its reason, rather than on the unique index.
+         * Confirmation links pass through untouched.
+         */
+        if (hookContext.path === "/verify-email") {
+          const link = await readChangeLink(
+            options.secret,
+            (hookContext.query as { token?: unknown } | undefined)?.token,
+          );
+          if (!link) {
+            return;
+          }
+          const session = await getSessionFromCtx(hookContext);
+          if (!session) {
+            throw hookContext.redirect(EMAIL_CHANGE_SIGN_IN);
+          }
+          const user = session.user as { id: string; email: string };
+          if (
+            user.id !== link.userId ||
+            user.email.toLowerCase() !== link.from
+          ) {
+            return;
+          }
+          const refusal = await completionRefusal(options.pool, {
+            userId: user.id,
+            email: user.email,
+            to: link.to,
+          });
+          if (refusal) {
+            throw hookContext.redirect(`/account?emailChange=${refusal}`);
+          }
+          return;
+        }
+
+        /**
+         * **Each address's allowance of confirmation links** (email-
+         * verification.md D9): one a minute and five a day, whatever network
+         * asks. Counted for every address before Better Auth looks it up, so
+         * the refusal is the same whether or not it has an account.
+         */
+        if (hookContext.path === "/send-verification-email") {
+          const email = (hookContext.body as { email?: unknown } | undefined)
+            ?.email;
+          if (!rateLimitEnabled || typeof email !== "string" || email === "") {
+            return;
+          }
+          const verdict = await resendAllowance(
+            resendStorage,
+            options.secret,
+            email,
+          );
+          if (!verdict.allowed) {
+            countVerificationLink(verificationReason("resend"), "refused");
+            throw resendHeldRefusal(verdict.retryAfterSeconds);
+          }
+          return;
+        }
+
+        /**
+         * **A password checked behind a session** (account-self-service.md
+         * D3, D8). In this order: a demonstration account and an account
+         * single sign-on claims are refused before anything is checked, so
+         * Better Auth never ends sessions for a change that cannot stand;
+         * a request Better Auth would refuse unchecked is let through
+         * uncounted; then the attempt is counted against the account's hold,
+         * exactly as a sign-in is, and a held one is refused unchecked.
+         */
+        if (SESSION_PASSWORD_PATHS.has(hookContext.path)) {
+          const session = await getSessionFromCtx(hookContext);
+          if (!session) {
+            // No session: the endpoint answers 401 itself.
+            return;
+          }
+          const user = session.user as { id: string; email: string };
+          const demoRefusal = DEMO_REFUSALS[hookContext.path];
+          if (demoRefusal && isDemoAccount(user.email)) {
+            throw new APIError("FORBIDDEN", {
+              message: demoRefusal,
+              code: "DEMO_ACCOUNT",
+            });
+          }
+          if (hookContext.path === "/change-password") {
+            const provider = await enforcedProviderForUser(
+              options.pool,
+              user.id,
+            );
+            if (provider) {
+              throw enforcedRefusal(provider);
+            }
+          }
+          if (
+            !lockoutEnabled ||
+            checkedPassword(hookContext.path, hookContext.body) === null ||
+            !(await accountHasPassword(options.pool, user.id))
+          ) {
+            return;
+          }
+          const verdict = await recordPasswordAttempt(options.pool, {
+            secret: options.secret,
+            email: user.email,
+            callerAddress: authCallerAddress(
+              hookContext.headers ?? new Headers(),
+            ),
+          });
+          if (verdict.held) {
+            defaultMetrics().count(METRIC.signInHeldTotal, {
+              scope: verdict.scope,
+            });
+            throw heldRefusal(verdict.retryAfterSeconds);
+          }
+          if (verdict.accountHoldBegan) {
+            void announceAccountHold(options.pool, {
+              email: user.email,
+              ...verdict.accountHoldBegan,
+              baseUrl: options.baseUrl,
+              send: options.sendSignInHeldNotice,
+            }).catch((error: unknown) => {
+              process.stderr.write(
+                `auth: could not record a sign-in hold: ${error instanceof Error ? error.message : String(error)}\n`,
+              );
+            });
+          }
+          return;
+        }
+
         if (!CREDENTIAL_PATHS.has(hookContext.path)) {
           return;
         }
@@ -640,6 +1104,52 @@ export function createAuth(options: AuthOptions) {
        * password matched. The session hook below covers every other factor.
        */
       after: createAuthMiddleware(async (hookContext) => {
+        /**
+         * **A password checked behind a session, and accepted** (account-
+         * self-service.md D3, D9). Only a success clears the account's
+         * counts: clearing on anything but a wrong password would let a
+         * guesser reset the count with a deliberately broken request. No
+         * address is marked as known; that is a sign-in's to do.
+         *
+         * A changed password is recorded and mailed here, so the screen and a
+         * direct call to the endpoint are recorded alike.
+         */
+        if (SESSION_PASSWORD_PATHS.has(hookContext.path)) {
+          const returned = hookContext.context.returned;
+          if (returned === undefined || returned instanceof Error) {
+            return;
+          }
+          const sessionUser = (
+            hookContext.context.session as {
+              user?: { id?: unknown; email?: unknown };
+            } | null
+          )?.user;
+          const changedUser = (returned as { user?: { id?: unknown } }).user;
+          const email = sessionUser?.email;
+          if (lockoutEnabled && typeof email === "string") {
+            await clearSignInAttempts(options.pool, {
+              secret: options.secret,
+              email,
+            });
+          }
+          if (hookContext.path === "/change-password") {
+            const userId = changedUser?.id ?? sessionUser?.id;
+            if (typeof userId === "string") {
+              await recordPasswordChange(options.pool, {
+                userId,
+                via: "change",
+                otherSessionsEnded:
+                  (hookContext.body as { revokeOtherSessions?: unknown })
+                    ?.revokeOtherSessions === true,
+                address: authCallerAddress(
+                  hookContext.headers ?? new Headers(),
+                ),
+              });
+            }
+          }
+          return;
+        }
+
         if (!lockoutEnabled || hookContext.path !== "/sign-in/email") {
           return;
         }
@@ -681,21 +1191,34 @@ export function createAuth(options: AuthOptions) {
            * account is ever read.
            */
           before: async (session, hookContext) => {
-            if (isProviderSignInPath(hookContext?.path)) {
-              return;
-            }
             const userId = (session as { userId?: unknown }).userId;
             if (typeof userId !== "string") {
               return;
             }
-            const provider = await enforcedProviderForUser(
-              options.pool,
-              userId,
-            );
-            if (provider) {
-              throw new APIError("FORBIDDEN", {
-                message: enforcementMessage(provider),
-              });
+            // The provider's own callback is what enforcement asks for, so
+            // only that check skips it. The deletion check below must not:
+            // an account with no password signs in only this way.
+            if (!isProviderSignInPath(hookContext?.path)) {
+              const provider = await enforcedProviderForUser(
+                options.pool,
+                userId,
+              );
+              if (provider) {
+                throw new APIError("FORBIDDEN", {
+                  message: enforcementMessage(provider),
+                });
+              }
+            }
+            // Deleting your own account (account-deletion.md §3.2, §3.3,
+            // plan 0.8.0 Y7). Every sign-in ends in a session row, whatever
+            // factor produced it, a provider's callback included, so this is
+            // where a sign-in cancels an open request, and where one is
+            // refused while the run is erasing the account. After the
+            // enforcement check, so a refused sign-in never cancels anything.
+            if (
+              (await cancelDeletionOnSignIn(options.pool, userId)) === "running"
+            ) {
+              throw accountBeingDeletedError();
             }
           },
           /**
@@ -723,7 +1246,10 @@ export function createAuth(options: AuthOptions) {
               await clearSignInAttempts(options.pool, {
                 secret: options.secret,
                 email,
-                ...(hookContext?.headers
+                // A session a password change or a second factor made is not
+                // a sign-in, so it marks no address as known (D3).
+                ...(hookContext?.headers &&
+                !SESSION_PASSWORD_PATHS.has(hookContext.path ?? "")
                   ? { callerAddress: authCallerAddress(hookContext.headers) }
                   : {}),
               });
@@ -767,6 +1293,37 @@ export function createAuth(options: AuthOptions) {
         },
       },
       user: {
+        update: {
+          /**
+           * **A completed change of sign-in email is recorded once**
+           * (account-self-service.md D20, plan 0.8.0 Y4): one
+           * `auth.email_changed` row, with both addresses as domains and
+           * keys. Better Auth runs this once per real update; a second click
+           * on the same link fails earlier, as `INVALID_TOKEN`, because the
+           * account no longer has the address the token is bound to.
+           *
+           * Here rather than in `afterEmailVerification`, which Better Auth
+           * calls only for an account whose old address was confirmed.
+           */
+          after: async (user, hookContext) => {
+            if (hookContext?.path !== "/verify-email") {
+              return;
+            }
+            const link = await readChangeLink(
+              options.secret,
+              (hookContext.query as { token?: unknown } | undefined)?.token,
+            );
+            const email = (user as { email?: unknown }).email;
+            if (
+              !link ||
+              typeof email !== "string" ||
+              email.toLowerCase() !== link.to
+            ) {
+              return;
+            }
+            await recordEmailChanged(options.pool, options.secret, link);
+          },
+        },
         create: {
           /**
            * The registration policy (§4.14): open until somebody has claimed
@@ -776,6 +1333,29 @@ export function createAuth(options: AuthOptions) {
            * registration by not knowing about the rule.
            */
           before: async (user, hookContext) => {
+            // **The account that claims the instance is admitted whatever
+            // the policy says** (docs/design/registration-policy.md §10 D17,
+            // plan 0.8.0 H3). Unclaimed is setup unfinished and no account,
+            // the same test the wizard's own guard reads. The setup wizard's
+            // sign-up is the claim, so a policy that refused it, such as
+            // `OPENOKR_REGISTRATION=invite_only` set before the first run,
+            // left an instance nobody could ever claim. A closed policy means
+            // closed behind the owner, and governs every account after this
+            // one. Whoever reaches an unclaimed instance first claims it,
+            // which is the rule with no policy too (D18).
+            //
+            // **And it arrives verified** (UAT BUG-028). The setup wizard
+            // signs up and finishes setup in one go, which needs a session.
+            // With mail configured before the first run, verification is
+            // required, so the sign-up gave no session, setup could not
+            // finish, and every later sign-in was refused as unverified.
+            // Whoever runs the wizard is the operator who deployed it, so
+            // there is nobody to prove the address to.
+            const setup = await readSetupState(options.pool);
+            if (!setup.configured && !setup.hasUser) {
+              return { data: { ...user, emailVerified: true } };
+            }
+
             // **An invitation is the exception, and the only one** (P6-G06b).
             // A closed instance was closed to everybody, including the person
             // an administrator had just invited, so every invitation issued
@@ -846,17 +1426,31 @@ export function createAuth(options: AuthOptions) {
               user.email,
             );
             if (refusal !== null) {
-              throw new APIError("FORBIDDEN", { message: refusal });
+              // **Not 403.** Better Auth turns a 403 from this hook into its
+              // generic sign-up success whenever confirmation is required, to
+              // keep an existing address secret, so the form said "your
+              // account is created, we sent a link" for an account that was
+              // never made (found with plan 0.8.0 S4). This refusal is about
+              // the address's domain or the policy, never about whether an
+              // account exists, so saying it hides nothing worth hiding.
+              throw new APIError("UNPROCESSABLE_ENTITY", { message: refusal });
             }
-            // **The account that claims the instance arrives verified** (UAT
-            // BUG-028). The setup wizard signs up and finishes setup in one
-            // go, which needs a session. With mail configured before the
-            // first run, verification is required, so the sign-up gave no
-            // session, setup could not finish, and every later sign-in was
-            // refused as unverified. Whoever runs the wizard is the operator
-            // who deployed it, so there is nobody to prove the address to.
-            const setup = await readSetupState(options.pool);
-            if (!setup.configured && !setup.hasUser) {
+            // **An invited address arrives confirmed** (plan 0.8.0 S5,
+            // email-verification.md §12). A personal invitation reached this
+            // inbox, which is the proof a confirmation link gives, so the
+            // person is not asked to give it twice. Confirmed here, before
+            // the row exists, because Better Auth decides on the row it
+            // created whether to sign them in; `sendVerificationEmail`
+            // already sends nothing to a confirmed account. A shared link
+            // names no address and confirms nothing.
+            if (
+              !user.emailVerified &&
+              (await invitationInCookieConfirms(
+                options.pool,
+                cookieHeaderFrom(hookContext),
+                user.email,
+              ))
+            ) {
               return { data: { ...user, emailVerified: true } };
             }
             return;
@@ -895,6 +1489,27 @@ export function createAuth(options: AuthOptions) {
             const timezone = browserTimezoneFromCookies(cookies);
             const token = inviteTokenFromCookies(cookies);
             if (token) {
+              // Asked before accepting, which uses a single-use link up
+              // (plan 0.8.0 S5): whether the address arrived confirmed
+              // because of this invitation, for the instance chain.
+              const confirmedByInvitation =
+                user.emailVerified &&
+                (await invitationInCookieConfirms(
+                  options.pool,
+                  cookies,
+                  user.email,
+                ).catch(() => false));
+              if (confirmedByInvitation) {
+                await recordConfirmedByInvitation(options.pool, user.id).catch(
+                  (error: unknown) => {
+                    // The address is confirmed already; a missing row never
+                    // undoes it, as with a confirmation link.
+                    process.stderr.write(
+                      `auth: could not record an invited address: ${error instanceof Error ? error.message : String(error)}\n`,
+                    );
+                  },
+                );
+              }
               await acceptPendingInvitation(
                 options.pool,
                 token,
@@ -1071,12 +1686,26 @@ export function createAuth(options: AuthOptions) {
                * product uses for membership; `provisionUser` above is.
                */
               organizationProvisioning: { disabled: true },
+              /**
+               * **No provider is ever registered through the plugin**
+               * (account-self-service.md D26). Its rows are derived from
+               * `sso_connections` by `saml-sync.ts`, which writes them
+               * itself. The HTTP path is off as well; this refuses a server
+               * call too, which `disabledPaths` never sees.
+               */
+              providersLimit: 0,
             }),
           ]
         : []),
       ...(options.plugins ?? []),
     ],
   });
+
+  contextOf = () => auth.$context;
+  resendFromServer = (email) =>
+    auth.api.sendVerificationEmail({
+      body: { email, callbackURL: "/email-confirmed" },
+    });
 
   // The caller's address is decided here, once, before the router's limiter
   // reads it (caller-address.ts). Server-side `auth.api` calls skip the router

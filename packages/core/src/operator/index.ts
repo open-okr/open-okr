@@ -5,6 +5,12 @@
  * `docs/design/operator-console.md`.
  */
 export {
+  type DefaultPlanFillResult,
+  type DefaultPlanReview,
+  fillDefaultPlanAsOperator,
+  reviewDefaultPlanFill,
+} from "./default-plan.ts";
+export {
   type MarkDomainVerifiedInput,
   markDomainVerifiedAsOperator,
 } from "./domains.ts";

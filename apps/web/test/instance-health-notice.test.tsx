@@ -3,8 +3,14 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 /**
- * The notice on Admin, General for a database role that bypasses row-level
- * security (H-B). It replaces what `/api/health` used to say to anybody.
+ * The instance notices on Admin, General, and the one plan 0.8.0 H2 adds
+ * (docs/design/trusted-proxies.md D12).
+ *
+ * A process that has met a caller it could not place is counting every such
+ * caller as one, so every per-address limit is shared. A correct deployment
+ * never meets one, so the notice says what it means and which variable to set.
+ * A managed cloud's operator reads the metric and the log instead, so its
+ * customers' administrators are never shown it.
  */
 
 vi.mock("../lib/translations", () => ({
@@ -18,17 +24,74 @@ const { InstanceHealthNotice } = await import(
   "../app/admin/general/instance-health-notice"
 );
 
-const rendered = async (props: {
-  tenantFloorBypassed: boolean;
-  schedulerFailed: boolean;
-}): Promise<string> => renderToString(await InstanceHealthNotice(props));
+const rendered = async (
+  props: Partial<Parameters<typeof InstanceHealthNotice>[0]>,
+): Promise<string> =>
+  renderToString(
+    await InstanceHealthNotice({
+      tenantFloorBypassed: false,
+      scheduler: null,
+      unplacedCallers: false,
+      cloud: false,
+      ...props,
+    }),
+  );
 
-describe("the instance health notice", () => {
-  it("says isolation is off and how to fix it when the role bypasses the floor", async () => {
+describe("the caller address notice", () => {
+  it("is shown on a self-hosted instance that has met a caller it could not place", async () => {
+    const html = await rendered({ unplacedCallers: true });
+    expect(html).toContain('data-testid="caller-address-notice"');
+    expect(html).toContain("OPENOKR_TRUSTED_PROXIES");
+    expect(html).toContain("OPENOKR_CLIENT_ADDRESS_HEADER");
+    // The guide that says which to set for each topology.
+    expect(html).toMatch(/href="[^"]*docs\/install\/[^"]*"/);
+  });
+
+  it("is not shown when every caller was placed", async () => {
+    expect(await rendered({})).toBe("");
+  });
+
+  it("is not shown on a managed cloud, whose operator reads the metric", async () => {
+    expect(await rendered({ unplacedCallers: true, cloud: true })).toBe("");
+  });
+
+  it("sits beside the tenant-floor notice rather than replacing it", async () => {
     const html = await rendered({
       tenantFloorBypassed: true,
-      schedulerFailed: false,
+      unplacedCallers: true,
     });
+    expect(html).toContain('data-testid="tenant-floor-notice"');
+    expect(html).toContain('data-testid="caller-address-notice"');
+  });
+});
+
+// docs/design/worker-deployment.md §1.3, plan 0.8.0 H10d.
+describe("the scheduler notice", () => {
+  it("says this instance's scheduler could not start", async () => {
+    const html = await rendered({ scheduler: "failed" });
+    expect(html).toContain('data-testid="scheduler-notice"');
+    expect(html).toContain("could not start");
+    expect(html).not.toContain("worker");
+  });
+
+  it("names the worker when the scheduler runs elsewhere and has stopped", async () => {
+    const html = await rendered({ scheduler: "elsewhere" });
+    expect(html).toContain('data-testid="scheduler-notice"');
+    expect(html).toContain("OPENOKR_SCHEDULER=elsewhere");
+    expect(html).toContain("worker");
+    expect(html).not.toContain("could not start on this instance");
+  });
+
+  it("is not shown when the scheduler is fine", async () => {
+    expect(await rendered({ scheduler: null })).toBe("");
+  });
+});
+
+// The hardening batch's notice (docs/design/hardening-batch-2026-11.md H-B),
+// on the props this component took once plan 0.8.0's notices joined it.
+describe("the instance health notice", () => {
+  it("says isolation is off and how to fix it when the role bypasses the floor", async () => {
+    const html = await rendered({ tenantFloorBypassed: true });
     expect(html).toContain('data-testid="tenant-floor-notice"');
     expect(html).toContain("not enforcing workspace isolation");
     expect(html).toContain("Connect as a role with neither privilege");
@@ -36,8 +99,6 @@ describe("the instance health notice", () => {
   });
 
   it("renders nothing when the floor holds and the scheduler runs", async () => {
-    expect(
-      await rendered({ tenantFloorBypassed: false, schedulerFailed: false }),
-    ).toBe("");
+    expect(await rendered({})).toBe("");
   });
 });

@@ -24,6 +24,7 @@
  * cleared and Slack is disconnected at the end, because `s36-channels.spec.ts`
  * connects Slack itself and expects to find it disconnected.
  */
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
@@ -157,12 +158,12 @@ test("a closed weekly session in that space has a digest", async () => {
     await pool.query<{ id: string }>(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          started_at, ended_at, facilitator_id, state, digest_id)
+          started_at, ended_at, facilitator_id, state, digest_id, short_id)
        values (gen_random_uuid(), $1, $2, $3, 'weekly', 'Channel post QA',
                now() - interval '2 hours', now() - interval '2 hours',
-               now() - interval '1 hour', $4, 'closed', $5)
+               now() - interval '1 hour', $4, 'closed', $5, $6)
        returning id`,
-      [workspaceId, spaceId, cycle.id, member.id, digest?.id],
+      [workspaceId, spaceId, cycle.id, member.id, digest?.id, newShortId()],
     )
   ).rows[0];
   sessionId = session?.id as string;

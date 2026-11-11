@@ -123,6 +123,9 @@ spec:
                   mountPath: /storage
                   readOnly: true
                 {{- end }}
+                {{- with (include "openokr.dbCaMount" .) }}
+                {{- . | nindent 16 }}
+                {{- end }}
           volumes:
             - name: backups
               {{- if .Values.backup.existingClaim }}
@@ -135,5 +138,8 @@ spec:
             - name: storage
               persistentVolumeClaim:
                 claimName: {{ printf "%s-storage" (include "openokr.fullname" .) }}
+            {{- end }}
+            {{- with (include "openokr.dbCaVolume" .) }}
+            {{- . | nindent 12 }}
             {{- end }}
 {{- end }}

@@ -204,6 +204,8 @@ test("company administrator: no plan, no seat limit, no way to start a workspace
 });
 
 test("company administrator: appoints an administrator for Sales and invites a member", async () => {
+  // Two whole sign-ups, each through its own welcome (plan 0.8.0 S4).
+  test.setTimeout(90_000);
   // Sales is the active workspace after the switch above.
   const adminPath = await inviteByEmail(companyAdmin, WORKSPACE_ADMIN.email);
   const memberPath = await inviteByEmail(companyAdmin, MEMBER.email);

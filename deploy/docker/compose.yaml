@@ -49,6 +49,10 @@ services:
   app:
     image: ${OPENOKR_IMAGE:-ghcr.io/open-okr/open-okr:latest}
     restart: unless-stopped
+    # A stop drains the work in flight for up to OPENOKR_SHUTDOWN_SECONDS (20
+    # by default) and then flushes error reports and spans. Docker's own 10
+    # seconds would kill it partway (plan 0.8.0 H10a).
+    stop_grace_period: 30s
     depends_on:
       db:
         condition: service_healthy
@@ -104,6 +108,11 @@ services:
       # an http:// address, which Caddy serves over plain HTTP without trying
       # to reach Let's Encrypt, so a laptop works with no configuration at all.
       OPENOKR_SITE: ${OPENOKR_SITE:-http://localhost}
+      # The proxies in front of this one, space separated, whose forwarded
+      # chain Caddy keeps (docs/design/trusted-proxies.md D14). `./openokr up`
+      # copies it from OPENOKR_TRUSTED_PROXIES in secrets/app.env, which is
+      # where the application reads the same list. Loopback trusts nothing.
+      OPENOKR_TRUSTED_PROXIES: ${OPENOKR_CADDY_TRUSTED_PROXIES:-127.0.0.1/32}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # Certificates live here. Losing this volume means re-issuing them, and

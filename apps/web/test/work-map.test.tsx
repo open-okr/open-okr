@@ -44,7 +44,6 @@ vi.mock("../lib/workspace", () => ({
 }));
 // The screen's children are drawn elsewhere and tested there. Stubbed so the
 // screen's own reads are all this file exercises.
-vi.mock("../app/first-visit-tour.tsx", () => ({ FirstVisitTour: () => null }));
 vi.mock("../app/goal-nodes.ts", () => ({ goalTreeNodes: () => [] }));
 vi.mock("../app/work-map.tsx", () => ({ WorkMap: () => null }));
 vi.mock("../app/work-map-header.tsx", () => ({
@@ -62,6 +61,8 @@ const READS: Readonly<Record<string, unknown>> = {
   "cycles.current": { id: CYCLE },
   "spaces.list": [{ id: SPACE, name: "Revenue", isCompany: false }],
   "goals.list": { goals: [] },
+  // Whether the reader may draft, for Start drafting (workspace-roles.md §13).
+  "goals.createAccess": { canCreate: true },
   "workflow.read": null,
   "alignment.score": {
     score: 82,

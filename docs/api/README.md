@@ -154,13 +154,14 @@ Every door a program uses is limited, and a refusal says when to try again.
 The limits are fixed rather than settings: they bound abuse of a public door,
 and nobody should have to configure one to be protected.
 
-**The caller address is the one the sign-in lockout counts.** It is read from
-`X-Forwarded-For`, then `X-Real-IP`, and only when the header holds exactly one
-address. The shipped reverse proxy replaces `X-Forwarded-For` with the address
-it saw, so that is what it holds. A proxy that appends to the header instead
-leaves a chain whose first entry the caller wrote, so a chain is not trusted,
-and every caller the instance cannot place shares one count. If your own proxy
-appends, configure it to replace the header.
+**The caller address is the one the sign-in lockout counts.** With nothing
+set it is read from `X-Forwarded-For`, and only when the header holds exactly
+one address. The shipped reverse proxy replaces `X-Forwarded-For` with the
+address it saw, so that is what it holds. A proxy that appends to the header
+instead leaves a chain whose first entry the caller wrote, so a chain is not
+trusted, and every caller the instance cannot place shares one count. Behind
+such a proxy, or a CDN, the deployment names the proxies or the one header to
+read ([behind a CDN or a load balancer](../install/behind-a-proxy.md)).
 
 ## Answers and errors
 

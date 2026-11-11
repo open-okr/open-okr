@@ -231,6 +231,31 @@ export const METRIC = {
    * own typing and one row each would be unbounded.
    */
   signInHeldTotal: "openokr_sign_in_held_total",
+  /**
+   * Links that confirm an email address, by why they were asked for
+   * (`sign_up`, `resend`, `repeat_sign_up`) and what became of the request:
+   * `queued`, `refused` by the per-address limit, or `failed` to queue
+   * (email-verification.md D17, plan 0.8.0 S3). Counted rather than audited,
+   * because one row per request would be unbounded.
+   */
+  verificationLinksTotal: "openokr_verification_links_total",
+  /**
+   * Callers whose address the instance could and could not place, by
+   * `outcome`, `resolved` or `unresolved` (docs/design/trusted-proxies.md
+   * D12, plan 0.8.0 H2). A correct deployment counts no unresolved caller; a
+   * steady stream of them means every per-address limit is shared, so the
+   * proxies in front of the instance need naming.
+   */
+  callerAddressesTotal: "openokr_caller_addresses_total",
+  /**
+   * Account changes whose record could not be written: the audit row and the
+   * mail that say a password was changed, by `via` (`change`, `set`,
+   * `reset`) (account-self-service.md D9, plan 0.8.0 Y3), and the link or the
+   * `auth.email_changed` row of a sign-in email change (`email`, D18, D20,
+   * Y4). The change itself stands; any count here is a change nobody was
+   * told about.
+   */
+  accountChangeRecordFailures: "openokr_account_change_record_failures_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",

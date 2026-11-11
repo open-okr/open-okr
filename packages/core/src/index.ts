@@ -200,6 +200,11 @@ export {
   seededModelsForProvider,
 } from "./ai/model-catalog.ts";
 export {
+  AI_OFF_REASONS,
+  type AIOffReason,
+  aiOffSentence,
+} from "./ai/off-reason.ts";
+export {
   type PersonalDataFinder,
   setPersonalDataFinder,
 } from "./ai/personal-data.ts";
@@ -503,10 +508,55 @@ export {
   verifyInstanceChain,
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
-export { type Auth, type AuthOptions, createAuth } from "./auth/auth.ts";
-export { callerAddress } from "./auth/caller-address.ts";
+export {
+  ACCOUNT_BEING_DELETED_CODE,
+  ACCOUNT_DELETION_WAIT_DAYS,
+  type DeletionBlock,
+  type DeletionCard,
+  type DeletionPass,
+  type DeletionRequestOutcome,
+  deletionCardFor,
+  deletionJustCancelled,
+  requestOwnDeletion,
+  runDueDeletions,
+} from "./auth/account-deletion.ts";
+export {
+  changeOwnEmail,
+  type EmailCard,
+  type EmailChangeOutcome,
+  emailCardFor,
+  type PasswordCard,
+  passwordCardFor,
+  type SetPasswordOutcome,
+  type SignInAgainProvider,
+  setOwnPassword,
+} from "./auth/account-self-service.ts";
+export {
+  type Auth,
+  type AuthOptions,
+  createAuth,
+} from "./auth/auth.ts";
+export {
+  callerAddress,
+  unresolvedCallersSeen,
+} from "./auth/caller-address.ts";
+export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
+export {
+  confirmByAcceptedInvitation,
+  invitationConfirms,
+} from "./auth/invited-address.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
+export { resolveCanSendMail } from "./auth/mail-capability.ts";
+export {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_CHANGED_TOPIC,
+} from "./auth/password-change.ts";
+export {
+  RECENT_SIGN_IN_SECONDS,
+  signedInRecently,
+} from "./auth/recent-sign-in.ts";
 export {
   syncAllSamlProviders,
   syncSamlProvider,
@@ -528,7 +578,17 @@ export {
   hashSessionToken,
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
-export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
+export {
+  EMAIL_VERIFICATION_MODES,
+  type EmailConfirmation,
+  type EmailVerificationMode,
+  HELD_BY_COMPANY_DOMAINS,
+  readEmailVerificationMode,
+  resolveEmailConfirmation,
+  resolveRequireEmailVerification,
+  setEmailVerificationMode,
+  setEmailVerificationModeAsOperator,
+} from "./auth/signup-policy.ts";
 export {
   type CreateSSOConnectionInput,
   derivedProviderId,
@@ -574,6 +634,7 @@ export {
   type SSOProviderTracker,
   trackSSOProviders,
 } from "./auth/sso-refresh.ts";
+export { EMAIL_VERIFICATION_LINK_SECONDS } from "./auth/verification-links.ts";
 export {
   applyBillingEvent,
   type BillingGateway,
@@ -797,6 +858,7 @@ export {
   DEMO_PERSONAS,
   type DemoPersona,
   demoPersonasOn,
+  isDemoAccount,
   type PrepareDemoPersonasInput,
   type PrepareDemoPersonasResult,
   type PreparedPersona,
@@ -810,6 +872,7 @@ export {
   syncDirectoryGroup,
   unmapDirectoryGroup,
 } from "./directory-sync/groups.ts";
+export { directoryManagesAccount } from "./directory-sync/managed.ts";
 export {
   displayName as scimDisplayName,
   logSyncOperation,
@@ -1076,9 +1139,12 @@ export {
   type CloudPreflightWarning,
   createSiteMessage,
   createWorkspaceAsOperator,
+  type DefaultPlanFillResult,
+  type DefaultPlanReview,
   deleteSiteMessage,
   dismissSiteMessage,
   endSupportSession,
+  fillDefaultPlanAsOperator,
   type GrantOutcome,
   grantOperator,
   grantSupportSession,
@@ -1098,6 +1164,7 @@ export {
   readUsageAsOperator,
   readWorkspaceLimitsAsOperator,
   requestSupportSession,
+  reviewDefaultPlanFill,
   revokeOperator,
   setLifecycleAsOperator,
   setPlanAsOperator,
@@ -1193,6 +1260,7 @@ export {
   getInstanceSetting,
   INSTANCE_SETTINGS,
   type InstanceSettingDefinition,
+  SCHEDULER_LAST_RUN_AT,
   SETUP_COMPLETED_AT,
 } from "./secrets/instance-registry.ts";
 export {
@@ -1289,6 +1357,10 @@ export {
   setupRefusal,
 } from "./setup/state.ts";
 export {
+  readSchedulerHeartbeat,
+  recordSchedulerHeartbeat,
+} from "./status/scheduler-heartbeat.ts";
+export {
   resolveStatusThresholds,
   StatusSettingError,
   type StatusThresholds,
@@ -1370,6 +1442,7 @@ export {
   remindBeforeErasure,
   remindTrialsEnding,
   resolveAdmissionLimits,
+  resolveDefaultPlan,
   seatState,
   setDefaultAdmission,
   sweepTrials,

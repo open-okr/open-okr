@@ -461,4 +461,24 @@ describe("an address a caller wrote for itself", () => {
     await knock({ "x-forwarded-for": "198.51.100.7, 10.0.0.1" });
     expect(rateLimit.mock.lastCall?.[0]).toBe(counted);
   });
+
+  it("is passed over for the caller behind the proxies the deployment names", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "10.0.1.0/24");
+    try {
+      rateLimit.mockResolvedValue(FULL);
+      await register.POST(
+        new Request(`${ISSUER}/api/mcp/register`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "203.0.113.9, 198.51.100.7, 10.0.1.9",
+          },
+          body: "{}",
+        }) as never,
+      );
+      expect(rateLimit.mock.lastCall?.[0]).toBe("oauth:register:198.51.100.7");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

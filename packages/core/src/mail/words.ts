@@ -37,8 +37,94 @@ const en = {
   "verify.bodyBefore": "Confirm ",
   "verify.bodyAfter": " to finish setting up your {instance} account.",
   "verify.action": "Confirm email",
+  // The link's lifetime, and a footer that is true: the account exists
+  // already, unconfirmed (email-verification.md D18).
+  "verify.notice": "The link works for {hours} hours.",
   "verify.footer":
-    "Did not sign up? Ignore this email and no account is created.",
+    "Did not sign up? Ignore this email. Nothing is confirmed unless the link is opened.",
+
+  // A password was changed, set or reset (account-self-service.md D9, D13).
+  // Never the password, and never a link that changes it.
+  "passwordChanged.subjectChange": "Your {instance} password was changed",
+  "passwordChanged.subjectSet": "A password was set on your {instance} account",
+  "passwordChanged.subjectReset": "Your {instance} password was reset",
+  "passwordChanged.preheader": "If this was not you, reset your password now.",
+  "passwordChanged.eyebrow": "Account security",
+  "passwordChanged.headingChange": "Your password was changed",
+  "passwordChanged.headingSet": "A password was set",
+  "passwordChanged.headingReset": "Your password was reset",
+  "passwordChanged.bodyBefore": "The password for ",
+  "passwordChanged.bodyChange": " was changed on {date} at {time} ({zone}).",
+  "passwordChanged.bodySet": " was set on {date} at {time} ({zone}).",
+  "passwordChanged.bodyReset": " was reset on {date} at {time} ({zone}).",
+  "passwordChanged.signedOutOthers":
+    "Your other devices were signed out. API tokens and connected apps keep working.",
+  "passwordChanged.signedOutEverywhere":
+    "Every device was signed out. API tokens and connected apps keep working.",
+  "passwordChanged.stayedSignedIn": "Your other devices stay signed in.",
+  "passwordChanged.notYou": "If this was not you, reset your password now.",
+  "passwordChanged.action": "Reset your password",
+  "passwordChanged.footer":
+    "Sent by {instance} at {host} whenever the password of this account changes. It never contains a password.",
+
+  // With confirmation off (plan 0.8.0 S4, email-verification.md §11.3): the
+  // account works already, so nothing here may read as a demand.
+  "verifyOptional.subject": "Your account on {instance} is ready",
+  "verifyOptional.preheader": "You can use your account now.",
+  "verifyOptional.heading": "Your account is ready",
+  "verifyOptional.bodyBefore":
+    "You can use your account now. If you would like to, confirm ",
+  "verifyOptional.bodyAfter":
+    " with the link below. It lets you join workspaces that admit people by their company's email domain.",
+  "verifyOptional.action": "Confirm this address",
+  // A change of sign-in email (account-self-service.md §4.2, plan 0.8.0 Y4).
+  // The link to the new address.
+  "changeEmail.subject": "Confirm your new sign-in email for {instance}",
+  "changeEmail.preheader":
+    "Open the link and this becomes the email you sign in with.",
+  "changeEmail.eyebrow": "Account security",
+  "changeEmail.heading": "Confirm your new sign-in email",
+  "changeEmail.bodyBefore": "Open this link to make ",
+  "changeEmail.bodyAfter": " the email you sign in to {instance} with.",
+  "changeEmail.action": "Use this email to sign in",
+  "changeEmail.notice":
+    "It works for {hours} hours, in a browser where you are signed in to {instance}.",
+  "changeEmail.footer":
+    "Did not ask for this? Ignore this email and nothing changes.",
+
+  // The notice to the current address. The same words whether or not the
+  // new address has an account.
+  "emailChangeNotice.subject":
+    "A change of sign-in email was asked for on your {instance} account",
+  "emailChangeNotice.preheader":
+    "If this was not you, change your password and sign out your other devices.",
+  "emailChangeNotice.eyebrow": "Account security",
+  "emailChangeNotice.heading": "A new sign-in email was asked for",
+  "emailChangeNotice.bodyBefore":
+    "Somebody signed in to your account asked to make ",
+  "emailChangeNotice.bodyAfter":
+    " its sign-in email, on {date} at {time} ({zone}).",
+  "emailChangeNotice.ifYou": "If that was you, follow the email sent to {to}.",
+  "emailChangeNotice.notYou":
+    "If it was not, change your password and sign out your other devices: an unopened link then stops working.",
+  "emailChangeNotice.action": "Change your password",
+  "emailChangeNotice.footer":
+    "Sent by {instance} at {host} whenever somebody asks to change this account's sign-in email.",
+
+  // An address that already has an account (AS-Q5 (b)).
+  "emailChangeTaken.subject":
+    "Somebody asked to use this address on {instance}",
+  "emailChangeTaken.preheader":
+    "This address already has an account. Nothing changed.",
+  "emailChangeTaken.eyebrow": "Account security",
+  "emailChangeTaken.heading": "This address already has an account",
+  "emailChangeTaken.body":
+    "Somebody asked to make this address the sign-in email of an account on {instance}. It already has an account here, so nothing changed.",
+  "emailChangeTaken.forgot":
+    "If you have forgotten your password, you can reset it.",
+  "emailChangeTaken.action": "Reset your password",
+  "emailChangeTaken.footer":
+    "Sent by {instance} at {host}. You do not need to do anything.",
 
   // A run of wrong passwords began an account hold (account-lockout.md Q2).
   "held.subject": "Somebody is trying to sign in to your {instance} account",
@@ -145,6 +231,7 @@ const en = {
   "digest.reason.support_request": "Support request",
   "digest.reason.support_ended": "Support ended",
   "digest.reason.connection_ended": "Connection ended",
+  "digest.reason.self_deleted": "Account deleted",
 
   "nudge.badge": "AGENT",
   "nudge.coach": "OKR Coach",
@@ -155,6 +242,55 @@ const en = {
     "Every message names the rule it follows: {rule}. Quiet hours are respected. ",
   "nudge.summaryHeading": "Since you last looked",
   "nudge.summaryHeld": "Held back this week, past your limit",
+  // Deleting your own account (account-deletion.md §7, plan 0.8.0 Y7): when
+  // it is asked for, the day before it runs, when it is cancelled, and when
+  // it is done. Each says how to keep the account while that is still
+  // possible, and none is a credential.
+  "deletion.eyebrow": "Your account",
+  "deletion.signIn": "Sign in to keep it",
+  "deletion.requestedSubject":
+    "Your {instance} account will be deleted on {date}",
+  "deletion.requestedPreheader": "Sign in before then to keep it.",
+  "deletion.requestedHeading": "Your account will be deleted",
+  "deletion.requestedBefore": "You asked to delete the account ",
+  "deletion.requestedAfter":
+    ". It will be deleted on {date}, and every device was signed out. API tokens and connected apps keep working until then.",
+  "deletion.requestedKeep":
+    "Changed your mind? Sign in before then and nothing is deleted.",
+  "deletion.requestedNotYou":
+    "If you did not ask for this, sign in now to cancel it, then change your password.",
+  "deletion.tomorrowSubject":
+    "Your {instance} account will be deleted tomorrow",
+  "deletion.tomorrowPreheader": "Sign in to keep it.",
+  "deletion.tomorrowHeading": "Your account will be deleted tomorrow",
+  "deletion.tomorrowBefore": "The account ",
+  "deletion.tomorrowAfter":
+    " will be deleted on {date}. What you wrote stays, under a placeholder name, and what identifies you goes.",
+  "deletion.tomorrowKeep": "Sign in before then to keep it.",
+  "deletion.cancelledSubject": "Your {instance} account is kept",
+  "deletion.cancelledPreheader": "Nothing was deleted.",
+  "deletion.cancelledHeading": "Your account is kept",
+  "deletion.cancelledSignedIn":
+    "You signed in, so the deletion you asked for is cancelled. Nothing was deleted.",
+  "deletion.cancelledLastOwner":
+    "The deletion you asked for is cancelled and nothing was deleted, because you are now the only owner of {workspace}. Hand it over or close it, then ask again.",
+  "deletion.cancelledDirectory":
+    "The deletion you asked for is cancelled and nothing was deleted, because your organisation's directory now manages this account. Ask your administrator.",
+  "deletion.cancelledOther":
+    "The deletion you asked for is cancelled and nothing was deleted. You can ask again from Your account.",
+  "deletion.cancelledNotYou":
+    "If you did not sign in, change your password now.",
+  "deletion.openAccount": "Open your account",
+  "deletion.doneSubject": "Your {instance} account is deleted",
+  "deletion.donePreheader": "This is the last mail to this address.",
+  "deletion.doneHeading": "Your account is deleted",
+  "deletion.doneBefore": "The account ",
+  "deletion.doneAfter":
+    " is deleted. What you wrote stays, under a placeholder name, and everything that identified you is gone.",
+  "deletion.footer":
+    "Sent by {instance} at {host} because a deletion of this account was asked for.",
+  "deletion.doneFooter":
+    "Sent by {instance} at {host}. No more mail will come to this address from {instance}.",
 } as const;
 
 export type MailWordKey = keyof typeof en;
@@ -186,7 +322,91 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verify.bodyBefore": "Sahkan ",
   "verify.bodyAfter": " untuk melengkapkan akaun {instance} anda.",
   "verify.action": "Sahkan e-mel",
-  "verify.footer": "Tidak mendaftar? Abaikan e-mel ini dan tiada akaun dibuat.",
+  "verify.notice": "Pautan ini berfungsi selama {hours} jam.",
+  "verify.footer":
+    "Tidak mendaftar? Abaikan e-mel ini. Tiada apa yang disahkan melainkan pautan ini dibuka.",
+
+  "passwordChanged.subjectChange": "Kata laluan {instance} anda telah ditukar",
+  "passwordChanged.subjectSet":
+    "Kata laluan telah ditetapkan pada akaun {instance} anda",
+  "passwordChanged.subjectReset":
+    "Kata laluan {instance} anda telah ditetapkan semula",
+  "passwordChanged.preheader":
+    "Jika ini bukan anda, tetapkan semula kata laluan anda sekarang.",
+  "passwordChanged.eyebrow": "Keselamatan akaun",
+  "passwordChanged.headingChange": "Kata laluan anda telah ditukar",
+  "passwordChanged.headingSet": "Kata laluan telah ditetapkan",
+  "passwordChanged.headingReset": "Kata laluan anda telah ditetapkan semula",
+  "passwordChanged.bodyBefore": "Kata laluan bagi ",
+  "passwordChanged.bodyChange":
+    " telah ditukar pada {date} jam {time} ({zone}).",
+  "passwordChanged.bodySet":
+    " telah ditetapkan pada {date} jam {time} ({zone}).",
+  "passwordChanged.bodyReset":
+    " telah ditetapkan semula pada {date} jam {time} ({zone}).",
+  "passwordChanged.signedOutOthers":
+    "Peranti anda yang lain telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi.",
+  "passwordChanged.signedOutEverywhere":
+    "Semua peranti telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi.",
+  "passwordChanged.stayedSignedIn": "Peranti anda yang lain kekal log masuk.",
+  "passwordChanged.notYou":
+    "Jika ini bukan anda, tetapkan semula kata laluan anda sekarang.",
+  "passwordChanged.action": "Tetapkan semula kata laluan",
+  "passwordChanged.footer":
+    "Dihantar oleh {instance} di {host} setiap kali kata laluan akaun ini berubah. Ia tidak pernah mengandungi kata laluan.",
+
+  "verifyOptional.subject": "Akaun anda di {instance} sudah sedia",
+  "verifyOptional.preheader": "Anda boleh menggunakan akaun anda sekarang.",
+  "verifyOptional.heading": "Akaun anda sudah sedia",
+  "verifyOptional.bodyBefore":
+    "Anda boleh menggunakan akaun anda sekarang. Jika anda mahu, sahkan ",
+  "verifyOptional.bodyAfter":
+    " dengan pautan di bawah. Ia membolehkan anda menyertai ruang kerja yang menerima orang melalui domain e-mel syarikat mereka.",
+  "verifyOptional.action": "Sahkan alamat ini",
+  "changeEmail.subject": "Sahkan e-mel log masuk baharu anda untuk {instance}",
+  "changeEmail.preheader":
+    "Buka pautan ini dan ia menjadi e-mel yang anda gunakan untuk log masuk.",
+  "changeEmail.eyebrow": "Keselamatan akaun",
+  "changeEmail.heading": "Sahkan e-mel log masuk baharu anda",
+  "changeEmail.bodyBefore": "Buka pautan ini untuk menjadikan ",
+  "changeEmail.bodyAfter":
+    " e-mel yang anda gunakan untuk log masuk ke {instance}.",
+  "changeEmail.action": "Gunakan e-mel ini untuk log masuk",
+  "changeEmail.notice":
+    "Ia berfungsi selama {hours} jam, dalam pelayar yang anda telah log masuk ke {instance}.",
+  "changeEmail.footer":
+    "Tidak meminta ini? Abaikan e-mel ini dan tiada apa yang berubah.",
+
+  "emailChangeNotice.subject":
+    "Pertukaran e-mel log masuk telah diminta pada akaun {instance} anda",
+  "emailChangeNotice.preheader":
+    "Jika ini bukan anda, tukar kata laluan anda dan log keluar peranti anda yang lain.",
+  "emailChangeNotice.eyebrow": "Keselamatan akaun",
+  "emailChangeNotice.heading": "E-mel log masuk baharu telah diminta",
+  "emailChangeNotice.bodyBefore":
+    "Seseorang yang log masuk ke akaun anda meminta untuk menjadikan ",
+  "emailChangeNotice.bodyAfter":
+    " e-mel log masuknya, pada {date} jam {time} ({zone}).",
+  "emailChangeNotice.ifYou": "Jika itu anda, ikut e-mel yang dihantar ke {to}.",
+  "emailChangeNotice.notYou":
+    "Jika bukan, tukar kata laluan anda dan log keluar peranti anda yang lain: pautan yang belum dibuka kemudian tidak lagi berfungsi.",
+  "emailChangeNotice.action": "Tukar kata laluan anda",
+  "emailChangeNotice.footer":
+    "Dihantar oleh {instance} di {host} setiap kali seseorang meminta untuk menukar e-mel log masuk akaun ini.",
+
+  "emailChangeTaken.subject":
+    "Seseorang meminta untuk menggunakan alamat ini di {instance}",
+  "emailChangeTaken.preheader":
+    "Alamat ini sudah mempunyai akaun. Tiada apa yang berubah.",
+  "emailChangeTaken.eyebrow": "Keselamatan akaun",
+  "emailChangeTaken.heading": "Alamat ini sudah mempunyai akaun",
+  "emailChangeTaken.body":
+    "Seseorang meminta untuk menjadikan alamat ini e-mel log masuk sebuah akaun di {instance}. Alamat ini sudah mempunyai akaun di sini, jadi tiada apa yang berubah.",
+  "emailChangeTaken.forgot":
+    "Jika anda terlupa kata laluan anda, anda boleh menetapkannya semula.",
+  "emailChangeTaken.action": "Tetapkan semula kata laluan",
+  "emailChangeTaken.footer":
+    "Dihantar oleh {instance} di {host}. Anda tidak perlu berbuat apa-apa.",
 
   "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
   "held.preheader":
@@ -292,6 +512,7 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "digest.reason.support_request": "Permintaan sokongan",
   "digest.reason.support_ended": "Sokongan tamat",
   "digest.reason.connection_ended": "Sambungan ditamatkan",
+  "digest.reason.self_deleted": "Akaun dipadam",
 
   "nudge.badge": "EJEN",
   "nudge.coach": "OKR Coach",
@@ -302,6 +523,50 @@ const ms: Readonly<Record<MailWordKey, string>> = {
     "Setiap mesej menamakan peraturan yang diikutinya: {rule}. Waktu senyap dihormati. ",
   "nudge.summaryHeading": "Sejak anda terakhir melihat",
   "nudge.summaryHeld": "Ditahan minggu ini, melebihi had anda",
+
+  "deletion.eyebrow": "Akaun anda",
+  "deletion.signIn": "Log masuk untuk mengekalkannya",
+  "deletion.requestedSubject": "Akaun {instance} anda akan dipadam pada {date}",
+  "deletion.requestedPreheader": "Log masuk sebelum itu untuk mengekalkannya.",
+  "deletion.requestedHeading": "Akaun anda akan dipadam",
+  "deletion.requestedBefore": "Anda meminta untuk memadam akaun ",
+  "deletion.requestedAfter":
+    ". Ia akan dipadam pada {date}, dan setiap peranti telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi sehingga itu.",
+  "deletion.requestedKeep":
+    "Berubah fikiran? Log masuk sebelum itu dan tiada apa yang dipadam.",
+  "deletion.requestedNotYou":
+    "Jika anda tidak memintanya, log masuk sekarang untuk membatalkannya, kemudian tukar kata laluan anda.",
+  "deletion.tomorrowSubject": "Akaun {instance} anda akan dipadam esok",
+  "deletion.tomorrowPreheader": "Log masuk untuk mengekalkannya.",
+  "deletion.tomorrowHeading": "Akaun anda akan dipadam esok",
+  "deletion.tomorrowBefore": "Akaun ",
+  "deletion.tomorrowAfter":
+    " akan dipadam pada {date}. Apa yang anda tulis kekal, di bawah nama pengganti, dan apa yang mengenal pasti anda dibuang.",
+  "deletion.tomorrowKeep": "Log masuk sebelum itu untuk mengekalkannya.",
+  "deletion.cancelledSubject": "Akaun {instance} anda dikekalkan",
+  "deletion.cancelledPreheader": "Tiada apa yang dipadam.",
+  "deletion.cancelledHeading": "Akaun anda dikekalkan",
+  "deletion.cancelledSignedIn":
+    "Anda telah log masuk, jadi pemadaman yang anda minta dibatalkan. Tiada apa yang dipadam.",
+  "deletion.cancelledLastOwner":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam, kerana anda kini satu-satunya pemilik {workspace}. Serahkannya atau tutupnya, kemudian minta semula.",
+  "deletion.cancelledDirectory":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam, kerana direktori organisasi anda kini mengurus akaun ini. Tanya pentadbir anda.",
+  "deletion.cancelledOther":
+    "Pemadaman yang anda minta dibatalkan dan tiada apa yang dipadam. Anda boleh meminta semula dari Akaun anda.",
+  "deletion.cancelledNotYou":
+    "Jika anda tidak log masuk, tukar kata laluan anda sekarang.",
+  "deletion.openAccount": "Buka akaun anda",
+  "deletion.doneSubject": "Akaun {instance} anda telah dipadam",
+  "deletion.donePreheader": "Ini e-mel terakhir ke alamat ini.",
+  "deletion.doneHeading": "Akaun anda telah dipadam",
+  "deletion.doneBefore": "Akaun ",
+  "deletion.doneAfter":
+    " telah dipadam. Apa yang anda tulis kekal, di bawah nama pengganti, dan semua yang mengenal pasti anda telah dibuang.",
+  "deletion.footer":
+    "Dihantar oleh {instance} di {host} kerana pemadaman akaun ini telah diminta.",
+  "deletion.doneFooter":
+    "Dihantar oleh {instance} di {host}. Tiada lagi e-mel akan dihantar ke alamat ini daripada {instance}.",
 };
 
 const WORDS: Readonly<

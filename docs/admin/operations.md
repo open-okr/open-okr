@@ -102,11 +102,42 @@ An instance runs these on a clock, all on by default:
 | Alignment scores | Hourly, at :35 | Stores the alignment score of each cycle nothing has changed since it was upgraded to 0.7. Until then the score is computed when it is read, so the figure is right either way |
 
 `OPENOKR_SCHEDULER=off` turns them all off for a host that should not run them,
-and then `pnpm cadence:sweep` and `pnpm audit:chain` are the manual equivalents
+and `OPENOKR_SCHEDULER=elsewhere` says another process of this instance runs
+them, such as the Helm chart's worker: nothing runs on that host, but
+`/api/status` there judges the stamp the other process writes rather than
+answering `operational`, and Admin General warns when it has gone stale.
+`OPENOKR_RELAY` takes the same three values for the outbox relay; with
+`elsewhere` the copilot still answers in the background and `/api/metrics`
+still serves the queue's gauges. With `off`, `pnpm cadence:sweep` and
+`pnpm audit:chain` are the manual equivalents
 of the two that matter most, `pnpm cloud:support-sweep` ends expired
 support sessions, and `pnpm alignment:fill` stores the missing alignment
 scores. `OPENOKR_OUTBOX_RETENTION_DAYS` sets the outbox
 window from the environment.
+
+## Stopping and restarting
+
+A stop is a drain, not a cut. When the container or pod is told to stop, the
+server finishes what it is doing for up to `OPENOKR_SHUTDOWN_SECONDS` (20 by
+default), then sends the error reports and spans it holds, writes one line and
+exits:
+
+```
+shutdown: SIGTERM, draining for up to 20s
+shutdown: stopped after 1.4s: relay finished the row in flight and released rows: 3, scheduler idle, actions in flight: 0, error reports flushed, telemetry flushed
+```
+
+| Work in flight | What a stop does with it |
+|---|---|
+| The delivery being sent | Finished and recorded |
+| The rest of the relay's batch | Handed back at once, with no attempt counted, for the next relay or the next start |
+| A scheduled run | Allowed to finish until three seconds before the bound, then handed back, and another scheduler runs it again from the start. Nudges are deduplicated, so a repeated run sends nothing twice |
+| An action somebody started | Waited for |
+
+Anything still running at the bound is cut and retried, as after a crash.
+Compose waits 30 seconds before it kills the container, which covers the
+default. If you raise the variable, raise `stop_grace_period` on the `app`
+service with it.
 
 ## If something is wrong now
 

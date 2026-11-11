@@ -108,6 +108,9 @@ capacity gauge.
 | `openokr_concurrent_actions` | none |
 | `openokr_admission_refusals_total` | reason (rate, concurrency) |
 | `openokr_sign_in_held_total` | scope (pair, account). A password attempt refused by a sign-in hold. A steady `account` rate is somebody guessing one account from many networks |
+| `openokr_caller_addresses_total` | outcome (resolved, unresolved). A request whose caller address something counted: a password sign-in, a new session, a 429, or a public door. Any `unresolved` on a production instance means a request arrived that the instance could not place, so every such caller shares one count; name the proxies in front of it ([behind a CDN or a load balancer](../install/behind-a-proxy.md)). A correct deployment counts none |
+| `openokr_verification_links_total` | reason (sign_up, resend, repeat_sign_up), outcome (queued, refused, failed). A link that confirms an email address. `refused` is the per-address limit of one a minute and five a day. Any `failed` is a link that could not be queued, which the person recovers with "Send the link again"; the mail itself is the `account.verifyEmail` topic in the outbox series |
+| `openokr_account_change_record_failures_total` | via (change, set, reset, email). A password change whose `auth.password_changed` row and mail could not be written, or (`email`) a sign-in email change whose link could not be queued or whose `auth.email_changed` row could not be written. The new password or address works either way; any count here is a change the account holder was not told about, or a link that never went, and the server log names the account |
 
 **Errors**
 
@@ -132,6 +135,26 @@ that may have passed.
 The age is measured from the row's own `created_at`, not from `available_at`.
 A row being retried has `available_at` in the future, so measuring from that
 would report a negative lag for exactly the rows that are struggling.
+
+### Which process counts what
+
+Each process serves its own numbers. With one process, or one Compose
+container, that is all of them. With the relay and the scheduler on worker
+pods (`OPENOKR_RELAY` and `OPENOKR_SCHEDULER` set to `elsewhere` on the web
+pods, which the Helm chart's `worker.enabled` does), they split:
+
+| Series | Where it is counted |
+|---|---|
+| The outbox gauges: pending, oldest pending, rate held | Every process. They are queries against the shared outbox, so a web pod with the relay `elsewhere` serves the same numbers the worker does |
+| `openokr_outbox_dispatched_total`, `openokr_outbox_dead_lettered_total`, `openokr_channel_deliveries_total`, the copilot's AI tokens and cost | Where the relay runs: the worker |
+| `openokr_job_runs_total`, `openokr_job_duration_seconds`, `openokr_nudges_total`, `openokr_agent_runs_total`, `openokr_agent_run_duration_seconds` | Where the scheduler runs: the worker |
+| The request series, the capacity gauges, the sign-in and caller-address counts | Where the request was served: the web pods |
+
+**So scrape every pod, not the Service.** A scrape through the Service reaches
+one pod at a time, and the worker is never behind it. Point Prometheus at each
+pod's `/api/metrics` with the scrape token, for example with Kubernetes pod
+discovery on the release's `app.kubernetes.io/instance` label, and add the
+counters across pods.
 
 ### What is never in a label
 
@@ -320,6 +343,23 @@ or echo a provider's body, and a span leaves the host.
 
 With it empty, no tracer provider is constructed, no exporter object exists,
 and no socket is opened.
+
+**A hosted collector that wants a key** (Grafana Cloud, Honeycomb, Datadog's
+OTLP intake and most others) takes it in a header. Name it the way the
+OpenTelemetry convention does, and the exporter sends it with every request:
+
+```
+OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <token>
+```
+
+Several headers are comma-separated, `name=value,name=value`;
+`OTEL_EXPORTER_OTLP_TRACES_HEADERS` applies to traces alone. The value is a
+credential, so put it where the instance's other secrets are: the
+`secrets/app.env` file on Compose, or a Secret named in `extraEnvFrom` with
+Helm, never in the chart's values, which `helm get values` reads back. A test
+(`packages/adapters/test/otlp-headers.test.ts`) sends a span to a local
+listener and checks the header arrives, so an upgrade of the exporter that
+stops reading it fails there (plan 0.8.0 H14).
 
 ## What is kept, and for how long
 

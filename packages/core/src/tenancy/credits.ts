@@ -23,6 +23,7 @@ import {
 import { and, asc, eq, gt, gte, isNull, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
+import { CREDITS_PAUSED_SENTENCE } from "../ai/off-reason.ts";
 import type { OperationTx } from "../operations/operation.ts";
 import {
   environmentValue,
@@ -189,8 +190,7 @@ export async function readHostedAccess(
   };
 }
 
-const PAUSED =
-  "This workspace has used its AI credits for this month. AI is paused until the 1st, or until somebody buys more. Everything else keeps working.";
+const PAUSED = CREDITS_PAUSED_SENTENCE;
 
 /**
  * Why AI is off here, when the reason is credits.

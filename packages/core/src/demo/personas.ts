@@ -45,11 +45,10 @@ import type { createAuth } from "../auth/auth.ts";
 import { withProvisioningAuthority } from "../auth/provisioning-authority.ts";
 import { OperationError } from "../operations/errors.ts";
 import { runOperation } from "../operations/operation.ts";
-import { INVENTED_CAST } from "./cast.ts";
 import { LAST_QUARTER } from "./last-quarter.ts";
+import { DEMO_PERSONAS, type DemoPersona, YEAR_CAST } from "./persona-list.ts";
 import { ANNUAL_OBJECTIVES } from "./year/annual.ts";
 import { toReal } from "./year/calendar.ts";
-import { YEAR_PEOPLE } from "./year/people.ts";
 
 type Auth = ReturnType<typeof createAuth>;
 
@@ -62,52 +61,11 @@ type Auth = ReturnType<typeof createAuth>;
  */
 export const DEMO_PERSONA_PASSWORD = "explore-openokr";
 
-/** One persona a visitor may sign in as, for the sign-in page (P8-T13c). */
-export interface DemoPersona {
-  readonly name: string;
-  readonly email: string;
-  readonly title: string;
-  /**
-   * The scenario day they join the story, for the people the year adds. A
-   * persona is not offered before it: there is no account to sign in to.
-   */
-  readonly arrives?: string;
-}
-
-/**
- * The five the Northwind year adds to the cast (P9-T22c-e-c): Hugo, Nadia,
- * Kofi, Leo and Yuki. Ben is not among them: he leaves in May and is
- * suspended, so an account could never sign in.
- */
-const YEAR_CAST: readonly DemoPersona[] = YEAR_PEOPLE.filter(
-  (person) =>
-    person.name !== "" &&
-    person.leaves === undefined &&
-    !INVENTED_CAST.some((member) => member.name === person.name),
-).map((person) => ({
-  name: person.name,
-  email: `${person.key}@northwind.example`,
-  title: person.title,
-  arrives: person.arrives,
-}));
-
-/**
- * Who a visitor can be on a demo instance.
- *
- * The seven the one-quarter demo writes, then the five the Northwind year
- * adds, which is what `pnpm db:seed` builds since P9-T22c-e-c. In the cast's
- * own order so the list reads top-down through the organisation. The page
- * that shows this cannot ask the database who has an account, because it is
- * rendered before anybody is signed in.
- */
-export const DEMO_PERSONAS: readonly DemoPersona[] = [
-  ...INVENTED_CAST.map((person) => ({
-    name: person.name,
-    email: person.email,
-    title: person.title,
-  })),
-  ...YEAR_CAST,
-];
+export {
+  DEMO_PERSONAS,
+  type DemoPersona,
+  isDemoAccount,
+} from "./persona-list.ts";
 
 /**
  * The personas a visitor can sign in as on a local date: everybody the year

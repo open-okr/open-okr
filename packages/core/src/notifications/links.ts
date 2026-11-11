@@ -50,6 +50,9 @@ const PATHS: Readonly<Record<string, (id: string) => string>> = {
   support_session: () => "/admin/support",
   // Plan 0.7.0 A4: an ended connection is explained on the member's own page.
   agent_connection: () => "/account/connections",
+  // Plan 0.8.0 Y7: a member who deleted their account. Their profile lists
+  // the goals they championed, each a link, for whoever may see them.
+  workspace_member: (id) => `/people/${id}`,
 };
 
 /** The subject types this module knows how to address. For the tests. */

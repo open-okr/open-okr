@@ -21,7 +21,7 @@ Source: the OKRGoal UX review (`docs/audits/okrgoal-ux-habit-review-2026-10-13.m
 | Goals | Goals | `/goals` | OKRs (`/goals`), KPIs (`/kpis`), Map (`/map`) | Everyone |
 | Work | Work | `/initiatives` | Initiatives (`/initiatives`), Board (`/board`) | Everyone |
 | Teams | the workspace's term for spaces, plural | `/spaces` | none | Everyone |
-| Cycle | Cycle | `/cycle` | as today | Workspace administrators, and members who are a coordinator or manager of any space |
+| Cycle | Cycle | `/cycle` | as today | Workspace administrators, whoever may set up a cycle (an Admin, since plan 0.8.0 R1), and members who are a coordinator or manager of any space |
 
 | Moved | To |
 |---|---|
@@ -45,7 +45,7 @@ Group headings go: five rows need none. The sidebar link carries a `title`, so i
 ## 3. Acceptance criteria
 
 - **Given** a member, **when** any screen opens, **then** the sidebar shows Home, Updates, Goals, Work and the spaces term, in that order, and no account rows, no Search and no Admin.
-- **Given** a workspace administrator or a space coordinator or manager, **then** the sidebar also shows Cycle, and the phase strip shows while the cycle is in planning; **given** anybody else, neither shows.
+- **Given** a workspace administrator, somebody who may set up a cycle (`cycles.setupAccess`), or a space coordinator or manager, **then** the sidebar also shows Cycle, and the phase strip shows while the cycle is in planning; **given** anybody else, neither shows.
 - **Given** `/inbox` is open, **then** the Updates row is active and the page shows the To do and Activity tabs with Activity current.
 - **Given** a reviewer owes 2 and has 3 unread, **then** the Updates row's badge reads 5.
 - **Given** the avatar menu is opened by an administrator, **then** it lists the account rows and "Workspace admin".

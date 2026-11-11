@@ -16,9 +16,11 @@ import { getTranslations } from "../../../lib/translations";
  * The read goes through `listUserSessions` rather than Better Auth's
  * `/list-sessions` endpoint, which refuses any session over a day old and so
  * made this page fail for most of a session's thirty-day life. That function
- * carries the full reasoning. Revoking still goes through the endpoint, which
- * asks only that the session be real, and checks the token belongs to the
- * caller before it deletes anything.
+ * carries the full reasoning. Revoking still goes through the endpoint, from
+ * the server through `auth.api`, which asks only that the session be real,
+ * and checks the token belongs to the caller before it deletes anything. Its
+ * HTTP path is off (docs/design/account-self-service.md §3), and a server
+ * call never meets that list.
  *
  * **A row per device rather than a run-on sentence.** The list was a bare
  * `<ul>` whose every item ran the user agent, the address, the date and an

@@ -24,17 +24,13 @@
  * are through it. The flag and the grant are both undone in `afterAll`, and
  * the suspension this file makes is lifted by the operator in its last step.
  */
+import { readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { fillDateTime } from "./date-time.ts";
 import { expect, test } from "./fixtures.ts";
-import {
-  goTo,
-  INSTANCE_ACCOUNT,
-  signIn,
-  skipOnboarding,
-} from "./instance-account.ts";
+import { getStarted, goTo, INSTANCE_ACCOUNT, signIn, skipOnboarding } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -89,6 +85,7 @@ async function arrive(
     await page.getByLabel("Email").fill(person.email);
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
+    await getStarted(page);
     await skipOnboarding(page);
   } else {
     await goTo(page, "/sign-in");
@@ -341,6 +338,17 @@ test("the instance page says what is true of the deployment", async () => {
   await expect(
     operatorPage.getByRole("heading", { name: "Messages" }),
   ).toBeVisible();
+
+  // Plan 0.8.0 V2: the operator is told which release runs. The suite turns
+  // the update check off so CI never calls GitHub, and the card says so
+  // rather than claiming nothing is newer.
+  const { version } = JSON.parse(
+    readFileSync(new URL("../apps/web/package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+  await expect(operatorPage.getByTestId("operator-version-running")).toHaveText(
+    `This instance runs v${version}.`,
+  );
+  await expect(operatorPage.getByTestId("operator-version-off")).toBeVisible();
 });
 
 /**
@@ -450,6 +458,81 @@ test("an operator is told what is overdue for erasure, and sees one being erased
     ]);
     await pool.query(
       "delete from system_settings where key = 'cloud.closureRetentionDays'",
+    );
+  }
+});
+
+/**
+ * Workspaces with no plan (plan 0.8.0 O2,
+ * docs/design/workspaces-without-a-plan.md §5).
+ *
+ * The catalogue above holds Team with no AI credits, so the review warns that
+ * moving gives no AI back. Whatever this moves is put back afterwards, so no
+ * later spec meets a plan it did not choose.
+ */
+test("workspaces with no plan are marked, reviewed and moved onto the default plan", async () => {
+  const before = await pool.query<{ workspace_id: string }>(
+    "select workspace_id from tenants where plan_key is null and deleted_at is null",
+  );
+  const unplanned = before.rows.map((row) => row.workspace_id);
+  try {
+    // No default plan yet: the console says what having none costs, and
+    // what to set.
+    await goTo(operatorPage, "/operator");
+    const notice = operatorPage.getByTestId("no-plan-notice");
+    await expect(notice).toContainText("no AI on the provider's key");
+    await expect(notice).toContainText("Set cloud.defaultPlan");
+    await expect(operatorPage.getByText("No plan").first()).toBeVisible();
+
+    await pool.query(
+      `insert into system_settings (key, value, source)
+       values ('cloud.defaultPlan', '"team"'::jsonb, 'admin')
+       on conflict (key) do update set value = excluded.value`,
+    );
+    await goTo(operatorPage, "/operator");
+    await operatorPage
+      .getByRole("link", { name: "Review putting them on Team" })
+      .click();
+    await expect(
+      operatorPage.getByRole("heading", { name: "Workspaces with no plan" }),
+    ).toBeVisible({ timeout: 15_000 });
+    // The link lands on the review page itself, which is also how
+    // route-coverage.test.ts sees the route opened.
+    expect(new URL(operatorPage.url()).pathname).toBe("/operator/default-plan");
+    await expect(
+      operatorPage.getByTestId("default-plan-no-credits"),
+    ).toContainText("Team includes no AI credits");
+    await expect(
+      operatorPage.getByTestId("default-plan-will-move"),
+    ).toContainText(CUSTOMER_WORKSPACE);
+
+    // Nothing moves without the operator's own reason (UAT 0.8.0 Q-6): the
+    // field arrives empty, and an empty one is refused before it is sent.
+    const reason = operatorPage.getByLabel("Reason");
+    await expect(reason).toHaveValue("");
+    expect(
+      await reason.evaluate(
+        (field) => (field as HTMLTextAreaElement).validity.valueMissing,
+      ),
+    ).toBe(true);
+    await reason.fill("Workspaces made before plans existed");
+    await operatorPage.getByTestId("default-plan-confirm").click();
+    await expect(operatorPage.getByTestId("default-plan-result")).toContainText(
+      "moved to Team",
+      { timeout: 15_000 },
+    );
+    const after = await pool.query<{ plan_key: string | null }>(
+      "select plan_key from tenants where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(after.rows[0]?.plan_key).toBe("team");
+  } finally {
+    await pool.query(
+      "update tenants set plan_key = null, seats = null where workspace_id = any($1)",
+      [unplanned],
+    );
+    await pool.query(
+      "delete from system_settings where key = 'cloud.defaultPlan'",
     );
   }
 });

@@ -18,6 +18,7 @@ import {
   type FileKind,
   fileKind,
 } from "./attachment-preview.tsx";
+import { UPLOAD_LIMIT_BYTES } from "./upload-limit";
 
 /**
  * Files on a subject (P6-G27b).
@@ -90,7 +91,9 @@ const readableSize = (bytes: number): string => {
   if (bytes < 1024 * 1024) {
     return `${Math.round(bytes / 1024)} KB`;
   }
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  const megabytes = bytes / (1024 * 1024);
+  // "25 MB" rather than "25.0 MB" for a whole number, as the limit is.
+  return `${Number.isInteger(megabytes) ? megabytes : megabytes.toFixed(1)} MB`;
 };
 
 /**
@@ -245,8 +248,10 @@ export function Attachments({
               data-testid="attachment-input"
               // The browser's own "Choose file" drawn as the kit's secondary
               // button, still the native input so keyboard and drop work
-              // (usability review IN3).
-              className="text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4"
+              // (usability review IN3). `min-w-0 max-w-full`: the native
+              // control's own width ran 4 px past a 390 px phone (UAT 0.8.0
+              // F-11).
+              className="min-w-0 max-w-full text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4"
             />
             <Button
               type="button"
@@ -258,6 +263,17 @@ export function Attachments({
                 const chosen = input.current?.files?.[0];
                 if (!chosen) {
                   setProblem(t("attachments.chooseFirst"));
+                  return;
+                }
+                // Said here rather than after a 25 MB upload the server
+                // would refuse anyway (plan 0.8.0 H13).
+                if (chosen.size > UPLOAD_LIMIT_BYTES) {
+                  setProblem(
+                    t("attachments.tooLarge", {
+                      size: readableSize(chosen.size),
+                      limit: readableSize(UPLOAD_LIMIT_BYTES),
+                    }),
+                  );
                   return;
                 }
                 const form = new FormData();
@@ -279,6 +295,11 @@ export function Attachments({
             >
               {uploading ? t("attachments.uploading") : t("attachments.attach")}
             </Button>
+            <span className="text-xs text-ink-3" data-testid="attachment-limit">
+              {t("attachments.limit", {
+                limit: readableSize(UPLOAD_LIMIT_BYTES),
+              })}
+            </span>
           </div>
         ) : null}
 

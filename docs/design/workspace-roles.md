@@ -359,3 +359,178 @@ Then it succeeds, as today
 |---|---|
 | Should a Viewer keep reacting to a comment? | No: a reaction is a comment-domain write. Viewer means reading |
 | Should a Viewer still use the copilot? | Yes: asking is reading, and every proposal it makes goes through the review queue, where applying it is measured on its own action |
+
+## 12. An Admin sets up a cycle (plan 0.8.0 R1)
+
+**Approved by Akmal on 11 November 2026** ("design approved"), with every open question answered as recommended.
+
+Asked on 10 November 2026: how does somebody set a cycle's sponsor? Recommended
+by Claude and agreed by Akmal the same day, as plan row R1. This section is the
+design R1's gate asks for. It needs "design approved" before the code.
+
+### What is true today
+
+| Fact | Where |
+|---|---|
+| `cycles.create` and `cycles.update` (roles, phase, levels, planning session dates, publication deadline) ask `full` and name no domain, so they are measured on the workspace context | `packages/core/src/actions/cycles.ts` |
+| On the workspace domain only the Owner holds `full`. An Admin holds `edit` there on purpose (§3) | `packages/core/src/access/roles.ts` |
+| So an Admin cannot create a cycle, name its sponsor or facilitator, or book its planning sessions. Whoever creates a cycle becomes its sponsor by default | `apps/web/app/cycle/page.tsx`, `canPublish = level >= full` |
+| **Every member already holds `edit` on the workspace context**, through the self-service binding (§11). Lowering these actions to `edit` and nothing else would hand the cycle to every Member, not only to the Admin | `packages/core/src/access/reads.ts`, `workspace_standard` |
+| The page's own `level` comes from the same context, so it cannot tell an Admin from a Member either | `apps/web/app/cycle/page.tsx`, `resolveAccessLevelFor` |
+
+### The change
+
+The cycle's setup writes join §11: each declares the domain `workspace` and asks
+`edit`. A member holding a role is then measured by what the role grants on
+the workspace domain, and the self-service binding is not consulted for them.
+
+| Actor | Workspace level that decides | Sets up a cycle |
+|---|---|---|
+| Owner | The role: `full` | Yes, as today |
+| Admin | The role: `edit` | **Yes, new** |
+| Member, Viewer | The role: `view` | No, as today |
+| A role a workspace made | Its own workspace level | Yes when it grants `edit` or more |
+| Guest invited to a space | No role, so §11's old rule: no workspace binding, so nothing | No, as today |
+| Agent | No role, and an agent can never be bound on the workspace | No, as today |
+| Support session | No role reaches it (the role read is for humans), so its binding: the level the owner granted | Yes when the owner granted `edit` or more. Today only at `full`. See R1-Q4 |
+
+**No new role, no new domain, no migration and no data change.** Admin's
+workspace row stays `edit`, so an Admin still cannot reach the settings, the
+plan, the roles or the handover, which ask `full`.
+
+**The screen asks core, not the level.** A read of its own, `cycles.setupAccess`,
+answers `canSetUp` from the same floor the writes run (`writeFloorFor` in
+`packages/core/src/operations/operation.ts`, beside `floorLevel`). It is its own
+read rather than a field on `workflow.read`, as first proposed, because the page
+needs the answer before any cycle exists, to draw the create. The cycle page
+draws the Roles and planning sessions card, the annual frame and objectives, the
+publish and close controls, and the create and deadline card on it, in place of
+`level >= full`, so the page and the server cannot disagree. The archive control
+is drawn on `full`, as R1-Q3 decided. F1's
+destinations at `full` read it too, and its sentence for a reader who cannot act
+becomes "An Owner or an Admin fills this in."
+
+### Which actions move
+
+| Action | What it does | Today | Proposed |
+|---|---|---|---|
+| `cycles.create` | Creates the cycle for a period | `full` | `edit`, domain `workspace` |
+| `cycles.update` | Roles, phase, levels, session dates, publication deadline, contributing units, first cycle | `full` | `edit`, domain `workspace`. One action for one form; splitting the fields would be a second action for the same card |
+| `frame.set` | The annual frame: mission, strategies, what not to do | `full` | `edit`, domain `workspace` (R1-Q1). An Admin already writes company objectives, which hold `full` on the goal domain; the frame is the text those objectives answer to. Revising an agreed frame still needs a written reason and is kept |
+| Phase 0's annual objectives card | Sends the year's objectives forward, through `goals.create` | Drawn for `full` | Drawn for `canSetUp` (R1-Q1). The write is on the goal domain, where the server already lets an Admin |
+| `workflow.publish` | Publishes the set once the gates allow it | `full` | `edit`, domain `workspace` (R1-Q2). The publish gates still decide whether it may happen; this decides only who presses the button |
+| `cycles.setClosing`, `cycles.close` | Starts closing early; closes once phase 7 is complete | `full` | `edit`, domain `workspace` (R1-Q2). The end of the cycle the Admin set up |
+| `cycles.archive` | Takes a cycle out of every list | `full` | **Stays** (R1-Q3) |
+| `rhythm.update` | The workspace's deviations from the method's thresholds, and its terminology | `full` | **Stays**. A practice setting (METHOD.md §12), on the admin screens |
+| `cycles.ensureCurrent` | Creates the current period's cycle if none exists | `edit`, any human member | Unchanged. Drafting a goal relies on it, and it names no roles |
+
+### Acceptance criteria
+
+```
+Given a workspace with an Owner, an Admin, a Member and a Viewer
+When the Admin creates a quarterly cycle and names the Member its sponsor
+Then the cycle exists with that sponsor, and the audit row names the Admin
+
+Given the same workspace
+When the Member calls cycles.create or cycles.update
+Then it is refused with "cycles.create needs a higher access level than you hold."
+And nothing is written
+
+Given a role the workspace made with workspace at edit
+When a member holding it creates a cycle
+Then it is created
+
+Given an agent bound to a space, or a guest invited to one
+When it calls cycles.create
+Then it is refused
+
+Given the Admin on the cycle page in Phase 1
+Then the Roles and planning sessions card is drawn and saves
+And for the Member it is not drawn, and "Still needed here" says
+  "An Owner or an Admin fills this in."
+```
+
+### Tests
+
+| Test | Kind |
+|---|---|
+| Every actor in the table above, for each action that moves, allowed or refused | Core, against a real database, `packages/core/test/cycle-setup-access.test.ts` |
+| `canSetUp` from `cycles.setupAccess` agrees with the write for every actor in the table | Same file |
+| The moved actions are listed under the `workspace` domain | `write-floor-classification.test.ts`, the existing walk of the registry |
+| The page draws the setup cards on `canSetUp`, and F1's sentence | Unit, `apps/web/test` |
+| An Admin made through the suite's helpers (`joinAsNewcomer`, `makeAdministrator` in `e2e/hosting.ts`) names a sponsor on `/cycle` | End to end, `e2e/s04b-admin-sets-up-cycle.spec.ts` |
+
+The contract artifacts carry each action's access level, so `pnpm gen:contract`
+runs in the same change.
+
+### What the specification gains
+
+TECHNICAL-PLAN §4.1, the role matrix's note on the workspace domain: running a
+cycle is `edit` on the workspace domain, and the settings stay `full`. UIUX-PLAN
+S-04 and S-06: the setup cards are drawn for whoever can set up the cycle.
+
+### Open questions
+
+| # | Question | Options | Recommended |
+|---|---|---|---|
+| R1-Q1 | Do the annual frame and the annual objectives card move with the cycle? | Move; or stay with the Owner | **Move.** Whoever runs the planning writes down what leadership agreed, and an Admin can already write the company objectives the frame explains |
+| R1-Q2 | Do publishing and closing move? | Move; or stay with the Owner | **Move.** Leaving them with the Owner makes the Owner a step in every quarter, and the gates, not the role, decide whether the set is ready |
+| R1-Q3 | Does archiving a cycle stay with the Owner? | Stay; or move | **Stay.** It changes what every member's lists show and is not part of running a cycle |
+| R1-Q4 | A support session the owner granted at `edit` can now set up a cycle. Accept? | Accept; or measure a support guest by the role it carries | **Accept.** The owner chose the level, and every write in the session is audited under the operator's own member row, like any member's |
+
+## 13. A new objective asks the goal role (UAT 0.8.0 F-04)
+
+Found by the 0.8.0 acceptance test and approved by Akmal on 11 November 2026
+("design approved"). A completion of §11, not a new rule.
+
+**What the test found.** A member holding Viewer saw "Start drafting" on the
+Work Map and "Add objective" on Phase 4, and the server created the objective.
+§11 says creating a goal was refused; that held only for a goal filed under a
+space, where `goals.create` checks `edit` on the space itself. A company-level
+or a member's own objective names no subject, so it was measured on the
+workspace context, where every member holds `edit` for self-service, and the
+role was never read. The write-floor walk listed `goals.create` under "checks
+its own subject", which was true for one owner kind of three.
+
+### The change
+
+| Where | Today | Changed |
+|---|---|---|
+| `goals.create` | No `domain`; measured on the workspace context unless the goal names a space | `domain: "goal"`, so the floor is the role's goal level, as `kpis.create` and `comments.create` are (§11). The space check stays for a goal filed under a space |
+| A screen that offers to create an objective | Drawn on the workspace level, which is `edit` for everybody | Drawn on `goals.createAccess`, a read answered by the floor the write runs (`writeFloorFor`, as `cycles.setupAccess` does in §12), so the two cannot disagree |
+
+The screens: the Work Map's "Start drafting" (plan 0.8.0 L2, whose sentence for
+a reader who cannot draft becomes reachable), Phase 4's drafting, "+ New
+objective" on Goals, "+ New, Objective" in the top bar, the product tour's
+"Start drafting OKRs" step and the command palette's "Create objective".
+
+**Who is affected.** Only a Viewer, and any custom role below `edit` on goals.
+Owner and Admin hold `manage` and Member holds `edit` on the goal domain, so
+they create as before. Actors with no role, an agent or a guest, keep §11's
+rule for actors without one. No binding changes, so nothing stored changes.
+
+### Acceptance criteria
+
+```
+Given a member holding Viewer
+When they call goals.create for a company objective or their own
+Then it is refused with "goals.create needs a higher access level than you hold."
+And no goal is written
+
+Given a member holding Member
+When they create a company objective
+Then it is created, as today
+
+Given a member holding Viewer
+When they open the Work Map of a cycle with no objectives
+Then they see the sentence and no "Start drafting" button
+And goals.createAccess answers canCreate false, and true for a Member
+```
+
+### Tests
+
+| Test | Kind |
+|---|---|
+| Viewer refused and Member allowed for `goals.create`; `goals.createAccess` agrees with the write | Core, `packages/core/test/role-domain-floor.test.ts` |
+| `goals.create` is listed under the `goal` domain | `write-floor-classification.test.ts` |
+| A Viewer sees no "Start drafting" on the Work Map | End to end, `e2e/s04b-admin-sets-up-cycle.spec.ts`, which already makes members of each role |

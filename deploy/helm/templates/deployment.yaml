@@ -1,6 +1,4 @@
 {{- include "openokr.validate" . -}}
-{{- /* `cloud` is absent from values reused from a release older than 0.6 (helm upgrade --reuse-values). */ -}}
-{{- $cloud := .Values.cloud | default dict }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,7 +6,9 @@ metadata:
   labels:
     {{- include "openokr.labels" . | nindent 4 }}
 spec:
+  {{- if not (include "openokr.autoscaling" .) }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -34,6 +34,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "openokr.serviceAccountName" . }}
+      # The pause, the drain and 15 seconds for the flushes (plan 0.8.0 H10b).
+      # Derived rather than a value of its own, so it cannot be shorter than
+      # what it has to cover.
+      terminationGracePeriodSeconds: {{ include "openokr.terminationGraceSeconds" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -46,170 +50,32 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+          {{- if gt (include "openokr.preStopSeconds" . | int) 0 }}
+          # Keeps answering while the endpoint change travels to kube-proxy,
+          # the ingress controller or a cloud load balancer, which still send
+          # requests for a few seconds after the pod is marked for deletion.
+          # Without it a rollout fails those requests (plan 0.8.0 H10b). `exec`
+          # with `sleep` rather than the native sleep action, which Kubernetes
+          # 1.27, the chart's floor, may not have.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "{{ include "openokr.preStopSeconds" . }}"]
+          {{- end }}
           {{- with .Values.extraEnvFrom }}
           envFrom:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           env:
-            {{- include "openokr.commonEnv" . | nindent 12 }}
-            # Migrations run in the pre-install and pre-upgrade hook, not here.
-            # Without this every replica would race to migrate on every restart;
-            # the advisory lock makes that safe but not fast, and a rollout
-            # should not depend on it.
-            - name: OPENOKR_SKIP_MIGRATIONS
-              value: "1"
-            - name: BETTER_AUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "openokr.secretName" . }}
-                  key: {{ .Values.secrets.authSecretKey }}
-            - name: BETTER_AUTH_URL
-              value: {{ include "openokr.publicUrl" . | quote }}
-            # Optional, so a release with its own Secret and no metrics key
-            # still starts (plan 0.7.0 B3).
-            - name: OPENOKR_METRICS_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "openokr.secretName" . }}
-                  {{- /* Absent from values reused from a release older than 0.7 (helm upgrade --reuse-values). */}}
-                  key: {{ .Values.secrets.metricsTokenKey | default "metrics-token" }}
-                  optional: true
-            - name: OPENOKR_INSTANCE_NAME
-              value: {{ .Values.instance.name | quote }}
-            # `hasKey`, not `default`: 0 is a real answer, and a release
-            # upgraded with --reuse-values from before this key existed has
-            # none, which must read as 1.
-            - name: OPENOKR_TRUSTED_PROXY_HOPS
-              value: {{ ternary (.Values.instance.trustedProxyHops | int) 1 (hasKey .Values.instance "trustedProxyHops") | quote }}
-            - name: OPENOKR_DEFAULT_LANGUAGE
-              value: {{ .Values.instance.language | quote }}
-            - name: OPENOKR_TELEMETRY
-              value: {{ .Values.instance.telemetry | quote }}
-            - name: OPENOKR_REGISTRATION
-              value: {{ .Values.instance.registration | quote }}
-            {{- with .Values.instance.sourceUrl }}
-            - name: OPENOKR_SOURCE_URL
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with .Values.instance.termsUrl }}
-            - name: OPENOKR_TERMS_URL
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with .Values.instance.privacyUrl }}
-            - name: OPENOKR_PRIVACY_URL
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with .Values.instance.supportEmail }}
-            - name: OPENOKR_SUPPORT_EMAIL
-              value: {{ . | quote }}
-            {{- end }}
-            {{- if $cloud.enabled }}
-            - name: OPENOKR_CLOUD
-              value: "true"
-            {{- with $cloud.region }}
-            - name: OPENOKR_CLOUD_REGION
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with $cloud.plans }}
-            - name: OPENOKR_CLOUD_PLANS
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with $cloud.defaultPlan }}
-            - name: OPENOKR_CLOUD_DEFAULT_PLAN
-              value: {{ . | quote }}
-            {{- end }}
-            {{- end }}
-            {{- with .Values.extraEnv }}
-            {{- toYaml . | nindent 12 }}
-            {{- end }}
-            - name: OPENOKR_MAIL_TRANSPORT
-              value: {{ .Values.mail.transport | quote }}
-            {{- if eq .Values.mail.transport "smtp" }}
-            - name: OPENOKR_MAIL_HOST
-              value: {{ .Values.mail.host | quote }}
-            - name: OPENOKR_MAIL_PORT
-              value: {{ .Values.mail.port | quote }}
-            - name: OPENOKR_MAIL_SECURE
-              value: {{ .Values.mail.secure | quote }}
-            - name: OPENOKR_MAIL_USER
-              value: {{ .Values.mail.user | quote }}
-            - name: OPENOKR_MAIL_FROM
-              value: {{ .Values.mail.from | quote }}
-            {{- if .Values.mail.existingSecret }}
-            - name: OPENOKR_MAIL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.mail.existingSecret }}
-                  key: {{ .Values.mail.existingSecretKey }}
-            {{- end }}
-            {{- end }}
-            # OPENOKR_STORAGE_ROOT, not OPENOKR_STORAGE_DIR. The chart set the
-            # second name from P1-T10 until P6-G05 and nothing in the product
-            # has ever read it: the schema declares ROOT. It happened to work,
-            # because ROOT defaults to the relative path `storage` and the image
-            # runs from /app, so it resolved to the mount by coincidence. A
-            # variable nobody reads plus a coincidence is not a configuration.
-            - name: OPENOKR_STORAGE_ROOT
-              value: /app/storage
-            {{- if .Values.storage.s3.bucket }}
-            # Naming a bucket switches the driver (P6-G05). The local-disk
-            # volume above stays mounted and unused, which costs nothing and
-            # means turning S3 off again does not need a new claim.
-            - name: OPENOKR_STORAGE_S3_BUCKET
-              value: {{ .Values.storage.s3.bucket | quote }}
-            - name: OPENOKR_STORAGE_S3_REGION
-              value: {{ .Values.storage.s3.region | quote }}
-            {{- with .Values.storage.s3.endpoint }}
-            - name: OPENOKR_STORAGE_S3_ENDPOINT
-              value: {{ . | quote }}
-            {{- end }}
-            {{- with .Values.storage.s3.keyPrefix }}
-            - name: OPENOKR_STORAGE_S3_KEY_PREFIX
-              value: {{ . | quote }}
-            {{- end }}
-            {{- if .Values.storage.s3.forcePathStyle }}
-            - name: OPENOKR_STORAGE_S3_FORCE_PATH_STYLE
-              value: {{ .Values.storage.s3.forcePathStyle | quote }}
-            {{- end }}
-            # Credentials come from a Secret and never from values, so they do
-            # not land in the release's stored values where `helm get values`
-            # would read them back. Same rule as database.existingSecret.
-            - name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.storage.s3.existingSecret }}
-                  key: {{ .Values.storage.s3.accessKeyIdKey }}
-            - name: OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.storage.s3.existingSecret }}
-                  key: {{ .Values.storage.s3.secretAccessKeyKey }}
-            {{- end }}
-            {{- /* The optional virus scan. Absent unless a host is named.
-                   Read through `default dict` rather than as a path: a
-                   release installed before this block existed and upgraded
-                   with --reuse-values has no `scan` at all, and a path through
-                   a missing map fails the upgrade before anything rolls out. */}}
-            {{- $scan := .Values.scan | default dict }}
-            {{- $clamd := $scan.clamd | default dict }}
-            {{- with $clamd.host }}
-            - name: OPENOKR_CLAMD_HOST
-              value: {{ . | quote }}
-            - name: OPENOKR_CLAMD_PORT
-              value: {{ $clamd.port | default 3310 | quote }}
-            {{- end }}
-            {{- /* Error reports. The DSN only from a Secret, and absent unless
-                   one is named, which is what sends nothing. `default dict`
-                   for the reason the scan block gives. */}}
-            {{- $errors := .Values.errors | default dict }}
-            - name: OPENOKR_ERROR_ENVIRONMENT
-              value: {{ $errors.environment | default "production" | quote }}
-            {{- with $errors.existingSecret }}
-            - name: OPENOKR_ERROR_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ . }}
-                  key: {{ $errors.dsnKey | default "dsn" }}
+            {{- include "openokr.serverEnv" . | nindent 12 }}
+            {{- if include "openokr.workerEnabled" . }}
+            # The worker Deployment runs both (plan 0.8.0 H10e). `elsewhere`
+            # rather than `off`, so the copilot keeps its background runs and
+            # /api/status judges the stamp the worker's scheduler writes.
+            - name: OPENOKR_RELAY
+              value: "elsewhere"
+            - name: OPENOKR_SCHEDULER
+              value: "elsewhere"
             {{- end }}
           # Ready means the database answers, not merely that the port is open.
           # A pod that is listening but cannot reach Postgres must not receive
@@ -250,6 +116,9 @@ spec:
               mountPath: /app/apps/web/.next/cache
             - name: storage
               mountPath: /app/storage
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir: {}
@@ -262,6 +131,9 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

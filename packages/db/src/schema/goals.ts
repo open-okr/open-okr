@@ -141,11 +141,12 @@ export const goals = pgTable("goals", {
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   /**
-   * The public address (TECHNICAL-PLAN §3, migration 0163). Nullable until
-   * 0.8.0 for a rolling upgrade; every write fills it, and the default fills
-   * it for any insert that names none (docs/design/short-ids.md S3).
+   * The public address (TECHNICAL-PLAN §3, migration 0163). Not null from
+   * migration 0165, after a release nullable for a rolling upgrade; every
+   * write fills it, and the default fills it for any insert that names none
+   * (docs/design/short-ids.md S3).
    */
-  shortId: text("short_id").$defaultFn(newShortId),
+  shortId: text("short_id").notNull().$defaultFn(newShortId),
   title: text("title").notNull(),
   description: jsonb("description"),
   descriptionVersion: integer("description_version"),
@@ -232,7 +233,7 @@ export const keyResults = pgTable("key_results", {
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   /** The public address; see `goals.shortId`. */
-  shortId: text("short_id").$defaultFn(newShortId),
+  shortId: text("short_id").notNull().$defaultFn(newShortId),
   goalId: uuid("goal_id")
     .notNull()
     .references(() => goals.id, { onDelete: "cascade" }),

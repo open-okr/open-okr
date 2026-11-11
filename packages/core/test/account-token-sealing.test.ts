@@ -459,7 +459,13 @@ const storedTokens = async () => {
   return rows;
 };
 
-/** The provider account's own row id, which Better Auth's token routes take. */
+/**
+ * The provider account's own row id, which Better Auth's token routes take.
+ *
+ * Those routes are called from server code here, because their HTTP paths
+ * are off (account-self-service.md §3). What is under test is the adapter's
+ * round trip, which is the same either way.
+ */
 const accountRowId = async (): Promise<string> => {
   const wb = await workerDb();
   const { rows } = await wb.admin.query<{ id: string }>(
@@ -558,31 +564,24 @@ describe("a sign-in through an identity provider", () => {
   it("reads the token back for Better Auth, which hands out what was issued", async () => {
     const session = await signInThroughProvider();
 
-    const response = await post(
-      "/get-access-token",
-      { accountId: await accountRowId() },
-      session,
-    );
-    expect(response.status).toBe(200);
-    expect(
-      ((await response.json()) as { accessToken: string }).accessToken,
-    ).toBe("idp-access-1");
+    const read = await auth.api.getAccessToken({
+      headers: new Headers({ cookie: session }),
+      body: { accountId: await accountRowId() },
+    });
+    expect(read.accessToken).toBe("idp-access-1");
   });
 
   it("refreshes with the token itself, and seals the ones it gets back", async () => {
     const session = await signInThroughProvider();
     const output = capturingOutput();
-    let response: Response;
     try {
-      response = await post(
-        "/refresh-token",
-        { accountId: await accountRowId() },
-        session,
-      );
+      await auth.api.refreshToken({
+        headers: new Headers({ cookie: session }),
+        body: { accountId: await accountRowId() },
+      });
     } finally {
       output.restore();
     }
-    expect(response.status).toBe(200);
 
     // The provider was sent the refresh token it issued, not the stored value.
     expect(idp.refreshTokensReceived).toEqual(["idp-refresh-1"]);
@@ -664,15 +663,13 @@ describe("tokens stored before sealing existed", () => {
       [userId, PROVIDER],
     );
 
-    const readAccessToken = async () => {
-      const response = await post(
-        "/get-access-token",
-        { accountId: "legacy-account" },
-        session,
-      );
-      expect(response.status).toBe(200);
-      return ((await response.json()) as { accessToken: string }).accessToken;
-    };
+    const readAccessToken = async () =>
+      (
+        await auth.api.getAccessToken({
+          headers: new Headers({ cookie: session }),
+          body: { accountId: "legacy-account" },
+        })
+      ).accessToken;
 
     expect(await readAccessToken()).toBe("legacy-access");
 

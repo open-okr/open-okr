@@ -360,6 +360,8 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
         }
       }}
       className="inline-flex h-7.5 cursor-pointer items-center rounded-control border border-line bg-surface pr-1.5 transition-colors duration-fast ease-out hover:border-line-2"
+      // The product tour's Ask AI step lights this (plan 0.8.0 T1).
+      data-tour-target="ask-ai"
     >
       <Button
         variant="ghost"

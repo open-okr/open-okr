@@ -18,6 +18,7 @@ import type { AccessLevel } from "../access/levels.ts";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { requireWorkspaceLevel } from "../access/reads.ts";
 import type { AgentDrafter } from "../agents/drafter.ts";
+import type { AIOffReason } from "../ai/off-reason.ts";
 import type { PromptEvaluator } from "../ai/prompt-evaluation.ts";
 import type { BillingGateway } from "../billing/gateway.ts";
 import type { EmbedFunction } from "../embeddings/service.ts";
@@ -108,6 +109,16 @@ export interface ActionCallContext {
    * and never decides that the proposal should exist.
    */
   readonly drafter?: AgentDrafter;
+  /**
+   * Why the host could build no drafter, when it tried and could not (plan
+   * 0.8.0 O1, `ai/off-reason.ts`).
+   *
+   * Absent means the host did not say, which reads as no provider at all, the
+   * one sentence every surface used before. A host that walked the provider
+   * chain names the step that stopped it, so the reader is told to choose a
+   * plan rather than that nothing is configured.
+   */
+  readonly aiOff?: AIOffReason;
   /**
    * Runs a prompt key's evaluation set over a new version, for
    * `ai.updatePrompt` (plan 0.7.0 A9, docs/design/ai-evaluation.md §7).

@@ -8,8 +8,17 @@ import {
   workerDb,
 } from "@openokr/test-support/db";
 import pg from "pg";
-import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import {
+  DATA_CHANGE_LOCK_KEY,
   type DataChangeBatchResult,
   type DataChangeClient,
   DataChangeError,
@@ -17,6 +26,10 @@ import {
   dataChangeStatus,
   runDataChanges,
 } from "../src/data-change.ts";
+import {
+  dataChangeCommand,
+  parseDataChangeArgs,
+} from "../src/data-change-command.ts";
 import { backfillMemberTimezone } from "../src/data-changes/0001_backfill_member_timezone.ts";
 import { seedChampionAgent } from "../src/data-changes/0006_seed_champion_agent.ts";
 import { backfillBlockerGoal } from "../src/data-changes/0008_backfill_blocker_goal.ts";
@@ -65,6 +78,14 @@ function migrationsBefore(prefix: string): string {
   }
   return dir;
 }
+
+/**
+ * Every migration before 0165, which made `short_id` not null on the seven
+ * addressable tables (plan 0.8.0 C1). A test that writes those rows by hand,
+ * the way a release before 0.7.0 wrote them, runs on the schema its script
+ * ran against.
+ */
+const beforeShortIdsNotNull = (): string => migrationsBefore("0165");
 
 /**
  * The data-change runner (P2-T12 test plan). Batched, resumable, idempotent
@@ -448,6 +469,212 @@ describe("dataChangeStatus", () => {
   });
 });
 
+/**
+ * A run inside a time budget, for the Helm chart's hook (plan 0.8.0 H10c,
+ * docs/design/worker-deployment.md D18). Helm waits for a hook up to its own
+ * timeout and then fails the release, cutting the batch in flight; a budget
+ * the runner keeps ends the run cleanly between two batches instead.
+ */
+describe("the command with --max-seconds", () => {
+  const output = () => {
+    const out: string[] = [];
+    const err: string[] = [];
+    return {
+      out,
+      err,
+      io: {
+        out: (text: string) => {
+          out.push(text);
+        },
+        err: (text: string) => {
+          err.push(text);
+        },
+      },
+    };
+  };
+
+  const fixture = async (rows: number) => {
+    await client.query(
+      "create table _counting_fixture (id int primary key, flagged boolean not null default false)",
+    );
+    await client.query(
+      `insert into _counting_fixture (id) select generate_series(1, ${rows})`,
+    );
+  };
+
+  const flaggedRows = async () =>
+    (
+      await client.query(
+        "select count(*)::int as n from _counting_fixture where flagged",
+      )
+    ).rows[0]?.n;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("stops after the batch that crosses the budget, says what is left, and exits 0; the next run resumes", async () => {
+    await fixture(5);
+    // Each batch takes 600 ms by this clock, so the second batch crosses a
+    // budget of one second and the third never starts.
+    let clock = 1_000_000;
+    vi.spyOn(Date, "now").mockImplementation(() => clock);
+    const calls = { n: 0 };
+    const script: DataChangeScript = {
+      ...countingScript(calls),
+      async runBatch(tx, cursor) {
+        calls.n += 1;
+        clock += 600;
+        return runCountingBatch(tx, cursor);
+      },
+    };
+    const later = { ...countingScript({ n: 0 }), name: "0002_not_started" };
+    const run = output();
+
+    const code = await dataChangeCommand(
+      client,
+      [script, later],
+      { status: false, maxSeconds: 1 },
+      run.io,
+    );
+
+    expect(code).toBe(0);
+    expect(calls.n).toBe(2);
+    expect(await flaggedRows()).toBe(4);
+    const printed = run.out.join("");
+    expect(printed).toMatch(/0001_counting: 2 batch\(es\), 4 row\(s\) changed/);
+    expect(printed).toMatch(/Stopped at the 1-second budget/);
+    expect(printed).toMatch(/0001_counting: in progress\./);
+    expect(printed).toMatch(/0002_not_started: not yet run\./);
+    expect(run.err).toEqual([]);
+
+    // The cursor was kept, so the next run takes the last row and stops.
+    vi.restoreAllMocks();
+    const resumed = { n: 0 };
+    const again = output();
+    expect(
+      await dataChangeCommand(
+        client,
+        [countingScript(resumed), later],
+        { status: false, maxSeconds: 240 },
+        again.io,
+      ),
+    ).toBe(0);
+    expect(resumed.n).toBe(1);
+    expect(await flaggedRows()).toBe(5);
+    expect(again.out.join("")).toMatch(/Data changes: all 2 complete\./);
+  });
+
+  it("says another run is going and exits 0 at once when the lock is held", async () => {
+    await fixture(3);
+    const holder = await connectScratch();
+    try {
+      await holder.query("select pg_advisory_lock($1)", [DATA_CHANGE_LOCK_KEY]);
+      const calls = { n: 0 };
+      const run = output();
+      const began = Date.now();
+
+      const code = await dataChangeCommand(
+        client,
+        [countingScript(calls)],
+        { status: false, maxSeconds: 240 },
+        run.io,
+      );
+
+      expect(code).toBe(0);
+      expect(Date.now() - began).toBeLessThan(5_000);
+      expect(calls.n).toBe(0);
+      expect(run.out.join("")).toMatch(
+        /Another data-change run holds the lock/,
+      );
+      expect(await flaggedRows()).toBe(0);
+    } finally {
+      await holder.end();
+    }
+  });
+
+  it("exits 1 naming a script that throws, and the ledger keeps its last committed batch", async () => {
+    await fixture(4);
+    let attempt = 0;
+    const flaky: DataChangeScript = {
+      ...countingScript({ n: 0 }),
+      async runBatch(tx, cursor) {
+        attempt += 1;
+        if (attempt === 2) {
+          throw new Error("simulated failure");
+        }
+        return runCountingBatch(tx, cursor);
+      },
+    };
+    const run = output();
+
+    const code = await dataChangeCommand(
+      client,
+      [flaky],
+      { status: false, maxSeconds: 240 },
+      run.io,
+    );
+
+    expect(code).toBe(1);
+    expect(run.err.join("")).toMatch(/0001_counting failed on batch 2/);
+    expect(run.err.join("")).toMatch(/simulated failure/);
+    const ledger = await client.query(
+      "select cursor, batches, completed_at from _data_changes where name = '0001_counting'",
+    );
+    expect(ledger.rows[0]).toMatchObject({
+      cursor: "2",
+      batches: 1,
+      completed_at: null,
+    });
+    expect(await flaggedRows()).toBe(2);
+  });
+
+  it("without a budget, runs to the end as before", async () => {
+    await fixture(5);
+    const calls = { n: 0 };
+    const run = output();
+
+    expect(
+      await dataChangeCommand(
+        client,
+        [countingScript(calls)],
+        { status: false },
+        run.io,
+      ),
+    ).toBe(0);
+    expect(calls.n).toBe(3);
+    expect(run.out.join("")).toMatch(
+      /Ran 1 script\(s\):\n {2}0001_counting: 3 batch\(es\), 5 row\(s\) changed\n/,
+    );
+  });
+});
+
+describe("parseDataChangeArgs", () => {
+  it("reads a run, a status and a budget", () => {
+    expect(parseDataChangeArgs([])).toEqual({ status: false });
+    expect(parseDataChangeArgs(["--status"])).toEqual({ status: true });
+    expect(parseDataChangeArgs(["--max-seconds", "240"])).toEqual({
+      status: false,
+      maxSeconds: 240,
+    });
+    expect(parseDataChangeArgs(["--max-seconds=60"])).toEqual({
+      status: false,
+      maxSeconds: 60,
+    });
+  });
+
+  it.each([
+    [["--max-seconds"]],
+    [["--max-seconds", "0"]],
+    [["--max-seconds", "soon"]],
+    [["--max-seconds", "2.5"]],
+    [["--status", "--max-seconds", "60"]],
+    [["--fast"]],
+  ])("refuses %j as a usage error", (argv) => {
+    expect(parseDataChangeArgs(argv)).toHaveProperty("usage");
+  });
+});
+
 describe("the sample script: backfilling member timezone", () => {
   it("sets a member's timezone from their workspace's, only where it was null", async () => {
     await runMigrations(client, {
@@ -584,7 +811,7 @@ describe("0006: seeding the Champion into workspaces that predate it", () => {
 describe("0008: recording the goal on blockers that have none", () => {
   it("takes each blocker's goal from its key result, and leaves one with no key result alone", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [beforeShortIdsNotNull()],
     });
 
     // The shape `sessions.createBlocker` left behind before completeness
@@ -655,7 +882,7 @@ describe("0008: recording the goal on blockers that have none", () => {
 describe("0009: binding the built-in agents to what belongs to no space", () => {
   it("binds both agents to a company goal and a workspace KPI, gives the KPI a context, and leaves space items alone", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [beforeShortIdsNotNull()],
     });
 
     // A workspace as it stood before completeness review H-04: two agents
@@ -1164,7 +1391,7 @@ describe("0015: carrying a strict Coach onto strict mode", () => {
 describe("0017: maintain key results from their direction", () => {
   it("makes a key result written with a maintain direction a maintain key result, and leaves the rest", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [beforeShortIdsNotNull()],
     });
     const { rows } = await client.query<{ direction: string; id: string }>(
       `with w as (
@@ -1225,7 +1452,7 @@ describe("0017: maintain key results from their direction", () => {
 describe("0018: the computed score of key results scored before adjusting existed", () => {
   it("copies a scored key result's score into its computed score, and leaves the unscored", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [beforeShortIdsNotNull()],
     });
     await client.query(
       `with w as (
@@ -1484,7 +1711,7 @@ describe("0022: a member's KPI is owned by that member", () => {
 describe("0023: blockers on the check-in's clock", () => {
   it("retires the hour clock and moves open blockers to their goal's next check-in, never earlier", async () => {
     await runMigrations(client, {
-      dirs: [join(import.meta.dirname, "../migrations")],
+      dirs: [beforeShortIdsNotNull()],
     });
     const { rows } = await client.query<{
       workspace_id: string;
@@ -2138,10 +2365,19 @@ describe("0144: the plain prose columns go, but only once every row has its docu
     expect(outcomes.map((outcome) => outcome.rowsChanged)).toEqual([
       0, 0, 0, 0, 0, 0,
     ]);
-    const { rows } = await client.query<{ completed: number }>(
-      "select count(*)::int as completed from _data_changes where completed_at is not null",
+    // The six, and 0034, which migration 0165 ran on its way (plan 0.8.0 C1).
+    const { rows } = await client.query<{ name: string }>(
+      "select name from _data_changes where completed_at is not null order by name",
     );
-    expect(rows[0]?.completed).toBe(6);
+    expect(rows.map((row) => row.name)).toEqual([
+      "0027_session_shifts_document",
+      "0028_decision_text_document",
+      "0029_management_answer_document",
+      "0030_stage_note_documents",
+      "0031_digest_note_document",
+      "0032_revalidation_note_documents",
+      "0034_short_ids",
+    ]);
   });
 });
 
@@ -2359,7 +2595,7 @@ describe("0033: attachment rows for the files already in comment and document te
   });
 
   it("writes a text row for each file its writer or an import put there, skips and counts the rest, and runs again as nothing", async () => {
-    await runMigrations(client, { dirs: [MIGRATIONS] });
+    await runMigrations(client, { dirs: [beforeShortIdsNotNull()] });
     await seed(client);
 
     const [outcome] = await runDataChanges(client, {
@@ -2406,7 +2642,7 @@ describe("0033: attachment rows for the files already in comment and document te
     );
     await owner.connect();
     try {
-      await runMigrations(owner, { dirs: [MIGRATIONS] });
+      await runMigrations(owner, { dirs: [beforeShortIdsNotNull()] });
       await seed(owner);
 
       const [outcome] = await runDataChanges(owner, {
@@ -2536,7 +2772,7 @@ describe("0034: a short identifier on every addressable row that has none", () =
   }
 
   it("fills every row of the seven tables in every workspace, keeps one already there, and runs again as nothing", async () => {
-    await runMigrations(client, { dirs: [MIGRATIONS] });
+    await runMigrations(client, { dirs: [beforeShortIdsNotNull()] });
     const acme = await seedWorkspace(client, "acme");
     const other = await seedWorkspace(client, "other");
     // A row a 0.7 write already gave one keeps it.
@@ -2565,7 +2801,7 @@ describe("0034: a short identifier on every addressable row that has none", () =
   });
 
   it("works through a workspace bigger than one batch, and fills on its next run a row a 0.6 replica writes meanwhile", async () => {
-    await runMigrations(client, { dirs: [MIGRATIONS] });
+    await runMigrations(client, { dirs: [beforeShortIdsNotNull()] });
     // A thousand and one tasks beside the six other rows: two batches here.
     const big = await seedWorkspace(client, "big", 1_000);
 
@@ -2614,7 +2850,7 @@ describe("0034: a short identifier on every addressable row that has none", () =
     );
     await owner.connect();
     try {
-      await runMigrations(owner, { dirs: [MIGRATIONS] });
+      await runMigrations(owner, { dirs: [beforeShortIdsNotNull()] });
       const acme = await seedWorkspace(owner, "acme");
       const other = await seedWorkspace(owner, "other");
 
@@ -2628,5 +2864,129 @@ describe("0034: a short identifier on every addressable row that has none", () =
       await owner.end();
       await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
     }
+  });
+
+  /**
+   * 0.8.0's half (plan 0.8.0 C1, docs/design/short-ids.md, "The 0.8.0 step",
+   * option A). Migration 0165 declares that it needs 0034, so an instance
+   * that never ran the data changes is not stranded: the migrator runs 0034
+   * first, in its own batches, then applies the not-null.
+   */
+  describe("0165: not null, after the migrator has run 0034", () => {
+    /** The tables whose `short_id` still takes a null. */
+    async function nullable(db: DataChangeClient): Promise<string[]> {
+      const { rows } = await db.query<{ table_name: string }>(
+        `select table_name from information_schema.columns
+          where column_name = 'short_id' and is_nullable = 'YES'
+            and table_name = any($1)
+          order by table_name`,
+        [[...TABLES]],
+      );
+      return rows.map((row) => row.table_name);
+    }
+
+    /** A scratch database the owner role owns, as a deployment's migrator. */
+    async function asOwner(
+      run: (owner: pg.Client) => Promise<void>,
+    ): Promise<void> {
+      const wb = await workerDb();
+      const ownerDb = `${scratchDb}_owner`;
+      await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+      await wb.admin.query(
+        `create database ${ownerDb} owner ${testDbEnv.ownerRole} ` +
+          `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+      );
+      const owner = new pg.Client(
+        connectionOptions(ownerDb, testDbEnv.ownerRole),
+      );
+      await owner.connect();
+      try {
+        await run(owner);
+      } finally {
+        await owner.end();
+        await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+      }
+    }
+
+    it("runs 0034 on an instance that skipped it, then makes all seven not null", async () => {
+      await runMigrations(client, { dirs: [beforeShortIdsNotNull()] });
+      const acme = await seedWorkspace(client, "acme");
+      const other = await seedWorkspace(client, "other");
+      expect(await nullable(client)).toHaveLength(7);
+
+      const lines: string[] = [];
+      const applied = await runMigrations(client, {
+        dirs: [MIGRATIONS],
+        log: (line) => lines.push(line),
+      });
+
+      expect(applied).toContain("0165_short_ids_not_null.sql");
+      expect(await nullable(client)).toEqual([]);
+      for (const workspaceId of [acme, other]) {
+        const all = Object.values(await shortIdsIn(client, workspaceId)).flat();
+        expect(all).toHaveLength(7);
+        for (const shortId of all) {
+          expect(shortId).toMatch(SHORT_ID);
+        }
+      }
+      const { rows } = await client.query(
+        "select completed_at from _data_changes where name = '0034_short_ids'",
+      );
+      expect(rows[0]?.completed_at).not.toBeNull();
+      expect(lines.join("\n")).toMatch(
+        /0165_short_ids_not_null\.sql needs data change 0034_short_ids/,
+      );
+    }, 60_000);
+
+    it("does the same as the table owner, under the tenant floor", async () => {
+      await asOwner(async (owner) => {
+        await runMigrations(owner, { dirs: [beforeShortIdsNotNull()] });
+        const acme = await seedWorkspace(owner, "acme");
+        const other = await seedWorkspace(owner, "other");
+
+        await runMigrations(owner, { dirs: [MIGRATIONS] });
+
+        expect(await nullable(owner)).toEqual([]);
+        for (const workspaceId of [acme, other]) {
+          const all = Object.values(
+            await shortIdsIn(owner, workspaceId),
+          ).flat();
+          expect(all.every((shortId) => shortId !== null)).toBe(true);
+        }
+      });
+    }, 60_000);
+
+    it("refuses, naming each table and its count, when 0034 is recorded complete and rows are still empty", async () => {
+      // The backstop, which should never fire: 0034 finished while the
+      // instance was empty, and rows with none arrived afterwards. Run as the
+      // owner, because a count under the tenant floor would see nothing.
+      await asOwner(async (owner) => {
+        await runMigrations(owner, { dirs: [beforeShortIdsNotNull()] });
+        await runDataChanges(owner, { scripts: [shortIds] });
+        await seedWorkspace(owner, "acme");
+        await seedWorkspace(owner, "other");
+
+        const refused = await runMigrations(owner, { dirs: [MIGRATIONS] }).then(
+          () => null,
+          (error: unknown) => error as Error,
+        );
+        expect(refused?.message).toMatch(/0165_short_ids_not_null\.sql failed/);
+        for (const table of TABLES) {
+          expect(refused?.message).toContain(`${table} (2)`);
+        }
+        expect(refused?.message).toContain(
+          "delete from _data_changes where name = '0034_short_ids'",
+        );
+        expect(await nullable(owner)).toHaveLength(7);
+
+        // What the message says to do, and the start that follows.
+        await owner.query(
+          "delete from _data_changes where name = '0034_short_ids'",
+        );
+        const applied = await runMigrations(owner, { dirs: [MIGRATIONS] });
+        expect(applied).toContain("0165_short_ids_not_null.sql");
+        expect(await nullable(owner)).toEqual([]);
+      });
+    }, 60_000);
   });
 });

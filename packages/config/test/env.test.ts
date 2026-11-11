@@ -1,5 +1,9 @@
 import { describe, expect, test } from "vitest";
 import {
+  callerAddressReading,
+  describeCallerAddressReading,
+} from "../src/caller-address";
+import {
   DEVELOPMENT_AUTH_SECRET,
   EnvironmentError,
   parseEnv,
@@ -213,16 +217,23 @@ describe("S3 storage", () => {
     expect(env.OPENOKR_STORAGE_ROOT).toBe("storage");
   });
 
-  test("a named bucket with no credentials is a boot error naming them", () => {
-    // The failure worth catching here rather than at the first upload: the
-    // driver would build fine, every request would fail, and the message a
-    // user saw would be about their file rather than about a missing variable.
-    expect(() =>
-      parseEnv({ ...VALID, OPENOKR_STORAGE_S3_BUCKET: "openokr-files" }),
-    ).toThrow(/OPENOKR_STORAGE_S3_ACCESS_KEY_ID/);
+  test("a named bucket with no keys leaves the credentials to the AWS SDK", () => {
+    // Plan 0.8.0 H9: workload identity (EKS Pod Identity, IRSA, an instance
+    // profile) gives the pod a role and no key, and the SDK's default chain
+    // finds it. Requiring a long-lived key made that impossible.
+    const env = parseEnv({
+      ...VALID,
+      OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+    });
+    expect(env.OPENOKR_STORAGE_S3_BUCKET).toBe("openokr-files");
+    expect(env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID).toBeUndefined();
+    expect(env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY).toBeUndefined();
   });
 
-  test("half a credential pair is still refused", () => {
+  test("half a credential pair is still refused, either half", () => {
+    // Half-configured is the state worth catching at boot: the driver would
+    // build, and every upload would fail with a message about the file rather
+    // than about the missing variable.
     expect(() =>
       parseEnv({
         ...VALID,
@@ -230,6 +241,13 @@ describe("S3 storage", () => {
         OPENOKR_STORAGE_S3_ACCESS_KEY_ID: "key",
       }),
     ).toThrow(/OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY/);
+    expect(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_STORAGE_S3_BUCKET: "openokr-files",
+        OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY: "secret",
+      }),
+    ).toThrow(/OPENOKR_STORAGE_S3_ACCESS_KEY_ID/);
   });
 
   test("a complete configuration parses, with a region default", () => {
@@ -271,6 +289,258 @@ describe("S3 storage", () => {
       throw new Error("expected a refusal");
     } catch (error) {
       expect((error as Error).message).not.toContain("AKIAsupersecretvalue");
+    }
+  });
+});
+
+/**
+ * Whose address a request is counted under (docs/design/trusted-proxies.md
+ * D1 to D8, plan 0.8.0 H2). Both variables are refused at boot when they are
+ * malformed, naming the entry, because Better Auth on its own would drop a bad
+ * range and carry on, and a dropped range turns that proxy into "the caller".
+ */
+describe("the caller address settings", () => {
+  test("nothing set counts one proxy, the hop count's default", () => {
+    const env = parseEnv(VALID);
+    expect(env.OPENOKR_TRUSTED_PROXIES).toBeUndefined();
+    expect(env.OPENOKR_CLIENT_ADDRESS_HEADER).toBeUndefined();
+    expect(callerAddressReading({})).toEqual({ mode: "proxy_hops", hops: 1 });
+  });
+
+  test("ranges are split on commas, spaces and newlines", () => {
+    const env = parseEnv({
+      ...VALID,
+      OPENOKR_TRUSTED_PROXIES:
+        "10.0.1.0/24, 2606:4700::/32\n173.245.48.0/20  192.0.2.10",
+    });
+    expect(env.OPENOKR_TRUSTED_PROXIES).toEqual([
+      "10.0.1.0/24",
+      "2606:4700::/32",
+      "173.245.48.0/20",
+      "192.0.2.10",
+    ]);
+    expect(
+      callerAddressReading({ OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24" }),
+    ).toEqual({ mode: "trusted_proxies", trustedProxies: ["10.0.1.0/24"] });
+  });
+
+  test("the header is read in lower case", () => {
+    expect(
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "CF-Connecting-IP" })
+        .OPENOKR_CLIENT_ADDRESS_HEADER,
+    ).toBe("cf-connecting-ip");
+    expect(
+      callerAddressReading({ OPENOKR_CLIENT_ADDRESS_HEADER: "X-Real-IP" }),
+    ).toEqual({ mode: "header", header: "x-real-ip" });
+  });
+
+  test("a host name is refused, naming the variable and the entry", () => {
+    const error = captureError(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24, cloudflare",
+      }),
+    );
+    expect(error).toBeInstanceOf(EnvironmentError);
+    expect((error as EnvironmentError).variables).toContain(
+      "OPENOKR_TRUSTED_PROXIES",
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toMatch(/cloudflare/);
+  });
+
+  test.each([
+    ["0.0.0.0/0", /every address/],
+    ["::/0", /every address/],
+    ["::ffff:10.0.0.0/104", /as IPv4/],
+    ["::ffff:10.0.1.5", /as IPv4/],
+    ["10.0.1.0/33", /not an IP address or a CIDR range/],
+    ["10.0.1.0/", /not an IP address or a CIDR range/],
+    ["10.0.1.0/2x", /not an IP address or a CIDR range/],
+    ["198.51.100.7:51234", /not an IP address or a CIDR range/],
+  ])("%s is refused and the message says why", (entry, why) => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_TRUSTED_PROXIES: entry }),
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toContain(entry);
+    expect(error.message).toMatch(why);
+  });
+
+  test("both set is refused, naming both", () => {
+    const error = captureError(() =>
+      parseEnv({
+        ...VALID,
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip",
+      }),
+    );
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+  });
+
+  test("X-Forwarded-For as the header points to the ranges instead", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "X-Forwarded-For" }),
+    );
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+    expect(error.message).toMatch(/OPENOKR_TRUSTED_PROXIES/);
+  });
+
+  test("a header name that is not an HTTP token is refused", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_CLIENT_ADDRESS_HEADER: "cf connecting ip" }),
+    );
+    expect(error.message).toMatch(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+    expect(error.message).toMatch(/header name/);
+  });
+
+  test("the running reading refuses what the boot refuses", () => {
+    expect(() =>
+      callerAddressReading({ OPENOKR_TRUSTED_PROXIES: "cloudflare" }),
+    ).toThrow(EnvironmentError);
+    expect(() =>
+      callerAddressReading({
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip",
+      }),
+    ).toThrow(/OPENOKR_CLIENT_ADDRESS_HEADER/);
+  });
+
+  test("blank means unset, as for every other variable", () => {
+    expect(
+      callerAddressReading({
+        OPENOKR_TRUSTED_PROXIES: "  ",
+        OPENOKR_CLIENT_ADDRESS_HEADER: "",
+      }),
+    ).toEqual({ mode: "proxy_hops", hops: 1 });
+  });
+
+  test("the reading is described in one line for the boot log", () => {
+    expect(describeCallerAddressReading({ mode: "proxy_hops", hops: 1 })).toBe(
+      "caller address: X-Forwarded-For, 1 proxy from the right",
+    );
+    expect(
+      describeCallerAddressReading({
+        mode: "trusted_proxies",
+        trustedProxies: ["10.0.1.0/24", "10.0.2.0/24"],
+      }),
+    ).toBe("caller address: X-Forwarded-For, trusting 2 ranges");
+    expect(
+      describeCallerAddressReading({
+        mode: "trusted_proxies",
+        trustedProxies: ["10.0.1.0/24"],
+      }),
+    ).toBe("caller address: X-Forwarded-For, trusting 1 range");
+    expect(
+      describeCallerAddressReading({
+        mode: "header",
+        header: "cf-connecting-ip",
+      }),
+    ).toBe("caller address: the cf-connecting-ip header only");
+  });
+});
+
+// docs/design/worker-deployment.md D8, plan 0.8.0 H10a.
+describe("how long a stopping process may drain", () => {
+  test("defaults to twenty seconds, so nothing has to be set", () => {
+    expect(parseEnv(VALID).OPENOKR_SHUTDOWN_SECONDS).toBe(20);
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(20);
+  });
+
+  test("takes a whole number of seconds from 1 to 300", () => {
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "1" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(1);
+    expect(
+      parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: "300" })
+        .OPENOKR_SHUTDOWN_SECONDS,
+    ).toBe(300);
+  });
+
+  test.each(["0", "301", "soon", "2.5"])(
+    "refuses %s, naming the variable",
+    (value) => {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, OPENOKR_SHUTDOWN_SECONDS: value }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toEqual([
+        "OPENOKR_SHUTDOWN_SECONDS",
+      ]);
+      expect(error.message).toMatch(/whole number of seconds from 1 to 300/);
+    },
+  );
+});
+
+// docs/design/worker-deployment.md D2, plan 0.8.0 H10d.
+describe("where the relay and the scheduler run", () => {
+  test.each(["OPENOKR_RELAY", "OPENOKR_SCHEDULER"] as const)(
+    "%s defaults to on and takes on, off and elsewhere",
+    (variable) => {
+      expect(parseEnv(VALID)[variable]).toBe("on");
+      for (const value of ["on", "off", "elsewhere"] as const) {
+        expect(parseEnv({ ...VALID, [variable]: value })[variable]).toBe(value);
+      }
+    },
+  );
+
+  test.each(["OPENOKR_RELAY", "OPENOKR_SCHEDULER"] as const)(
+    "%s refuses a value it does not know, naming the variable",
+    (variable) => {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, [variable]: "sometimes" }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toEqual([variable]);
+    },
+  );
+});
+
+// Plan 0.8.0 S4, docs/design/email-verification.md §11.1.
+describe("email confirmation at sign-up", () => {
+  test("unset means nothing chosen here, and auto and off are taken", () => {
+    expect(parseEnv(VALID).OPENOKR_EMAIL_VERIFICATION).toBeUndefined();
+    expect(
+      parseEnv({ ...VALID, OPENOKR_EMAIL_VERIFICATION: "off" })
+        .OPENOKR_EMAIL_VERIFICATION,
+    ).toBe("off");
+  });
+
+  test("anything else refuses the boot, naming the variable", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_EMAIL_VERIFICATION: "never" }),
+    );
+    expect(error).toBeInstanceOf(EnvironmentError);
+    expect((error as EnvironmentError).variables).toEqual([
+      "OPENOKR_EMAIL_VERIFICATION",
+    ]);
+  });
+});
+
+// Akmal, 11 November 2026: the hop count is the default reading, and the
+// ranges or the header replace it.
+describe("the hop count beside the other two", () => {
+  test("is the default, one proxy", () => {
+    expect(callerAddressReading({})).toEqual({ mode: "proxy_hops", hops: 1 });
+  });
+
+  test("is refused beside named ranges or a header, naming the variable", () => {
+    for (const other of [
+      { OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24" },
+      { OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip" },
+    ]) {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, OPENOKR_TRUSTED_PROXY_HOPS: "2", ...other }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toContain(
+        "OPENOKR_TRUSTED_PROXY_HOPS",
+      );
     }
   });
 });

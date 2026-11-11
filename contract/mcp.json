@@ -118,10 +118,15 @@
     },
     {
       "name": "people.updateOwnProfile",
-      "description": "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+      "description": "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
       "inputSchema": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "timezone": {
             "type": "string"
           },
@@ -1637,7 +1642,8 @@
               "check_in",
               "support_request",
               "support_ended",
-              "connection_ended"
+              "connection_ended",
+              "self_deleted"
             ],
             "description": "One line on why, where the workspace asks for one."
           },
@@ -1806,7 +1812,8 @@
                 "check_in",
                 "support_request",
                 "support_ended",
-                "connection_ended"
+                "connection_ended",
+                "self_deleted"
               ]
             },
             "additionalProperties": {
@@ -4975,6 +4982,21 @@
             "description": "annual or quarterly cycles."
           }
         }
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
+    },
+    {
+      "name": "cycles.setupAccess",
+      "description": "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
       },
       "scope": "read",
       "annotations": {
@@ -9386,6 +9408,21 @@
       "example": {
         "cycleId": "…"
       }
+    },
+    {
+      "name": "goals.createAccess",
+      "description": "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {}
     },
     {
       "name": "goals.place",

@@ -17,11 +17,12 @@
 import { createProviderDrafter, workspacePrompts } from "@openokr/agents";
 import {
   type AgentDrafter,
+  type AIOffReason,
   builtInAgentId,
   resolveAgentRunCostCap,
 } from "@openokr/core";
 import type { ModelTier } from "@openokr/db";
-import { providerForTier, type UsageAttribution } from "./ai-provider";
+import { resolveProviderForTier, type UsageAttribution } from "./ai-provider";
 import { getPool } from "./auth";
 
 /**
@@ -64,6 +65,28 @@ export async function drafterFor(
   forUser?: string,
   attribution?: UsageAttribution,
 ): Promise<AgentDrafter | null> {
+  const outcome = await resolveDrafterFor(
+    workspaceId,
+    tier,
+    forUser,
+    attribution,
+  );
+  return "drafter" in outcome ? outcome.drafter : null;
+}
+
+/**
+ * `drafterFor`, saying why there is none (plan 0.8.0 O1).
+ *
+ * The copilot passes the reason to core on the action context, so a reader is
+ * told what stopped AI here: a plan with no AI credits, closed egress, an
+ * unpriced model, or no provider at all.
+ */
+export async function resolveDrafterFor(
+  workspaceId: string,
+  tier: ModelTier = "balanced",
+  forUser?: string,
+  attribution?: UsageAttribution,
+): Promise<{ readonly drafter: AgentDrafter } | { readonly off: AIOffReason }> {
   const pool = getPool();
   const costCapUsd = await runCostCapFor(pool, workspaceId);
 
@@ -71,17 +94,23 @@ export async function drafterFor(
   // under their own name is worth a better model than the cheapest one, and
   // the run cap bounds what that can cost. Whichever provider the workspace
   // routes that tier to, not OpenRouter always (completeness review H-27).
-  const routed = await providerForTier(workspaceId, tier, forUser, attribution);
-  if (!routed) {
-    return null;
+  const outcome = await resolveProviderForTier(
+    workspaceId,
+    tier,
+    forUser,
+    attribution,
+  );
+  if ("off" in outcome) {
+    return outcome;
   }
+  const routed = outcome.routed;
   // A workspace whose egress controls let nothing reach this provider has no
   // drafter, exactly as one with no provider has none (M-10): its assists are
   // hidden and its agents run in their deterministic form, rather than
   // offering buttons the guard would refuse every time. `assist` is the
   // narrowest purpose, so nothing is permitted when it is not.
   if (!routed.provider.permits("assist")) {
-    return null;
+    return { off: "egress_blocked" };
   }
 
   // The workspace's own version of each editable prompt, while it passes its
@@ -89,7 +118,7 @@ export async function drafterFor(
   // after the provider check, so a workspace with AI off pays nothing for it.
   const systemPrompts = await workspacePrompts(pool, workspaceId);
 
-  return createProviderDrafter({
+  const drafter = createProviderDrafter({
     systemPrompts,
     provider: routed.provider,
     model: routed.modelId,
@@ -107,6 +136,7 @@ export async function drafterFor(
       ? {}
       : { costCachedInPerMillion: routed.costCachedInPerMillion }),
   });
+  return { drafter };
 }
 
 /**

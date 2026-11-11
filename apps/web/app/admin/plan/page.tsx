@@ -87,10 +87,12 @@ export default async function PlanPage({
     listSeatHolders(pool, access.workspaceId),
   ]);
   const currentKey = own?.planKey ?? null;
+  // This screen exists only with a catalogue, where "Free" for a workspace
+  // with no plan read as the catalogue's own Free plan (UAT 0.8.0 F-05).
   const currentName =
     plans.find((plan) => plan.key === currentKey)?.name ??
     currentKey ??
-    t("admin.plan.free");
+    t("admin.plan.none");
   const instanceName = await getInstanceName();
   const supportEmail = await resolveSupportEmail(pool);
   const credits = await readCreditSummary(pool, access.workspaceId);

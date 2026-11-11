@@ -59,9 +59,15 @@ beforeEach(() => {
 });
 
 describe("the version footer", () => {
-  it("is nothing for a member without full access", async () => {
+  it("shows every member the running version, and only an administrator the notice", async () => {
+    // Plan 0.8.0 V1 (Q7): the version was for `full` only.
     state.latest = NEWER;
-    expect(await render(ACCESS_LEVELS.edit)).toBe("");
+    for (const level of [ACCESS_LEVELS.view, ACCESS_LEVELS.edit]) {
+      const html = await render(level);
+      expect(html).toContain("v0.4.0");
+      expect(html).not.toContain("available");
+    }
+    // Nobody without `full` can act on a newer release, so nothing is asked.
     expect(state.checked).toBe(0);
   });
 

@@ -3,6 +3,7 @@ import {
   listTenantsAsOperator,
   readPlans,
   readUsageAsOperator,
+  resolveDefaultPlan,
 } from "@openokr/core";
 import {
   Button,
@@ -101,11 +102,24 @@ export default async function OperatorWorkspacesPage({
   const operator = await requireOperator();
   const pool = getPool();
 
-  const [tenants, usage, plans] = await Promise.all([
+  const [tenants, usage, plans, defaultPlan] = await Promise.all([
     listTenantsAsOperator(pool, operator.userId),
     readUsageAsOperator(pool, operator.userId),
     readPlans(pool),
+    resolveDefaultPlan(pool),
   ]);
+  // With a catalogue, a workspace with no plan may not use the provider's AI
+  // key (ai-credits.md §3), and until 0.8.0 nothing here said so (plan 0.8.0
+  // O2, docs/design/workspaces-without-a-plan.md §2).
+  const noPlanCostsAI = plans.length > 0;
+  const withoutAPlan = noPlanCostsAI
+    ? tenants.filter(
+        (one) =>
+          one.planKey === null &&
+          one.tenantState !== "closed" &&
+          one.erasingAt === null,
+      ).length
+    : 0;
   const byWorkspace = new Map(usage.map((row) => [row.workspaceId, row]));
   const { t } = await getTranslations();
   const filter = readWorkspaceFilter((await searchParams) ?? {});
@@ -158,6 +172,32 @@ export default async function OperatorWorkspacesPage({
               })}
         </p>
       </header>
+
+      {withoutAPlan > 0 ? (
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border-y border-r border-l-4 border-warn-dot bg-warn-bg px-4 py-3 text-sm text-warn"
+          role="status"
+          data-testid="no-plan-notice"
+        >
+          <span>
+            {withoutAPlan === 1
+              ? t("operator.workspaces.noPlanOne")
+              : t("operator.workspaces.noPlanOther", { count: withoutAPlan })}
+          </span>
+          {defaultPlan ? (
+            <Link
+              className="font-semibold underline underline-offset-2"
+              href="/operator/default-plan"
+            >
+              {t("operator.workspaces.reviewDefaultPlan", {
+                plan: defaultPlan.name,
+              })}
+            </Link>
+          ) : (
+            <span>{t("operator.workspaces.setDefaultPlan")}</span>
+          )}
+        </div>
+      ) : null}
 
       {overdue > 0 ? (
         <p
@@ -221,7 +261,11 @@ export default async function OperatorWorkspacesPage({
             >
               <option value="">{t("operator.workspaces.filterPlanAny")}</option>
               <option value={planFilterValue(null)}>
-                {t("operator.workspaces.filterPlanNone")}
+                {/* "Free (no plan)" beside a catalogue's own Free could not
+                    be told apart from it (UAT 0.8.0 F-05). */}
+                {noPlanCostsAI
+                  ? t("operator.workspaces.noPlan")
+                  : t("operator.workspaces.filterPlanNone")}
               </option>
               {planOptions.map((plan) => (
                 <option key={plan.key} value={planFilterValue(plan.key)}>
@@ -323,7 +367,18 @@ export default async function OperatorWorkspacesPage({
                           </Chip>
                         </td>
                         <td className="p-3 text-ink-2">
-                          {tenant.planKey ?? t("operator.workspace.planFree")}
+                          {tenant.planKey === null && noPlanCostsAI ? (
+                            <span className="flex flex-col items-start gap-0.5">
+                              <Chip tone="warn">
+                                {t("operator.workspaces.noPlan")}
+                              </Chip>
+                              <span className="text-xs text-ink-3">
+                                {t("operator.workspaces.noProviderAI")}
+                              </span>
+                            </span>
+                          ) : (
+                            (tenant.planKey ?? t("operator.workspace.planFree"))
+                          )}
                         </td>
                         {/* Seats used, as the limit counts them, against the
                          * plan's seats (operator-console.md §11, plan 0.7.0

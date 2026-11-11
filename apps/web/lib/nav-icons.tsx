@@ -14,6 +14,7 @@ import {
   Hammer,
   HardDrive,
   Home,
+  IdCard,
   Inbox,
   KeyRound,
   Layers,
@@ -76,6 +77,9 @@ const ICONS: Readonly<Record<string, ReactNode>> = {
   "check-in": <CheckCircle2 className="size-full" />,
   sessions: <CalendarDays className="size-full" />,
   spaces: <Layers className="size-full" />,
+  // A card that names its holder, for Your account (plan 0.8.0 Y2). Not a
+  // person-shape: `Users`, `UserPlus` and `UserCog` are taken below.
+  "account-profile": <IdCard className="size-full" />,
   "account-channels": <MessageSquare className="size-full" />,
   "account-security": <Shield className="size-full" />,
   "account-api-tokens": <KeyRound className="size-full" />,

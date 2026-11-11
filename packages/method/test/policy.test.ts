@@ -35,6 +35,7 @@ const phase = (n: number, missing: string[] = []): PhaseResult => ({
   title: `Phase ${n}`,
   state: missing.length === 0 ? "pass" : "todo",
   missing,
+  needs: [],
   blocked: [],
   conditions: { met: 0, total: missing.length },
 });

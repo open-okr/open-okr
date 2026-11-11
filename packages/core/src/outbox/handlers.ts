@@ -46,6 +46,26 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  ACCOUNT_DELETION_CANCELLED_TOPIC,
+  ACCOUNT_DELETION_DONE_TOPIC,
+  ACCOUNT_DELETION_REQUESTED_TOPIC,
+  ACCOUNT_DELETION_TOMORROW_TOPIC,
+} from "../auth/account-deletion.ts";
+import {
+  CHANGE_EMAIL_TOPIC,
+  EMAIL_CHANGE_NOTICE_TOPIC,
+  EMAIL_CHANGE_TAKEN_TOPIC,
+} from "../auth/email-change.ts";
+import {
+  PASSWORD_CHANGE_VIAS,
+  PASSWORD_CHANGED_TOPIC,
+  type PasswordChangeVia,
+} from "../auth/password-change.ts";
+import {
+  EMAIL_VERIFICATION_LINK_SECONDS,
+  VERIFY_EMAIL_TOPIC,
+} from "../auth/verification-links.ts";
+import {
   endSubscriptionOnClosing,
   type SubscriptionEnder,
 } from "../billing/closing.ts";
@@ -66,6 +86,18 @@ import {
   runExportJob,
 } from "../exports/worker.ts";
 import {
+  changeEmailMail,
+  type DeletionCancelReason,
+  deletionCancelledMail,
+  deletionDoneMail,
+  deletionRequestedMail,
+  deletionTomorrowMail,
+  emailChangeNoticeMail,
+  emailChangeTakenMail,
+  passwordChangedMail,
+  verifyEmailMail,
+} from "../mail/account.ts";
+import {
   closureMail,
   erasureReminderMail,
   invitationMail,
@@ -76,13 +108,14 @@ import {
   trialReminderMail,
   webhookTurnedOffMail,
 } from "../mail/mails.ts";
-import { mailWords } from "../mail/words.ts";
+import { mailLocale, mailWords } from "../mail/words.ts";
 import { workspaceMail, workspaceMailInTx } from "../mail/workspace.ts";
 import { digestItemsFor } from "../notifications/digest.ts";
 import { DIGEST_TOPIC } from "../notifications/drain.ts";
 import { parseIndexJob, runIndexJob } from "../search/worker.ts";
 import { instanceNameOr } from "../secrets/instance-registry.ts";
 import type { KeyRing } from "../secrets/key-ring.ts";
+import { resolveInstanceDefaultLanguage } from "../settings/workspace-defaults.ts";
 import { defaultMetrics, METRIC } from "../telemetry/recorder.ts";
 import {
   END_SUBSCRIPTION_TOPIC,
@@ -110,6 +143,7 @@ import {
   WEBHOOK_TURNED_OFF_TOPIC,
   webhookRetrySeconds,
 } from "../webhooks/jobs.ts";
+import { timezoneForAccount } from "../workspaces/memberships.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
 /** One delivered outbox row, as a handler sees it. */
@@ -429,6 +463,325 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
   });
   await deps.sendMail({ to, ...built });
 };
+
+/**
+ * Sends one link that confirms an email address (docs/design/
+ * email-verification.md D5, plan 0.8.0 S3).
+ *
+ * **Checks before it sends, and skips rather than fails.** A link nobody can
+ * use is not worth a mail: no mail configured, the link expired, the account
+ * gone, the address already confirmed, or the account's address changed
+ * since. A refusal that lasts, such as a mail service still in its sandbox,
+ * is retried on the relay's default policy and then dead-lettered; the person
+ * asks for another link once the operator has fixed it.
+ *
+ * **Safe to run twice** in the sense mail can be: a second delivery sends the
+ * same link again, which works the same as the first.
+ */
+const sendVerificationLink: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const url = asString(delivery.payload.url);
+  const expiresAt = Date.parse(asString(delivery.payload.expiresAt) ?? "");
+  if (!userId || !to || !url || Number.isNaN(expiresAt)) {
+    throw new PermanentDispatchError(
+      "A confirmation link needs an account, an address, a link and when it expires, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  if (expiresAt <= Date.now()) {
+    deps.onSkipped?.(delivery, "the link has expired");
+    return;
+  }
+
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{
+    email: string;
+    email_verified: boolean;
+  }>("select email, email_verified from users where id = $1", [userId]);
+  const account = rows[0];
+  if (!account) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+  if (account.email_verified) {
+    deps.onSkipped?.(delivery, "the address is already confirmed");
+    return;
+  }
+  if (account.email.toLowerCase() !== to.toLowerCase()) {
+    deps.onSkipped?.(delivery, "the account's address has changed");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = verifyEmailMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    url,
+    hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+    // Plan 0.8.0 S4: confirmation off, the account works already.
+    optional: delivery.payload.optional === true,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells an account holder that its password changed (docs/design/
+ * account-self-service.md §4.2, D9, D13).
+ *
+ * **Sent to the address the account had when the password changed**, which
+ * the row carries and which is gone from it once delivered. Skipped when the
+ * account is gone, because a mail about an account nobody holds helps nobody.
+ * Otherwise sent even when the address has changed since: that is exactly
+ * when the old address should hear of it.
+ */
+const sendPasswordChanged: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const via = asString(delivery.payload.via);
+  const at = new Date(asString(delivery.payload.at) ?? "");
+  if (
+    !userId ||
+    !to ||
+    !PASSWORD_CHANGE_VIAS.includes(via as PasswordChangeVia) ||
+    Number.isNaN(at.getTime())
+  ) {
+    throw new PermanentDispatchError(
+      "A password notice needs an account, an address, how the password changed and when, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{ id: string }>(
+    "select id from users where id = $1",
+    [userId],
+  );
+  if (rows.length === 0) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = passwordChangedMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    via: via as PasswordChangeVia,
+    otherSessionsEnded: delivery.payload.otherSessionsEnded === true,
+    at,
+    // In the person's own timezone, named (UAT 0.8.0 Q-7).
+    timeZone: await timezoneForAccount(deps.pool, userId).catch(() => "UTC"),
+    baseUrl: deps.baseUrl,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Sends the link that makes a new address the sign-in email (docs/design/
+ * account-self-service.md §4.2, D18, plan 0.8.0 Y4), to that new address.
+ *
+ * **Skips rather than fails** a link nobody can use: no mail configured, the
+ * link expired, the account gone, or its address no longer the one the link
+ * was asked from. Better Auth refuses such a link when it is opened anyway;
+ * this only spares a mail that could do nothing.
+ */
+const sendChangeEmailLink: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const from = asString(delivery.payload.from);
+  const to = asString(delivery.payload.to);
+  const url = asString(delivery.payload.url);
+  const expiresAt = Date.parse(asString(delivery.payload.expiresAt) ?? "");
+  if (!userId || !from || !to || !url || Number.isNaN(expiresAt)) {
+    throw new PermanentDispatchError(
+      "A change-of-email link needs an account, both addresses, a link and when it expires, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  if (expiresAt <= Date.now()) {
+    deps.onSkipped?.(delivery, "the link has expired");
+    return;
+  }
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{ email: string }>(
+    "select email from users where id = $1",
+    [userId],
+  );
+  const account = rows[0];
+  if (!account) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+  if (account.email.toLowerCase() !== from.toLowerCase()) {
+    deps.onSkipped?.(delivery, "the account's address has changed");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = changeEmailMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    url,
+    hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells the current address that a new sign-in email was asked for
+ * (account-self-service.md §4.2, D16, AS-Q4 (a)). The same mail whether or
+ * not the new address has an account. Skipped only when the account is gone;
+ * sent even when the address has changed since, because that is exactly
+ * when the old address should hear of it.
+ */
+const sendEmailChangeNotice: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const newEmail = asString(delivery.payload.newEmail);
+  const at = new Date(asString(delivery.payload.at) ?? "");
+  if (!userId || !to || !newEmail || Number.isNaN(at.getTime())) {
+    throw new PermanentDispatchError(
+      "A change-of-email notice needs an account, both addresses and when it was asked for, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const { rows } = await deps.pool.query<{ id: string }>(
+    "select id from users where id = $1",
+    [userId],
+  );
+  if (rows.length === 0) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = emailChangeNoticeMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    newEmail,
+    at,
+    // In the person's own timezone, named (UAT 0.8.0 Q-7).
+    timeZone: await timezoneForAccount(deps.pool, userId).catch(() => "UTC"),
+    baseUrl: deps.baseUrl,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells an address that already has an account that somebody asked to make
+ * it another account's sign-in email, and that nothing changed
+ * (account-self-service.md AS-Q5 (b)). Names no account, so it reads nothing
+ * and is never skipped while mail is configured.
+ */
+const sendEmailChangeTaken: OutboxHandler = async (delivery, deps) => {
+  const to = asString(delivery.payload.to);
+  if (!to) {
+    throw new PermanentDispatchError(
+      "An address-taken notice needs the address, and this row has none.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = emailChangeTakenMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    baseUrl: deps.baseUrl,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * The four mails of deleting your own account (account-deletion.md §7, plan
+ * 0.8.0 Y7). Each carries its address, which leaves the row once delivered.
+ * The account's row is still there when every one of them is sent, the last
+ * included: it is anonymised, never removed.
+ */
+const sendDeletionMail =
+  (kind: "requested" | "tomorrow" | "cancelled" | "done"): OutboxHandler =>
+  async (delivery, deps) => {
+    const to = asString(delivery.payload.to);
+    const runsAt = new Date(asString(delivery.payload.runsAt) ?? "");
+    if (
+      !to ||
+      ((kind === "requested" || kind === "tomorrow") &&
+        Number.isNaN(runsAt.getTime()))
+    ) {
+      throw new PermanentDispatchError(
+        "A deletion mail needs an address, and a date where it says one, and this row is missing one.",
+      );
+    }
+    if (!deps.sendMail || !deps.baseUrl) {
+      deps.onSkipped?.(delivery, "no mail transport is configured");
+      return;
+    }
+    const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+      () => "en",
+    );
+    const common = {
+      instanceName: instanceNameOr(deps.instanceName),
+      locale: mailLocale(language),
+      to,
+      baseUrl: deps.baseUrl,
+    };
+    const built =
+      kind === "requested"
+        ? deletionRequestedMail({ ...common, runsAt })
+        : kind === "tomorrow"
+          ? deletionTomorrowMail({ ...common, runsAt })
+          : kind === "cancelled"
+            ? deletionCancelledMail({
+                ...common,
+                reason: cancelReasonOf(delivery.payload),
+              })
+            : deletionDoneMail(common);
+    await deps.sendMail({ to, ...built });
+  };
+
+function cancelReasonOf(
+  payload: Readonly<Record<string, unknown>>,
+): DeletionCancelReason {
+  if (payload.reason === "signed_in") {
+    return { kind: "signed_in" };
+  }
+  const workspace = asString(payload.workspace);
+  if (payload.block === "last_owner" && workspace) {
+    return { kind: "last_owner", workspace };
+  }
+  if (payload.block === "directory") {
+    return { kind: "directory" };
+  }
+  return { kind: "other" };
+}
 
 /**
  * Sends one closed batch as a digest (P6-G01b).
@@ -1248,6 +1601,22 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [EMBED_TOPIC]: embedContent,
   [CHANNEL_MESSAGE_TOPIC]: deliverChannelMessage,
   "invitation.email": sendInvitation,
+  // The link that confirms an address, queued by `createAuth` rather than
+  // sent inside the sign-up request (email-verification.md D1, S3).
+  [VERIFY_EMAIL_TOPIC]: sendVerificationLink,
+  // A password was changed, set or reset (account-self-service.md D9).
+  [PASSWORD_CHANGED_TOPIC]: sendPasswordChanged,
+  // A change of sign-in email (account-self-service.md §4.2, plan 0.8.0
+  // Y4): the link to the new address, the notice to the current one, and
+  // the mail to an address that already has an account.
+  [CHANGE_EMAIL_TOPIC]: sendChangeEmailLink,
+  [EMAIL_CHANGE_NOTICE_TOPIC]: sendEmailChangeNotice,
+  [EMAIL_CHANGE_TAKEN_TOPIC]: sendEmailChangeTaken,
+  // Deleting your own account (account-deletion.md §7, plan 0.8.0 Y7).
+  [ACCOUNT_DELETION_REQUESTED_TOPIC]: sendDeletionMail("requested"),
+  [ACCOUNT_DELETION_TOMORROW_TOPIC]: sendDeletionMail("tomorrow"),
+  [ACCOUNT_DELETION_CANCELLED_TOPIC]: sendDeletionMail("cancelled"),
+  [ACCOUNT_DELETION_DONE_TOPIC]: sendDeletionMail("done"),
   // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
   // outside the package barrel from P2-T06 until this row existed.
   [DIGEST_TOPIC]: sendDigest,
@@ -1339,6 +1708,24 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   Record<string, readonly string[]>
 > = {
   "invitation.email": ["to", "token"],
+  // The address and the link, which confirms an account to whoever opens it
+  // (email-verification.md D4). A dead-lettered row keeps both until the
+  // daily purge, by which time the link has expired.
+  [VERIFY_EMAIL_TOPIC]: ["to", "url"],
+  // The address a password notice went to (account-self-service.md §4.2).
+  [PASSWORD_CHANGED_TOPIC]: ["to"],
+  // Both addresses and the link of a change of sign-in email, and the
+  // addresses its two notices went to (§4.2). `from` goes too, which the
+  // design's table did not list: an address is no use once delivered.
+  [CHANGE_EMAIL_TOPIC]: ["to", "url", "from"],
+  [EMAIL_CHANGE_NOTICE_TOPIC]: ["to", "newEmail"],
+  [EMAIL_CHANGE_TAKEN_TOPIC]: ["to"],
+  // The address each deletion mail went to (account-deletion.md §3.3): the
+  // last one's is the only copy of it left once the account is anonymised.
+  [ACCOUNT_DELETION_REQUESTED_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_TOMORROW_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_CANCELLED_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_DONE_TOPIC]: ["to"],
   // Of a customer the provider no longer has. Nothing needs it once it is gone.
   [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };

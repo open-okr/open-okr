@@ -1,10 +1,10 @@
 import { ACCESS_LEVELS, navigationFor } from "@openokr/core";
 import { TERM_KEYS, TERMINOLOGY } from "@openokr/method";
-import { TranslationsProvider } from "@openokr/ui";
+import { CATALOGUES, TranslationsProvider, translate } from "@openokr/ui";
 import { type ComponentProps, createElement, type ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { navBlocks, navLabel } from "../lib/nav-groups.ts";
+import { navBlocks, navText } from "../lib/nav-groups.ts";
 
 /**
  * A workspace's own words for the method's terms, on its screens
@@ -121,6 +121,9 @@ describe("the Spaces screen", () => {
   });
 });
 
+// The sidebar's English, as the shell's translator gives it (UAT 0.8.0 F-08).
+const english = (key: string) => translate(CATALOGUES.en, key);
+
 describe("the sidebar", () => {
   // Inside items too: KPIs is a tab of Goals since the five areas
   // (navigation-five-areas.md), and the palette still names it.
@@ -136,7 +139,7 @@ describe("the sidebar", () => {
 
   it("names the entries after the workspace's own words", () => {
     const labels = Object.fromEntries(
-      items.map((item) => [item.id, navLabel(item, renamed)]),
+      items.map((item) => [item.id, navText(item, english, renamed)]),
     );
     expect(labels.spaces).toBe("Teams");
     expect(labels.kpis).toBe("Metrics");
@@ -147,7 +150,7 @@ describe("the sidebar", () => {
 
   it("keeps the registry's labels when nothing was renamed", () => {
     for (const item of items) {
-      expect(navLabel(item)).toBe(item.label);
+      expect(navText(item, english)).toBe(item.label);
     }
     expect(
       navBlocks(navigationFor("sidebar", ACCESS_LEVELS.full)).map(

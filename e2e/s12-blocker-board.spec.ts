@@ -20,6 +20,7 @@
  */
 import { expect, test } from "./fixtures.ts";
 import type { BrowserContext, Page } from "@playwright/test";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { INSTANCE_ACCOUNT, goTo, signIn } from "./instance-account.ts";
@@ -92,11 +93,11 @@ test("four blockers of different ages are open in a space", async () => {
     await pool.query<{ id: string }>(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          facilitator_id, state, stage_key)
+          facilitator_id, state, stage_key, short_id)
        values (gen_random_uuid(), $1, $2, $3, 'weekly', 'Blocker QA',
-               now() - interval '1 hour', $4, 'running', 'blockers')
+               now() - interval '1 hour', $4, 'running', 'blockers', $5)
        returning id`,
-      [member.workspace_id, spaceId, cycle.id, member.id],
+      [member.workspace_id, spaceId, cycle.id, member.id, newShortId()],
     )
   ).rows[0];
 

@@ -18,6 +18,15 @@ database, or two replicas quietly corrupting each other's uploads.
 {{- fail "\n\ndatabase.url must be a postgres:// or postgresql:// connection string.\n" -}}
 {{- end -}}
 
+{{- if and (dig "caBundle" "existingSecret" "" .Values.database) (dig "caBundle" "configMap" "" .Values.database) -}}
+{{- fail "\n\ndatabase.caBundle names both a Secret and a ConfigMap. Name one: the bundle is mounted from exactly one place.\n" -}}
+{{- end -}}
+
+{{- /* A key in a Secret that is not there: the owner role would be read from nothing (plan 0.8.0 H8). */ -}}
+{{- if and (dig "existingSecretAdminKey" "" .Values.database) (not .Values.database.existingSecret) -}}
+{{- fail "\n\ndatabase.existingSecretAdminKey names a key in database.existingSecret, which is empty.\n\nPut the owner-role connection in the same Secret as the application's and name both:\n  --set database.existingSecret=my-db-secret\n  --set database.existingSecretAdminKey=database-admin-url\n" -}}
+{{- end -}}
+
 {{/*
 The one that actually bites. The local-disk storage driver writes to a
 volume, and a ReadWriteOnce claim can only be mounted by pods on one node. Two
@@ -38,19 +47,36 @@ defaults no longer produce it, and NOTES.txt says what it costs.
 A named S3 bucket exempts the whole check: object storage is shared by
 definition, so the replica count stops mattering.
 */}}
-{{- if and (not .Values.storage.s3.bucket) .Values.persistence.enabled (gt (int .Values.replicaCount) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
+{{- /* With the autoscaler on, the count that matters is its ceiling (plan 0.8.0 H10f). */ -}}
+{{- if and (not .Values.storage.s3.bucket) .Values.persistence.enabled (gt (include "openokr.mostWebReplicas" . | int) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- fail "\n\npersistence.accessMode is ReadWriteOnce but autoscaling.maxReplicas is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - use S3-compatible object storage: --set storage.s3.bucket=... --set storage.s3.existingSecret=...\n  - leave autoscaling.enabled=false, which is the default\n" -}}
+{{- else -}}
 {{- fail "\n\npersistence.accessMode is ReadWriteOnce but replicaCount is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - set replicaCount=1, which is the default\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - use S3-compatible object storage: --set storage.s3.bucket=... --set storage.s3.existingSecret=...\n" -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* The autoscaler's bounds and targets (plan 0.8.0 H10f). Kubernetes refuses most of these too, but only after the release has started to roll. */ -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- $autoscaling := .Values.autoscaling | default dict -}}
+{{- if or (lt (include "openokr.minReplicas" . | int) 1) (gt (include "openokr.minReplicas" . | int) (include "openokr.maxReplicas" . | int)) -}}
+{{- fail "\n\nautoscaling.minReplicas must be at least 1 and no more than autoscaling.maxReplicas.\n\nThe defaults are 2 and 6.\n" -}}
+{{- end -}}
+{{- if lt (dig "targetCPUUtilizationPercentage" 70 $autoscaling | int) 1 -}}
+{{- fail "\n\nautoscaling.targetCPUUtilizationPercentage must be 1 or more.\n\nIt is a share of resources.requests.cpu. 70 is the default.\n" -}}
+{{- end -}}
+{{- if lt (dig "targetMemoryUtilizationPercentage" 0 $autoscaling | int) 0 -}}
+{{- fail "\n\nautoscaling.targetMemoryUtilizationPercentage must be 0 or more. 0 scales on CPU only.\n" -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
 S3 credentials come from a Secret, never from values, so a key cannot land in
-the release where `helm get values` reads it back. The application refuses a
-named bucket with no credentials at boot too, but a pod crash-looping on a
-missing variable is a worse way to learn this than a template that says so.
+the release where `helm get values` reads it back. A bucket with no Secret is
+allowed since 0.8.0 (plan H9): the AWS SDK's default chain then finds the pod's
+own credentials, which is how EKS Pod Identity, IRSA and an instance profile
+work. Annotate the service account for that (serviceAccount.annotations).
 */}}
-{{- if and .Values.storage.s3.bucket (not .Values.storage.s3.existingSecret) -}}
-{{- fail "\n\nstorage.s3.bucket names a bucket but storage.s3.existingSecret is empty.\n\nCredentials are read from a Secret rather than from values, because a value lands in the release and `helm get values` reads it back.\n\n  kubectl create secret generic openokr-s3 \\\n    --from-literal=access-key-id=... \\\n    --from-literal=secret-access-key=...\n\n  --set storage.s3.existingSecret=openokr-s3\n" -}}
-{{- end -}}
 
 {{- if and .Values.storage.s3.forcePathStyle (not (has .Values.storage.s3.forcePathStyle (list "on" "off"))) -}}
 {{- fail "\n\nstorage.s3.forcePathStyle must be \"on\", \"off\" or empty.\n\nEmpty lets the driver decide: on when an endpoint is set, off for AWS S3.\n" -}}
@@ -62,6 +88,52 @@ missing variable is a worse way to learn this than a template that says so.
 
 {{- if not (has .Values.instance.registration (list "auto" "open" "company_domains" "invite_only")) -}}
 {{- fail "\n\ninstance.registration must be auto, open, company_domains or invite_only.\n" -}}
+{{- end -}}
+
+{{- /* One reading of the caller's address, and never one that trusts every
+       address (docs/design/trusted-proxies.md D5, D7, D15). The application
+       refuses both at boot too; refused here, nothing reaches the cluster. */ -}}
+{{- $network := .Values.network | default dict -}}
+{{- if and $network.trustedProxies (not (kindIs "slice" $network.trustedProxies)) -}}
+{{- fail "\n\nnetwork.trustedProxies must be a list, such as --set 'network.trustedProxies={10.0.1.0/24,10.0.2.0/24}'.\n" -}}
+{{- end -}}
+{{- if and $network.trustedProxies $network.clientAddressHeader -}}
+{{- fail "\n\nnetwork.trustedProxies and network.clientAddressHeader are both set. Set one.\n\ntrustedProxies names the proxies in front of the instance, so X-Forwarded-For is read from the right past them. clientAddressHeader names the one header your CDN writes the visitor's address into. docs/install/behind-a-proxy.md says which to use.\n" -}}
+{{- end -}}
+{{- range $network.trustedProxies -}}
+{{- if or (eq (toString .) "0.0.0.0/0") (eq (toString .) "::/0") -}}
+{{- fail (printf "\n\nnetwork.trustedProxies holds %s, which trusts every address, so every caller could choose their own.\n\nName your proxies' own addresses or ranges.\n" (toString .)) -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* How a pod stops (plan 0.8.0 H10b). The server refuses a drain outside 1 to 300 at boot, so the chart says so first rather than leaving pods crash-looping. `dig` for a release from before 0.8 that reuses values without `shutdown`. */ -}}
+{{- $shutdown := .Values.shutdown | default dict -}}
+{{- $drain := dig "drainSeconds" 20 $shutdown -}}
+{{- if or (lt (int $drain) 1) (gt (int $drain) 300) (ne (float64 $drain) (float64 (int $drain))) -}}
+{{- fail "\n\nshutdown.drainSeconds must be a whole number of seconds from 1 to 300.\n\nIt becomes OPENOKR_SHUTDOWN_SECONDS, which the server refuses outside that range. 20 is the default.\n" -}}
+{{- end -}}
+{{- $pause := dig "preStopSeconds" 10 $shutdown -}}
+{{- if or (lt (int $pause) 0) (ne (float64 $pause) (float64 (int $pause))) -}}
+{{- fail "\n\nshutdown.preStopSeconds must be a whole number of seconds, 0 or more.\n\n0 removes the pause. 10 is the default.\n" -}}
+{{- end -}}
+
+{{- /* The data-change hook's budget (plan 0.8.0 H10c). `dig` for values reused from before 0.8. */ -}}
+{{- $budget := dig "timeBudgetSeconds" 240 (.Values.dataChanges | default dict) -}}
+{{- if or (lt (int $budget) 0) (ne (float64 $budget) (float64 (int $budget))) -}}
+{{- fail "\n\ndataChanges.timeBudgetSeconds must be a whole number of seconds, 0 or more.\n\n0 runs the data changes to the end, under whatever --timeout Helm is given. 240 is the default.\n" -}}
+{{- end -}}
+
+{{- /* The worker (plan 0.8.0 H10e, docs/design/worker-deployment.md D13, D15). */ -}}
+{{- if include "openokr.workerEnabled" . -}}
+{{- if not (or .Values.storage.s3.bucket (and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteMany"))) -}}
+{{- fail "\n\nworker.enabled needs storage every pod shares, and this release's is not.\n\nThe worker builds exports and scans uploads, and its scheduler removes orphaned ones, so it has to see the files the web pods see. A ReadWriteOnce volume cannot be mounted on two nodes, and with persistence off each pod writes to its own emptyDir.\n\nChoose one:\n  - use S3-compatible object storage: --set storage.s3.bucket=... (with storage.s3.existingSecret, or the pod's own role)\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - leave worker.enabled=false: the web pods then run the relay and the scheduler themselves\n" -}}
+{{- end -}}
+{{- /* extraEnv reaches both Deployments, so an old OPENOKR_SCHEDULER=off would quietly stop the worker's scheduler. */ -}}
+{{- range .Values.extraEnv -}}
+{{- if and (kindIs "map" .) (has (toString .name) (list "OPENOKR_RELAY" "OPENOKR_SCHEDULER")) -}}
+{{- fail (printf "\n\nextraEnv sets %s, and worker.enabled is true.\n\nWith the worker on, the chart sets OPENOKR_RELAY and OPENOKR_SCHEDULER itself: elsewhere on the web pods, on in the worker. extraEnv reaches both Deployments, so this would override one of them. Remove it from extraEnv.\n" (toString .name)) -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}

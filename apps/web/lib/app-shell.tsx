@@ -3,6 +3,8 @@ import {
   ACCESS_LEVELS,
   callAction,
   hasPlanScreen,
+  isDemoAccount,
+  liveSupportSession,
   mayCreateOwnWorkspace,
   navigationFor,
   OperationError,
@@ -26,7 +28,7 @@ import { Ellipsis } from "lucide-react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { AvatarMenu } from "../app/avatar-menu.tsx";
+import { type AccountBadge, AvatarMenu } from "../app/avatar-menu.tsx";
 import { copilotAvailabilityAction } from "../app/copilot/actions.ts";
 import { CopilotPanel } from "../app/copilot/copilot-panel.tsx";
 import {
@@ -44,15 +46,22 @@ import { brandingImageUrl } from "./branding-image.ts";
 import { CreditsBanner } from "./credits-banner.tsx";
 import { loadCycleStrip } from "./cycle-strip-data.ts";
 import { seesCycle } from "./cycle-visibility.ts";
+import { DemoPill } from "./demo-pill.tsx";
 import { embedFor } from "./embedder";
 import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { getInstanceName } from "./instance-name";
-import { navBlocks, navLabel } from "./nav-groups.ts";
+import {
+  builtinRoleLabel,
+  navBlocks,
+  navGroupLabel,
+  navText,
+} from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
 import { NewMenu } from "./new-menu.tsx";
 import { getPool } from "./pool";
+import { ProductTour } from "./product-tour.tsx";
 import { loadReviewBadge } from "./review-badge.ts";
 import { ReviewBadgeLive } from "./review-badge-live.tsx";
 import { SidebarToggle } from "./sidebar-toggle.tsx";
@@ -109,6 +118,33 @@ function activeItemId(
     }
   }
   return best?.id ?? null;
+}
+
+/**
+ * The mark beside the role in the avatar menu (plan 0.8.0 Y1), where it changes
+ * what the person should expect: an operator inside a support session, a
+ * guest, or an account `pnpm demo:prepare` made, whose address is one of the
+ * personas' and can belong to nobody else (`@northwind.example`, RFC 2606).
+ */
+async function accountBadge(
+  workspaceId: string,
+  userId: string,
+  email: string,
+  kind: string,
+): Promise<AccountBadge | null> {
+  const support = await liveSupportSession(getPool(), workspaceId).catch(
+    () => null,
+  );
+  if (support?.operatorUserId === userId) {
+    return "support";
+  }
+  if (kind === "guest") {
+    return "guest";
+  }
+  if (isDemoAccount(email)) {
+    return "demo";
+  }
+  return null;
 }
 
 export async function AppShellLayout({
@@ -190,8 +226,9 @@ export async function AppShellLayout({
   const accountItems = sidebarItems.filter((item) => item.group === "account");
 
   // Cycle and the phase strip are for the people who run the cycle
-  // (navigation-five-areas.md, OKRGoal UX review N3). Read from the spaces
-  // list the reader already gets, so nothing new is asked of the database.
+  // (navigation-five-areas.md, OKRGoal UX review N3): from the spaces list the
+  // reader already gets, and from whether they may set up a cycle, which plan
+  // 0.8.0 R1 opened to an Admin (UAT 0.8.0, F-03).
   const spaceRoles = await callAction(
     {
       pool: getPool(),
@@ -208,8 +245,44 @@ export async function AppShellLayout({
       }
       throw error;
     });
+  const setsUpCycle = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "cycles.setupAccess",
+    {},
+  )
+    .then((access) => access.canSetUp)
+    .catch((error: unknown) => {
+      if (error instanceof OperationError) {
+        return false;
+      }
+      throw error;
+    });
+  // Whether this member may create an objective at all, the floor
+  // `goals.create` runs (workspace-roles.md §13, UAT 0.8.0 F-04). The
+  // workspace level below is `edit` for everybody, a Viewer included.
+  const createsGoals = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "goals.createAccess",
+    {},
+  )
+    .then((access) => access.canCreate)
+    .catch((error: unknown) => {
+      if (error instanceof OperationError) {
+        return false;
+      }
+      throw error;
+    });
   const runsCycle = seesCycle({
     administers: adminItems.length > 0,
+    setsUpCycle,
     spaceRoles,
   });
   // The rows the sidebar draws: the five areas, and Cycle for those who run
@@ -269,10 +342,12 @@ export async function AppShellLayout({
   const groups: SidebarGroup[] = navBlocks(drawnItems, renamed).map(
     (block) => ({
       id: block.id,
-      ...(block.label === undefined ? {} : { label: block.label }),
+      ...(block.label === undefined
+        ? {}
+        : { label: navGroupLabel(block.id, t) ?? block.label }),
       items: block.items.map((item) => ({
         id: item.id,
-        label: navLabel(item, renamed),
+        label: navText(item, t, renamed),
         href: item.href,
         icon: iconFor(item.id),
         active: item.id === active,
@@ -302,13 +377,13 @@ export async function AppShellLayout({
   const paletteDestinations: PaletteDestination[] = [
     ...sidebarItems.map((item) => ({
       id: item.id,
-      label: navLabel(item, renamed),
+      label: navText(item, t, renamed),
       href: item.href,
       area: item.group === "account" ? ("account" as const) : ("page" as const),
     })),
     ...insideItems.map((item) => ({
       id: item.id,
-      label: navLabel(item, renamed),
+      label: navText(item, t, renamed),
       href: item.href,
       area: "page" as const,
     })),
@@ -316,7 +391,7 @@ export async function AppShellLayout({
       .filter((item) => plans || !item.needsPlans)
       .map((item) => ({
         id: item.id,
-        label: item.label,
+        label: navText(item, t),
         href: item.href,
         area: "admin" as const,
       })),
@@ -324,7 +399,7 @@ export async function AppShellLayout({
 
   const tabItems = drawnItems.slice(0, 4).map((item) => ({
     id: item.id,
-    label: navLabel(item, renamed),
+    label: navText(item, t, renamed),
     href: item.href,
     icon: iconFor(item.id),
     active: item.id === active,
@@ -333,7 +408,10 @@ export async function AppShellLayout({
   // Admin is in the avatar menu since the five areas, beside the account
   // rows, for those who reach it.
   const avatarItems = [
-    ...accountItems.map((item) => ({ href: item.href, label: item.label })),
+    ...accountItems.map((item) => ({
+      href: item.href,
+      label: navText(item, t),
+    })),
     ...(adminItems.length > 0
       ? [
           // The first card directly: `/admin` redirects only after the shell
@@ -387,6 +465,10 @@ export async function AppShellLayout({
           topbar={
             <Topbar
               breadcrumb={workspace.name}
+              // A demonstration instance says so on every screen, not only on
+              // sign-in (plan 0.8.0 D1). The same variable the persona panel
+              // reads, and nothing else.
+              badge={loadEnv().OPENOKR_DEMO === "on" ? <DemoPill /> : undefined}
               search={<TopbarSearchField />}
               // UIUX-PLAN §3's `+ New`: a menu of what this member may
               // create, the same on every screen (lib/new-menu.tsx). Somebody
@@ -395,13 +477,17 @@ export async function AppShellLayout({
                 level >= ACCESS_LEVELS.edit ? (
                   <NewMenu
                     items={[
-                      {
-                        key: "objective",
-                        label: t("newMenu.objective"),
-                        icon: iconFor("goals"),
-                        href: "/goals?new=objective",
-                        screens: ["/goals", "/cycle", "/map"],
-                      },
+                      ...(createsGoals
+                        ? [
+                            {
+                              key: "objective",
+                              label: t("newMenu.objective"),
+                              icon: iconFor("goals"),
+                              href: "/goals?new=objective",
+                              screens: ["/goals", "/cycle", "/map"],
+                            },
+                          ]
+                        : []),
                       {
                         key: "initiative",
                         label: t("newMenu.initiative"),
@@ -455,7 +541,25 @@ export async function AppShellLayout({
               askAi={<CopilotPanel initialAvailability={copilot} />}
               avatarMenu={
                 <AvatarMenu
-                  name={workspace.name}
+                  // The person, not the workspace (plan 0.8.0 Y1): the circle
+                  // drew the workspace's initials and nothing said who was
+                  // signed in. The workspace's name stays in the breadcrumb.
+                  name={me.name}
+                  avatarUrl={
+                    me.avatarBlobId
+                      ? `/api/blobs/${me.avatarBlobId}/thumbnail`
+                      : null
+                  }
+                  email={session.user.email}
+                  roleName={builtinRoleLabel(me.roleKey, me.roleName, t)}
+                  badge={
+                    await accountBadge(
+                      workspace.workspaceId,
+                      session.user.id,
+                      session.user.email,
+                      me.kind,
+                    )
+                  }
                   sourceUrl={await resolveSourceUrl(getPool())}
                   // From the registry rather than a literal list. A literal one
                   // is how /account/channels shipped unlinked at P5-T02c and how
@@ -553,6 +657,29 @@ export async function AppShellLayout({
          * screen shows the bar without each form remembering to (UIUX-PLAN
          * §4, "Acting"). */}
         <ActivityIndicator />
+        {/* The product tour on a first sign-in, on whatever screen it lands
+         * (plan 0.8.0 T1). Beside the shell because it dims all of it.
+         * Onboarding (S-34) is outside the shell, so the tour comes after it,
+         * never on top of it. */}
+        <ProductTour
+          offered={
+            !(
+              await callAction(
+                {
+                  pool: getPool(),
+                  workspaceId: workspace.workspaceId,
+                  actor: { kind: "human" as const, userId: session.user.id },
+                },
+                "people.readOwnTour",
+                {},
+              ).catch(() => ({ finished: true }))
+            ).finished
+          }
+          demo={loadEnv().OPENOKR_DEMO === "on"}
+          canDraft={createsGoals}
+          askAvailable={copilot.available}
+          instanceName={await getInstanceName()}
+        />
         {/*
          * Beside the shell rather than inside the topbar, because the palette is
          * an overlay over the whole page. Mounted once here, so ⌘K works on every
@@ -560,7 +687,7 @@ export async function AppShellLayout({
          */}
         <CommandPalette
           destinations={paletteDestinations}
-          canCreateObjective={level >= ACCESS_LEVELS.edit}
+          canCreateObjective={createsGoals}
           semantic={semantic}
         />
         {/* The Review count, kept current by the workspace's own feed

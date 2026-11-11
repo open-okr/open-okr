@@ -1,3 +1,4 @@
+import { newShortId } from "@openokr/db";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -63,11 +64,11 @@ const cycleEnding = async (
   const wb = await workerDb();
   const startsOn = `${endsOn.slice(0, 4)}-${String(Number(endsOn.slice(5, 7)) - 2).padStart(2, "0")}-01`;
   const { rows } = await wb.admin.query(
-    `insert into cycles (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase, published_at)
+    `insert into cycles (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase, published_at, short_id)
      values (gen_random_uuid(), $1, $2, 'quarterly', 'quarterly', $3, $4, $5, 6,
-             case when $5 in ('active', 'closed') then now() else null end)
+             case when $5 in ('active', 'closed') then now() else null end, $6)
      returning id`,
-    [workspaceId, `Ending ${endsOn}`, startsOn, endsOn, status],
+    [workspaceId, `Ending ${endsOn}`, startsOn, endsOn, status, newShortId()],
   );
   return rows[0].id as string;
 };

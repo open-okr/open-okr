@@ -8,17 +8,18 @@ import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 
 /**
- * The two account mails, password reset and email confirmation, in the
- * shared layout (docs/design/email-templates.md §5).
+ * The two account mails sent from inside a request, the password reset and
+ * the held-sign-in notice, in the shared layout (docs/design/
+ * email-templates.md §5). The confirmation mail is built in `packages/core`
+ * and sent by the relay (email-verification.md D6).
  *
  * **In the instance's language, not a workspace's.** The person asking may
  * belong to several workspaces or to none yet, so the one language that is
  * always theirs to receive is the deployment's default, `instance.language`.
  *
  * **The link is Better Auth's own**, built from the instance's base url and
- * pointing at its own verification route, which then sends the person to the
- * page that finishes the job: `/reset-password` for a reset, the home screen
- * for a confirmation. Nothing here invents a url.
+ * pointing at its own route, which then sends the person to the page that
+ * finishes the job: `/reset-password`. Nothing here invents a url.
  */
 
 export interface AccountMail {
@@ -102,34 +103,4 @@ export async function signInHeldMail(
     ],
   );
   return { subject: t("held.subject", { instance }), html, text };
-}
-
-export async function verifyEmailMail(
-  to: string,
-  url: string,
-): Promise<AccountMail> {
-  const { instance, locale, t } = await mailContext();
-  const { html, text } = renderEmail(
-    {
-      lang: locale,
-      brand: { name: instance },
-      preheader: t("verify.preheader"),
-      footer: [t("verify.footer")],
-      labels: { linkFallback: t("linkFallback") },
-    },
-    [
-      { kind: "eyebrow", text: t("verify.eyebrow") },
-      { kind: "heading", text: t("verify.heading") },
-      {
-        kind: "paragraph",
-        parts: [
-          t("verify.bodyBefore"),
-          { bold: to },
-          t("verify.bodyAfter", { instance }),
-        ],
-      },
-      { kind: "action", label: t("verify.action"), href: url },
-    ],
-  );
-  return { subject: t("verify.subject", { instance }), html, text };
 }

@@ -1118,3 +1118,59 @@ describe("phase 0 reads the workspace's strategy bounds (H-17)", () => {
     );
   });
 });
+
+// Plan 0.8.0 F1: every "still needed" item carries a key, so a screen can lead
+// to the place it is filled in. The sentences and the keys come from one call,
+// so they cannot disagree; this holds that across a cycle with a gap in every
+// phase.
+describe("what each phase still needs, by key", () => {
+  const thin = base({
+    mode: "annual",
+    firstCycle: false,
+    sponsorId: null,
+    facilitatorId: null,
+    packItems: [],
+    packDistributedAt: null,
+    firstSessionOn: null,
+    priorScores: [],
+    hasBaselineHealth: false,
+    issues: [],
+    priorities: [],
+    frame: {
+      hasMission: false,
+      hasStrategy: false,
+      strategyCount: 1,
+      notDoingWritten: false,
+      agreed: false,
+      annualKeyResultCount: 0,
+    },
+  });
+  const results = phaseCompletion(thin, thresholds);
+
+  it("lists the same sentences as `missing`, in the same order", () => {
+    for (const result of results) {
+      expect(
+        result.needs.map((need) => need.text),
+        `phase ${result.phase}`,
+      ).toEqual([...result.missing]);
+    }
+  });
+
+  it("names the input pack item and the roles by key", () => {
+    const prepare = results[1];
+    const keys = prepare?.needs.map((need) => need.key) ?? [];
+    expect(keys).toContain("role.sponsor");
+    expect(keys).toContain("role.facilitator");
+    expect(keys).toContain("pack.distribute");
+    const items = prepare?.needs.filter((need) => need.key === "pack.item");
+    expect(items?.map((need) => need.ref)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+    ]);
+  });
+});

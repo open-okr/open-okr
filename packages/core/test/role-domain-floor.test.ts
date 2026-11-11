@@ -100,6 +100,14 @@ const kpi = {
   frequency: "monthly" as const,
 };
 
+const objective = () => ({
+  title: "Every new customer live within a week",
+  level: "company" as const,
+  ownerKind: "workspace" as const,
+  weight: 1,
+  cycleId,
+});
+
 beforeEach(async () => {
   const wb = await workerDb();
   await wb.truncateAllTables();
@@ -139,6 +147,19 @@ describe("a member holding Viewer", () => {
     ).rejects.toThrow("kpis.create needs a higher access level than you hold.");
   });
 
+  // workspace-roles.md §13, UAT 0.8.0 F-04: a company or personal objective
+  // names no subject, so it too is measured on the role's goal level.
+  it("cannot create an objective, and the screens are told so", async () => {
+    await expect(
+      callAction(await as(PERSON), "goals.create", objective()),
+    ).rejects.toThrow(
+      "goals.create needs a higher access level than you hold.",
+    );
+    await expect(
+      callAction(await as(PERSON), "goals.createAccess", {}),
+    ).resolves.toEqual({ canCreate: false });
+  });
+
   it("still serves themself", async () => {
     await expect(
       callAction(await as(PERSON), "people.updateOwnProfile", {
@@ -150,6 +171,15 @@ describe("a member holding Viewer", () => {
 
 describe("a member holding Member", () => {
   beforeEach(() => addMember("member"));
+
+  it("creates an objective as before, and the screens are told so", async () => {
+    await expect(
+      callAction(await as(PERSON), "goals.create", objective()),
+    ).resolves.toBeDefined();
+    await expect(
+      callAction(await as(PERSON), "goals.createAccess", {}),
+    ).resolves.toEqual({ canCreate: true });
+  });
 
   it("comments and creates a KPI as before", async () => {
     await expect(

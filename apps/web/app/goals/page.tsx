@@ -343,13 +343,17 @@ export default async function GoalsPage({
 
   const canEdit = accessLevel >= ACCESS_LEVELS.edit;
   const canAdminister = accessLevel >= ACCESS_LEVELS.full;
+  // Adding an objective asks the role's goal level, which a Viewer lacks
+  // although `canEdit` is `edit` for every member (workspace-roles.md §13,
+  // UAT 0.8.0 F-04). Editing a row stays on `canEdit`.
+  const { canCreate } = await callAction(context, "goals.createAccess", {});
 
   // Whether a new objective may be written in this cycle now, read before
   // anybody presses "+ New objective", so the button opens the practice's
   // reason and the place it is resolved rather than a field the server will
   // refuse (P9-T07b-a, acceptance U8).
   const creation =
-    cycleId && canEdit
+    cycleId && canCreate
       ? await callAction(context, "goals.creationPolicy", { cycleId })
       : null;
   const refusal =
@@ -485,7 +489,7 @@ export default async function GoalsPage({
                * which set am I looking at, and what do I want to put in it.
                * The set also carries an add row under it, for the moment
                * somebody is already reading. */}
-              {canEdit && cycleId ? (
+              {canCreate && cycleId ? (
                 <NewObjectiveButton
                   cycleId={cycleId}
                   level={levelForNew}
@@ -573,6 +577,7 @@ export default async function GoalsPage({
             // §4.3 puts most objectives at.
             level={levelForNew}
             canEdit={canEdit}
+            canCreate={canCreate}
             canAdminister={canAdminister}
             progressMax={progressMax}
             empty={

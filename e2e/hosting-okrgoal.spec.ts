@@ -243,6 +243,8 @@ test("company administrator: a second free workspace is refused, naming the limi
 });
 
 test("company administrator: two people join, and the plan shows every seat taken", async () => {
+  // Two whole sign-ups, each through its own welcome (plan 0.8.0 S4).
+  test.setTimeout(90_000);
   const adminPath = await inviteByEmail(companyAdmin, WORKSPACE_ADMIN.email);
   const memberPath = await inviteByEmail(companyAdmin, MEMBER.email);
   await joinAsNewcomer(workspaceAdmin, adminPath, WORKSPACE_ADMIN);

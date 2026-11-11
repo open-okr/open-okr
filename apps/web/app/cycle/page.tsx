@@ -42,6 +42,8 @@ import { Drafting, objectivesInUnit } from "./drafting.tsx";
 import { Gates } from "./gates.tsx";
 import { GuidanceRail } from "./guidance-rail.tsx";
 import { InputPack } from "./input-pack.tsx";
+import { needDestination } from "./need-destinations.ts";
+import { NeedLink } from "./need-link.tsx";
 import {
   BaselineHealth,
   CapacityCuts,
@@ -113,7 +115,20 @@ export default async function CyclePage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
-  const canPublish = level >= ACCESS_LEVELS.full;
+  // Archiving a cycle stays with the Owner (workspace-roles.md §12, R1-Q3).
+  const canArchive = level >= ACCESS_LEVELS.full;
+  // Setting up and running a cycle is the Owner's and an Admin's (plan 0.8.0
+  // R1). Asked of the server, because the page's own level comes from the
+  // workspace context, where every member holds edit for self-service.
+  const { canSetUp } = await callAction(context, "cycles.setupAccess", {});
+  // Phase 4 is goal work, so it asks the role's goal level, which a Viewer
+  // lacks although `canEdit` above is `edit` for every member
+  // (workspace-roles.md §13, UAT 0.8.0 F-04).
+  const { canCreate: draftsGoals } = await callAction(
+    context,
+    "goals.createAccess",
+    {},
+  );
 
   const query = await searchParams;
   const everyCycle = await callAction(context, "cycles.list", {});
@@ -160,9 +175,9 @@ export default async function CyclePage({
                 ? t("cycle.theAnnualCycleHolds")
                 : t("cycle.thisWorkspaceHasNo")}
             </p>
-            {canPublish ? null : (
+            {canSetUp ? null : (
               <p className="text-xs text-ink-3">
-                {t("cycle.creatingACycleNeedsFullAccess")}
+                {t("cycle.creatingACycleNeedsSetUp")}
               </p>
             )}
           </CardBody>
@@ -175,8 +190,9 @@ export default async function CyclePage({
          * is no cycle already is (P6-G27b), and it makes the horizon the
          * reader is looking at (M-06).
          */}
-        {canPublish ? (
+        {canSetUp ? (
           <CycleAdmin
+            canArchive={canArchive}
             mode={mode}
             currentCycleId={null}
             currentName={null}
@@ -415,7 +431,7 @@ export default async function CyclePage({
   // The people a phase 1 role can name, read only there. Agents and
   // placeholders are not people who can sponsor or facilitate (H-09).
   const people =
-    viewing === 1 && canPublish
+    viewing === 1 && canSetUp
       ? (await callAction(context, "people.directory", {}))
           .filter(
             (member) => member.kind === "human" || member.kind === "guest",
@@ -560,13 +576,14 @@ export default async function CyclePage({
                 </ul>
               </CardBody>
             ) : null}
-            {phase && phase.missing.length > 0 ? (
+            {phase && phase.needs.length > 0 ? (
               <CardBody className="border-line border-t">
                 <p className="mb-1 text-xs font-bold tracking-wide text-ink-3 uppercase">
                   {t("cycle.stillNeededHere")}
                 </p>
                 <ul className="flex list-disc flex-col gap-0.5 pl-4 text-sm text-ink-2">
-                  {phase.missing.map((reason) => {
+                  {phase.needs.map((need) => {
+                    const reason = need.text;
                     // A reason that carries its gaps as further sentences,
                     // one per team, reads as a list under its first sentence
                     // (usability review C6).
@@ -575,9 +592,34 @@ export default async function CyclePage({
                     const [head, ...gaps] = reason.includes('"')
                       ? [reason]
                       : reason.split(". ");
+                    const text = gaps.length === 0 ? reason : (head ?? reason);
+                    // Each item leads to where it is filled in, or says who
+                    // can fill it when this reader cannot (plan 0.8.0 F1).
+                    const place = needDestination(need);
+                    const permitted =
+                      place.level === "setup" ? canSetUp : canEdit;
                     return (
                       <li key={reason}>
-                        {gaps.length === 0 ? reason : head}
+                        {!permitted ? (
+                          <>
+                            {text}{" "}
+                            <span className="text-ink-3">
+                              {place.level === "setup"
+                                ? t("cycle.need.ownerFills")
+                                : t("cycle.need.editorFills")}
+                            </span>
+                          </>
+                        ) : place.kind === "page" ? (
+                          <Link
+                            href={place.href}
+                            className="text-ink-2 underline decoration-line-2 underline-offset-2 hover:text-ink"
+                            data-testid="need-link"
+                          >
+                            {text}
+                          </Link>
+                        ) : (
+                          <NeedLink anchor={place.anchor}>{text}</NeedLink>
+                        )}
                         {gaps.length > 0 ? (
                           <ul className="mt-0.5 list-[circle] pl-4 text-ink-3">
                             {gaps.map((gap) => (
@@ -594,76 +636,88 @@ export default async function CyclePage({
           </Card>
 
           {viewing === 1 ? (
-            <InputPack
-              cycleId={workflow.cycleId}
-              mode={workflow.mode}
-              items={workflow.packItems}
-              distributedAt={workflow.packDistributedAt}
-              sponsor={workflow.sponsor}
-              facilitator={workflow.facilitator}
-              canEdit={canEdit}
-            />
+            <div id="need-input-pack" className="scroll-mt-20">
+              <InputPack
+                cycleId={workflow.cycleId}
+                mode={workflow.mode}
+                items={workflow.packItems}
+                distributedAt={workflow.packDistributedAt}
+                sponsor={workflow.sponsor}
+                facilitator={workflow.facilitator}
+                canEdit={canEdit}
+              />
+            </div>
           ) : null}
 
-          {viewing === 1 && canPublish ? (
-            <CycleSetup
-              cycleId={workflow.cycleId}
-              people={people}
-              sponsorId={workflow.sponsor?.id ?? null}
-              facilitatorId={workflow.facilitator?.id ?? null}
-              firstCycle={workflow.firstCycle}
-              sessionDates={workflow.sessionDates}
-            />
-          ) : null}
-
-          {viewing === 2 ? (
-            <BaselineHealth
-              cycleId={workflow.cycleId}
-              saved={workflow.baselineHealthDocuments}
-              canEdit={canEdit}
-            />
+          {viewing === 1 && canSetUp ? (
+            <div id="need-roles" className="scroll-mt-20">
+              <CycleSetup
+                cycleId={workflow.cycleId}
+                people={people}
+                sponsorId={workflow.sponsor?.id ?? null}
+                facilitatorId={workflow.facilitator?.id ?? null}
+                firstCycle={workflow.firstCycle}
+                sessionDates={workflow.sessionDates}
+              />
+            </div>
           ) : null}
 
           {viewing === 2 ? (
-            <Diagnose
-              cycleId={workflow.cycleId}
-              issues={workflow.issues}
-              minimum={workflow.asks.strategicIssues}
-              canEdit={canEdit}
-            />
+            <div id="need-baseline" className="scroll-mt-20">
+              <BaselineHealth
+                cycleId={workflow.cycleId}
+                saved={workflow.baselineHealthDocuments}
+                canEdit={canEdit}
+              />
+            </div>
+          ) : null}
+
+          {viewing === 2 ? (
+            <div id="need-diagnose" className="scroll-mt-20">
+              <Diagnose
+                cycleId={workflow.cycleId}
+                issues={workflow.issues}
+                minimum={workflow.asks.strategicIssues}
+                canEdit={canEdit}
+              />
+            </div>
           ) : null}
 
           {viewing === 3 && workflow.mode === "quarterly" ? (
-            <Revalidation
-              cycleId={workflow.cycleId}
-              // The verdict, with each note as editor JSON for the editors
-              // to open on (guided-inputs change 12).
-              saved={
-                workflow.revalidation
-                  ? {
-                      holds: workflow.revalidation.holds,
-                      changed: workflow.revalidation.changed,
-                      changeNote:
-                        workflow.revalidationDocuments?.changeNote ?? null,
-                      focusNote:
-                        workflow.revalidationDocuments?.focusNote ?? null,
-                    }
-                  : null
-              }
-              focus={workflow.focus}
-              canEdit={canEdit}
-            />
+            <div id="need-revalidation" className="scroll-mt-20">
+              <Revalidation
+                cycleId={workflow.cycleId}
+                // The verdict, with each note as editor JSON for the editors
+                // to open on (guided-inputs change 12).
+                saved={
+                  workflow.revalidation
+                    ? {
+                        holds: workflow.revalidation.holds,
+                        changed: workflow.revalidation.changed,
+                        changeNote:
+                          workflow.revalidationDocuments?.changeNote ?? null,
+                        focusNote:
+                          workflow.revalidationDocuments?.focusNote ?? null,
+                      }
+                    : null
+                }
+                focus={workflow.focus}
+                canEdit={canEdit}
+              />
+            </div>
           ) : null}
 
           {viewing === 3 ? (
-            <Direction
-              cycleId={workflow.cycleId}
-              mode={workflow.mode}
-              priorities={workflow.priorities}
-              issues={workflow.issues}
-              bounds={workflow.asks.priorities}
-              canEdit={canEdit}
-            />
+            <div id="need-direction" className="scroll-mt-20">
+              <Direction
+                cycleId={workflow.cycleId}
+                mode={workflow.mode}
+                priorities={workflow.priorities}
+                issues={workflow.issues}
+                bounds={workflow.asks.priorities}
+                canEdit={canEdit}
+              />
+            </div>
           ) : null}
 
           {/* Before the capacity check, because §5.4 comes before §5.5 in the
@@ -703,140 +757,153 @@ export default async function CyclePage({
           ) : null}
 
           {viewing === 5 ? (
-            <Gates
-              cycleId={workflow.cycleId}
-              gates={workflow.gates}
-              publishable={workflow.publishable}
-              publishedAt={workflow.publishedAt}
-              companyPublishedAt={workflow.companyPublishedAt}
-              canPublish={canPublish}
-              pinnedCycleId={pinnedCycleId}
-            />
+            <div id="need-gates" className="scroll-mt-20">
+              <Gates
+                cycleId={workflow.cycleId}
+                gates={workflow.gates}
+                publishable={workflow.publishable}
+                publishedAt={workflow.publishedAt}
+                companyPublishedAt={workflow.companyPublishedAt}
+                canPublish={canSetUp}
+                pinnedCycleId={pinnedCycleId}
+              />
+            </div>
           ) : null}
 
           {viewing === 4 ? (
-            <Drafting
-              cycleId={workflow.cycleId}
-              endsOn={workflow.endsOn}
-              draftingAllowed={workflow.drafting.allowed}
-              draftingReasons={workflow.drafting.reasons}
-              goals={draft.goals}
-              members={draft.members}
-              kpis={draft.kpis}
-              canEdit={canEdit}
-              thresholds={draft.thresholds}
-              practice={draft.practice}
-              checkTitles={draft.checkTitles}
-              memberId={workspace.memberId}
-              spaces={(await callAction(context, "spaces.list", {})).map(
-                (space) => ({ id: space.id, name: space.name }),
-              )}
-              defaultSpaceId={query.space ?? null}
-              assistsAvailable={await assistsAvailableAction()}
-              levels={
-                (
-                  await callAction(context, "cycles.levelsInUse", {
-                    cycleId: workflow.cycleId,
-                  })
-                ).levels
-              }
-            />
+            <div id="need-drafting" className="scroll-mt-20">
+              <Drafting
+                cycleId={workflow.cycleId}
+                endsOn={workflow.endsOn}
+                draftingAllowed={workflow.drafting.allowed}
+                draftingReasons={workflow.drafting.reasons}
+                goals={draft.goals}
+                members={draft.members}
+                kpis={draft.kpis}
+                canEdit={draftsGoals}
+                thresholds={draft.thresholds}
+                practice={draft.practice}
+                checkTitles={draft.checkTitles}
+                memberId={workspace.memberId}
+                spaces={(await callAction(context, "spaces.list", {})).map(
+                  (space) => ({ id: space.id, name: space.name }),
+                )}
+                defaultSpaceId={query.space ?? null}
+                assistsAvailable={await assistsAvailableAction()}
+                levels={
+                  (
+                    await callAction(context, "cycles.levelsInUse", {
+                      cycleId: workflow.cycleId,
+                    })
+                  ).levels
+                }
+              />
+            </div>
           ) : null}
 
           {viewing === 0 ? (
-            <AnnualFrame
-              frame={frame}
-              canEdit={canPublish}
-              cycle={{ id: cycle.id, mode: workflow.mode }}
-            />
+            <div id="need-frame" className="scroll-mt-20">
+              <AnnualFrame
+                frame={frame}
+                canEdit={canSetUp}
+                cycle={{ id: cycle.id, mode: workflow.mode }}
+              />
+            </div>
           ) : null}
 
           {viewing === 0 ? (
-            <AnnualObjectives
-              strategies={frame?.strategies ?? []}
-              objectives={annualObjectives}
-              canEdit={canPublish}
-              // The reader champions and reviews what they send forward. A
-              // picker here would be a second drafting form on a phase that
-              // is not the drafting phase; the goal page is where either is
-              // changed.
-              championId={workspace.memberId}
-              reviewerId={workspace.memberId}
-              frameAgreed={frame?.agreed ?? false}
-            />
+            <div id="need-annual-objectives" className="scroll-mt-20">
+              <AnnualObjectives
+                strategies={frame?.strategies ?? []}
+                objectives={annualObjectives}
+                canEdit={canSetUp}
+                // The reader champions and reviews what they send forward. A
+                // picker here would be a second drafting form on a phase that
+                // is not the drafting phase; the goal page is where either is
+                // changed.
+                championId={workspace.memberId}
+                reviewerId={workspace.memberId}
+                frameAgreed={frame?.agreed ?? false}
+              />
+            </div>
           ) : null}
 
           {viewing === 6 && cadence ? (
-            <RunningCadence
-              team={query.team ?? null}
-              teamHref={(team) => {
-                const params = new URLSearchParams();
-                params.set("phase", "6");
-                if (query.cycle) {
-                  params.set("cycle", query.cycle);
-                }
-                if (team) {
-                  params.set("team", team);
-                }
-                return `/cycle?${params.toString()}`;
-              }}
-              sessions={cadence.sessions}
-              blockers={cadence.blockers}
-              decisions={cycleDecisions.map((decision) => ({
-                id: decision.id,
-                summary: decision.text,
-                at: decision.at,
-              }))}
-              confidence={cycleGoals.flatMap((goal) =>
-                goal.keyResults.map((keyResult) => ({
-                  id: keyResult.id,
-                  title: keyResult.title,
-                  goalTitle: goal.title,
-                  confidence: keyResult.confidence,
-                  // The trend needs the previous check-in's figure, which
-                  // `goals.list` does not carry. Left null rather than
-                  // guessed: the card renders "no trend yet" and says so,
-                  // which is honest, and P6-G19 is where the confidence
-                  // history arrives for the session screen anyway.
-                  previousConfidence: null,
-                })),
-              )}
-              streak={cadence.streak}
-              calibration={workflow.calibration}
-            />
+            <div id="need-cadence" className="scroll-mt-20">
+              <RunningCadence
+                team={query.team ?? null}
+                teamHref={(team) => {
+                  const params = new URLSearchParams();
+                  params.set("phase", "6");
+                  if (query.cycle) {
+                    params.set("cycle", query.cycle);
+                  }
+                  if (team) {
+                    params.set("team", team);
+                  }
+                  return `/cycle?${params.toString()}`;
+                }}
+                sessions={cadence.sessions}
+                blockers={cadence.blockers}
+                decisions={cycleDecisions.map((decision) => ({
+                  id: decision.id,
+                  summary: decision.text,
+                  at: decision.at,
+                }))}
+                confidence={cycleGoals.flatMap((goal) =>
+                  goal.keyResults.map((keyResult) => ({
+                    id: keyResult.id,
+                    title: keyResult.title,
+                    goalTitle: goal.title,
+                    confidence: keyResult.confidence,
+                    // The trend needs the previous check-in's figure, which
+                    // `goals.list` does not carry. Left null rather than
+                    // guessed: the card renders "no trend yet" and says so,
+                    // which is honest, and P6-G19 is where the confidence
+                    // history arrives for the session screen anyway.
+                    previousConfidence: null,
+                  })),
+                )}
+                streak={cadence.streak}
+                calibration={workflow.calibration}
+              />
+            </div>
           ) : null}
 
           {viewing === 7 && reviewThresholds ? (
-            <ReviewAndLearn
-              keyResults={cycleGoals.flatMap((goal) =>
-                goal.keyResults.map((keyResult) => ({
-                  id: keyResult.id,
-                  title: keyResult.title,
-                  goalTitle: goal.title,
-                  score: keyResult.score,
-                  carryForward: keyResult.carryForward,
-                })),
-              )}
-              cycleId={workflow.cycleId}
-              cycleName={workflow.name}
-              status={workflow.status}
-              endsOn={workflow.endsOn}
-              // The server decides with the workspace's own date and refuses
-              // in words; this only spares an undo that would be refused.
-              ended={new Date().toISOString().slice(0, 10) > workflow.endsOn}
-              closure={workflow.closure}
-              reviewMinutes={reviewMinutes}
-              // The same evaluation `cycles.close` refuses on, so the control
-              // is disabled for exactly the reasons the server would give.
-              waitingFor={[
-                ...(phase?.missing ?? []),
-                ...(phase?.blocked ?? []),
-              ]}
-              // `full`, which is what `cycles.close` requires.
-              canEdit={canPublish}
-              thresholds={reviewThresholds}
-              practice={reviewPractice ?? defaultPractice()}
-            />
+            <div id="need-review" className="scroll-mt-20">
+              <ReviewAndLearn
+                keyResults={cycleGoals.flatMap((goal) =>
+                  goal.keyResults.map((keyResult) => ({
+                    id: keyResult.id,
+                    title: keyResult.title,
+                    goalTitle: goal.title,
+                    score: keyResult.score,
+                    carryForward: keyResult.carryForward,
+                  })),
+                )}
+                cycleId={workflow.cycleId}
+                cycleName={workflow.name}
+                status={workflow.status}
+                endsOn={workflow.endsOn}
+                // The server decides with the workspace's own date and refuses
+                // in words; this only spares an undo that would be refused.
+                ended={new Date().toISOString().slice(0, 10) > workflow.endsOn}
+                closure={workflow.closure}
+                reviewMinutes={reviewMinutes}
+                // The same evaluation `cycles.close` refuses on, so the control
+                // is disabled for exactly the reasons the server would give.
+                waitingFor={[
+                  ...(phase?.missing ?? []),
+                  ...(phase?.blocked ?? []),
+                ]}
+                // Whoever can set up the cycle, which is what `cycles.close`
+                // requires (plan 0.8.0 R1).
+                canEdit={canSetUp}
+                thresholds={reviewThresholds}
+                practice={reviewPractice ?? defaultPractice()}
+              />
+            </div>
           ) : null}
         </div>
 
@@ -931,8 +998,9 @@ export default async function CyclePage({
            * the column beside it, which is the defect P6-G11b shipped on the
            * goal page and P6-G24b's own suite caught here within the hour.
            */}
-          {canPublish ? (
+          {canSetUp ? (
             <CycleAdmin
+              canArchive={canArchive}
               mode={workflow.mode}
               currentCycleId={cycle.id}
               currentName={cycle.name}

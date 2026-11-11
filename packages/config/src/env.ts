@@ -1,4 +1,15 @@
 import { z } from "zod";
+import {
+  BOTH_SET_PROBLEM,
+  CLIENT_ADDRESS_HEADER_VARIABLE,
+  HOPS_WITH_ANOTHER_PROBLEM,
+  parseClientAddressHeader,
+  parseTrustedProxies,
+  TRUSTED_PROXY_HOPS_VARIABLE,
+} from "./caller-address.ts";
+import { EnvironmentError } from "./environment-error.ts";
+
+export { EnvironmentError };
 
 /**
  * The environment contract for every OpenOKR process: the web app, the outbox
@@ -208,9 +219,21 @@ const envSchema = z
      * a deployment that drains nothing sends no invitation email and publishes
      * no live event, and that was the state of every deployment until now
      * (PLAN.md §12 R10). Concurrent relays are safe: rows are claimed with
-     * `FOR UPDATE SKIP LOCKED` under a lease. Set `off` on serving replicas
-     * when you want one dedicated drainer instead of all of them polling. */
-    OPENOKR_RELAY: optional(z.enum(["on", "off"]).default("on")),
+     * `FOR UPDATE SKIP LOCKED` under a lease.
+     *
+     * `elsewhere` (plan 0.8.0 H10d, docs/design/worker-deployment.md D2)
+     * means another process of this instance drains it, such as the Helm
+     * chart's worker: nothing drains here, but the copilot still runs in the
+     * background and the outbox gauges are still served. `off` means not
+     * here, and perhaps nowhere. */
+    OPENOKR_RELAY: optional(z.enum(["on", "off", "elsewhere"]).default("on")),
+
+    /** Whether a new account confirms its email before it signs in (plan
+     * 0.8.0 S4, docs/design/email-verification.md §11). `auto`, the
+     * default, requires it exactly when the instance can deliver mail;
+     * `off` lets the account be used at once. A value saved on General, or
+     * by a cloud's operator, wins. Anything else is refused at boot. */
+    OPENOKR_EMAIL_VERIFICATION: optional(z.enum(["auto", "off"]).optional()),
 
     /** How many database connections one process may hold (P8-T06b).
      *
@@ -229,6 +252,29 @@ const envSchema = z
      * so no single workspace can hold every slot. */
     OPENOKR_DB_POOL_MAX: optional(z.coerce.number().int().min(1).default(20)),
 
+    /** How long a stopping process may finish the work in flight, in seconds
+     * (plan 0.8.0 H10a, docs/design/worker-deployment.md D8). On SIGTERM the
+     * relay finishes its row and releases the rest, the scheduler hands back
+     * any job still running three seconds before this, and the actions in
+     * flight are waited for. Whatever is still running at this bound is cut
+     * and retried, which is what a crash does. Twenty fits a mail, a webhook
+     * or a short AI step. The Helm chart derives its grace period from it,
+     * and Compose stops the container after 30 seconds.
+     *
+     * Checked as text rather than coerced: a coerced `soon` or `2.5` fails
+     * as a type error with no input, which the message below reads as
+     * "is missing". */
+    OPENOKR_SHUTDOWN_SECONDS: optional(
+      z
+        .string()
+        .default("20")
+        .refine((value) => {
+          const seconds = Number(value.trim());
+          return /^\d+$/.test(value.trim()) && seconds >= 1 && seconds <= 300;
+        }, "must be a whole number of seconds from 1 to 300")
+        .transform((value) => Number(value.trim())),
+    ),
+
     /** Whether this process runs the recurring work (P6-G01a). On by default,
      * because a deployment that schedules nothing never chases a check-in, never
      * sends a morning summary, never ages a blocker and never flips a neglected
@@ -236,8 +282,15 @@ const envSchema = z
      * and until now no instance had ever run one on its own clock. Unlike the
      * relay, concurrent schedulers are wasteful rather than dangerous: pg-boss
      * holds one schedule per name however many hosts declare it, and a job is
-     * handed to one worker. Set `off` on the replicas you do not want polling. */
-    OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
+     * handed to one worker. Set `off` on the replicas you do not want polling.
+     *
+     * `elsewhere` (plan 0.8.0 H10d, docs/design/worker-deployment.md D2)
+     * means another process of this instance runs it: nothing runs here, and
+     * `/api/status` judges the stamp the other process writes rather than
+     * answering `operational` as it does for `off`. */
+    OPENOKR_SCHEDULER: optional(
+      z.enum(["on", "off", "elsewhere"]).default("on"),
+    ),
 
     /** How many reverse proxies sit between the internet and this server. The
      * caller's address is the `X-Forwarded-For` entry that many places from the
@@ -247,7 +300,9 @@ const envSchema = z
      * them and nothing has to be set. A cloud load balancer in front of the
      * ingress makes it `2`. `0` means no proxy: the header is ignored and every
      * caller shares one unresolved sign-in limit (docs/design/sign-in-rate-limit.md). */
-    OPENOKR_TRUSTED_PROXY_HOPS: optional(trustedProxyHopsSchema),
+    // No default here, so the refine below can tell a hop count somebody set
+    // from none: `trustedProxyHops()` answers 1 when it is unset.
+    OPENOKR_TRUSTED_PROXY_HOPS: optional(trustedProxyHopsSchema.optional()),
 
     /** Whether this instance is a public demonstration (P8-T13c). Off by
      * default, and it is a claim about the deployment rather than a feature
@@ -298,42 +353,105 @@ const envSchema = z
     ),
     /** Prefix every object key, so one bucket can hold several instances. */
     OPENOKR_STORAGE_S3_KEY_PREFIX: optional(z.string().min(1).optional()),
+
+    /**
+     * `network.trustedProxies` (docs/design/trusted-proxies.md D1, D3, D6,
+     * D7): the proxies in front of the instance, as addresses or CIDR ranges,
+     * separated by commas, spaces or newlines. Unset reads `X-Forwarded-For`
+     * only when it holds one address. Environment only: a screen that could
+     * change it is a way to switch off every per-address limit from a stolen
+     * session. A bad entry refuses the boot by name, because Better Auth on
+     * its own would drop it and count every visitor through that proxy as one.
+     */
+    OPENOKR_TRUSTED_PROXIES: optional(
+      z
+        .string()
+        .superRefine((value, ctx) => {
+          for (const message of parseTrustedProxies(value).problems) {
+            ctx.addIssue({ code: "custom", message });
+          }
+        })
+        .transform((value) => {
+          const { entries } = parseTrustedProxies(value);
+          return entries.length > 0 ? entries : undefined;
+        })
+        .optional(),
+    ),
+
+    /**
+     * `network.clientAddressHeader` (D4): the one header a CDN writes the
+     * visitor's address into, such as `cf-connecting-ip`. Safe only when the
+     * origin refuses every request that did not come through your own CDN
+     * zone. Read in lower case. Never together with the ranges above (D5).
+     */
+    OPENOKR_CLIENT_ADDRESS_HEADER: optional(
+      z
+        .string()
+        .superRefine((value, ctx) => {
+          const { problem } = parseClientAddressHeader(value);
+          if (problem !== undefined) {
+            ctx.addIssue({ code: "custom", message: problem });
+          }
+        })
+        .transform((value) => parseClientAddressHeader(value).header ?? value)
+        .optional(),
+    ),
   })
   .superRefine((env, ctx) => {
-    // A named bucket with no credentials is the failure worth catching at boot:
-    // the driver would build, every upload would fail at the first request, and
-    // the message a user saw would be about an upload rather than about a
-    // missing variable. Half-configured is the state to refuse, not "unset".
+    // **One reading of the caller's address, not two** (trusted-proxies.md
+    // D5). Better Auth would apply the ranges to the header's single value,
+    // which means nothing useful.
+    if (
+      env.OPENOKR_TRUSTED_PROXIES !== undefined &&
+      env.OPENOKR_CLIENT_ADDRESS_HEADER !== undefined
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: [CLIENT_ADDRESS_HEADER_VARIABLE],
+        message: BOTH_SET_PROBLEM,
+      });
+    }
+    // **One of three, not two** (Akmal, 11 November 2026, merging the
+    // hardening batch's hop count with plan 0.8.0 H2). The hop count is the
+    // default reading; the ranges and the header are for a deployment where
+    // counting hops is not reliable, and either replaces it.
+    if (
+      env.OPENOKR_TRUSTED_PROXY_HOPS !== undefined &&
+      (env.OPENOKR_TRUSTED_PROXIES !== undefined ||
+        env.OPENOKR_CLIENT_ADDRESS_HEADER !== undefined)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: [TRUSTED_PROXY_HOPS_VARIABLE],
+        message: HOPS_WITH_ANOTHER_PROBLEM,
+      });
+    }
+    // **Both keys or neither** (plan 0.8.0 H9). Neither leaves the
+    // credentials to the AWS SDK's default chain, which is how workload
+    // identity works: EKS Pod Identity, IRSA or an instance profile gives the
+    // pod a role and no key. Half a pair is the failure worth catching at
+    // boot: the driver would build, every upload would fail at the first
+    // request, and the message a user saw would be about an upload rather
+    // than about a missing variable.
     if (env.OPENOKR_STORAGE_S3_BUCKET === undefined) {
       return;
     }
-    for (const name of [
-      "OPENOKR_STORAGE_S3_ACCESS_KEY_ID",
-      "OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY",
-    ] as const) {
-      if (env[name] === undefined) {
-        ctx.addIssue({
-          code: "custom",
-          path: [name],
-          message: `${name} is required when OPENOKR_STORAGE_S3_BUCKET names a bucket. Unset the bucket to use local disk instead.`,
-        });
-      }
+    const id = env.OPENOKR_STORAGE_S3_ACCESS_KEY_ID !== undefined;
+    const secret = env.OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY !== undefined;
+    if (id === secret) {
+      return;
     }
+    const missing = id
+      ? "OPENOKR_STORAGE_S3_SECRET_ACCESS_KEY"
+      : "OPENOKR_STORAGE_S3_ACCESS_KEY_ID";
+    ctx.addIssue({
+      code: "custom",
+      path: [missing],
+      message: `${missing} is required with the other half of the S3 key pair. Set both, or neither to let the AWS SDK find the pod's own credentials.`,
+    });
   });
 
 export type Env = z.infer<typeof envSchema>;
-
-/** Thrown when the environment is invalid. Carries the offending variable names
- * so a caller can act on them without parsing the message. */
-export class EnvironmentError extends Error {
-  readonly variables: readonly string[];
-
-  constructor(variables: readonly string[], message: string) {
-    super(message);
-    this.name = "EnvironmentError";
-    this.variables = variables;
-  }
-}
 
 /**
  * Refuses to boot production with a development placeholder in place. This is

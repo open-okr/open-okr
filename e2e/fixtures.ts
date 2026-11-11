@@ -58,6 +58,29 @@ const SETTLING = Symbol("settling navigation");
 const CLOSING = Symbol("closing connections");
 
 /**
+ * The cookie a spec sets to meet the product tour (plan 0.8.0 T1).
+ *
+ * The tour is a dialog that dims the screen on a member's first sign-in, and
+ * many specs sign a fresh member in and go straight to work. So every browser
+ * context starts as if the tour had ended in it, which is a rule the product
+ * keeps anyway: a browser that ended the tour is not offered it again
+ * (`apps/web/lib/product-tour.tsx`, `ENDED_KEY`). A spec that walks the tour
+ * sets this cookie and clears the key first.
+ */
+export const TOUR_COOKIE = "openokr-e2e-tour";
+
+/** Runs in every document before the app does. */
+function quietTour(cookie: string): void {
+  if (!document.cookie.split("; ").includes(`${cookie}=on`)) {
+    try {
+      window.localStorage.setItem("openokr.tour.ended", "1");
+    } catch {
+      // A document with no storage, such as about:blank, has no tour either.
+    }
+  }
+}
+
+/**
  * Makes a page's `goto` and `reload` wait for the document to settle.
  *
  * Kept alongside the assertion wrapper below rather than replaced by it: a
@@ -88,6 +111,7 @@ function settlingNavigation(page: Page): Page {
 
 export const test = base.extend({
   page: async ({ page }, use) => {
+    await page.context().addInitScript(quietTour, TOUR_COOKIE);
     await use(settlingNavigation(page));
   },
   // **And every page a spec opens for itself** (completeness review M-20's
@@ -106,6 +130,7 @@ export const test = base.extend({
         const newContext = browser.newContext.bind(browser);
         browser.newContext = async (options) => {
           const context = await newContext(options);
+          await context.addInitScript(quietTour, TOUR_COOKIE);
           const newPage = context.newPage.bind(context);
           context.newPage = async () => settlingNavigation(await newPage());
           return context;

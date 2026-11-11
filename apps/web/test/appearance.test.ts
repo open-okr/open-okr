@@ -24,7 +24,8 @@ const control = at("../lib/appearance.tsx");
 const action = at("../lib/appearance-action.ts");
 const shell = at("../lib/app-shell.tsx");
 const menu = at("../app/avatar-menu.tsx");
-const profile = at("../app/people/[id]/page.tsx");
+// Your account carries the full control since plan 0.8.0 Y2, not the profile.
+const profile = at("../app/account/page.tsx");
 
 describe("the appearance control", () => {
   test("calls the provider methods nothing had ever called", () => {
@@ -44,7 +45,7 @@ describe("the appearance control", () => {
   test("is on both surfaces the task names", () => {
     expect(shell).toContain("<AppearanceControl compact />");
     expect(menu).toContain("{appearance}");
-    // The profile passes the stored language in (P6-G22a): unlike the theme
+    // Your account passes the stored language in (P6-G22a): unlike the theme
     // there is no provider holding it, because the catalogue is chosen while
     // the page renders on the server.
     expect(profile).toContain("<AppearanceControl language={member.language}");

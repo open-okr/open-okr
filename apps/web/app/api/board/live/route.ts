@@ -46,6 +46,7 @@ import {
   type BoardPresence,
   joinBoardPresence,
 } from "../../../../lib/board-presence";
+import { keepAlive } from "../../../../lib/keep-alive";
 import { getRealtime } from "../../../../lib/realtime";
 import { requireWorkspace } from "../../../../lib/workspace";
 
@@ -209,6 +210,9 @@ export async function GET(request: NextRequest) {
   }
 
   send(": heartbeat\n\n");
+  // Again every 25 seconds, so no proxy's idle timeout cuts a quiet stream
+  // (plan 0.8.0 H11).
+  keepAlive(() => send(": heartbeat\n\n"), request.signal);
   request.signal.addEventListener("abort", () => {
     void shutdown();
   });

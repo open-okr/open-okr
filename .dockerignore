@@ -23,8 +23,13 @@ deploy/helm
 deploy/cloud
 deploy/docker/secrets
 
+# Every env file, at any depth: a nested one, such as a developer's
+# apps/web/.env, would otherwise reach the build stage with whatever real
+# values it holds (UAT 0.8.0 Q-11). The example alone is wanted.
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
 *.log
 

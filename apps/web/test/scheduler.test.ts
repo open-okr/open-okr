@@ -1,7 +1,8 @@
 import { AGENT_SCHEDULES } from "@openokr/agents";
 import { resetEnvCache } from "@openokr/config";
 import { actionNames } from "@openokr/core";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { schedulerMode } from "../lib/background-work";
 import {
   localHourIn,
   runScheduledJob,
@@ -9,6 +10,8 @@ import {
   type SchedulableWorkspace,
   type ScheduledRun,
   schedulerEnabled,
+  schedulerState,
+  startScheduler,
 } from "../lib/scheduler";
 
 /**
@@ -47,6 +50,36 @@ describe("the toggle", () => {
   test("a misspelt value is a boot error, not a silent stop", () => {
     process.env.OPENOKR_SCHEDULER = "of";
     expect(() => schedulerEnabled()).toThrow(/OPENOKR_SCHEDULER/);
+  });
+
+  // docs/design/worker-deployment.md D2 and §1.3, plan 0.8.0 H10d.
+  test("elsewhere is not here, and says where it is", () => {
+    expect(schedulerEnabled({ OPENOKR_SCHEDULER: "elsewhere" })).toBe(false);
+    expect(schedulerMode({ OPENOKR_SCHEDULER: "elsewhere" })).toBe("elsewhere");
+    process.env.OPENOKR_SCHEDULER = "elsewhere";
+    expect(schedulerState()).toBe("elsewhere");
+    process.env.OPENOKR_SCHEDULER = "off";
+    resetEnvCache();
+    expect(schedulerState()).toBe("off");
+  });
+
+  test("with the scheduler elsewhere, boot starts none and says so", () => {
+    process.env.OPENOKR_SCHEDULER = "elsewhere";
+    const written: string[] = [];
+    const write = vi
+      .spyOn(process.stdout, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(String(chunk));
+        return true;
+      });
+    try {
+      expect(startScheduler()).toBeNull();
+    } finally {
+      write.mockRestore();
+    }
+    expect(written).toEqual([
+      "scheduler: runs elsewhere (OPENOKR_SCHEDULER=elsewhere)\n",
+    ]);
   });
 });
 
@@ -122,6 +155,9 @@ describe("the run table", () => {
   // `sso.recheckDomains` since single sign-on domain proof
   // (sso-domain-verification.md): a clock looking the DNS records up again,
   // and an API caller starting it would only be asking for a lookup.
+  // `account.runDeletions` since plan 0.8.0 Y7 (account-deletion.md §7): a
+  // person's own account belongs to no workspace, and no token may start the
+  // erasure of an account (Y7-Q2).
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
@@ -135,6 +171,7 @@ describe("the run table", () => {
     "alignment.fillScores",
     "webhooks.purgeDeliveries",
     "sso.recheckDomains",
+    "account.runDeletions",
   ]);
 
   test("names a real action for every run", () => {
@@ -169,12 +206,14 @@ describe("the run table", () => {
       "alignment.fillScores",
       "webhooks.purgeDeliveries",
       "sso.recheckDomains",
+      "account.runDeletions",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
     expect(off.map((run) => run.job).sort()).toEqual([
+      "account.runDeletions",
       "alignment.fillScores",
       "audit.chain",
       "auth.purgeSignInAttempts",
@@ -203,6 +242,17 @@ describe("the run table", () => {
     );
     expect(sweep?.instance).toBe(true);
     expect(sweep?.cron).toBe("*/5 * * * *");
+  });
+
+  // A request runs in the hour its fourteen days end, and a failed
+  // workspace is retried the next hour from the ledger (account-deletion.md
+  // §3.3, plan 0.8.0 Y7).
+  test("runs due account deletions for the instance, every hour", () => {
+    const run = SCHEDULED_RUNS.find(
+      (entry) => entry.action === "account.runDeletions",
+    );
+    expect(run?.instance).toBe(true);
+    expect(run?.cron).toBe("45 * * * *");
   });
 
   // Spraying random addresses makes sign-in counter rows, and nothing else

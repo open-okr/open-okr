@@ -1,0 +1,109 @@
+{{- /* `dig` with the values.yaml defaults, because values reused from a release
+       before 0.8 have no `dataChanges`; never `| default` on `enabled`, which
+       would read false as unset and turn the hook back on (worker-deployment.md
+       D19). */ -}}
+{{- $dataChanges := .Values.dataChanges | default dict }}
+{{- if dig "enabled" true $dataChanges }}
+{{- include "openokr.validate" . -}}
+{{- $budget := dig "timeBudgetSeconds" 240 $dataChanges | int }}
+# The data changes an upgrade brought, after every install and upgrade (plan
+# 0.8.0 H10c, docs/design/worker-deployment.md D17 and §1.5).
+#
+# Before this, nothing in the chart ran them, and no page said how. They run
+# while either release serves, by the conventions every script follows
+# (docs/design/data-change-conventions.md), so this runs once the new pods are
+# up with --wait, or beside the rollout without it.
+#
+# Inside a budget that ends the run between two batches and says what is left,
+# well under Helm's default --timeout of five minutes. What is left runs at the
+# next upgrade, or now with `kubectl exec` (docs/install/kubernetes.md).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Named per revision, like the migration hook: a hook Job cannot be patched.
+  name: {{ printf "%s-data-change-%d" (include "openokr.fullname" .) .Release.Revision }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+    app.kubernetes.io/component: data-change
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
+    # Kept on failure, for its log: a script that throws fails the release the
+    # way a failed migration does, and this is where it says which one.
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  # No retry. A failing script fails the same way again, and the next upgrade
+  # tries it anyway; the batches it finished are kept either way.
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  {{- if gt $budget 0 }}
+  # A backstop only: the runner stops itself at the budget, between batches.
+  # This catches a batch that hangs, two minutes after the budget.
+  activeDeadlineSeconds: {{ add $budget 120 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        {{- include "openokr.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: data-change
+    spec:
+      restartPolicy: Never
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # The default service account with no token, like the migration hook:
+      # this talks to Postgres and to nothing else.
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: data-change
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          # The same runner as `pnpm db:change` and `./openokr data-change`.
+          command:
+            - node
+            - --experimental-strip-types
+            - --no-warnings
+            - ./migrator/packages/db/src/bin/data-change.ts
+            {{- if gt $budget 0 }}
+            - --max-seconds
+            - {{ $budget | quote }}
+            {{- end }}
+          workingDir: /app
+          env:
+            {{- include "openokr.commonEnv" . | nindent 12 }}
+            # The command loads the server's whole environment, which in
+            # production refuses to start without the real auth secret. The
+            # erasure job stopped on exactly that until O3 gave it this.
+            - name: BETTER_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "openokr.secretName" . }}
+                  key: {{ .Values.secrets.authSecretKey | default "better-auth-secret" }}
+          resources:
+            {{- toYaml .Values.migrationResources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

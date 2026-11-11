@@ -1,14 +1,24 @@
 /**
  * People actions (TECHNICAL-PLAN §4.1, screen S-33, P2-T03).
  *
- * **Self versus others.** `updateOwnProfile` is timezone, avatar and bio: the
- * fields that are nobody else's business. `updateMember` is name, title and
- * manager: the org-structural fields, editable only by someone holding
- * `full` on the workspace's own context, which today means whoever
- * provisioning gave a personal binding to. This split is this task's own
- * reading of "self-versus-others editable field sets" — TECHNICAL-PLAN
- * §4.1 names the property without drawing the line, so it is recorded here
- * and in STATUS.md for a human to confirm rather than assumed silently.
+ * **Self versus others.** `updateOwnProfile` is the member's own name,
+ * timezone, avatar, bio and the rest of what is nobody else's business.
+ * `updateMember` is somebody else's name, title and manager, editable only by
+ * someone holding `full` on the workspace's own context. Title and manager
+ * stay the administrator's; the name is both (plan 0.8.0 Q2).
+ *
+ * **Who writes which name** (docs/design/account-self-service.md D22 to D25,
+ * plan 0.8.0 Y5). A person has two: `users.name` belongs to the account and
+ * is what a new workspace's member row starts from, and
+ * `workspace_members.name` is what each workspace shows. The member's own
+ * change writes this workspace's row and `users.name` together, so the next
+ * workspace starts from their latest choice; other workspaces keep the name
+ * they have, because their administrators may have set it. An
+ * administrator's change writes this workspace's row only. Nothing else
+ * writes `users.name` after the account is made: Better Auth's
+ * `/update-user` is off (Y6), and a directory never writes a name, so a
+ * member a directory manages may still rename themselves (AS-Q1). A
+ * demonstration account may not, because anybody can sign in to it.
  *
  * **Suspend, restore, convert, erase** all require `full` and, except
  * restore, all refuse to act on the workspace's last full-access holder
@@ -18,10 +28,13 @@
 import {
   accessBindings,
   activeOnly,
+  BUILTIN_ROLE_KEYS,
   softDeleteRows,
+  users,
   withContext,
   withWorkspace,
   workspaceMembers,
+  workspaceRoles,
 } from "@openokr/db";
 import { EMAIL_PATTERN, isListedTimezone } from "@openokr/formats";
 import {
@@ -45,12 +58,17 @@ import {
   resolveSubjectContext,
 } from "../access/reads.ts";
 import { moveAdministratorRole } from "../access/roles.ts";
+import { isDemoAccount } from "../demo/persona-list.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
-import { eraseAccountIfAlone, sweepPersonalData } from "../people/erasure.ts";
+import {
+  eraseMemberInTx,
+  erasureAuditPayload,
+  erasureExport,
+  loadMemberForErasure,
+} from "../people/erase-member.ts";
 import { buildPersonalExport } from "../people/export.ts";
 import {
-  type ErasureExport,
   isLastFullAccessHolder,
   refuseIfLastOwner,
   stripBindings,
@@ -97,6 +115,20 @@ const bioInputSchema = markedAsRichText(
     }),
 ).optional();
 
+/**
+ * A member's name, as both the member's own form and an administrator's take
+ * it (docs/design/account-self-service.md D22, §5).
+ */
+const memberName = z
+  .string()
+  .trim()
+  .min(1, "A member needs a name.")
+  .max(200, "Use at most 200 characters.");
+
+/** Said to a demonstration account that tries to rename itself (D1). */
+const DEMO_KEEPS_NAME =
+  "Demonstration accounts keep their name. Anyone can sign in to them, so anyone could change it.";
+
 const memberSummary = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -119,8 +151,13 @@ const memberSummary = z.object({
 export const updateOwnProfile = defineWriteAction({
   name: "people.updateOwnProfile",
   summary:
-    "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+    "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
   input: z.object({
+    /**
+     * Their own name (plan 0.8.0 Y5). Written to this workspace's member row
+     * and to the account's name, never to another workspace's row.
+     */
+    name: memberName.optional(),
     // On the list the profile offers, trimmed first (docs/design/
     // guided-inputs.md §4.6). A name the runtime merely resolves, such as
     // `EST`, was stored as typed.
@@ -194,7 +231,10 @@ export const updateOwnProfile = defineWriteAction({
         throw new OperationError("forbidden", "No member to update.");
       }
       const [current] = await tx
-        .select({ avatarBlobId: workspaceMembers.avatarBlobId })
+        .select({
+          avatarBlobId: workspaceMembers.avatarBlobId,
+          userId: workspaceMembers.userId,
+        })
         .from(workspaceMembers)
         .where(
           activeOnly(
@@ -207,11 +247,29 @@ export const updateOwnProfile = defineWriteAction({
       if (!current) {
         throw new OperationError("not_found", "No such member.");
       }
+      // A demonstration account keeps its name (account-self-service.md D1):
+      // anybody can sign in to it, so one visitor's rename is every
+      // visitor's until the nightly rebuild.
+      if (input.name !== undefined && current.userId) {
+        const [account] = await tx
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, current.userId))
+          .limit(1);
+        if (isDemoAccount(account?.email)) {
+          throw new OperationError("forbidden", DEMO_KEEPS_NAME);
+        }
+      }
       if (!input.avatarBlobId) {
-        return { previousAvatarBlobId: current.avatarBlobId, avatar: null };
+        return {
+          previousAvatarBlobId: current.avatarBlobId,
+          userId: current.userId,
+          avatar: null,
+        };
       }
       return {
         previousAvatarBlobId: current.avatarBlobId,
+        userId: current.userId,
         avatar: await requireAvatarImage(tx, {
           workspaceId,
           memberId: actor.memberId,
@@ -227,6 +285,10 @@ export const updateOwnProfile = defineWriteAction({
       // Which facts changed, by name and never by value, for the audit row:
       // a bio is somebody's own words and does not belong in the trail.
       const changed: string[] = [];
+      if (input.name !== undefined) {
+        patch.name = input.name;
+        changed.push("name");
+      }
       if (input.timezone !== undefined) {
         patch.timezone = input.timezone;
         changed.push("timezone");
@@ -292,6 +354,19 @@ export const updateOwnProfile = defineWriteAction({
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
       }
+      // **The account's name follows the member's own choice** (D22), in
+      // this transaction, so the two never disagree about what the person
+      // last chose. Other workspaces' rows are left as they are.
+      if (input.name !== undefined && loaded.userId) {
+        // openokr:allow-mutation: this Operation's own transaction. The
+        // account is identity data outside any workspace, and this is the
+        // one write after sign-up that may change its name, as erasure's is
+        // the one that may anonymise it.
+        await tx
+          .update(users)
+          .set({ name: input.name, updatedAt: new Date() })
+          .where(eq(users.id, loaded.userId));
+      }
 
       return {
         result: updated,
@@ -321,12 +396,10 @@ export const updateMember = defineWriteAction({
   summary: "Update another member's name, title or manager (org fields).",
   input: z.object({
     memberId: z.uuid(),
-    name: z
-      .string()
-      .trim()
-      .min(1, "A member needs a name.")
-      .max(200)
-      .optional(),
+    // This workspace's row only, never the account's name (account-self-
+    // service.md D24): one workspace's administrator does not decide what the
+    // next workspace sees.
+    name: memberName.optional(),
     title: z.string().trim().max(200).nullable().optional(),
     managerId: z.uuid().nullable().optional(),
   }),
@@ -852,132 +925,31 @@ export const eraseMember = defineWriteAction({
   safety: "destructive",
   operation: (context, input) => ({
     async load({ tx, workspaceId }) {
-      const [before] = await tx
-        .select({
-          userId: workspaceMembers.userId,
-          name: workspaceMembers.name,
-          title: workspaceMembers.title,
-          bio: workspaceMembers.bio,
-          timezone: workspaceMembers.timezone,
-          avatarBlobId: workspaceMembers.avatarBlobId,
-        })
-        .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.id, input.memberId),
-            eq(workspaceMembers.workspaceId, workspaceId),
-          ),
-        )
-        .limit(1);
-      if (!before) {
-        throw new OperationError("not_found", "No such member.");
-      }
-      // **Taken in `load`, before a single row is anonymised, and on the
-      // same transaction** (P7-T08b). An export read afterwards would be a
-      // copy of what erasure had already destroyed, and one read in a
-      // separate transaction could miss a row written between the two. This
-      // is the member's one chance to be handed what the instance held.
-      const personalExport = await buildPersonalExport(tx, {
+      // The member and their export, read before a single row is anonymised
+      // and on the same transaction (P7-T08b). This is the member's one
+      // chance to be handed what the instance held.
+      return loadMemberForErasure(tx, {
         workspaceId,
         memberId: input.memberId,
+        withExport: true,
       });
-      return { ...before, personalExport };
     },
     async execute({ tx, workspaceId, loaded }) {
-      refuseIfLastOwner(
-        await isLastFullAccessHolder(tx, workspaceId, input.memberId),
-      );
-
-      const erasedAt = new Date();
-      const [updated] = await tx
-        .update(workspaceMembers)
-        .set({
-          name: "Erased member",
-          title: null,
-          bio: null,
-          bioVersion: null,
-          avatarBlobId: null,
-          timezone: null,
-          quietHours: null,
-          userId: null,
-          status: "suspended",
-          suspendedAt: erasedAt,
-          updatedAt: erasedAt,
-        })
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.id, input.memberId),
-            eq(workspaceMembers.workspaceId, workspaceId),
-          ),
-        )
-        .returning({ id: workspaceMembers.id });
-      if (!updated) {
-        throw new OperationError("not_found", "No such member.");
-      }
-
-      // **After the member row, not before** (P7-T08b). Both run in this
-      // one transaction, so the order changes nothing about what commits.
-      // It changes what a reader of this function believes happened: the
-      // row is anonymised and then everything that identified the person
-      // outside it is removed, which is the sentence the audit row will
-      // carry.
-      const removed = await sweepPersonalData(tx, {
+      // The one body a person's own deletion runs too (account-deletion.md
+      // §3.3), so there is no second way to do half of it.
+      const erasure = await eraseMemberInTx(tx, context.pool, {
         workspaceId,
         memberId: input.memberId,
+        loaded,
       });
-
-      // Their picture stops being shown to the workspace (completeness review
-      // M-22). Clearing the column alone would leave the file readable by
-      // everybody through the binding that made it an avatar.
-      await shareAvatar(tx, {
-        workspaceId,
-        previousBlobId: loaded.avatarBlobId,
-        next: null,
-      });
-
-      // The sign-in account, when this was the person's only workspace
-      // (completeness review M-18).
-      const account = loaded.userId
-        ? await eraseAccountIfAlone(tx, context.pool, {
-            workspaceId,
-            userId: loaded.userId,
-          })
-        : null;
-
-      // Earlier feed entries about this member carried their name in the
-      // payload, which is where the feed reads it from. They keep the event
-      // and lose the name (completeness review M-18).
-      // openokr:allow-mutation: this Operation's own transaction.
-      await tx.execute(sql`
-        update activities
-           set payload = jsonb_set(payload, '{name}', '"Erased member"'::jsonb)
-         where workspace_id = ${workspaceId}
-           and subject_type = 'workspace_member'
-           and subject_id = ${updated.id}
-           and payload ? 'name'
-      `);
-
-      const exported: ErasureExport = {
-        memberId: updated.id,
-        erasedAt: erasedAt.toISOString(),
-        priorProfile: {
-          name: loaded.name,
-          title: loaded.title,
-          bio: loaded.bio,
-          timezone: loaded.timezone,
-        },
-        removed,
-        data: loaded.personalExport,
-      };
+      const exported = erasureExport(erasure, loaded);
 
       return {
-        result: { id: updated.id, export: exported },
+        result: { id: erasure.memberId, export: exported },
         activity: {
           kind: "member.erased",
           subjectType: "workspace_member",
-          subjectId: updated.id,
+          subjectId: erasure.memberId,
           // No name (completeness review M-18). This carried the name from
           // before erasure "because the row no longer does", which wrote the
           // one thing erasure removes into a new row the whole workspace can
@@ -987,23 +959,11 @@ export const eraseMember = defineWriteAction({
         audit: {
           action: "people.erase",
           targetType: "workspace_member",
-          targetId: updated.id,
+          targetId: erasure.memberId,
           // What the sweep removed, so the trail records what the erasure
           // did and not only that it ran. No identifier is in here: these
           // are counts.
-          payload: {
-            removed,
-            ...(account
-              ? {
-                  account: {
-                    anonymised: account.anonymised,
-                    otherWorkspaces: account.otherWorkspaces,
-                    sessionsRevoked: account.sessionsRevoked,
-                    credentialsRemoved: account.credentialsRemoved,
-                  },
-                }
-              : {}),
-          },
+          payload: erasureAuditPayload(erasure),
         },
       };
     },
@@ -1127,6 +1087,19 @@ const memberProfile = z.object({
    * text is rendered there.
    */
   language: z.enum(["en", "ms"]).nullable(),
+  /**
+   * The name of this member's workspace role: Owner, Admin, Member, Viewer or
+   * one the workspace made (plan 0.8.0 Y1). Null for a guest, an agent and a
+   * placeholder, which hold no workspace-wide role. The avatar menu says it
+   * beside the person's name, so they know what they should expect to do.
+   */
+  roleName: z.string().nullable(),
+  /**
+   * The role's built-in key, or null for a role the workspace made. A built-in
+   * role cannot be renamed, so a screen may name it in the reader's language
+   * (UAT 0.8.0, F-08).
+   */
+  roleKey: z.enum(BUILTIN_ROLE_KEYS).nullable(),
 });
 
 /**
@@ -1169,8 +1142,18 @@ export const readMember = defineReadAction({
             theme: workspaceMembers.theme,
             density: workspaceMembers.density,
             language: workspaceMembers.language,
+            roleName: workspaceRoles.name,
+            roleKey: workspaceRoles.builtinKey,
           })
           .from(workspaceMembers)
+          // A removed role names nothing, as no role does.
+          .leftJoin(
+            workspaceRoles,
+            and(
+              eq(workspaceRoles.id, workspaceMembers.roleId),
+              isNull(workspaceRoles.deletedAt),
+            ),
+          )
           .where(
             activeOnly(
               workspaceMembers,

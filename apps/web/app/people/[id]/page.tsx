@@ -1,5 +1,4 @@
 import { ACCESS_LEVELS, callAction } from "@openokr/core";
-import { listTimezones } from "@openokr/formats";
 import {
   Avatar,
   Card,
@@ -13,7 +12,6 @@ import {
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { resolveAccessLevelFor } from "../../../lib/access";
-import { AppearanceControl } from "../../../lib/appearance.tsx";
 import { memberOption } from "../../../lib/entity-options.ts";
 import { FeedPanel } from "../../../lib/feed-panel.tsx";
 import { itemTitle } from "../../../lib/page-title.ts";
@@ -21,17 +19,10 @@ import { getPool } from "../../../lib/pool";
 import { richTextHtml } from "../../../lib/rich-text-html.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import {
-  removeAvatar,
-  updateMemberFields,
-  updateProfile,
-  uploadAvatar,
-} from "../actions.ts";
-import { AvatarForm } from "./avatar-form.tsx";
+import { updateMemberFields } from "../actions.ts";
 import { LeaveCard } from "./leave-card.tsx";
 import { LifecycleControls } from "./lifecycle-controls.tsx";
 import { MemberFieldsForm } from "./member-fields-form.tsx";
-import { ProfileForm } from "./profile-form.tsx";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
 export async function generateMetadata({
@@ -124,12 +115,6 @@ export default async function MemberProfilePage({
   );
   const isAdmin = level >= ACCESS_LEVELS.full;
   const isSelf = id === workspace.memberId;
-  // The member's own window, so the profile form shows it. Its boxes were
-  // empty, and an empty pair means "off", so saving a new timezone here
-  // deleted the quiet hours set on /account/channels.
-  const ownDelivery = isSelf
-    ? await callAction(context, "channels.mySettings", {})
-    : null;
   // Whether the member on this page is an administrator, for the handover
   // control (completeness review H-14). Only read for somebody who could act
   // on the answer.
@@ -247,7 +232,16 @@ export default async function MemberProfilePage({
           ) : null}
 
           {isSelf ? (
-            <div className="mt-2 border-line border-t pt-3">
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-line border-t pt-3">
+              {/* The self-edit forms live on Your account since plan 0.8.0
+                  Y2 (Q5); this page is what other people see. */}
+              <Link
+                href="/account"
+                className="text-xs font-semibold text-brand-text hover:underline"
+                data-testid="edit-own-profile"
+              >
+                {t("people.detail.editOnYourAccount")}
+              </Link>
               <Link
                 href="/account/channels"
                 className="text-xs font-semibold text-brand-text hover:underline"
@@ -325,46 +319,6 @@ export default async function MemberProfilePage({
             </ul>
           </CardBody>
         </Card>
-      ) : null}
-
-      {/* How the product looks to this member (P6-G23). Their own profile
-          only: a theme is a preference, not something an admin sets for
-          somebody else. */}
-      {isSelf ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-sm font-bold text-ink">
-              {t("people.detail.appearance")}
-            </h2>
-            <p className="text-xs text-ink-3">
-              {t("people.detail.keptOnYouRather")}
-            </p>
-          </CardHeader>
-          <CardBody>
-            <AppearanceControl language={member.language} />
-          </CardBody>
-        </Card>
-      ) : null}
-
-      {/* Self-edit: the picture, then the rest (completeness review M-22). */}
-      {isSelf ? (
-        <AvatarForm
-          name={member.name}
-          avatarUrl={avatarUrl}
-          uploadAvatar={uploadAvatar}
-          removeAvatar={removeAvatar}
-        />
-      ) : null}
-      {isSelf ? (
-        <ProfileForm
-          memberId={id}
-          timezone={member.timezone}
-          zones={listTimezones()}
-          primaryChannel={member.primaryChannel}
-          quietHours={ownDelivery?.quietHours ?? null}
-          bio={member.bio}
-          updateProfile={updateProfile}
-        />
       ) : null}
 
       <LeaveCard

@@ -54,6 +54,13 @@ const serverEnv = (port: number, url: string) => ({
   OPENOKR_ENCRYPTION_KEY: E2E_ENCRYPTION_KEY,
   // The suite makes no call to GitHub (docs/design/version-footer.md §6).
   OPENOKR_UPDATE_CHECK: "off",
+  // **No sign-up waits for a confirmation link** (plan 0.8.0 S4). The rule
+  // used to be read once at boot, when the suite's instance had no mail, so
+  // it was off for the whole run; it is now followed live, and the hosting
+  // specs that configure a mail sink would otherwise lock out every account
+  // made before them, the instance account included. Off says outright what
+  // the run always had. `s35g-confirmation-off.spec.ts` drives the setting.
+  OPENOKR_EMAIL_VERIFICATION: "off",
   // **This run is the AI-off leg** (PLAN.md §9, AI-NATIVE-PLAN §10,
   // docs/design/ai-off-leg.md). Playwright lays this `env` over the runner's
   // own, so a key exported in a shell or set on a job would otherwise reach
@@ -180,6 +187,12 @@ export default defineConfig({
         DATABASE_URL: databaseUrl("openokr_e2e_wizard"),
         // The whole point of this instance: never set up.
         E2E_MARK_CONFIGURED: "0",
+        // Closed before the first run, as an operator who wants a private
+        // instance sets it. The wizard's own sign-up is the claim and is
+        // admitted whatever this says (registration-policy.md §10 D17, plan
+        // 0.8.0 H3); everybody after it needs an invitation, which the spec's
+        // "registration is closed" step reads.
+        OPENOKR_REGISTRATION: "invite_only",
         // Named by its deployment, as the public demo is (completeness review
         // M-33). Only the wizard spec runs against this server, so the name
         // changes what that spec reads and nothing else: every other spec

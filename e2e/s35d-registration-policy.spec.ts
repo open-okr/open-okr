@@ -16,7 +16,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
-import { goTo, signIn } from "./instance-account.ts";
+import { getStarted, goTo, signIn } from "./instance-account.ts";
 
 const PASSWORD = "correct-horse-battery-staple-9";
 const COMPANY_ADDRESS = `ana-${Date.now()}@company-only.example`;
@@ -125,6 +125,7 @@ test("a company address signs up and lands in a workspace of its own", async () 
   // The form says the rule before anybody tries.
   await expect(stranger.getByTestId("company-only")).toBeVisible();
   await signUp(stranger, COMPANY_ADDRESS);
+  await getStarted(stranger);
   await expect(stranger).not.toHaveURL(/\/sign-up/, { timeout: 30_000 });
   await expect
     .poll(

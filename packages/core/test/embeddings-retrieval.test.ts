@@ -55,9 +55,16 @@ const call = async (name: string, input: unknown, userId = OWNER) => {
   );
 };
 
+/**
+ * Full text on every stack. On CI's pgvector leg (plan 0.8.0 H5) the column
+ * is a vector, and a service with a model would take the vector path, where
+ * every chunk is some distance from every question; this file is about the
+ * degradation and the access filter, and `embeddings-pgvector.test.ts` is
+ * about the vector path.
+ */
 const retrieve = async (query: string, memberId: string, limit = 10) => {
   const wb = await workerDb();
-  const service = new EmbeddingService(wb.appPool, embed);
+  const service = new EmbeddingService(wb.appPool, null);
   return service.retrieve({ workspaceId, memberId, query, limit });
 };
 

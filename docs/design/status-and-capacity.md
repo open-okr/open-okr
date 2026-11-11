@@ -149,11 +149,27 @@ Champion's hourly, daily, weekly and cycle runs, the Coach's nightly run,
 the usage sweep (hourly), and the audit chain (every minute).
 
 Rather than coupling to pg-boss internals, the scheduler records its own
-heartbeat: an `openokrSchedulerLastRunAt` timestamp on `globalThis`,
-updated after each scheduled run. The status endpoint reads that timestamp
-and compares it against a grace period. A scheduler turned off by
-configuration reports `operational`, and one that failed to start reports
-`unavailable` at once.
+heartbeat after each scheduled run: an `openokrSchedulerLastRunAt` timestamp
+on `globalThis`, and, since 0.8.0, the same time in `system_settings` under
+`scheduler.last_run_at` (plan 0.8.0 H12). pg-boss hands each job to one pod,
+so with several pods only the one that ran it had a timestamp, and a healthy
+scheduler read as degraded whenever another pod answered. The status endpoint
+judges the newer of the shared and the local reading against a grace period
+(`apps/web/lib/scheduler-health.ts`). One that failed to start reports
+`unavailable` at once, unless another pod's run is fresh.
+
+What the answering pod's `OPENOKR_SCHEDULER` says decides the rule (plan 0.8.0
+H10d, [worker-deployment](worker-deployment.md) §1.3):
+
+| `OPENOKR_SCHEDULER` on the answering pod | The scheduler component |
+|---|---|
+| `on`, the default | The newer of the shared and the local stamp, by age. Before any run, grace from this pod's scheduler boot |
+| `elsewhere`, as on the Helm chart's web pods with the worker on | The shared stamp, by age. Before any run, grace from this process's start. A stamp that cannot be read is `unavailable` |
+| `off` | `operational`, whatever the stamp: an instance that runs its sweeps by hand is not reported down |
+
+With `elsewhere`, Admin General shows the scheduler notice when this judgement
+is `unavailable`, with a sentence that sends the administrator to the worker.
+`/api/health` says `scheduler: "elsewhere"`.
 
 | Setting | Default | Meaning |
 |---|---|---|

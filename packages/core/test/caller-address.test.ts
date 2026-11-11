@@ -1,3 +1,4 @@
+import type { CallerAddressReading } from "@openokr/config";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   authCallerAddress,
@@ -150,5 +151,161 @@ describe("the address Better Auth is handed", () => {
       }),
     );
     expect(await request.json()).toEqual({ email: "a@example.com" });
+  });
+});
+
+// Plan 0.8.0 H2's two readings, kept beside the hop count (Akmal, 11 November
+// 2026): the ranges or the header replace the default when one is set.
+/** Cloudflare's published ranges, as the install guide shows them. */
+const CLOUDFLARE: CallerAddressReading = {
+  mode: "trusted_proxies",
+  trustedProxies: [
+    "173.245.48.0/20",
+    "103.21.244.0/22",
+    "103.22.200.0/22",
+    "103.31.4.0/22",
+    "141.101.64.0/18",
+    "108.162.192.0/18",
+    "190.93.240.0/20",
+    "188.114.96.0/20",
+    "197.234.240.0/22",
+    "198.41.128.0/17",
+    "162.158.0.0/15",
+    "104.16.0.0/13",
+    "104.24.0.0/14",
+    "172.64.0.0/13",
+    "131.0.72.0/22",
+    "2400:cb00::/32",
+    "2606:4700::/32",
+    "2803:f800::/32",
+    "2405:b500::/32",
+    "2405:8100::/32",
+    "2a06:98c0::/29",
+    "2c0f:f248::/32",
+  ],
+};
+
+const HEADER: CallerAddressReading = {
+  mode: "header",
+  header: "cf-connecting-ip",
+};
+
+const fromReading = (
+  headers: Record<string, string>,
+  reading: CallerAddressReading,
+) => callerAddress(new Headers(headers), reading);
+
+/** What a caller the instance cannot place is counted under. */
+const unresolvedFor = (reading: CallerAddressReading) =>
+  fromReading({}, reading);
+
+describe("the caller's address behind named proxies", () => {
+  it("is the first hop outside the ranges, read from the right", () => {
+    expect(
+      fromReading(
+        { "x-forwarded-for": "198.51.100.7, 172.70.1.2" },
+        CLOUDFLARE,
+      ),
+    ).toBe("198.51.100.7");
+  });
+
+  it("never reaches an entry the caller wrote to the left", () => {
+    expect(
+      fromReading(
+        { "x-forwarded-for": "203.0.113.66, 198.51.100.7, 172.70.1.2" },
+        CLOUDFLARE,
+      ),
+    ).toBe("198.51.100.7");
+  });
+
+  it("is unresolved when every hop is trusted", () => {
+    expect(
+      fromReading({ "x-forwarded-for": "172.70.9.9, 172.70.1.2" }, CLOUDFLARE),
+    ).toBe(unresolvedFor(CLOUDFLARE));
+  });
+
+  it("is unresolved when the hop it reaches carries a port", () => {
+    expect(
+      fromReading(
+        { "x-forwarded-for": "198.51.100.7:51234, 172.70.1.2" },
+        CLOUDFLARE,
+      ),
+    ).toBe(unresolvedFor(CLOUDFLARE));
+  });
+
+  it("folds an IPv6 caller to its /64, as every key does", () => {
+    expect(
+      fromReading(
+        { "x-forwarded-for": "2001:db8:1:2::7, 2606:4700::1" },
+        CLOUDFLARE,
+      ),
+    ).toBe("2001:0db8:0001:0002:0000:0000:0000:0000");
+  });
+
+  it("walks past a load balancer whose own address never appears", () => {
+    const alb: CallerAddressReading = {
+      mode: "trusted_proxies",
+      trustedProxies: ["10.0.1.0/24"],
+    };
+    expect(
+      fromReading({ "x-forwarded-for": "203.0.113.66, 198.51.100.7" }, alb),
+    ).toBe("198.51.100.7");
+  });
+
+  it("skips a hop written as an IPv4-mapped IPv6 address", () => {
+    const alb: CallerAddressReading = {
+      mode: "trusted_proxies",
+      trustedProxies: ["10.0.1.0/24"],
+    };
+    expect(
+      fromReading({ "x-forwarded-for": "198.51.100.7, ::ffff:10.0.1.5" }, alb),
+    ).toBe("198.51.100.7");
+  });
+
+  it("does not read X-Real-IP when the chain resolves nothing", () => {
+    expect(
+      fromReading(
+        {
+          "x-forwarded-for": "172.70.9.9, 172.70.1.2",
+          "x-real-ip": "203.0.113.66",
+        },
+        CLOUDFLARE,
+      ),
+    ).toBe(unresolvedFor(CLOUDFLARE));
+  });
+});
+
+describe("the caller's address from a CDN's own header", () => {
+  it("is that header, whatever X-Forwarded-For says", () => {
+    expect(
+      fromReading(
+        {
+          "cf-connecting-ip": "198.51.100.7",
+          "x-forwarded-for": "203.0.113.66",
+        },
+        HEADER,
+      ),
+    ).toBe("198.51.100.7");
+  });
+
+  it("is unresolved when the header is absent", () => {
+    expect(fromReading({ "x-forwarded-for": "198.51.100.7" }, HEADER)).toBe(
+      unresolvedFor(HEADER),
+    );
+  });
+
+  it("is unresolved when the header holds more than one address", () => {
+    expect(
+      fromReading({ "cf-connecting-ip": "203.0.113.66, 198.51.100.7" }, HEADER),
+    ).toBe(unresolvedFor(HEADER));
+  });
+
+  it("reads X-Real-IP only when it is the header named", () => {
+    expect(
+      fromReading(
+        { "x-real-ip": "198.51.100.1" },
+        { mode: "header", header: "x-real-ip" },
+      ),
+    ).toBe("198.51.100.1");
   });
 });

@@ -13,7 +13,7 @@ import { VersionFooter } from "./version-footer.tsx";
  *
  * **Something for everyone.** The instance's name; the two shortcuts the topbar teaches (⌘J only while the
  * copilot can answer, since an AI affordance is hidden when the provider is
- * off); and, for an administrator, the running version and a newer release.
+ * off); the running version; and, for an administrator, a newer release.
  *
  * **Always in view.** Sticky to the foot of the content pane, so it stays put
  * while the page scrolls under it (the owner's choice). A sticky offset is

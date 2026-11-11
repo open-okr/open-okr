@@ -52,9 +52,24 @@ const nextConfig: NextConfig = {
        * unexplained failure rather than as the wizard's own refusal naming the
        * bound. The row limit is the control; this only has to be comfortably
        * above what that limit can produce.
+       *
+       * **And above the largest attachment** (plan 0.8.0 H13). A file is
+       * uploaded through a server action too, and at 8 MB a file between 8
+       * and 25 MB was cut off with a generic failure before core's own check
+       * could say the real limit, `MAX_BLOB_BYTES`, 25 MiB. 27 leaves room for
+       * the form's other fields; a test holds it above that limit.
        */
-      bodySizeLimit: "8mb",
+      bodySizeLimit: "27mb",
     },
+    /**
+     * The proxy clones and buffers every request body so both it and the
+     * route can read it, and stops buffering at 10 MB by default. An upload
+     * above that reached the server action cut short and failed as
+     * "Unexpected end of form", a 500 page, although `bodySizeLimit` above
+     * allows 27 (UAT 0.8.0, F-01). Kept equal to it; a test holds both above
+     * `MAX_BLOB_BYTES`.
+     */
+    proxyClientMaxBodySize: "27mb",
   },
   // Next's own dev-only overlay (route/bundler info, preferences), never
   // shipped to production. Off by explicit request: its own UI is not

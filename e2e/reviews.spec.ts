@@ -20,6 +20,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 import { choose, chooseAt, chooseContaining, offered } from "./pickers.ts";
@@ -205,10 +206,17 @@ test("a monthly review records a trend and a decision, and the goal shows it", a
     await client.query(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          facilitator_id, state, started_at)
+          facilitator_id, state, started_at, short_id)
        values ($1, $2, $3, $4, 'monthly', 'Monthly review', now(), $5,
-               'running', now())`,
-      [monthlyId, member.workspace_id, goal.space_id, goal.cycle_id, member.id],
+               'running', now(), $6)`,
+      [
+        monthlyId,
+        member.workspace_id,
+        goal.space_id,
+        goal.cycle_id,
+        member.id,
+        newShortId(),
+      ],
     );
     await client.query("commit");
   } finally {
@@ -410,15 +418,16 @@ test("a quarterly review runs its rail, and the second client follows", async ({
     await client.query(
       `insert into okr_sessions
          (id, workspace_id, space_id, cycle_id, kind, title, scheduled_for,
-          facilitator_id, state)
+          facilitator_id, state, short_id)
        values ($1, $2, $3, $4, 'quarterly', 'Q1 review', now(), $5,
-               'scheduled')`,
+               'scheduled', $6)`,
       [
         reviewId,
         member.workspace_id,
         scope.space_id,
         scope.cycle_id,
         member.id,
+        newShortId(),
       ],
     );
     await client.query("commit");

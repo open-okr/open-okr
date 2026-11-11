@@ -68,11 +68,14 @@ fi
 defaults=$(render)
 
 # --- S3-compatible object storage (P6-G05) --------------------------------
-if render --set storage.s3.bucket=openokr-files 2>&1 \
-  | grep -q "storage.s3.existingSecret is empty"; then
-  pass "refuses a bucket with no credential Secret"
+# A bucket with no Secret leaves the credentials to the pod's own role
+# (plan 0.8.0 H9): no key variable at all, so the AWS SDK's chain decides.
+keyless=$(render --set storage.s3.bucket=openokr-files 2>&1)
+if printf '%s' "$keyless" | grep -q "name: OPENOKR_STORAGE_S3_BUCKET" \
+  && ! printf '%s' "$keyless" | grep -q "name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID"; then
+  pass "a bucket with no Secret renders with no key, for workload identity"
 else
-  fail "accepted a bucket with credentials that could only come from values"
+  fail "a bucket with no Secret was refused, or rendered a key from nowhere"
 fi
 
 if render --set storage.s3.forcePathStyle=yes 2>&1 \
@@ -192,6 +195,79 @@ elif printf '%s' "$bucket_notes" | grep -q "S3 bucket openokr-files"; then
   pass "says uploads go to the bucket when one is named"
 else
   fail "does not say where uploads go when a bucket is named"
+fi
+
+# --- the database's CA bundle (plan 0.8.0 H6) ------------------------------
+# A managed Postgres signs with an authority Node does not hold, so without a
+# bundle the only working connection was sslmode=no-verify. With one, every
+# workload mounts it and points Node and libpq (the backup jobs) at it.
+ca_all=$(render --set database.caBundle.configMap=rds-ca \
+  --set database.caBundle.key=global-bundle.pem \
+  --set backup.enabled=true --set cloud.erasure.schedule="0 3 * * *" \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr)
+ca_ok=true
+for workload in deployment.yaml migration-job.yaml erasure-cronjob.yaml backup-cronjob.yaml backup-verify-job.yaml; do
+  doc=$(printf '%s' "$ca_all" | awk -v src="# Source: openokr/templates/$workload" '
+    $0 == src { on = 1; next } /^# Source:/ { on = 0 } on')
+  if ! printf '%s' "$doc" | grep -A 1 "name: NODE_EXTRA_CA_CERTS" | grep -q "/etc/openokr/db-ca/global-bundle.pem" \
+    || ! printf '%s' "$doc" | grep -q "name: PGSSLROOTCERT" \
+    || ! printf '%s' "$doc" | grep -A 1 "name: db-ca" | grep -q "mountPath: /etc/openokr/db-ca\|configMap:"; then
+    ca_ok=false
+    echo "  ($workload has no CA bundle)" >&2
+  fi
+done
+if $ca_ok; then
+  pass "a named CA bundle reaches the server and every job"
+else
+  fail "a named CA bundle did not reach every workload"
+fi
+
+if ! printf '%s' "$defaults" | grep -q "NODE_EXTRA_CA_CERTS\|name: db-ca"; then
+  pass "no CA bundle unless one is named"
+else
+  fail "a CA bundle appeared with none named"
+fi
+
+if render_expecting_failure --set "database.url=$DB" \
+  --set database.caBundle.configMap=a --set database.caBundle.existingSecret=b \
+  | grep -q "names both a Secret and a ConfigMap"; then
+  pass "refuses a CA bundle named in two places"
+else
+  fail "accepted a CA bundle named in two places"
+fi
+
+# --- the owner role from the operator's own Secret (plan 0.8.0 H8) ---------
+# adminUrl beside existingSecret read DATABASE_ADMIN_URL from a Secret the
+# chart renders only without existingSecret, so the migration hook could not
+# start unless the operator had made a Secret of exactly that name.
+own_admin=$(render_one migration-job.yaml \
+  --set database.existingSecret=my-db \
+  --set database.existingSecretAdminKey=admin-url)
+if echo "$own_admin" | grep -A 4 "name: DATABASE_ADMIN_URL" | grep -q "name: my-db" \
+  && echo "$own_admin" | grep -A 4 "name: DATABASE_ADMIN_URL" | grep -q "key: admin-url" \
+  && echo "$own_admin" | grep -q "name: OPENOKR_APP_ROLE"; then
+  pass "reads the owner role from the operator's own Secret, by its key"
+else
+  fail "does not read the owner role from the operator's own Secret"
+fi
+
+if render_expecting_failure --set "database.url=$DB" \
+  --set database.existingSecretAdminKey=admin-url \
+  | grep -q "existingSecretAdminKey names a key"; then
+  pass "refuses an admin key with no Secret to read it from"
+else
+  fail "accepted an admin key with no Secret to read it from"
+fi
+
+old_pair=$(notes --set database.existingSecret=my-db \
+  --set database.adminUrl=postgres://owner:secret@db:5432/openokr)
+new_pair=$(notes --set database.existingSecret=my-db \
+  --set database.existingSecretAdminKey=admin-url)
+if printf '%s' "$old_pair" | grep -q "WARNING: database.adminUrl is set beside" \
+  && ! printf '%s' "$new_pair" | grep -q "WARNING: database.adminUrl"; then
+  pass "warns about adminUrl beside existingSecret, and not about the key"
+else
+  fail "says nothing about adminUrl beside existingSecret"
 fi
 
 if render --set mail.transport=smtp 2>&1 | grep -q "mail.host is empty"; then
@@ -331,6 +407,67 @@ else
   fail "a Kubernetes API token is mounted for no reason"
 fi
 
+# --- how a pod stops (plan 0.8.0 H10b) ---------------------------------------
+# docs/design/worker-deployment.md D9. A pause before SIGTERM, so the pod keeps
+# answering while the endpoint change reaches whatever sends it traffic, the
+# drain's bound in the pod, and a grace period derived from both plus 15
+# seconds for the flushes, so the three cannot disagree.
+stop_shape() {
+  doc=$(render_one deployment.yaml "$@")
+  pause=$(printf '%s\n' "$doc" | sed -n 's/.*command: \["sleep", "\([0-9]*\)"\].*/\1/p')
+  grace=$(printf '%s\n' "$doc" | sed -n 's/^ *terminationGracePeriodSeconds: \([0-9]*\)$/\1/p')
+  drain=$(printf '%s\n' "$doc" | grep -A 1 "name: OPENOKR_SHUTDOWN_SECONDS" \
+    | sed -n 's/^ *value: "\([0-9]*\)"$/\1/p')
+  echo "pause=${pause:-none} grace=${grace:-none} drain=${drain:-none}"
+}
+
+shape=$(stop_shape)
+if [ "$shape" = "pause=10 grace=45 drain=20" ]; then
+  pass "a pod pauses 10s before SIGTERM, drains for 20s and is killed only at 45s"
+else
+  fail "the default stop is not a 10s pause, a 20s drain and a 45s grace period ($shape)"
+fi
+
+shape=$(stop_shape --set shutdown.preStopSeconds=0)
+if [ "$shape" = "pause=none grace=35 drain=20" ] \
+  && ! render_one deployment.yaml --set shutdown.preStopSeconds=0 | grep -q "lifecycle:"; then
+  pass "a pause of 0 removes the pre-stop hook and takes 10s off the grace period"
+else
+  fail "a pause of 0 did not remove the hook or shorten the grace period ($shape)"
+fi
+
+shape=$(stop_shape --set shutdown.drainSeconds=40)
+if [ "$shape" = "pause=10 grace=65 drain=40" ]; then
+  pass "a longer drain reaches the pod and lengthens the grace period with it"
+else
+  fail "a longer drain did not reach the pod and the grace period together ($shape)"
+fi
+
+# Values reused from 0.7.0 have no `shutdown` at all (helm upgrade
+# --reuse-values), and must stop the way a fresh install does.
+shape=$(stop_shape --set shutdown=null)
+if [ "$shape" = "pause=10 grace=45 drain=20" ]; then
+  pass "values reused from v0.7.0 stop the way a fresh install does"
+else
+  fail "values reused from v0.7.0 stop differently from a fresh install ($shape)"
+fi
+
+for bad in "shutdown.drainSeconds=0" "shutdown.drainSeconds=301" "shutdown.drainSeconds=2.5"; do
+  if render_expecting_failure --set "database.url=$DB" --set "$bad" \
+    | grep -q "shutdown.drainSeconds must be a whole number of seconds from 1 to 300"; then
+    pass "refuses $bad, which the server would refuse at boot"
+  else
+    fail "accepted $bad, which the server refuses at boot"
+  fi
+done
+
+if render_expecting_failure --set "database.url=$DB" --set shutdown.preStopSeconds=-1 \
+  | grep -q "shutdown.preStopSeconds must be a whole number of seconds, 0 or more"; then
+  pass "refuses a negative pause"
+else
+  fail "accepted a negative pause"
+fi
+
 # --- the optional pieces render ------------------------------------------
 if render --set ingress.enabled=true --set ingress.hosts[0].host=okr.example.com \
   --set ingress.hosts[0].paths[0].path=/ \
@@ -461,6 +598,49 @@ else
   fail "a named error Secret does not reach the pod by reference"
 fi
 
+# --- whose address a request is counted under (trusted-proxies.md D15) -----
+# Both empty renders neither variable, which keeps the application's default.
+# A list reaches the pod joined by commas; both set, or a range that trusts
+# every address, is refused before anything reaches the cluster.
+if render_one deployment.yaml | grep -q "OPENOKR_TRUSTED_PROXIES\|OPENOKR_CLIENT_ADDRESS_HEADER"; then
+  fail "a caller address setting rendered although none is set"
+else
+  pass "no trusted proxies and no header means neither variable"
+fi
+if render_one deployment.yaml --set 'network.trustedProxies={10.0.1.0/24,2606:4700::/32}' \
+  | grep -A1 "name: OPENOKR_TRUSTED_PROXIES" | grep -q '"10.0.1.0/24,2606:4700::/32"'; then
+  pass "a list of trusted proxies reaches the pod joined by commas"
+else
+  fail "a list of trusted proxies did not reach the pod joined by commas"
+fi
+if render_one deployment.yaml --set network.clientAddressHeader=cf-connecting-ip \
+  | grep -A1 "name: OPENOKR_CLIENT_ADDRESS_HEADER" | grep -q '"cf-connecting-ip"'; then
+  pass "a client address header reaches the pod"
+else
+  fail "a client address header did not reach the pod"
+fi
+if render_expecting_failure --set "database.url=$DB" \
+  --set 'network.trustedProxies={10.0.1.0/24}' --set network.clientAddressHeader=cf-connecting-ip \
+  | grep -q "network.trustedProxies and network.clientAddressHeader are both set"; then
+  pass "refuses trusted proxies and a client address header together, naming both"
+else
+  fail "accepted trusted proxies and a client address header together"
+fi
+for everything in "0.0.0.0/0" "::/0"; do
+  if render_expecting_failure --set "database.url=$DB" \
+    --set "network.trustedProxies={10.0.1.0/24,$everything}" \
+    | grep -q "trusts every address"; then
+    pass "refuses $everything as a trusted proxy"
+  else
+    fail "accepted $everything as a trusted proxy"
+  fi
+done
+if render_one deployment.yaml --set network=null | grep -q "^kind: Deployment"; then
+  pass "a release from before the network block still renders"
+else
+  fail "a release from before the network block fails to render on upgrade"
+fi
+
 # --- the setups in PLAN.md section 5.2 -------------------------------------
 if render_one deployment.yaml | grep -q "OPENOKR_CLOUD"; then
   fail "an ordinary install is told it is a cloud"
@@ -512,6 +692,380 @@ if echo "$erase_job" | grep -q "cloud-erase.ts" \
   pass "the erasure CronJob runs with the owner role, from a Secret"
 else
   fail "the erasure CronJob does not run with the owner role from a Secret"
+fi
+
+# The command loads the server's whole environment, and in production that
+# refuses a missing auth secret. The chart gave the job the database and the
+# encryption key but not this, so every scheduled run stopped before it read
+# anything (plan 0.8.0 O3). By reference, never by value.
+if echo "$erase_job" | grep -A 4 "name: BETTER_AUTH_SECRET" | grep -q "secretKeyRef"; then
+  pass "the erasure CronJob gets the auth secret its command needs, from a Secret"
+else
+  fail "the erasure CronJob has no auth secret, so it stops before it starts"
+fi
+
+# --- data changes after install and upgrade (plan 0.8.0 H10c) ----------------
+# docs/design/worker-deployment.md D17 and D18. A post-install, post-upgrade
+# hook runs the data-change runner inside a budget that ends it between two
+# batches, with the migration hook's environment and the auth secret its
+# command needs, by reference (the lesson of O3).
+dc_job=$(render_one data-change-job.yaml)
+dc_command() {
+  printf '%s\n' "$1" | sed -n '/^ *command:/,/^ *workingDir:/p' \
+    | sed -n 's/^ *- //p' | tr -d '"' | tr '\n' ' ' | sed 's/ $//'
+}
+if printf '%s' "$dc_job" | grep -q "^  name: openokr-data-change-1$" \
+  && printf '%s' "$dc_job" | grep -q '"helm.sh/hook": post-install,post-upgrade' \
+  && printf '%s' "$dc_job" | grep -q "^  backoffLimit: 0$" \
+  && printf '%s' "$dc_job" | grep -q "^  activeDeadlineSeconds: 360$"; then
+  pass "a post-install and post-upgrade Job runs the data changes, once, with a backstop of 360s"
+else
+  fail "no data-change hook with one attempt and a 360s backstop"
+fi
+case "$(dc_command "$dc_job")" in
+  *"/data-change.ts --max-seconds 240")
+    pass "the hook runs the data changes inside a 240-second budget" ;;
+  *) fail "the hook does not run data-change.ts --max-seconds 240 ($(dc_command "$dc_job"))" ;;
+esac
+dc_env_ok=true
+for variable in DATABASE_URL OPENOKR_ENCRYPTION_KEY BETTER_AUTH_SECRET; do
+  if ! printf '%s' "$dc_job" | grep -A 4 "name: $variable$" | grep -q "secretKeyRef"; then
+    dc_env_ok=false
+    echo "  (the data-change hook has no $variable from a Secret)" >&2
+  fi
+done
+if $dc_env_ok && ! printf '%s' "$dc_job" | grep -q "secret@postgres"; then
+  pass "the hook gets the database, the encryption key and the auth secret, each by reference"
+else
+  fail "the hook lacks a variable its command needs, or carries one by value"
+fi
+
+if render_one data-change-job.yaml --set dataChanges.enabled=false 2>&1 | grep -q "kind: Job"; then
+  fail "the data-change hook renders although it is turned off"
+else
+  pass "dataChanges.enabled=false renders no hook"
+fi
+if render_one data-change-job.yaml --set dataChanges=null | grep -q "^  name: openokr-data-change-1$"; then
+  pass "values reused from v0.7.0 run the data-change hook, as a fresh install does"
+else
+  fail "values reused from v0.7.0 lost the data-change hook"
+fi
+unbounded=$(render_one data-change-job.yaml --set dataChanges.timeBudgetSeconds=0)
+if [ "$(dc_command "$unbounded")" = "node --experimental-strip-types --no-warnings ./migrator/packages/db/src/bin/data-change.ts" ] \
+  && ! printf '%s' "$unbounded" | grep -q "activeDeadlineSeconds"; then
+  pass "a budget of 0 runs to the end, with no flag and no deadline"
+else
+  fail "a budget of 0 still bounds the hook"
+fi
+if render_expecting_failure --set "database.url=$DB" --set dataChanges.timeBudgetSeconds=-1 \
+  | grep -q "dataChanges.timeBudgetSeconds must be a whole number of seconds, 0 or more"; then
+  pass "refuses a negative data-change budget"
+else
+  fail "accepted a negative data-change budget"
+fi
+
+dc_notes=$(notes)
+if printf '%s' "$dc_notes" | grep -q "Data changes run after each install and upgrade" \
+  && printf '%s' "$dc_notes" | grep -q "exec deploy/openokr -- node"; then
+  pass "the install notes say the data changes run, and how to finish them by hand"
+else
+  fail "the install notes do not say how the data changes run"
+fi
+if notes --set dataChanges.enabled=false | grep -q "nothing runs the data changes"; then
+  pass "the install notes say so when nothing runs the data changes"
+else
+  fail "the install notes are silent when nothing runs the data changes"
+fi
+
+# --- background work on its own pods (plan 0.8.0 H10e) -----------------------
+# docs/design/worker-deployment.md D10 to D15. Off by default, so the defaults
+# keep one Deployment whose pods run the relay and the scheduler themselves.
+# On, a second Deployment runs both and the web pods say `elsewhere`.
+
+# The `key: value` lines indented under the first line matching $2, without
+# their indentation. A selector, a label set, a matchLabels block.
+children() {
+  printf '%s\n' "$1" | awk -v want="$2" '
+    !on && $0 ~ want { on = 1; match($0, /^ */); base = RLENGTH; next }
+    on { match($0, /^ */); if (RLENGTH <= base || $0 ~ /^ *$/) exit; print substr($0, RLENGTH + 1) }'
+}
+
+# A container's env list, without comments and without the two flags, so the
+# web pods and the worker can be compared entry by entry.
+env_block() {
+  printf '%s\n' "$1" | awk '
+    /^          env:$/ { on = 1; next }
+    on && /^          [A-Za-z]/ { exit }
+    on && /^ *#/ { next }
+    on && /^            - name: OPENOKR_(RELAY|SCHEDULER)$/ { skip = 1; next }
+    on && skip && /^              value:/ { skip = 0; next }
+    on { skip = 0; print }'
+}
+
+# The value one env entry is given, quotes removed.
+env_value() {
+  printf '%s\n' "$1" | grep -A 1 "^ *- name: $2$" | sed -n 's/^ *value: "\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -1
+}
+
+if printf '%s' "$defaults" | grep -q "name: openokr-worker$"; then
+  fail "a worker Deployment renders although worker.enabled is false"
+else
+  pass "no worker Deployment unless it is asked for"
+fi
+if render_one deployment.yaml | grep -q "name: OPENOKR_RELAY$\|name: OPENOKR_SCHEDULER$"; then
+  fail "the web Deployment sets OPENOKR_RELAY or OPENOKR_SCHEDULER with the worker off"
+else
+  pass "with the worker off the web pods set neither flag, so they run both"
+fi
+
+worker_on="--set worker.enabled=true --set storage.s3.bucket=openokr-files --set worker.replicaCount=2"
+# shellcheck disable=SC2086
+worker=$(render_one worker-deployment.yaml $worker_on || true)
+# shellcheck disable=SC2086
+web=$(render_one deployment.yaml $worker_on || true)
+if printf '%s' "$worker" | grep -q "^  name: openokr-worker$" \
+  && printf '%s' "$worker" | grep -q "^  replicas: 2$" \
+  && [ "$(env_value "$worker" OPENOKR_RELAY)" = "on" ] \
+  && [ "$(env_value "$worker" OPENOKR_SCHEDULER)" = "on" ]; then
+  pass "worker.enabled renders openokr-worker with worker.replicaCount pods, running the relay and the scheduler"
+else
+  fail "worker.enabled did not render openokr-worker with its replicas and both flags on"
+fi
+if [ "$(env_value "$web" OPENOKR_RELAY)" = "elsewhere" ] \
+  && [ "$(env_value "$web" OPENOKR_SCHEDULER)" = "elsewhere" ]; then
+  pass "with the worker on, the web pods say both run elsewhere"
+else
+  fail "with the worker on, the web pods do not say both run elsewhere"
+fi
+if ! printf '%s' "$worker" | grep -q "lifecycle:" \
+  && printf '%s' "$worker" | grep -q "^      terminationGracePeriodSeconds: 35$"; then
+  pass "the worker has no pause, nothing routes to it, and a grace period of drain + 15"
+else
+  fail "the worker pauses before SIGTERM, or its grace period is not drain + 15"
+fi
+if [ "$(printf '%s' "$worker" | sed -n 's/^ *serviceAccountName: //p')" = "$(printf '%s' "$web" | sed -n 's/^ *serviceAccountName: //p')" ]; then
+  pass "the worker uses the web pods' service account, so workload identity reaches it"
+else
+  fail "the worker uses a different service account from the web pods"
+fi
+
+web_env=$(env_block "$web")
+worker_env=$(env_block "$worker")
+if [ -n "$web_env" ] && [ "$web_env" = "$worker_env" ]; then
+  pass "the worker's environment equals the web pods', less the two flags"
+else
+  fail "the worker's environment differs from the web pods'"
+  diff_file=$(mktemp)
+  printf '%s\n' "$web_env" > "$diff_file"
+  printf '%s\n' "$worker_env" | diff "$diff_file" - | head -10 >&2 || true
+  rm -f "$diff_file"
+fi
+# shellcheck disable=SC2086
+everything_on=$(render_one worker-deployment.yaml $worker_on \
+  --set database.caBundle.configMap=rds-ca \
+  --set-json 'extraEnvFrom=[{"secretRef":{"name":"providers"}}]' \
+  --set storage.s3.existingSecret=openokr-s3 || true)
+if printf '%s' "$everything_on" | grep -q "name: NODE_EXTRA_CA_CERTS" \
+  && printf '%s' "$everything_on" | grep -A 1 "^            - name: db-ca$" | grep -q "mountPath: /etc/openokr/db-ca" \
+  && printf '%s' "$everything_on" | grep -q "name: providers" \
+  && printf '%s' "$everything_on" | grep -A 3 "name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID" | grep -q "secretKeyRef"; then
+  pass "the worker mounts the CA bundle and reads extraEnvFrom and the S3 Secret, as the web pods do"
+else
+  fail "the worker lacks the CA bundle, extraEnvFrom or the S3 Secret"
+fi
+
+# The Service and the web PDB must never select a worker pod: the Service
+# would send it web traffic, and the PDB would count it as a web replica.
+worker_pod_labels=$(children "$worker" "^      labels:$")
+selected_by() {
+  [ -n "$1" ] || return 1
+  for pair in $(printf '%s\n' "$1" | tr -d ' '); do
+    printf '%s\n' "$worker_pod_labels" | tr -d ' ' | grep -qxF "$pair" || return 1
+  done
+  return 0
+}
+# shellcheck disable=SC2086
+service_selector=$(children "$(render_one service.yaml $worker_on || true)" "^  selector:$")
+# shellcheck disable=SC2086
+web_pdb_selector=$(children "$(render_one pdb.yaml $worker_on --set replicaCount=2 || true)" "^    matchLabels:$")
+if [ -n "$worker_pod_labels" ] && [ -n "$service_selector" ] && [ -n "$web_pdb_selector" ] \
+  && ! selected_by "$service_selector" && ! selected_by "$web_pdb_selector"; then
+  pass "neither the Service nor the web PDB selects a worker pod"
+else
+  fail "a worker pod's labels match the Service's selector or the web PDB's"
+fi
+
+if render_expecting_failure --set "database.url=$DB" --set worker.enabled=true \
+  | grep -q "worker.enabled needs storage every pod shares"; then
+  pass "refuses the worker on a ReadWriteOnce volume, naming the remedies"
+else
+  fail "allowed the worker on a ReadWriteOnce volume"
+fi
+if render_expecting_failure --set "database.url=$DB" --set worker.enabled=true \
+  --set persistence.enabled=false | grep -q "storage.s3.bucket"; then
+  pass "refuses the worker with persistence off and no bucket"
+else
+  fail "allowed the worker with each pod's files on its own emptyDir"
+fi
+if render_one worker-deployment.yaml --set worker.enabled=true \
+  --set persistence.accessMode=ReadWriteMany | grep -q "claimName: openokr-storage"; then
+  pass "a ReadWriteMany volume is shared storage, and the worker mounts it"
+else
+  fail "the worker was refused, or did not mount, a ReadWriteMany volume"
+fi
+if printf '%s' "$worker" | grep -q "claimName:"; then
+  fail "with a bucket the worker mounts the volume claim, which a ReadWriteOnce class ties to one node"
+else
+  pass "with a bucket the worker mounts no volume claim, so no node holds it"
+fi
+for variable in OPENOKR_SCHEDULER OPENOKR_RELAY; do
+  # shellcheck disable=SC2086
+  if render_expecting_failure --set "database.url=$DB" $worker_on \
+    --set-json "extraEnv=[{\"name\":\"$variable\",\"value\":\"off\"}]" \
+    | grep -q "extraEnv sets $variable"; then
+    pass "with the worker on, refuses an extraEnv that sets $variable"
+  else
+    fail "with the worker on, accepted an extraEnv that sets $variable"
+  fi
+done
+if render --set-json 'extraEnv=[{"name":"OPENOKR_SCHEDULER","value":"off"}]' >/dev/null 2>&1; then
+  pass "with the worker off, an extraEnv that sets OPENOKR_SCHEDULER still works"
+else
+  fail "refused an extraEnv OPENOKR_SCHEDULER a release may already be running"
+fi
+
+# shellcheck disable=SC2086
+if render_one worker-pdb.yaml $worker_on | grep -q "^  minAvailable: 1$"; then
+  pass "two workers get a PDB that keeps one through a node drain"
+else
+  fail "two workers have no PDB"
+fi
+if render_one worker-pdb.yaml --set worker.enabled=true --set storage.s3.bucket=f 2>&1 \
+  | grep -q "kind: PodDisruptionBudget"; then
+  fail "one worker got a PDB, which would block every node drain"
+else
+  pass "one worker gets no PDB"
+fi
+# shellcheck disable=SC2086
+if render_one worker-deployment.yaml $worker_on --set worker.resources.requests.cpu=250m \
+  | grep -A 2 "requests:" | grep -q "cpu: 250m" \
+  && printf '%s' "$worker" | grep -A 2 "requests:" | grep -q "cpu: 100m"; then
+  pass "the worker takes worker.resources, or the web pods' resources when it is empty"
+else
+  fail "the worker's resources are not worker.resources, nor resources when empty"
+fi
+
+# Values reused from 0.7.0 have no `worker` at all, and render as a fresh
+# install does: no worker, no flags.
+reused=$(render --set worker=null || true)
+if ! printf '%s' "$reused" | grep -q "name: openokr-worker$" \
+  && ! printf '%s' "$reused" | grep -q "name: OPENOKR_RELAY$"; then
+  pass "values reused from v0.7.0 keep one Deployment and set no flag"
+else
+  fail "values reused from v0.7.0 rendered a worker or a flag"
+fi
+
+# shellcheck disable=SC2086
+worker_notes=$(notes $worker_on || true)
+if printf '%s' "$worker_notes" | grep -q "run on the worker pods" \
+  && printf '%s' "$worker_notes" | grep -q "logs deploy/openokr-worker" \
+  && ! printf '%s' "$defaults" | grep -q "run on the worker pods"; then
+  pass "the install notes say where the background work runs and how to read its log"
+else
+  fail "the install notes do not say the worker runs the background work"
+fi
+
+# --- an autoscaler on the web Deployment (plan 0.8.0 H10f) -------------------
+# docs/design/worker-deployment.md D16. Off by default. On, the autoscaler owns
+# the web Deployment's replica count, so the Deployment renders none, and the
+# storage rule and the PDB read the autoscaler's bounds.
+hpa_on="--set autoscaling.enabled=true --set storage.s3.bucket=openokr-files"
+# shellcheck disable=SC2086
+hpa=$(render_one hpa.yaml $hpa_on || true)
+# shellcheck disable=SC2086
+hpa_web=$(render_one deployment.yaml $hpa_on || true)
+if printf '%s' "$hpa" | grep -q "^apiVersion: autoscaling/v2$" \
+  && printf '%s' "$hpa" | grep -q "^kind: HorizontalPodAutoscaler$" \
+  && printf '%s' "$hpa" | grep -A 3 "scaleTargetRef:" | grep -q "kind: Deployment" \
+  && printf '%s' "$hpa" | grep -A 3 "scaleTargetRef:" | grep -q "name: openokr$" \
+  && printf '%s' "$hpa" | grep -q "^  minReplicas: 2$" \
+  && printf '%s' "$hpa" | grep -q "^  maxReplicas: 6$" \
+  && printf '%s' "$hpa" | grep -A 5 "name: cpu" | grep -q "averageUtilization: 70$" \
+  && ! printf '%s' "$hpa" | grep -q "name: memory"; then
+  pass "autoscaling.enabled scales the web Deployment from 2 to 6 replicas on CPU at 70 percent"
+else
+  fail "autoscaling.enabled did not render an autoscaling/v2 autoscaler on the web Deployment, 2 to 6 at 70 percent CPU"
+fi
+if [ -n "$hpa_web" ] && ! printf '%s' "$hpa_web" | grep -q "^  replicas:"; then
+  pass "with the autoscaler on, the web Deployment sets no replica count for it to fight"
+else
+  fail "with the autoscaler on, the web Deployment still sets replicas"
+fi
+# shellcheck disable=SC2086
+if render_one hpa.yaml $hpa_on --set autoscaling.targetMemoryUtilizationPercentage=80 2>&1 \
+  | grep -A 5 "name: memory" | grep -q "averageUtilization: 80$"; then
+  pass "a memory target adds a memory metric"
+else
+  fail "a memory target added no memory metric"
+fi
+if render_expecting_failure --set "database.url=$DB" --set autoscaling.enabled=true \
+  | grep -q "cannot be shared across nodes"; then
+  pass "refuses the autoscaler on a ReadWriteOnce volume, which several replicas cannot share"
+else
+  fail "allowed the autoscaler to scale pods onto a ReadWriteOnce volume"
+fi
+if render --set autoscaling.enabled=true --set autoscaling.minReplicas=1 \
+  --set autoscaling.maxReplicas=1 >/dev/null 2>&1; then
+  pass "an autoscaler held at one replica may keep a ReadWriteOnce volume"
+else
+  fail "refused an autoscaler that never goes past one replica"
+fi
+for bad in "autoscaling.minReplicas=2 --set autoscaling.maxReplicas=1" "autoscaling.minReplicas=0"; do
+  # shellcheck disable=SC2086
+  if render_expecting_failure --set "database.url=$DB" $hpa_on --set $bad \
+    | grep -q "autoscaling.minReplicas must be at least 1 and no more than autoscaling.maxReplicas"; then
+    pass "refuses $bad"
+  else
+    fail "accepted $bad"
+  fi
+done
+# shellcheck disable=SC2086
+if render_expecting_failure --set "database.url=$DB" $hpa_on --set autoscaling.targetCPUUtilizationPercentage=0 \
+  | grep -q "autoscaling.targetCPUUtilizationPercentage must be"; then
+  pass "refuses a CPU target of 0"
+else
+  fail "accepted a CPU target of 0"
+fi
+# shellcheck disable=SC2086
+if render_one pdb.yaml $hpa_on 2>&1 | grep -q "kind: PodDisruptionBudget"; then
+  pass "with the autoscaler's floor at 2, the web PDB renders"
+else
+  fail "with the autoscaler's floor at 2, the web PDB is missing"
+fi
+# shellcheck disable=SC2086
+if render_one pdb.yaml $hpa_on --set autoscaling.minReplicas=1 2>&1 | grep -q "kind: PodDisruptionBudget"; then
+  fail "with the autoscaler's floor at 1, a web PDB renders and would block a node drain"
+else
+  pass "with the autoscaler's floor at 1, no web PDB"
+fi
+if ! printf '%s' "$defaults" | grep -q "kind: HorizontalPodAutoscaler" \
+  && printf '%s' "$defaults" | grep -q "^  replicas: 1$"; then
+  pass "with no values, no autoscaler and one replica"
+else
+  fail "with no values, an autoscaler rendered or the replica count went"
+fi
+reused=$(render --set autoscaling=null || true)
+if ! printf '%s' "$reused" | grep -q "kind: HorizontalPodAutoscaler" \
+  && printf '%s' "$reused" | grep -q "^  replicas: 1$"; then
+  pass "values reused from v0.7.0 render no autoscaler and keep the replica count"
+else
+  fail "values reused from v0.7.0 rendered an autoscaler or lost the replica count"
+fi
+hpa_notes=$(notes --set autoscaling.enabled=true --set persistence.enabled=false || true)
+if printf '%s' "$hpa_notes" | grep -q "With up to 6 replicas they are also invisible"; then
+  pass "the emptyDir warning counts the autoscaler's ceiling"
+else
+  fail "the emptyDir warning does not count the autoscaler's ceiling"
 fi
 
 # --- values reused from an older release -------------------------------------
@@ -627,6 +1181,18 @@ if [ "$(hops_of --set instance.trustedProxyHops=null)" = '"1"' ]; then
   pass "a release from before the hop count existed reads as 1"
 else
   fail "a release without a hop count does not read as 1"
+fi
+# One reading, not two (Akmal, 11 November 2026): the ranges or the header
+# replace the hop count, and the server refuses both at once.
+if render_one deployment.yaml --set 'network.trustedProxies={10.0.1.0/24}' | grep -q "OPENOKR_TRUSTED_PROXY_HOPS"; then
+  fail "the hop count is rendered beside network.trustedProxies, which the server refuses"
+else
+  pass "named proxy ranges replace the hop count"
+fi
+if render_one deployment.yaml --set network.clientAddressHeader=cf-connecting-ip | grep -q "OPENOKR_TRUSTED_PROXY_HOPS"; then
+  fail "the hop count is rendered beside network.clientAddressHeader, which the server refuses"
+else
+  pass "a CDN header replaces the hop count"
 fi
 
 echo ""

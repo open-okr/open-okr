@@ -30,6 +30,16 @@ export interface InstanceSettingDefinition {
 export const SETUP_COMPLETED_AT = "setup.completed_at";
 
 /**
+ * When any of the instance's schedulers last completed a run (plan 0.8.0 H12).
+ *
+ * A stamp, like the one above, not a setting anybody chooses. Kept in the
+ * database so `/api/status` answers the same from every pod: the heartbeat
+ * lived in one process's memory, and behind a load balancer the answer
+ * depended on which pod replied.
+ */
+export const SCHEDULER_LAST_RUN_AT = "scheduler.last_run_at";
+
+/**
  * What an instance is called when nobody has named it: the software's own
  * name. Every builder that is handed no name falls back to this one, so the
  * default is written once (completeness review M-33).
@@ -59,6 +69,13 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     fallback: "",
     summary:
       "When the first-run wizard finished. Empty means the instance is unconfigured.",
+  },
+  {
+    key: SCHEDULER_LAST_RUN_AT,
+    kind: "string",
+    fallback: "",
+    summary:
+      "When a scheduler last completed a run, written by whichever pod ran it, so /api/status answers the same from every pod. Empty until the first run.",
   },
   {
     key: "instance.name",
@@ -114,6 +131,15 @@ export const INSTANCE_SETTINGS: readonly InstanceSettingDefinition[] = [
     environment: "OPENOKR_REGISTRATION",
     summary:
       "'auto' is open until the instance is claimed and closed afterwards. 'open', 'company_domains' and 'invite_only' fix it; 'company_domains' refuses free mail addresses without an invitation. A value saved on General wins.",
+  },
+  {
+    // Plan 0.8.0 S4, docs/design/email-verification.md §11.
+    key: "auth.emailVerification",
+    kind: "string",
+    fallback: "auto",
+    environment: "OPENOKR_EMAIL_VERIFICATION",
+    summary:
+      "'auto' requires a new account to confirm its email exactly when this instance can deliver mail. 'off' lets it be used at once. Under the company_domains registration policy confirmation stays required. A value saved on General, or on a cloud by the operator, wins.",
   },
   // The cloud tenancy settings (P8-T02a). All three default to the
   // self-hosted answer, so an instance that never touches them is a

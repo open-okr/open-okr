@@ -11,8 +11,18 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
+import { DemoPill } from "../../../lib/demo-pill";
 import { useInstanceName } from "../../../lib/instance-name-context";
 import { AuthCard, FormError } from "../auth-card";
+import { ResendLink, useLinkHours } from "../resend-link";
+import { pathAfterSignIn } from "./deletion-actions";
+
+/**
+ * What Better Auth answers a sign-in with while the account is being erased
+ * (`ACCOUNT_BEING_DELETED_CODE` in core's `account-deletion.ts`). Written out
+ * here because this page runs in the browser, which may not load core.
+ */
+const ACCOUNT_BEING_DELETED_CODE = "ACCOUNT_BEING_DELETED";
 
 interface SSOProvider {
   id: string;
@@ -48,9 +58,15 @@ export default function SignInPage() {
   // A sign-in hold, in whole minutes, kept apart from `error` because its
   // message carries a link to the reset page (account-lockout.md D12).
   const [heldMinutes, setHeldMinutes] = useState<number | null>(null);
+  // The address Better Auth said waits to be confirmed, which it says only
+  // after the password matched, so a new link can be offered for it
+  // (plan 0.8.0 S3).
+  const [unconfirmed, setUnconfirmed] = useState<string | null>(null);
+  const linkHours = useLinkHours();
   const clearError = () => {
     setError("");
     setHeldMinutes(null);
+    setUnconfirmed(null);
   };
   const [pending, setPending] = useState(false);
   // The passkey or provider button that started a call, so only it spins. Set
@@ -62,6 +78,27 @@ export default function SignInPage() {
   const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
   const [personas, setPersonas] = useState<DemoPersona[]>([]);
   const [demoPassword, setDemoPassword] = useState<string | null>(null);
+  // The instance says it is a demonstration, whether or not it lists anybody
+  // to sign in as (plan 0.8.0 D1).
+  const [demo, setDemo] = useState(false);
+  // A change-of-email link opened signed out sends the person here, and it
+  // works only inside their session (account-self-service.md D19, plan 0.8.0
+  // Y4). Read from the address bar once, after the first render, so the page
+  // needs no suspense boundary for it.
+  const [openLinkAgain, setOpenLinkAgain] = useState(false);
+  // A deletion was just asked for, and this is the day it runs (account-
+  // deletion.md §3.1, plan 0.8.0 Y7). Read the same way, for the same reason.
+  const [deletionOn, setDeletionOn] = useState<string | null>(null);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    setOpenLinkAgain(query.get("notice") === "email-change");
+    const on = query.get("on");
+    setDeletionOn(
+      query.get("notice") === "deletion" && on && /^\d{4}-\d{2}-\d{2}$/.test(on)
+        ? on
+        : null,
+    );
+  }, []);
 
   // Load SSO providers for buttons. Non-blocking: the password form renders
   // immediately and the buttons appear when the fetch completes.
@@ -100,6 +137,7 @@ export default function SignInPage() {
     fetch("/api/demo-personas")
       .then((r) => r.json())
       .then((data) => {
+        setDemo(data?.demo === true);
         if (Array.isArray(data?.personas) && data.personas.length > 0) {
           setPersonas(data.personas);
           setDemoPassword(
@@ -141,9 +179,10 @@ export default function SignInPage() {
     clearError();
     setPending(true);
     const form = new FormData(event.currentTarget);
+    const email = String(form.get("email"));
 
     const { data, error: failure } = await authClient.signIn.email({
-      email: String(form.get("email")),
+      email,
       password: String(form.get("password")),
     });
     setPending(false);
@@ -164,6 +203,15 @@ export default function SignInPage() {
         );
         return;
       }
+      if (failure.code === "EMAIL_NOT_VERIFIED") {
+        setUnconfirmed(email);
+      }
+      // The run is erasing the account (account-deletion.md §3.3). Said only
+      // after the password matched, so it confirms nothing to a guesser.
+      if (failure.code === ACCOUNT_BEING_DELETED_CODE) {
+        setError(t("auth.signIn.accountBeingDeleted"));
+        return;
+      }
       // Deliberately the same message whether the address is unknown or the
       // password is wrong: saying which would confirm who has an account.
       setError(
@@ -182,7 +230,7 @@ export default function SignInPage() {
       setChallenge(true);
       return;
     }
-    router.push("/");
+    router.push(await pathAfterSignIn());
   };
 
   // Called by the code field once its sixth digit is in, and by Verify.
@@ -197,10 +245,14 @@ export default function SignInPage() {
 
     if (failure) {
       setCode("");
-      setError(t("auth.signIn.thatCodeWasNotRight"));
+      setError(
+        failure.code === ACCOUNT_BEING_DELETED_CODE
+          ? t("auth.signIn.accountBeingDeleted")
+          : t("auth.signIn.thatCodeWasNotRight"),
+      );
       return;
     }
-    router.push("/");
+    router.push(await pathAfterSignIn());
   };
 
   const signInWithPasskey = async () => {
@@ -209,10 +261,15 @@ export default function SignInPage() {
     const result = await authClient.signIn.passkey();
     setActing(null);
     if (result?.error) {
-      setError(t("auth.signIn.thatPasskeyDidNotWork"));
+      setError(
+        "code" in result.error &&
+          result.error.code === ACCOUNT_BEING_DELETED_CODE
+          ? t("auth.signIn.accountBeingDeleted")
+          : t("auth.signIn.thatPasskeyDidNotWork"),
+      );
       return;
     }
-    router.push("/");
+    router.push(await pathAfterSignIn());
   };
 
   if (challenge) {
@@ -266,6 +323,7 @@ export default function SignInPage() {
   return (
     <AuthCard
       title={t("auth.signIn.heading", { instanceName })}
+      badge={demo ? <DemoPill /> : undefined}
       footer={
         <>
           <Link
@@ -284,6 +342,34 @@ export default function SignInPage() {
         </>
       }
     >
+      <div role="status" aria-live="polite" className="contents">
+        {deletionOn ? (
+          <p
+            data-testid="deletion-requested"
+            className="mb-3 rounded-md bg-info-bg px-2.5 py-1.5 text-xs font-medium text-info"
+          >
+            {t("auth.signIn.deletionRequested", {
+              date: new Date(`${deletionOn}T00:00:00Z`).toLocaleDateString(
+                undefined,
+                {
+                  day: "numeric",
+                  month: "long",
+                  year: "numeric",
+                  timeZone: "UTC",
+                },
+              ),
+            })}
+          </p>
+        ) : null}
+        {openLinkAgain ? (
+          <p
+            data-testid="open-link-again"
+            className="mb-3 rounded-md bg-info-bg px-2.5 py-1.5 text-xs font-medium text-info"
+          >
+            {t("auth.signIn.openTheLinkAgain")}
+          </p>
+        ) : null}
+      </div>
       <form onSubmit={signIn} className="flex flex-col gap-3">
         <EmailInput
           label={t("people.detail.profileForm.email")}
@@ -429,6 +515,9 @@ export default function SignInPage() {
           error
         )}
       </FormError>
+      {unconfirmed !== null && linkHours !== null ? (
+        <ResendLink email={unconfirmed} hours={linkHours} wording="direct" />
+      ) : null}
     </AuthCard>
   );
 }

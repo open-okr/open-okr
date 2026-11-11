@@ -30,6 +30,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../lib/auth";
+import { keepAlive } from "../../../../lib/keep-alive";
 import { getRealtime } from "../../../../lib/realtime";
 import { requireWorkspace } from "../../../../lib/workspace";
 
@@ -111,6 +112,13 @@ export async function GET(request: NextRequest) {
       // response, not an outbox write. enqueue() writes bytes to the HTTP
       // response body, not to a driver or a queue.
       controller.enqueue(encoder.encode(": heartbeat\n\n"));
+      // Again every 25 seconds, so no proxy's idle timeout cuts a quiet
+      // stream (plan 0.8.0 H11).
+      keepAlive(
+        // openokr:allow-side-effect: SSE stream write, not an outbox write.
+        () => controller.enqueue(encoder.encode(": heartbeat\n\n")),
+        request.signal,
+      );
 
       const subscription = await realtime.subscribe(
         channel,

@@ -1,4 +1,5 @@
-{{- if and .Values.podDisruptionBudget.enabled (gt (int .Values.replicaCount) 1) -}}
+{{- /* With the autoscaler on, its floor decides (plan 0.8.0 H10f): a PDB over one pod blocks every node drain. */ -}}
+{{- if and .Values.podDisruptionBudget.enabled (gt (include "openokr.fewestWebReplicas" . | int) 1) -}}
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:

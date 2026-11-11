@@ -47,8 +47,13 @@ export interface S3StorageOptions {
   readonly bucket: string;
   /** Required by the SDK even for services that ignore it. */
   readonly region: string;
-  readonly accessKeyId: string;
-  readonly secretAccessKey: string;
+  /**
+   * A long-lived key pair, or neither. Neither leaves the credentials to the
+   * AWS SDK's default chain, which is how workload identity reaches the pod
+   * (plan 0.8.0 H9). The environment schema refuses half a pair.
+   */
+  readonly accessKeyId?: string;
+  readonly secretAccessKey?: string;
   /**
    * A compatible service's own endpoint. Absent means AWS S3 itself, addressed
    * virtual-host style.
@@ -100,10 +105,14 @@ export class S3Storage implements FileStorage {
       options.defaultExpirySeconds ?? DEFAULT_EXPIRY_SECONDS;
     this.#client = new S3Client({
       region: options.region,
-      credentials: {
-        accessKeyId: options.accessKeyId,
-        secretAccessKey: options.secretAccessKey,
-      },
+      ...(options.accessKeyId && options.secretAccessKey
+        ? {
+            credentials: {
+              accessKeyId: options.accessKeyId,
+              secretAccessKey: options.secretAccessKey,
+            },
+          }
+        : {}),
       ...(options.endpoint ? { endpoint: options.endpoint } : {}),
       forcePathStyle: options.forcePathStyle ?? options.endpoint !== undefined,
     });

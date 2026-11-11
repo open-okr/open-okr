@@ -80,6 +80,8 @@ const NOT_CHECKED_HERE: Readonly<Record<string, string>> = {
     "an operator route, and not-found to everybody on a self-hosted instance",
   "/operator/instance":
     "an operator route, and not-found to everybody on a self-hosted instance",
+  "/operator/default-plan":
+    "an operator route, and not-found to everybody on a self-hosted instance",
   // docs/design/hosting-profiles.md §3: starting another workspace is open only
   // where sign-up is, and this claimed instance is invitation-only.
   "/workspaces/new":
@@ -141,12 +143,17 @@ const DETAIL: Readonly<Record<string, string>> = {
 };
 
 /**
- * The two screens a visitor meets before signing in, scanned signed out.
+ * The screens a visitor meets before signing in, scanned signed out.
  *
  * Every spec signs in through `/sign-in`, which made it the most visited page
- * in the suite and one this file never scanned.
+ * in the suite and one this file never scanned. `/email-confirmed` is where a
+ * sign-up's confirmation link lands, with no session (plan 0.8.0 S2).
  */
-const SIGNED_OUT: readonly string[] = ["/sign-in", "/forgot-password"];
+const SIGNED_OUT: readonly string[] = [
+  "/sign-in",
+  "/forgot-password",
+  "/email-confirmed",
+];
 
 /** Screens drawn without the application shell, for a room rather than a desk. */
 const FOCUS_SCREENS: readonly string[] = ["/session/"];

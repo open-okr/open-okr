@@ -9,7 +9,8 @@
  *   Given an administrator on Admin, General, then the Update check card says
  *   which version runs and saves the switch.
  *
- * The member who sees no footer is proved in `apps/web/test/version-footer.test.ts`.
+ * That every member sees the version and only an administrator the notice
+ * (plan 0.8.0 V1) is proved in `apps/web/test/version-footer.test.ts`.
  */
 import { readFileSync } from "node:fs";
 import type { BrowserContext, Page } from "@playwright/test";

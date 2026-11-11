@@ -35,6 +35,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
+import { aiOffSentence } from "../ai/off-reason.ts";
 import { readableCitations } from "../copilot/citations.ts";
 import { isEmbeddableType } from "../embeddings/subjects.ts";
 import { subjectAddress } from "../ids/address.ts";
@@ -837,7 +838,12 @@ export const readAvailability = defineReadAction({
   output: z.object({
     /** True only when a question asked now would get prose back. */
     available: z.boolean(),
-    /** True when the deployment has no answering provider wired at all. */
+    /**
+     * False when nothing can answer for this workspace: no provider, a plan
+     * with no AI credits, egress closed, or an unpriced model. `reason` says
+     * which. Credits used up for the month reads true, because that pause ends
+     * by itself.
+     */
     providerConfigured: z.boolean(),
     /** Null when available. Shown to the reader as it is. */
     reason: z.string().nullable(),
@@ -877,8 +883,10 @@ export const readAvailability = defineReadAction({
       return {
         available: false,
         providerConfigured: false,
-        reason:
-          "No AI provider is configured, so the copilot can find sources but cannot write an answer.",
+        // The step that stopped the host, where it said (plan 0.8.0 O1). A
+        // cloud workspace with no plan used to read "No AI provider is
+        // configured" while the provider's key worked for everybody else.
+        reason: aiOffSentence(context.aiOff ?? "no_provider", "panel"),
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
         streaming: false,

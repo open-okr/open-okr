@@ -7,13 +7,19 @@
  * administrators and the coordinators and managers of its spaces: the roles
  * that run a space's weekly session and the cycle around it (METHOD.md §2.5).
  * Visibility only: `/cycle` still opens at view for anybody who goes there.
+ *
+ * `setsUpCycle` is `cycles.setupAccess`, the rule plan 0.8.0 R1 opened to an
+ * Admin. Without it an Admin could set up a cycle and had no way to the
+ * screen that does it (UAT 0.8.0, F-03).
  */
 export function seesCycle(reader: {
   readonly administers: boolean;
+  readonly setsUpCycle: boolean;
   readonly spaceRoles: readonly (string | null)[];
 }): boolean {
   return (
     reader.administers ||
+    reader.setsUpCycle ||
     reader.spaceRoles.some(
       (role) => role === "coordinator" || role === "manager",
     )

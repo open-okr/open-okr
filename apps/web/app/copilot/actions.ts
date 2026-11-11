@@ -15,7 +15,7 @@
  */
 import { callAction, proposeFromRequest } from "@openokr/core";
 import { getPool } from "../../lib/auth";
-import { drafterFor } from "../../lib/drafter";
+import { drafterFor, resolveDrafterFor } from "../../lib/drafter";
 import { requireWorkspace } from "../../lib/workspace";
 
 async function context() {
@@ -50,14 +50,19 @@ export async function readCopilotThreadAction(threadId: string) {
  */
 export async function copilotAvailabilityAction() {
   const base = await context();
-  const drafter = await drafterFor(
+  // With the reason when there is no drafter (plan 0.8.0 O1), so a cloud
+  // workspace with no plan is told to choose one rather than that no provider
+  // is configured.
+  const outcome = await resolveDrafterFor(
     base.workspaceId,
     "balanced",
     base.actor.userId,
     { source: "copilot" },
   );
   return callAction(
-    drafter ? { ...base, drafter } : base,
+    "drafter" in outcome
+      ? { ...base, drafter: outcome.drafter }
+      : { ...base, aiOff: outcome.off },
     "copilot.availability",
     {},
   );

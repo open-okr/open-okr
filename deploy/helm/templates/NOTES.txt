@@ -21,6 +21,18 @@ first-run wizard, creates the owner account, and registration closes behind
 them. Finish setup right after the first start: until then, anyone who reaches
 this address can claim the instance.
 
+{{- if and .Values.database.existingSecret .Values.database.adminUrl (not (dig "existingSecretAdminKey" "" .Values.database)) }}
+
+WARNING: database.adminUrl is set beside database.existingSecret.
+
+The migration hook then reads the owner-role connection from a Secret named
+{{ printf "%s-database" (include "openokr.fullname" .) }}, which this chart renders only when existingSecret is
+empty. It works only if you created that Secret yourself. Put the connection
+in your own Secret instead and name its key:
+
+  --set database.existingSecretAdminKey=database-admin-url --set database.adminUrl=
+{{- end }}
+
 {{- if not .Values.secrets.existingSecret }}
 
 Back this up now, before anything else:
@@ -56,8 +68,8 @@ ReadWriteMany class:
 WARNING: persistence is off, so uploaded files go to an emptyDir.
 
 They are deleted when a pod restarts, and nothing warns anybody when they go.
-{{- if gt (int .Values.replicaCount) 1 }}
-With {{ .Values.replicaCount }} replicas they are also invisible to the other
+{{- if gt (include "openokr.mostWebReplicas" . | int) 1 }}
+With {{ if include "openokr.autoscaling" . }}up to {{ end }}{{ include "openokr.mostWebReplicas" . }} replicas they are also invisible to the other
 pods: a file uploaded through one pod cannot be downloaded through another, and
 which pod serves a request is not something a user can influence.
 {{- end }}
@@ -66,6 +78,41 @@ That is a working configuration for an instance that accepts no uploads, and a
 data-loss bug for one that does. To keep files:
 
   --set persistence.enabled=true
+{{- end }}
+
+{{- if include "openokr.workerEnabled" . }}
+
+The outbox relay and the scheduler run on the worker pods, the Deployment
+{{ include "openokr.fullname" . }}-worker ({{ include "openokr.workerReplicas" . }} replica{{ if gt (include "openokr.workerReplicas" . | int) 1 }}s{{ end }}). The web pods only serve, and their
+OPENOKR_RELAY and OPENOKR_SCHEDULER say elsewhere. Invitations, live
+updates, the agents and every job on a clock wait for the worker, so read its
+log when one of them goes quiet:
+
+  kubectl --namespace {{ .Release.Namespace }} logs deploy/{{ include "openokr.fullname" . }}-worker
+
+Scrape every pod's /api/metrics rather than the Service: the job, nudge and
+delivery series are counted where the work runs.
+{{- end }}
+
+{{- $dataChanges := .Values.dataChanges | default dict }}
+{{- $finish := printf "kubectl --namespace %s exec deploy/%s -- node --experimental-strip-types --no-warnings /app/migrator/packages/db/src/bin/data-change.ts" .Release.Namespace (include "openokr.fullname" .) }}
+{{- if dig "enabled" true $dataChanges }}
+
+Data changes run after each install and upgrade, in the Job
+{{ printf "%s-data-change-%d" (include "openokr.fullname" .) .Release.Revision }}
+{{- $budget := dig "timeBudgetSeconds" 240 $dataChanges | int }}
+{{- if gt $budget 0 }}, for up to {{ $budget }} seconds. What is
+left runs at the next upgrade, or now with:
+{{- else }}. To run them again by hand:
+{{- end }}
+
+  {{ $finish }}
+{{- else }}
+
+dataChanges.enabled is false, so nothing runs the data changes an upgrade
+brings. Run them after each upgrade with:
+
+  {{ $finish }}
 {{- end }}
 
 {{- if eq .Values.mail.transport "console" }}

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  changeEmailMail,
+  emailChangeNoticeMail,
+  emailChangeTakenMail,
+  passwordChangedMail,
+  verifyEmailMail,
+} from "../src/mail/account.ts";
+import {
   invitationMail,
   notificationDigestMail,
   nudgeEmail,
@@ -169,5 +176,249 @@ describe("a nudge", () => {
     expect(html).toContain("Held back this week");
     expect(html).toContain(`${BASE}/goals/g2`);
     expect(html).toContain(`href="${BASE}/inbox"`);
+  });
+});
+
+/**
+ * The mail that confirms an address (email-verification.md D6, D18), built
+ * here since plan 0.8.0 S3 so the relay can send it. It was built in the web
+ * app while it was sent from inside the sign-up request.
+ */
+describe("the confirmation mail", () => {
+  const VERIFY = `${BASE}/api/auth/verify-email?token=tok456&callbackURL=%2Femail-confirmed`;
+
+  it("names the instance and the address, and carries Better Auth's link in both parts", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.subject).toBe("Confirm your email address for Northwind OKR");
+    expect(built.html).toContain("<b>amara@example.com</b>");
+    // The button and the raw link under it, both the url as given.
+    expect(hrefs(built.html)).toEqual([VERIFY, VERIFY]);
+    expect(built.text).toContain(`Confirm email: ${VERIFY}`);
+  });
+
+  it("says how long the link works, and never that no account was made", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.text).toContain("The link works for 24 hours.");
+    expect(built.text).toContain(
+      "Nothing is confirmed unless the link is opened.",
+    );
+    expect(built.text).not.toContain("no account is created");
+  });
+
+  it("is written in the instance's language", () => {
+    const built = verifyEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "ms",
+      to: "amara@example.com",
+      url: VERIFY,
+      hours: 24,
+    });
+    expect(built.subject).toBe("Sahkan alamat e-mel anda untuk Northwind OKR");
+    expect(built.html).toContain('<html lang="ms">');
+    expect(built.text).toContain("Pautan ini berfungsi selama 24 jam.");
+  });
+});
+
+/**
+ * The notice that a password changed (account-self-service.md §4.2, D9, D13):
+ * when, to the minute in the person's own timezone, whether other devices were signed out, and one
+ * button to the page that asks for a reset link. Never the password, and
+ * never a link that changes it.
+ */
+describe("the password notice", () => {
+  const AT = new Date("2026-11-11T07:05:00Z");
+  const notice = (over: Partial<Parameters<typeof passwordChangedMail>[0]>) =>
+    passwordChangedMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      via: "change",
+      otherSessionsEnded: true,
+      at: AT,
+      baseUrl: BASE,
+      ...over,
+    });
+
+  // UAT 0.8.0 Q-7: a time in UTC is one more sum for somebody checking
+  // whether it was them, so it is said in their own timezone, named.
+  it("says the time in the person's own timezone, naming it", () => {
+    const built = notice({ timeZone: "Asia/Kuala_Lumpur" });
+    expect(built.text).toContain(
+      "was changed on 11 November 2026 at 15:05 (Asia/Kuala_Lumpur).",
+    );
+    // A day can change with the zone, and the date follows it.
+    expect(
+      notice({
+        at: new Date("2026-11-11T20:30:00Z"),
+        timeZone: "Asia/Jakarta",
+      }).text,
+    ).toContain("on 12 November 2026 at 03:30 (Asia/Jakarta).");
+  });
+
+  it("falls back to UTC for a zone it does not know", () => {
+    expect(notice({ timeZone: "Mars/Olympus_Mons" }).text).toContain(
+      "at 07:05 (UTC).",
+    );
+  });
+
+  it("says what changed and when, and links only to the reset request", () => {
+    const built = notice({});
+    expect(built.subject).toBe("Your Northwind OKR password was changed");
+    expect(built.html).toContain("<b>amara@example.com</b>");
+    expect(built.text).toContain(
+      "The password for amara@example.com was changed on 11 November 2026 at 07:05 (UTC).",
+    );
+    expect(built.text).toContain(
+      "Your other devices were signed out. API tokens and connected apps keep working.",
+    );
+    expect(built.text).toContain(
+      "If this was not you, reset your password now.",
+    );
+    expect(hrefs(built.html)).toEqual([
+      `${BASE}/forgot-password`,
+      `${BASE}/forgot-password`,
+    ]);
+  });
+
+  it("says a set and a reset in their own words, and who stays signed in", () => {
+    const set = notice({ via: "set", otherSessionsEnded: false });
+    expect(set.subject).toBe(
+      "A password was set on your Northwind OKR account",
+    );
+    expect(set.text).toContain("was set on 11 November 2026 at 07:05 (UTC).");
+    expect(set.text).toContain("Your other devices stay signed in.");
+
+    const reset = notice({ via: "reset" });
+    expect(reset.subject).toBe("Your Northwind OKR password was reset");
+    expect(reset.text).toContain("was reset on 11 November 2026");
+    expect(reset.text).toContain("Every device was signed out.");
+  });
+
+  it("is written in the instance's language", () => {
+    const built = notice({ locale: "ms" });
+    expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
+    expect(built.html).toContain('<html lang="ms">');
+    expect(built.text).toContain(
+      "telah ditukar pada 11 November 2026 jam 07:05 (UTC).",
+    );
+    expect(built.text).toContain("Tetapkan semula kata laluan");
+  });
+});
+
+/**
+ * The three mails of a change of sign-in email (account-self-service.md
+ * §4.2, plan 0.8.0 Y4): the link to the new address, the notice to the
+ * current one, and what an address that already has an account hears.
+ */
+describe("a change of sign-in email", () => {
+  const AT = new Date("2026-11-11T07:05:00Z");
+  const URL_ = `${BASE}/api/auth/verify-email?token=t&callbackURL=%2Faccount`;
+
+  it("sends the new address its link, how long it works, and nothing else", () => {
+    const built = changeEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@new.example",
+      url: URL_,
+      hours: 24,
+    });
+    expect(built.subject).toBe(
+      "Confirm your new sign-in email for Northwind OKR",
+    );
+    expect(built.html).toContain("<b>amara@new.example</b>");
+    expect(built.text).toContain(
+      "Open this link to make amara@new.example the email you sign in to Northwind OKR with.",
+    );
+    expect(built.text).toContain(
+      "It works for 24 hours, in a browser where you are signed in to Northwind OKR.",
+    );
+    expect(built.text).toContain(
+      "Did not ask for this? Ignore this email and nothing changes.",
+    );
+    expect(hrefs(built.html)).toEqual([URL_, URL_]);
+  });
+
+  it("tells the current address what was asked and how to stop it, with no link that changes anything", () => {
+    const built = emailChangeNoticeMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@old.example",
+      newEmail: "amara@new.example",
+      at: AT,
+      baseUrl: BASE,
+    });
+    expect(built.subject).toBe(
+      "A change of sign-in email was asked for on your Northwind OKR account",
+    );
+    expect(built.text).toContain(
+      "Somebody signed in to your account asked to make amara@new.example its sign-in email, on 11 November 2026 at 07:05 (UTC).",
+    );
+    expect(built.text).toContain(
+      "If that was you, follow the email sent to amara@new.example.",
+    );
+    expect(built.text).toContain(
+      "If it was not, change your password and sign out your other devices: an unopened link then stops working.",
+    );
+    expect(hrefs(built.html)).toEqual([
+      `${BASE}/account/security`,
+      `${BASE}/account/security`,
+    ]);
+  });
+
+  it("tells an address that already has an account that nothing changed", () => {
+    const built = emailChangeTakenMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      baseUrl: BASE,
+    });
+    expect(built.text).toContain(
+      "Somebody asked to make this address the sign-in email of an account on Northwind OKR. It already has an account here, so nothing changed.",
+    );
+    expect(built.text).toContain(
+      "If you have forgotten your password, you can reset it.",
+    );
+    expect(hrefs(built.html)).toEqual([
+      `${BASE}/forgot-password`,
+      `${BASE}/forgot-password`,
+    ]);
+  });
+
+  it("is written in the instance's language", () => {
+    const link = changeEmailMail({
+      instanceName: "Northwind OKR",
+      locale: "ms",
+      to: "amara@new.example",
+      url: URL_,
+      hours: 24,
+    });
+    expect(link.html).toContain('<html lang="ms">');
+    expect(link.text).toContain("Ia berfungsi selama 24 jam");
+    const notice = emailChangeNoticeMail({
+      instanceName: "Northwind OKR",
+      locale: "ms",
+      to: "amara@old.example",
+      newEmail: "amara@new.example",
+      at: AT,
+      baseUrl: BASE,
+    });
+    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 (UTC).");
+    const taken = emailChangeTakenMail({
+      instanceName: "Northwind OKR",
+      locale: "ms",
+      baseUrl: BASE,
+    });
+    expect(taken.text).toContain("jadi tiada apa yang berubah.");
   });
 });

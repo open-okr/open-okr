@@ -212,6 +212,8 @@ describe("the avatar menu", () => {
     // page without a registry row fails the orphan test above; adding a row
     // without a page fails page-width.test.ts.
     expect(account.map((item) => item.href).sort()).toEqual([
+      // Your account, first in the menu (plan 0.8.0 Y2).
+      "/account",
       "/account/ai",
       "/account/api-tokens",
       "/account/channels",

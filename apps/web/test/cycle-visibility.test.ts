@@ -8,21 +8,44 @@ import { seesCycle } from "../lib/cycle-visibility.ts";
  */
 describe("who sees Cycle", () => {
   it("is a workspace administrator", () => {
-    expect(seesCycle({ administers: true, spaceRoles: [] })).toBe(true);
+    expect(
+      seesCycle({ administers: true, setsUpCycle: true, spaceRoles: [] }),
+    ).toBe(true);
   });
 
   it("is a coordinator or a manager of any space", () => {
     expect(
-      seesCycle({ administers: false, spaceRoles: ["member", "coordinator"] }),
+      seesCycle({
+        administers: false,
+        setsUpCycle: false,
+        spaceRoles: ["member", "coordinator"],
+      }),
     ).toBe(true);
-    expect(seesCycle({ administers: false, spaceRoles: ["manager"] })).toBe(
-      true,
-    );
+    expect(
+      seesCycle({
+        administers: false,
+        setsUpCycle: false,
+        spaceRoles: ["manager"],
+      }),
+    ).toBe(true);
+  });
+
+  // UAT 0.8.0 F-03: plan 0.8.0 R1 lets an Admin set up a cycle, but the
+  // sidebar asked for administration (Full), so an Admin was never shown the
+  // way to the screen R1 opened to them.
+  it("is whoever may set up a cycle, an Admin included", () => {
+    expect(
+      seesCycle({ administers: false, setsUpCycle: true, spaceRoles: [] }),
+    ).toBe(true);
   });
 
   it("is not a member who only belongs to spaces", () => {
     expect(
-      seesCycle({ administers: false, spaceRoles: ["member", null] }),
+      seesCycle({
+        administers: false,
+        setsUpCycle: false,
+        spaceRoles: ["member", null],
+      }),
     ).toBe(false);
   });
 });

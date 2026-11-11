@@ -13,6 +13,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
+import { newShortId } from "@openokr/db";
 import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import { INSTANCE_ACCOUNT } from "./instance-account.ts";
 import { chooseAt } from "./pickers.ts";
@@ -137,9 +138,9 @@ test("create a session and navigate to the session screen", async () => {
     await client.query(`set local app.workspace_id = '${member.workspace_id}'`);
     await client.query(
       `insert into okr_sessions
-         (id, workspace_id, space_id, kind, title, scheduled_for, facilitator_id, state)
-       values ($1, $2, $3, 'weekly', 'Weekly check-in', now() + interval '1 hour', $4, 'scheduled')`,
-      [id, member.workspace_id, space.id, member.id],
+         (id, workspace_id, space_id, kind, title, scheduled_for, facilitator_id, state, short_id)
+       values ($1, $2, $3, 'weekly', 'Weekly check-in', now() + interval '1 hour', $4, 'scheduled', $5)`,
+      [id, member.workspace_id, space.id, member.id, newShortId()],
     );
     // **A week with a figure, when no earlier spec left one.** This session
     // has no cycle, so no key results and no average of its own (see the

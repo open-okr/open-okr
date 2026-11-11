@@ -74,6 +74,19 @@ On [one server](compose.md), add them to `secrets/app.env` and run `./openokr up
 On [Kubernetes](kubernetes.md), set `cloud.enabled` and `cloud.plans` in the chart's
 values, and pass credentials with `extraEnvFrom`.
 
+**Behind a CDN, lock the origin and name the header.** A cloud is usually
+reached through a CDN and a load balancer, and with nothing set every visitor
+arrives as a chain the instance cannot place, so they all share one sign-in
+limit. Behind Cloudflare, set `OPENOKR_CLIENT_ADDRESS_HEADER=cf-connecting-ip`
+(Helm: `network.clientAddressHeader`) and make the load balancer refuse every
+request that did not come through your zone: a request header Transform Rule
+adds a secret header, and the load balancer forwards only requests carrying it.
+Allowing Cloudflare's address ranges is not enough, because every Cloudflare
+customer sends from them. Then send a sign-in to the load balancer's own
+hostname with a made-up `CF-Connecting-IP` and confirm it is refused.
+[Behind a CDN or a load balancer](behind-a-proxy.md) has the steps and the
+other setups. A per-visitor rate limit at the CDN is a stopgap until then.
+
 The operator console is at `/operator` and is not-found to anybody without a
 grant. **The first operator is granted by the deployment, never by a screen**,
 because a screen that creates the first operator can be reached by whoever gets

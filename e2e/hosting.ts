@@ -256,13 +256,72 @@ export async function roleIn(
   return rows[0]?.key ?? null;
 }
 
-/** Signs somebody up through the open sign-up page, and skips their setup. */
-export async function signUp(page: Page, person: Person): Promise<void> {
+/**
+ * What follows Create account (plan 0.8.0 S4). Where nothing waits, the
+ * welcome card's Get started goes in. Where confirmation is required, the
+ * address is confirmed from the link in the caught mail and the person signs
+ * in: an instance with mail whose registration is limited to company domains
+ * keeps it required whatever the setting says (Q13), for a newcomer by
+ * invitation too, so a spec on one passes its catcher.
+ */
+/**
+ * Which way a sign-up ended: on the welcome card, or by confirming from the
+ * mail. A spec that knows which its instance gives says so with the answer.
+ */
+export type SignUpEnding = "welcome" | "confirmed_by_mail";
+
+async function throughSignUpEnding(
+  page: Page,
+  person: Person,
+  mail?: MailCatcher,
+): Promise<SignUpEnding> {
+  const welcome = page.getByTestId("get-started");
+  const checkEmail = page.getByTestId("check-email");
+  await expect(welcome.or(checkEmail)).toBeVisible({ timeout: 30_000 });
+  if (!(await checkEmail.isVisible())) {
+    await welcome.click();
+    return "welcome";
+  }
+  if (!mail) {
+    throw new Error(
+      `${person.email} has to confirm its address on this instance: pass the mail catcher.`,
+    );
+  }
+  const text = await mail.waitFor(person.email, /verify-email/);
+  const link = text.match(
+    /https?:\/\/[^\s)>\]]+\/api\/auth\/verify-email\?[^\s)>\]]+/,
+  )?.[0];
+  if (!link) {
+    throw new Error(`No confirmation link in:\n${text}`);
+  }
+  await page.goto(link);
+  await page.getByRole("link", { name: "Sign in", exact: true }).click();
+  await page.getByLabel("Email").fill(person.email);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).first().click();
+  return "confirmed_by_mail";
+}
+
+/**
+ * Signs somebody up through the open sign-up page, and skips their setup.
+ *
+ * Where nothing waits, the welcome card's Get started goes in (plan 0.8.0
+ * S4). Where confirmation is required, the address is confirmed from the link
+ * in the caught mail and they sign in: an instance with mail whose
+ * registration is limited to company domains keeps confirmation required
+ * whatever the setting says (Q13), so a spec on one passes its catcher.
+ */
+export async function signUp(
+  page: Page,
+  person: Person,
+  mail?: MailCatcher,
+): Promise<void> {
   await goTo(page, "/sign-up");
   await page.getByLabel("Name").fill(person.name);
   await page.getByLabel("Email").fill(person.email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
+  await throughSignUpEnding(page, person, mail);
   await skipOnboarding(page);
   await expect(page).toHaveURL("/", { timeout: 15_000 });
 }
@@ -300,7 +359,8 @@ export async function joinAsNewcomer(
   page: Page,
   joinPath: string,
   person: Person,
-): Promise<void> {
+  mail?: MailCatcher,
+): Promise<SignUpEnding> {
   await goTo(page, joinPath);
   await expect(
     page.getByRole("heading", { name: /You have been invited/ }),
@@ -310,6 +370,7 @@ export async function joinAsNewcomer(
   await page.getByLabel("Email").fill(person.email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
+  const ending = await throughSignUpEnding(page, person, mail);
   await page.waitForURL(
     (url) => url.pathname === "/" || url.pathname === "/welcome",
     { timeout: 30_000 },
@@ -318,6 +379,7 @@ export async function joinAsNewcomer(
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({
     timeout: 30_000,
   });
+  return ending;
 }
 
 /**

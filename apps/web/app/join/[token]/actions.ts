@@ -14,6 +14,7 @@
  */
 import {
   callAction,
+  confirmByAcceptedInvitation,
   INVITE_COOKIE,
   INVITE_COOKIE_MAX_AGE_SECONDS,
   OperationError,
@@ -21,6 +22,7 @@ import {
 } from "@openokr/core";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getAuth } from "../../../lib/auth";
 import { requestBrowserTimezone } from "../../../lib/browser-timezone";
 import { getPool } from "../../../lib/pool";
 import { requireSession } from "../../../lib/session";
@@ -61,6 +63,21 @@ export async function acceptInvitation(
     }
     throw error;
   }
+
+  // **A personal invitation to this account's own address confirms it**
+  // (plan 0.8.0 S5-Q2, email-verification.md §12): the same proof a sign-up
+  // through it gives. Never fatal: they have joined either way, and a
+  // confirmation link still confirms the address later.
+  await confirmByAcceptedInvitation(getAuth(), getPool(), {
+    userId: session.user.id,
+    email: session.user.email,
+    emailVerified: session.user.emailVerified === true,
+    invitation,
+  }).catch((error: unknown) => {
+    process.stderr.write(
+      `join: could not confirm an invited address: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  });
 
   const jar = await cookies();
   jar.delete(INVITE_COOKIE);

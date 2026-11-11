@@ -28,7 +28,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import pg from "pg";
 import { expect, test } from "./fixtures.ts";
-import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { getStarted, INSTANCE_ACCOUNT } from "./instance-account.ts";
 
 const { email: OWNER_EMAIL, password: OWNER_PASSWORD } = INSTANCE_ACCOUNT;
 
@@ -137,6 +137,7 @@ test("they accept it and land in the workspace", async () => {
     .getByLabel("Password", { exact: true })
     .fill(MEMBER_PASSWORD);
   await memberPage.getByRole("button", { name: "Create account" }).click();
+  await getStarted(memberPage);
 
   await expect(
     memberPage.getByRole("navigation", { name: "Primary" }),

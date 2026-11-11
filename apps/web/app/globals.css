@@ -37,29 +37,6 @@
   }
 }
 
-/* The first-visit tour's outline (UIUX-PLAN S-34, completeness review L-08).
- *
- * The tour card puts the stop it is showing on `<html>` as `data-tour-stop`,
- * and each rule below outlines the thing that stop names. Here rather than in
- * the components, so the sidebar, the top bar and the cycle strip do not have
- * to know a tour exists; a stop whose thing is not on screen outlines nothing.
- *
- * The focus ring's own colour and width, because it is the one outline the
- * design system already holds to §7's 3 to 1 on both themes. Dashed and set
- * further out, because a solid ring in that colour read as keyboard focus
- * (usability review D7). No animation, so
- * there is nothing for reduced motion to switch off. */
-@layer components {
-  :root[data-tour-stop="work-map"] [data-tour-target="work-map"],
-  :root[data-tour-stop="review"] nav a[href="/review"],
-  :root[data-tour-stop="cycle-strip"] .cycle-strip,
-  :root[data-tour-stop="cycle-strip"] [data-tour-target="cycle-strip"],
-  :root[data-tour-stop="search"] .topbar-shell label:has(input[type="search"]) {
-    outline: 2px dashed var(--color-brand-strong);
-    outline-offset: 4px;
-  }
-}
-
 /* The OKR diagram's canvas (P9-T09a), in the design system's own colours.
  *
  * React Flow paints its canvas, controls and minimap from these variables,
@@ -185,5 +162,17 @@
     textarea[data-text-first]:focus {
       font-size: 16px;
     }
+  }
+}
+
+/* Where a "Still needed here" item led (plan 0.8.0 F1): outlined for a moment
+ * so the eye finds the card. The focus ring's own colour, dashed so it does
+ * not read as keyboard focus. No animation, so there is nothing for reduced
+ * motion to switch off. */
+@layer components {
+  [data-need-flash] {
+    outline: 2px dashed var(--color-brand-strong);
+    outline-offset: 4px;
+    border-radius: var(--radius-lg, 0.5rem);
   }
 }

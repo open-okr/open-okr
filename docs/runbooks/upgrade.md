@@ -17,7 +17,9 @@ cd deploy/docker
 
 The helper takes the backup, keeps the last three, pulls, and restarts.
 Migrations run in the entrypoint, take an advisory lock, and are safe to
-repeat and safe with more than one replica.
+repeat and safe with more than one replica. Once the instance is healthy
+again it runs the data changes the release brought, to the end, and prints
+what ran ([backfills](#backfills-never-hold-up-a-boot)).
 
 ## If your database is backed up somewhere else
 
@@ -76,10 +78,61 @@ it.
 
 ## Backfills never hold up a boot
 
-Schema migrations run on start. Data changes run separately, on your
-schedule: `./openokr data-change` on Docker Compose, or `pnpm db:change` from
-a checkout. Either runs every script not yet complete and names what it ran,
-or says nothing was left. An upgrade is never held open by a long backfill.
+Schema migrations run on start. Data changes run separately, once the new
+release is serving: `./openokr data-change` on Docker Compose, or
+`pnpm db:change` from a checkout. Either runs every script not yet complete
+and names what it ran, or says nothing was left. A boot is never held open by
+a long backfill, with one exception below.
+
+**On Docker Compose `./openokr upgrade` runs them for you** (plan 0.8.0 H10g),
+after the health wait, so the instance is already serving the new release
+while they run. To the end rather than to a budget: you are watching the
+terminal, and stopping it with Ctrl-C loses nothing, because each batch
+commits and the next run resumes. A script that fails leaves the upgrade
+done and the instance serving, names the script, and exits non-zero; fix the
+cause and run `./openokr data-change`. To leave them for a quieter hour:
+
+```
+OPENOKR_SKIP_DATA_CHANGE=1 ./openokr upgrade
+```
+
+prints what is pending instead, as `./openokr status` does.
+
+**On Kubernetes the chart runs them for you.** After each install and
+upgrade a Job, `<release>-data-change-<revision>`, runs every script not yet
+complete for up to `dataChanges.timeBudgetSeconds`, 240 by default. At the
+budget it stops between two batches, says which scripts are left, and exits
+cleanly; nothing is lost, and the next upgrade resumes them. To finish them
+now:
+
+```sh
+kubectl -n <namespace> exec deploy/<release> -- \
+  node --experimental-strip-types --no-warnings \
+  /app/migrator/packages/db/src/bin/data-change.ts
+```
+
+A script that fails fails the release, as a failed migration does, and the
+Job is kept for its log: `kubectl -n <namespace> logs job/<release>-data-change-<revision>`.
+With `--atomic` (`--rollback-on-failure` in Helm 4) Helm then rolls the pods
+back too. That is safe, because the previous release runs against the new
+schema, but it rolls back the application for a backfill's bug, so read the
+Job's log before you retry. `dataChanges.enabled=false` turns the hook off,
+and then the `kubectl exec` line above is how they run.
+
+**The exception: a backfill a migration needs.** A migration that tightens a
+column, such as 0.8.0's not-null on `short_id`, cannot apply while rows are
+still waiting for the backfill that fills it. Such a migration names that
+data change, and when this instance has not finished it, the migrator runs it
+first, in its own batches, then applies the migration. Only then, and only on
+an instance that skipped that data change. The start log names it, with its
+batches, rows and seconds:
+
+```
+openokr: 0165_short_ids_not_null.sql needs data change 0034_short_ids first, which has not run here. Running it now: ...
+openokr: 0034_short_ids finished: 3 batch(es), 2412 row(s) changed, in 1.8s.
+```
+
+Stopping it part way loses nothing: the next start resumes it.
 
 `./openokr status` names the data changes not yet complete, and
 `pnpm db:change --status` does the same from a checkout. Both only read, so
@@ -89,6 +142,79 @@ Run it with `OPENOKR_ENCRYPTION_KEY` in the environment. The data change that
 seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
+
+## 0.7 to 0.8
+
+- **Every short identifier is now required.** Migration 0165 makes
+  `short_id` not null on cycles, goals, key results, initiatives, tasks,
+  documents and sessions, the seven tables 0.7.0 gave one. Nothing to do if
+  you ran the data changes after upgrading to 0.7: data change 0034 is
+  complete and the migration applies in a moment. If you did not, or you are
+  coming straight from 0.6 or earlier, the migrator runs 0034 first and the
+  start waits for it ([the exception](#backfills-never-hold-up-a-boot)):
+  seconds for an ordinary instance, a minute or two for a hundred thousand
+  goals and a million tasks.
+
+  To keep that wait out of the upgrade, run 0034 on 0.7 beforehand:
+  `./openokr data-change` on Compose, `pnpm db:change`, or on Kubernetes the
+  `kubectl exec` line [above](#backfills-never-hold-up-a-boot), which the 0.7
+  image runs too. On Helm the
+  migration hook runs it under `helm upgrade --timeout`, five minutes unless
+  you set it, so give a very large instance a longer one. A hook stopped by
+  the timeout loses nothing: the next attempt resumes 0034 where it stopped.
+
+  The migration also counts any row still empty after 0034 finished, which
+  should never happen, and refuses with the table and the count. Its message
+  says what to do: remove 0034's ledger row
+  (`delete from _data_changes where name = '0034_short_ids'`) and start
+  again, and the migrator runs 0034 before the migration.
+
+- **Installing and upgrading with pgvector.** Until 0.8.0, migration 0031
+  stopped every database where the `vector` extension was installed: it built
+  an index pgvector refuses. 0.8.0 rewrites that part of 0031 and builds no
+  index. An instance that already applied 0031 did so without the extension,
+  so nothing it has changes; the migrator accepts the checksum it recorded
+  and updates it, once. Any other edit to a shipped migration is still
+  refused.
+
+  Migration 0166 makes `embeddings.embedding` a vector when the extension is
+  there and the column is still text, which is the case for an instance whose
+  migrations could not create it. pgvector is not a trusted extension: only a
+  superuser can create it (on RDS, a member of `rds_superuser`), so create it
+  before you upgrade if the role that runs migrations cannot. Until the column
+  is a vector, semantic search keeps to full text, and nothing raises.
+
+  **Adding pgvector after upgrading to 0.8.** Create the extension as a
+  superuser, then convert the column yourself as the owner of the tables:
+
+  ```sql
+  create extension if not exists vector;
+  alter table embeddings alter column embedding type vector using embedding::vector;
+  ```
+
+  Chunks written before have no vector, and get one when their text next
+  changes; until then the full-text half of search finds them.
+
+- **`X-Real-IP` is no longer read.** Until 0.8.0 the instance read a
+  visitor's address from `X-Forwarded-For` when it held one address, and from
+  `X-Real-IP` when it did not. A proxy that appends to `X-Forwarded-For`, such
+  as an AWS load balancer, leaves `X-Real-IP` as the caller sent it, so a
+  caller could choose the address every per-address limit counted them under.
+  Now `X-Forwarded-For` alone is read, still only when it holds one address.
+  The Compose install, whose Caddy writes `X-Forwarded-For`, sees no
+  difference. A proxy of your own that writes only `X-Real-IP` is named with
+  `OPENOKR_CLIENT_ADDRESS_HEADER=x-real-ip`.
+- **Behind a CDN or a layer-7 load balancer, name what is in front.**
+  `OPENOKR_TRUSTED_PROXIES` (Helm: `network.trustedProxies`) or
+  `OPENOKR_CLIENT_ADDRESS_HEADER` (`network.clientAddressHeader`). Without
+  either, a forwarded chain places nobody and every such visitor shares one
+  sign-in limit, as before. After the upgrade the log says which reading is in
+  force on its `caller address:` line, Admin, General says so when the
+  instance meets a visitor it cannot place, and the first boot writes one
+  `instance.caller_address_configured` row to the instance audit chain.
+  [Behind a CDN or a load balancer](../install/behind-a-proxy.md) says which
+  to set. A malformed entry, both set, or `0.0.0.0/0` refuses the boot, naming
+  the entry. A person's sessions show no address until they next sign in.
 
 ## 0.6 to 0.7
 
@@ -106,9 +232,11 @@ still to run. Nothing on screen waits for them.
   have none until you run the data changes (`./openokr data-change`, or
   `pnpm db:change`): **data change 0034** fills them a thousand rows at a
   batch and is safe to stop and run again. Nothing on screen waits for it.
-  **Run it before you upgrade to 0.8.0**, whose migration makes the column
-  not null on all seven tables and refuses to run while a row is still empty,
-  naming the table. `./openokr status` lists 0034 until it is complete.
+  **Run it before you upgrade to 0.8.0** if you can: 0.8.0's migration makes
+  the column not null on all seven tables, and on an instance that has not
+  run 0034 it runs it first, which holds that start until it finishes
+  ([0.7 to 0.8](#07-to-08)). `./openokr status` lists 0034 until it is
+  complete.
 
 - **Outbound webhooks.** Migration 0164 adds `webhooks` and
   `webhook_deliveries`. Nothing is sent until an administrator adds a hook,

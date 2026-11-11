@@ -97,9 +97,9 @@ Run these from `deploy/docker/`.
 | Command | What it does |
 |---|---|
 | `./openokr status` | What is running, whether it is healthy, and which data changes are pending |
-| `./openokr data-change` | Run the data changes an upgrade brought. Batched and resumable |
+| `./openokr data-change` | Run the data changes an upgrade brought, by hand. Batched and resumable. `upgrade` runs them itself |
 | `./openokr logs` | Follow the application log. `./openokr logs proxy` for the proxy |
-| `./openokr upgrade` | Pull the new image, restart, re-run migrations, report |
+| `./openokr upgrade` | Back up, pull the new image, restart, re-run migrations, then run the data changes once healthy and print what ran. `OPENOKR_SKIP_DATA_CHANGE=1` leaves them for later and prints what is pending |
 | `./openokr backup` | An encrypted database dump and a copy of the files, with a checksum |
 | `./openokr verify-backup DIR` | Prove a backup would restore, without touching the live database |
 | `./openokr restore DIR` | Restore from a directory `backup` made |
@@ -120,6 +120,14 @@ Every one of these has a working default, and none of them blocks the install.
 | Mail | The console driver: messages go to the log | You want invitations and reset links delivered. See [Settings](../admin/settings.md) |
 | AI | Off. Every AI affordance is hidden | You want drafting and rewriting. Bring your own key, or a local model |
 | The setup | One organisation with one workspace | You want several workspaces, a workspace per company, or a cloud of your own. See [Choose a setup](setups.md) |
+
+**Behind a load balancer or a CDN**, tell the instance which proxies are in
+front of it, or every visitor is counted as the proxy and shares one sign-in
+limit. Add `OPENOKR_TRUSTED_PROXIES` (their addresses or ranges) or, behind a
+CDN that is the only way in, `OPENOKR_CLIENT_ADDRESS_HEADER` to
+`secrets/app.env` and run `./openokr up`, which hands the same ranges to Caddy.
+[Behind a CDN or a load balancer](behind-a-proxy.md) says which to set and how
+to check it.
 
 **Changing the address later is supported and has one consequence.**
 `./openokr up` notices a changed public URL and rewrites it, and says so.

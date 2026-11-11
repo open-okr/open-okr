@@ -45,11 +45,17 @@ import {
  * otherwise go on showing the one containing today.
  */
 export function CycleAdmin({
+  canArchive,
   mode,
   currentCycleId,
   currentName,
   publicationDeadline,
 }: {
+  /**
+   * Whether the archive control is drawn. Setting up a cycle is an Admin's
+   * too since plan 0.8.0 R1, and archiving one stays with the Owner (R1-Q3).
+   */
+  readonly canArchive: boolean;
   readonly mode: "annual" | "quarterly";
   readonly currentCycleId: string | null;
   readonly currentName: string | null;
@@ -201,40 +207,44 @@ export function CycleAdmin({
               ) : null}
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-ink-3">
-                {t("common.archive2", { currentName: currentName ?? "" })}
-              </span>
-              <div>
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={pending}
-                  pending={pending && acting === "archive"}
-                  className="text-bad"
-                  data-testid="archive-cycle"
-                  onClick={() => {
-                    // Archiving is not undone from any screen (UAT BUG-023),
-                    // so it asks once, naming what is being archived.
-                    if (
-                      !window.confirm(
-                        t("cycle.admin.archiveConfirm", {
-                          name: currentName ?? "",
-                        }),
-                      )
-                    ) {
-                      return;
-                    }
-                    run("archive", () => archiveCycle({ id: currentCycleId }));
-                  }}
-                >
-                  {t("common.archive")}
-                </Button>
+            {canArchive ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-ink-3">
+                  {t("common.archive2", { currentName: currentName ?? "" })}
+                </span>
+                <div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={pending}
+                    pending={pending && acting === "archive"}
+                    className="text-bad"
+                    data-testid="archive-cycle"
+                    onClick={() => {
+                      // Archiving is not undone from any screen (UAT BUG-023),
+                      // so it asks once, naming what is being archived.
+                      if (
+                        !window.confirm(
+                          t("cycle.admin.archiveConfirm", {
+                            name: currentName ?? "",
+                          }),
+                        )
+                      ) {
+                        return;
+                      }
+                      run("archive", () =>
+                        archiveCycle({ id: currentCycleId }),
+                      );
+                    }}
+                  >
+                    {t("common.archive")}
+                  </Button>
+                </div>
+                <span className="text-xs text-ink-4">
+                  {t("cycle.admin.archiveHelp")}
+                </span>
               </div>
-              <span className="text-xs text-ink-4">
-                {t("cycle.admin.archiveHelp")}
-              </span>
-            </div>
+            ) : null}
           </>
         ) : null}
 

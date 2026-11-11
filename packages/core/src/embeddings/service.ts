@@ -107,18 +107,32 @@ export class EmbeddingService {
   }
 
   /**
-   * Check once whether pgvector is installed. Cached for the lifetime of
-   * this service instance.
+   * Check once whether vectors can be stored and compared here. Cached for
+   * the lifetime of this service instance.
+   *
+   * **The column, not only the extension** (plan 0.8.0 H5,
+   * docs/design/pgvector-migration.md §3.4). An instance that ran migration
+   * 0031 without pgvector keeps `embeddings.embedding` as text, and adding
+   * the extension later does not change it. Asking only for the extension
+   * sent such an instance down the vector path, where `text <=> vector`
+   * raised instead of falling back to full text.
    */
   async hasPgvector(): Promise<boolean> {
     if (this.#pgvectorAvailable !== null) {
       return this.#pgvectorAvailable;
     }
     try {
-      const result = await this.#pool.query(
-        "select 1 from pg_extension where extname = 'vector'",
+      const result = await this.#pool.query<{ ready: boolean }>(
+        `select exists (select 1 from pg_extension where extname = 'vector')
+            and exists (
+              select 1 from pg_attribute
+               where attrelid = to_regclass('embeddings')
+                 and attname = 'embedding'
+                 and not attisdropped
+                 and format_type(atttypid, atttypmod) like 'vector%'
+            ) as ready`,
       );
-      this.#pgvectorAvailable = (result.rowCount ?? 0) > 0;
+      this.#pgvectorAvailable = result.rows[0]?.ready === true;
     } catch {
       this.#pgvectorAvailable = false;
     }
@@ -356,16 +370,30 @@ export class EmbeddingService {
     }
 
     const vectorStr = `[${queryVector.join(",")}]`;
+    // $1 the workspace, $2 the query vector, $3 its size, $4 the question,
+    // and $5 the entity types when there are any.
+    const params: unknown[] = [
+      input.workspaceId,
+      vectorStr,
+      queryVector.length,
+      input.query,
+    ];
     const typeFilter =
       input.entityTypes && input.entityTypes.length > 0
-        ? `and entity_type = any($3)`
+        ? "and entity_type = any($5)"
         : "";
-    const params: unknown[] = [input.workspaceId, vectorStr];
     if (input.entityTypes && input.entityTypes.length > 0) {
       params.push(input.entityTypes);
     }
 
-    // Hybrid: combine vector cosine similarity with full-text rank
+    // Hybrid: combine vector cosine similarity with full-text rank.
+    //
+    // **Only chunks of the query's size are compared** (plan 0.8.0 H5,
+    // docs/design/pgvector-migration.md §3.4). The worker re-embeds a chunk
+    // only when its text changes, so after the embedding model changes the
+    // older chunks keep the older size, and pgvector raises "different
+    // vector dimensions" on any comparison that meets one. They are left
+    // out here and still found by the full-text half.
     const rows = await this.#queryInWorkspace(
       input.workspaceId,
       `with vector_hits as (
@@ -375,17 +403,18 @@ export class EmbeddingService {
          where workspace_id = $1
            ${typeFilter}
            and embedding is not null
+           and dimensions = $3
          order by embedding <=> $2::vector
          limit ${limit * 2}
        ),
        text_hits as (
          select entity_type, entity_id, content,
                 ts_rank(to_tsvector('english', content),
-                        ${ANY_TERM_TSQUERY(`${params.length + 1}`)}) as text_score
+                        ${ANY_TERM_TSQUERY("$4")}) as text_score
          from embeddings
          where workspace_id = $1
            ${typeFilter}
-           and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY(`${params.length + 1}`)}
+           and to_tsvector('english', content) @@ ${ANY_TERM_TSQUERY("$4")}
          limit ${limit * 2}
        )
        select
@@ -400,7 +429,7 @@ export class EmbeddingService {
          and v.content = t.content
        order by score desc
        limit ${limit}`,
-      [...params, input.query],
+      params,
     );
 
     return rows.map((row) => ({

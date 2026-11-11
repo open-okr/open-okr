@@ -89,6 +89,11 @@ ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+# The server owns SIGTERM, not Next (plan 0.8.0 H10a). Next's handler exits
+# without waiting for the relay or the scheduler, so with this set it
+# registers none, and `apps/web/lib/shutdown.ts` drains the work in flight
+# within OPENOKR_SHUTDOWN_SECONDS and exits 0.
+ENV NEXT_MANUAL_SIG_HANDLE=true
 
 # Never root. The uid is fixed so a bind-mounted volume has predictable
 # ownership across hosts.

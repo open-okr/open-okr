@@ -8,7 +8,12 @@
  * a driver directly.
  */
 import { PgBoss } from "pg-boss";
-import type { JobHandler, JobOptions, JobQueue } from "../../ports/jobs.ts";
+import type {
+  JobHandler,
+  JobOptions,
+  JobQueue,
+  JobStopOptions,
+} from "../../ports/jobs.ts";
 
 export interface PgBossJobQueueOptions {
   readonly connectionString: string;
@@ -29,6 +34,8 @@ export interface PgBossJobQueueOptions {
 export class PgBossJobQueue implements JobQueue {
   readonly #boss: PgBoss;
   readonly #started: Set<string> = new Set();
+  /** Ids of the jobs whose handler is running in this process now. */
+  readonly #active: Set<string> = new Set();
   #running = false;
 
   constructor(options: PgBossJobQueueOptions) {
@@ -48,14 +55,38 @@ export class PgBossJobQueue implements JobQueue {
     this.#running = true;
   }
 
-  async stop(): Promise<void> {
+  /**
+   * Graceful: jobs already running may finish, rather than being orphaned as
+   * active rows that only expire on a timeout, fifteen minutes later.
+   *
+   * **Within `timeoutMs`** (plan 0.8.0 H10a, docs/design/worker-deployment.md
+   * D7). A job still running when it passes is failed with "pg-boss shut down
+   * while active", which puts it in `retry`, and another queue's worker takes
+   * it at once. Its handler keeps running here until the process exits;
+   * `running` counts it. pg-boss's own default is 30 seconds, which a drain of
+   * twenty cannot wait for.
+   */
+  async stop(options: JobStopOptions = {}): Promise<void> {
     if (!this.#running) {
       return;
     }
     this.#running = false;
-    // Graceful: let jobs already in flight finish rather than orphaning them
-    // as active rows that only expire on a timeout.
-    await this.#boss.stop({ graceful: true, close: true });
+    await this.#boss.stop({
+      graceful: true,
+      close: true,
+      ...(options.timeoutMs !== undefined
+        ? { timeout: options.timeoutMs }
+        : {}),
+    });
+  }
+
+  /**
+   * Jobs whose handler is running in this process now. After `stop`, the
+   * ones it handed back: their handlers are still going, and no longer
+   * this queue's.
+   */
+  get running(): number {
+    return this.#active.size;
   }
 
   /**
@@ -109,7 +140,18 @@ export class PgBossJobQueue implements JobQueue {
     // batch, so each is awaited in turn rather than dropped.
     await this.#boss.work<TPayload>(name, async (jobs) => {
       for (const job of jobs) {
-        await handler(job.data);
+        this.#active.add(job.id);
+      }
+      try {
+        for (const job of jobs) {
+          await handler(job.data);
+          this.#active.delete(job.id);
+        }
+      } finally {
+        // A job of a batch that failed is pg-boss's to retry, not running.
+        for (const job of jobs) {
+          this.#active.delete(job.id);
+        }
       }
     });
   }

@@ -12,6 +12,7 @@
         "TEST_MYSQL_USER",
         "TEST_MYSQL_PASSWORD",
         "TEST_DB_HOST",
+        "TEST_PGVECTOR",
         "DATABASE_URL"
       ]
     },
@@ -28,6 +29,7 @@
         "TEST_MYSQL_USER",
         "TEST_MYSQL_PASSWORD",
         "TEST_DB_HOST",
+        "TEST_PGVECTOR",
         "DATABASE_URL"
       ]
     },

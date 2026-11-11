@@ -277,6 +277,7 @@ export function OkrTable({
   cycleId,
   level,
   canEdit,
+  canCreate,
   canAdminister,
   progressMax,
   members,
@@ -296,6 +297,13 @@ export function OkrTable({
   readonly cycleId: string | null;
   readonly level: GoalLevel;
   readonly canEdit: boolean;
+  /**
+   * Whether the reader may add an objective: `goals.createAccess`, the role's
+   * goal level. Editing an existing row stays on `canEdit`, since a champion
+   * edits their own objective whatever their role (workspace-roles.md §13).
+   * Left out, it follows `canEdit`.
+   */
+  readonly canCreate?: boolean;
   readonly canAdminister: boolean;
   readonly progressMax: number;
   /** People who may champion an objective or own a key result. */
@@ -324,6 +332,7 @@ export function OkrTable({
       cycleId={cycleId}
       level={level}
       canEdit={canEdit}
+      canCreate={canCreate ?? canEdit}
       canAdminister={canAdminister}
       progressMax={progressMax}
       members={members}
@@ -354,6 +363,7 @@ function LiveOkrTable({
   cycleId,
   level,
   canEdit,
+  canCreate,
   canAdminister,
   progressMax,
   members,
@@ -369,6 +379,13 @@ function LiveOkrTable({
   readonly cycleId: string;
   readonly level: GoalLevel;
   readonly canEdit: boolean;
+  /**
+   * Whether the reader may add an objective: `goals.createAccess`, the role's
+   * goal level. Editing an existing row stays on `canEdit`, since a champion
+   * edits their own objective whatever their role (workspace-roles.md §13).
+   * Left out, it follows `canEdit`.
+   */
+  readonly canCreate?: boolean;
   readonly canAdminister: boolean;
   readonly progressMax: number;
   readonly members: readonly Person[];
@@ -624,7 +641,9 @@ function LiveOkrTable({
             className="rounded-lg border border-line bg-surface p-3 text-sm text-ink-2"
             data-testid="okr-empty-cycle"
           >
-            {canEdit ? t("okrList.emptyCycle") : t("okrList.emptyCycleRead")}
+            {(canCreate ?? canEdit)
+              ? t("okrList.emptyCycle")
+              : t("okrList.emptyCycleRead")}
           </p>
         ) : goals.length === 0 ? (
           <div className="rounded-lg border border-line bg-surface">
@@ -749,7 +768,7 @@ function LiveOkrTable({
           })}
         </KeyboardList>
 
-        {canEdit ? (
+        {(canCreate ?? canEdit) ? (
           <div className="overflow-hidden rounded-lg border border-dashed border-line-2 bg-surface [&>*]:border-b-0">
             <AddRow
               label={t("goals.editor.addObjective")}

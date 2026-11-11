@@ -193,12 +193,27 @@ test.describe("a cloud run by a provider", () => {
         ]),
       ],
     );
+    // A workspace may already have a tenant row: the scheduler adopts every
+    // workspace hourly while a spec before this one has the cloud flag on,
+    // with no plan. Left as it was, the plan carries no credits and the
+    // sentence is never drawn, so the plan is set either way and put back.
+    const { rows: before } = await pool.query<{
+      workspace_id: string;
+      plan_key: string | null;
+    }>(
+      "select workspace_id, plan_key from tenants where workspace_id = any($1::uuid[])",
+      [workspaces],
+    );
     const { rows: made } = await pool.query<{ id: string }>(
       `insert into tenants (workspace_id, plan_key, region)
        select id, 'team', 'local' from unnest($1::uuid[]) as id
        on conflict (workspace_id) do nothing
        returning workspace_id as id`,
       [workspaces],
+    );
+    await pool.query(
+      "update tenants set plan_key = 'team' where workspace_id = any($1::uuid[])",
+      [before.map((row) => row.workspace_id)],
     );
     await pool.query(
       `insert into ai_credit_packs
@@ -225,6 +240,12 @@ test.describe("a cloud run by a provider", () => {
         "delete from tenants where workspace_id = any($1::uuid[])",
         [made.map((row) => row.id)],
       );
+      for (const row of before) {
+        await pool.query(
+          "update tenants set plan_key = $2 where workspace_id = $1",
+          [row.workspace_id, row.plan_key],
+        );
+      }
       await pool.query("delete from system_settings where key = 'cloud.plans'");
     }
   });

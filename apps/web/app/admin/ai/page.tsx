@@ -19,6 +19,7 @@ import {
   TextInput,
   UrlInput,
 } from "@openokr/ui";
+import Link from "next/link";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
@@ -203,6 +204,9 @@ export default async function AdminAIPage() {
   const evaluations = await latestEvaluations(prompts);
 
   const configured = providers.filter((one) => one.hasWorkspaceCredential);
+  // A cloud workspace whose plan carries no AI credits and that has no key of
+  // its own: the plan is why AI is off (plan 0.8.0 O1).
+  const planIsWhy = hosted.kind === "none" && configured.length === 0;
   // What a tier can route to: every model the catalogue holds active.
   const modelChoices = models
     .filter((model) => model.active)
@@ -221,15 +225,33 @@ export default async function AdminAIPage() {
             {hosted.kind === "credits" ? (
               <p className="text-ink-2 text-sm">{t("admin.credits.ownKey")}</p>
             ) : null}
+            {/* A cloud workspace whose plan carries no AI credits and that has
+                no key of its own has no AI at all, while this page used to say
+                only "not configured" (plan 0.8.0 O1). Say why, and where. */}
+            {planIsWhy ? (
+              <p
+                className="text-warn text-sm"
+                data-testid="ai-plan-without-credits"
+              >
+                {t("admin.ai.planWithoutCredits")}{" "}
+                <Link className="underline" href="/admin/plan">
+                  {t("admin.ai.choosePlan")}
+                </Link>
+              </p>
+            ) : null}
             <p className="text-xs text-ink-3">
               {t("admin.ai.everyRuleScoreGate")}
             </p>
           </div>
-          <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
-            {configured.length > 0
-              ? t("admin.ai.configuredCount", { count: configured.length })
-              : t("admin.ai.notConfigured")}
-          </Chip>
+          {/* Beside the plan's sentence, "not configured" repeated the reason
+              O1 replaced (UAT 0.8.0 F-09). */}
+          {planIsWhy ? null : (
+            <Chip tone={configured.length > 0 ? "ok" : "neutral"}>
+              {configured.length > 0
+                ? t("admin.ai.configuredCount", { count: configured.length })
+                : t("admin.ai.notConfigured")}
+            </Chip>
+          )}
         </CardHeader>
       </Card>
 

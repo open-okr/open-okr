@@ -20,7 +20,8 @@ import { requireWorkspace } from "../../lib/workspace";
  * Profile and org-field writes for the people pages (P6-G09, screen S-33).
  *
  * `updateProfile` is the self-edit path: timezone, bio, primary channel and
- * quiet hours. `uploadAvatar` and `removeAvatar` are the same path for the
+ * quiet hours. `updateOwnName` is the member's own name, on Your account
+ * (plan 0.8.0 Y5). `uploadAvatar` and `removeAvatar` are the same path for the
  * picture (completeness review M-22). `updateMemberFields` is the admin path:
  * name, title and manager. All of them revalidate the profile page so the
  * reader sees their own change without a manual reload.
@@ -116,6 +117,7 @@ export async function updateProfile(
 
     await callAction(ctx, "people.updateOwnProfile", input);
     revalidatePath(`/people/${memberId}`);
+    revalidatePath("/account");
     return { ok: true, message: t("people.actions.profileUpdated") };
   } catch (error) {
     // A schema's refusal is its message rather than its JSON (plan U1b).
@@ -198,6 +200,8 @@ export async function uploadAvatar(
     };
   }
   revalidatePath(`/people/${workspace.memberId}`);
+  // Edited from Your account since plan 0.8.0 Y2.
+  revalidatePath("/account");
   return { ok: true, message: t("people.actions.pictureUpdated") };
 }
 
@@ -225,7 +229,37 @@ export async function removeAvatar(): Promise<ProfileResult> {
     };
   }
   revalidatePath(`/people/${workspace.memberId}`);
+  // Edited from Your account since plan 0.8.0 Y2.
+  revalidatePath("/account");
   return { ok: true, message: t("people.actions.pictureRemoved") };
+}
+
+/**
+ * The member's own name (docs/design/account-self-service.md D22, D23, plan
+ * 0.8.0 Y5). `people.updateOwnProfile` writes this workspace's member row and
+ * the account's name in one transaction; another workspace keeps its own.
+ * An empty name is sent as it is, so the refusal says why.
+ */
+export async function updateOwnName(
+  _previous: ProfileResult | null,
+  form: FormData,
+): Promise<ProfileResult> {
+  const { t } = await getTranslations();
+  try {
+    const ctx = await actionContext();
+    await callAction(ctx, "people.updateOwnProfile", {
+      name: String(form.get("name") ?? ""),
+    });
+  } catch (error) {
+    const refused = refusedProfile(error, t);
+    if (refused === null) {
+      throw error;
+    }
+    return refused;
+  }
+  // The avatar menu in the shell says the name too, so the whole tree.
+  revalidatePath("/", "layout");
+  return { ok: true, message: t("account.profile.nameSaved") };
 }
 
 export async function updateMemberFields(

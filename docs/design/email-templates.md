@@ -90,8 +90,12 @@ Dark mode is an enhancement. A client that strips the `<style>` block (Gmail) sh
 | Mail | Sent by today | Header shows | Action |
 |---|---|---|---|
 | Password reset | `apps/web/lib/auth.ts` | instance name | Choose a new password |
-| Confirm email | `apps/web/lib/auth.ts` | instance name | Confirm email |
+| Confirm email | outbox `account.verifyEmail`, built in `packages/core/src/mail/account.ts` (plan 0.8.0 S3, [email-verification](email-verification.md) D1, D6) | instance name | Confirm email, then "The link works for 24 hours." The footer says nothing is confirmed unless the link is opened, where it used to say no account is created |
 | Invitation | outbox `invitation.email` | workspace name | Accept the invitation |
+| Password changed | outbox `account.passwordChanged`, built in `packages/core/src/mail/account.ts` (plan 0.8.0 Y3, [account-self-service](account-self-service.md) D9, §4.2) | instance name | Reset your password, to `/forgot-password`. Says changed, set or reset, the date and time in UTC, and whether other devices were signed out; never the password and never a link that changes it |
+| Sign-in email change link | outbox `account.changeEmail`, built in `packages/core/src/mail/account.ts` (plan 0.8.0 Y4, [account-self-service](account-self-service.md) D18, §4.2) | instance name | Use this email to sign in, to Better Auth's change link. Says the link works for 24 hours, in a browser signed in to the instance, and that ignoring it changes nothing |
+| Sign-in email change notice | outbox `account.emailChangeNotice`, the same file (Y4, D16, AS-Q4) | instance name | Change your password, to `/account/security`. Names the new address and when, the same words whether or not that address has an account |
+| Address already has an account | outbox `account.emailChangeTaken`, the same file (Y4, AS-Q5) | instance name | Reset your password, to `/forgot-password`. Says nothing changed |
 | Notification digest | outbox, `renderDigest` | workspace name | Open your inbox |
 | Agent nudges | email channel, `nudges/deliver.ts` | workspace name | one link per nudge |
 | ~~Weekly digest post~~ | `actions/digest-posts.ts` | | |
@@ -158,7 +162,11 @@ The condition the approval carried: every button and link opens a page that work
 | Mail | Link | Lands on | Proved by |
 |---|---|---|---|
 | Password reset | Better Auth's reset url | `/reset-password`, then sign-in | Followed end to end from Mailpit on the UAT instance, 12 October 2026 |
-| Confirm email | Better Auth's verification url | The home screen, signed in | `account-mail.test.ts` checks the url is the one handed over |
+| Confirm email | Better Auth's verification url | `/email-confirmed`, signed out (plan 0.8.0 S2) | `packages/core/test/email-mails.test.ts` checks the url is the one handed over |
+| Password changed | `/forgot-password` on the instance | The page that asks for a reset link | `packages/core/test/email-mails.test.ts` checks it is the only link |
+| Sign-in email change link | Better Auth's change url, with `/account?emailChange=changed` as its callback | Your account, which says the new address or why the link changed nothing (plan 0.8.0 Y4) | `packages/core/test/email-change.test.ts` opens it signed in, signed out and in another account's session |
+| Sign-in email change notice | `/account/security` on the instance | Security, the Password card first | `packages/core/test/email-mails.test.ts` checks it is the only link |
+| Address already has an account | `/forgot-password` on the instance | The page that asks for a reset link | `packages/core/test/email-mails.test.ts` checks it is the only link |
 | Invitation | `/join/<token>` | The join page, then sign-up | Followed end to end from Mailpit |
 | Notification digest | each row's subject page, `/inbox`, `/account/channels` | The goal, the inbox, notification settings | Followed end to end from Mailpit |
 | Agent nudge | the nudge's own link (the goal, the check-in, the inbox), `/account/channels` | That page, then snooze and channel settings | Followed end to end from Mailpit |

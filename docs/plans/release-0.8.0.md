@@ -11,7 +11,7 @@ This plan grows as changes are named for 0.8.0. So far it holds ten things:
 5. **Which version is running, and whether a newer one exists**: the version for every member, and the update notice for a cloud's operator. Section 5. Asked for by Akmal on 10 November 2026, after upgrading OKRGoal to 0.7.0 and seeing no version on any of the three instances. Q7 and Q8 decided the same day.
 6. **"Still needed here" leads to the field**: each item on a phase's list opens the place where it is filled in. Section 6. Asked for by Akmal on 10 November 2026.
 7. **Screen layout**: layouts that waste space, squeeze content or hide the next step. Section 7. Phase 1's Roles and Suggested timeline, and the Work Map's Start drafting, both asked for by Akmal on 10 November 2026.
-8. **After sign-up**: a page that says to check your email, and a welcome page when the link is opened. Section 8. Asked for by Akmal on 10 November 2026.
+8. **After sign-up**: a page that says to check your email, and a welcome page when the link is opened. Section 8. Asked for by Akmal on 10 November 2026. An administrator or operator may also turn confirmation off (S4), asked for by Akmal on 11 November 2026.
 9. **The product tour on first sign-in**: a Start tour or Skip tour dialog, then one step at a time with the step's area lit and the rest dimmed, ending with Start drafting OKRs. Section 9. Asked for by Akmal on 10 November 2026, with tour.niazmorshed.dev as the example. Q9 decided the same day.
 10. **Who may set up a cycle**: an Admin can create a cycle and name its sponsor and facilitator, which today only the Owner can. Section 10. Agreed by Akmal on 10 November 2026.
 
@@ -298,6 +298,8 @@ On an instance that cannot send mail nothing changes: verification is not requir
 | S1 | **"Check your email" after sign-up**, where verification is required. Instead of the home page, the form opens a page on the same auth card: the account is created, a link has gone to the address they typed, open it to confirm, how long the link lasts, look in spam, and a way back to sign-in. The address is carried in the page's own state, never in the address bar. Where verification is not required, sign-up goes on to onboarding as today | S | None |
 | S2 | **A welcome page when the link is opened.** Sign-up passes Better Auth a return address, a new signed-out page such as `/welcome`, which the proxy lets through without a session. With no error it says "Welcome to *instance name*. Your email is confirmed." with a Sign in button. An already confirmed address gets the same page, because Better Auth sends it there with no error. `TOKEN_EXPIRED` says the link has expired, and `INVALID_TOKEN` and the other errors say it is not valid. Both say what to do next, which is S3's "send a new link" once that is built. Links sent before 0.8.0 still lead to the home page | S | None |
 | S3 | **Send the link again**, on the check-your-email page, on S2's expired page, and beside "Confirm your email first" on sign-in. The answer is the same whether or not the address has an account, so the form cannot be used to find out who has one, and it is rate limited per address and per network. The design also decides how long a link lasts, one hour today, and the page in S1 says whatever it decides. **It carries H1** (section 3.1): the verification mail goes through the outbox, so a mail server that refuses it never fails sign-up, and the send is retried | M | Design first: authentication and account enumeration |
+| S4 | **An administrator or operator can turn off email confirmation at sign-up.** One instance setting, `auth.emailVerification`: `auto`, the default and today's rule (required when the instance can deliver mail), or `off`, bootstrapped from `OPENOKR_EMAIL_VERIFICATION`. With `off`, somebody who signs up with an address no account holds is signed in at once with the email and password they typed. **They see no notice about confirming anywhere**: in place of the check-your-email card, sign-up shows a card built like S2's confirmed page, "Welcome to *instance name*. Your account has been created. You can use it right away." with Get started, which goes straight in because they are already signed in (Akmal, 11 November 2026). The same card ends sign-up on an instance that cannot send mail. An address an account already holds is refused as it is now. It works the same on a cloud (OKRGoal included), a group and a single self-hosted instance. **Who sets it:** an administrator on Admin, General on a self-hosted or group instance; on a cloud the operator, on the console's Instance screen, beside the registration policy (Q12). A change takes effect without a restart (the policy is read at boot today, `packages/core/src/auth/signup-policy.ts`) and is written to the instance audit chain. **It lowers nothing else:** joining a workspace by trusted email domain still needs a confirmed address (`packages/core/src/invitations/trusted-domain.ts` already refuses an unconfirmed one), an invitation link proves the mailbox by itself, and changing a sign-in email (Y4) still confirms the new address | M | Design first: security. It decides who may sign in with an address they have not proved |
+| S5 | **An invited address arrives confirmed.** Signing up through a personal invitation, one sent to an address, with that same address creates the account already confirmed, because opening the invitation's link proves the inbox exactly as a confirmation link would. Today such a person is asked to confirm a second time wherever confirmation is required. Not a shared workspace link, which can be forwarded and names no address, and not a sign-up with a different address. Recorded as `auth.email_verified` with `via: "invitation"`. Asked for by Akmal on 11 November 2026 | S | Design first: security. `docs/design/email-verification.md` §12 |
 
 S1 and S2 need no design and can ship first. Until S3 lands, the expired page can only say to ask the workspace's administrator or the instance's support address.
 
@@ -307,6 +309,28 @@ S1 and S2 need no design and can ship first. Until S3 lands, the expired page ca
 |---|---|
 | S1, S2 | UIUX-PLAN §6, S-35: the check-your-email card and the welcome page with its error states |
 | S3 | TECHNICAL-PLAN §8, the resend endpoint and the link lifetime; S-35 |
+| S5 | `docs/design/email-verification.md` §12; TECHNICAL-PLAN §8 |
+| S4 | `docs/design/email-verification.md`, a section for the setting; TECHNICAL-PLAN §4.14 (the setting) and §8; UIUX-PLAN Admin, General and S-47; `docs/admin/security.md`, what turning it off allows |
+
+### 8.4 What turning confirmation off allows, and S4's questions
+
+Turning it off is a trade an organisation may want: an internal deployment whose people all have company addresses, or a cloud that wants people in without a mail round trip. What it gives up:
+
+| With confirmation off | What still holds |
+|---|---|
+| Anybody can create an account with an address they do not own | The address is still unique. The real owner who finds it taken recovers it with Forgot password, which since S3 confirms the address and signs every other device out |
+| Mistyped addresses make accounts nobody can recover by mail | The account works; its owner can correct the address with Y4, which confirms the new one |
+| On a cloud with open sign-up, an account and a workspace cost no more than a form | The per-address and per-network sign-up limits, which H2 makes per visitor behind a CDN |
+| Unconfirmed accounts never learn their mail bounces | Nothing changes for anybody already confirmed |
+
+Akmal decided Q10 to Q13 on 11 November 2026, as recommended.
+
+| # | Question | Recommended |
+|---|---|---|
+| Q10 | The default | **`auto`, today's rule.** A new setting never changes what a running instance does |
+| Q11 | With it off, is a confirmation link still sent? | **Yes, where the instance can send mail, without blocking anything.** The account works at once, and the link confirms the address for the few things that need one (joining by trusted domain). Not chosen: no mail at all, which leaves a reset as the only way to confirm |
+| Q12 | Who sets it on a cloud? | **The operator only.** Accounts are shared by every workspace on the instance, so no one customer's administrator may lower the rule for the others. On a self-hosted or group instance, the administrator on Admin, General |
+| Q13 | Registration set to company domains, with confirmation off: anybody could type an address at the company's domain and get in | **Refuse the combination.** Under `company_domains` confirmation stays required whatever S4 says, and the setting's card says so. Not chosen: allow it with a warning |
 
 ## 9. The product tour on first sign-in
 
@@ -374,6 +398,8 @@ The specification gains it in TECHNICAL-PLAN §4.1, the role matrix's note on th
 10. O2's design and code. Q6 is decided.
 11. The designs for H5, H7 and H10. H10 is split into rows once designed, and changing migration 0031 for H5 is Akmal's decision.
 12. The design for Y7, which follows the answers in section 2.5, then the code. Last, because it is the largest and the only one that cannot be undone.
+14. S5, added on 11 November 2026: its design, then the code, on its own branch by pull request into `release-0.8.0`.
+13. S4, added on 11 November 2026: its design, as a section of `docs/design/email-verification.md`, then the code. It builds on S3, which is done.
 
 ## 12. Build log
 
@@ -381,45 +407,49 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 
 | Row | Status | Note |
 |---|---|---|
-| C1 | to do | |
-| Y1 | to do | |
-| Y2 | to do | |
-| Y3 | to do | |
-| Y4 | to do | |
-| Y5 | to do | |
-| Y6 | to do | |
-| Y7 | to do | Design first; Y7-1 to Y7-6 decided |
-| H1 | carried by S3 | |
-| H2 | to do | Design first: security |
-| H3 | to do | Design first: registration policy |
-| H4 | to do | |
-| H5 | to do | Design first: schema; changing 0031 is Akmal's decision |
-| H6 | to do | |
-| H7 | to do | Design first |
-| H8 | to do | |
-| H9 | to do | |
-| H10 | to do | Design first; split into rows once designed |
-| H11 | to do | |
-| H12 | to do | |
-| H13 | to do | |
-| H14 | to do | |
-| H15 | done | Branch `fix/helm-notes-object-storage`, commit `84f85321`: `sh deploy/helm/check.sh` and `pnpm check:fast` green, not pushed |
-| O1 | to do | |
-| O2 | to do | Design first; Q6 decided |
-| O3 | to do | |
-| D1 | to do | |
-| V1 | to do | Q7 decided |
-| V2 | to do | Q8 decided |
-| F1 | to do | |
-| L1 | to do | |
-| L2 | to do | |
-| S1 | to do | |
-| S2 | to do | |
-| S3 | to do | Design first; carries H1 |
-| T1 | to do | Q9 decided |
-| R1 | to do | Design first: access |
+| C1 | done | Migration 0165 makes `short_id` not null and declares `requires-data-change: 0034_short_ids`; the migrator runs 0034 first where its ledger says it never finished. Beyond the design (recorded in `short-ids.md`): data change 0004 now writes a short id, twelve hand-written test inserts give one, PLAN §5.1 states the exception, and the upgrade rehearsal checks 0034 finished. Known gap: a rollout straight from 0.6 to 0.8 has 0.6 pods inserting rows without a short id until they are gone |
+| Y1 | done | The circle is the person's picture or initials and its name theirs; the menu opens with their name, email and role (`people.readMember` gains `roleName`), with Guest, Demo account or Support access, linking to Your account. Unit, core and browser tests (`s03b-account-menu.spec.ts`) |
+| Y2 | done | `/account`, screen S-51, first in the avatar menu (registry `account-profile`). The picture, profile and appearance forms moved from the person's own `/people/<id>`, which gains Edit your profile. Name, title and manager read only until Y5; email shown, password via Security until Y3 and Y4. `s33-people.spec.ts` follows the forms |
+| Y3 | done | A Password card on Security calling Better Auth's `/change-password` behind a guard in `createAuth`'s hooks, so the screen and a direct call meet the same rules: refused for demo and SSO-enforced accounts, counted toward the sign-in hold, `auth.password_changed` audited and `account.passwordChanged` mailed in one transaction, 10 a minute per network. Set a password within 10 minutes of a sign-in (`recent-sign-in.ts`, which Y4 and Y7 use). Demo accounts cannot turn a one-time code on or off (AS-Q8). Deviations in the design's §2.2 |
+| Y4 | done | Better Auth's verified change behind a guard: offered only where mail can be sent (`resolveCanSendMail`), refused for demo, directory-managed (`directoryManagesAccount` in `packages/core/src/directory-sync/managed.ts`, which Y7 uses), SSO-enforced and company-domain-refused addresses, the same answer whoever holds the new address (AS-Q5's mail to a taken one), a notice to the old address, audited. Built (Y4) in the design's §2.3 |
+| Y5 | done | `people.updateOwnProfile` takes `name`, writing this workspace's member row and `users.name` together; other workspaces keep theirs; directory-managed members allowed (AS-Q1); demo accounts refused. `isDemoAccount` moved to `packages/core/src/demo/persona-list.ts` to break an import cycle |
+| Y6 | done | `AUTH_ENDPOINTS` in `packages/core/src/auth/endpoints.ts` classifies every endpoint the catch-all answers; the off ones answer 404 through `disabledPaths`, and the SSO plugin gets `providersLimit: 0`. An inventory test fails on any unclassified path. 57 paths, 30 on and 27 off; the two SSO domain-verification paths are never served (design §3 updated). `/change-password` keeps its old behaviour until Y3 |
+| Y7 | done (Agung) | Branch `feat/y7-account-deletion` (`agung/...` cannot exist beside the `agung` branch), pull request into `release-0.8.0`. Migration 0167: `account_deletions` and the `self_deleted` inbox reason. `docs/design/account-deletion.md` §12 As built: the request, cancelled by any sign-in in the session hook, the hourly run per workspace through `eraseMemberInTx`, which `people.erase` now shares, the ledger, the notice, four mails, `pnpm account:delete-due`. Deviations AB1 to AB9 |
+| H1 | done, by S3 | |
+| H2 | done | `OPENOKR_TRUSTED_PROXIES` and `OPENOKR_CLIENT_ADDRESS_HEADER` (Helm `network.trustedProxies`, `network.clientAddressHeader`); with neither, `X-Real-IP` is no longer read (Q1). One guide, `docs/install/behind-a-proxy.md`, which the Admin, General notice links to. **Yours, for OKRGoal:** a Cloudflare request-header Transform Rule setting a secret header; an ALB listener rule forwarding only requests carrying it (default action a fixed 403); `network.clientAddressHeader: cf-connecting-ip` and `helm upgrade`; the guide's deployment check against the ALB's own hostname; then remove the per-visitor rate limit at Cloudflare |
+| H3 | done | The first account on an unclaimed instance is admitted whatever the policy says; every later one follows it. The wizard's browser server now runs with `OPENOKR_REGISTRATION=invite_only`, so `first-run-wizard.spec.ts` proves the claim |
+| H4 | no change | Not reproducible on `main`, nor on 0.6.0: the proxy sends a signed-out visitor to `/sign-in`, and the auth layout sends sign-in to `/setup` while no account exists and setup is unfinished (`apps/web/app/(auth)/layout.tsx`, `readSetupState`). Nothing on that path reads the cloud flag, and `e2e/first-run-wizard.spec.ts` asserts it. What OKRGoal saw needs an account to exist before setup finished, which is the deliberate recovery path, and most likely came from H3's broken wizard sign-up. H3's fix covers it |
+| H5 | done | 0031's pgvector branch only changes the column type, with the shipped checksum sanctioned by name (and the rewrite's, so any further edit is still refused); 0166 converts the column for an instance that adds pgvector later; `hasPgvector()` reads the column; the query filters by size, and a third fault, `3` where `$3` was meant, is fixed. A CI job runs on `pgvector/pgvector:pg17`. Measured (§3.3): p95 121 to 138 ms at 20,000 chunks of 1536 dimensions, about 1 to 2 s extrapolated to the large dataset; no index built. H5-Q4 decided by Akmal on 11 November 2026: leave it until a deployment nears the size that needs it |
+| H6 | done | `database.caBundle` (a ConfigMap or a Secret, and its key) mounts the bundle read-only in the server, the migration hook and every job, as `NODE_EXTRA_CA_CERTS` and, for the backups' `pg_dump` and `pg_restore`, `PGSSLROOTCERT`. The Helm README shows RDS with `sslmode=verify-full` |
+| H7 | done for 0.8.0 | As decided, only the warning ships now: `docs/install/kubernetes.md`, "Behind PgBouncer", says what breaks through a transaction pooler. `DATABASE_DIRECT_URL` (`docs/design/direct-connection.md`) is built when a deployment adds one |
+| H8 | done | `database.existingSecretAdminKey` reads the owner role from the operator's own Secret, and refuses without `existingSecret`. **Deviation:** adminUrl beside existingSecret is warned about in the install notes rather than refused, because it works wherever the operator made a Secret of the chart's own name, which is OKRGoal's workaround; refusing would break its next deploy. OKRGoal can move to the key and drop the workaround |
+| H9 | done | Both keys or neither, in the environment schema, the driver and the chart. Neither lets the AWS SDK's default chain find the pod's own role; half a pair is still refused at boot. The Helm README shows IRSA, Pod Identity and an instance profile |
+| H10 | done | All seven rows: H10a drain on SIGTERM, H10b the pause and grace period, H10c data changes after install and upgrade, H10d `elsewhere`, H10e the opt-in worker Deployment, H10f the optional autoscaler, H10g `./openokr upgrade` runs the data changes. As built in the design's §10; `/api/health`'s `elsewhere` was superseded by the hardening batch's H-B when `main` was merged. `deploy/docker/smoke-test.sh` and `deploy/helm/cluster-test.sh` both passed on 11 November 2026, the cluster test end to end with the worker on and SeaweedFS as its stand-in object store (MinIO's images can no longer be pulled) |
+| H11 | done | `apps/web/lib/keep-alive.ts`: a heartbeat every 25 seconds on all five live routes (inbox, feed, board, agents, copilot), stopping when the request ends or a write fails. A test refuses a live route without it. `docs/install/kubernetes.md` says what idle timeout a proxy needs |
+| H12 | done | The pod that completes a run also writes `scheduler.last_run_at` to `system_settings`; `/api/status` judges the newer of that and its own (`apps/web/lib/scheduler-health.ts`). A pod with the scheduler off still answers operational, so an instance running its sweeps by hand is not reported down; H10 is where that changes. `status-and-capacity.md` §2.6 |
+| H13 | done | The server-action body limit is 27 MB, above `MAX_BLOB_BYTES` (25 MiB) with room for the form; the control says "Up to 25 MB a file" and refuses a larger file before uploading it. `apps/web/lib/upload-limit.ts` gives the browser the number, and a test holds it equal to core's and below the body limit. Browser spec run with the batch |
+| H14 | no code change | The installed exporter (`@opentelemetry/exporter-trace-otlp-http` 0.301.0) already merges `OTEL_EXPORTER_OTLP_HEADERS` and `OTEL_EXPORTER_OTLP_TRACES_HEADERS` from the environment. What was missing was proof and a word: `packages/adapters/test/otlp-headers.test.ts` sends a span to a local listener and checks the header arrives, and `docs/runbooks/observability.md` says how to set it from a secret |
+| H15 | done | PR #203, merged 10 November 2026 with every CI job green |
+| O1 | done | The provider chain names its step (`resolveProviderForTier`, `resolveDrafterFor`), core turns it into one sentence (`ai/off-reason.ts`) on the copilot's footer, answer and stream; Admin, AI says a plan has no credits. `docs/design/ai-credits.md` §9.1 |
+| O2 | done | `reviewDefaultPlanFill` and `fillDefaultPlanAsOperator` in `packages/core/src/operator/default-plan.ts`; each move is `setPlanAsOperator` with `bulk`, which re-checks inside its transaction and is skipped as "Already on" when a plan arrived since the review. S-45's notice and chips, S-46's fact, the review page at `/operator/default-plan`. Core, unit and browser tests (`s45-operator-console.spec.ts`) |
+| O3 | done | The erasure CronJob gets `BETTER_AUTH_SECRET` by reference; `check.sh` asserts it, and fails without the fix |
+| D1 | done | `apps/web/lib/demo-pill.tsx`: an `info` chip reading Demo, focusable, the sentence in a tooltip and in hidden text. A `badge` slot on the top bar and on the auth card; `/api/demo-personas` answers `demo`. Unit tests; the suite's instance is not a demo, so no browser spec |
+| V1 | done | Every member sees the version; the notice stays with `full` |
+| V2 | done | The console's Instance screen has a Version card |
+| F1 | done | `packages/method` gives every item a key (`NEED_KEYS`, `needs` beside `missing`, from one call so they cannot disagree); `cycle.workflow` returns them; the cycle page links each to its card or row (`need-destinations.ts`, a record over every key) or says who fills it. UIUX-PLAN S-04 has the table. Method, unit and browser tests |
+| L1 | done | Stacked at every width; the two roles side by side inside Roles from `sm`; When takes a quarter of the table and wraps. Mockup 02 redrawn. `e2e/s06-prepare-layout.spec.ts` |
+| L2 | done | A primary button under the sentence, `data-testid="start-drafting"`, drawn only for `canEdit` (the same `edit` the cycle page drafts with). Unit test both readers |
+| S1 | done | One commit with S2, since the sign-up form carries both. The card replaces the form when sign-up returns no session; the link's hour is now named (`EMAIL_VERIFICATION_LINK_SECONDS`) |
+| S2 | done | At `/email-confirmed`, because `/welcome` is onboarding (S-34). Until S3, an expired or broken link points to the instance's support address, or to whoever runs it |
+| S3 | done | The confirmation mail goes through the outbox (`account.verifyEmail`), its address and link removed once delivered. "Send the link again" on the check-your-email card, the link page and sign-in, held per address and per network; a repeat sign-up of an unconfirmed address sends a fresh link; a link lasts 24 hours; a completed reset confirms the address. Deviations in `email-verification.md` §10. `s35f-email-confirmed.spec.ts` |
+| S4 | done | `auth.emailVerification` (`auto` or `off`, `OPENOKR_EMAIL_VERIFICATION`), on Admin, General or, on a cloud, only the operator's S-47; refused under `company_domains`; followed without a restart. With nothing waiting, sign-up ends on the welcome card with Get started and nothing about confirming; where mail works, the link goes worded as optional. As built in the design's §11.7. `e2e/s35g-confirmation-off.spec.ts` |
+| S5 | done | Built on 11 November 2026 on `release-0.8.0` rather than by Obed, who ran the acceptance test that day (Akmal's choice). `docs/design/email-verification.md` §12.6 As built: a personal invitation to the sign-up's own address creates the account confirmed in the user-create hook, `auth.email_verified` with `via: "invitation"`, and S5-Q2 on the join page. The form signs in after such a sign-up, because Better Auth signs nobody in at sign-up while confirmation is required. Answers the acceptance test's Q-3 |
+| T1 | done | `apps/web/lib/product-tour.tsx`, mounted by the shell; the Work Map card and its CSS removed. Browser memory under `openokr.tour.ended`; the suite's contexts start with it set (`TOUR_COOKIE` opts back in). Unit tests for every step and ending; the claim spec walks it with the keyboard and scans both dialogs |
+| R1 | done | Setup writes (`cycles.create`, `cycles.update`, `frame.set`, `workflow.publish`, `cycles.setClosing`, `cycles.close`) ask `edit` on the `workspace` domain; archive and `rhythm.update` stay `full`. The page asks `cycles.setupAccess`, its own read rather than a `workflow.read` field so the create shows before any cycle exists (design updated). Core, unit and browser tests (`s04b-admin-sets-up-cycle.spec.ts`) |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |
 | Y7-1 to Y7-6 | decided | 10 November 2026, section 2.5 |
 | Q6 | decided | 10 November 2026, section 3.2: nothing automatic, the console's one action |
 | Q7, Q8 | decided | 10 November 2026, section 5.3: the version for every member; the operator's update notice |
 | Q9 | decided | 10 November 2026, section 9.3: S-34's five steps, ending with Start drafting OKRs |
+| Merging `main` | done | 11 November 2026: the hardening batch and the SSO DNS domain checks (#204). Akmal decided to combine the two caller-address rules (`trusted-proxies.md` §10). Also found and fixed: a sign-up the registration policy refused was told its account had been made wherever confirmation was required |
+| Every design question | decided | 11 November 2026: Akmal approved all eleven designs with every open question as recommended (C1-Q1; H2 Q1 to Q3; H3-Q1; S3 Q1 to Q3; R1-Q1 to Q4; O2-Q1 to Q4; H5-Q1 to Q3; H7-Q1 and Q2; H10 Q1 to Q7; AS-Q1 to Q8; Y7-Q1 to Q4), and Y6's endpoint switch-off to land first as its own commit |

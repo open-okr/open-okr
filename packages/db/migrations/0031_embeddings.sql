@@ -43,13 +43,19 @@ create table embeddings (
 );
 
 -- If pgvector is available, alter the column to the native vector type.
--- The cosine-distance index uses hnsw rather than ivfflat because hnsw does
--- not require a training set and works on an empty table.
+--
+-- No index (plan 0.8.0 H5, docs/design/pgvector-migration.md). This block
+-- used to build an hnsw index here, which pgvector refuses on a column with
+-- no dimensions, so on every database with the extension this migration
+-- failed and recorded nothing. An index needs a fixed size, the size belongs
+-- to the embedding model, and the model is chosen after migrations run.
+-- Retrieval is filtered to one workspace and compares exactly. The runner
+-- accepts the checksum the shipped file recorded on every instance without
+-- the extension, the only instances that ever applied it.
 do $$
 begin
   if exists (select 1 from pg_extension where extname = 'vector') then
     execute 'alter table embeddings alter column embedding type vector using embedding::vector';
-    execute 'create index embeddings_vector_idx on embeddings using hnsw (embedding vector_cosine_ops)';
   end if;
 end
 $$;

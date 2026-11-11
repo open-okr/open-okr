@@ -40,6 +40,21 @@ database:
   # Optional owner-role connection used only by the migration hook, so the
   # application role never owns the tables.
   adminUrl: ""
+  # With existingSecret: the key in that same Secret that holds the owner-role
+  # connection. Prefer it over adminUrl, which lands in the release's stored
+  # values; adminUrl with existingSecret reads a Secret the chart does not
+  # render (plan 0.8.0 H8), so the install notes warn about that pairing.
+  existingSecretAdminKey: ""
+  # A CA bundle that signs the database's certificate, from a Secret or a
+  # ConfigMap (not both), under `key`. A managed Postgres (RDS, Cloud SQL,
+  # Azure) signs with an authority Node does not hold, so without this the
+  # only connection that works is `sslmode=no-verify`. With it, use
+  # `sslmode=verify-full` (plan 0.8.0 H6). Mounted read-only in every
+  # workload, the server and each job.
+  caBundle:
+    existingSecret: ""
+    configMap: ""
+    key: "ca.pem"
 
 # The instance's public origin. Passkeys are bound to it, so it must be the
 # address people actually use. Defaults to the first ingress host when unset.
@@ -64,7 +79,8 @@ instance:
   language: "en"
   telemetry: false
   # auto | open | company_domains | invite_only. A choice saved on Admin >
-  # General wins over this.
+  # General wins over this. The account the setup wizard creates is admitted
+  # whatever this says, so a closed policy closes behind the owner.
   registration: "auto"
   # Where every member is offered the source (AGPL-3.0 section 13). Empty means
   # upstream. If you changed the code and offer it over a network, name your own.
@@ -120,6 +136,22 @@ mail:
   # A Secret holding the SMTP password. Never put the password in values.
   existingSecret: ""
   existingSecretKey: "mail-password"
+
+# Whose address a request is counted under (docs/design/trusted-proxies.md).
+# Every per-address limit, the sign-in hold and the session row read it. Both
+# empty is the default and reads X-Forwarded-For only when it holds one
+# address, which is right when the ingress controller writes one. Behind a
+# load balancer or a CDN that leaves a chain, set one of these, never both:
+#   trustedProxies: the proxies' own addresses or CIDR ranges, so the chain is
+#     read from the right past them. Name your proxies, not a broad private
+#     range that also holds people. The instance never fetches a list.
+#   clientAddressHeader: the one header your CDN writes the visitor's address
+#     into, such as cf-connecting-ip. Safe only when the load balancer refuses
+#     every request that did not come through your own CDN zone.
+# docs/install/behind-a-proxy.md says which to set for each setup.
+network:
+  trustedProxies: []
+  clientAddressHeader: ""
 
 service:
   type: ClusterIP
@@ -194,9 +226,11 @@ storage:
     forcePathStyle: ""
     # Prefix every object key, so one bucket can hold several instances.
     keyPrefix: ""
-    # A Secret holding the credentials. Required when a bucket is named:
-    # putting a key in values would store it in the release, where anyone with
-    # `helm get values` can read it. Same rule as database.existingSecret.
+    # A Secret holding a key pair, or empty. Empty since 0.8.0 means no key:
+    # the AWS SDK finds the pod's own credentials, which is how EKS Pod
+    # Identity, IRSA and an instance profile work (annotate the service account
+    # below for IRSA). A key in values would land in the release, where anyone
+    # with `helm get values` can read it, so a pair is only ever read from here.
     existingSecret: ""
     accessKeyIdKey: "access-key-id"
     secretAccessKeyKey: "secret-access-key"
@@ -253,6 +287,61 @@ securityContext:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# How a pod stops (plan 0.8.0 H10). The grace period Kubernetes waits before
+# it kills a stopping pod is preStopSeconds + drainSeconds + 15, so the three
+# cannot disagree; the 15 covers flushing error reports and spans.
+shutdown:
+  # Keeps answering while the load balancer stops sending: the endpoint change
+  # takes a few seconds to reach kube-proxy, an ingress controller or a cloud
+  # load balancer. 0 removes the pause. Behind the AWS Load Balancer Controller,
+  # start at 20 and watch the load balancer's 5xx count during a rollout.
+  preStopSeconds: 10
+  # How long a stopping server may finish the work in flight
+  # (OPENOKR_SHUTDOWN_SECONDS, 1 to 300). Longer work is cut and retried.
+  drainSeconds: 20
+
+# Runs the data changes an upgrade brings after every install and upgrade
+# (plan 0.8.0 H10), in a Job that stops cleanly at its budget and says what is
+# left. The next upgrade, or `kubectl exec` (docs/install/kubernetes.md),
+# finishes it. A script that fails fails the release, as a failed migration
+# does, and the Job is kept for its log.
+dataChanges:
+  enabled: true
+  # Under Helm's default --timeout of 5m. 0 runs to the end, under whatever
+  # --timeout you pass.
+  timeBudgetSeconds: 240
+
+# An autoscaler on the web Deployment (plan 0.8.0 H10). With it on,
+# replicaCount is ignored and the Deployment sets no replica count. The target
+# is a share of resources.requests.cpu, so raise that from 100m first, and keep
+# maxReplicas times OPENOKR_DB_POOL_MAX (20) under the database's
+# max_connections. Needs metrics-server. Without a bucket or a ReadWriteMany
+# volume, maxReplicas above 1 is refused, as replicaCount above 1 is.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  # 0 means CPU only.
+  targetMemoryUtilizationPercentage: 0
+
+# Background work on its own pods (plan 0.8.0 H10). Off keeps one Deployment
+# whose pods serve pages and also run the outbox relay and the scheduler. On,
+# a second Deployment, <release>-openokr-worker, runs both, and the web pods
+# only serve (OPENOKR_RELAY and OPENOKR_SCHEDULER say "elsewhere" there).
+# Needs shared storage: a bucket, or persistence with ReadWriteMany, because
+# the relay builds exports and scans uploads, and the scheduler removes
+# orphaned ones. With it on, extraEnv may not set either variable.
+worker:
+  enabled: false
+  # One is enough for the work. Two keep a node drain from leaving a minute
+  # with no scheduler, in which a due run is skipped; two get a PDB.
+  replicaCount: 1
+  # Empty means the same as `resources`.
+  resources: {}
+  # Not shared with the web pods, whose affinity rules may name their labels.
+  affinity: {}
 
 # Keeps the deployment available during a rolling update and a node drain.
 podDisruptionBudget:

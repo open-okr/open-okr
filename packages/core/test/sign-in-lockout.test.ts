@@ -1,5 +1,13 @@
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import { purgeStaleSignInAttempts } from "../src/auth/lockout.ts";
 
@@ -302,5 +310,202 @@ describe("the daily purge", () => {
       "select 1 from sign_in_attempts where account_key = 'stale'",
     );
     expect(stale.rows).toHaveLength(0);
+  });
+});
+
+/**
+ * Every password check behind a session counts toward the same hold
+ * (docs/design/account-self-service.md D3, plan 0.8.0 Y3). Before this only
+ * `/sign-in/email` was counted, so a stolen session cookie could test
+ * passwords freely through the password change, the second-factor endpoints
+ * and a server call to verify one.
+ */
+describe("password checks behind a session", () => {
+  const STOLEN = "203.0.113.40";
+  const NEW_PASSWORD = "a longer and newer passphrase";
+  let cookie: string;
+
+  const behindSession = (path: string, body: unknown, address = STOLEN) =>
+    auth.handler(
+      new Request(`${BASE_URL}/api/auth${path}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE_URL,
+          cookie,
+          "x-forwarded-for": address,
+        },
+        body: JSON.stringify(body),
+      }),
+    );
+
+  beforeEach(async () => {
+    const signedIn = await attempt("192.0.2.200", PASSWORD);
+    expect(signedIn.status).toBe(200);
+    cookie = signedIn.headers
+      .getSetCookie()
+      .map((header) => header.split(";")[0] as string)
+      .join("; ");
+  });
+
+  const wrongChanges = async (times: number) => {
+    for (let index = 0; index < times; index++) {
+      const response = await behindSession("/change-password", {
+        currentPassword: `wrong-${index}`,
+        newPassword: NEW_PASSWORD,
+      });
+      expect(response.status).toBe(400);
+    }
+  };
+
+  it("counts a wrong current password at the password change toward the sign-in hold", async () => {
+    await wrongChanges(5);
+    const held = await attempt(STOLEN, PASSWORD);
+    expect(held.status).toBe(429);
+    expect(((await held.json()) as { code: string }).code).toBe("SIGN_IN_HELD");
+  });
+
+  it("holds the sixth password change unchecked, with the wait", async () => {
+    await wrongChanges(5);
+    const held = await behindSession("/change-password", {
+      currentPassword: PASSWORD,
+      newPassword: NEW_PASSWORD,
+    });
+    expect(held.status).toBe(429);
+    expect(Number(held.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect(((await held.json()) as { code: string }).code).toBe("SIGN_IN_HELD");
+    // The right password was never checked, so nothing changed.
+    expect((await attempt("192.0.2.200", PASSWORD)).status).toBe(200);
+  });
+
+  it("counts a wrong password at each second-factor endpoint", async () => {
+    for (const path of [
+      "/two-factor/enable",
+      "/two-factor/enable",
+      "/two-factor/disable",
+      "/two-factor/generate-backup-codes",
+      "/two-factor/enable",
+    ]) {
+      expect((await behindSession(path, { password: "guess" })).status).toBe(
+        400,
+      );
+    }
+    expect((await attempt(STOLEN, PASSWORD)).status).toBe(429);
+  });
+
+  it("counts a server call that verifies a password", async () => {
+    const headers = new Headers({ cookie, "x-forwarded-for": STOLEN });
+    for (let index = 0; index < 5; index++) {
+      await expect(
+        auth.api.verifyPassword({ headers, body: { password: "guess" } }),
+      ).rejects.toMatchObject({ body: { code: "INVALID_PASSWORD" } });
+    }
+    await expect(
+      auth.api.verifyPassword({ headers, body: { password: PASSWORD } }),
+    ).rejects.toMatchObject({ body: { code: "SIGN_IN_HELD" } });
+  });
+
+  it("does not count a request Better Auth refuses before checking anything", async () => {
+    for (let index = 0; index < 6; index++) {
+      expect(
+        (
+          await behindSession("/change-password", {
+            currentPassword: `wrong-${index}`,
+            newPassword: "too short",
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (await behindSession("/two-factor/enable", { password: "" })).status,
+      ).toBe(400);
+    }
+    expect((await attempt(STOLEN, PASSWORD)).status).toBe(200);
+  });
+
+  it("is cleared by a check that succeeds, and not by one that is refused", async () => {
+    await wrongChanges(4);
+    // Refused unchecked: neither counted nor forgiven.
+    await behindSession("/change-password", {
+      currentPassword: PASSWORD,
+      newPassword: "too short",
+    });
+    await wrongChanges(1);
+    expect((await attempt(STOLEN, PASSWORD)).status).toBe(429);
+  });
+
+  it("forgets the run once the right password is given", async () => {
+    await wrongChanges(4);
+    const right = await behindSession("/change-password", {
+      currentPassword: PASSWORD,
+      newPassword: NEW_PASSWORD,
+    });
+    expect(right.status).toBe(200);
+    await wrongChanges(4);
+    expect((await attempt(STOLEN, NEW_PASSWORD)).status).toBe(200);
+  });
+
+  it("marks no address as known when a password change makes a session", async () => {
+    const changed = await behindSession("/change-password", {
+      currentPassword: PASSWORD,
+      newPassword: NEW_PASSWORD,
+      revokeOtherSessions: true,
+    });
+    expect(changed.status).toBe(200);
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query(
+      "select 1 from sign_in_attempts where last_success_at is not null",
+    );
+    // The sign-in in `beforeEach` marked its own address, and nothing else.
+    expect(rows).toHaveLength(1);
+  });
+});
+
+/**
+ * Behind a CDN, every visitor arrives from a few edge addresses
+ * (docs/design/trusted-proxies.md, plan 0.8.0 H2). Named as trusted proxies,
+ * those hops are walked past, so the pair counter is keyed on the person
+ * rather than on the edge, and one person's wrong passwords hold nobody else.
+ */
+describe("behind a trusted edge", () => {
+  const EDGE = "172.70.1.2";
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps one caller's pair hold from holding another caller behind the same edge", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "172.64.0.0/13");
+    const behind = build((await workerDb()).appPool);
+    for (let index = 0; index < 5; index++) {
+      await attempt(`198.51.100.7, ${EDGE}`, `wrong-${index}`, EMAIL, behind);
+    }
+    expect(
+      (await attempt(`198.51.100.7, ${EDGE}`, PASSWORD, EMAIL, behind)).status,
+    ).toBe(429);
+
+    expect(
+      (await attempt(`198.51.100.8, ${EDGE}`, PASSWORD, EMAIL, behind)).status,
+    ).toBe(200);
+  });
+
+  it("records the caller, not the edge, on the session", async () => {
+    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "172.64.0.0/13");
+    const behind = build((await workerDb()).appPool);
+    expect(
+      (
+        await attempt(
+          `203.0.113.66, 198.51.100.9, ${EDGE}`,
+          PASSWORD,
+          EMAIL,
+          behind,
+        )
+      ).status,
+    ).toBe(200);
+
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ ip_address: string }>(
+      "select ip_address from sessions order by created_at desc limit 1",
+    );
+    expect(rows[0]?.ip_address).toBe("198.51.100.9");
   });
 });

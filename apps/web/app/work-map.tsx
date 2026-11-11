@@ -8,6 +8,7 @@ import {
 import {
   Avatar,
   Bar,
+  buttonVariants,
   Card,
   CardBody,
   Chip,
@@ -368,11 +369,18 @@ export async function WorkMap({
   nodes,
   selected,
   canEdit,
+  canDraft,
   hrefFor,
 }: {
   readonly nodes: readonly MapNode[];
   readonly selected: MapNode | null;
   readonly canEdit: boolean;
+  /**
+   * Whether the reader may create an objective: `goals.createAccess`, the
+   * role's goal level, not `canEdit`, which every member holds through the
+   * workspace's self-service binding (workspace-roles.md §13, F-04).
+   */
+  readonly canDraft: boolean;
   /** Deep links every node, so a row is a URL somebody can send. */
   readonly hrefFor: (nodeId: string | null) => string;
 }) {
@@ -381,24 +389,33 @@ export async function WorkMap({
 
   return (
     <div className="flex flex-col gap-3.5 lg:flex-row lg:items-start">
-      {/* The first stop of the first-visit tour (L-08) outlines this. */}
-      <div className="min-w-0 flex-1" data-tour-target="work-map">
+      <div className="min-w-0 flex-1">
         <GoalTable
           nodes={nodes}
           selected={selected}
           rowHref={(node) => hrefFor(node.id)}
           empty={
-            <div className="flex flex-col gap-1.5 p-3">
+            <div className="flex flex-col items-start gap-1.5 p-3">
               <p className="text-sm text-ink-2">
                 {t("workMap.nothingInThisCycle")}
               </p>
               <p className="text-xs text-ink-3">
-                {t("workMap.objectivesAreDraftedIn")}{" "}
-                <Link className="underline" href="/cycle?phase=4">
+                {t("workMap.objectivesAreDraftedIn")}
+              </p>
+              {/* The one thing to do on an empty map, so it is a button
+                  rather than a link at the end of a grey sentence (plan
+                  0.8.0 L2). Drawn only for a reader who can draft, by the
+                  rule `goals.create` itself runs (workspace-roles.md §13);
+                  anybody else gets the explanation alone. */}
+              {canDraft ? (
+                <Link
+                  className={`${buttonVariants({ variant: "primary" })} mt-1.5`}
+                  href="/cycle?phase=4"
+                  data-testid="start-drafting"
+                >
                   {t("workMap.startDrafting")}
                 </Link>
-                .
-              </p>
+              ) : null}
             </div>
           }
         />

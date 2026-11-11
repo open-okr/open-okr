@@ -1837,7 +1837,7 @@
     "/people/updateOwnProfile": {
       "post": {
         "operationId": "people.updateOwnProfile",
-        "summary": "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+        "summary": "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
         "tags": [
           "people"
         ],
@@ -1971,6 +1971,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
                   "timezone": {
                     "type": "string"
                   },
@@ -3710,6 +3715,28 @@
                               "type": "null"
                             }
                           ]
+                        },
+                        "roleName": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "roleKey": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "owner",
+                                "admin",
+                                "member",
+                                "viewer"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -3726,7 +3753,9 @@
                         "primaryChannel",
                         "theme",
                         "density",
-                        "language"
+                        "language",
+                        "roleName",
+                        "roleKey"
                       ],
                       "additionalProperties": false
                     }
@@ -11764,7 +11793,8 @@
                               "check_in",
                               "support_request",
                               "support_ended",
-                              "connection_ended"
+                              "connection_ended",
+                              "self_deleted"
                             ]
                           },
                           "channel": {
@@ -11910,7 +11940,8 @@
                 "check_in",
                 "support_request",
                 "support_ended",
-                "connection_ended"
+                "connection_ended",
+                "self_deleted"
               ]
             }
           },
@@ -12525,7 +12556,8 @@
                         "check_in",
                         "support_request",
                         "support_ended",
-                        "connection_ended"
+                        "connection_ended",
+                        "self_deleted"
                       ]
                     },
                     "additionalProperties": {
@@ -12588,7 +12620,8 @@
                                 "check_in",
                                 "support_request",
                                 "support_ended",
-                                "connection_ended"
+                                "connection_ended",
+                                "self_deleted"
                               ]
                             },
                             {
@@ -12871,7 +12904,8 @@
                       "check_in",
                       "support_request",
                       "support_ended",
-                      "connection_ended"
+                      "connection_ended",
+                      "self_deleted"
                     ]
                   }
                 },
@@ -25856,6 +25890,73 @@
         ]
       }
     },
+    "/cycles/setupAccess": {
+      "get": {
+        "operationId": "cycles.setupAccess",
+        "summary": "Whether you may set up and run a cycle: create it, name its sponsor and facilitator, book its sessions, set the annual frame, publish and close.",
+        "tags": [
+          "cycles"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "canSetUp": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "canSetUp"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
+      }
+    },
     "/cycles/ensureCurrent": {
       "post": {
         "operationId": "cycles.ensureCurrent",
@@ -29901,6 +30002,63 @@
                                   "type": "string"
                                 }
                               },
+                              "needs": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "key": {
+                                      "type": "string",
+                                      "enum": [
+                                        "frame.missing",
+                                        "frame.mission",
+                                        "frame.strategy",
+                                        "frame.strategyCount",
+                                        "company.objective",
+                                        "role.sponsor",
+                                        "role.facilitator",
+                                        "pack.item",
+                                        "pack.distribute",
+                                        "sessions.dates",
+                                        "pack.lead",
+                                        "prior.scores",
+                                        "prior.unscored",
+                                        "baseline.health",
+                                        "issues.count",
+                                        "priorities.count",
+                                        "priorities.success",
+                                        "frame.notDoing",
+                                        "frame.agreement",
+                                        "revalidation.missing",
+                                        "revalidation.note",
+                                        "revalidation.outcome",
+                                        "focus.keyResults",
+                                        "focus.areas",
+                                        "drafting.quality",
+                                        "drafting.none",
+                                        "goal.quality",
+                                        "gate",
+                                        "publish",
+                                        "cadence.booking",
+                                        "cadence.decision",
+                                        "scores",
+                                        "retrospective"
+                                      ]
+                                    },
+                                    "text": {
+                                      "type": "string"
+                                    },
+                                    "ref": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "key",
+                                    "text"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              },
                               "blocked": {
                                 "type": "array",
                                 "items": {
@@ -29933,6 +30091,7 @@
                               "title",
                               "state",
                               "missing",
+                              "needs",
                               "blocked",
                               "conditions"
                             ],
@@ -42231,6 +42390,73 @@
             }
           }
         ]
+      }
+    },
+    "/goals/createAccess": {
+      "get": {
+        "operationId": "goals.createAccess",
+        "summary": "Whether you may create an objective: your role's level on goals, measured as the write measures it.",
+        "tags": [
+          "goals"
+        ],
+        "x-openokr-scope": "read",
+        "x-openokr-safety": "read",
+        "responses": {
+          "200": {
+            "description": "The action's own output, under `data`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "canCreate": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "canCreate"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/E400"
+          },
+          "401": {
+            "$ref": "#/components/responses/E401"
+          },
+          "403": {
+            "$ref": "#/components/responses/E403"
+          },
+          "404": {
+            "$ref": "#/components/responses/E404"
+          },
+          "405": {
+            "$ref": "#/components/responses/E405"
+          },
+          "409": {
+            "$ref": "#/components/responses/E409"
+          },
+          "422": {
+            "$ref": "#/components/responses/E422"
+          },
+          "429": {
+            "$ref": "#/components/responses/E429"
+          },
+          "500": {
+            "$ref": "#/components/responses/E500"
+          }
+        }
       }
     },
     "/goals/place": {

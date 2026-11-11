@@ -157,6 +157,9 @@ spec:
             - name: backups
               mountPath: /backups
               readOnly: true
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
       volumes:
         - name: backups
           {{- if .Values.backup.existingClaim }}
@@ -165,4 +168,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
 {{- end }}

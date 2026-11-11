@@ -11,7 +11,7 @@ Source: the OKRGoal UX review (`docs/audits/okrgoal-ux-habit-review-2026-10-13.m
 | Administrators, space coordinators and managers | **The cockpit**: Rhythm by team (each space's open goals not past due, weakest first), then the Work Map as it was: phase and gates, the numbers, the scope tabs and the company tree |
 | Everybody else | A link to the company map |
 
-The company tree is the Map tab of Goals (`/map`) for everybody. Its first-visit tour goes with it.
+The company tree is the Map tab of Goals (`/map`) for everybody. Its first-visit tour went with it until 0.8.0, which left most members never meeting it; since plan 0.8.0 T1 the shell offers the tour on whatever screen a first sign-in lands.
 
 ## 2. Rules
 

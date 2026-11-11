@@ -1,0 +1,36 @@
+{{- /* An autoscaler on the web Deployment only (plan 0.8.0 H10f,
+       docs/design/worker-deployment.md D16). The worker's load follows the
+       queue, not the traffic. A scale-down deletes a pod like any other, so
+       it gets the pause and the drain. */}}
+{{- if include "openokr.autoscaling" . }}
+{{- $autoscaling := .Values.autoscaling | default dict }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "openokr.fullname" . }}
+  labels:
+    {{- include "openokr.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "openokr.fullname" . }}
+  minReplicas: {{ include "openokr.minReplicas" . }}
+  maxReplicas: {{ include "openokr.maxReplicas" . }}
+  metrics:
+    # A share of resources.requests.cpu, so raise that from its 100m first.
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ dig "targetCPUUtilizationPercentage" 70 $autoscaling | int }}
+    {{- with (dig "targetMemoryUtilizationPercentage" 0 $autoscaling | int) }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ . }}
+    {{- end }}
+{{- end }}

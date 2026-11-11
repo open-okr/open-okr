@@ -140,23 +140,37 @@ test("the org chart tab renders at least one node", async () => {
   ).toBeVisible();
 });
 
+/** The signed-in member's own profile, as other people see it (Y2). */
+let profileUrl = "";
+
 test("the profile page loads for the signed-in member", async () => {
   await goTo(page, "/people");
   await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
   await page.waitForURL(/\/people\//);
-  // The profile shows the member's name and has a self-edit section.
+  // The profile shows the member's name, and its owner a way to Your account,
+  // where the self-edit forms have lived since plan 0.8.0 Y2.
   await expect(
     page.getByRole("heading", { name: INSTANCE_ACCOUNT.name }),
   ).toBeVisible();
+  profileUrl = page.url();
+  await page.getByTestId("edit-own-profile").click();
+  await page.waitForURL(/\/account$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Your account" }),
+  ).toBeVisible();
+  // A field since plan 0.8.0 Y5: the member renames themselves here.
+  await expect(page.getByTestId("account-name")).toHaveValue(
+    INSTANCE_ACCOUNT.name,
+  );
   await expect(
     page.getByRole("heading", { name: "Edit your profile" }),
   ).toBeVisible();
 });
 
 test("the profile has a timezone field", async () => {
-  // Already on the profile page from the previous test. A list to choose from
-  // since the field kit (guided-inputs §4.6): the name the form submits is the
-  // list's hidden field, and the box a person sees is labelled.
+  // On Your account from the previous test. A list to choose from since the
+  // field kit (guided-inputs §4.6): the name the form submits is the list's
+  // hidden field, and the box a person sees is labelled.
   await expect(page.getByLabel("Timezone")).toBeVisible();
   await expect(page.locator("input[name='timezone']")).toHaveCount(1);
 });
@@ -217,11 +231,14 @@ test("a member writes their own bio and reads it back", async () => {
     timeout: 15_000,
   });
 
-  await page.reload();
+  // Read back where other people read it, the profile, then back to Your
+  // account for the next test.
+  await goTo(page, profileUrl);
   await expect(page.getByRole("heading", { name: "Bio" })).toBeVisible();
   await expect(
     page.getByText("Runs the growth team from Kuala Lumpur.").first(),
   ).toBeVisible();
+  await goTo(page, "/account");
 });
 
 test("and both can be taken away again", async () => {
@@ -239,7 +256,7 @@ test("and both can be taken away again", async () => {
   await expect(page.getByText("Picture removed.", { exact: false })).toBeVisible(
     { timeout: 15_000 },
   );
-  await page.reload();
+  await goTo(page, profileUrl);
   await expect(page.getByRole("heading", { name: "Bio" })).toHaveCount(0);
   await expect(page.locator("img[src$='/thumbnail']")).toHaveCount(0);
 });
@@ -449,9 +466,8 @@ test("a goal, a space and a profile each carry their own feed", async () => {
  * that survived only a reload would be the behaviour this replaces.
  */
 test("a theme follows the member to another browser", async ({ browser }) => {
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // Appearance moved to Your account with the other self-edit forms (Y2).
+  await goTo(page, "/account");
 
   await expect(
     page.getByRole("heading", { name: "Appearance" }),
@@ -478,10 +494,8 @@ test("a theme follows the member to another browser", async ({ browser }) => {
   await second.close();
 
   // Back to following the system, so every spec after this one meets the
-  // instance it expects.
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // instance it expects. On Your account, where Y2 moved the control.
+  await goTo(page, "/account");
   await page.getByTestId("theme-system").first().click();
   await expect(page.getByTestId("theme-system").first()).toHaveAttribute(
     "aria-pressed",
@@ -587,9 +601,8 @@ test("the workspace feed inserts a row without a reload", async () => {
  * choice reaches the renderer at all.
  */
 test("a member's language reaches the document", async () => {
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // Appearance moved to Your account with the other self-edit forms (Y2).
+  await goTo(page, "/account");
 
   await expect(page.locator("html")).toHaveAttribute("lang", "en");
 
@@ -603,10 +616,9 @@ test("a member's language reaches the document", async () => {
   await goTo(page, "/");
   await expect(page.locator("html")).toHaveAttribute("lang", "ms");
 
-  // And back, so the instance is as it was for whatever spec runs next.
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // And back, so the instance is as it was for whatever spec runs next. Left
+  // in Malay, every later spec that finds a field by its English label fails.
+  await goTo(page, "/account");
   await page.getByTestId("language-en").click();
   await expect(page.locator("html")).toHaveAttribute("lang", "en", {
     timeout: 15_000,

@@ -1,9 +1,21 @@
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
+import { writeSettings } from "../src/secrets/instance-settings.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
+import { completeSetup } from "../src/setup/complete.ts";
+import { readSetupState } from "../src/setup/state.ts";
 import {
   COMPANY_EMAIL_MESSAGE,
+  REGISTRATION_CLOSED_MESSAGE,
   readRegistrationPolicy,
   registrationPolicyOrigin,
   registrationRefusal,
@@ -251,5 +263,87 @@ describe("invitation only and anyone (§3)", () => {
     });
     const response = await register("ana@gmail.com", "Ana");
     expect(response.status).toBe(200);
+  });
+});
+
+/**
+ * A closed policy must not stop the claim (registration-policy.md §10 D17,
+ * plan 0.8.0 H3).
+ *
+ * The setup wizard's sign-up is the claim. `OPENOKR_REGISTRATION=invite_only`
+ * means "closed behind the owner", so it was refusing the owner too, and the
+ * instance could never be claimed. An unclaimed instance, setup unfinished and
+ * no account, now admits its first account whatever the policy says, and the
+ * policy governs every account after it.
+ */
+describe("the first account on an unclaimed instance", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  /** The address the wizard is filled in with: free mail, the hardest case. */
+  const OWNER = "owner@gmail.com";
+
+  const emailVerified = async (email: string): Promise<boolean | undefined> => {
+    const wb = await workerDb();
+    const rows = await wb.admin.query<{ email_verified: boolean }>(
+      "select email_verified from users where email = $1",
+      [email],
+    );
+    return rows.rows[0]?.email_verified;
+  };
+
+  const closings: readonly [string, "invite_only" | "company_domains"][] = [
+    ["invitation only", "invite_only"],
+    ["company addresses only", "company_domains"],
+  ];
+
+  it.each(closings)(
+    "is admitted with %s from the variable, verified, and setup finishes",
+    async (_name, policy) => {
+      vi.stubEnv("OPENOKR_REGISTRATION", policy);
+      const response = await register(OWNER, "Owner");
+      expect(response.status).toBe(200);
+      expect(await usersCalled(OWNER)).toBe(1);
+      expect(await emailVerified(OWNER)).toBe(true);
+
+      const wb = await workerDb();
+      const finished = await completeSetup(wb.appPool, ring, { settings: [] });
+      expect(finished.claimed).toBe(true);
+      expect((await readSetupState(wb.appPool)).configured).toBe(true);
+    },
+  );
+
+  it.each(closings)("is admitted with %s stored", async (_name, policy) => {
+    const wb = await workerDb();
+    await writeSettings(wb.appPool, ring, [
+      { key: "registration.policy", value: policy, source: "admin" },
+    ]);
+    const response = await register(OWNER, "Owner");
+    expect(response.status).toBe(200);
+    expect(await usersCalled(OWNER)).toBe(1);
+    expect(await emailVerified(OWNER)).toBe(true);
+  });
+
+  it("leaves the policy to govern the next sign-up, which is refused with the closed sentence", async () => {
+    vi.stubEnv("OPENOKR_REGISTRATION", "invite_only");
+    expect((await register(OWNER, "Owner")).status).toBe(200);
+    const wb = await workerDb();
+    await completeSetup(wb.appPool, ring, { settings: [] });
+
+    const second = await register("ana@acme.example", "Ana");
+    expect(second.status).toBeGreaterThanOrEqual(400);
+    expect(await second.text()).toContain(REGISTRATION_CLOSED_MESSAGE);
+    expect(await usersCalled("ana@acme.example")).toBe(0);
+  });
+
+  it("refuses a second account while setup is still unfinished, because one exists", async () => {
+    vi.stubEnv("OPENOKR_REGISTRATION", "invite_only");
+    expect((await register(OWNER, "Owner")).status).toBe(200);
+
+    const second = await register("ana@acme.example", "Ana");
+    expect(second.status).toBeGreaterThanOrEqual(400);
+    expect(await second.text()).toContain(REGISTRATION_CLOSED_MESSAGE);
+    expect(await usersCalled("ana@acme.example")).toBe(0);
   });
 });

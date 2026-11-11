@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
-import { expect, test } from "./fixtures.ts";
-import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
+import { expect, TOUR_COOKIE, test } from "./fixtures.ts";
+import { getStarted, INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
 import { choose, chooseAt } from "./pickers.ts";
 
 /**
@@ -44,6 +44,7 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
+  await getStarted(page);
 
   /**
    * **A first sign-in goes to onboarding now, and that is P6-G26.** Before it,
@@ -91,59 +92,76 @@ test("registering provisions a workspace and lands on the dashboard", async () =
 });
 
 /**
- * The first-visit tour (UIUX-PLAN S-34, completeness review L-08).
+ * The product tour on a first sign-in (UIUX-PLAN S-34, plan 0.8.0 T1).
  *
- * "Per user on first visit: a five-stop tour covering the Work Map, the review
- * inbox, a check-in, the cycle strip and ⌘K." The account registered above is
- * on its first visit, so this is the one place the tour can be walked from its
- * start. **Finishing it here is also what keeps it out of every later spec**:
- * they all sign in as this account, and the tour is remembered on the member,
- * so none of them meets it.
+ * The account registered above is on its first visit, so this is the one place
+ * the tour can be walked from its start. Every other spec's browser starts as
+ * if the tour had ended in it (`TOUR_COOKIE` in fixtures.ts), and this one
+ * opts back in. **Finishing it here also keeps it out of every later spec**:
+ * they sign in as this account, and the tour is remembered on the member.
  */
-test("a first visit is offered a five-stop tour, and finishing it ends it for good", async () => {
+test("a first sign-in is offered the tour, which ends on the cycle page and for good", async () => {
+  const origin = new URL(page.url()).origin;
+  await context.addCookies([{ name: TOUR_COOKIE, value: "on", url: origin }]);
+  await page.evaluate(() => window.localStorage.removeItem("openokr.tour.ended"));
   await page.goto("/");
-  const tour = page.getByRole("region", { name: "Finding your way around" });
-  await expect(tour).toBeVisible({ timeout: 15_000 });
+
+  const welcome = page.getByTestId("tour-welcome");
+  await expect(welcome).toBeVisible({ timeout: 15_000 });
+  await expect(welcome).toHaveAttribute("aria-modal", "true");
+  await expect(page.getByTestId("tour-start")).toBeFocused();
 
   // `s43-accessibility` scans every screen as this account, which never sees
-  // the tour again after this test, so the card is scanned here, while it is
-  // on screen, against the same rules and the same failing impacts.
-  const scan = await new AxeBuilder({ page })
-    .include('[data-testid="first-visit-tour"]')
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-    .analyze();
-  expect(
-    scan.violations
-      .filter((one) => one.impact === "serious" || one.impact === "critical")
-      .map((one) => `${one.id}: ${one.help}`),
-  ).toEqual([]);
+  // the tour again after this test, so the dialogs are scanned here, against
+  // the same rules and the same failing impacts.
+  const scan = async (selector: string) => {
+    const result = await new AxeBuilder({ page })
+      .include(selector)
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+      .analyze();
+    expect(
+      result.violations
+        .filter((one) => one.impact === "serious" || one.impact === "critical")
+        .map((one) => `${one.id}: ${one.help}`),
+    ).toEqual([]);
+  };
+  await scan('[data-testid="tour-welcome"]');
 
-  const stops = ["work-map", "review", "check-in", "cycle-strip", "search"];
-  for (const [index, stop] of stops.entries()) {
-    await expect(tour.getByTestId("tour-progress")).toContainText(
-      `${index + 1} / ${stops.length}`,
-    );
-    await expect(tour.getByTestId("tour-stop")).toHaveAttribute(
-      "data-stop",
-      stop,
-    );
-    // The stop sits on the page root, which is what outlines the thing it
-    // names: the tree, the Review link, the strip, the search box.
-    await expect(page.locator("html")).toHaveAttribute("data-tour-stop", stop);
-    await tour.getByTestId("tour-next").click();
+  // The keyboard alone: Enter starts it, the arrow keys move.
+  await page.keyboard.press("Enter");
+  const tour = page.getByTestId("tour");
+  await expect(tour).toHaveAttribute("data-step", "home");
+  await expect(page.getByTestId("tour-light")).toBeVisible();
+  await scan('[data-testid="tour-card"]');
+  const count = (await page.getByTestId("tour-count").textContent()) ?? "";
+  const total = Number(count.split(" of ")[1]);
+  expect(total).toBeGreaterThanOrEqual(4);
+
+  await page.keyboard.press("ArrowRight");
+  await expect(tour).toHaveAttribute("data-step", "review");
+  await page.keyboard.press("ArrowLeft");
+  await expect(tour).toHaveAttribute("data-step", "home");
+
+  // Nothing behind the tour can be pressed while it is open.
+  await expect(page.getByTestId("tour-card")).toBeVisible();
+  for (let step = 1; step < total; step += 1) {
+    await page.getByTestId("tour-next").click();
   }
+  await expect(page.getByTestId("tour-count")).toHaveText(`${total} of ${total}`);
+  const last = page.getByTestId("tour-next");
+  await expect(last).toHaveText("Start drafting OKRs");
+  await last.click();
+  await expect(page).toHaveURL(/\/cycle$/, { timeout: 15_000 });
+  await expect(tour).toHaveCount(0);
 
-  // The last press was Done: the card goes, and so does the outline.
-  await expect(tour).toHaveCount(0, { timeout: 15_000 });
-  await expect(page.locator("html")).not.toHaveAttribute("data-tour-stop");
-
-  // Remembered on the member rather than the page: a fresh load of the front
-  // door does not offer it again.
+  // Remembered on the member rather than the page or this browser.
+  await page.evaluate(() => window.localStorage.removeItem("openokr.tour.ended"));
   await page.goto("/");
   await expect(
     page.getByRole("heading", { level: 1, name: "Work map" }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId("first-visit-tour")).toHaveCount(0);
+  await expect(page.getByTestId("tour-welcome")).toHaveCount(0);
+  await context.clearCookies({ name: TOUR_COOKIE });
 });
 
 test("the front door shows what provisioning resolved, with nothing configured", async () => {
@@ -442,6 +460,15 @@ test("the planning phases complete from the browser, and the gaps clear", async 
   await expect(
     page.getByRole("button", { name: "Confirm distribution" }),
   ).toBeVisible({ timeout: 15_000 });
+
+  // Each gap leads to where it is filled in (plan 0.8.0 F1): the item's own
+  // row, with the keyboard already there.
+  await page
+    .getByTestId("need-link")
+    .filter({ hasText: /^Input pack item 4 is missing/ })
+    .click();
+  await expect(page).toHaveURL(/#pack-item-4$/);
+  await expect(page.locator("#pack-item-4 :focus")).toHaveCount(1);
 
   // The rest of the input pack.
   const ungathered = page.getByRole("button", { name: /^Mark ".*" as gathered$/ });

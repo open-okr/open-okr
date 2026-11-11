@@ -21,8 +21,9 @@
  * **Several hosts are wasteful rather than dangerous**, which is a weaker
  * guarantee than the relay's and worth stating. pg-boss keeps one schedule per
  * job name however many processes declare it, and hands a queued job to one
- * worker. What several hosts cost is the polling. `OPENOKR_SCHEDULER=off`
- * leaves one instance doing it.
+ * worker. What several hosts cost is the polling. `OPENOKR_SCHEDULER=elsewhere`
+ * on the serving replicas leaves one instance doing it, which is what the Helm
+ * chart's worker does (plan 0.8.0 H10d, docs/design/worker-deployment.md D2).
  *
  * **A failing workspace never stops the sweep.** `agents.runChampion` raises
  * `not_found` for a workspace whose Champion is turned off, which is an
@@ -55,18 +56,22 @@ import {
   purgeStaleSignInAttempts,
   purgeWebhookDeliveries,
   recheckSSODomains,
+  recordSchedulerHeartbeat as recordSharedHeartbeat,
   remindBeforeErasure,
   remindTrialsEnding,
   reportError,
+  runDueDeletions,
   sweepEndedCycles,
   sweepExpiredSessions,
   sweepTrials,
 } from "@openokr/core";
+import { schedulerMode } from "./background-work";
 import { getDns } from "./dns";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
+import { onShutdown } from "./shutdown";
 import { getStorage } from "./storage";
 
 const log = (message: string): void => {
@@ -77,11 +82,22 @@ const logError = (message: string): void => {
   process.stderr.write(`scheduler: ${message}\n`);
 };
 
+/**
+ * How long before the drain's bound pg-boss hands back the jobs still
+ * running (docs/design/worker-deployment.md D7): time for it to fail them and
+ * close its pool before the process exits.
+ */
+const HAND_BACK_BEFORE_MS = 3_000;
+
+/** pg-boss's own floor for a stop's timeout. */
+const MIN_HAND_BACK_MS = 1_000;
+
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
 /**
- * Whether this process runs the recurring work.
+ * Whether this process runs the recurring work: `on` only. `elsewhere` means
+ * another process of this instance runs it (`background-work.ts`).
  *
  * Read through the validated environment rather than `process.env`, so
  * `OPENOKR_SCHEDULER=of` is a boot error naming the variable rather than a
@@ -90,7 +106,7 @@ const reason = (error: unknown): string =>
 export function schedulerEnabled(
   env: Pick<Env, "OPENOKR_SCHEDULER"> = loadEnv(),
 ): boolean {
-  return env.OPENOKR_SCHEDULER !== "off";
+  return schedulerMode(env) === "on";
 }
 
 /** A workspace, as much of it as a scheduled run needs to decide. */
@@ -150,6 +166,11 @@ export interface ScheduledRun {
     // support-access.md §5). Access is refused at expiry without it; this
     // stamps the row and suspends the operator's member (plan 0.7.0, B2).
     | "support.sweepExpired"
+    // Deleting the accounts whose fourteen days have passed, and the
+    // day-before mails (docs/design/account-deletion.md §7, plan 0.8.0 Y7).
+    // Not a registry action: a person's own account is no workspace's, and
+    // `pnpm account:delete-due` is the operator half.
+    | "account.runDeletions"
     // Storing the alignment scores no structural write has stored yet, such
     // as an upgraded instance's earlier cycles (alignment-engine.md §10,
     // plan 0.7.0 D2). `alignment.score` computes them on read meanwhile.
@@ -336,6 +357,15 @@ const SUPPORT_SWEEP_CRON = "*/5 * * * *";
  * may pay for the graph on a cycle nothing has written to since the upgrade.
  * Once every scope has a row the pass is one indexed query per workspace.
  */
+/**
+ * Deleting your own account (account-deletion.md §3.3, plan 0.8.0 Y7). Hourly,
+ * at a minute no other hourly job takes. A request runs in the hour its
+ * fourteen days end, and a workspace whose erasure failed is retried the
+ * next hour from the ledger. The pass is one indexed read when nothing is due.
+ */
+const ACCOUNT_DELETION_JOB = "account.runDeletions";
+const ACCOUNT_DELETION_CRON = "45 * * * *";
+
 const ALIGNMENT_FILL_JOB = "alignment.fillScores";
 const ALIGNMENT_FILL_CRON = "35 * * * *";
 
@@ -449,6 +479,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: SUPPORT_SWEEP_JOB,
     action: "support.sweepExpired",
     cron: SUPPORT_SWEEP_CRON,
+    instance: true,
+  },
+  {
+    job: ACCOUNT_DELETION_JOB,
+    action: "account.runDeletions",
+    cron: ACCOUNT_DELETION_CRON,
     instance: true,
   },
   {
@@ -640,6 +676,17 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     }
     return;
   }
+  if (run.action === "account.runDeletions") {
+    const { reminded, completed, cancelled, failed } = await runDueDeletions(
+      getPool(),
+    );
+    if (reminded + completed + cancelled + failed > 0) {
+      log(
+        `account.runDeletions reminded ${reminded}, deleted ${completed}, cancelled ${cancelled}, failed ${failed} (retried next hour)`,
+      );
+    }
+    return;
+  }
   if (run.action === "alignment.fillScores") {
     // Straight to the fill, as the system: it walks every workspace, has no
     // member to act as, and stores what a structural write would have.
@@ -782,11 +829,16 @@ async function runOne(
  * green and the status page called the scheduler operational for two hours
  * after a boot that never started it. Both read this now.
  */
-export type SchedulerState = "off" | "starting" | "running" | "failed";
+export type SchedulerState =
+  | "off"
+  | "elsewhere"
+  | "starting"
+  | "running"
+  | "failed";
 
 const globals = globalThis as typeof globalThis & {
   openokrScheduler?: PgBossJobQueue;
-  openokrSchedulerState?: Exclude<SchedulerState, "off">;
+  openokrSchedulerState?: Exclude<SchedulerState, "off" | "elsewhere">;
   /** Updated after each successful scheduler sweep (P8-T06c). */
   openokrSchedulerLastRunAt?: number;
   /** Set to `Date.now()` at boot so the status endpoint does not report
@@ -802,7 +854,18 @@ const globals = globalThis as typeof globalThis & {
  * this to decide whether the scheduler component is operational.
  */
 function recordSchedulerHeartbeat(): void {
-  globals.openokrSchedulerLastRunAt = Date.now();
+  const now = Date.now();
+  globals.openokrSchedulerLastRunAt = now;
+  // And in the database, so every pod's /api/status reads the same answer
+  // (plan 0.8.0 H12). A failed write leaves this pod's own reading, which is
+  // what the endpoint used before, so it is logged rather than thrown.
+  recordSharedHeartbeat(getPool(), getKeyRing(), new Date(now)).catch(
+    (error: unknown) => {
+      log(
+        `could not record the heartbeat: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    },
+  );
 }
 
 /**
@@ -821,10 +884,14 @@ export function schedulerBootedAt(): number | null {
   return globals.openokrSchedulerBootedAt ?? null;
 }
 
-/** The scheduler's state in this process. */
+/**
+ * The scheduler's state in this process. `off` and `elsewhere` are the two
+ * ways it does not run here (plan 0.8.0 H10d); `/api/health` says which.
+ */
 export function schedulerState(): SchedulerState {
-  if (!schedulerEnabled()) {
-    return "off";
+  const mode = schedulerMode();
+  if (mode !== "on") {
+    return mode;
   }
   return globals.openokrSchedulerState ?? "starting";
 }
@@ -841,7 +908,12 @@ export function schedulerState(): SchedulerState {
  * discover through a serving outage than through a log line.
  */
 export function startScheduler(): PgBossJobQueue | null {
-  if (!schedulerEnabled()) {
+  const mode = schedulerMode();
+  if (mode === "elsewhere") {
+    log("runs elsewhere (OPENOKR_SCHEDULER=elsewhere)");
+    return null;
+  }
+  if (mode === "off") {
     log("disabled by OPENOKR_SCHEDULER=off");
     return null;
   }
@@ -937,12 +1009,28 @@ export function startScheduler(): PgBossJobQueue | null {
   })();
 
   // Lets a job already running finish rather than orphaning it as an active
-  // row that only expires on a timeout.
-  const stop = () => {
-    void queue.stop();
-  };
-  process.once("SIGTERM", stop);
-  process.once("SIGINT", stop);
+  // row that only expires on a timeout, within the drain: three seconds
+  // before its bound, pg-boss hands back whatever is still running, and
+  // another scheduler retries it at once (plan 0.8.0 H10a,
+  // docs/design/worker-deployment.md D7). A Champion or Coach run retried this
+  // way starts again from its first workspace; nudges are deduplicated per
+  // subject per member per day, so the repeat sends nothing twice.
+  onShutdown({
+    name: "scheduler",
+    phase: "drain",
+    async stop(deadline) {
+      await queue.stop({
+        timeoutMs: Math.max(
+          MIN_HAND_BACK_MS,
+          deadline - Date.now() - HAND_BACK_BEFORE_MS,
+        ),
+      });
+      const handedBack = queue.running;
+      return handedBack === 0
+        ? "scheduler idle"
+        : `scheduled jobs handed back: ${handedBack}`;
+    },
+  });
 
   return queue;
 }

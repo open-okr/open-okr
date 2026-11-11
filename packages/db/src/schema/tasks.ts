@@ -47,10 +47,11 @@ export const tasks = pgTable("tasks", {
     .notNull()
     .references(() => workspaces.id, { onDelete: "cascade" }),
   /**
-   * The public address (TECHNICAL-PLAN §3, migration 0163). Nullable until
-   * 0.8.0 for a rolling upgrade (docs/design/short-ids.md S3).
+   * The public address (TECHNICAL-PLAN §3, migration 0163). Not null from
+   * migration 0165, after a release nullable for a rolling upgrade
+   * (docs/design/short-ids.md S3).
    */
-  shortId: text("short_id").$defaultFn(newShortId),
+  shortId: text("short_id").notNull().$defaultFn(newShortId),
   spaceId: uuid("space_id")
     .notNull()
     .references(() => spaces.id, { onDelete: "cascade" }),

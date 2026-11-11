@@ -26,6 +26,16 @@ export const testDbEnv = {
   spikeLeakDatabase: "openokr_spike_leak",
   ownerRole: "openokr_owner",
   appRole: "openokr_app",
+  /**
+   * `TEST_PGVECTOR=1`: this Postgres offers pgvector, and the suite must take
+   * the vector path (plan 0.8.0 H5). The template gets the extension from the
+   * superuser before migrations run, as an operator enables it on managed
+   * Postgres: pgvector is not a trusted extension, so the owner role the
+   * migrations run as cannot create it. The pgvector tests then fail rather
+   * than skip when the extension is missing. CI's pgvector leg sets it; the
+   * default stack has no pgvector and leaves it unset.
+   */
+  pgvector: process.env.TEST_PGVECTOR === "1",
 } as const;
 
 /**

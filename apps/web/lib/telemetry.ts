@@ -5,6 +5,7 @@ import {
   setDefaultMetrics,
 } from "@openokr/core";
 import { getPool } from "./pool";
+import { onShutdown, waitForActions } from "./shutdown";
 
 /**
  * This process's meter (P7-T06a).
@@ -105,6 +106,22 @@ export function isMetricsEnabled(): boolean {
  * instead of assembling the pieces itself.
  */
 export function installTelemetry(): void {
+  // A stop waits for the actions in flight, the number the concurrency gauge
+  // below already reads, and then flushes the spans they left (plan 0.8.0
+  // H10a, docs/design/worker-deployment.md §1.1). Registered first, so a
+  // meter that cannot be built still leaves the wait in place.
+  onShutdown(waitForActions(currentConcurrentActions));
+  onShutdown({
+    name: "telemetry",
+    phase: "flush",
+    async stop() {
+      // The exporter's own bound is five seconds (`otel.ts`), and its
+      // failure is written to the log there rather than thrown.
+      await globals.openokrTelemetry?.stop();
+      return "telemetry flushed";
+    },
+  });
+
   const telemetry = getTelemetry();
   setDefaultMetrics(telemetry);
 

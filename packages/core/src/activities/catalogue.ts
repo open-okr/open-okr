@@ -137,6 +137,17 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // erased, and writing who into a row every member can read undid it.
   "member.erased": z.object({}),
   /**
+   * A member deleted their own account and this workspace erased them
+   * (account-deletion.md §3.3, plan 0.8.0 Y7). Counts of what now needs an
+   * owner, never titles: the row is on the feed every member reads, and a
+   * private goal's title is not theirs to see.
+   */
+  "member.self_deleted": z.object({
+    goals: z.number().int().nonnegative(),
+    keyResults: z.number().int().nonnegative(),
+    reviews: z.number().int().nonnegative(),
+  }),
+  /**
    * A member an import created or claimed (P6-T03a).
    *
    * `matched` says which of the three it was: a placeholder written now, a row

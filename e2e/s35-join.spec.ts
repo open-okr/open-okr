@@ -23,7 +23,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
-import { INSTANCE_ACCOUNT } from "./instance-account.ts";
+import { getStarted, INSTANCE_ACCOUNT } from "./instance-account.ts";
 import { chooseAt } from "./pickers.ts";
 
 const { email: OWNER_EMAIL, password: OWNER_PASSWORD } = INSTANCE_ACCOUNT;
@@ -163,6 +163,7 @@ test("the invitee follows the address, signs up, and lands in the workspace", as
   await guest
     .getByRole("button", { name: "Create account" })
     .click();
+  await getStarted(guest);
 
   // They land in the product, in the workspace that invited them, rather than
   // in one of their own. `provisionWorkspaceForUser` returns the membership it
@@ -273,6 +274,7 @@ test("the guest is told what they are joining, and lands with one space", async 
   await visitor.getByLabel("Email").fill(VISITOR_EMAIL);
   await visitor.getByLabel("Password", { exact: true }).fill(GUEST_PASSWORD);
   await visitor.getByRole("button", { name: "Create account" }).click();
+  await getStarted(visitor);
   await expect(
     visitor.getByRole("navigation", { name: "Primary" }),
   ).toBeVisible({ timeout: 20_000 });

@@ -188,6 +188,54 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # **The pgvector leg** (plan 0.8.0 H5, docs/design/pgvector-migration.md
+  # §3.6). Managed Postgres offers pgvector by default, and until 0.8.0
+  # migration 0031 stopped every install that had it. The test stack has no
+  # pgvector, so no test ever took that branch. This runs the migrations and
+  # the embedding tests on a Postgres that has it. The default stack stays
+  # plain Postgres, because the product must be whole without the extension.
+  #
+  # `TEST_PGVECTOR=1` gives the test template the extension before the
+  # migrations run, as an operator enables it on managed Postgres (it is not
+  # a trusted extension, so the owner role cannot create it), and makes every
+  # pgvector test fail rather than skip when the extension is missing.
+  pgvector:
+    name: Migrations and retrieval on pgvector
+    needs: scope
+    if: needs.scope.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        # A free host port, read back below, for the reason the test job
+        # asks Docker for one.
+        ports:
+          - 5432/tcp
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/setup
+
+      - name: Migrations, then retrieval by vector
+        env:
+          TEST_DB_PORT: ${{ job.services.postgres.ports['5432'] }}
+          TEST_PGVECTOR: "1"
+        run: >-
+          pnpm exec vitest run --config vitest.ci.config.ts
+          packages/db/test/migrate.test.ts
+          packages/db/test/pgvector.test.ts
+          packages/core/test/embeddings-pgvector.test.ts
+          packages/core/test/embeddings-retrieval.test.ts
+          packages/core/test/embeddings-worker.test.ts
+
   # **This job is the AI-off leg** (PLAN.md §9, AI-NATIVE-PLAN §10,
   # docs/design/ai-off-leg.md). It boots with no AI provider, runs every P0
   # flow (`e2e/p0-flows.ts` names them) and `e2e/ai-off.spec.ts` proves no
@@ -435,7 +483,7 @@ jobs:
   # documentation-only skip can change without touching branch protection.
   ci:
     name: CI
-    needs: [scope, quality, test, e2e, deploy, helm, flakiness, build, image, compliance]
+    needs: [scope, quality, test, pgvector, e2e, deploy, helm, flakiness, build, image, compliance]
     if: always()
     runs-on: ubuntu-latest
     steps:

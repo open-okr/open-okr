@@ -45,6 +45,9 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.branding.mirror.part.logo",
   // A version number and nothing else (docs/design/version-footer.md).
   "shell.version.running",
+  // "Demo" is the word Malay uses, as for logo and favicon above; the pill's
+  // full sentence is translated (plan 0.8.0 D1).
+  "shell.demo.label",
   "method.detail.okrChampion",
   "method.detail.okrCoach",
   "admin.ai.providerAnthropic",
@@ -86,8 +89,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.sso.ssoForm.urlPlaceholder",
   "common.esc",
   "common.enter",
-  // The shortcut itself, as the tour's last stop is named for it (L-08).
-  "tour.search.title",
   // Abbreviations the method keeps in English in every language.
   "common.ai",
   "dev.components.ai",
@@ -150,6 +151,11 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Tab titles that are only the workspace term, or "Import", which Malay
   // borrows.
   "pageTitle.adminImports",
+  // The same three words as navigation labels (UAT 0.8.0 F-08): "Import",
+  // which Malay borrows, and the abbreviations AI and OKR.
+  "nav.item.admin-imports",
+  "nav.item.admin-ai",
+  "nav.group.okr",
   "pageTitle.checkIn",
   "pageTitle.cycle",
   "pageTitle.kpi",
@@ -180,7 +186,6 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "sessions.schedule.facilitator",
   "sessions.schedule.space",
   "spaces.spaces",
-  "tour.checkIn.title",
   // A line made only of holes: the workspace's own word for its key
   // results and how many there are. Nothing to translate.
   "okrList.keyResultsBand",

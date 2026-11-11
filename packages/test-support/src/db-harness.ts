@@ -159,6 +159,7 @@ const templateFingerprint = async (): Promise<string> => {
     JSON.stringify({
       owner: testDbEnv.ownerRole,
       app: testDbEnv.appRole,
+      pgvector: testDbEnv.pgvector,
       v: 1,
     }),
   );
@@ -212,6 +213,17 @@ export default async function setupTemplateDatabase(): Promise<void> {
         `create database ${testDbEnv.templateDatabase} owner ${testDbEnv.ownerRole} ` +
           `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
       );
+
+      // The extension an operator enables before installing, on the
+      // pgvector leg only (`TEST_PGVECTOR`). Migration 0031 then finds it,
+      // as it does on managed Postgres. A server without pgvector fails here,
+      // because a leg that asked for vectors and silently took full text
+      // would prove nothing.
+      if (testDbEnv.pgvector) {
+        await withSuperuser(testDbEnv.templateDatabase, (template) =>
+          template.query("create extension if not exists vector"),
+        );
+      }
 
       // Migrations run as the owner role, exactly as production will, so an
       // accidental superuser-only assumption in a migration fails here.

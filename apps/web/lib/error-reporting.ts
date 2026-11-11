@@ -22,6 +22,7 @@ import {
   reportError,
 } from "@openokr/core";
 import { RUNNING_VERSION } from "./app-version";
+import { onShutdown } from "./shutdown";
 import { getTelemetry } from "./telemetry";
 
 const globals = globalThis as typeof globalThis & {
@@ -94,12 +95,16 @@ function installProcessHandlers(): void {
       reportError(reason, { source: "process" });
     });
   }
-  // Beside the relay's drain: whatever is still held goes out before exit.
-  const flush = () => {
-    void flushErrorReports(SHUTDOWN_FLUSH_MS);
-  };
-  process.once("SIGTERM", flush);
-  process.once("SIGINT", flush);
+  // After the relay's and the scheduler's drain, so what they reported while
+  // stopping goes out too, and before exit (plan 0.8.0 H10a).
+  onShutdown({
+    name: "error reports",
+    phase: "flush",
+    async stop() {
+      await flushErrorReports(SHUTDOWN_FLUSH_MS);
+      return "error reports flushed";
+    },
+  });
 }
 
 /**

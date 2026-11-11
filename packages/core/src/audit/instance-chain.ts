@@ -126,6 +126,23 @@ export async function recordInstanceAuditEvent(
 }
 
 /**
+ * Takes the lock every append takes, until the caller's transaction ends.
+ *
+ * For a caller that reads the chain and appends only when what it read says
+ * to, such as the caller-address reading (trusted-proxies.md D11): the read
+ * and the append are one decision only when nothing can append in between.
+ * The lock is re-entrant within a transaction, so the append that follows
+ * takes it again without waiting.
+ */
+export async function lockInstanceChain(
+  tx: Pick<ReturnType<typeof drizzle>, "execute">,
+): Promise<void> {
+  await tx.execute(
+    sql`select pg_advisory_xact_lock(${INSTANCE_AUDIT_LOCK_KEY})`,
+  );
+}
+
+/**
  * The same, on a transaction the caller holds with the instance-admin flag set,
  * so the row commits or rolls back with the caller's own change. Erasure's claim
  * and its receipt use it (docs/design/workspace-erasure.md §4).
@@ -134,9 +151,7 @@ export async function appendInstanceAuditInTx(
   tx: Pick<ReturnType<typeof drizzle>, "execute" | "select" | "insert">,
   input: RecordInstanceAuditEventInput,
 ): Promise<void> {
-  await tx.execute(
-    sql`select pg_advisory_xact_lock(${INSTANCE_AUDIT_LOCK_KEY})`,
-  );
+  await lockInstanceChain(tx);
 
   const [head] = await tx
     .select({

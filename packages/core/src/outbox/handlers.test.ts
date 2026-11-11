@@ -3,10 +3,18 @@ import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import { agentRunChangedEvent } from "../agents/live.ts";
 import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
+import {
+  CHANGE_EMAIL_TOPIC,
+  EMAIL_CHANGE_NOTICE_TOPIC,
+  EMAIL_CHANGE_TAKEN_TOPIC,
+} from "../auth/email-change.ts";
+import { PASSWORD_CHANGED_TOPIC } from "../auth/password-change.ts";
+import { VERIFY_EMAIL_TOPIC } from "../auth/verification-links.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
   dispatchOutbox,
   OUTBOX_HANDLERS,
+  OUTBOX_REDACT_ON_DELIVERY,
   type OutboxDelivery,
   type OutboxHandlerDeps,
 } from "./handlers.ts";
@@ -195,6 +203,164 @@ describe("invitation email", () => {
   });
 });
 
+/**
+ * The link that confirms an address (email-verification.md D5). The checks
+ * that read the account need a database and are in
+ * `packages/core/test/email-verification.test.ts`; these are the ones that
+ * must be decided before anything is read.
+ */
+describe("a confirmation link", () => {
+  const link = (over: Record<string, unknown> = {}) =>
+    delivery(VERIFY_EMAIL_TOPIC, {
+      userId: "u1",
+      to: "amara@example.com",
+      url: "https://okr.example.com/api/auth/verify-email?token=t",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      reason: "sign_up",
+      ...over,
+    });
+
+  it("fails permanently when the row has no link, because no retry will add one", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(link({ url: undefined }), deps),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+
+  it("skips when no mail is configured, before reading anything", async () => {
+    const { skipped, sent, deps } = recorder();
+    const { sendMail: _sendMail, ...withoutMail } = deps;
+    await dispatchOutbox(link(), withoutMail);
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([
+      [VERIFY_EMAIL_TOPIC, "no mail transport is configured"],
+    ]);
+  });
+
+  it("skips a link that has expired, because nobody could use it", async () => {
+    const { skipped, sent, deps } = recorder();
+    await dispatchOutbox(
+      link({ expiresAt: new Date(Date.now() - 1000).toISOString() }),
+      deps,
+    );
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([[VERIFY_EMAIL_TOPIC, "the link has expired"]]);
+  });
+
+  it("loses the address and the link once delivered", () => {
+    expect(OUTBOX_REDACT_ON_DELIVERY[VERIFY_EMAIL_TOPIC]).toEqual([
+      "to",
+      "url",
+    ]);
+  });
+});
+
+/**
+ * The notice that a password changed (account-self-service.md §4.2). Reading
+ * the account needs a database and is in `packages/core/test/
+ * password-change.test.ts`.
+ */
+describe("a password notice", () => {
+  const notice = (over: Record<string, unknown> = {}) =>
+    delivery(PASSWORD_CHANGED_TOPIC, {
+      userId: "u1",
+      to: "amara@example.com",
+      via: "change",
+      otherSessionsEnded: true,
+      at: new Date().toISOString(),
+      ...over,
+    });
+
+  it("fails permanently when the row cannot say how the password changed", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(notice({ via: "guessed" }), deps),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+
+  it("skips when no mail is configured, before reading anything", async () => {
+    const { skipped, sent, deps } = recorder();
+    const { sendMail: _sendMail, ...withoutMail } = deps;
+    await dispatchOutbox(notice(), withoutMail);
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([
+      [PASSWORD_CHANGED_TOPIC, "no mail transport is configured"],
+    ]);
+  });
+
+  it("loses the address once delivered", () => {
+    expect(OUTBOX_REDACT_ON_DELIVERY[PASSWORD_CHANGED_TOPIC]).toEqual(["to"]);
+  });
+});
+
+/**
+ * The three mails of a change of sign-in email (account-self-service.md
+ * §4.2, plan 0.8.0 Y4). Reading the account needs a database and is in
+ * `packages/core/test/email-change.test.ts`.
+ */
+describe("a change of sign-in email", () => {
+  it("fails permanently when a row is missing what its mail needs", async () => {
+    const { deps } = recorder();
+    for (const [topic, payload] of [
+      [CHANGE_EMAIL_TOPIC, { userId: "u1", to: "new@example.com" }],
+      [EMAIL_CHANGE_NOTICE_TOPIC, { userId: "u1", to: "old@example.com" }],
+      [EMAIL_CHANGE_TAKEN_TOPIC, {}],
+    ] as const) {
+      await expect(
+        dispatchOutbox(delivery(topic, payload), deps),
+      ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+    }
+  });
+
+  it("skips when no mail is configured, before reading anything", async () => {
+    const { skipped, sent, deps } = recorder();
+    const { sendMail: _sendMail, ...withoutMail } = deps;
+    const at = new Date().toISOString();
+    await dispatchOutbox(
+      delivery(CHANGE_EMAIL_TOPIC, {
+        userId: "u1",
+        from: "old@example.com",
+        to: "new@example.com",
+        url: "https://okr.example.test/api/auth/verify-email?token=t",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      }),
+      withoutMail,
+    );
+    await dispatchOutbox(
+      delivery(EMAIL_CHANGE_NOTICE_TOPIC, {
+        userId: "u1",
+        to: "old@example.com",
+        newEmail: "new@example.com",
+        at,
+      }),
+      withoutMail,
+    );
+    await dispatchOutbox(
+      delivery(EMAIL_CHANGE_TAKEN_TOPIC, { to: "new@example.com", at }),
+      withoutMail,
+    );
+    expect(sent).toEqual([]);
+    expect(skipped.map(([topic]) => topic)).toEqual([
+      CHANGE_EMAIL_TOPIC,
+      EMAIL_CHANGE_NOTICE_TOPIC,
+      EMAIL_CHANGE_TAKEN_TOPIC,
+    ]);
+  });
+
+  it("loses the addresses and the link once delivered", () => {
+    expect(OUTBOX_REDACT_ON_DELIVERY[CHANGE_EMAIL_TOPIC]).toEqual([
+      "to",
+      "url",
+      "from",
+    ]);
+    expect(OUTBOX_REDACT_ON_DELIVERY[EMAIL_CHANGE_NOTICE_TOPIC]).toEqual([
+      "to",
+      "newEmail",
+    ]);
+    expect(OUTBOX_REDACT_ON_DELIVERY[EMAIL_CHANGE_TAKEN_TOPIC]).toEqual(["to"]);
+  });
+});
+
 describe("topics with no consumer yet", () => {
   it("acknowledges a rename rather than dead-lettering every one of them", async () => {
     const { skipped, deps } = recorder();
@@ -316,5 +482,13 @@ describe("the table against the code that enqueues", () => {
     // `packages/agents`, which this scan does not read (M-11). The executor
     // wrote it from P2-T17 with nothing to read it.
     expect(AGENT_RUN_STEP_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Queued by the confirmation callback in `createAuth` (S3).
+    expect(VERIFY_EMAIL_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Queued by every password change (account-self-service.md D9).
+    expect(PASSWORD_CHANGED_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Queued by a change of sign-in email (account-self-service.md §4.2).
+    expect(CHANGE_EMAIL_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    expect(EMAIL_CHANGE_NOTICE_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    expect(EMAIL_CHANGE_TAKEN_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

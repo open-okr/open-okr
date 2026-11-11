@@ -15,7 +15,7 @@ Better Auth paths below are in the installed 1.7.14, under `node_modules/better-
 | Where the count lives | `api/rate-limiter/index.mjs:6`, `:197` | A `Map` in each process. Two replicas allow twice the count. `rateLimit.customStorage` (one `consume(key, rule)`) is Better Auth's supported way to share it |
 | A second factor | `plugins/two-factor/verify-two-factor.mjs:117-180`; `packages/db/src/schema/auth.ts:128-131` | **Already locked per account** by Better Auth: 10 failed codes in a row, across TOTP and backup codes, lock that factor for 15 minutes. On by default, the columns exist since migration 0004. Not set explicitly in `createAuth`, and not audited as such |
 | The refusal's audit row | `apps/web/app/api/auth/[...all]/route.ts:36-55` | Every 429 writes `auth.rate_limited` (path, address) to the instance chain. It reads the address from the first `X-Forwarded-For` entry itself (`:40-43`), which `caller-address.ts` says must not be trusted |
-| The caller's address | `packages/core/src/auth/caller-address.ts` | One answer for every per-address limit. Better Auth's `getIP` folds IPv6 to its /64 |
+| The caller's address | `packages/core/src/auth/caller-address.ts` | One answer for every per-address limit. Better Auth's `getIP` folds IPv6 to its /64. Behind a CDN or a load balancer the deployment names the proxies or the one header to read ([trusted-proxies](trusted-proxies.md), plan 0.8.0 H2) |
 | Hook points Better Auth really offers | `api/dispatch.mjs:245-247`; `auth.ts:433`, `:451`; `api/routes/password.mjs:164` | `hooks.before` can refuse before the endpoint runs (SSO enforcement uses it). `hooks.after` runs with `context.returned` holding the endpoint's `APIError`. `databaseHooks.session.create` sees every sign-in by any factor. `emailAndPassword.onPasswordReset({ user })` runs after a reset |
 | The sign-in endpoint | `api/routes/sign-in.mjs:316-336` | One error for an unknown address and a wrong password, and a dummy hash for an unknown address, so timing says nothing |
 | The page | `apps/web/app/(auth)/sign-in/page.tsx:144-154`; `packages/ui/src/i18n/messages/en.json:1186` | Any 429 reads "Too many attempts. Wait a minute and try again." |
@@ -114,7 +114,7 @@ Primary key `(account_key, caller_key)`. Marked `openokr:not-tenant-scoped` and 
 ## 7. What this does not do
 
 - No CAPTCHA, no device fingerprint and no trusted-device cookie.
-- No count on password checks behind a signed-in session (change password, enabling a second factor). The address limiter covers them, and a session must exist first.
+- ~~No count on password checks behind a signed-in session (change password, enabling a second factor).~~ **Changed by [account-self-service](account-self-service.md) D3 (plan 0.8.0 Y3, approved 11 November 2026):** every password check behind a session now counts toward the same pair and account counters a sign-in does: `/change-password`, `/verify-password` (a server call since Y6), `/two-factor/enable`, `/two-factor/disable` and `/two-factor/generate-backup-codes`. A held one gets the same 429 `SIGN_IN_HELD` unchecked; a request Better Auth refuses before checking anything is not counted; only a success clears the counts, and it marks no address as known.
 - No screen or command to lift a hold.
 - No per-user limits on the API, channels or exports, which §8.2 also lists. Tokens are not passwords.
 - `auth.rate_limited` still writes one row per limiter refusal. Bounding it is a separate change.

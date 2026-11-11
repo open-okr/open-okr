@@ -31,9 +31,87 @@ a hold ends on its own.
   the instance audit chain records when it begins.
 - **Per network**: ten sign-in attempts a minute from one network address,
   and five reset requests. The count is kept in the database, so every
-  replica shares it. A refusal writes `auth.rate_limited`.
+  replica shares it. A refusal writes `auth.rate_limited`. The count is per
+  caller only when the instance can place callers: behind a CDN or a load
+  balancer, name it, or every visitor shares one count
+  ([behind a CDN or a load balancer](../install/behind-a-proxy.md)).
 - The answer is the same whether or not an account exists, so a hold tells
   nobody who has one. The counts are kept as keyed hashes, never as addresses.
+
+### Confirming email addresses
+
+| Question | Answer |
+|---|---|
+| When is it required? | By default, only when the instance can send mail, which is when its mail transport is SMTP. The rule is read again every fifteen seconds, so setting up mail takes effect without a restart. An account made before then, and never confirmed, is asked to confirm at its next sign-in, where **Send the link again** is offered. With the console transport, a new account is signed in straight away |
+| Can it be turned off? | Yes, from 0.8.0: **Email confirmation at sign-up** on Admin, General, or on a cloud the operator's Instance screen, or `OPENOKR_EMAIL_VERIFICATION=off`. Off, a new account is signed in at once and sees a welcome, with nothing about confirming. Where mail works a link is still sent, worded as optional, because joining a workspace by company domain needs a confirmed address. Under the company-domains registration policy it cannot be turned off. A change takes effect within about fifteen seconds, without a restart, and is recorded as `instance.email_verification_set` |
+| What does turning it off allow? | Anybody can open an account with an address they do not own. The real owner who finds it taken gets it back with Forgot password, which confirms the address and signs every other device out. Joining by trusted domain, invitations and changing a sign-in email still prove the mailbox |
+| How does the link travel? | It is queued on the outbox and the relay sends it, usually within a second. A mail server that refuses it never fails the sign-up: the relay retries ten times over about a quarter of an hour, then gives up and counts it in `openokr_outbox_dead_lettered_total` |
+| How long does a link work? | 24 hours. It confirms the address and signs nobody in. A newer link does not cancel an older one |
+| What does somebody whose mail never came do? | Press **Send the link again** on the check-your-email card, beside "Confirm your email first" on sign-in, or on the page an expired link opens. Signing up again with the same address sends a fresh link too. Completing a password reset also confirms the address, and signs every device out |
+| What stops this being abused? | One link a minute and five a day for any one address, whatever network asks, and five requests a minute from one network. The answer is the same whether or not the address has an account, so the button tells nobody who has one |
+| What is recorded? | `auth.email_verified` on the instance audit chain when an address is confirmed, by a link or by a reset, once per account. Links queued and refused count in `openokr_verification_links_total` ([observability](../runbooks/observability.md)). The outbox row holds the address and the link until it is delivered, then both are removed |
+
+**Behind a CDN and a load balancer**, every caller can look like one network
+until the instance is told which proxies to trust, so the five a minute is
+then shared by everybody. The per-address limit is not affected. A per-visitor
+rate limit at the CDN holds it off meanwhile.
+
+### Changing a password
+
+A signed-in person changes their password on Security: the current one, the
+new one twice, and **Sign out my other devices**, ticked. An account that
+signs in only by single sign-on can **set** a password there instead, within
+ten minutes of signing in.
+
+| Question | Answer |
+|---|---|
+| What does "Sign out my other devices" end? | Every other session. This browser gets a new one. API tokens, device tokens and connected apps keep working; revoke those on their own pages |
+| Does a wrong current password count? | Yes, toward the same hold as a wrong sign-in, and so does every other password check behind a session: turning a one-time code on or off and making new backup codes |
+| Who is told? | The account's address, by mail, every time a password is changed, set or reset, through the outbox. The mail says when and whether other devices were signed out, and links to the page that asks for a reset link |
+| What is recorded? | `auth.password_changed` on the instance audit chain, with how (`change`, `set`, `reset`) and the caller's network address. A record that could not be written counts in `openokr_account_change_record_failures_total`; the new password works either way |
+| Who cannot? | A demonstration account, whose password is published, and an account single sign-on claims, which signs in with its provider anyway. A demonstration account cannot turn a one-time code on either |
+| How often? | Ten requests a minute from one network, counted in the database so every replica shares the count |
+
+### Changing the sign-in email
+
+A signed-in person changes the email they sign in with on Your account: the
+new address and their current password. A link goes to the new address and a
+notice to the current one. **Nothing changes until the link is opened**, in a
+browser where they are signed in to the same account.
+
+| Question | Answer |
+|---|---|
+| When is it offered? | Only where the instance can send mail: `mail.transport` is `smtp`, read when the server starts. Otherwise Your account says the change needs mail. Changing the transport needs a restart before the card follows |
+| Who cannot? | A demonstration account; an account a directory manages (an active member of any workspace with a live SCIM token), because the directory finds people by address; and an account single sign-on claims, because its address is the organisation's. Each is told why before typing anything |
+| Which addresses are refused? | The current one, and a free mail address when registration accepts company addresses only. Invitation-only registration refuses nothing here: it decides who may create an account, not where an existing account's mail goes |
+| What proves it is them? | Their current password, which counts toward the sign-in hold like a wrong sign-in. An account with no password needs a sign-in in the last ten minutes instead |
+| What if the address already has an account? | The answer on the screen is the same. That address is mailed "This address already has an account here, so nothing changed." and no link is sent, so the form cannot be used to find out who has an account |
+| How do I stop a change I did not ask for? | Change the password with "Sign out my other devices" ticked. The link only works inside a signed-in session of the account, so every unopened link stops working |
+| What is recorded? | `auth.email_change_requested` for each accepted request and `auth.email_changed` when a link completes it, on the instance audit chain. Addresses appear as their domain and a keyed hash, never in clear |
+| How often? | Three requests a day from one account, and three a day for one new address from any account, counted in the database |
+| What follows the new address? | Sign-in, every mail, the `userName` SCIM answers, which single sign-on connection claims the account, and trusted-domain offers. Member rows hold no address and are untouched |
+
+### Authentication endpoints that are off
+
+Everything under `/api/auth` is Better Auth, the sign-in library. It serves
+more endpoints than any screen uses, and the ones nothing uses answer 404.
+You do not need to configure this, and nothing in the product stops working.
+
+| Off | Why |
+|---|---|
+| `/update-user`, `/update-session` | Changed the account's name or picture with no record |
+| `/change-email`, `/verify-password` | Asked for no password, or checked one without counting it toward the hold. Changing the sign-in email goes through Your account instead |
+| `/delete-user`, `/delete-user/callback` | Deleting your own account has its own flow |
+| `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions` | Security lists and ends sessions from the server. A stolen cookie could have signed the owner out everywhere |
+| `/list-accounts`, `/link-social`, `/unlink-account` | Unlinking removed a password or a provider link with no record |
+| `/get-access-token`, `/refresh-token`, `/account-info` | Handed the identity provider's tokens to anybody holding the session cookie |
+| `/two-factor/get-totp-uri`, `/two-factor/send-otp`, `/two-factor/verify-otp`, `/passkey/update-passkey`, `/ok` | No screen uses them |
+| `/sso/register`, `/sso/providers`, `/sso/get-provider`, `/sso/update-provider`, `/sso/delete-provider`, `/sso/callback` | Single sign-on connections are managed on Admin, Single sign-on. Registering a provider is refused from server code as well |
+
+The full list, with every endpoint that stays on, is in
+[account-self-service.md](../design/account-self-service.md) §3. A test fails
+the build when Better Auth adds an endpoint the list does not name, so an
+upgrade cannot quietly switch one on.
 
 ## Agent connections
 

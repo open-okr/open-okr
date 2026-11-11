@@ -19,6 +19,12 @@ import { cn } from "../lib/cn.ts";
  */
 export interface TopbarProps {
   readonly breadcrumb: ReactNode;
+  /**
+   * A short mark that belongs to the whole instance, such as "Demo" (plan
+   * 0.8.0 D1). Drawn after the breadcrumb and never shrunk with it, so it
+   * stays at phone width.
+   */
+  readonly badge?: ReactNode;
   readonly search?: ReactNode;
   readonly newAction?: ReactNode;
   readonly askAi?: ReactNode;
@@ -29,6 +35,7 @@ export interface TopbarProps {
 
 export function Topbar({
   breadcrumb,
+  badge,
   search,
   newAction,
   askAi,
@@ -44,6 +51,7 @@ export function Topbar({
       )}
     >
       <div className="min-w-0 truncate text-sm text-ink-3">{breadcrumb}</div>
+      {badge ? <div className="flex-none">{badge}</div> : null}
       {search}
       <div className="ml-auto flex items-center gap-2.5">
         {newAction}

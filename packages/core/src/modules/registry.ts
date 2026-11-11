@@ -333,6 +333,16 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     name: "account",
     navigation: [
       {
+        id: "account-profile",
+        label: "Your account",
+        href: "/account",
+        section: "sidebar",
+        group: "account",
+        // Every member: who they are here and how they sign in, first in the
+        // avatar menu (plan 0.8.0 Y2).
+        minLevel: ACCESS_LEVELS.view,
+      },
+      {
         id: "account-channels",
         label: "Where to reach you",
         href: "/account/channels",

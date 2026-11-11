@@ -18,6 +18,10 @@ const asString = (value: unknown, fallback = ""): string =>
 const asCount = (value: unknown, fallback = 0): number =>
   typeof value === "number" && Number.isFinite(value) ? value : fallback;
 
+/** "3 goals", "1 review", or null for none. */
+const plural = (count: number, noun: string): string | null =>
+  count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`;
+
 /** §8.8's five decisions as a feed line says them (P9-T20e-a). */
 /** How a support session ended, in words (support-access.md §10.3). */
 const SUPPORT_END_WORDS: Readonly<Record<string, string>> = {
@@ -113,6 +117,23 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "member.converted_to_guest": (p) =>
     `${asString(p.name, "A member")} was converted to a guest`,
   "member.erased": () => "A member's data was erased",
+  "member.self_deleted": (p) => {
+    const parts = [
+      plural(asCount(p.goals), "goal"),
+      plural(asCount(p.keyResults), "key result"),
+      plural(asCount(p.reviews), "review"),
+    ].filter((part): part is string => part !== null);
+    if (parts.length === 0) {
+      return "A member deleted their account";
+    }
+    const list =
+      parts.length === 1
+        ? parts[0]
+        : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+    const one =
+      asCount(p.goals) + asCount(p.keyResults) + asCount(p.reviews) === 1;
+    return `A member deleted their account. ${list} now ${one ? "needs" : "need"} an owner`;
+  },
   "member.imported": (p) =>
     p.matched === undefined
       ? `${asString(p.name, "A member")} was imported`

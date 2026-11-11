@@ -2,8 +2,10 @@ import { loadEnv } from "@openokr/config";
 import {
   authLimiterStorage,
   createAuth,
+  type EmailConfirmation,
   followSSOProviders,
-  resolveRequireEmailVerification,
+  resolveCanSendMail,
+  resolveEmailConfirmation,
   type SSOFollowingAuth,
   type SSOProviderConfig,
 } from "@openokr/core";
@@ -47,8 +49,58 @@ export { getPool };
 const globals = globalThis as typeof globalThis & {
   openokrAuthFollower?: SSOFollowingAuth<ReturnType<typeof createAuth>>;
   openokrRequireEmailVerification?: boolean;
+  openokrOptionalVerificationLinks?: boolean;
+  openokrConfirmationCheckedAt?: number;
+  openokrCanSendMail?: boolean;
   openokrAuthInstanceName?: string;
 };
+
+/**
+ * Holds the answer the auth instance is built with. Returns whether it
+ * moved, so the caller knows to rebuild.
+ */
+function holdConfirmation(answer: EmailConfirmation): boolean {
+  const optional = answer.linksCanArrive && !answer.required;
+  const moved =
+    globals.openokrRequireEmailVerification !== answer.required ||
+    globals.openokrOptionalVerificationLinks !== optional;
+  globals.openokrRequireEmailVerification = answer.required;
+  globals.openokrOptionalVerificationLinks = optional;
+  return moved;
+}
+
+/** How often the auth route reads the confirmation rule again (S4). */
+const CONFIRMATION_RECHECK_MS = 15_000;
+
+/**
+ * Follows a change to `auth.emailVerification` without a restart (plan 0.8.0
+ * S4, email-verification.md §11.1). Read at most every fifteen seconds, on
+ * the route every sign-up and sign-in arrives at, and the instance rebuilt
+ * when the answer moved. Every replica reads it for itself, so a change on
+ * one reaches all of them. A failed read keeps the answer it had.
+ */
+async function followConfirmationRule(): Promise<void> {
+  const now = Date.now();
+  if (
+    now - (globals.openokrConfirmationCheckedAt ?? 0) <
+    CONFIRMATION_RECHECK_MS
+  ) {
+    return;
+  }
+  globals.openokrConfirmationCheckedAt = now;
+  try {
+    if (holdConfirmation(await resolveEmailConfirmation(getPool()))) {
+      globals.openokrAuthFollower = undefined;
+    }
+  } catch {
+    // Keeps the answer it had; boot already logged why a read can fail.
+  }
+}
+
+/** Makes the next auth request read the rule again, after a change here. */
+export function readConfirmationRuleAgain(): void {
+  globals.openokrConfirmationCheckedAt = 0;
+}
 
 /**
  * Resolves whether a sign-in must wait for a verified address, once, at boot
@@ -71,14 +123,36 @@ const globals = globalThis as typeof globalThis & {
 export async function resolveSignupPolicy(): Promise<void> {
   globals.openokrAuthInstanceName = await getInstanceName();
   try {
-    globals.openokrRequireEmailVerification =
-      await resolveRequireEmailVerification(getPool());
+    holdConfirmation(await resolveEmailConfirmation(getPool()));
+    globals.openokrConfirmationCheckedAt = Date.now();
   } catch (error) {
     process.stderr.write(
       `auth: could not resolve the mail transport, so email verification ` +
         `stays off: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
+  // Whether mail can be sent at all, which turns on changing the sign-in
+  // email (account-self-service.md D14, plan 0.8.0 Y4). Its own answer, so a
+  // later rule about confirming addresses at sign-up does not move it.
+  try {
+    globals.openokrCanSendMail = await resolveCanSendMail(getPool());
+  } catch (error) {
+    process.stderr.write(
+      `auth: could not resolve the mail transport, so changing a sign-in ` +
+        `email stays off: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Whether this instance can send mail, as boot resolved it (account-self-
+ * service.md D14, plan 0.8.0 Y4). Your account offers the change of sign-in
+ * email only where this is true, and `createAuth` turns Better Auth's change
+ * on from the same answer, so the card and the endpoint never disagree.
+ * False until boot has run, and after a failed read.
+ */
+export function canSendMail(): boolean {
+  return globals.openokrCanSendMail ?? false;
 }
 
 /**
@@ -129,17 +203,17 @@ function buildAuth(
       await sendMail({ to, ...(await signInHeldMail(to, resetUrl)) });
     },
     // Resolved at boot from `mail.transport`: the question is whether a
-    // link can arrive, not whether this is a managed cloud (P8-T02b).
+    // link can arrive, not whether this is a managed cloud (P8-T02b). The
+    // link itself is queued on the outbox and sent by the relay, so nothing
+    // here waits on a mail server (email-verification.md D1, D6).
     requireEmailVerification: globals.openokrRequireEmailVerification ?? false,
-    sendVerificationEmail: globals.openokrRequireEmailVerification
-      ? async ({ to, url }) => {
-          const [{ sendMail }, { verifyEmailMail }] = await Promise.all([
-            import("./mail"),
-            import("./account-mail"),
-          ]);
-          await sendMail({ to, ...(await verifyEmailMail(to, url)) });
-        }
-      : undefined,
+    // Confirmation off where mail can arrive: a link worded as optional,
+    // nothing waiting on it (plan 0.8.0 S4).
+    optionalVerificationLinks:
+      globals.openokrOptionalVerificationLinks ?? false,
+    // Resolved at boot from `mail.transport` too, and read by Your account
+    // through `canSendMail()` (account-self-service.md D14).
+    canSendMail: canSendMail(),
     // From sso_connections, as last read (P8-T07, L-15).
     ssoProviders: providers,
     // Lets a server action set and clear the session cookie. Framework glue,
@@ -177,6 +251,7 @@ export function getAuth(): ReturnType<typeof createAuth> {
  * Reads a stamp of `sso_connections` at most once every few seconds, shared
  * by every request that arrives meanwhile.
  */
-export function getCurrentAuth(): Promise<ReturnType<typeof createAuth>> {
+export async function getCurrentAuth(): Promise<ReturnType<typeof createAuth>> {
+  await followConfirmationRule();
   return authFollower().current();
 }

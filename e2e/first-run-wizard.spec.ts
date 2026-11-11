@@ -76,6 +76,10 @@ test("it reports the deployment honestly, including what is not built yet", asyn
 });
 
 test("creating the first account finishes setup", async ({ page }) => {
+  // This server runs with `OPENOKR_REGISTRATION=invite_only`
+  // (playwright.config.ts). The policy closes the instance behind its owner,
+  // never to them: until plan 0.8.0 H3 it refused this sign-up, and an
+  // instance deployed that way could never be claimed.
   await page.goto("/setup/account");
 
   // Pre-filled with the deployment's name and left alone, so nothing is

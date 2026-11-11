@@ -7,6 +7,7 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 | Deciding how to run it: a managed cloud, your own cloud, a group, or one organisation | [Choose a setup](install/setups.md) |
 | Putting OpenOKR on a server | [Install on one server](install/compose.md) |
 | Putting it on Kubernetes | [Install on Kubernetes](install/kubernetes.md) |
+| Running it behind a CDN or a load balancer | [Behind a CDN or a load balancer](install/behind-a-proxy.md) |
 | Using the managed cloud | [Start on the cloud](install/cloud.md) |
 | Running several companies on one instance | [One instance for several companies](install/group.md) |
 | Running an instance somebody installed | [Administrator guide](admin/README.md) |
@@ -22,6 +23,7 @@ OpenOKR is the software an organisation runs its OKRs on, with the OKR method bu
 | [Choose a setup](install/setups.md) | The four ways one release runs, who does what in each, and the settings behind them |
 | [One server with Docker Compose](install/compose.md) | The whole install, from an empty machine to a signed-in owner |
 | [Kubernetes with Helm](install/kubernetes.md) | What the chart does, what it deliberately does not, and the secret to back up |
+| [Behind a CDN or a load balancer](install/behind-a-proxy.md) | Telling the instance whose address a request comes from, so every per-address limit counts people rather than proxies |
 | [The managed cloud](install/cloud.md) | Signing up, and what the vendor operates |
 | [One instance for several companies](install/group.md) | A workspace per company on your own servers, and running your own model |
 | [The first run](install/first-run.md) | The wizard, the owner account, and the five things to do next |

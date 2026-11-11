@@ -21,7 +21,7 @@ import type {
   DataChangeClient,
   DataChangeScript,
 } from "../data-change.ts";
-import { newId } from "../id.ts";
+import { newId, newShortId } from "../id.ts";
 
 const BATCH_SIZE = 200;
 
@@ -113,16 +113,23 @@ export const backfillRhythmAndCycle: DataChangeScript = {
       }
 
       if (candidate.needs_cycle) {
+        // With its short identifier, which is not null from migration 0165
+        // (plan 0.8.0 C1). The migrator may already have run data change
+        // 0034, which would not come back for a cycle written after it. Not
+        // added to `expects`, which would change this script's checksum:
+        // every release that carries this line has the column.
         await client.query(
           `insert into cycles
-             (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase)
-           values ($1, $2, $3, 'quarterly', 'quarterly', $4, $5, 'planning', 1)`,
+             (id, workspace_id, name, mode, cadence, starts_on, ends_on, status, phase,
+              short_id)
+           values ($1, $2, $3, 'quarterly', 'quarterly', $4, $5, 'planning', 1, $6)`,
           [
             newId(),
             candidate.workspace_id,
             candidate.cycle_name,
             candidate.starts_on,
             candidate.ends_on,
+            newShortId(),
           ],
         );
         changed += 1;
