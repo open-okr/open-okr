@@ -250,14 +250,15 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | W3 | to do | CP8, CP3, CP2, CP1, CP6, CP4, CP7, CP9 in that order; CP5, CP10, CP11 are 0.9.0 |
 | W4 | to do | Before CP6 wires Stop |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
-| K2 | to do | |
-| K3 | to do | |
+| K2 | done | Lucide `Check` on K1's token in the review rail. Built by the UI builder |
+| K3 | done | Mockup 02 redrawn and only its PNG re-rendered; the phase list's done mark is an icon too |
 | P1 | done | Lockfile only: 5.12.0 and its own three dependencies, inside `@better-auth/sso`'s range. SAML and SSO suites: 82 core, 27 web |
 | P2 | done | `shell-quote` 1.12.0 and `launch-editor` 2.14.2 inside their ranges. `vite` 8.3.7 (with `rolldown` 1.2.18) inside `vitest`'s `^8.0.0`: `pnpm update` will not move a package `vitest` holds as both dependency and peer, so a temporary override moved it and was removed again; none is left. Method 636, ui 454 and two web files pass on it. Empty changeset |
 | U1 | to do | U1-Q decided: accept `run` |
 | U2 | to do | Check first |
 | U3 | to do | Last |
-| Q-8 | to do | Q-8-Q decided: the browser's language when shipped |
-| Q-9 | to do | |
-| Q-10a to Q-10e | to do | |
+| Q-8 | done | `apps/web/lib/accept-language.ts` (q-values, regions, ties); signed out or with no workspace yet: browser, instance, English. Playwright now pins `en-US` so `signIn` by English labels keeps working; `s35h-visitor-language` signs in first, then switches. UIUX-PLAN §8 |
+| Q-9 | done | **Adopt now** on the console, also above a non-empty list when workspaces wait; a server action behind `requireOperator` and a core function that rechecks the grant and writes `operator.workspaces_adopted` to the instance audit. No registry action. New Malay strings need the F-08 review |
+| Q-10a to Q-10d | done | Sign out is a `menuitem` (the kit's bare `SubmitButton` now keeps `type="submit"`), the footer is not sticky on a phone, the agent pill fits at 390 px, the role matrix fits "Manage" in English and Malay. Two specs that found Sign out as a button now find a menu item |
+| Q-10e | to do | |
 | S5-R | to do | Design to write next, then "design approved" |
