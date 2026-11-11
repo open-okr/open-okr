@@ -36,8 +36,10 @@ import { Check, Send, Square, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { dayLabel } from "../../lib/day-label";
 import {
   applyCopilotProposalAction,
+  type CopilotAvailability,
   copilotAvailabilityAction,
   dismissCopilotProposalAction,
   listCopilotProposalsAction,
@@ -70,12 +72,7 @@ interface ThreadSummary {
   readonly title: string | null;
 }
 
-interface Availability {
-  readonly available: boolean;
-  readonly providerConfigured: boolean;
-  readonly reason: string | null;
-  readonly streaming: boolean;
-}
+type Availability = CopilotAvailability;
 
 interface Source {
   readonly entityType: string;
@@ -408,6 +405,118 @@ function stepWords(
   }
 }
 
+/**
+ * Four questions the copilot answers well today (plan 0.8.1 CP8, review Q9).
+ *
+ * Before L2 gives it the reads, a question about values and health is one it
+ * cannot answer, and a suggestion whose first press fails teaches somebody
+ * the copilot does not work. These lean on what it does have: the passages
+ * people wrote, and the cards it can make.
+ */
+const SUGGESTIONS = [
+  "copilot.copilotPanel.suggestion.feedback",
+  "copilot.copilotPanel.suggestion.blockers",
+  "copilot.copilotPanel.suggestion.task",
+  "copilot.copilotPanel.suggestion.initiative",
+] as const;
+
+/** Each page that can turn the copilot back on, and what its link says. */
+const FIX_LINKS = {
+  aiSettings: { href: "/admin/ai", key: "copilot.copilotPanel.fix.aiSettings" },
+  plan: { href: "/admin/plan", key: "copilot.copilotPanel.fix.plan" },
+  personalKeys: {
+    href: "/account/ai",
+    key: "copilot.copilotPanel.fix.personalKeys",
+  },
+} as const;
+
+/**
+ * Why the copilot cannot answer, when that lifts, and where it is changed
+ * (UIUX-PLAN S-39, "AI off with a link for admins").
+ */
+function Unavailable({
+  availability,
+}: {
+  readonly availability: Availability;
+}) {
+  const { t, locale } = useTranslations();
+  return (
+    <div className="mb-2 flex flex-col gap-1.5 text-xs text-ink-3">
+      <p>
+        {availability.reason ?? t("copilot.copilotPanel.cannotAnswerRightNow")}
+      </p>
+      {availability.resetsAt ? (
+        <p>
+          {t("copilot.copilotPanel.liftsOn", {
+            date: dayLabel(availability.resetsAt, locale),
+          })}
+        </p>
+      ) : null}
+      {availability.fixes.length > 0 ? (
+        <p className="flex flex-wrap gap-x-3 gap-y-1">
+          {availability.fixes.map((fix) => (
+            <Link
+              key={fix}
+              href={FIX_LINKS[fix].href}
+              className="font-semibold text-brand-text hover:underline"
+            >
+              {t(FIX_LINKS[fix].key)}
+            </Link>
+          ))}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * What arrived for a question and is not in the recorded thread (plan 0.8.1
+ * CP8, review F1). With AI off the passages and the reason are the answer, and
+ * nothing records them, so the re-read that follows every turn used to take
+ * them off the screen.
+ */
+interface Kept {
+  readonly sources: readonly Source[];
+  readonly notice: string | null;
+}
+
+/**
+ * The passages and the reason a question was given, after the turn landed.
+ * The reason is left out when the recorded answer already says it.
+ */
+function KeptAnswer({
+  kept,
+  said,
+}: {
+  readonly kept: Kept;
+  /** What the recorded answer says about why it stopped, if anything. */
+  readonly said: string | null;
+}) {
+  const { t } = useTranslations();
+  return (
+    <div data-testid="copilot-kept">
+      {kept.notice && kept.notice !== said ? (
+        <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
+          {kept.notice}
+        </p>
+      ) : null}
+      <SourceList
+        title={t("copilot.copilotPanel.passagesThatMatch")}
+        items={kept.sources}
+      />
+    </div>
+  );
+}
+
+/** The answer a question was given, when the next message is one. */
+const answerTo = (
+  messages: readonly Message[],
+  index: number,
+): Message | null => {
+  const next = messages[index + 1];
+  return next?.role === "assistant" ? next : null;
+};
+
 export function CopilotPanel({
   initialAvailability,
 }: {
@@ -427,6 +536,8 @@ export function CopilotPanel({
   const [sources, setSources] = useState<readonly Source[]>([]);
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Passages and reasons kept beside the questions they answered (CP8). */
+  const [kept, setKept] = useState<Readonly<Record<string, Kept>>>({});
   /** What the run says it is doing, while no words have arrived (W2). */
   const [step, setStep] = useState<Step | null>(null);
   const [busy, setBusy] = useState(false);
@@ -437,6 +548,8 @@ export function CopilotPanel({
   /** The answer a background run is writing, so Stop can stop it (W4). */
   const runningAnswer = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  /** The thread whose messages are on screen, so `kept` is cleared on a change. */
+  const shownThread = useRef<string | null>(null);
 
   useKeyboardShortcut(
     {
@@ -459,13 +572,20 @@ export function CopilotPanel({
     inputRef.current?.focus();
     let live = true;
     void (async () => {
+      // Neither failure is the panel's to show as an error: the availability
+      // read says "cannot answer right now" by itself, and a list that did not
+      // load is one with nothing to pick yet.
       const [next, list] = await Promise.all([
-        copilotAvailabilityAction(),
-        listCopilotThreadsAction(),
+        copilotAvailabilityAction().catch(() => null),
+        listCopilotThreadsAction().catch(() => null),
       ]);
       if (live) {
-        setAvailability(next);
-        setThreads(list);
+        if (next) {
+          setAvailability(next);
+        }
+        if (list) {
+          setThreads(list);
+        }
       }
     })();
     return () => {
@@ -478,6 +598,11 @@ export function CopilotPanel({
       readCopilotThreadAction(id),
       listCopilotProposalsAction(id),
     ]);
+    // What was kept belongs to the conversation it was asked in.
+    if (shownThread.current !== thread.id) {
+      setKept({});
+    }
+    shownThread.current = thread.id;
     setThreadId(thread.id);
     setMessages(thread.messages);
     setProposals(listed);
@@ -578,126 +703,155 @@ export function CopilotPanel({
     abort.current?.abort();
   }, []);
 
-  const send = useCallback(async () => {
-    const asked = question.trim();
-    if (asked === "" || busy) {
-      return;
-    }
-    setQuestion("");
-    setBusy(true);
-    setNotice(null);
-    setSources([]);
-    setStreaming("");
-    // The first thing every run does. Said at once rather than when the event
-    // arrives, because a background run may publish it before the panel has
-    // subscribed (plan 0.8.1 W2).
-    setStep({ step: "searching" });
-    // Shown straight away rather than after the round trip. The id is the
-    // server's, so this turn is replaced when the thread is re-read.
-    setMessages((current) => [
-      ...current,
-      {
-        id: `pending-${current.length}`,
-        role: "member",
-        content: asked,
-        citations: [],
-        stopped: false,
-      },
-    ]);
-
-    const controller = new AbortController();
-    abort.current = controller;
-    let landedThreadId = threadId;
-    try {
-      const response = await fetch("/api/copilot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: asked,
-          ...(threadId ? { threadId } : {}),
-        }),
-        signal: controller.signal,
-      });
-      if (!response.ok || !response.body) {
-        setNotice(t("copilot.copilotPanel.couldNotBeReached"));
+  const send = useCallback(
+    async (suggested?: string) => {
+      const asked = (suggested ?? question).trim();
+      if (asked === "" || busy) {
         return;
       }
+      if (suggested === undefined) {
+        setQuestion("");
+      }
+      setBusy(true);
+      setNotice(null);
+      setSources([]);
+      setStreaming("");
+      // The first thing every run does. Said at once rather than when the event
+      // arrives, because a background run may publish it before the panel has
+      // subscribed (plan 0.8.1 W2).
+      setStep({ step: "searching" });
+      // Shown straight away rather than after the round trip. The id is the
+      // server's, so this turn is replaced when the thread is re-read.
+      setMessages((current) => [
+        ...current,
+        {
+          id: `pending-${current.length}`,
+          role: "member",
+          content: asked,
+          citations: [],
+          stopped: false,
+        },
+      ]);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let text = "";
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) {
-          break;
+      const controller = new AbortController();
+      abort.current = controller;
+      let landedThreadId = threadId;
+      // What this question was given, kept past the re-read when no words came.
+      let questionId: string | null = null;
+      let arrived = "";
+      let found: readonly Source[] = [];
+      let said: string | null = null;
+      try {
+        const response = await fetch("/api/copilot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: asked,
+            ...(threadId ? { threadId } : {}),
+          }),
+          signal: controller.signal,
+        });
+        if (!response.ok || !response.body) {
+          setNotice(t("copilot.copilotPanel.couldNotBeReached"));
+          return;
         }
-        buffer += decoder.decode(value, { stream: true });
-        // Server-Sent Events: frames are separated by a blank line, and only
-        // the `data:` line is parsed. The `event:` line names the same kind the
-        // payload carries, so nothing is read twice.
-        const frames = buffer.split("\n\n");
-        buffer = frames.pop() ?? "";
-        for (const frame of frames) {
-          const line = frame
-            .split("\n")
-            .find((part) => part.startsWith("data: "));
-          if (!line) {
-            continue;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let text = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            break;
           }
-          const event = JSON.parse(line.slice(6)) as
-            | { kind: "thread"; threadId: string; answerMessageId?: string }
-            | { kind: "sources"; sources: readonly Source[] }
-            | { kind: "proposal"; proposalId: string }
-            | ({ kind: "step" } & Step)
-            | { kind: "unavailable"; reason: string }
-            | { kind: "text"; text: string }
-            | { kind: "done" };
-          if (event.kind === "thread") {
-            landedThreadId = event.threadId;
-            runningAnswer.current = event.answerMessageId ?? null;
-            setThreadId(event.threadId);
-          } else if (event.kind === "step") {
-            setStep(event);
-          } else if (event.kind === "proposal" && landedThreadId) {
-            // The card was made before the answer (plan 0.8.1 A2), so it is
-            // shown while the answer is still being written.
-            const listed = await listCopilotProposalsAction(
-              landedThreadId,
-            ).catch(() => null);
-            if (listed) {
-              setProposals(listed);
+          buffer += decoder.decode(value, { stream: true });
+          // Server-Sent Events: frames are separated by a blank line, and only
+          // the `data:` line is parsed. The `event:` line names the same kind the
+          // payload carries, so nothing is read twice.
+          const frames = buffer.split("\n\n");
+          buffer = frames.pop() ?? "";
+          for (const frame of frames) {
+            const line = frame
+              .split("\n")
+              .find((part) => part.startsWith("data: "));
+            if (!line) {
+              continue;
             }
-          } else if (event.kind === "sources") {
-            setSources(event.sources);
-          } else if (event.kind === "unavailable") {
-            setNotice(event.reason);
-          } else if (event.kind === "text") {
-            text += event.text;
-            setStreaming(text);
+            const event = JSON.parse(line.slice(6)) as
+              | {
+                  kind: "thread";
+                  threadId: string;
+                  questionMessageId: string;
+                  answerMessageId?: string;
+                }
+              | { kind: "sources"; sources: readonly Source[] }
+              | { kind: "proposal"; proposalId: string }
+              | ({ kind: "step" } & Step)
+              | { kind: "unavailable"; reason: string }
+              | { kind: "text"; text: string }
+              | { kind: "done" };
+            if (event.kind === "thread") {
+              landedThreadId = event.threadId;
+              questionId = event.questionMessageId;
+              runningAnswer.current = event.answerMessageId ?? null;
+              setThreadId(event.threadId);
+            } else if (event.kind === "step") {
+              setStep(event);
+            } else if (event.kind === "proposal" && landedThreadId) {
+              // The card was made before the answer (plan 0.8.1 A2), so it is
+              // shown while the answer is still being written.
+              const listed = await listCopilotProposalsAction(
+                landedThreadId,
+              ).catch(() => null);
+              if (listed) {
+                setProposals(listed);
+              }
+            } else if (event.kind === "sources") {
+              found = event.sources;
+              setSources(event.sources);
+            } else if (event.kind === "unavailable") {
+              said = event.reason;
+              setNotice(event.reason);
+            } else if (event.kind === "text") {
+              text += event.text;
+              arrived = text;
+              setStreaming(text);
+            }
           }
         }
+      } catch (error) {
+        // An abort is the stop control working, not a failure. What arrived was
+        // recorded by the server, and the re-read below shows it.
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
+        }
+      } finally {
+        abort.current = null;
+        runningAnswer.current = null;
+        setBusy(false);
+        setStreaming(null);
+        setStep(null);
+        if (landedThreadId) {
+          // The recorded thread, with citations filtered against access now,
+          // replaces everything drawn optimistically above. A proposal was asked
+          // for on the server before the answer (plan 0.8.1 A2), so it is in it.
+          await loadThread(landedThreadId).catch(() => undefined);
+        }
+        // With no words, the passages and the reason were the answer, and the
+        // thread holds neither (plan 0.8.1 CP8, review F1). Kept beside the
+        // question until another conversation is opened.
+        const id = questionId;
+        if (id && arrived.trim() === "" && (found.length > 0 || said)) {
+          setKept((was) => ({
+            ...was,
+            [id]: { sources: found, notice: said },
+          }));
+        }
       }
-    } catch (error) {
-      // An abort is the stop control working, not a failure. What arrived was
-      // recorded by the server, and the re-read below shows it.
-      if (!(error instanceof DOMException && error.name === "AbortError")) {
-        setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
-      }
-    } finally {
-      abort.current = null;
-      runningAnswer.current = null;
-      setBusy(false);
-      setStreaming(null);
-      setStep(null);
-      if (landedThreadId) {
-        // The recorded thread, with citations filtered against access now,
-        // replaces everything drawn optimistically above. A proposal was asked
-        // for on the server before the answer (plan 0.8.1 A2), so it is in it.
-        await loadThread(landedThreadId).catch(() => undefined);
-      }
-    }
-  }, [busy, loadThread, question, t, threadId]);
+    },
+    [busy, loadThread, question, t, threadId],
+  );
 
   if (!open) {
     return <CopilotTrigger onClick={() => setOpen(true)} />;
@@ -756,9 +910,33 @@ export function CopilotPanel({
           <div className="flex-1 overflow-y-auto px-4 py-3">
             {messages.length === 0 && streaming === null ? (
               <div className="flex flex-col gap-3">
-                <p className="text-sm text-ink-3">
-                  {t("copilot.copilotPanel.askAboutThisWorkspace")}
-                </p>
+                <div className="flex flex-col items-start gap-2 pt-2">
+                  <AgentFace mood={mood} className="size-8" />
+                  <p className="text-sm text-ink-3">
+                    {t("copilot.copilotPanel.askAboutThisWorkspace")}
+                  </p>
+                </div>
+                {/* Only where an answer can come: with AI off a suggestion
+                    would be a search for a sentence (plan 0.8.1 CP8). */}
+                {canAsk ? (
+                  <ul
+                    aria-label={t("copilot.copilotPanel.suggestions")}
+                    className="flex flex-col gap-1.5"
+                  >
+                    {SUGGESTIONS.map((key) => (
+                      <li key={key}>
+                        <Button
+                          variant="default"
+                          disabled={busy}
+                          onClick={() => void send(t(key))}
+                          className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
+                        >
+                          {t(key)}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
                 {threads.length > 0 ? (
                   <div>
                     <p className="text-xs text-ink-4">
@@ -782,9 +960,34 @@ export function CopilotPanel({
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {messages.map((message) => (
-                  <Turn key={message.id} message={message} />
-                ))}
+                {messages.map((message, index) => {
+                  // After the answer to its question, or in the answer's
+                  // place when the run recorded none (relay off, AI off).
+                  const asked = messages[index - 1];
+                  const extra =
+                    message.role === "assistant"
+                      ? asked?.role === "member"
+                        ? kept[asked.id]
+                        : undefined
+                      : answerTo(messages, index) === null
+                        ? kept[message.id]
+                        : undefined;
+                  return (
+                    <div key={message.id} className="contents">
+                      <Turn message={message} />
+                      {extra ? (
+                        <KeptAnswer
+                          kept={extra}
+                          said={
+                            message.role === "assistant"
+                              ? (message.haltedReason ?? null)
+                              : null
+                          }
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
                 {proposals.map((proposal) => (
                   <ProposalCard
                     key={proposal.id}
@@ -853,12 +1056,7 @@ export function CopilotPanel({
           </div>
 
           <footer className="flex-none border-t border-line px-4 py-3">
-            {canAsk ? null : (
-              <p className="mb-2 text-xs text-ink-3">
-                {availability.reason ??
-                  t("copilot.copilotPanel.cannotAnswerRightNow")}
-              </p>
-            )}
+            {canAsk ? null : <Unavailable availability={availability} />}
             <div className="flex items-end gap-2">
               <TextArea
                 label={t("copilot.copilotPanel.yourQuestion")}

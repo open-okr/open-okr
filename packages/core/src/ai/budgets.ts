@@ -32,6 +32,16 @@ function periodStart(period: BudgetPeriod, now: Date): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
 }
 
+/** When the period `now` falls in ends, which is when a crossed budget lifts. */
+function periodEnd(period: BudgetPeriod, now: Date): Date {
+  if (period === "day") {
+    return new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+    );
+  }
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+}
+
 export interface BudgetCheckResult {
   readonly configured: boolean;
   readonly withinLimit: boolean;
@@ -133,7 +143,19 @@ export async function checkBudget(
 export interface FeatureAvailability {
   readonly available: boolean;
   readonly reason?: string;
+  /**
+   * When a crossed budget lifts by itself: the end of its period (plan 0.8.1
+   * CP8). Absent when nothing will lift it, such as a feature an administrator
+   * turned off.
+   */
+  readonly resetsAt?: Date;
 }
+
+/** The end of a crossed budget's period, or nothing for one with no period. */
+const resetOf = (result: BudgetCheckResult): { resetsAt?: Date } =>
+  result.period === null
+    ? {}
+    : { resetsAt: periodEnd(result.period, new Date()) };
 
 /**
  * Whether a feature may run right now, combining P2-T15's own switch and
@@ -173,6 +195,7 @@ export async function checkFeatureAvailability(
     return {
       available: false,
       reason: `This workspace has reached its AI budget (${workspaceCap.current} of ${workspaceCap.limit}).`,
+      ...resetOf(workspaceCap),
     };
   }
 
@@ -187,6 +210,7 @@ export async function checkFeatureAvailability(
       return {
         available: false,
         reason: `You have reached your own AI budget (${userCap.current} of ${userCap.limit}).`,
+        ...resetOf(userCap),
       };
     }
   }
@@ -202,6 +226,7 @@ export async function checkFeatureAvailability(
       return {
         available: false,
         reason: `This agent has reached its own AI budget (${agentCap.current} of ${agentCap.limit}).`,
+        ...resetOf(agentCap),
       };
     }
   }

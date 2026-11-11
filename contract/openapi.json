@@ -10553,6 +10553,12 @@
                         },
                         "streaming": {
                           "type": "boolean"
+                        },
+                        "resetsAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
                         }
                       },
                       "required": [
@@ -10560,7 +10566,8 @@
                         "providerConfigured",
                         "reason",
                         "searchAvailable",
-                        "streaming"
+                        "streaming",
+                        "resetsAt"
                       ],
                       "additionalProperties": false
                     }

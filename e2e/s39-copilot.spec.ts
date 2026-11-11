@@ -93,6 +93,11 @@ test("⌘J opens the panel, and it says the copilot cannot write prose", async (
   // The box still invites a question, and its placeholder says what asking will
   // actually do here: search, not answer.
   await expect(panel.getByPlaceholder("Search your workspace")).toBeVisible();
+  // S-39's "AI off with a link for admins" (plan 0.8.1 CP8). The instance's
+  // owner can open the AI page, so it is linked.
+  await expect(
+    panel.getByRole("link", { name: "Open AI settings" }),
+  ).toHaveAttribute("href", "/admin/ai");
 });
 
 /**
@@ -138,6 +143,17 @@ test("a question is recorded and answered with what is there to find", async () 
   await expect(
     panel.getByText("No AI provider is configured", { exact: false }).first(),
   ).toBeVisible({ timeout: 15_000 });
+
+  // **And it stays once the turn has landed** (plan 0.8.1 CP8, review F1).
+  // The re-read after a turn used to take the reason and the passages off the
+  // screen, and the assertion above passed on the footer's sentence. This is
+  // the answer's own sentence, which the footer never says.
+  await expect(panel.getByRole("textbox")).toBeEnabled({ timeout: 30_000 });
+  await expect(
+    panel.getByText("these are the passages that match your question", {
+      exact: false,
+    }),
+  ).toBeVisible();
 });
 
 test("the conversation is there when the panel is reopened", async () => {

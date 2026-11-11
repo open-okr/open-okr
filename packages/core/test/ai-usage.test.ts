@@ -161,6 +161,38 @@ describe("checkFeatureAvailability", () => {
     });
     expect(availability.available).toBe(false);
     expect(availability.reason).toMatch(/budget/i);
+    // When it lifts by itself (plan 0.8.1 CP8): a daily budget at the next
+    // midnight UTC, so the copilot can say when to come back.
+    const now = new Date();
+    expect(availability.resetsAt?.toISOString()).toBe(
+      new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1),
+      ).toISOString(),
+    );
+  });
+
+  it("names the first of next month for a monthly budget", async () => {
+    const wb = await workerDb();
+    await callAction({ pool: wb.appPool, ...context(OWNER) }, "ai.setBudget", {
+      scope: "workspace",
+      scopeRef: null,
+      metric: "cost",
+      period: "month",
+      limitValue: 5,
+    });
+    await recordCall(10);
+
+    const availability = await checkFeatureAvailability(wb.appPool, {
+      workspaceId,
+      featureKey: "draft.objective",
+      defaultTier: "balanced",
+    });
+    const now = new Date();
+    expect(availability.resetsAt?.toISOString()).toBe(
+      new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+      ).toISOString(),
+    );
   });
 
   it("stays available for a feature with no budget configured at all — every manual path keeps working", async () => {
@@ -188,6 +220,8 @@ describe("checkFeatureAvailability", () => {
     });
     expect(availability.available).toBe(false);
     expect(availability.reason).toMatch(/turned off/);
+    // A switch an administrator turned off does not lift by itself.
+    expect(availability.resetsAt).toBeUndefined();
   });
 });
 

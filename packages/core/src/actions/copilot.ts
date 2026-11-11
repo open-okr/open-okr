@@ -945,6 +945,12 @@ export const readAvailability = defineReadAction({
      * than showing a stop control for something that cannot be stopped.
      */
     streaming: z.boolean(),
+    /**
+     * When a budget that stopped the copilot lifts by itself, as an ISO time
+     * (plan 0.8.1 CP8). Null when nothing will lift it on its own: no
+     * provider, a switch an administrator turned off, or available.
+     */
+    resetsAt: z.string().nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context) {
@@ -963,6 +969,8 @@ export const readAvailability = defineReadAction({
           reason: paused,
           searchAvailable: true,
           streaming: false,
+          // The sentence says "until the 1st" itself.
+          resetsAt: null,
         };
       }
       return {
@@ -975,6 +983,7 @@ export const readAvailability = defineReadAction({
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
         streaming: false,
+        resetsAt: null,
       };
     }
 
@@ -993,6 +1002,10 @@ export const readAvailability = defineReadAction({
       reason: availability.available ? null : (availability.reason ?? null),
       searchAvailable: true,
       streaming,
+      resetsAt:
+        availability.available || !availability.resetsAt
+          ? null
+          : availability.resetsAt.toISOString(),
     };
   },
 });

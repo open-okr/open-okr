@@ -15,10 +15,18 @@
  * through `callAction`, so the panel cannot reach a thread that is not the
  * reader's: the actions answer not-found for somebody else's.
  */
-import { callAction } from "@openokr/core";
+import {
+  type AIOffReason,
+  callAction,
+  hasPlanScreen,
+  navigationFor,
+  reportError,
+} from "@openokr/core";
+import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { resolveDrafterFor } from "../../lib/drafter";
 import { requireWorkspace } from "../../lib/workspace";
+import { type CopilotFix, copilotFixes } from "./fixes";
 
 async function context() {
   const { session, workspace } = await requireWorkspace();
@@ -39,6 +47,33 @@ export async function readCopilotThreadAction(threadId: string) {
   return callAction(await context(), "copilot.thread", { threadId });
 }
 
+/** What the panel needs to know before it offers a box to type in. */
+export interface CopilotAvailability {
+  readonly available: boolean;
+  readonly providerConfigured: boolean;
+  readonly reason: string | null;
+  readonly searchAvailable: boolean;
+  readonly streaming: boolean;
+  /** When a crossed budget lifts by itself, as an ISO time. */
+  readonly resetsAt: string | null;
+  /** The pages this reader may open that would turn the copilot back on. */
+  readonly fixes: readonly CopilotFix[];
+}
+
+/**
+ * What the panel says when the read itself failed (plan 0.8.1 CP8, review
+ * F14): the copilot cannot answer right now, and the page renders.
+ */
+const UNKNOWN: CopilotAvailability = {
+  available: false,
+  providerConfigured: true,
+  reason: null,
+  searchAvailable: false,
+  streaming: false,
+  resetsAt: null,
+  fixes: [],
+};
+
 /**
  * Whether the copilot can answer, and why not when it cannot.
  *
@@ -49,25 +84,83 @@ export async function readCopilotThreadAction(threadId: string) {
  * The drafter has to be on the context. Without it the read cannot tell a
  * provider-off workspace from one whose provider simply was not passed to this
  * call, and it would report AI off for a workspace that has a key.
+ *
+ * **It never throws past the session check** (plan 0.8.1 CP8, review F14). The
+ * shell awaits this on every page, and an AI key sealed by a root key this
+ * process does not hold took every page down with it. A failure here is the
+ * copilot being unavailable, which is reported and said, never the page.
  */
-export async function copilotAvailabilityAction() {
-  const base = await context();
-  // With the reason when there is no drafter (plan 0.8.0 O1), so a cloud
-  // workspace with no plan is told to choose one rather than that no provider
-  // is configured.
-  const outcome = await resolveDrafterFor(
-    base.workspaceId,
-    "balanced",
-    base.actor.userId,
-    { source: "copilot" },
-  );
-  return callAction(
-    "drafter" in outcome
-      ? { ...base, drafter: outcome.drafter }
-      : { ...base, aiOff: outcome.off },
-    "copilot.availability",
-    {},
-  );
+export async function copilotAvailabilityAction(): Promise<CopilotAvailability> {
+  const { session, workspace } = await requireWorkspace();
+  const base = {
+    pool: getPool(),
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  try {
+    // With the reason when there is no drafter (plan 0.8.0 O1), so a cloud
+    // workspace with no plan is told to choose one rather than that no
+    // provider is configured.
+    const outcome = await resolveDrafterFor(
+      base.workspaceId,
+      "balanced",
+      base.actor.userId,
+      { source: "copilot" },
+    );
+    const offReason: AIOffReason | null =
+      "drafter" in outcome ? null : outcome.off;
+    const availability = await callAction(
+      "drafter" in outcome
+        ? { ...base, drafter: outcome.drafter }
+        : { ...base, aiOff: outcome.off },
+      "copilot.availability",
+      {},
+    );
+    return {
+      ...availability,
+      fixes: availability.available
+        ? []
+        : await fixesFor(base, workspace.memberId, offReason),
+    };
+  } catch (error) {
+    reportError(error, {
+      source: "request",
+      action: "copilot.availability",
+      workspaceId: base.workspaceId,
+      userId: base.actor.userId,
+    });
+    return UNKNOWN;
+  }
+}
+
+/** The facts `copilotFixes` decides on, read only when the copilot is off. */
+async function fixesFor(
+  base: {
+    readonly pool: ReturnType<typeof getPool>;
+    readonly workspaceId: string;
+    readonly actor: { readonly kind: "human"; readonly userId: string };
+  },
+  memberId: string,
+  offReason: AIOffReason | null,
+): Promise<readonly CopilotFix[]> {
+  const level = await resolveAccessLevelFor(base.workspaceId, memberId);
+  // The registry's own entries, so a link is offered exactly where the
+  // sidebar and the route guard would let the reader through.
+  const admin = navigationFor("admin", level);
+  const reachesPlan =
+    admin.some((item) => item.href === "/admin/plan") &&
+    (await hasPlanScreen(base.pool));
+  const personalKeysOffered =
+    offReason === "no_provider"
+      ? (await callAction(base, "ai.readOwnCredentialStatus", {})).length > 0
+      : false;
+  return copilotFixes({
+    available: false,
+    offReason,
+    reachesAiSettings: admin.some((item) => item.href === "/admin/ai"),
+    reachesPlan,
+    personalKeysOffered,
+  });
 }
 
 /**

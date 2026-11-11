@@ -35,6 +35,7 @@ import type {
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
+import { recordUsageEvent } from "../src/ai/usage.ts";
 import { answerQuestion } from "../src/copilot/answer.ts";
 import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -247,7 +248,42 @@ describe("the AI-off state, which is what a self-hosted instance gets", () => {
     expect(availability).toMatchObject({
       available: true,
       providerConfigured: true,
+      resetsAt: null,
     });
+  });
+
+  // Plan 0.8.1 CP8: a capped copilot says when it comes back.
+  it("says when a crossed budget lifts", async () => {
+    await call("ai.setBudget", {
+      scope: "workspace",
+      scopeRef: null,
+      metric: "cost",
+      period: "month",
+      limitValue: 1,
+    });
+    await recordUsageEvent((await workerDb()).appPool, {
+      workspaceId,
+      source: "assist",
+      provider: "anthropic",
+      modelId: "claude-sonnet-5",
+      inputTokens: 100,
+      outputTokens: 50,
+      cost: 2,
+    });
+    const drafter = new StubDrafter({ text: "yes", usedSourceIndexes: [] });
+    const availability = (await callAction(
+      await contextFor(OWNER, drafter),
+      "copilot.availability" as never,
+      {} as never,
+    )) as { available: boolean; reason: string | null; resetsAt: string };
+    expect(availability.available).toBe(false);
+    expect(availability.reason).toMatch(/budget/i);
+    const now = new Date();
+    expect(availability.resetsAt).toBe(
+      new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+      ).toISOString(),
+    );
   });
 
   it("keeps the question when the provider throws", async () => {
