@@ -237,7 +237,8 @@ column, which is where a drag has always put it.
 Asked for by Akmal on 11 November 2026: an existing task can be moved into an
 initiative, which until now happened only by creating the task on that
 initiative's board. Building it found a gap in what is already there, so this
-section needs "design approved" before the code: it changes access.
+section waited for approval before the code, since it changes access. Akmal
+approved it on 11 November 2026 ("let's proceed the development").
 
 **The gap.** `tasks.create` and `tasks.update` write `initiative_id` and
 `key_result_id` as given. Nothing checks that the initiative or key result is
@@ -277,6 +278,12 @@ sentence above and named in the import report, never dropped.
 cannot see,
 **when** `tasks.create` or `tasks.update` names it,
 **then** the answer is not found, and nothing is written.
+
+**As built.** `assertWhatATaskNames` in `packages/core/src/actions/tasks.ts`,
+called by `tasks.create` and `tasks.update` before anything is written; the
+rail's `InitiativeField` in `apps/web/app/tasks/[id]/controls.tsx`, saved by
+`setInitiativeAction`. Tested in `packages/core/test/tasks.test.ts` and
+`e2e/s26-initiatives.spec.ts`.
 
 ## 4. Documents and attachments (P5-T12)
 

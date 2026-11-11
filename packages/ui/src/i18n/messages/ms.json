@@ -4439,6 +4439,8 @@
   "tasks.detail.assignees": "Penerima tugasan",
   "tasks.detail.checklist": "Senarai semak",
   "tasks.detail.controls.dueDate": "Tarikh akhir",
+  "tasks.detail.controls.initiative": "Inisiatif tempat tugasan ini",
+  "tasks.detail.openInitiative": "Buka inisiatif",
   "tasks.detail.draftTheCopy": "Draf teks",
   "tasks.detail.initiative": "Inisiatif",
   "tasks.detail.next": "Tugasan seterusnya",

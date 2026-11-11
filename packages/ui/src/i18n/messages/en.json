@@ -4439,6 +4439,8 @@
   "tasks.detail.assignees": "Assignees",
   "tasks.detail.checklist": "Checklist",
   "tasks.detail.controls.dueDate": "Due date",
+  "tasks.detail.controls.initiative": "Initiative this task belongs to",
+  "tasks.detail.openInitiative": "Open the initiative",
   "tasks.detail.draftTheCopy": "Draft the copy",
   "tasks.detail.initiative": "Initiative",
   "tasks.detail.next": "Next task",

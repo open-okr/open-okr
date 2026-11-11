@@ -1,6 +1,14 @@
 "use client";
 
-import { DateInput, guardPress, Spinner, useTranslations } from "@openokr/ui";
+import {
+  DateInput,
+  type EntityOption,
+  EntityPicker,
+  guardPress,
+  Spinner,
+  useTranslations,
+} from "@openokr/ui";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import type { Conflict } from "../../../lib/conflict.ts";
 import { ConflictNotice } from "../../../lib/conflict-notice.tsx";
@@ -213,6 +221,104 @@ export function DueDateField({
           onTakeTheirs={() => {
             const theirs = stored();
             setValue(theirs);
+            setRead(theirs);
+            setConflict(null);
+          }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * The initiative a task belongs to, changed where it is read (plan 0.8.0 I2,
+ * docs/design/work-layer.md §3.6): the initiatives of the task's space, and
+ * None. Saved as it is picked, sending the initiative it was drawn with, as
+ * the due date does (V4). A refusal, such as an initiative the reader cannot
+ * edit, is said under the picker and the choice goes back.
+ */
+export function InitiativeField({
+  initiativeId,
+  current,
+  options,
+  onSave,
+}: {
+  readonly initiativeId: string | null;
+  /** The initiative it is in when that is not among `options`. */
+  readonly current: EntityOption | null;
+  readonly options: readonly EntityOption[];
+  readonly onSave: (initiativeId: string, read: string) => Promise<WriteState>;
+}) {
+  const { t } = useTranslations();
+
+  const [value, setValue] = useState(initiativeId);
+  const [read, setRead] = useState(initiativeId ?? "");
+  const [conflict, setConflict] = useState<Conflict | null>(null);
+  const { error, pending, run } = useRun();
+
+  const save = (
+    next: string | null,
+    before: string,
+    previous: string | null,
+  ) => {
+    setValue(next);
+    setConflict(null);
+    run(
+      "initiative",
+      async () => {
+        const state = await onSave(next ?? "", before);
+        if (state.conflict) {
+          setConflict(state.conflict);
+        } else if (!state.error) {
+          setRead(next ?? "");
+        }
+        return state;
+      },
+      () => setValue(previous),
+    );
+  };
+  const stored = () => {
+    const theirs = conflict?.current.initiativeId;
+    return typeof theirs === "string" ? theirs : "";
+  };
+
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <span className="flex items-center gap-1.5">
+        {pending ? <Spinner /> : null}
+        <EntityPicker
+          label={t("tasks.detail.controls.initiative")}
+          hideLabel
+          value={value}
+          current={current}
+          options={options}
+          noneLabel={t("tasks.detail.none")}
+          disabled={pending}
+          onValueChange={(chosen) => save(chosen, read, value)}
+          className="w-52"
+        />
+      </span>
+      {value ? (
+        <Link
+          href={`/initiatives/${value}`}
+          className="text-xs text-brand-text hover:underline"
+        >
+          {t("tasks.detail.openInitiative")}
+        </Link>
+      ) : null}
+      {error ? (
+        <span role="alert" className="text-xs text-bad">
+          {error}
+        </span>
+      ) : null}
+      {conflict ? (
+        <ConflictNotice
+          conflict={conflict}
+          pending={pending}
+          onKeepMine={() => save(value, stored(), read === "" ? null : read)}
+          onTakeTheirs={() => {
+            const theirs = stored();
+            setValue(theirs === "" ? null : theirs);
             setRead(theirs);
             setConflict(null);
           }}

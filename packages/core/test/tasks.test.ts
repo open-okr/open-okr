@@ -183,6 +183,122 @@ describe("what finishing work does to a key result, which is nothing", () => {
  * tasks are how that progress reaches a key result it serves. Each task counts
  * once, and the measured value is still the only number that moves.
  */
+describe("what a task may name (plan 0.8.0 I2, work-layer.md §3.6)", () => {
+  const initiativeIn = async (space: string, title: string) =>
+    (
+      (await call("initiatives.create", {
+        spaceId: space,
+        title,
+        ownerId: ownerMemberId,
+      })) as { id: string }
+    ).id;
+
+  const onBoard = async (initiativeId: string) => {
+    const board = (await call("tasks.board", { initiativeId })) as {
+      columns: { cards: { id: string }[] }[];
+    };
+    return board.columns.flatMap((one) => one.cards.map((card) => card.id));
+  };
+
+  /** A second workspace, with an initiative and a key result of its own. */
+  const elsewhere = async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('task-stranger', 'Cy', 'task-stranger@example.com')",
+    );
+    const theirs = await provisionWorkspaceForUser(wb.appPool, {
+      id: "task-stranger",
+      name: "Cy",
+    });
+    const ctx = {
+      pool: wb.appPool,
+      workspaceId: theirs.workspaceId,
+      actor: { kind: "human" as const, userId: "task-stranger" },
+    };
+    const [space] = (await callAction(ctx, "spaces.list", {})) as {
+      id: string;
+    }[];
+    const initiative = (await callAction(ctx, "initiatives.create", {
+      spaceId: space?.id as string,
+      title: "Somebody else's work",
+      ownerId: theirs.memberId,
+    })) as { id: string };
+    const cycle = (await callAction(ctx, "cycles.current", {
+      mode: "quarterly",
+    })) as { id: string };
+    const goal = (await callAction(ctx, "goals.create", {
+      title: "Somebody else's objective",
+      cycleId: cycle.id,
+      spaceId: space?.id as string,
+      level: "team",
+      ownerKind: "space",
+      championId: theirs.memberId,
+      reviewerId: theirs.memberId,
+      weight: 1,
+    })) as { id: string };
+    const keyResult = (await callAction(ctx, "goals.addKeyResult", {
+      goalId: goal.id,
+      title: "Somebody else's number",
+      direction: "increase",
+      indicatorType: "leading",
+      baselineValue: 0,
+      targetValue: 10,
+      weight: 1,
+    })) as { id: string };
+    return { initiativeId: initiative.id, keyResultId: keyResult.id };
+  };
+
+  it("moves an existing task into an initiative of its space, and out again", async () => {
+    const initiativeId = await initiativeIn(spaceId, "Rebuild onboarding");
+    const task = await createTask("Design the welcome screen");
+    await call("tasks.update", { id: task.id, initiativeId });
+    expect(await onBoard(initiativeId)).toEqual([task.id]);
+
+    await call("tasks.update", { id: task.id, initiativeId: null });
+    expect(await onBoard(initiativeId)).toEqual([]);
+  });
+
+  it("refuses an initiative in another space, on create and on update", async () => {
+    const other = (await call("spaces.create", { name: "Platform" })) as {
+      id: string;
+    };
+    const initiativeId = await initiativeIn(other.id, "Move the queue");
+    const sentence =
+      /A task joins an initiative in its own space\. Move the queue is in Platform\./;
+    await expect(
+      createTask("Write the runbook", { initiativeId }),
+    ).rejects.toThrow(sentence);
+    const task = await createTask("Write the runbook");
+    await expect(
+      call("tasks.update", { id: task.id, initiativeId }),
+    ).rejects.toThrow(sentence);
+    expect(await onBoard(initiativeId)).toEqual([]);
+  });
+
+  it("finds no initiative or key result of another workspace", async () => {
+    const theirs = await elsewhere();
+    await expect(
+      createTask("Borrow their work", { initiativeId: theirs.initiativeId }),
+    ).rejects.toMatchObject({ code: "not_found" });
+    await expect(
+      createTask("Borrow their number", { keyResultId: theirs.keyResultId }),
+    ).rejects.toMatchObject({ code: "not_found" });
+    const task = await createTask("Stay home");
+    await expect(
+      call("tasks.update", { id: task.id, initiativeId: theirs.initiativeId }),
+    ).rejects.toMatchObject({ code: "not_found" });
+    await expect(
+      call("tasks.update", { id: task.id, keyResultId: theirs.keyResultId }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("still names a key result the actor can see", async () => {
+    const task = await createTask("Instrument the funnel", { keyResultId });
+    await call("tasks.update", { id: task.id, keyResultId: null });
+    await call("tasks.update", { id: task.id, keyResultId });
+  });
+});
+
 describe("initiatives feed a key result's linked work", () => {
   const createInitiative = async (title: string) =>
     (

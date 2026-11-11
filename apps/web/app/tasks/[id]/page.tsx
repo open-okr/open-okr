@@ -28,12 +28,18 @@ import {
   removeChecklistItemAction,
   setChecklistItemAction,
   setDueOnAction,
+  setInitiativeAction,
   setTaskStatusAction,
   unassignTaskAction,
 } from "../../board/actions.ts";
 import { ActionForm } from "../../cycle/action-form.tsx";
 import { InlineSelect } from "../../initiatives/inline-select.tsx";
-import { ChecklistLine, DueDateField, RailButton } from "./controls.tsx";
+import {
+  ChecklistLine,
+  DueDateField,
+  InitiativeField,
+  RailButton,
+} from "./controls.tsx";
 
 /** The tab reads this item's own name (lib/page-title.ts). */
 export async function generateMetadata({
@@ -111,6 +117,11 @@ export default async function TaskPage({
     workspace.memberId,
   );
   const canEdit = level >= ACCESS_LEVELS.edit;
+  // The initiatives this task can move into: those of its own space, which
+  // is where `tasks.update` lets it go (plan 0.8.0 I2).
+  const spaceInitiatives = canEdit
+    ? await callAction(context, "initiatives.list", { spaceId: task.spaceId })
+    : [];
 
   const members = canEdit
     ? (await callAction(context, "people.directory", {})).filter(
@@ -356,7 +367,29 @@ export default async function TaskPage({
               )}
             </Row>
             <Row label={t("tasks.detail.initiative")}>
-              {task.initiativeId ? (
+              {canEdit ? (
+                <InitiativeField
+                  initiativeId={task.initiativeId}
+                  current={
+                    task.initiativeId &&
+                    !spaceInitiatives.some(
+                      (one) => one.id === task.initiativeId,
+                    )
+                      ? {
+                          id: task.initiativeId,
+                          label:
+                            task.initiativeTitle ??
+                            t("tasks.detail.anInitiative"),
+                        }
+                      : null
+                  }
+                  options={spaceInitiatives.map((one) => ({
+                    id: one.id,
+                    label: one.title,
+                  }))}
+                  onSave={setInitiativeAction.bind(null, task.id)}
+                />
+              ) : task.initiativeId ? (
                 <Link
                   href={`/initiatives/${task.initiativeId}`}
                   className="text-brand-text hover:underline"

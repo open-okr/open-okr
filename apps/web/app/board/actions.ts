@@ -214,6 +214,42 @@ export async function setChecklistItemAction(
   );
 }
 
+/**
+ * Moves a task into an initiative of its space, or out of one (plan 0.8.0
+ * I2, docs/design/work-layer.md §3.6). The action refuses an initiative in
+ * another space, or one the reader cannot edit, in a sentence shown under the
+ * picker. Sends the initiative the field was drawn with (V4), so a move
+ * somebody else made since is refused rather than overwritten.
+ */
+export async function setInitiativeAction(
+  id: string,
+  initiativeId: string,
+  /** The initiative the field was drawn with, empty for none. */
+  read?: string,
+): Promise<WriteState> {
+  const value = initiativeId === "" ? null : initiativeId;
+  const state = await run(
+    (context) =>
+      callAction(context, "tasks.update", {
+        id,
+        initiativeId: value,
+        ...(read === undefined
+          ? {}
+          : { read: { initiativeId: read === "" ? null : read } }),
+      }),
+    ["/board", `/tasks/${id}`, "/initiatives"],
+    (error, t) => {
+      const conflict = conflictOf(error, { initiativeId: value });
+      return conflict ? { error: null, conflict } : refusedSentence(error, t);
+    },
+  );
+  if (state.error === null && !state.conflict) {
+    // Both initiatives' pages count the task in their progress.
+    revalidatePath("/initiatives/[id]", "page");
+  }
+  return state;
+}
+
 export async function setDueOnAction(
   id: string,
   dueOn: string,

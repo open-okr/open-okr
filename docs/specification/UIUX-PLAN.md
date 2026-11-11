@@ -214,7 +214,7 @@ Format: purpose, layout, primary actions, states.
 
 **S-27 OKR board.** A left rail of objectives and their key results, each with progress derived from linked completed tasks, a confidence chip and a task count, acting as a filter. The board itself has four columns with drag, live presence and inline creation. Cards show title, the key result they serve, due chip and assignee avatars.
 
-**S-28 Task detail.** Title inline, status, description, checklist, comments and activity. A right rail with assignees, due date, initiative, linked key result and watchers.
+**S-28 Task detail.** Title inline, status, description, checklist, comments and activity. A right rail with assignees, due date, initiative, linked key result and watchers. **The initiative is a picker** (plan 0.8.0 I2) for anybody who can edit the task: the initiatives of the task's own space, and None, so an existing task moves into an initiative, or out of one, where it is read.
 
 ### Platform
 

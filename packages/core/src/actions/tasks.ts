@@ -820,6 +820,90 @@ export const readTask = defineReadAction({
   },
 });
 
+/**
+ * What a task names is checked before it is written (plan 0.8.0 I2,
+ * docs/design/work-layer.md §3.6).
+ *
+ * `initiative_id` and `key_result_id` were written as given, and their
+ * foreign keys are checked past row-level security, so a task could name a
+ * row of another workspace, or put itself on the board of an initiative its
+ * author cannot open. An initiative is reached at edit, since adding work to
+ * it changes its progress, and must be in the task's own space, as a task
+ * made on its board is. A key result's objective is reached at view, which is
+ * what the Board's picker offers. Clearing either names nothing to check.
+ */
+async function assertWhatATaskNames(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly spaceId: string;
+    readonly initiativeId?: string | null;
+    readonly keyResultId?: string | null;
+  },
+): Promise<void> {
+  if (input.initiativeId) {
+    await getAccessScoped(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.memberId,
+      resourceType: "initiative",
+      resourceId: input.initiativeId,
+      requires: ACCESS_LEVELS.edit,
+    });
+    const [initiative] = await tx
+      .select({
+        title: initiatives.title,
+        spaceId: initiatives.spaceId,
+        spaceName: spaces.name,
+      })
+      .from(initiatives)
+      .innerJoin(spaces, eq(spaces.id, initiatives.spaceId))
+      .where(
+        activeOnly(
+          initiatives,
+          eq(initiatives.workspaceId, input.workspaceId),
+          eq(initiatives.id, input.initiativeId),
+        ),
+      )
+      .limit(1);
+    if (!initiative) {
+      throw new OperationError(
+        "not_found",
+        "No such initiative, or you do not have access to it.",
+      );
+    }
+    if (initiative.spaceId !== input.spaceId) {
+      throw new OperationError(
+        "forbidden",
+        `A task joins an initiative in its own space. ${initiative.title} is in ${initiative.spaceName}.`,
+      );
+    }
+  }
+  if (input.keyResultId) {
+    const [keyResult] = await tx
+      .select({ goalId: keyResults.goalId })
+      .from(keyResults)
+      .where(
+        activeOnly(
+          keyResults,
+          eq(keyResults.workspaceId, input.workspaceId),
+          eq(keyResults.id, input.keyResultId),
+        ),
+      )
+      .limit(1);
+    if (!keyResult) {
+      throw new OperationError("not_found", "No such key result.");
+    }
+    await getAccessScoped(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.memberId,
+      resourceType: "goal",
+      resourceId: keyResult.goalId,
+      requires: ACCESS_LEVELS.view,
+    });
+  }
+}
+
 export const createTask = defineWriteAction({
   name: "tasks.create",
   summary: "Creates a task in a space, optionally behind a key result.",
@@ -850,6 +934,13 @@ export const createTask = defineWriteAction({
     },
     async execute({ tx, workspaceId, actor }) {
       await assertLegacyKeyFree(tx, workspaceId, tasks, input.legacy, "task");
+      await assertWhatATaskNames(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        spaceId: input.spaceId,
+        initiativeId: input.initiativeId,
+        keyResultId: input.keyResultId,
+      });
 
       const created = await createTaskInTx(tx, {
         workspaceId,
@@ -1001,7 +1092,14 @@ export const updateTask = defineWriteAction({
         ACCESS_LEVELS.edit,
       );
     },
-    async execute({ tx, workspaceId, loaded }) {
+    async execute({ tx, workspaceId, actor, loaded }) {
+      await assertWhatATaskNames(tx, {
+        workspaceId,
+        memberId: requireMemberId(actor.memberId),
+        spaceId: loaded.spaceId,
+        initiativeId: input.initiativeId,
+        keyResultId: input.keyResultId,
+      });
       await requireReadUnchanged(tx, {
         workspaceId,
         subjectType: "task",

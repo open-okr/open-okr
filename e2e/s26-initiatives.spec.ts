@@ -455,3 +455,54 @@ test("the drawer names a key result's initiatives and leads to their list", asyn
     named.getByRole("link", { name: "View initiatives" }),
   ).toHaveAttribute("href", `/initiatives?keyResult=${keyResult.id}`);
 });
+
+/**
+ * A task moves into an initiative from its own page (plan 0.8.0 I2,
+ * docs/design/work-layer.md §3.6).
+ *
+ * Acceptance criterion:
+ *   Given a task made on the space's board, in no initiative, when the
+ *   initiative of its space is chosen on the task's page, then it is on that
+ *   initiative's board; and None takes it out again.
+ */
+test("an existing task moves into an initiative from its own page", async () => {
+  const task = "Draft the activation email";
+  // Taken off the space's board again whatever happens: a spec after this one
+  // on the same shard, the Board's, opens on that board expecting it empty.
+  try {
+    await goTo(page, "/board");
+    await page.getByLabel("What has to happen").fill(task);
+    await page.getByRole("button", { name: "Add" }).click();
+    await page.getByRole("link", { name: task }).click();
+    await page.waitForURL(/\/tasks\//, { timeout: 15_000 });
+
+    const picker = page.getByLabel("Initiative this task belongs to");
+    await choose(picker, TITLE);
+    await expect(
+      page.getByRole("link", { name: "Open the initiative" }),
+    ).toBeVisible({ timeout: 15_000 });
+
+    const { rows } = await pool.query<{ id: string }>(
+      "select id from initiatives where workspace_id = $1 and title = $2 and deleted_at is null",
+      [workspaceId, TITLE],
+    );
+    const initiativeId = rows[0]?.id as string;
+    await expect(async () => {
+      const { rows: tasks } = await pool.query<{ initiative_id: string | null }>(
+        "select initiative_id from tasks where workspace_id = $1 and title = $2 and deleted_at is null",
+        [workspaceId, task],
+      );
+      expect(tasks).toEqual([{ initiative_id: initiativeId }]);
+    }).toPass({ timeout: 15_000 });
+
+    await goTo(page, `/board?initiative=${initiativeId}`);
+    await expect(page.getByRole("link", { name: task })).toBeVisible({
+      timeout: 15_000,
+    });
+  } finally {
+    await pool.query(
+      "update tasks set deleted_at = now() where workspace_id = $1 and title = $2 and deleted_at is null",
+      [workspaceId, task],
+    );
+  }
+});
