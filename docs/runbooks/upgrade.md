@@ -195,26 +195,29 @@ root key, and refuses to finish without it rather than report them sealed.
   Chunks written before have no vector, and get one when their text next
   changes; until then the full-text half of search finds them.
 
-- **`X-Real-IP` is no longer read.** Until 0.8.0 the instance read a
-  visitor's address from `X-Forwarded-For` when it held one address, and from
-  `X-Real-IP` when it did not. A proxy that appends to `X-Forwarded-For`, such
-  as an AWS load balancer, leaves `X-Real-IP` as the caller sent it, so a
-  caller could choose the address every per-address limit counted them under.
-  Now `X-Forwarded-For` alone is read, still only when it holds one address.
-  The Compose install, whose Caddy writes `X-Forwarded-For`, sees no
-  difference. A proxy of your own that writes only `X-Real-IP` is named with
-  `OPENOKR_CLIENT_ADDRESS_HEADER=x-real-ip`.
-- **Behind a CDN or a layer-7 load balancer, name what is in front.**
-  `OPENOKR_TRUSTED_PROXIES` (Helm: `network.trustedProxies`) or
-  `OPENOKR_CLIENT_ADDRESS_HEADER` (`network.clientAddressHeader`). Without
-  either, a forwarded chain places nobody and every such visitor shares one
-  sign-in limit, as before. After the upgrade the log says which reading is in
-  force on its `caller address:` line, Admin, General says so when the
+- **How a visitor's address is read.** Until 0.8.0 the instance read
+  `X-Forwarded-For` when it held one address and `X-Real-IP` when it did not.
+  A proxy that appends to `X-Forwarded-For`, such as an AWS load balancer,
+  leaves `X-Real-IP` as the caller sent it, so a caller could choose the
+  address every per-address limit counted them under. Now the visitor is the
+  `X-Forwarded-For` entry `OPENOKR_TRUSTED_PROXY_HOPS` places from the right,
+  1 by default, which is the entry the nearest proxy wrote. `X-Real-IP` is
+  read only with one proxy and no `X-Forwarded-For` at all. The Compose
+  install and one ingress controller in Helm need nothing set. A cloud load
+  balancer in front of the ingress controller is
+  `OPENOKR_TRUSTED_PROXY_HOPS=2` (Helm: `instance.trustedProxyHops`).
+- **A chain whose length varies, or a CDN, is named instead.**
+  `OPENOKR_TRUSTED_PROXIES` (Helm: `network.trustedProxies`) lists the
+  proxies in front, or `OPENOKR_CLIENT_ADDRESS_HEADER`
+  (`network.clientAddressHeader`) names the one header a CDN writes, and
+  either replaces the hop count. After the upgrade the log says which reading
+  is in force on its `caller address:` line, Admin, General says so when the
   instance meets a visitor it cannot place, and the first boot writes one
   `instance.caller_address_configured` row to the instance audit chain.
   [Behind a CDN or a load balancer](../install/behind-a-proxy.md) says which
-  to set. A malformed entry, both set, or `0.0.0.0/0` refuses the boot, naming
-  the entry. A person's sessions show no address until they next sign in.
+  to set. A malformed entry, two of the three variables set, or `0.0.0.0/0`
+  refuses the boot, naming the variable. A person's sessions show no address
+  until they next sign in.
 
 ## 0.6 to 0.7
 

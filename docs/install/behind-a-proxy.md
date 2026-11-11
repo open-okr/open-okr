@@ -28,9 +28,9 @@ The instance says the same in three other places:
 - **Admin, General** shows "This instance cannot tell some visitors apart" once
   it has met a request it could not place since it last started. Not on a
   managed cloud, whose operator reads the next two.
-- **The log** has one line at boot: `caller address: one forwarded address
-  only`, `caller address: X-Forwarded-For, trusting 22 ranges`, or `caller
-  address: the cf-connecting-ip header only`.
+- **The log** has one line at boot: `caller address: X-Forwarded-For, 1
+  proxy from the right` by default, `caller address: X-Forwarded-For,
+  trusting 22 ranges`, or `caller address: the cf-connecting-ip header only`.
 - **The metric** `openokr_caller_addresses_total{outcome="unresolved"}`. A
   correct deployment never counts one.
 
