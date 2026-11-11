@@ -1,5 +1,24 @@
 # @openokr/ui
 
+## 0.8.0
+
+### Patch Changes
+
+- [#207](https://github.com/open-okr/open-okr/pull/207) [`c596cc9`](https://github.com/open-okr/open-okr/commit/c596cc97668102a4dff97fbbb2490edd4e167eeb) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - Compact density now changes what you see: every padding, gap and size is a fifth smaller on a tablet or a computer, so a long list such as Goals is about a tenth shorter. It set values nothing read, so choosing it changed nothing. On a phone the spacing stays comfortable, because everything there is tapped. The theme is now chosen with three icons, light, dark and system, each with its name as a tooltip and for screen readers.
+
+- [#205](https://github.com/open-okr/open-okr/pull/205) [`b803f7e`](https://github.com/open-okr/open-okr/commit/b803f7e778fb99652a7a411df1de9a2627198933) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - In Bahasa Melayu the sidebar, its block headings, the bottom bar on a phone, the search palette, the account rows of the avatar menu and the admin sections are in Malay, and so is a built-in role's name (Pemilik, Pentadbir, Ahli, Pemerhati). They were all in English. A workspace's own words for its terms still win, and a role the workspace made keeps the name it was given. `people.readMember` returns the role's built-in key as `roleKey`, or null for a role the workspace made.
+
+- [#205](https://github.com/open-okr/open-okr/pull/205) [`ae15cbd`](https://github.com/open-okr/open-okr/commit/ae15cbdea7186cbb9643f47a340fcffd97cbfe8f) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - On a cloud with a plan catalogue, a workspace that has no plan is shown as "No plan": on its page in the operator console, in the console's plan filter, and on the workspace's own Plan and seats page. It was shown as "free" or "Free", the same word as a plan in many catalogues. Without a catalogue, where Free is the only plan, nothing changes.
+
+- [#207](https://github.com/open-okr/open-okr/pull/207) [`cab0042`](https://github.com/open-okr/open-okr/commit/cab004285c6f6b74896372dff1ef895513623e0b) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The product tour's cycle step lights only the strip under the top bar, which is drawn while a cycle is being planned, and is left out otherwise. It used to fall back to the Work Map's phase strip further down the page, where its words about a strip under the top bar were out of place. The last step no longer shows Skip tour, so "Start drafting OKRs" fits on the card, and the buttons wrap rather than run past it in any language.
+
+- [#207](https://github.com/open-okr/open-okr/pull/207) [`cc5ba20`](https://github.com/open-okr/open-okr/commit/cc5ba206271a1aaea3dba26c621cb8678a2d2fb6) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The Work area's tabs are Initiatives and Tasks. The Tasks screen, still at `/board`, is headed Tasks and shows them as a board; an initiative's or a key result's tasks are headed "Initiative tasks" and "Key result tasks", the command palette and the phone menu name it Tasks too, and an initiative's link to its tasks reads View tasks.
+
+- [#207](https://github.com/open-okr/open-okr/pull/207) [`88842eb`](https://github.com/open-okr/open-okr/commit/88842eba368d8a5d36d76cb83f819e1efcd24e99) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - The words for work are the same everywhere: a task is one item of work, an initiative is a project made of tasks, the board shows tasks by status, and work means initiatives and tasks together. The Board says "No tasks on this board yet", Add an initiative asks "What project is this", and a key result's link to its board reads "View tasks". A key result's menu on Goals, and its place in the drawer, now offer View tasks under View initiatives, opening its board: the tasks that name it and its initiatives' tasks.
+- Updated dependencies []:
+  - @openokr/formats@0.8.0
+  - @openokr/method@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes

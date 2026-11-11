@@ -1,5 +1,15 @@
 # @openokr/agents
 
+## 0.8.0
+
+### Patch Changes
+
+- Updated dependencies [[`06a4ef3`](https://github.com/open-okr/open-okr/commit/06a4ef30127da7876cb40465d56de7beebf8be65), [`686cd08`](https://github.com/open-okr/open-okr/commit/686cd086ce8e82ed8ed7098a7b5b41cb22b7a71d), [`416eb66`](https://github.com/open-okr/open-okr/commit/416eb66c7ac7b544babd7517c04dd4237fc73484), [`b803f7e`](https://github.com/open-okr/open-okr/commit/b803f7e778fb99652a7a411df1de9a2627198933), [`508a4b6`](https://github.com/open-okr/open-okr/commit/508a4b62de015086f27f92572526cd836540151e), [`1021b7c`](https://github.com/open-okr/open-okr/commit/1021b7cfea9d42fb7f683b135e521612612f726c), [`3e37fd0`](https://github.com/open-okr/open-okr/commit/3e37fd0ed8f008a0a3dc992b64ed18ca38d7e6d1), [`0dd555d`](https://github.com/open-okr/open-okr/commit/0dd555d6663ffbb0048ae06ef55a159b22f0314a), [`cdad1fa`](https://github.com/open-okr/open-okr/commit/cdad1fa90e1f045a5907520c99f47de49f2748c9), [`fcd1c4e`](https://github.com/open-okr/open-okr/commit/fcd1c4ed08bebb64f3bd069d9196e3cd0fef34c0), [`cc5ba20`](https://github.com/open-okr/open-okr/commit/cc5ba206271a1aaea3dba26c621cb8678a2d2fb6)]:
+  - @openokr/core@0.8.0
+  - @openokr/db@0.8.0
+  - @openokr/adapters@0.8.0
+  - @openokr/method@0.8.0
+
 ## 0.7.0
 
 ### Patch Changes
