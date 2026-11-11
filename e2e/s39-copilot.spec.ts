@@ -222,7 +222,11 @@ test("a question is recorded and answered with what is there to find", async () 
   // The re-read after a turn used to take the reason and the passages off the
   // screen, and the assertion above passed on the footer's sentence. This is
   // the answer's own sentence, which the footer never says.
-  await expect(panel.getByRole("textbox")).toBeEnabled({ timeout: 30_000 });
+  // Landed: no turn is still waiting for words. The box itself stays usable
+  // throughout (plan 0.8.1 CP6), so it is no signal.
+  await expect(panel.locator("article[aria-busy]")).toHaveCount(0, {
+    timeout: 30_000,
+  });
   await expect(
     panel
       .getByRole("log", { name: "Conversation" })
@@ -232,6 +236,54 @@ test("a question is recorded and answered with what is there to find", async () 
   ).toBeVisible();
   // And the composer has focus again for the next question (plan 0.8.1 CP1).
   await expect(panel.getByRole("textbox")).toBeFocused();
+});
+
+/**
+ * **The composer** (plan 0.8.1 CP6, review F13 and F17).
+ *
+ * Acceptance criteria:
+ *   Given the composer focused, when the person types twenty lines, then the
+ *   box grows to 40% of the panel, then scrolls inside.
+ *   Given the server refuses the request, when the person presses Send, then
+ *   the question is back in the box and an error under it says why.
+ */
+test("the box grows to 40% of the panel, then scrolls inside", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const box = panel.getByRole("textbox");
+  const resting = (await box.boundingBox())?.height ?? 0;
+  await box.fill(
+    Array.from({ length: 20 }, (_, line) => `Line ${line + 1}`).join("\n"),
+  );
+  const panelHeight = (await panel.boundingBox())?.height ?? 0;
+  const grown = (await box.boundingBox())?.height ?? 0;
+  expect(grown).toBeGreaterThan(resting * 3);
+  expect(grown).toBeLessThanOrEqual(panelHeight * 0.4 + 2);
+  expect(
+    await box.evaluate((area) => area.scrollHeight > area.clientHeight),
+  ).toBe(true);
+  await box.fill("");
+});
+
+test("a refused question comes back to the box, with why", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await page.route("**/api/copilot", (route) =>
+    route.fulfill({ status: 400, body: "Bad request" }),
+  );
+  const box = panel.getByRole("textbox");
+  await box.fill("A question the server refuses");
+  await panel.getByRole("button", { name: "Send the question" }).click();
+  // Under the box, as the field's own error.
+  await expect(
+    panel
+      .getByRole("alert")
+      .filter({
+        hasText:
+          "The copilot could not be reached. Your question was not saved.",
+      }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(box).toHaveValue("A question the server refuses");
+  await page.unroute("**/api/copilot");
+  await box.fill("");
 });
 
 test("the conversation is there when the panel is reopened", async () => {

@@ -31,19 +31,10 @@ import {
   Button,
   Chip,
   Kbd,
-  TextArea,
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import {
-  ArrowDown,
-  History,
-  Maximize2,
-  Send,
-  Square,
-  SquarePen,
-  X,
-} from "lucide-react";
+import { ArrowDown, History, Maximize2, SquarePen, X } from "lucide-react";
 import Link from "next/link";
 import {
   type RefObject,
@@ -65,6 +56,7 @@ import {
   stopCopilotRunAction,
   undoCopilotProposalAction,
 } from "./actions";
+import { Composer } from "./composer";
 import { type Proposal, ProposalCard } from "./proposal-card";
 import { ThreadList, type ThreadSummary } from "./thread-list";
 import {
@@ -280,6 +272,11 @@ export function CopilotPanel({
   const [rejoined, setRejoined] = useState<Rejoined>({ text: "", step: null });
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /**
+   * Why the last question did not reach the copilot, under the box that
+   * holds it again (plan 0.8.1 CP6, review F13).
+   */
+  const [sendError, setSendError] = useState<string | null>(null);
   /** Passages and reasons kept beside the questions they answered (CP8). */
   const [kept, setKept] = useState<Readonly<Record<string, Kept>>>({});
   const [busy, setBusy] = useState(false);
@@ -642,6 +639,7 @@ export function CopilotPanel({
       }
       setBusy(true);
       setNotice(null);
+      setSendError(null);
       setAnnouncement(t("copilot.copilotPanel.announce.answering"));
       // Shown straight away rather than after the round trip, with the first
       // thing every run does: a background run may publish that step before
@@ -681,7 +679,6 @@ export function CopilotPanel({
         });
         if (!response.ok || !response.body) {
           reached = false;
-          setNotice(t("copilot.copilotPanel.couldNotBeReached"));
           return;
         }
 
@@ -759,6 +756,9 @@ export function CopilotPanel({
         // recorded by the server, and the re-read below shows it.
         if (error instanceof DOMException && error.name === "AbortError") {
           stopped = true;
+        } else if (questionId === null) {
+          // Nothing was recorded: the question never reached the copilot.
+          reached = false;
         } else {
           setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
         }
@@ -769,16 +769,22 @@ export function CopilotPanel({
         // replaces everything drawn optimistically above, in one render so
         // the answer never leaves the screen. A proposal was asked for on the
         // server before the answer (plan 0.8.1 A2), so it is in it.
-        const landed = landedThreadId
-          ? await read(landedThreadId).catch(() => null)
-          : null;
-        if (landed) {
+        const landed =
+          reached && landedThreadId
+            ? await read(landedThreadId).catch(() => null)
+            : null;
+        if (!reached) {
+          // Nothing was recorded, in a new conversation or an open one. The
+          // question goes back in the box, unless the next one is being
+          // typed there already, with why under it (plan 0.8.1 CP6).
+          setArriving(null);
+          setQuestion((current) => (current.trim() === "" ? asked : current));
+          setSendError(t("copilot.copilotPanel.couldNotBeReached"));
+        } else if (landed) {
           show(...landed);
           setArriving(null);
-        } else if (reached) {
-          update({ settled: true });
         } else {
-          setArriving(null);
+          update({ settled: true });
         }
         setBusy(false);
         // Said once, politely: the words themselves were never read out as
@@ -852,6 +858,8 @@ export function CopilotPanel({
           />
         ));
   const empty = turns.length === 0 && arriving === null;
+  /** Words may still come for the question just asked. */
+  const answering = arriving !== null && !arriving.settled;
 
   return (
     <>
@@ -1109,55 +1117,25 @@ export function CopilotPanel({
             </p>
             <footer className="flex-none border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
               {canAsk ? null : <Unavailable availability={availability} />}
-              <div className="flex items-end gap-2">
-                <TextArea
-                  label={t("copilot.copilotPanel.yourQuestion")}
-                  hideLabel
-                  ref={inputRef}
-                  rows={2}
-                  value={question}
-                  disabled={busy}
-                  onChange={(event) => setQuestion(event.target.value)}
-                  onCompositionStart={() => {
-                    composing.current = true;
-                  }}
-                  onCompositionEnd={() => {
-                    composing.current = false;
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      void send();
-                    }
-                  }}
-                  placeholder={
-                    canAsk
-                      ? t("copilot.copilotPanel.askAQuestion")
-                      : t("copilot.copilotPanel.searchForMatchingPassages")
-                  }
-                  maxLength={4000}
-                  className="flex-1"
-                  inputClassName="resize-none placeholder:text-ink-4"
-                />
-                {busy && availability.streaming ? (
-                  <Button
-                    variant="ghost"
-                    onClick={stop}
-                    aria-label={t("copilot.copilotPanel.stopTheAnswer")}
-                  >
-                    <Square className="size-4" />
-                    {t("copilot.copilotPanel.stop")}
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => void send()}
-                    disabled={busy || question.trim() === ""}
-                    aria-label={t("copilot.copilotPanel.sendTheQuestion")}
-                  >
-                    <Send className="size-4" />
-                  </Button>
-                )}
-              </div>
+              <Composer
+                value={question}
+                onChange={(next) => {
+                  setQuestion(next);
+                  setSendError(null);
+                }}
+                onSend={() => void send()}
+                onStop={stop}
+                answering={answering}
+                canStop={answering && availability.streaming}
+                placeholder={
+                  canAsk
+                    ? t("copilot.copilotPanel.askAQuestion")
+                    : t("copilot.copilotPanel.searchForMatchingPassages")
+                }
+                error={sendError}
+                inputRef={inputRef}
+                composing={composing}
+              />
             </footer>
           </Dialog.Popup>
         </Dialog.Portal>

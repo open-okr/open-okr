@@ -37,6 +37,7 @@ const actions = vi.hoisted(() => ({
   listCopilotProposalsAction: vi.fn(async (): Promise<unknown[]> => []),
   listCopilotThreadsAction: vi.fn(async (): Promise<unknown[]> => []),
   readCopilotThreadAction: vi.fn(),
+  stopCopilotRunAction: vi.fn(async () => ({})),
   undoCopilotProposalAction: vi.fn(),
 }));
 vi.mock("../app/copilot/actions", () => actions);
@@ -723,5 +724,149 @@ describe("the frame and the keyboard (plan 0.8.1 CP1)", () => {
     const log = panel()?.querySelector('[role="log"]');
     expect(log?.getAttribute("aria-live")).toBe("off");
     expect(document.activeElement?.tagName).toBe("TEXTAREA");
+  });
+});
+
+describe("the composer (plan 0.8.1 CP6)", () => {
+  const type = async (text: string) => {
+    const box = panel()?.querySelector("textarea");
+    if (!box) {
+      throw new Error("no box");
+    }
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(box, text);
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    return box;
+  };
+
+  test("Enter that confirms an input method's word sends nothing", async () => {
+    await render(AVAILABLE);
+    await open();
+    const box = await type("こんにちは");
+    await act(async () => {
+      box.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Enter",
+          bubbles: true,
+          isComposing: true,
+        }),
+      );
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(box.value).toBe("こんにちは");
+  });
+
+  test("the next question can be typed while an answer arrives, and is kept", async () => {
+    // A stream that never ends, so the answer is still arriving.
+    fetchMock.mockResolvedValue(
+      new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    );
+    // No streaming provider, so there is nothing to stop and Send stays.
+    await render({ ...AVAILABLE, streaming: false });
+    await open();
+    await ask("First question");
+    await settle();
+
+    const box = await type("Second question");
+    expect(box.disabled).toBe(false);
+    expect(box.value).toBe("Second question");
+    const send = byName("Send the question") as HTMLButtonElement;
+    expect(send.disabled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test("Send becomes Stop in the same place while an answer can be stopped", async () => {
+    fetchMock.mockResolvedValue(
+      new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+        headers: { "Content-Type": "text/event-stream" },
+      }),
+    );
+    await render(AVAILABLE);
+    await open();
+    await ask("First question");
+    await settle();
+    expect(() => byName("Send the question")).toThrow();
+    expect(byName("Stop the answer")).toBeDefined();
+  });
+
+  test("Stop tells a background run to stop, then lets go of the request", async () => {
+    const encoder = new TextEncoder();
+    let aborted = false;
+    fetchMock.mockImplementation(async (_url: string, init: RequestInit) => {
+      init.signal?.addEventListener("abort", () => {
+        aborted = true;
+      });
+      return new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `event: thread\ndata: ${JSON.stringify({
+                  kind: "thread",
+                  threadId: THREAD,
+                  questionMessageId: QUESTION_ID,
+                  answerMessageId: "00000000-0000-4000-8000-0000000000aa",
+                })}\n\n`,
+              ),
+            );
+            init.signal?.addEventListener("abort", () =>
+              controller.error(new DOMException("aborted", "AbortError")),
+            );
+          },
+        }),
+        { headers: { "Content-Type": "text/event-stream" } },
+      );
+    });
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Long one",
+      messages: [],
+    });
+    await render(AVAILABLE);
+    await open();
+    await ask("A long question");
+    await settle();
+
+    await act(async () => byName("Stop the answer").click());
+    await settle();
+    expect(actions.stopCopilotRunAction).toHaveBeenCalledWith(
+      "00000000-0000-4000-8000-0000000000aa",
+    );
+    expect(aborted).toBe(true);
+  });
+
+  test("a refused send puts the question back, with the reason under it", async () => {
+    fetchMock.mockResolvedValue(new Response("Bad request", { status: 400 }));
+    // In a conversation already open, which is where it went missing before.
+    window.history.replaceState(null, "", `/?copilot=${THREAD}`);
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Open",
+      messages: [
+        recorded(QUESTION_ID, "member", "Earlier", "2026-11-12T10:00:00.000Z"),
+      ],
+    });
+    await render(AVAILABLE);
+    await settle();
+    await ask("A question the server refuses");
+    await settle();
+
+    const box = panel()?.querySelector("textarea");
+    expect(box?.value).toBe("A question the server refuses");
+    const alert = panel()?.querySelector('[role="alert"]');
+    expect(alert?.textContent).toBe(
+      "The copilot could not be reached. Your question was not saved.",
+    );
   });
 });
