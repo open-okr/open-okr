@@ -289,3 +289,19 @@ Deployment:
 
 **OKRGoal's move to header mode (Q3) is an operations step.** In order: add a request header Transform Rule in the Cloudflare zone that sets a long random secret header on every request; add an ALB listener rule that forwards only requests carrying that header and make the default action a fixed 403; set `network.clientAddressHeader: cf-connecting-ip` and `helm upgrade`; run the deployment check in `docs/install/behind-a-proxy.md` against the ALB's own hostname; then remove the per-visitor rate limit at Cloudflare.
 
+## 10. Combined with the hop count (11 November 2026)
+
+While 0.8.0 was being built, the hardening batch on `main` added
+`OPENOKR_TRUSTED_PROXY_HOPS` (`docs/design/sign-in-rate-limit.md`), another
+answer to the same question. Merging `main` into the release had to pick one
+rule, and Akmal decided to **combine** them:
+
+| Rule | As merged |
+|---|---|
+| The default | The hop count, 1, not "one forwarded address only". It is right for both shipped installs without anything set |
+| The ranges and the header | Kept, for a chain whose length varies and for a CDN's own header. Either replaces the hop count |
+| At most one | Any two of the three set refuses the boot, naming the variable. The chart renders the hop count only when neither `network.trustedProxies` nor `network.clientAddressHeader` is set |
+| Better Auth | Reads only the private header `withResolvedCaller` writes, the hardening batch's mechanism, for all three readings, so the limiter and `callerAddress()` cannot disagree |
+| `X-Real-IP` (Q1) | Still never read with the ranges or a header. With the hop count it is read only with one proxy and no `X-Forwarded-For` at all, where that proxy overwrote the caller's value: the hardening batch's rule, and narrower than the case Q1 closed |
+| The Admin, General notice and the metric (D12) | Unchanged: they count callers no reading could place |
+

@@ -150,6 +150,22 @@ instance audit chain. An operator sets a workspace's plan, or a seat count of
 their own for a contract no plan matches, on the workspace's page in the
 console, with a reason the customer reads in their own audit log.
 
+## Mail deliverability
+
+A cloud sends invitations, password resets and nudges, so the sending domain
+needs three DNS records or the mail lands in spam. The console's Instance
+screen warns while the mail transport is still `console`, which sends nothing.
+
+| Record | What it does |
+|---|---|
+| SPF | A TXT record on the sending domain listing the servers allowed to send for it. Include your SMTP provider's entry. |
+| DKIM | A signature your SMTP provider adds to each message. Publish the public key it gives you as a TXT or CNAME record. |
+| DMARC | A TXT record at `_dmarc.<domain>` saying what a receiver does with mail that fails SPF and DKIM. Start with `p=none` and a `rua` address, then tighten it. |
+
+`OPENOKR_MAIL_FROM` must be an address on a domain you hold these records for.
+Send a test message to a mailbox you control and read its headers for `spf=pass`,
+`dkim=pass` and `dmarc=pass` before you open sign-up.
+
 ## Taking payment
 
 Billing is off until you turn it on. With it off, an operator sets each plan by hand.

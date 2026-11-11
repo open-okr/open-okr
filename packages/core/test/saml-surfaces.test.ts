@@ -3,7 +3,6 @@ import * as saml from "samlify";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import {
-  createSSOConnection,
   loadSSOConnections,
   samlServiceProviderUrls,
   validateSSOConnectionInput,
@@ -15,6 +14,8 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
+import { seedVerifiedDomain } from "./sso-domain-fixtures.ts";
 
 /**
  * The surfaces around SAML (P8-T07c-b).
@@ -68,6 +69,9 @@ beforeAll(async () => {
       name: "SAML Surfaces",
     })
   ).workspaceId;
+  // The enforcing connection below is only allowed over a domain this
+  // workspace has proved (sso-domain-verification.md, rule 3).
+  await seedVerifiedDomain(workspaceId, "acme.example");
 }, 60_000);
 
 afterAll(async () => {

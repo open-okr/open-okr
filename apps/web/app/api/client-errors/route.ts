@@ -4,6 +4,7 @@ import { getPool } from "../../../lib/auth";
 import { resolveBrowserFrames } from "../../../lib/browser-frames";
 import { getCache } from "../../../lib/cache";
 import { receiveClientError } from "../../../lib/client-errors";
+import { refuseCrossSite } from "../../../lib/same-origin";
 import { currentSession } from "../../../lib/session";
 import { ACTIVE_WORKSPACE_COOKIE } from "../../../lib/workspace";
 
@@ -18,6 +19,10 @@ export const dynamic = "force-dynamic";
  * one: a person with no workspace yet is still reported, with none named.
  */
 export async function POST(request: Request): Promise<Response> {
+  const crossSite = refuseCrossSite(request);
+  if (crossSite) {
+    return crossSite;
+  }
   return receiveClientError(request, {
     async session() {
       const session = await currentSession();

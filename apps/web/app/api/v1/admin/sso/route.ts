@@ -2,13 +2,15 @@ import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
   type CreateSSOConnectionInput,
-  createSSOConnection,
-  type KeyRing,
+  callAction,
+  OperationError,
   SSOConnectionRejected,
 } from "@openokr/core";
 import { NextResponse } from "next/server";
 import { requireAccessLevel } from "../../../../../lib/access";
 import { getPool } from "../../../../../lib/auth";
+import { checkOutboundUrl } from "../../../../../lib/outbound";
+import { refuseCrossSite } from "../../../../../lib/same-origin";
 import { getKeyRing } from "../../../../../lib/secrets";
 import { expireSSOProviders } from "../../../../../lib/sso";
 
@@ -24,14 +26,17 @@ import { expireSSOProviders } from "../../../../../lib/sso";
  * cannot have. One validator now answers for both and names the field, and
  * the screen shows what it said.
  *
- * **Only adding is here.** Changing, turning off and removing a connection are
- * registered actions, `sso.updateConnection`, `sso.setConnectionEnabled` and
- * `sso.removeConnection`, which run through the Operation pipeline and are
- * audited. This route predates them and still writes outside it.
+ * **A thin caller of `sso.createConnection`**, which runs through the
+ * Operation pipeline and is audited, as are `sso.updateConnection`,
+ * `sso.setConnectionEnabled` and `sso.removeConnection`.
  */
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request): Promise<NextResponse> {
+export async function POST(request: Request): Promise<Response> {
+  const crossSite = refuseCrossSite(request);
+  if (crossSite) {
+    return crossSite;
+  }
   try {
     // **The workspace comes from here, not from the connection** (audit,
     // 18 September 2026). This route used to insert with
@@ -39,7 +44,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     // rather than returning null, so no SSO provider could ever be created on
     // any instance. `requireAccessLevel` has returned the workspace all
     // along; the route discarded it and asked the database instead.
-    const { workspaceId } = await requireAccessLevel(ACCESS_LEVELS.full);
+    const { workspaceId, userId } = await requireAccessLevel(
+      ACCESS_LEVELS.full,
+    );
     const body = (await request.json()) as Partial<CreateSSOConnectionInput>;
 
     const input: CreateSSOConnectionInput = {
@@ -65,13 +72,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       samlAudience: body.samlAudience ? String(body.samlAudience) : null,
     };
 
-    const ring: KeyRing = getKeyRing();
-    const created = await createSSOConnection(
-      getPool(),
-      workspaceId,
-      ring,
+    const created = await callAction(
+      {
+        pool: getPool(),
+        workspaceId,
+        actor: { kind: "human", userId },
+        ring: getKeyRing(),
+        baseUrl: loadEnv().BETTER_AUTH_URL,
+        // The provider's addresses are checked by the outbound guard before
+        // they are stored, as a webhook's are.
+        checkOutboundUrl,
+      },
+      "sso.createConnection",
       input,
-      loadEnv().BETTER_AUTH_URL,
     );
 
     // **Usable from the administrator's next click** (completeness review
@@ -94,10 +107,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
     // Duplicate provider ID.
-    if (
-      error instanceof Error &&
-      error.message.includes("sso_connections_provider")
-    ) {
+    if (error instanceof OperationError && error.code === "conflict") {
       return NextResponse.json(
         { error: "A provider with that ID already exists in this workspace" },
         { status: 409 },

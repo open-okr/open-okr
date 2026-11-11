@@ -151,18 +151,10 @@ describe("the auth route's lockout audit wrapper", () => {
     handlerMock.mockImplementation(async () => limited());
     const { POST } = await import("../app/api/auth/[...all]/route");
 
-    // X-Real-IP is no fallback (trusted-proxies.md Q1): a proxy that appends
-    // to X-Forwarded-For leaves it as the caller sent it.
-    await POST(
-      request("/api/auth/sign-in/email", { "x-real-ip": "198.51.100.1" }),
-    );
-    const realIp = recordInstanceAuditEventMock.mock.lastCall?.[1] as {
-      payload: { address: string };
-    };
-    expect(realIp.payload.address).not.toBe("198.51.100.1");
-
-    // A chain's first entry is whatever the caller chose to send
-    // (caller-address.ts), so it is not what the row records.
+    // A chain's first entry is whatever the caller chose to send, so it is not
+    // what the row records. With the default of one proxy (the hop count,
+    // combined with trusted-proxies.md by Akmal on 11 November 2026), the
+    // rightmost entry, which that proxy wrote, is.
     await POST(
       request("/api/auth/sign-in/email", {
         "x-forwarded-for": "6.6.6.6, 203.0.113.50",
@@ -172,6 +164,7 @@ describe("the auth route's lockout audit wrapper", () => {
       payload: { address: string };
     };
     expect(last.payload.address).not.toBe("6.6.6.6");
+    expect(last.payload.address).toBe("203.0.113.50");
   });
 
   it("records the caller behind the proxies the deployment names (trusted-proxies.md D9)", async () => {

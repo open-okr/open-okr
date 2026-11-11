@@ -41,6 +41,7 @@ import { getPool } from "../../../lib/auth";
 import { outboxDrained } from "../../../lib/background-work";
 import { resolveDrafterFor } from "../../../lib/drafter";
 import { getRealtime } from "../../../lib/realtime";
+import { refuseCrossSite } from "../../../lib/same-origin";
 import { requireWorkspace } from "../../../lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,10 @@ function parseBody(value: unknown): AskBody | null {
 }
 
 export async function POST(request: NextRequest) {
+  const crossSite = refuseCrossSite(request);
+  if (crossSite) {
+    return crossSite;
+  }
   let workspaceId: string;
   let userId: string;
   try {

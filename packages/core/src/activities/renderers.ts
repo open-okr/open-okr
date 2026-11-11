@@ -126,6 +126,9 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     (payload as { via: string }).via === "sso"
       ? "Someone joined by signing in through the identity provider"
       : "The directory added someone",
+  "sso.connection_created": (p) =>
+    `Single sign-on through "${asString(p.name, "a provider")}" was added`,
+  "directory.token_created": () => "A directory-sync token was created",
   "sso.connection_updated": (p) =>
     `Single sign-on through "${asString(p.name, "a provider")}" was changed`,
   "sso.connection_switched": (p) =>
@@ -134,6 +137,18 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
       : `Single sign-on through "${asString(p.name, "a provider")}" was turned off`,
   "sso.connection_removed": (p) =>
     `Single sign-on through "${asString(p.name, "a provider")}" was removed`,
+  "sso.domain_verification_started": (p) =>
+    `Verification of ${asString(p.domain, "a domain")} for single sign-on was started`,
+  "sso.domain_checked": (p) =>
+    `The record for ${asString(p.domain, "a domain")} was checked`,
+  "sso.domain_verified": (p) =>
+    `${asString(p.domain, "A domain")} was verified for single sign-on`,
+  "sso.domain_check_failed": (p) =>
+    `The record for ${asString(p.domain, "a domain")} could not be found on its daily check`,
+  "sso.domain_check_recovered": (p) =>
+    `The record for ${asString(p.domain, "a domain")} is back`,
+  "sso.domain_unverified": (p) =>
+    `${asString(p.domain, "A domain")} lost its verification after repeated failed checks`,
   "blob.prepared": () => "A file upload was started",
   "blob.claimed": () => "A file was uploaded",
   "blob.scanned": (payload) =>

@@ -13,7 +13,7 @@ import { recordCallerAddressReading } from "../src/auth/caller-address-audit.ts"
  * together write one.
  */
 
-const NOTHING: CallerAddressReading = { mode: "single_address" };
+const NOTHING: CallerAddressReading = { mode: "proxy_hops", hops: 1 };
 const RANGES: CallerAddressReading = {
   mode: "trusted_proxies",
   trustedProxies: ["10.0.2.0/24", "10.0.1.0/24"],
@@ -47,7 +47,7 @@ describe("the caller address reading on the instance chain", () => {
       "recorded",
     );
     expect(await rows()).toEqual([
-      { mode: "single_address", trustedProxies: [], header: null },
+      { mode: "proxy_hops", trustedProxies: [], header: null, hops: 1 },
     ]);
   });
 
@@ -66,6 +66,7 @@ describe("the caller address reading on the instance chain", () => {
         mode: "trusted_proxies",
         trustedProxies: ["10.0.1.0/24", "10.0.2.0/24"],
         header: null,
+        hops: null,
       },
     ]);
   });
@@ -80,8 +81,13 @@ describe("the caller address reading on the instance chain", () => {
       }),
     ).toBe("recorded");
     expect(await rows()).toEqual([
-      { mode: "single_address", trustedProxies: [], header: null },
-      { mode: "header", trustedProxies: [], header: "cf-connecting-ip" },
+      { mode: "proxy_hops", trustedProxies: [], header: null, hops: 1 },
+      {
+        mode: "header",
+        trustedProxies: [],
+        header: "cf-connecting-ip",
+        hops: null,
+      },
     ]);
   });
 
@@ -105,6 +111,7 @@ describe("the caller address reading on the instance chain", () => {
     const [payload] = await rows();
     expect(Object.keys(payload ?? {}).sort()).toEqual([
       "header",
+      "hops",
       "mode",
       "trustedProxies",
     ]);

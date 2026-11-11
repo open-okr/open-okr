@@ -2,8 +2,10 @@ import { z } from "zod";
 import {
   BOTH_SET_PROBLEM,
   CLIENT_ADDRESS_HEADER_VARIABLE,
+  HOPS_WITH_ANOTHER_PROBLEM,
   parseClientAddressHeader,
   parseTrustedProxies,
+  TRUSTED_PROXY_HOPS_VARIABLE,
 } from "./caller-address.ts";
 import { EnvironmentError } from "./environment-error.ts";
 
@@ -37,6 +39,28 @@ const optional = <T extends z.ZodTypeAny>(schema: T) =>
       typeof value === "string" && value.trim() === "" ? undefined : value,
     schema,
   );
+
+/** Proxies in front of the server: a whole number from 0 to 10, default 1. */
+const trustedProxyHopsSchema = z.coerce
+  .number()
+  .int()
+  .min(0)
+  .max(10)
+  .default(1);
+
+/**
+ * `OPENOKR_TRUSTED_PROXY_HOPS` alone, for a caller that needs it on every
+ * request and must not pay for validating the whole environment. A bad value
+ * falls back to the default here, and `parseEnv` refuses it at boot, so a typo
+ * is reported once and never changes whose address a limit counts.
+ */
+export function trustedProxyHops(
+  source: NodeJS.ProcessEnv | Record<string, unknown> = process.env,
+): number {
+  const raw = source.OPENOKR_TRUSTED_PROXY_HOPS;
+  const parsed = optional(trustedProxyHopsSchema).safeParse(raw);
+  return parsed.success ? (parsed.data as number) : 1;
+}
 
 /**
  * The development stand-in for `BETTER_AUTH_SECRET`. Deliberately obvious:
@@ -261,6 +285,18 @@ const envSchema = z
       z.enum(["on", "off", "elsewhere"]).default("on"),
     ),
 
+    /** How many reverse proxies sit between the internet and this server. The
+     * caller's address is the `X-Forwarded-For` entry that many places from the
+     * right, because the rightmost entry is the one the nearest proxy wrote and
+     * a caller cannot forge it. Both shipped topologies put one proxy in front
+     * (Caddy in Compose, one ingress controller in Helm), so `1` is right for
+     * them and nothing has to be set. A cloud load balancer in front of the
+     * ingress makes it `2`. `0` means no proxy: the header is ignored and every
+     * caller shares one unresolved sign-in limit (docs/design/sign-in-rate-limit.md). */
+    // No default here, so the refine below can tell a hop count somebody set
+    // from none: `trustedProxyHops()` answers 1 when it is unset.
+    OPENOKR_TRUSTED_PROXY_HOPS: optional(trustedProxyHopsSchema.optional()),
+
     /** Whether this instance is a public demonstration (P8-T13c). Off by
      * default, and it is a claim about the deployment rather than a feature
      * flag: on, the sign-in page names the personas anybody may sign in as and
@@ -366,6 +402,21 @@ const envSchema = z
         code: "custom",
         path: [CLIENT_ADDRESS_HEADER_VARIABLE],
         message: BOTH_SET_PROBLEM,
+      });
+    }
+    // **One of three, not two** (Akmal, 11 November 2026, merging the
+    // hardening batch's hop count with plan 0.8.0 H2). The hop count is the
+    // default reading; the ranges and the header are for a deployment where
+    // counting hops is not reliable, and either replaces it.
+    if (
+      env.OPENOKR_TRUSTED_PROXY_HOPS !== undefined &&
+      (env.OPENOKR_TRUSTED_PROXIES !== undefined ||
+        env.OPENOKR_CLIENT_ADDRESS_HEADER !== undefined)
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: [TRUSTED_PROXY_HOPS_VARIABLE],
+        message: HOPS_WITH_ANOTHER_PROBLEM,
       });
     }
     // **Both keys or neither** (plan 0.8.0 H9). Neither leaves the

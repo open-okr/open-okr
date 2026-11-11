@@ -13,7 +13,6 @@ import {
 import { createAuth } from "../src/auth/auth.ts";
 import { syncAllSamlProviders } from "../src/auth/saml-sync.ts";
 import {
-  createSSOConnection,
   loadSSOConnections,
   type SSOProviderConfig,
   samlServiceProviderUrls,
@@ -29,6 +28,7 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
 
 /**
  * A connection saved while the process runs is used by the next sign-in

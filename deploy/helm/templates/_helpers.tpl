@@ -330,6 +330,17 @@ erasure job lost the auth secret (plan 0.8.0 O3). check.sh compares the two.
 - name: OPENOKR_CLIENT_ADDRESS_HEADER
   value: {{ . | quote }}
 {{- end }}
+{{- /* The hop count is the default reading (the hardening batch,
+       combined with trusted-proxies.md by Akmal on 11 November 2026), and
+       either setting above replaces it: the server refuses the hop count
+       beside one of them, so it is rendered only when neither is set.
+       `hasKey`, not `default`: 0 is a real answer, and a release upgraded
+       with --reuse-values from before this key existed has none, which must
+       read as 1. */}}
+{{- if not (or $network.trustedProxies $network.clientAddressHeader) }}
+- name: OPENOKR_TRUSTED_PROXY_HOPS
+  value: {{ ternary (.Values.instance.trustedProxyHops | int) 1 (hasKey .Values.instance "trustedProxyHops") | quote }}
+{{- end }}
 {{- with .Values.extraEnv }}
 {{- toYaml . | nindent 0 }}
 {{- end }}

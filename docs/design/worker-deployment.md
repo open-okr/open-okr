@@ -523,3 +523,10 @@ Where the build moved from the sections above, and why.
 |---|---|---|---|
 | H10g-B1 | After `wait_for_health`, to the end; `OPENOKR_SKIP_DATA_CHANGE=1` skips and prints what is pending | As written, through one `data_change` function that `status`, `data-change` and `upgrade` share. **A script that fails exits the helper non-zero** after saying the upgrade is done, the instance is serving and `./openokr data-change` finishes it | The same answer the Helm hook gives a failed script, without a rollback: the new release is already serving, and the batches before the failure are kept |
 | H10g-B2 | The smoke test's two cases | The smoke test no longer runs `./openokr data-change` before the upgrade, so every script is still pending when the upgrade runs: the upgrade's output after the health wait must hold the runner's `Ran N script(s):`, and `status` then says every script is complete. `./openokr data-change` is checked after it, finding nothing left. The `OPENOKR_SKIP_BACKUP=1` upgrade also sets `OPENOKR_SKIP_DATA_CHANGE=1` and must print the status text and no run | With every script already complete, "prints what ran" could only ever see "Nothing to run" |
+
+**Superseded by the hardening batch (merged 11 November 2026).** `/api/health`
+now answers only `status` to anybody (`docs/design/hardening-batch-2026-11.md`,
+H-B), so it no longer says `elsewhere` or names the scheduler. The scheduler's
+state stays on `/api/status`, which judges the shared stamp as §1.3 says, and on
+Admin, General.
+

@@ -2,6 +2,7 @@ import {
   INSTANCE_SETTINGS,
   listSiteMessages,
   listTenantsAsOperator,
+  readCloudPreflight,
   readInstanceFlags,
   readRegistrationPolicy,
   registrationPolicyOrigin,
@@ -14,6 +15,7 @@ import { requireOperator } from "../../../lib/operator";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getPool } from "../../../lib/pool";
 import { getTranslations } from "../../../lib/translations";
+import { PreflightNotice } from "./preflight-notice";
 import { OperatorRegistrationCard } from "./registration-card";
 import { publishSiteMessage } from "./site-message-actions";
 import { SiteMessageForm } from "./site-message-form";
@@ -57,7 +59,7 @@ export default async function OperatorInstancePage() {
   const operator = await requireOperator();
   const pool = getPool();
 
-  const [flags, messages, tenants, registration, origin, check] =
+  const [flags, messages, tenants, registration, origin, check, preflight] =
     await Promise.all([
       readInstanceFlags(pool),
       listSiteMessages(pool),
@@ -67,6 +69,8 @@ export default async function OperatorInstancePage() {
       // The cloud flag does not stop it here, unlike the footer: the operator
       // is the one person on a cloud who can act on it (plan 0.8.0 V2).
       releaseCheck(pool),
+      // A warning that cannot be read is no warning: the page must still open.
+      readCloudPreflight(pool).catch(() => []),
     ]);
   // On a cloud with nothing chosen, sign-up is open, whatever the computed
   // default for a self-hosted instance would say (registration-policy.md D5).
@@ -90,6 +94,8 @@ export default async function OperatorInstancePage() {
         </h1>
         <p className="text-ink-2 text-sm">{t("operator.instance.intro")}</p>
       </header>
+
+      <PreflightNotice warnings={preflight} />
 
       <OperatorVersionCard running={RUNNING_VERSION} check={check} />
 

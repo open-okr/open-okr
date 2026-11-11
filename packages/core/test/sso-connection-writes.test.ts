@@ -1,9 +1,9 @@
+import { createHash } from "node:crypto";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { errorFor } from "../src/api/errors.ts";
 import {
-  createSSOConnection,
   listSSOProviders,
   loadSSOConnections,
   SSOConnectionRejected,
@@ -15,6 +15,8 @@ import {
   generateSigningPairs,
   type SigningPairs,
 } from "./saml-fixture-keys.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
+import { seedVerifiedDomain } from "./sso-domain-fixtures.ts";
 
 /**
  * Changing, turning off and removing a single sign-on connection from the
@@ -51,6 +53,8 @@ const as = async (userId: string, workspace: string) => ({
   actor: { kind: "human" as const, userId },
   ring,
   baseUrl: BASE,
+  // The guard is the host's; these tests are about what the action stores.
+  checkOutboundUrl: async () => ({ ok: true as const }),
 });
 
 const owner = () => as(OWNER, workspaceId);
@@ -140,6 +144,9 @@ beforeEach(async () => {
   otherWorkspaceId = (
     await provisionWorkspaceForUser(wb.appPool, { id: OTHER, name: "Other" })
   ).workspaceId;
+  // Enforcement is only allowed over a domain the workspace has proved
+  // (sso-domain-verification.md, rule 3), and these tests enforce this one.
+  await seedVerifiedDomain(workspaceId, "acme.example");
 });
 
 afterAll(async () => {
@@ -589,6 +596,7 @@ describe("the record each write leaves", () => {
       [workspaceId],
     );
     expect(audit.map((row) => row.action).sort()).toEqual([
+      "sso.createConnection",
       "sso.removeConnection",
       "sso.setConnectionEnabled",
       "sso.updateConnection",
@@ -607,6 +615,7 @@ describe("the record each write leaves", () => {
       [workspaceId],
     );
     expect(feed.map((row) => row.kind).sort()).toEqual([
+      "sso.connection_created",
       "sso.connection_removed",
       "sso.connection_switched",
       "sso.connection_updated",
@@ -614,5 +623,121 @@ describe("the record each write leaves", () => {
     for (const row of feed) {
       expect(row.actor_member_id).toBe(member[0]?.id);
     }
+  });
+});
+
+describe("adding a connection and minting a directory token are audited", () => {
+  it("writes one audit row for a new connection, naming the actor and never the secret", async () => {
+    const wb = await workerDb();
+    const created = await create(
+      oidc({ providerId: "audited", clientSecret: "never-in-the-audit-row" }),
+    );
+    const { rows: member } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    const { rows: audit } = await wb.admin.query<{
+      action: string;
+      actor_member_id: string;
+      target_id: string;
+      payload: Record<string, unknown>;
+    }>(
+      `select action, actor_member_id, target_id, payload from audit_events
+        where workspace_id = $1 and action = 'sso.createConnection'`,
+      [workspaceId],
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.actor_member_id).toBe(member[0]?.id);
+    expect(audit[0]?.target_id).toBe(created.id);
+    expect(audit[0]?.payload).toEqual({
+      providerId: "audited",
+      protocol: "oidc",
+    });
+    expect(await everythingRecorded()).not.toContain("never-in-the-audit-row");
+  });
+
+  it("writes one audit row for a directory token and keeps the token out of it", async () => {
+    const wb = await workerDb();
+    const minted = await callAction(await owner(), "directory.createToken", {
+      label: "Okta SCIM",
+    });
+    expect(minted.token).toMatch(/^[0-9a-f]{64}$/);
+
+    const { rows: member } = await wb.admin.query<{ id: string }>(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    const { rows: audit } = await wb.admin.query<{
+      actor_member_id: string;
+      target_id: string;
+    }>(
+      `select actor_member_id, target_id from audit_events
+        where workspace_id = $1 and action = 'directory.createToken'`,
+      [workspaceId],
+    );
+    expect(audit).toHaveLength(1);
+    expect(audit[0]?.actor_member_id).toBe(member[0]?.id);
+    expect(audit[0]?.target_id).toBe(minted.id);
+
+    const recorded = await everythingRecorded();
+    expect(recorded).not.toContain(minted.token);
+    const digest = createHash("sha256").update(minted.token).digest("hex");
+    expect(recorded).not.toContain(digest);
+  });
+
+  it("refuses a provider address the outbound guard refuses, on add and on edit", async () => {
+    const refuse = async (url: string) =>
+      url.includes("169.254.169.254")
+        ? ({
+            ok: false,
+            detail: `${url} is a private or reserved address.`,
+          } as const)
+        : ({ ok: true } as const);
+    const guarded = async () => ({
+      ...(await owner()),
+      checkOutboundUrl: refuse,
+    });
+
+    await expect(
+      callAction(await guarded(), "sso.createConnection", {
+        ...oidc({ providerId: "metadata" }),
+        discoveryUrl: "https://169.254.169.254/latest/meta-data/",
+      }),
+    ).rejects.toMatchObject({ field: "discoveryUrl" });
+
+    const created = await create(oidc());
+    await expect(
+      callAction(await guarded(), "sso.updateConnection", {
+        id: created.id,
+        tokenUrl: "https://169.254.169.254/token",
+      }),
+    ).rejects.toMatchObject({ field: "tokenUrl" });
+
+    // A name that does not resolve yet must not block saving, so the check
+    // is asked to accept it.
+    const seen: boolean[] = [];
+    await callAction(
+      {
+        ...(await owner()),
+        checkOutboundUrl: async (_url, options) => {
+          seen.push(options.allowUnresolved === true);
+          return { ok: true } as const;
+        },
+      },
+      "sso.updateConnection",
+      { id: created.id, tokenUrl: "https://idp.example/token" },
+    );
+    expect(seen).toEqual([true]);
+
+    // An edit that leaves the addresses alone never asks the guard.
+    const renamed = await callAction(
+      {
+        ...(await owner()),
+        checkOutboundUrl: async () => ({ ok: false, detail: "x" }),
+      },
+      "sso.updateConnection",
+      { id: created.id, displayName: "Renamed" },
+    );
+    expect(renamed.displayName).toBe("Renamed");
   });
 });

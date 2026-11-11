@@ -20,6 +20,9 @@ vi.mock("@openokr/core", () => ({
   copilotThreadChannel: (workspaceId: string, threadId: string) =>
     `copilot:${workspaceId}:${threadId}`,
   streamAnswer: (...args: unknown[]) => streamAnswer(...args),
+  // The cross-site check reads the instance's issuer through this
+  // (hardening batch H-A, merged 11 November 2026).
+  withoutTrailingSlashes: (value: string) => value.replace(/\/+$/, ""),
 }));
 vi.mock("../lib/workspace", () => ({
   requireWorkspace: async () => ({

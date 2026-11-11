@@ -10,6 +10,10 @@ export {
   fillDefaultPlanAsOperator,
   reviewDefaultPlanFill,
 } from "./default-plan.ts";
+export {
+  type MarkDomainVerifiedInput,
+  markDomainVerifiedAsOperator,
+} from "./domains.ts";
 export { readInstanceFlags } from "./flags.ts";
 export {
   type GrantOutcome,
@@ -23,6 +27,7 @@ export {
   setWorkspaceLimitsAsOperator,
 } from "./limits.ts";
 export { setPlanAsOperator } from "./plans.ts";
+export { type CloudPreflightWarning, readCloudPreflight } from "./preflight.ts";
 export {
   endSupportSession,
   grantSupportSession,

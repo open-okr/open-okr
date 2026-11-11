@@ -55,6 +55,7 @@ import {
   outboxRetentionDays,
   purgeStaleSignInAttempts,
   purgeWebhookDeliveries,
+  recheckSSODomains,
   recordSchedulerHeartbeat as recordSharedHeartbeat,
   remindBeforeErasure,
   remindTrialsEnding,
@@ -64,6 +65,7 @@ import {
   sweepTrials,
 } from "@openokr/core";
 import { schedulerMode } from "./background-work";
+import { getDns } from "./dns";
 import { drafterForAgent } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
@@ -135,6 +137,9 @@ export interface ScheduledRun {
     // Plan 0.7.0 D5: the webhook delivery log's thirty days, per workspace.
     // Not a registry action: delivery bookkeeping, as the outbox purge is.
     | "webhooks.purgeDeliveries"
+    // The daily re-check of verified single sign-on domains, per workspace, as
+    // the system. Not a registry action: a clock is not an API caller.
+    | "sso.recheckDomains"
     // Plan 0.7.0 O2: moving every ended cycle to closing, per workspace, as
     // the system. Not a registry action: a date passing is not something an
     // API caller starts (okr-core-domain.md §10 C2).
@@ -286,6 +291,16 @@ const WEBHOOK_PURGE_JOB = "webhooks.purgeDeliveries";
 const WEBHOOK_PURGE_CRON = "50 4 * * *";
 
 /**
+ * The daily look at every DNS-verified single sign-on domain
+ * (docs/design/sso-domain-verification.md). Daily at 05:10 UTC, after the
+ * housekeeping above, for the reason housekeeping takes turns. Three failed
+ * checks in a row unverify a domain. Per workspace, because the domains are
+ * each workspace's own.
+ */
+const SSO_DOMAIN_RECHECK_JOB = "sso.recheckDomains";
+const SSO_DOMAIN_RECHECK_CRON = "10 5 * * *";
+
+/**
  * Moving ended cycles to closing (okr-core-domain.md §10 C1, plan 0.7.0 O2).
  * Hourly, so a cycle moves within the hour after its workspace's own
  * midnight, at a minute no agent cadence uses.
@@ -403,6 +418,11 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: WEBHOOK_PURGE_JOB,
     action: "webhooks.purgeDeliveries",
     cron: WEBHOOK_PURGE_CRON,
+  },
+  {
+    job: SSO_DOMAIN_RECHECK_JOB,
+    action: "sso.recheckDomains",
+    cron: SSO_DOMAIN_RECHECK_CRON,
   },
   {
     job: TENANCY_ADOPT_JOB,
@@ -680,6 +700,22 @@ async function runOne(
     const purged = await purgeWebhookDeliveries(getPool(), workspace.id);
     if (purged > 0) {
       log(`webhooks.purgeDeliveries removed ${purged} delivery row(s)`);
+    }
+    return;
+  }
+  // Looking at every DNS-verified domain again, as the system (rule 7 of
+  // docs/design/sso-domain-verification.md). Each change of state is its own
+  // Operation inside, so it commits with its audit row.
+  if (run.action === "sso.recheckDomains") {
+    const rechecked = await recheckSSODomains(
+      getPool(),
+      workspace.id,
+      getDns(),
+    );
+    if (rechecked.failed > 0 || rechecked.unavailable > 0) {
+      log(
+        `sso.recheckDomains checked ${rechecked.checked} domain(s): ${rechecked.failed} without the record, ${rechecked.unverified} unverified, ${rechecked.unavailable} lookup(s) unanswered`,
+      );
     }
     return;
   }

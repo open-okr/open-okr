@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAuth } from "../src/auth/auth.ts";
 import {
   callerAddress,
-  callerAddressOptions,
+  withResolvedCaller,
 } from "../src/auth/caller-address.ts";
 import {
   METRIC,
@@ -19,11 +19,12 @@ import {
 /**
  * One configuration, two readers (docs/design/trusted-proxies.md D8).
  *
- * Better Auth's limiter and session row read the caller through the options
- * `createAuth` hands it; the sign-in hold, the 429 audit row and the public
- * doors read it through `callerAddress()`. Both come from
- * `callerAddressOptions()`, so for any request the two must agree, and no
- * entry the boot accepts may be one Better Auth would quietly drop.
+ * Better Auth's limiter and session row read the caller from the private
+ * header `withResolvedCaller` writes; the sign-in hold, the 429 audit row and
+ * the public doors read it through `callerAddress()`. Both come from the one
+ * reading in force (the hop count by default, or the ranges, or the header),
+ * so for any request the two must agree, and no entry the boot accepts may be
+ * one that is quietly dropped.
  */
 
 afterEach(() => {
@@ -31,37 +32,39 @@ afterEach(() => {
   setDefaultMetrics(NO_METRICS);
 });
 
-describe("the Better Auth block, per mode", () => {
-  it("reads one forwarded address when nothing is set", () => {
-    expect(callerAddressOptions({ mode: "single_address" })).toEqual({
-      ipAddressHeaders: ["x-forwarded-for"],
+describe("the reading, per setting", () => {
+  it("counts one proxy when nothing is set", () => {
+    expect(callerAddressReading({})).toEqual({ mode: "proxy_hops", hops: 1 });
+  });
+
+  it("counts the proxies the hop count names", () => {
+    expect(callerAddressReading({ OPENOKR_TRUSTED_PROXY_HOPS: "2" })).toEqual({
+      mode: "proxy_hops",
+      hops: 2,
     });
   });
 
   it("walks X-Forwarded-For past the ranges named", () => {
     expect(
-      callerAddressOptions({
-        mode: "trusted_proxies",
-        trustedProxies: ["10.0.1.0/24", "2606:4700::/32"],
-      }),
-    ).toEqual({
-      ipAddressHeaders: ["x-forwarded-for"],
-      trustedProxies: ["10.0.1.0/24", "2606:4700::/32"],
-    });
+      callerAddressReading({ OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24" }),
+    ).toEqual({ mode: "trusted_proxies", trustedProxies: ["10.0.1.0/24"] });
   });
 
   it("reads the named header alone", () => {
     expect(
-      callerAddressOptions({ mode: "header", header: "cf-connecting-ip" }),
-    ).toEqual({ ipAddressHeaders: ["cf-connecting-ip"] });
+      callerAddressReading({
+        OPENOKR_CLIENT_ADDRESS_HEADER: "CF-Connecting-IP",
+      }),
+    ).toEqual({ mode: "header", header: "cf-connecting-ip" });
   });
 
-  it("follows the environment when no reading is passed", () => {
-    vi.stubEnv("OPENOKR_TRUSTED_PROXIES", "10.0.1.0/24");
-    expect(callerAddressOptions()).toEqual({
-      ipAddressHeaders: ["x-forwarded-for"],
-      trustedProxies: ["10.0.1.0/24"],
-    });
+  it("refuses the hop count beside either of the others", () => {
+    expect(() =>
+      callerAddressReading({
+        OPENOKR_TRUSTED_PROXY_HOPS: "2",
+        OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24",
+      }),
+    ).toThrow(/OPENOKR_TRUSTED_PROXY_HOPS/);
   });
 });
 
@@ -93,16 +96,9 @@ describe("every entry the boot accepts", () => {
     // The entry's own address as the nearest hop, a caller outside it to its
     // left. Honoured means the hop is skipped and the caller is reached.
     const hop = entry.split("/")[0] as string;
-    const resolved = getIP(
+    const resolved = callerAddress(
       new Headers({ "x-forwarded-for": `192.0.2.77, ${hop}` }),
-      {
-        advanced: {
-          ipAddress: callerAddressOptions({
-            mode: "trusted_proxies",
-            trustedProxies: [entry],
-          }),
-        },
-      },
+      { mode: "trusted_proxies", trustedProxies: [entry] },
     );
     expect(resolved).toBe("192.0.2.77");
   });
@@ -122,6 +118,7 @@ const REQUESTS: readonly Record<string, string>[] = [
 
 const SETTINGS: readonly [string, Record<string, string>][] = [
   ["nothing set", {}],
+  ["two hops", { OPENOKR_TRUSTED_PROXY_HOPS: "2" }],
   ["ranges", { OPENOKR_TRUSTED_PROXIES: "172.64.0.0/13, 10.0.1.0/24" }],
   ["a header", { OPENOKR_CLIENT_ADDRESS_HEADER: "CF-Connecting-IP" }],
 ];
@@ -138,7 +135,12 @@ describe("Better Auth and callerAddress()", () => {
     });
     for (const request of REQUESTS) {
       const headers = new Headers(request);
-      expect(callerAddress(headers)).toBe(getIP(headers, auth.options));
+      // Better Auth sees the request the router hands it, with the private
+      // header written.
+      const routed = withResolvedCaller(
+        new Request("http://localhost:3000/api/auth/ok", { headers }),
+      );
+      expect(callerAddress(headers)).toBe(getIP(routed.headers, auth.options));
     }
   });
 });
@@ -156,7 +158,8 @@ describe("what callerAddress() counts", () => {
     counted.length = 0;
     setDefaultMetrics(recorder);
     callerAddress(new Headers({ "x-forwarded-for": "198.51.100.7" }), {
-      mode: "single_address",
+      mode: "proxy_hops",
+      hops: 1,
     } satisfies CallerAddressReading);
     expect(counted).toEqual([
       {

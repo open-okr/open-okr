@@ -1,9 +1,9 @@
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { resolveAgentRunCostCap } from "../src/ai/resolve.ts";
-import { createSSOConnection } from "../src/auth/sso.ts";
 import { newRootKey, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { createSSOConnection } from "./sso-create-helper.ts";
 
 /**
  * Two reads and a write that ran on a connection with no tenant setting

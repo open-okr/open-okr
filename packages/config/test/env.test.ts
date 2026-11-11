@@ -300,11 +300,11 @@ describe("S3 storage", () => {
  * range and carry on, and a dropped range turns that proxy into "the caller".
  */
 describe("the caller address settings", () => {
-  test("nothing set reads one forwarded address only", () => {
+  test("nothing set counts one proxy, the hop count's default", () => {
     const env = parseEnv(VALID);
     expect(env.OPENOKR_TRUSTED_PROXIES).toBeUndefined();
     expect(env.OPENOKR_CLIENT_ADDRESS_HEADER).toBeUndefined();
-    expect(callerAddressReading({})).toEqual({ mode: "single_address" });
+    expect(callerAddressReading({})).toEqual({ mode: "proxy_hops", hops: 1 });
   });
 
   test("ranges are split on commas, spaces and newlines", () => {
@@ -413,12 +413,12 @@ describe("the caller address settings", () => {
         OPENOKR_TRUSTED_PROXIES: "  ",
         OPENOKR_CLIENT_ADDRESS_HEADER: "",
       }),
-    ).toEqual({ mode: "single_address" });
+    ).toEqual({ mode: "proxy_hops", hops: 1 });
   });
 
   test("the reading is described in one line for the boot log", () => {
-    expect(describeCallerAddressReading({ mode: "single_address" })).toBe(
-      "caller address: one forwarded address only",
+    expect(describeCallerAddressReading({ mode: "proxy_hops", hops: 1 })).toBe(
+      "caller address: X-Forwarded-For, 1 proxy from the right",
     );
     expect(
       describeCallerAddressReading({
@@ -499,4 +499,27 @@ describe("where the relay and the scheduler run", () => {
       expect((error as EnvironmentError).variables).toEqual([variable]);
     },
   );
+});
+
+// Akmal, 11 November 2026: the hop count is the default reading, and the
+// ranges or the header replace it.
+describe("the hop count beside the other two", () => {
+  test("is the default, one proxy", () => {
+    expect(callerAddressReading({})).toEqual({ mode: "proxy_hops", hops: 1 });
+  });
+
+  test("is refused beside named ranges or a header, naming the variable", () => {
+    for (const other of [
+      { OPENOKR_TRUSTED_PROXIES: "10.0.1.0/24" },
+      { OPENOKR_CLIENT_ADDRESS_HEADER: "cf-connecting-ip" },
+    ]) {
+      const error = captureError(() =>
+        parseEnv({ ...VALID, OPENOKR_TRUSTED_PROXY_HOPS: "2", ...other }),
+      );
+      expect(error).toBeInstanceOf(EnvironmentError);
+      expect((error as EnvironmentError).variables).toContain(
+        "OPENOKR_TRUSTED_PROXY_HOPS",
+      );
+    }
+  });
 });
