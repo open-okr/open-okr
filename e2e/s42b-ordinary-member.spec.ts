@@ -456,11 +456,11 @@ test("dismissing the other one changes nothing but the proposal", async () => {
 test("the board shows who else has it open, and forgets them when they go", async () => {
   await ownerPage.goto("/board");
   await expect(
-    ownerPage.getByRole("heading", { level: 1, name: "Board" }),
+    ownerPage.getByRole("heading", { level: 1, name: "Tasks" }),
   ).toBeVisible({ timeout: 20_000 });
   await memberPage.goto("/board");
   await expect(
-    memberPage.getByRole("heading", { level: 1, name: "Board" }),
+    memberPage.getByRole("heading", { level: 1, name: "Tasks" }),
   ).toBeVisible({ timeout: 20_000 });
 
   await expect(memberPage.getByTestId("board-presence")).toContainText(

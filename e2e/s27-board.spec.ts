@@ -94,11 +94,11 @@ test("the sidebar reaches the board, and it says so when empty", async () => {
     .click();
   await page
     .getByRole("navigation", { name: "Work" })
-    .getByRole("link", { name: "Board" })
+    .getByRole("link", { name: "Tasks" })
     .click();
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "Board" }),
+    page.getByRole("heading", { level: 1, name: "Tasks" }),
   ).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("board-count")).toContainText("No tasks");
   // Four columns, always, whether or not anything is in them.
@@ -348,7 +348,7 @@ test("a key result's board holds the work behind it, one click from its goal", a
   await expect(
     page.getByRole("heading", { level: 1, name: keyResult.title }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("link", { name: "Key result board" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Key result tasks" })).toBeVisible();
   await expect(
     page.getByTestId("board-card").filter({ hasText: TASK }),
   ).toBeVisible();
@@ -373,11 +373,11 @@ test("an initiative's board is one click from the initiative, and work added the
   }
 
   await goTo(page, `/initiatives/${initiative.id}`);
-  await page.getByRole("link", { name: "Open the board" }).click();
+  await page.getByRole("link", { name: "View tasks" }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: initiative.title }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole("link", { name: "Initiative board" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Initiative tasks" })).toBeVisible();
 
   await page.getByLabel("What has to happen").fill(THIRD);
   await page.getByRole("button", { name: "Add" }).click();
