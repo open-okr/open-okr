@@ -254,7 +254,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | K3 | done | Mockup 02 redrawn and only its PNG re-rendered; the phase list's done mark is an icon too |
 | P1 | done | Lockfile only: 5.12.0 and its own three dependencies, inside `@better-auth/sso`'s range. SAML and SSO suites: 82 core, 27 web |
 | P2 | done | `shell-quote` 1.12.0 and `launch-editor` 2.14.2 inside their ranges. `vite` 8.3.7 (with `rolldown` 1.2.18) inside `vitest`'s `^8.0.0`: `pnpm update` will not move a package `vitest` holds as both dependency and peer, so a temporary override moved it and was removed again; none is left. Method 636, ui 454 and two web files pass on it. Empty changeset |
-| U1 | to do | U1-Q decided: accept `run` |
+| U1 | done | `run` accepted as the first argument and named in the usage line; `run --status`, a second `run` and `run` anywhere else are usage errors. The config comment the plan named used "run" as a verb and is reworded so it cannot be read as the argument. db 69 tests |
 | U2 | to do | Check first |
 | U3 | to do | Last |
 | Q-8 | done | `apps/web/lib/accept-language.ts` (q-values, regions, ties); signed out or with no workspace yet: browser, instance, English. Playwright now pins `en-US` so `signIn` by English labels keeps working; `s35h-visitor-language` signs in first, then switches. UIUX-PLAN §8 |
