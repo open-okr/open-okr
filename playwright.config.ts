@@ -108,6 +108,11 @@ export default defineConfig({
     // Kept only for a failure, so a green run leaves nothing behind.
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // A signed-out page speaks the browser's language since Q-8 (plan 0.8.1),
+    // and the specs find their fields by English labels. Pinned, so a machine
+    // set to Malay runs the same suite as CI. A spec about language sets its
+    // own (s35h-visitor-language.spec.ts).
+    locale: "en-US",
   },
 
   /**
