@@ -221,8 +221,9 @@ export async function AppShellLayout({
   const accountItems = sidebarItems.filter((item) => item.group === "account");
 
   // Cycle and the phase strip are for the people who run the cycle
-  // (navigation-five-areas.md, OKRGoal UX review N3). Read from the spaces
-  // list the reader already gets, so nothing new is asked of the database.
+  // (navigation-five-areas.md, OKRGoal UX review N3): from the spaces list the
+  // reader already gets, and from whether they may set up a cycle, which plan
+  // 0.8.0 R1 opened to an Admin (UAT 0.8.0, F-03).
   const spaceRoles = await callAction(
     {
       pool: getPool(),
@@ -239,8 +240,25 @@ export async function AppShellLayout({
       }
       throw error;
     });
+  const setsUpCycle = await callAction(
+    {
+      pool: getPool(),
+      workspaceId: workspace.workspaceId,
+      actor: { kind: "human" as const, userId: session.user.id },
+    },
+    "cycles.setupAccess",
+    {},
+  )
+    .then((access) => access.canSetUp)
+    .catch((error: unknown) => {
+      if (error instanceof OperationError) {
+        return false;
+      }
+      throw error;
+    });
   const runsCycle = seesCycle({
     administers: adminItems.length > 0,
+    setsUpCycle,
     spaceRoles,
   });
   // The rows the sidebar draws: the five areas, and Cycle for those who run

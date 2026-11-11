@@ -71,8 +71,10 @@ export default async function HomePage({
   const query = await searchParams;
 
   const spaces = await callAction(context, "spaces.list", {});
+  const setup = await callAction(context, "cycles.setupAccess", {});
   const runsCycle = seesCycle({
     administers: level >= ACCESS_LEVELS.full,
+    setsUpCycle: setup.canSetUp,
     spaceRoles: spaces.map((space) => space.ownRole),
   });
 
