@@ -2,7 +2,7 @@
 
 Written for whoever approves this design, and for whoever builds it.
 
-Status: **waiting for "design approved"**. It changes the copilot's answer path, adds two migrations and changes AI-NATIVE-PLAN §2.4, so no code is written until it is approved.
+Status: **approved by Akmal on 11 November 2026**, "design approved for all": every decision in §10 as recommended, except D8, where he chose GPT-6 Luna (§10 records both). It changes the copilot's answer path, adds two migrations and changes AI-NATIVE-PLAN §2.4.
 
 ## 1. The problem
 
@@ -143,7 +143,19 @@ The model still picks what to change by number from a list, never by identifier.
 
 `copilot.undoProposal` works out the reverse from what applying returned. An edit returns only an id, so there is nothing to reverse from. **Migration 2** adds `reverse_payload jsonb` to `proposed_changes`. Applying reads the current values in the same transaction as the write and stores the reverse beside it. Undo applies the stored reverse, as the member, through the action's own access check. If the record changed since, undo is refused with a sentence rather than overwriting somebody else's later edit.
 
-### 4.3 Preview
+### 4.3 A reason, when the workspace asks for one
+
+A workspace whose `reasons.midCycleAddition` is `required` refuses an objective or key result added after its cycle started unless it says why (METHOD.md §2.9). A copilot proposal carried no reason, so Apply was refused with that sentence, live on the Northwind workspace, for every model tested. The setting's default is `optional`, so a new workspace never hit it.
+
+| When | What happens |
+|---|---|
+| The person's request says why ("…because the pilot starts next week") | The model writes it into the proposal's `reason`, from those words only |
+| It does not, and the workspace requires one | The proposal card shows a one-line reason field, and Apply waits for it |
+| The workspace does not require one | Nothing changes |
+
+The model never invents a reason: a reason is the person's account of why, and it is shown to the reviewer as theirs.
+
+### 4.4 Preview
 
 S-39 already describes "a preview or difference". An edit shows before and after: `Status: To do -> Done`. A check-in shows each key result's value as `64.6 -> 65`.
 
@@ -167,6 +179,8 @@ Estimated at Sonnet 4.5's prices ($3 per million tokens in, $15 out), with about
 | "Compare our three KPIs in the red with last quarter" | 5, the most | About $0.08 |
 
 The proposal call adds about $0.003 to each, as today.
+
+**On GPT-6 Luna, the default since 11 November 2026 (D8), all of this is about a thirtieth.** Measured that day, fifteen questions with their proposal calls cost $0.004 on Luna against $0.126 on Sonnet 4.5. A five-call run on Luna is well under a cent.
 
 The per-run cap stops a run long before $2 would be reached, and the credits check runs before every round.
 
@@ -192,9 +206,10 @@ Each row is one change and one commit.
 | L1 | Port: assistant tool-call turns in every driver, the Google tool result, tool-name mapping | |
 | L2 | The copilot's read tools and the loop, citations from reads, the reading status line | L1 |
 | L3 | Migration 1, recording the copilot's reads in `ai_tool_calls` | L2 |
-| L4 | The five edit proposals, migration 2 for their undo, the before and after preview | |
+| L4 | The five edit proposals, migration 2 for their undo, the before and after preview, and the mid-cycle reason (§4.3) | |
 | L5 | Evaluation: tool selection, the injection fixture, a multi-round fixture; the live smoke test on OpenRouter | L2, L4 |
 | L6 | The Northwind questions from §1 as an end-to-end spec against the mock provider | L2, L4 |
+| L7 | Tune the copilot's prompts on GPT-6 Luna: the answer, the proposal and the tool loop's, measured by the evaluation sets and a live run of the §1 questions before and after | L2, L5 |
 
 L4 does not need the loop and can be built first if edits matter more than answers.
 
@@ -210,6 +225,7 @@ L4 does not need the loop and can be built first if edits matter more than answe
 8. **Given** no provider, **when** a member asks anything, **then** they see matching passages and the reason, exactly as today.
 9. **Given** a run that reaches four rounds, **when** the model asks for a fifth read, **then** it is told to answer, and the answer says what it could not read.
 10. **Given** any copilot read, **when** an administrator opens the agent activity, **then** the read is listed with the member, the tool, the outcome and the time.
+11. **Given** a workspace that requires a reason mid-cycle, **when** a member asks the copilot to add an objective without saying why, **then** the proposal card asks for a reason, Apply waits for it, and the objective is saved with the member's words as its reason.
 
 ## 10. Decisions for Akmal
 
@@ -222,5 +238,6 @@ L4 does not need the loop and can be built first if edits matter more than answe
 | D5 | Undo for edits | **Store the before values when a proposal is applied (migration 2)** | No undo for edits, said on the card. Simpler, but a wrong check-in then needs a delete |
 | D6 | Recording the copilot's reads | **In `ai_tool_calls`, beside the agent surface's (migration 1)** | Not recorded. Cheaper, but nobody can see what the model read on whose behalf |
 | D7 | Limits | **Fixed: 4 rounds, 6 reads a round, 6,000 characters a result. Not settings** | Make them workspace settings. Every setting is something to explain and default; these have no reason to differ between workspaces yet |
-| D8 | Model tier | **Keep `balanced` (Sonnet 4.5 on OpenRouter)** | `fast` (GPT-4.1 mini on OpenRouter): about a fifth of the cost, and noticeably worse at choosing tools |
-| D9 | Order | **The three bug fixes first (0.8.1), then L4, then L1 to L3, L5, L6 (0.9.0)** | The loop first. Answers matter more to you than edits, but edits need no port change and are the smaller, safer step |
+| D8 | Model | Recommended: Sonnet 5.5 for `balanced`. **Chosen: GPT-6 Luna as the default for `fast` and `balanced` on OpenRouter**, with the prompts tuned to it (L7). Live on 11 November it filled every proposal and, with one token budget raised, passed all 24 evaluation sets; on reading questions it misread more than the Claude models, which is what L7 is for | Sonnet 4.5 or 5.5: more careful readers, thirty times the price |
+| D9 | Order | **The three bug fixes first (0.8.1), then L4, then L1 to L3, L5, L6, L7 (0.9.0)** | The loop first. Answers matter more to you than edits, but edits need no port change and are the smaller, safer step |
+| D10 | A reason mid-cycle | **The model writes it from the person's words, or the card asks for it (§4.3)**. Proposed beside D8 on 11 November and approved with the design | Leave it to the refusal. Apply then fails with a sentence the panel gives no way to answer |
