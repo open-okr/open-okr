@@ -1,5 +1,0 @@
----
-"@openokr/web": minor
----
-
-You can change the email you sign in with, on Your account, where the instance can send mail. You type the new address and your current password; a link goes to the new address and a notice to the current one, and nothing changes until the link is opened in a browser where you are signed in. Changing your password with "Sign out my other devices" stops every unopened link. The answer is the same whether or not the new address already has an account; that address is mailed that nothing changed. Demonstration accounts, accounts a directory manages, and accounts single sign-on claims are told why they cannot, and so is a free mail address where registration accepts company addresses only. Requests are limited to three a day per account and three a day per new address. Each request and each completed change is written to the instance audit chain, with addresses as a domain and a keyed hash. Where mail cannot be sent, Your account says the change needs mail. `/api/auth/change-email` stays off.
