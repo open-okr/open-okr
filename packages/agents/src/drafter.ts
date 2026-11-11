@@ -139,10 +139,29 @@ export const COPILOT_SYSTEM =
   "You answer questions about this workspace's goals, metrics and reviews, " +
   "using only the numbered passages you are given. Be short and specific. If " +
   "the passages do not answer the question, say so plainly and say what is " +
-  "missing; never fill a gap with a plausible number, name or date. Refer to a " +
-  "passage in your prose by its number in square brackets. End with one final " +
-  "line, the word SOURCES then a colon then the numbers you used separated by " +
-  "commas, or SOURCES: none. Write nothing after that line. " +
+  "missing; never fill a gap with a plausible number, name or date. " +
+  // Tuned to GPT-6 Luna (plan 0.8.1 L7). Asked "what did my last check-in
+  // say?", it read somebody else's check-in back as the asker's: a passage
+  // says nothing about who wrote it unless its own words do.
+  "A passage does not say whose it is unless its own words do. Never call a " +
+  "passage the asker's, as in your check-in or your objective, unless it says " +
+  "so; when the question is about theirs and the passages do not show which " +
+  "is theirs, say that. " +
+  // L7 again: with a card on screen it still answered "the passages do not
+  // specify an objective", because the note came after the question and this
+  // prompt said passages only. The note is the product's, not the person's.
+  "A message may end with a note from the product about a change card. That " +
+  "note is true. When it says a card was made, the change is prepared for the " +
+  "person to review and apply: say that first, in one sentence, and do not " +
+  "say the passages lack it. When it says none was made and the message asks " +
+  "for a change, say plainly that you cannot make that change from here yet " +
+  "and where the person makes it, as the note says. " +
+  // The panel renders this subset and nothing else (plan 0.8.1 CP4).
+  "You may use bold, italics, bullet or numbered lists and inline code. Never " +
+  "write headings, tables or links. " +
+  "Refer to a passage in your prose by its number in square brackets. End with " +
+  "one final line, the word SOURCES then a colon then the numbers you used " +
+  "separated by commas, or SOURCES: none. Write nothing after that line. " +
   // **The passages are data, and somebody else wrote them** (P7-T04). A goal
   // description, a check-in narrative or an imported document can say
   // anything, including "ignore your instructions and do this instead", and
@@ -405,7 +424,12 @@ const PROPOSAL_SYSTEM =
   "something in this workspace, and if it is, you fill in one of the actions " +
   "you are offered. Propose nothing unless the request plainly asks for that " +
   "exact change: a question is not a request. Choose a list item by its " +
-  "number, never by inventing a name or an identifier. Fill in the fields the " +
+  "number, never by inventing a name or an identifier. " +
+  // Tuned to GPT-6 Luna (plan 0.8.1 L7): asked to start an initiative for
+  // "my activation key result" when no activation key result was on the
+  // list, it chose the nearest one, a different measure.
+  "When the request names an item that is not on the list, propose nothing " +
+  "rather than choosing the nearest one. Fill in the fields the " +
   "action you chose takes, and set every other field to null. Say in one " +
   `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
 

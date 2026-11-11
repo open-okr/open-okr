@@ -1030,6 +1030,17 @@ const proposeAction = evaluationSet<ProposalRequestContext>({
       reply: json({ ...PROPOSED_ACTION, propose: true, why: "" }),
       expected: null,
     },
+    {
+      // Found live on GPT-6 Luna (plan 0.8.1 L7): asked for work behind a
+      // key result that was not on the list, it chose the nearest one.
+      name: "a request naming an objective that is not on the list",
+      context: {
+        ...PROPOSAL,
+        request: "Add a key result to the partner channel objective",
+      },
+      reply: json({ propose: false, action: "none", fields: {}, why: "" }),
+      expected: null,
+    },
   ],
 });
 
@@ -1078,6 +1089,71 @@ const answerGrounded = evaluationSet<GroundedQuestionContext>({
       context: QUESTION,
       reply: "SOURCES: none",
       expected: null,
+    },
+    // Misreads found live on GPT-6 Luna (plan 0.8.1 L7), each kept as a
+    // fixture so a live run asks it again. The check-in one first: asked for
+    // "my last check-in", it read somebody else's back as the asker's.
+    {
+      name: "a check-in the passages do not say is the asker's",
+      context: {
+        question: "What did my last check-in say?",
+        history: [],
+        sources: [
+          {
+            label: "Pipeline eased on 12 May",
+            content:
+              "S2.1 eased to $2.9M on 12 May: Brightline's launch took $0.5M of late-stage pipeline.",
+          },
+        ],
+      },
+      reply:
+        "The passages do not show which check-in is yours. One update says S2.1 eased to $2.9M on 12 May [1].\nSOURCES: 1",
+      expected: {
+        text: "The passages do not show which check-in is yours. One update says S2.1 eased to $2.9M on 12 May [1].",
+        usedSourceIndexes: [0],
+        ...MOCK_ANSWER,
+      },
+    },
+    {
+      // With a card on screen it said "the passages do not specify an
+      // objective": the product's note now says a card exists.
+      name: "a request the product made a card for",
+      context: {
+        question: "Create an objective to make partner onboarding self-serve.",
+        history: [],
+        sources: [],
+        proposal: {
+          made: true,
+          label: "Create an objective",
+          preview: [
+            { label: "Objective", value: "Make partner onboarding self-serve" },
+            { label: "Space", value: "Product" },
+          ],
+        },
+      },
+      reply:
+        "A change card is ready for you to review and apply: it creates the objective Make partner onboarding self-serve in Product.\nSOURCES: none",
+      expected: {
+        text: "A change card is ready for you to review and apply: it creates the objective Make partner onboarding self-serve in Product.",
+        usedSourceIndexes: [],
+        ...MOCK_ANSWER,
+      },
+    },
+    {
+      name: "a change the copilot cannot make yet",
+      context: {
+        question: "Check in on my activation key result at 65%.",
+        history: [],
+        sources: [],
+        proposal: { made: false },
+      },
+      reply:
+        "I cannot make a check-in from here yet. Add it under Check in.\nSOURCES: none",
+      expected: {
+        text: "I cannot make a check-in from here yet. Add it under Check in.",
+        usedSourceIndexes: [],
+        ...MOCK_ANSWER,
+      },
     },
   ],
 });
