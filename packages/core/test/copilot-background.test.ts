@@ -179,6 +179,8 @@ const drive = async (
     readonly skipped?: string[];
     /** Who the host was asked to build the drafter for (M-36). */
     readonly askedFor?: (readonly [string, string | undefined])[];
+    /** Called with each event as it is published, before the run goes on. */
+    readonly onPublish?: (event: string) => Promise<void>;
   } = {},
 ) => {
   const wb = await workerDb();
@@ -206,6 +208,7 @@ const drive = async (
       },
       async publish(channel, event, data) {
         published.push({ channel, event, data });
+        await options.onPublish?.(event);
       },
       onSkipped: (_delivery, reason) => options.skipped?.push(reason),
     },
@@ -400,6 +403,112 @@ describe("the run, with nobody watching", () => {
     expect(
       published.find((one) => one.data?.step === "found")?.data?.count,
     ).toBe(1);
+  });
+
+  describe("Stop (plan 0.8.1 W4)", () => {
+    const PIECES = Array.from({ length: 14 }, (_, at) => `piece${at + 1} `);
+
+    it("ends the run where the member stopped it, keeping what arrived", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { threadId: string; answerMessageId: string };
+
+      let stopped = false;
+      const published = await drive(new StreamingDrafter(PIECES), {
+        // The member presses Stop once the first words are on screen.
+        onPublish: async (event) => {
+          if (event === "copilot.text" && !stopped) {
+            stopped = true;
+            const result = (await call("copilot.stopRun", {
+              answerMessageId: started.answerMessageId,
+            })) as { stopped: boolean };
+            expect(result.stopped).toBe(true);
+          }
+        },
+      });
+
+      const [answer] = await answers();
+      expect(answer?.content.startsWith("piece1")).toBe(true);
+      // Fewer pieces than the model would have written.
+      expect(answer?.content.split(" ").length).toBeLessThan(PIECES.length);
+      expect(answer?.run_completed_at).not.toBeNull();
+      expect(answer?.run_halted_reason).toBeNull();
+      expect(published.at(-1)).toMatchObject({
+        event: "copilot.done",
+        data: { stopped: true },
+      });
+
+      const thread = (await call("copilot.thread", {
+        threadId: started.threadId,
+      })) as {
+        messages: { role: string; stopped: boolean; running: boolean }[];
+      };
+      const turn = thread.messages.find((one) => one.role === "assistant");
+      expect(turn).toMatchObject({ stopped: true, running: false });
+    });
+
+    it("stops before a word is written when pressed during the search", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      await call("copilot.stopRun", {
+        answerMessageId: started.answerMessageId,
+      });
+
+      // A run that is no longer running when it starts does nothing at all:
+      // no search, no proposal, nothing paid for.
+      const published = await drive(new StreamingDrafter(PIECES));
+      expect(published).toEqual([]);
+      const [answer] = await answers();
+      expect(answer?.content).toBe("");
+    });
+
+    it("says it stopped nothing when the answer had already ended", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      await drive(new FixedDrafter("Sixty per cent by June."));
+
+      const result = (await call("copilot.stopRun", {
+        answerMessageId: started.answerMessageId,
+      })) as { stopped: boolean };
+      expect(result.stopped).toBe(false);
+      const [answer] = await answers();
+      expect(answer?.content).toBe("Sixty per cent by June.");
+    });
+
+    it("cannot be pressed by anybody but the member who asked", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      const wb = await workerDb();
+      // Another member of the same workspace, as the proposals test makes one.
+      await wb.admin.query(
+        "insert into users (id, name, email) values ('background-other', 'Other', 'background-other@example.com')",
+      );
+      await wb.admin.query(
+        `insert into workspace_members (id, workspace_id, user_id, name, status)
+         values (gen_random_uuid(), $1, 'background-other', 'Other', 'active')`,
+        [workspaceId],
+      );
+      await expect(
+        callAction(
+          {
+            pool: wb.appPool,
+            workspaceId,
+            actor: { kind: "human", userId: "background-other" },
+          },
+          "copilot.stopRun",
+          { answerMessageId: started.answerMessageId },
+        ),
+      ).rejects.toThrow();
+      const [answer] = await answers();
+      expect(answer?.run_completed_at).toBeNull();
+    });
   });
 
   it("is safe to run twice, because the relay delivers at least once", async () => {

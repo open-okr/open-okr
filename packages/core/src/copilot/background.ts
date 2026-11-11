@@ -168,7 +168,9 @@ export async function runCopilotAnswer(
    */
   // **A redelivered row stops here** (plan 0.8.1 A2). Asking for the proposal
   // writes a card, and `copilot.completeRun` refusing the second answer comes
-  // too late to stop a second card. An answer no longer running was written.
+  // too late to stop a second card. An answer no longer running was written,
+  // or its member stopped it before the run began (W4): either way there is
+  // nothing to do and nothing to pay for.
   if (await alreadyAnswered(context, job)) {
     return { answered: false, haltedReason: null, sources: [] };
   }
@@ -231,14 +233,45 @@ export async function runCopilotAnswer(
   const ask = { ...prepared.ask, proposal: proposal.note };
   await step({ step: "writing" });
 
-  const answered = drafter?.streamGrounded
-    ? await streamInto(drafter, ask, (text) =>
-        publish("copilot.text", { answerMessageId: job.answerMessageId, text }),
-      )
-    : await wholeInto(drafter, ask, (text) =>
-        publish("copilot.text", { answerMessageId: job.answerMessageId, text }),
-      );
+  // A member may stop the run while it works (plan 0.8.1 W4). Asked between
+  // pieces, at most every `STOP_CHECK_EVERY_MS`, and once more before the
+  // answer starts, since a stop pressed during the search lands here first.
+  const stopped = stopCheck(context, job);
+  const answered = (await stopped(true))
+    ? ({ kind: "stopped", text: "" } as const)
+    : drafter?.streamGrounded
+      ? await streamInto(
+          drafter,
+          ask,
+          (text) =>
+            publish("copilot.text", {
+              answerMessageId: job.answerMessageId,
+              text,
+            }),
+          stopped,
+        )
+      : await wholeInto(drafter, ask, (text) =>
+          publish("copilot.text", {
+            answerMessageId: job.answerMessageId,
+            text,
+          }),
+        );
 
+  if (answered.kind === "stopped") {
+    // What arrived goes into a message that already reads as stopped. Nothing
+    // is said about it: the member pressed the button and knows.
+    await callAction(context, "copilot.completeRun", {
+      answerMessageId: job.answerMessageId,
+      text: answered.text,
+      citations: [],
+    });
+    await publish("copilot.done", {
+      answerMessageId: job.answerMessageId,
+      haltedReason: null,
+      stopped: true,
+    });
+    return { answered: false, haltedReason: null, sources: prepared.sources };
+  }
   if (answered.kind === "failed") {
     return halt(
       "The provider did not answer. These are the passages that match your question.",
@@ -302,8 +335,42 @@ const PUBLISH_AT_CHARACTERS = 1_000;
 type Answered =
   | { readonly kind: "whole"; readonly answer: GroundedAnswer }
   | { readonly kind: "partial"; readonly answer: GroundedAnswer }
+  | { readonly kind: "stopped"; readonly text: string }
   | { readonly kind: "empty" }
   | { readonly kind: "failed" };
+
+/** How often a running answer asks whether its member pressed Stop (W4). */
+const STOP_CHECK_EVERY_MS = 750;
+
+/**
+ * Whether the member stopped this run, asked no more often than
+ * `STOP_CHECK_EVERY_MS` unless `now` is true. Read through the thread, the
+ * member's own read, rather than by a query of its own. A read that fails is
+ * not a stop: the answer carries on.
+ */
+function stopCheck(
+  context: ActionCallContext,
+  job: CopilotRunJob,
+): (now?: boolean) => Promise<boolean> {
+  let askedAt = 0;
+  return async (now = false) => {
+    if (!now && Date.now() - askedAt < STOP_CHECK_EVERY_MS) {
+      return false;
+    }
+    askedAt = Date.now();
+    try {
+      const thread = await callAction(context, "copilot.thread", {
+        threadId: job.threadId,
+      });
+      return (
+        thread.messages.find((message) => message.id === job.answerMessageId)
+          ?.stopped ?? false
+      );
+    } catch {
+      return false;
+    }
+  };
+}
 
 /**
  * The answer, published as it is written (plan 0.8.1 W1).
@@ -321,6 +388,7 @@ async function streamInto(
   drafter: AgentDrafter,
   ask: GroundedQuestionContext,
   publishText: (text: string) => Promise<void>,
+  stopped: () => Promise<boolean>,
 ): Promise<Answered> {
   let text = "";
   let pending = "";
@@ -349,6 +417,12 @@ async function streamInto(
         pending.length >= PUBLISH_AT_CHARACTERS
       ) {
         await flush();
+      }
+      if (await stopped()) {
+        // Leaving the loop ends the provider's stream as well: nothing more
+        // is generated, so nothing more is paid for.
+        await flush();
+        return { kind: "stopped", text: text.trim() };
       }
     }
   } catch {

@@ -823,6 +823,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     /** The relay delivered the same run twice and the second found it done. */
     redelivered: z.boolean().optional(),
   }),
+  /** A member stopped a background run (plan 0.8.1 W4). False when it had ended. */
+  "copilot.stopped": z.object({ threadId: z.string(), stopped: z.boolean() }),
   // The action name travels; the payload does not. A proposal's content is the
   // member's own conversation, and the audit row already holds what an
   // administrator needs (P4-T14b-a).
@@ -871,6 +873,7 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "billing.requested",
   "copilot.asked",
   "copilot.answered",
+  "copilot.stopped",
   // A proposal is a suggestion in one member's conversation. What it *does* when
   // applied writes its own activity through the applied action's own operation,
   // and that one belongs in the feed because the change does (P4-T14b-a).

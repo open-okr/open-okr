@@ -43,6 +43,7 @@ import {
   listCopilotProposalsAction,
   listCopilotThreadsAction,
   readCopilotThreadAction,
+  stopCopilotRunAction,
   undoCopilotProposalAction,
 } from "./actions";
 
@@ -433,6 +434,8 @@ export function CopilotPanel({
   // because `busy` is also set while a question is sent.
   const [acting, setActing] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
+  /** The answer a background run is writing, so Stop can stop it (W4). */
+  const runningAnswer = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useKeyboardShortcut(
@@ -566,6 +569,12 @@ export function CopilotPanel({
   );
 
   const stop = useCallback(() => {
+    // A background run is not this request, so cancelling the request alone
+    // would only stop listening (plan 0.8.1 W4). The run is told first.
+    const answerId = runningAnswer.current;
+    if (answerId) {
+      void stopCopilotRunAction(answerId).catch(() => undefined);
+    }
     abort.current?.abort();
   }, []);
 
@@ -637,7 +646,7 @@ export function CopilotPanel({
             continue;
           }
           const event = JSON.parse(line.slice(6)) as
-            | { kind: "thread"; threadId: string }
+            | { kind: "thread"; threadId: string; answerMessageId?: string }
             | { kind: "sources"; sources: readonly Source[] }
             | { kind: "proposal"; proposalId: string }
             | ({ kind: "step" } & Step)
@@ -646,6 +655,7 @@ export function CopilotPanel({
             | { kind: "done" };
           if (event.kind === "thread") {
             landedThreadId = event.threadId;
+            runningAnswer.current = event.answerMessageId ?? null;
             setThreadId(event.threadId);
           } else if (event.kind === "step") {
             setStep(event);
@@ -676,6 +686,7 @@ export function CopilotPanel({
       }
     } finally {
       abort.current = null;
+      runningAnswer.current = null;
       setBusy(false);
       setStreaming(null);
       setStep(null);

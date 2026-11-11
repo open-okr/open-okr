@@ -248,7 +248,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | W1 | done | `streamInto` in the background run, joined for 60 ms or 1,000 characters; `streamGrounded`'s `done` carries the provider's count and cost; a stream that stops partway keeps what arrived. The mock evaluation's streaming fixtures now expect the count, as the whole-answer ones do. Core 26, agents 56, 24 sets |
 | W2 | done | `step` events (`searching`, `found` with a count, `proposing` only when offers exist, `writing`) from `streamAnswer` and the background run; `copilotStepFrom` checks them at both routes; the panel's fixed "Reading your workspace" is now the live step line, a polite status. Built live only, as W2-Q recommends. Core 30, web 23, catalogue tests |
 | W3 | to do | CP8, CP3, CP2, CP1, CP6, CP4, CP7, CP9 in that order; CP5, CP10, CP11 are 0.9.0 |
-| W4 | to do | Before CP6 wires Stop |
+| W4 | done | `copilot.stopRun` (self-service, own thread, private `copilot.stopped` activity, audited); the run asks between pieces every 750 ms and ends with what arrived; a run stopped before it starts does nothing at all, no search and no spend. The background route's `thread` event carries `answerMessageId`, `done` carries `stopped`. The panel's Stop tells the run first; CP6 restyles it. Contract regenerated. Core 20 (background), write-floor classification, `test:changed` 5643 |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | done | Lucide `Check` on K1's token in the review rail. Built by the UI builder |
 | K3 | done | Mockup 02 redrawn and only its PNG re-rendered; the phase list's done mark is an icon too |

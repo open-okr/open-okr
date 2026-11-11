@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
             send("done", {
               kind: "done",
               answerMessageId: data.answerMessageId ?? null,
-              stopped: false,
+              stopped: data.stopped === true,
             });
             subscription.unsubscribe().catch(() => undefined);
             controller.close();

@@ -70,6 +70,16 @@ export async function copilotAvailabilityAction() {
   );
 }
 
+/**
+ * Stops a background run, keeping what it has written (plan 0.8.1 W4).
+ *
+ * The panel calls this before it cancels its request: cancelling alone only
+ * stops listening, and the run would carry on and land the whole answer.
+ */
+export async function stopCopilotRunAction(answerMessageId: string) {
+  return callAction(await context(), "copilot.stopRun", { answerMessageId });
+}
+
 /** The proposals in one of the reader's own conversations. */
 export async function listCopilotProposalsAction(threadId: string) {
   return callAction(await context(), "copilot.proposals", { threadId });

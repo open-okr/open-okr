@@ -352,6 +352,12 @@ export type CopilotEvent =
       readonly kind: "thread";
       readonly threadId: string;
       readonly questionMessageId: string;
+      /**
+       * The answer a background run writes into, so the panel can stop it
+       * (plan 0.8.1 W4). Absent inline, where stopping is cancelling the
+       * request.
+       */
+      readonly answerMessageId?: string;
     }
   /** What retrieval found. Sent before any prose, and sent when there is none. */
   | { readonly kind: "sources"; readonly sources: readonly AnswerSource[] }

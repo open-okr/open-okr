@@ -512,6 +512,91 @@ export const completeRun = defineWriteAction({
 });
 
 /**
+ * Stops a background run, keeping what it has written (plan 0.8.1 W4).
+ *
+ * **Stop used to stop nothing on most deployments.** It cancelled the reader's
+ * request, and a background run is not attached to one: the panel re-read the
+ * thread, saw the run still going and subscribed again, and the answer arrived
+ * anyway. This stamps the answer as stopped. The run checks between pieces of
+ * the answer and ends there, and `copilot.completeRun` then writes what had
+ * arrived into a message that already reads as stopped.
+ *
+ * **Stopping what has already ended is not an error**, because the reader and
+ * the run race: the answer may finish in the same second the button is
+ * pressed. `stopped` says whether this call stopped anything.
+ */
+export const stopRun = defineWriteAction({
+  name: "copilot.stopRun",
+  agentSurface: false,
+  summary: "Stops a background copilot run, keeping what it has written.",
+  input: z.object({ answerMessageId: z.uuid() }),
+  output: z.object({ messageId: z.uuid(), stopped: z.boolean() }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const [message] = await tx
+        .select({
+          id: aiMessages.id,
+          threadId: aiMessages.threadId,
+          runStartedAt: aiMessages.runStartedAt,
+          runCompletedAt: aiMessages.runCompletedAt,
+          stoppedAt: aiMessages.stoppedAt,
+        })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, input.answerMessageId),
+          ),
+        )
+        .limit(1);
+      if (!message?.runStartedAt) {
+        throw new OperationError("not_found", "There is no such run.");
+      }
+      // Only the member whose conversation it is may stop it.
+      await ownThread(tx, workspaceId, memberId, message.threadId);
+
+      const running =
+        message.runCompletedAt === null && message.stoppedAt === null;
+      if (running) {
+        await tx
+          .update(aiMessages)
+          .set({ stoppedAt: new Date(), updatedAt: new Date() })
+          .where(
+            activeOnly(
+              aiMessages,
+              eq(aiMessages.workspaceId, workspaceId),
+              eq(aiMessages.id, message.id),
+            ),
+          );
+      }
+
+      return {
+        result: { messageId: message.id, stopped: running },
+        activity: {
+          kind: "copilot.stopped",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { threadId: message.threadId, stopped: running },
+        },
+        audit: {
+          action: "copilot.stopRun",
+          targetType: "ai_message",
+          targetId: message.id,
+          payload: { threadId: message.threadId, stopped: running },
+        },
+      };
+    },
+  }),
+});
+
+/**
  * Records the answer to the thread's last question.
  *
  * **Citations are stored as the answer's claim about what it used**, filtered

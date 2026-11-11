@@ -196,6 +196,7 @@ import {
   readThread,
   readThreads,
   recordAnswer,
+  stopRun,
 } from "./copilot.ts";
 import {
   applyProposal,
@@ -649,6 +650,7 @@ export const ACTION_MAP = {
   "tokens.approveDevice": decideDevice,
   "copilot.ask": ask,
   "copilot.completeRun": completeRun,
+  "copilot.stopRun": stopRun,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,
   "copilot.threads": readThreads,

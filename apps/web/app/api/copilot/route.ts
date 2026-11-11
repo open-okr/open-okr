@@ -229,6 +229,10 @@ data: ${JSON.stringify(event)}
         kind: "thread",
         threadId: started.threadId,
         questionMessageId: started.messageId,
+        // So the panel can stop the run (plan 0.8.1 W4).
+        ...(started.answerMessageId
+          ? { answerMessageId: started.answerMessageId }
+          : {}),
       });
 
       const subscription = await getRealtime().subscribe(
@@ -272,7 +276,7 @@ data: ${JSON.stringify(event)}
             send({
               kind: "done",
               answerMessageId: started.answerMessageId,
-              stopped: false,
+              stopped: data.stopped === true,
             });
             controller.close();
           }
