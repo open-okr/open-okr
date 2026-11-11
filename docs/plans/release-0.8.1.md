@@ -197,10 +197,10 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | A2 | to do | A2-Q decided: the proposal first |
 | A3 | to do | |
 | L7 | to do | After A1 and A2. The split is approved |
-| K1 | to do | PR #211, open |
+| K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | to do | |
 | K3 | to do | |
-| P1 | to do | |
+| P1 | done | Lockfile only: 5.12.0 and its own three dependencies, inside `@better-auth/sso`'s range. SAML and SSO suites: 82 core, 27 web |
 | P2 | to do | |
 | U1 | to do | U1-Q decided: accept `run` |
 | U2 | to do | Check first |
