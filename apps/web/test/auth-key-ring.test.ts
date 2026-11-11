@@ -20,7 +20,14 @@ vi.mock("@openokr/core", () => ({
   createAuth: createAuthMock,
   // The shared sign-in limiter (plan 0.7.0 P10b); these tests need none.
   authLimiterStorage: () => undefined,
-  resolveRequireEmailVerification: vi.fn(),
+  // Plan 0.8.0 S4: the confirmation rule, followed on the auth route.
+  resolveEmailConfirmation: vi.fn(async () => ({
+    required: false,
+    linksCanArrive: false,
+    mode: "auto",
+    heldByCompanyDomains: false,
+    companyDomains: false,
+  })),
   // Builds on every call, which is all these two tests need of it. What it
   // does between calls is `test/sso-without-restart.test.ts`'s subject.
   followSSOProviders: (

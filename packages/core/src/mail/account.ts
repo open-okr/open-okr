@@ -27,9 +27,51 @@ export function verifyEmailMail(input: {
   readonly url: string;
   /** How long the link works, read from `EMAIL_VERIFICATION_LINK_SECONDS`. */
   readonly hours: number;
+  /**
+   * Confirmation is off and the account works already (plan 0.8.0 S4), so
+   * the words offer the link rather than ask for it.
+   */
+  readonly optional?: boolean;
 }): BuiltMail {
   const t = mailWords(input.locale);
   const instance = input.instanceName;
+  if (input.optional) {
+    const optional = renderEmail(
+      {
+        lang: input.locale,
+        brand: { name: instance },
+        preheader: t("verifyOptional.preheader"),
+        footer: [t("verify.footer")],
+        labels: { linkFallback: t("linkFallback") },
+      },
+      [
+        { kind: "eyebrow", text: t("verify.eyebrow") },
+        { kind: "heading", text: t("verifyOptional.heading") },
+        {
+          kind: "paragraph",
+          parts: [
+            t("verifyOptional.bodyBefore"),
+            { bold: input.to },
+            t("verifyOptional.bodyAfter"),
+          ],
+        },
+        {
+          kind: "action",
+          label: t("verifyOptional.action"),
+          href: input.url,
+        },
+        {
+          kind: "notice",
+          parts: [t("verify.notice", { hours: input.hours })],
+        },
+      ],
+    );
+    return {
+      subject: t("verifyOptional.subject", { instance }),
+      html: optional.html,
+      text: optional.text,
+    };
+  }
   const { html, text } = renderEmail(
     {
       lang: input.locale,

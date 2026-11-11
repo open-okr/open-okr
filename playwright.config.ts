@@ -54,6 +54,13 @@ const serverEnv = (port: number, url: string) => ({
   OPENOKR_ENCRYPTION_KEY: E2E_ENCRYPTION_KEY,
   // The suite makes no call to GitHub (docs/design/version-footer.md §6).
   OPENOKR_UPDATE_CHECK: "off",
+  // **No sign-up waits for a confirmation link** (plan 0.8.0 S4). The rule
+  // used to be read once at boot, when the suite's instance had no mail, so
+  // it was off for the whole run; it is now followed live, and the hosting
+  // specs that configure a mail sink would otherwise lock out every account
+  // made before them, the instance account included. Off says outright what
+  // the run always had. `s35g-confirmation-off.spec.ts` drives the setting.
+  OPENOKR_EMAIL_VERIFICATION: "off",
   // **This run is the AI-off leg** (PLAN.md §9, AI-NATIVE-PLAN §10,
   // docs/design/ai-off-leg.md). Playwright lays this `env` over the runner's
   // own, so a key exported in a shell or set on a job would otherwise reach

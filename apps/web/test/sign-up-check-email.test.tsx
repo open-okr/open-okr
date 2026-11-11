@@ -49,6 +49,7 @@ const render = async () => {
         <SignUpForm
           legal={{ termsUrl: null, privacyUrl: null }}
           linkHours={1}
+          instanceName="Northwind OKRs"
         />
       </TranslationsProvider>,
     );
@@ -119,6 +120,29 @@ describe("sign-up", () => {
     expect(window.location.search).not.toContain("priya");
   });
 
+  test("says the account was created, and nothing about confirming, when nothing waits (plan 0.8.0 S4)", async () => {
+    auth.signUp.mockResolvedValue({
+      data: { token: "t", user: {} },
+      error: null,
+    });
+    await render();
+    await submit();
+    const card = host.querySelector('[data-testid="account-created"]');
+    expect(host.textContent).toContain("Welcome to Northwind OKRs");
+    expect(card?.textContent).toContain(
+      "Your account has been created. You can use it right away.",
+    );
+    expect(host.textContent).not.toMatch(/confirm|check your email/i);
+    // Signed in already, so Get started goes straight in.
+    expect(router.push).not.toHaveBeenCalled();
+    await act(async () => {
+      host
+        .querySelector<HTMLButtonElement>('[data-testid="get-started"]')
+        ?.click();
+    });
+    expect(router.push).toHaveBeenCalledWith("/");
+  });
+
   test("offers the link again for the address it was sent to", async () => {
     auth.signUp.mockResolvedValue({
       data: { token: null, user: {} },
@@ -143,17 +167,6 @@ describe("sign-up", () => {
     expect(
       host.querySelector('[data-testid="resend-answer"]')?.textContent,
     ).toContain("If priya@northwind.example has an account waiting");
-  });
-
-  test("goes on as before when there is a session", async () => {
-    auth.signUp.mockResolvedValue({
-      data: { token: "t", user: {} },
-      error: null,
-    });
-    await render();
-    await submit();
-    expect(router.push).toHaveBeenCalledWith("/");
-    expect(host.querySelector('[data-testid="check-email"]')).toBeNull();
   });
 
   test("shows a refusal and stays on the form", async () => {

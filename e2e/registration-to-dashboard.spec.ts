@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, TOUR_COOKIE, test } from "./fixtures.ts";
-import { INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
+import { getStarted, INSTANCE_ACCOUNT, skipOnboarding } from "./instance-account.ts";
 import { choose, chooseAt } from "./pickers.ts";
 
 /**
@@ -44,6 +44,7 @@ test("registering provisions a workspace and lands on the dashboard", async () =
   await page.getByLabel("Email").fill(EMAIL);
   await page.getByLabel("Password").fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
+  await getStarted(page);
 
   /**
    * **A first sign-in goes to onboarding now, and that is P6-G26.** Before it,

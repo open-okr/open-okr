@@ -19,6 +19,7 @@ export function SignUpForm({
   companyOnly = false,
   legal,
   linkHours = 1,
+  instanceName,
 }: {
   readonly companyOnly?: boolean;
   /**
@@ -29,6 +30,8 @@ export function SignUpForm({
   readonly legal: LegalLinks;
   /** How long the confirmation link works, for the check-your-email card. */
   readonly linkHours?: number;
+  /** For the welcome card's title, as the confirmed page says it. */
+  readonly instanceName: string;
 }) {
   const { t } = useTranslations();
 
@@ -38,6 +41,8 @@ export function SignUpForm({
   // The address the link went to, once the account exists and is waiting for
   // it. Held in the page's own state, never in the address bar.
   const [sentTo, setSentTo] = useState<string | null>(null);
+  // The account works at once: no confirmation was asked for (plan 0.8.0 S4).
+  const [created, setCreated] = useState(false);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -64,14 +69,42 @@ export function SignUpForm({
     // **No session means the address must be confirmed first** (plan 0.8.0
     // S1). The form went to the home page whatever happened, which bounced a
     // new person to sign in with nothing said about the mail they had been
-    // sent. Where the instance cannot send mail there is a session, and they
-    // go on to onboarding as before.
+    // sent.
     if (data && !data.token) {
       setSentTo(email);
       return;
     }
-    router.push("/");
+    // **A session means nothing waits** (plan 0.8.0 S4,
+    // email-verification.md §11.2): confirmation is off, or the instance
+    // cannot send mail. Not a word about confirming; the welcome the
+    // confirmed page gives instead, and Get started goes straight in,
+    // because they are signed in already (Akmal, 11 November 2026).
+    setCreated(true);
   };
+
+  if (created) {
+    return (
+      <AuthCard
+        title={t("auth.emailConfirmed.welcome", { instance: instanceName })}
+      >
+        <div
+          className="flex flex-col gap-3.5 text-sm text-ink-2"
+          data-testid="account-created"
+        >
+          <p>{t("auth.signUp.created.body")}</p>
+          <Button
+            type="button"
+            variant="primary"
+            className="w-full"
+            data-testid="get-started"
+            onClick={() => router.push("/")}
+          >
+            {t("auth.signUp.created.getStarted")}
+          </Button>
+        </div>
+      </AuthCard>
+    );
+  }
 
   if (sentTo !== null) {
     return (

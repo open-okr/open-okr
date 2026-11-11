@@ -193,6 +193,8 @@ test("company administrator: meets none of the instance's own settings", async (
 });
 
 test("company administrator: invites a workspace administrator and a member", async () => {
+  // Two whole sign-ups, each through its own welcome (plan 0.8.0 S4).
+  test.setTimeout(90_000);
   const adminPath = await inviteByEmail(companyAdmin, WORKSPACE_ADMIN.email);
   const memberPath = await inviteByEmail(companyAdmin, MEMBER.email);
   await joinAsNewcomer(workspaceAdmin, adminPath, WORKSPACE_ADMIN);

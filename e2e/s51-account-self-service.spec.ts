@@ -15,7 +15,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import { signIn } from "./instance-account.ts";
+import { getStarted, signIn } from "./instance-account.ts";
 
 const PERSON = {
   email: `self-service-${Date.now()}@example.com`,
@@ -72,6 +72,7 @@ test("the owner invites somebody, and they join", async ({
   await page.getByLabel("Email").fill(PERSON.email);
   await page.getByLabel("Password", { exact: true }).fill(PERSON.password);
   await page.getByRole("button", { name: "Create account" }).click();
+  await getStarted(page);
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({
     timeout: 30_000,
   });

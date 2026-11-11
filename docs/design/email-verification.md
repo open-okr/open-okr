@@ -331,3 +331,13 @@ Then they see the same welcome card, and no mail is queued
 | The setting's writer, its audit event and the refused combination | Same |
 | The welcome card and no confirming notice; the mail's words | Unit, `apps/web/test` |
 | Sign-up with confirmation off, then Get started | End to end, `e2e/s35g-confirmation-off.spec.ts` |
+
+### 11.7 As built (S4)
+
+| # | What | Why |
+|---|---|---|
+| S4-B1 | `resolveEmailConfirmation` in `packages/core/src/auth/signup-policy.ts` answers `required`, `linksCanArrive`, `mode`, `heldByCompanyDomains` and `companyDomains`; `createAuth` takes `optionalVerificationLinks` beside `requireEmailVerification`, and the outbox row carries `optional` so the relay picks the optional words | One answer for Better Auth, the mail and both cards |
+| S4-B2 | The auth route reads the rule again at most every fifteen seconds and rebuilds the auth instance when it moved (`followConfirmationRule` in `apps/web/lib/auth.ts`); a save on this server reads it at once | Every replica follows a change without a restart, which a boot-time read could not |
+| S4-B3 | One card, `apps/web/lib/email-confirmation-card.tsx`, for Admin, General and S-47, each with its own action checking its own grant | The two screens cannot drift apart |
+| S4-B4 | The browser suite's sign-ups now meet the welcome card, so the helpers that sign up press Get started (`getStarted` in `e2e/instance-account.ts`) | The suite's instance sends no mail, so every successful sign-up there ends on it |
+

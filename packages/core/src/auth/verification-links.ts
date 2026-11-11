@@ -197,6 +197,8 @@ export async function queueVerificationLink(
     readonly token: string;
     readonly lifetimeSeconds: number;
     readonly reason: VerificationReason;
+    /** Worded as optional, nothing waiting on it (plan 0.8.0 S4). */
+    readonly optional?: boolean;
   },
 ): Promise<void> {
   try {
@@ -210,6 +212,7 @@ export async function queueVerificationLink(
           Date.now() + link.lifetimeSeconds * 1000,
         ).toISOString(),
         reason: link.reason,
+        ...(link.optional ? { optional: true } : {}),
       },
       idempotencyKey: `${VERIFY_EMAIL_TOPIC}:${createHash("sha256").update(link.token).digest("hex")}`,
     });

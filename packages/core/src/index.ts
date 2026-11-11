@@ -556,7 +556,17 @@ export {
   hashSessionToken,
   withHashedSessionTokens,
 } from "./auth/session-hashing.ts";
-export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
+export {
+  EMAIL_VERIFICATION_MODES,
+  type EmailConfirmation,
+  type EmailVerificationMode,
+  HELD_BY_COMPANY_DOMAINS,
+  readEmailVerificationMode,
+  resolveEmailConfirmation,
+  resolveRequireEmailVerification,
+  setEmailVerificationMode,
+  setEmailVerificationModeAsOperator,
+} from "./auth/signup-policy.ts";
 export {
   type CreateSSOConnectionInput,
   createSSOConnection,

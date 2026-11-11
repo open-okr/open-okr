@@ -149,7 +149,7 @@ test("a visitor with a free mail address is told to use a company one", async ({
 });
 
 test("operator: the group's IT signs up with the group's address and is granted the console", async () => {
-  await signUp(operator, OPERATOR);
+  await signUp(operator, OPERATOR, mail);
   await expectNotFound(operator, "/operator");
   await grantOperator(pool, OPERATOR);
   await goTo(operator, "/operator");
@@ -181,7 +181,7 @@ test("company administrators: each follows their email and owns their company's 
     [logisticsAdmin, LOGISTICS_ADMIN, logisticsId, LOGISTICS],
   ] as const) {
     const invitation = await mail.waitFor(person.email, /\/join\//);
-    await joinAsNewcomer(page, joinPathIn(invitation), person);
+    await joinAsNewcomer(page, joinPathIn(invitation), person, mail);
     await expect(page.getByText(name).first()).toBeVisible();
     expect(await roleIn(pool, id, person.email)).toBe("owner");
     expect(await roleIn(pool, id, OPERATOR.email)).toBeNull();
@@ -214,10 +214,12 @@ test("company administrator: a company address is offered a workspace of its own
 });
 
 test("company administrator: appoints a workspace administrator and invites a member", async () => {
+  // Two whole sign-ups, each through its own welcome (plan 0.8.0 S4).
+  test.setTimeout(90_000);
   const adminPath = await inviteByEmail(tradingAdmin, WORKSPACE_ADMIN.email);
   const memberPath = await inviteByEmail(tradingAdmin, MEMBER.email);
-  await joinAsNewcomer(workspaceAdmin, adminPath, WORKSPACE_ADMIN);
-  await joinAsNewcomer(member, memberPath, MEMBER);
+  await joinAsNewcomer(workspaceAdmin, adminPath, WORKSPACE_ADMIN, mail);
+  await joinAsNewcomer(member, memberPath, MEMBER, mail);
   await makeAdministrator(
     tradingAdmin,
     await memberIdIn(pool, tradingId, WORKSPACE_ADMIN.email),

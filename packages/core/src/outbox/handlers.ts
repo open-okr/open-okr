@@ -503,6 +503,8 @@ const sendVerificationLink: OutboxHandler = async (delivery, deps) => {
     to,
     url,
     hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+    // Plan 0.8.0 S4: confirmation off, the account works already.
+    optional: delivery.payload.optional === true,
   });
   await deps.sendMail({ to, ...built });
 };

@@ -204,6 +204,13 @@ const envSchema = z
      * here, and perhaps nowhere. */
     OPENOKR_RELAY: optional(z.enum(["on", "off", "elsewhere"]).default("on")),
 
+    /** Whether a new account confirms its email before it signs in (plan
+     * 0.8.0 S4, docs/design/email-verification.md §11). `auto`, the
+     * default, requires it exactly when the instance can deliver mail;
+     * `off` lets the account be used at once. A value saved on General, or
+     * by a cloud's operator, wins. Anything else is refused at boot. */
+    OPENOKR_EMAIL_VERIFICATION: optional(z.enum(["auto", "off"]).optional()),
+
     /** How many database connections one process may hold (P8-T06b).
      *
      * **It had no ceiling at all until now**, which meant `pg`'s own default

@@ -65,7 +65,14 @@ vi.mock("@openokr/core", () => ({
   },
   loadSSOConnections: loadSSOConnectionsMock,
   recordInstanceAuditEvent: vi.fn(),
-  resolveRequireEmailVerification: vi.fn(),
+  // Plan 0.8.0 S4: the confirmation rule, followed on the auth route.
+  resolveEmailConfirmation: vi.fn(async () => ({
+    required: false,
+    linksCanArrive: false,
+    mode: "auto",
+    heldByCompanyDomains: false,
+    companyDomains: false,
+  })),
   SSOConnectionRejected,
   syncAllSamlProviders: syncAllSamlProvidersMock,
   trackSSOProviders: (options: typeof tracked.options) => {

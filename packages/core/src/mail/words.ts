@@ -67,6 +67,17 @@ const en = {
   "passwordChanged.footer":
     "Sent by {instance} at {host} whenever the password of this account changes. It never contains a password.",
 
+  // With confirmation off (plan 0.8.0 S4, email-verification.md §11.3): the
+  // account works already, so nothing here may read as a demand.
+  "verifyOptional.subject": "Your account on {instance} is ready",
+  "verifyOptional.preheader": "You can use your account now.",
+  "verifyOptional.heading": "Your account is ready",
+  "verifyOptional.bodyBefore":
+    "You can use your account now. If you would like to, confirm ",
+  "verifyOptional.bodyAfter":
+    " with the link below. It lets you join workspaces that admit people by their company's email domain.",
+  "verifyOptional.action": "Confirm this address",
+
   // A run of wrong passwords began an account hold (account-lockout.md Q2).
   "held.subject": "Somebody is trying to sign in to your {instance} account",
   "held.preheader":
@@ -243,6 +254,15 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "passwordChanged.action": "Tetapkan semula kata laluan",
   "passwordChanged.footer":
     "Dihantar oleh {instance} di {host} setiap kali kata laluan akaun ini berubah. Ia tidak pernah mengandungi kata laluan.",
+
+  "verifyOptional.subject": "Akaun anda di {instance} sudah sedia",
+  "verifyOptional.preheader": "Anda boleh menggunakan akaun anda sekarang.",
+  "verifyOptional.heading": "Akaun anda sudah sedia",
+  "verifyOptional.bodyBefore":
+    "Anda boleh menggunakan akaun anda sekarang. Jika anda mahu, sahkan ",
+  "verifyOptional.bodyAfter":
+    " dengan pautan di bawah. Ia membolehkan anda menyertai ruang kerja yang menerima orang melalui domain e-mel syarikat mereka.",
+  "verifyOptional.action": "Sahkan alamat ini",
 
   "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
   "held.preheader":

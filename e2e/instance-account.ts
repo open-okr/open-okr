@@ -187,6 +187,20 @@ export async function goTo(
 
 
 /**
+ * After the sign-up form's Create account: the welcome card that says the
+ * account works (plan 0.8.0 S4, email-verification.md §11.2), whose Get
+ * started goes straight in. The suite's instance sends no mail, so no
+ * sign-up here waits for a link, and every successful one meets this card.
+ */
+export async function getStarted(
+  page: import("@playwright/test").Page,
+): Promise<void> {
+  const button = page.getByTestId("get-started");
+  await button.waitFor({ state: "visible", timeout: 30_000 });
+  await button.click();
+}
+
+/**
  * Skips every step of onboarding (S-34), synchronised on the wizard's own state.
  *
  * **The wizard is briefly mounted twice on arrival, and a click in that

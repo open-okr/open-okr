@@ -10,6 +10,7 @@ import {
 import { headers } from "next/headers";
 import Link from "next/link";
 import { getPool } from "../../../lib/auth";
+import { getInstanceName } from "../../../lib/instance-name";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { AuthCard } from "../auth-card";
@@ -76,6 +77,7 @@ export default async function SignUpPage() {
       companyOnly={companyOnly}
       legal={await resolveLegalLinks(getPool())}
       linkHours={EMAIL_VERIFICATION_LINK_SECONDS / 3600}
+      instanceName={await getInstanceName()}
     />
   );
 }

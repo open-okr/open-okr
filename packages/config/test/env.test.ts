@@ -500,3 +500,24 @@ describe("where the relay and the scheduler run", () => {
     },
   );
 });
+
+// Plan 0.8.0 S4, docs/design/email-verification.md §11.1.
+describe("email confirmation at sign-up", () => {
+  test("unset means nothing chosen here, and auto and off are taken", () => {
+    expect(parseEnv(VALID).OPENOKR_EMAIL_VERIFICATION).toBeUndefined();
+    expect(
+      parseEnv({ ...VALID, OPENOKR_EMAIL_VERIFICATION: "off" })
+        .OPENOKR_EMAIL_VERIFICATION,
+    ).toBe("off");
+  });
+
+  test("anything else refuses the boot, naming the variable", () => {
+    const error = captureError(() =>
+      parseEnv({ ...VALID, OPENOKR_EMAIL_VERIFICATION: "never" }),
+    );
+    expect(error).toBeInstanceOf(EnvironmentError);
+    expect((error as EnvironmentError).variables).toEqual([
+      "OPENOKR_EMAIL_VERIFICATION",
+    ]);
+  });
+});

@@ -8,6 +8,7 @@ import {
   readInstanceName,
   readRegistrationPolicy,
   readUpdateCheck,
+  resolveEmailConfirmation,
   resolveWorkspaceSettings,
   unresolvedCallersSeen,
 } from "@openokr/core";
@@ -15,6 +16,7 @@ import { listTimezones } from "@openokr/formats";
 import { resolveAccessLevelFor } from "../../../lib/access";
 import { getPool } from "../../../lib/auth";
 import { getBilling } from "../../../lib/billing";
+import { EmailConfirmationCard } from "../../../lib/email-confirmation-card";
 import { holdOf, readLifecycle } from "../../../lib/held-by";
 import { getMailSettings } from "../../../lib/mail";
 import { pageTitle } from "../../../lib/page-title.ts";
@@ -24,6 +26,7 @@ import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { CloseWorkspaceCard } from "./close-workspace-card";
 import { ConsoleMailNotice } from "./console-mail-notice";
+import { saveEmailConfirmation } from "./email-confirmation-actions";
 import { GeneralSettingsForm } from "./general-settings-form";
 import { InstanceHealthNotice } from "./instance-health-notice";
 import { InstanceNameCard } from "./instance-name-card";
@@ -76,6 +79,10 @@ export default async function GeneralSettingsPage() {
   const updateCheck = cloud
     ? null
     : await readUpdateCheck(getPool()).catch(() => null);
+  // Plan 0.8.0 S4. On a cloud the operator decides (Q12), so absent there.
+  const emailConfirmation = cloud
+    ? null
+    : await resolveEmailConfirmation(getPool()).catch(() => null);
 
   // Where the workspace stands with its provider (docs/design/workspace-erasure.md
   // §8). Null on every self-hosted instance, which shows neither card's cloud half.
@@ -170,6 +177,12 @@ export default async function GeneralSettingsPage() {
         <RegistrationCard
           policy={registration.value}
           source={registration.source}
+        />
+      ) : null}
+      {emailConfirmation ? (
+        <EmailConfirmationCard
+          confirmation={emailConfirmation}
+          save={saveEmailConfirmation}
         />
       ) : null}
       {updateCheck ? <UpdateCheckCard enabled={updateCheck.value} /> : null}

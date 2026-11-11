@@ -30,12 +30,7 @@ import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
 import pg from "pg";
 import { fillDateTime } from "./date-time.ts";
 import { expect, test } from "./fixtures.ts";
-import {
-  goTo,
-  INSTANCE_ACCOUNT,
-  signIn,
-  skipOnboarding,
-} from "./instance-account.ts";
+import { getStarted, goTo, INSTANCE_ACCOUNT, signIn, skipOnboarding } from "./instance-account.ts";
 
 test.describe.configure({ mode: "serial" });
 
@@ -90,6 +85,7 @@ async function arrive(
     await page.getByLabel("Email").fill(person.email);
     await page.getByLabel("Password").fill(PASSWORD);
     await page.getByRole("button", { name: "Create account" }).click();
+    await getStarted(page);
     await skipOnboarding(page);
   } else {
     await goTo(page, "/sign-in");

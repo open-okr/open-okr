@@ -377,6 +377,13 @@ export interface AuthOptions {
    */
   readonly requireEmailVerification?: boolean;
   /**
+   * A link may be sent without anything waiting for it (plan 0.8.0 S4,
+   * email-verification.md §11.3): confirmation is off, and the instance can
+   * deliver mail. The account works at once; the link, worded as optional,
+   * confirms the address for what still needs one, joining by trusted domain.
+   */
+  readonly optionalVerificationLinks?: boolean;
+  /**
    * SSO provider configurations loaded from `sso_connections` (P8-T07). Each
    * OIDC entry becomes a genericOAuth provider that appears on the sign-in
    * page and flows through Better Auth's social-provider path.
@@ -557,6 +564,8 @@ export function createAuth(options: AuthOptions) {
   const keyRing = options.keyRing ?? processOnlyKeyRing();
   const lockoutEnabled = options.lockout?.enabled ?? true;
   const requireEmailVerification = options.requireEmailVerification ?? false;
+  const optionalVerificationLinks =
+    !requireEmailVerification && (options.optionalVerificationLinks ?? false);
   const rateLimitEnabled = options.rateLimit?.enabled ?? true;
   // Where each address's allowance of confirmation links is counted (D9):
   // the shared storage when there is one, so every replica sees one count.
@@ -703,7 +712,7 @@ export function createAuth(options: AuthOptions) {
       expiresIn: EMAIL_VERIFICATION_LINK_SECONDS,
       // Queued on sign-up only where a link can arrive. With a console
       // transport nothing is queued and nothing is written to the log.
-      sendOnSignUp: requireEmailVerification,
+      sendOnSignUp: requireEmailVerification || optionalVerificationLinks,
       /**
        * **Queued on the outbox, never sent here** (email-verification.md D1
        * to D4, plan 0.8.0 H1). The row is written on the pool in its own
@@ -717,10 +726,14 @@ export function createAuth(options: AuthOptions) {
       sendVerificationEmail: async ({ user, url, token }, request) => {
         // The account that claims the instance is created verified, and a
         // link asking it to confirm again would only confuse (BUG-028).
-        if (!requireEmailVerification || user.emailVerified) {
+        if (
+          (!requireEmailVerification && !optionalVerificationLinks) ||
+          user.emailVerified
+        ) {
           return;
         }
         await queueVerificationLink(options.pool, {
+          optional: optionalVerificationLinks,
           userId: user.id,
           to: user.email,
           url,
