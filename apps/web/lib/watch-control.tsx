@@ -39,6 +39,9 @@ const REASON_WORDS: Record<string, string> = {
   support_request: "watchControl.becauseSupport",
   support_ended: "watchControl.becauseSupport",
   connection_ended: "watchControl.becauseConnection",
+  // Plan 0.8.0 Y7: a member deleted their account, told to the people who
+  // administer the workspace or manage them.
+  self_deleted: "watchControl.becauseSelfDeleted",
 };
 
 /** A reason a member should think twice about switching off. */

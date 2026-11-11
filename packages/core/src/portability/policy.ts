@@ -107,6 +107,12 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
       "Failed sign-ins and the holds they caused (plan 0.7.0 P10). Keyed by account and caller rather than by workspace, and about this instance's door, not the workspace's work.",
   },
   {
+    table: "account_deletions",
+    decision: "exclude",
+    reason:
+      "A person's request to delete their own account and its ledger (plan 0.8.0 Y7). About the account on this instance, across every workspace it belongs to, so no workspace's archive holds it, and restored elsewhere it would delete somebody who never asked there.",
+  },
+  {
     table: "outbox",
     decision: "exclude",
     reason:

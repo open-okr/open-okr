@@ -37,6 +37,7 @@ const NAME_KEYS: Readonly<Record<string, string>> = {
   workspace: "inbox.subject.workspace",
   support_session: "inbox.subject.supportSession",
   agent_connection: "inbox.subject.agentConnection",
+  workspace_member: "inbox.subject.member",
 };
 
 /** The key for a subject type's heading, or null for a type with no word. */
@@ -66,6 +67,7 @@ export const REASON_FALLBACK_KEYS: Readonly<Record<string, string>> = {
   support_request: "inbox.fallback.supportRequest",
   support_ended: "inbox.fallback.supportEnded",
   connection_ended: "inbox.fallback.connectionEnded",
+  self_deleted: "inbox.fallback.selfDeleted",
 };
 
 export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
@@ -78,4 +80,5 @@ export const REASON_LABEL_KEYS: Readonly<Record<string, string>> = {
   support_request: "inbox.reason.supportRequest",
   support_ended: "inbox.reason.supportEnded",
   connection_ended: "inbox.reason.connectionEnded",
+  self_deleted: "inbox.reason.selfDeleted",
 };

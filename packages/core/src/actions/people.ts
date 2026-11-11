@@ -60,10 +60,14 @@ import { moveAdministratorRole } from "../access/roles.ts";
 import { isDemoAccount } from "../demo/persona-list.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
-import { eraseAccountIfAlone, sweepPersonalData } from "../people/erasure.ts";
+import {
+  eraseMemberInTx,
+  erasureAuditPayload,
+  erasureExport,
+  loadMemberForErasure,
+} from "../people/erase-member.ts";
 import { buildPersonalExport } from "../people/export.ts";
 import {
-  type ErasureExport,
   isLastFullAccessHolder,
   refuseIfLastOwner,
   stripBindings,
@@ -920,132 +924,31 @@ export const eraseMember = defineWriteAction({
   safety: "destructive",
   operation: (context, input) => ({
     async load({ tx, workspaceId }) {
-      const [before] = await tx
-        .select({
-          userId: workspaceMembers.userId,
-          name: workspaceMembers.name,
-          title: workspaceMembers.title,
-          bio: workspaceMembers.bio,
-          timezone: workspaceMembers.timezone,
-          avatarBlobId: workspaceMembers.avatarBlobId,
-        })
-        .from(workspaceMembers)
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.id, input.memberId),
-            eq(workspaceMembers.workspaceId, workspaceId),
-          ),
-        )
-        .limit(1);
-      if (!before) {
-        throw new OperationError("not_found", "No such member.");
-      }
-      // **Taken in `load`, before a single row is anonymised, and on the
-      // same transaction** (P7-T08b). An export read afterwards would be a
-      // copy of what erasure had already destroyed, and one read in a
-      // separate transaction could miss a row written between the two. This
-      // is the member's one chance to be handed what the instance held.
-      const personalExport = await buildPersonalExport(tx, {
+      // The member and their export, read before a single row is anonymised
+      // and on the same transaction (P7-T08b). This is the member's one
+      // chance to be handed what the instance held.
+      return loadMemberForErasure(tx, {
         workspaceId,
         memberId: input.memberId,
+        withExport: true,
       });
-      return { ...before, personalExport };
     },
     async execute({ tx, workspaceId, loaded }) {
-      refuseIfLastOwner(
-        await isLastFullAccessHolder(tx, workspaceId, input.memberId),
-      );
-
-      const erasedAt = new Date();
-      const [updated] = await tx
-        .update(workspaceMembers)
-        .set({
-          name: "Erased member",
-          title: null,
-          bio: null,
-          bioVersion: null,
-          avatarBlobId: null,
-          timezone: null,
-          quietHours: null,
-          userId: null,
-          status: "suspended",
-          suspendedAt: erasedAt,
-          updatedAt: erasedAt,
-        })
-        .where(
-          activeOnly(
-            workspaceMembers,
-            eq(workspaceMembers.id, input.memberId),
-            eq(workspaceMembers.workspaceId, workspaceId),
-          ),
-        )
-        .returning({ id: workspaceMembers.id });
-      if (!updated) {
-        throw new OperationError("not_found", "No such member.");
-      }
-
-      // **After the member row, not before** (P7-T08b). Both run in this
-      // one transaction, so the order changes nothing about what commits.
-      // It changes what a reader of this function believes happened: the
-      // row is anonymised and then everything that identified the person
-      // outside it is removed, which is the sentence the audit row will
-      // carry.
-      const removed = await sweepPersonalData(tx, {
+      // The one body a person's own deletion runs too (account-deletion.md
+      // §3.3), so there is no second way to do half of it.
+      const erasure = await eraseMemberInTx(tx, context.pool, {
         workspaceId,
         memberId: input.memberId,
+        loaded,
       });
-
-      // Their picture stops being shown to the workspace (completeness review
-      // M-22). Clearing the column alone would leave the file readable by
-      // everybody through the binding that made it an avatar.
-      await shareAvatar(tx, {
-        workspaceId,
-        previousBlobId: loaded.avatarBlobId,
-        next: null,
-      });
-
-      // The sign-in account, when this was the person's only workspace
-      // (completeness review M-18).
-      const account = loaded.userId
-        ? await eraseAccountIfAlone(tx, context.pool, {
-            workspaceId,
-            userId: loaded.userId,
-          })
-        : null;
-
-      // Earlier feed entries about this member carried their name in the
-      // payload, which is where the feed reads it from. They keep the event
-      // and lose the name (completeness review M-18).
-      // openokr:allow-mutation: this Operation's own transaction.
-      await tx.execute(sql`
-        update activities
-           set payload = jsonb_set(payload, '{name}', '"Erased member"'::jsonb)
-         where workspace_id = ${workspaceId}
-           and subject_type = 'workspace_member'
-           and subject_id = ${updated.id}
-           and payload ? 'name'
-      `);
-
-      const exported: ErasureExport = {
-        memberId: updated.id,
-        erasedAt: erasedAt.toISOString(),
-        priorProfile: {
-          name: loaded.name,
-          title: loaded.title,
-          bio: loaded.bio,
-          timezone: loaded.timezone,
-        },
-        removed,
-        data: loaded.personalExport,
-      };
+      const exported = erasureExport(erasure, loaded);
 
       return {
-        result: { id: updated.id, export: exported },
+        result: { id: erasure.memberId, export: exported },
         activity: {
           kind: "member.erased",
           subjectType: "workspace_member",
-          subjectId: updated.id,
+          subjectId: erasure.memberId,
           // No name (completeness review M-18). This carried the name from
           // before erasure "because the row no longer does", which wrote the
           // one thing erasure removes into a new row the whole workspace can
@@ -1055,23 +958,11 @@ export const eraseMember = defineWriteAction({
         audit: {
           action: "people.erase",
           targetType: "workspace_member",
-          targetId: updated.id,
+          targetId: erasure.memberId,
           // What the sweep removed, so the trail records what the erasure
           // did and not only that it ran. No identifier is in here: these
           // are counts.
-          payload: {
-            removed,
-            ...(account
-              ? {
-                  account: {
-                    anonymised: account.anonymised,
-                    otherWorkspaces: account.otherWorkspaces,
-                    sessionsRevoked: account.sessionsRevoked,
-                    credentialsRemoved: account.credentialsRemoved,
-                  },
-                }
-              : {}),
-          },
+          payload: erasureAuditPayload(erasure),
         },
       };
     },

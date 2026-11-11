@@ -315,7 +315,16 @@ export interface AccountErasure {
 export async function eraseAccountIfAlone(
   tx: WorkspaceTx,
   pool: Pool,
-  input: { readonly workspaceId: string; readonly userId: string },
+  input: {
+    /**
+     * The workspace erasing the person, whose membership is the one being
+     * removed. Absent when no membership is left at all, which is how a
+     * person's own deletion finishes an account that belongs to nothing
+     * (account-deletion.md §3.3).
+     */
+    readonly workspaceId?: string;
+    readonly userId: string;
+  },
 ): Promise<AccountErasure> {
   const memberships = await withUser(drizzle(pool), input.userId, (own) =>
     own
@@ -325,7 +334,9 @@ export async function eraseAccountIfAlone(
         activeOnly(
           workspaceMembers,
           eq(workspaceMembers.userId, input.userId),
-          ne(workspaceMembers.workspaceId, input.workspaceId),
+          ...(input.workspaceId
+            ? [ne(workspaceMembers.workspaceId, input.workspaceId)]
+            : []),
         ),
       ),
   );

@@ -60,6 +60,7 @@ import {
   remindBeforeErasure,
   remindTrialsEnding,
   reportError,
+  runDueDeletions,
   sweepEndedCycles,
   sweepExpiredSessions,
   sweepTrials,
@@ -165,6 +166,11 @@ export interface ScheduledRun {
     // support-access.md §5). Access is refused at expiry without it; this
     // stamps the row and suspends the operator's member (plan 0.7.0, B2).
     | "support.sweepExpired"
+    // Deleting the accounts whose fourteen days have passed, and the
+    // day-before mails (docs/design/account-deletion.md §7, plan 0.8.0 Y7).
+    // Not a registry action: a person's own account is no workspace's, and
+    // `pnpm account:delete-due` is the operator half.
+    | "account.runDeletions"
     // Storing the alignment scores no structural write has stored yet, such
     // as an upgraded instance's earlier cycles (alignment-engine.md §10,
     // plan 0.7.0 D2). `alignment.score` computes them on read meanwhile.
@@ -351,6 +357,15 @@ const SUPPORT_SWEEP_CRON = "*/5 * * * *";
  * may pay for the graph on a cycle nothing has written to since the upgrade.
  * Once every scope has a row the pass is one indexed query per workspace.
  */
+/**
+ * Deleting your own account (account-deletion.md §3.3, plan 0.8.0 Y7). Hourly,
+ * at a minute no other hourly job takes. A request runs in the hour its
+ * fourteen days end, and a workspace whose erasure failed is retried the
+ * next hour from the ledger. The pass is one indexed read when nothing is due.
+ */
+const ACCOUNT_DELETION_JOB = "account.runDeletions";
+const ACCOUNT_DELETION_CRON = "45 * * * *";
+
 const ALIGNMENT_FILL_JOB = "alignment.fillScores";
 const ALIGNMENT_FILL_CRON = "35 * * * *";
 
@@ -464,6 +479,12 @@ export const SCHEDULED_RUNS: readonly ScheduledRun[] = [
     job: SUPPORT_SWEEP_JOB,
     action: "support.sweepExpired",
     cron: SUPPORT_SWEEP_CRON,
+    instance: true,
+  },
+  {
+    job: ACCOUNT_DELETION_JOB,
+    action: "account.runDeletions",
+    cron: ACCOUNT_DELETION_CRON,
     instance: true,
   },
   {
@@ -651,6 +672,17 @@ async function runInstance(run: ScheduledRun): Promise<void> {
     if (failed > 0) {
       log(
         `support.sweepExpired could not end ${failed} expired support session(s); access is refused at expiry regardless`,
+      );
+    }
+    return;
+  }
+  if (run.action === "account.runDeletions") {
+    const { reminded, completed, cancelled, failed } = await runDueDeletions(
+      getPool(),
+    );
+    if (reminded + completed + cancelled + failed > 0) {
+      log(
+        `account.runDeletions reminded ${reminded}, deleted ${completed}, cancelled ${cancelled}, failed ${failed} (retried next hour)`,
       );
     }
     return;

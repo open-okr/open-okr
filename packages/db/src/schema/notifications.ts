@@ -14,6 +14,9 @@ export const NOTIFICATION_REASONS = [
   "support_request",
   "support_ended",
   "connection_ended",
+  // Release 0.8.0, migration 0167. A member deleted their own account, to the
+  // workspace's administrators and their manager (account-deletion.md §5).
+  "self_deleted",
 ] as const;
 export type NotificationReason = (typeof NOTIFICATION_REASONS)[number];
 

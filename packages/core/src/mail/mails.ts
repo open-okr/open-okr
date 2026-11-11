@@ -96,6 +96,7 @@ const REASON_WORDS: Readonly<Record<string, MailWordKey>> = {
   support_request: "digest.reason.support_request",
   support_ended: "digest.reason.support_ended",
   connection_ended: "digest.reason.connection_ended",
+  self_deleted: "digest.reason.self_deleted",
 };
 
 /** One digest line as a row: its reason as a chip, who did it, where to go. */

@@ -1,4 +1,11 @@
-import { callAction, emailCardFor, isDemoAccount } from "@openokr/core";
+import {
+  ACCOUNT_DELETION_WAIT_DAYS,
+  callAction,
+  deletionCardFor,
+  emailCardFor,
+  isCloudEnabled,
+  isDemoAccount,
+} from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { Avatar, Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
@@ -15,6 +22,8 @@ import {
   updateProfile,
   uploadAvatar,
 } from "../people/actions.ts";
+import { requestDeletion } from "./delete-actions.ts";
+import { DeleteAccountCard } from "./delete-card.tsx";
 import { changeEmail } from "./email-actions.ts";
 import { EmailCard } from "./email-card.tsx";
 import { NameForm } from "./name-form.tsx";
@@ -39,31 +48,49 @@ export const generateMetadata = pageTitle("pageTitle.account");
  * **How they sign in**: their email, which they change here (Y4), and
  * Security for the password (Y3). An opened change link lands back here, and
  * says what became of it.
+ *
+ * **At the foot, Delete your account** (Y7): the danger card, which says
+ * why not or asks for the password. A sign-in that cancelled a deletion lands
+ * here and says the account is kept.
  */
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ emailChange?: string; error?: string }>;
+  searchParams: Promise<{
+    emailChange?: string;
+    error?: string;
+    deletion?: string;
+  }>;
 }) {
   const { t } = await getTranslations();
   const { session, workspace } = await requireWorkspace();
-  const opened = linkOutcome(await searchParams, session.user.email, t);
+  const params = await searchParams;
+  const opened = linkOutcome(params, session.user.email, t);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const [member, directory, delivery, emailCard] = await Promise.all([
-    callAction(context, "people.readMember", { memberId: workspace.memberId }),
-    callAction(context, "people.directory", {}),
-    callAction(context, "channels.mySettings", {}),
-    emailCardFor(getPool(), {
-      userId: session.user.id,
-      email: session.user.email,
-      canSendMail: canSendMail(),
-      sessionCreatedAt: session.session.createdAt,
-    }),
-  ]);
+  const [member, directory, delivery, emailCard, deletionCard, cloud] =
+    await Promise.all([
+      callAction(context, "people.readMember", {
+        memberId: workspace.memberId,
+      }),
+      callAction(context, "people.directory", {}),
+      callAction(context, "channels.mySettings", {}),
+      emailCardFor(getPool(), {
+        userId: session.user.id,
+        email: session.user.email,
+        canSendMail: canSendMail(),
+        sessionCreatedAt: session.session.createdAt,
+      }),
+      deletionCardFor(getPool(), {
+        userId: session.user.id,
+        email: session.user.email,
+        sessionCreatedAt: session.session.createdAt,
+      }),
+      isCloudEnabled(getPool()).catch(() => false),
+    ]);
   const demo = isDemoAccount(session.user.email);
   const manager = member.managerId
     ? (directory.find((one) => one.id === member.managerId) ?? null)
@@ -75,6 +102,15 @@ export default async function AccountPage({
 
   return (
     <div className="flex flex-col gap-4.5" data-testid="your-account">
+      {params.deletion === "kept" ? (
+        <p
+          role="status"
+          data-testid="deletion-kept"
+          className="max-w-prose rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok"
+        >
+          {t("account.delete.kept")}
+        </p>
+      ) : null}
       <Card>
         <CardHeader className="justify-between">
           <h1 className="text-lg font-bold text-ink">
@@ -188,6 +224,14 @@ export default async function AccountPage({
           </Link>
         </CardBody>
       </Card>
+
+      <DeleteAccountCard
+        card={deletionCard}
+        days={ACCOUNT_DELETION_WAIT_DAYS}
+        currentWorkspaceId={workspace.workspaceId}
+        cloud={cloud}
+        action={requestDeletion}
+      />
     </div>
   );
 }

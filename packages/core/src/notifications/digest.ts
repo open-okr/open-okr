@@ -209,6 +209,10 @@ const REASON_SUMMARIES: Readonly<Record<string, string>> = {
     "A support session in this workspace ended. See how, and what was done, on Admin, Support.",
   connection_ended:
     "An administrator ended one of your agent connections. Your Connections page says which.",
+  // Plan 0.8.0 Y7. Never what they owned by name: the mail leaves the
+  // instance, and the profile it links to lists it for whoever may see it.
+  self_deleted:
+    "A member deleted their account. What they owned now needs an owner.",
 };
 
 /**

@@ -155,6 +155,9 @@ describe("the run table", () => {
   // `sso.recheckDomains` since single sign-on domain proof
   // (sso-domain-verification.md): a clock looking the DNS records up again,
   // and an API caller starting it would only be asking for a lookup.
+  // `account.runDeletions` since plan 0.8.0 Y7 (account-deletion.md §7): a
+  // person's own account belongs to no workspace, and no token may start the
+  // erasure of an account (Y7-Q2).
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
@@ -168,6 +171,7 @@ describe("the run table", () => {
     "alignment.fillScores",
     "webhooks.purgeDeliveries",
     "sso.recheckDomains",
+    "account.runDeletions",
   ]);
 
   test("names a real action for every run", () => {
@@ -202,12 +206,14 @@ describe("the run table", () => {
       "alignment.fillScores",
       "webhooks.purgeDeliveries",
       "sso.recheckDomains",
+      "account.runDeletions",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
     );
     // And it is scheduled, rather than declared and never run.
     expect(off.map((run) => run.job).sort()).toEqual([
+      "account.runDeletions",
       "alignment.fillScores",
       "audit.chain",
       "auth.purgeSignInAttempts",
@@ -236,6 +242,17 @@ describe("the run table", () => {
     );
     expect(sweep?.instance).toBe(true);
     expect(sweep?.cron).toBe("*/5 * * * *");
+  });
+
+  // A request runs in the hour its fourteen days end, and a failed
+  // workspace is retried the next hour from the ledger (account-deletion.md
+  // §3.3, plan 0.8.0 Y7).
+  test("runs due account deletions for the instance, every hour", () => {
+    const run = SCHEDULED_RUNS.find(
+      (entry) => entry.action === "account.runDeletions",
+    );
+    expect(run?.instance).toBe(true);
+    expect(run?.cron).toBe("45 * * * *");
   });
 
   // Spraying random addresses makes sign-in counter rows, and nothing else

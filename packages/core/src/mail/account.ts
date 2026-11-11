@@ -346,3 +346,185 @@ export function emailChangeTakenMail(input: {
     text,
   };
 }
+
+/** "11 November 2026", in UTC, as the deletion mails say a day. */
+function dayOf(at: Date, locale: MailLocale): string {
+  return dateAndTime(at, locale).date;
+}
+
+/** What every deletion mail needs to be built. */
+interface DeletionMailInput {
+  readonly instanceName: string;
+  readonly locale: MailLocale;
+  readonly to: string;
+  /** The instance's public origin, where `/sign-in` and `/account` live. */
+  readonly baseUrl: string;
+}
+
+/**
+ * A deletion was asked for (docs/design/account-deletion.md §3.1, plan 0.8.0
+ * Y7): when it runs, that every device was signed out, and that signing in
+ * before then keeps the account. The button goes to sign-in, which is itself
+ * the cancellation, so the mail carries no credential.
+ */
+export function deletionRequestedMail(
+  input: DeletionMailInput & { readonly runsAt: Date },
+): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const signInUrl = new URL("/sign-in", input.baseUrl).toString();
+  const host = new URL(signInUrl).host;
+  const date = dayOf(input.runsAt, input.locale);
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("deletion.requestedPreheader"),
+      footer: [t("deletion.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("deletion.eyebrow") },
+      { kind: "heading", text: t("deletion.requestedHeading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("deletion.requestedBefore"),
+          { bold: input.to },
+          t("deletion.requestedAfter", { date }),
+        ],
+      },
+      { kind: "paragraph", parts: [t("deletion.requestedKeep")] },
+      { kind: "notice", parts: [t("deletion.requestedNotYou")] },
+      { kind: "action", label: t("deletion.signIn"), href: signInUrl },
+    ],
+  );
+  return {
+    subject: t("deletion.requestedSubject", { instance, date }),
+    html,
+    text,
+  };
+}
+
+/** The day before the deletion runs (design §3.2, Y7-1). */
+export function deletionTomorrowMail(
+  input: DeletionMailInput & { readonly runsAt: Date },
+): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const signInUrl = new URL("/sign-in", input.baseUrl).toString();
+  const host = new URL(signInUrl).host;
+  const date = dayOf(input.runsAt, input.locale);
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("deletion.tomorrowPreheader"),
+      footer: [t("deletion.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("deletion.eyebrow") },
+      { kind: "heading", text: t("deletion.tomorrowHeading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("deletion.tomorrowBefore"),
+          { bold: input.to },
+          t("deletion.tomorrowAfter", { date }),
+        ],
+      },
+      { kind: "paragraph", parts: [t("deletion.tomorrowKeep")] },
+      { kind: "action", label: t("deletion.signIn"), href: signInUrl },
+    ],
+  );
+  return { subject: t("deletion.tomorrowSubject", { instance }), html, text };
+}
+
+/** Why a deletion was cancelled, as the cancelled mail says it. */
+export type DeletionCancelReason =
+  | { readonly kind: "signed_in" }
+  | { readonly kind: "last_owner"; readonly workspace: string }
+  | { readonly kind: "directory" }
+  | { readonly kind: "other" };
+
+/**
+ * The deletion was cancelled (design §3.2, §3.3): because the person signed
+ * in, or because a refusal held when the run began, naming what to do
+ * (Y7-Q1).
+ */
+export function deletionCancelledMail(
+  input: DeletionMailInput & { readonly reason: DeletionCancelReason },
+): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const accountUrl = new URL("/account", input.baseUrl).toString();
+  const host = new URL(accountUrl).host;
+  const sentence =
+    input.reason.kind === "signed_in"
+      ? t("deletion.cancelledSignedIn")
+      : input.reason.kind === "last_owner"
+        ? t("deletion.cancelledLastOwner", {
+            workspace: input.reason.workspace,
+          })
+        : input.reason.kind === "directory"
+          ? t("deletion.cancelledDirectory")
+          : t("deletion.cancelledOther");
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("deletion.cancelledPreheader"),
+      footer: [t("deletion.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("deletion.eyebrow") },
+      { kind: "heading", text: t("deletion.cancelledHeading") },
+      { kind: "paragraph", parts: [sentence] },
+      ...(input.reason.kind === "signed_in"
+        ? [
+            {
+              kind: "notice" as const,
+              parts: [t("deletion.cancelledNotYou")],
+            },
+          ]
+        : []),
+      { kind: "action", label: t("deletion.openAccount"), href: accountUrl },
+    ],
+  );
+  return { subject: t("deletion.cancelledSubject", { instance }), html, text };
+}
+
+/**
+ * The deletion is done (design §3.3). The last mail to the address: it was
+ * read before the account was anonymised and leaves the outbox row once
+ * delivered.
+ */
+export function deletionDoneMail(input: DeletionMailInput): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const host = new URL(input.baseUrl).host;
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("deletion.donePreheader"),
+      footer: [t("deletion.doneFooter", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("deletion.eyebrow") },
+      { kind: "heading", text: t("deletion.doneHeading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("deletion.doneBefore"),
+          { bold: input.to },
+          t("deletion.doneAfter"),
+        ],
+      },
+    ],
+  );
+  return { subject: t("deletion.doneSubject", { instance }), html, text };
+}

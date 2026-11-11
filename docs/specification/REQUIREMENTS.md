@@ -148,7 +148,7 @@ One channel port with one driver per provider. Every inbound message resolves to
 ### Pillar F: Platform (P0)
 
 - **Spaces (P0).** Team homes with their own goals, sessions, documents, members and access scope.
-- **People and org (P0).** Per-workspace profiles (title, timezone, avatar, bio), a manager chain and org chart, a directory, suspend and restore, guests, invitations by email and reusable links with domain rules, and trusted-domain auto-join.
+- **People and org (P0).** Per-workspace profiles (title, timezone, avatar, bio), a manager chain and org chart, a directory, suspend and restore, a person deleting their own account after a 14-day wait in which signing in again keeps it (plan 0.8.0 Y7, [account-deletion](../design/account-deletion.md)), guests, invitations by email and reusable links with domain rules, and trusted-domain auto-join.
 - **Access (P0).** Relationship-based per-object access on top of database-enforced tenant isolation, through one enforcement point shared by the browser, the API, MCP and the agents.
 - **Comments, reactions, mentions, subscriptions, notifications (P0).** Everywhere, with per-reason routing, per-channel delivery, digest windows and a daily summary in the member's own timezone.
 - **Activity feed (P0).** Typed, human-readable, permission-filtered, live, at workspace, space, goal and profile scope. Separate from the compliance audit log.

@@ -46,6 +46,12 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  ACCOUNT_DELETION_CANCELLED_TOPIC,
+  ACCOUNT_DELETION_DONE_TOPIC,
+  ACCOUNT_DELETION_REQUESTED_TOPIC,
+  ACCOUNT_DELETION_TOMORROW_TOPIC,
+} from "../auth/account-deletion.ts";
+import {
   CHANGE_EMAIL_TOPIC,
   EMAIL_CHANGE_NOTICE_TOPIC,
   EMAIL_CHANGE_TAKEN_TOPIC,
@@ -81,6 +87,11 @@ import {
 } from "../exports/worker.ts";
 import {
   changeEmailMail,
+  type DeletionCancelReason,
+  deletionCancelledMail,
+  deletionDoneMail,
+  deletionRequestedMail,
+  deletionTomorrowMail,
   emailChangeNoticeMail,
   emailChangeTakenMail,
   passwordChangedMail,
@@ -703,6 +714,69 @@ const sendEmailChangeTaken: OutboxHandler = async (delivery, deps) => {
   });
   await deps.sendMail({ to, ...built });
 };
+
+/**
+ * The four mails of deleting your own account (account-deletion.md §7, plan
+ * 0.8.0 Y7). Each carries its address, which leaves the row once delivered.
+ * The account's row is still there when every one of them is sent, the last
+ * included: it is anonymised, never removed.
+ */
+const sendDeletionMail =
+  (kind: "requested" | "tomorrow" | "cancelled" | "done"): OutboxHandler =>
+  async (delivery, deps) => {
+    const to = asString(delivery.payload.to);
+    const runsAt = new Date(asString(delivery.payload.runsAt) ?? "");
+    if (
+      !to ||
+      ((kind === "requested" || kind === "tomorrow") &&
+        Number.isNaN(runsAt.getTime()))
+    ) {
+      throw new PermanentDispatchError(
+        "A deletion mail needs an address, and a date where it says one, and this row is missing one.",
+      );
+    }
+    if (!deps.sendMail || !deps.baseUrl) {
+      deps.onSkipped?.(delivery, "no mail transport is configured");
+      return;
+    }
+    const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+      () => "en",
+    );
+    const common = {
+      instanceName: instanceNameOr(deps.instanceName),
+      locale: mailLocale(language),
+      to,
+      baseUrl: deps.baseUrl,
+    };
+    const built =
+      kind === "requested"
+        ? deletionRequestedMail({ ...common, runsAt })
+        : kind === "tomorrow"
+          ? deletionTomorrowMail({ ...common, runsAt })
+          : kind === "cancelled"
+            ? deletionCancelledMail({
+                ...common,
+                reason: cancelReasonOf(delivery.payload),
+              })
+            : deletionDoneMail(common);
+    await deps.sendMail({ to, ...built });
+  };
+
+function cancelReasonOf(
+  payload: Readonly<Record<string, unknown>>,
+): DeletionCancelReason {
+  if (payload.reason === "signed_in") {
+    return { kind: "signed_in" };
+  }
+  const workspace = asString(payload.workspace);
+  if (payload.block === "last_owner" && workspace) {
+    return { kind: "last_owner", workspace };
+  }
+  if (payload.block === "directory") {
+    return { kind: "directory" };
+  }
+  return { kind: "other" };
+}
 
 /**
  * Sends one closed batch as a digest (P6-G01b).
@@ -1533,6 +1607,11 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [CHANGE_EMAIL_TOPIC]: sendChangeEmailLink,
   [EMAIL_CHANGE_NOTICE_TOPIC]: sendEmailChangeNotice,
   [EMAIL_CHANGE_TAKEN_TOPIC]: sendEmailChangeTaken,
+  // Deleting your own account (account-deletion.md §7, plan 0.8.0 Y7).
+  [ACCOUNT_DELETION_REQUESTED_TOPIC]: sendDeletionMail("requested"),
+  [ACCOUNT_DELETION_TOMORROW_TOPIC]: sendDeletionMail("tomorrow"),
+  [ACCOUNT_DELETION_CANCELLED_TOPIC]: sendDeletionMail("cancelled"),
+  [ACCOUNT_DELETION_DONE_TOPIC]: sendDeletionMail("done"),
   // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
   // outside the package barrel from P2-T06 until this row existed.
   [DIGEST_TOPIC]: sendDigest,
@@ -1636,6 +1715,12 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   [CHANGE_EMAIL_TOPIC]: ["to", "url", "from"],
   [EMAIL_CHANGE_NOTICE_TOPIC]: ["to", "newEmail"],
   [EMAIL_CHANGE_TAKEN_TOPIC]: ["to"],
+  // The address each deletion mail went to (account-deletion.md §3.3): the
+  // last one's is the only copy of it left once the account is anonymised.
+  [ACCOUNT_DELETION_REQUESTED_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_TOMORROW_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_CANCELLED_TOPIC]: ["to"],
+  [ACCOUNT_DELETION_DONE_TOPIC]: ["to"],
   // Of a customer the provider no longer has. Nothing needs it once it is gone.
   [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };
