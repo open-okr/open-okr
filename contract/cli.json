@@ -1851,6 +1851,23 @@
       "pages": false
     },
     {
+      "name": "copilot deleteThread",
+      "action": "copilot.deleteThread",
+      "method": "POST",
+      "path": "/copilot/deleteThread",
+      "scope": "destructive",
+      "summary": "Deletes one of the caller's own copilot conversations.",
+      "flags": [
+        {
+          "name": "thread-id",
+          "field": "threadId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "blobs prepareUpload",
       "action": "blobs.prepareUpload",
       "method": "POST",

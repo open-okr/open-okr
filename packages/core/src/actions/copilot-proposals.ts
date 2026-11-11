@@ -24,7 +24,7 @@ import {
   proposedChanges,
   withContext,
 } from "@openokr/db";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -63,6 +63,10 @@ async function ownProposal(
         // `proposals.bulkApply`, which requires `full`.
         isNotNull(proposedChanges.threadId),
         eq(aiThreads.memberId, memberId),
+        // A deleted conversation takes its cards with it (plan 0.8.1 CP2):
+        // soft delete is the default scope, and a card is reached through
+        // the thread it was made in.
+        isNull(aiThreads.deletedAt),
       ),
     )
     .limit(1);

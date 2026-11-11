@@ -717,6 +717,70 @@ export const recordAnswer = defineWriteAction({
   }),
 });
 
+/**
+ * Deletes one of the caller's own conversations (plan 0.8.1 CP2, review Q4).
+ *
+ * **Soft, on the thread's own `deleted_at`**, so no migration and nothing is
+ * lost to an audit: the messages stay where they are, and every read of a
+ * thread is scoped to live ones, so the conversation leaves the list and its
+ * address answers not-found. Its cards go with it, because a proposal is
+ * reached through its thread.
+ *
+ * Destructive in the registry's sense: it removes something a person can see,
+ * and nothing gives it back, so a token needs the destructive scope for it.
+ * Access is `comment`, the level that asked the questions in it, because the
+ * conversation is the member's own and nobody else's to keep or delete.
+ */
+export const deleteThread = defineWriteAction({
+  name: "copilot.deleteThread",
+  summary: "Deletes one of the caller's own copilot conversations.",
+  input: z.object({ threadId: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.comment,
+  safety: "destructive",
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      // Somebody else's, or one already deleted, is not-found: the second
+      // press of a slow button records nothing a second time.
+      const thread = await ownThread(tx, workspaceId, memberId, input.threadId);
+
+      await tx
+        .update(aiThreads)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          activeOnly(
+            aiThreads,
+            eq(aiThreads.workspaceId, workspaceId),
+            eq(aiThreads.id, thread.id),
+          ),
+        );
+
+      return {
+        result: { id: thread.id },
+        activity: {
+          kind: "copilot.threadDeleted",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          // Not the title: it is the member's question, and the activity feed
+          // is the workspace's, for the reason `copilot.ask` gives.
+          payload: { threadId: thread.id },
+        },
+        audit: {
+          action: "copilot.deleteThread",
+          targetType: "ai_thread",
+          targetId: thread.id,
+          payload: {},
+        },
+      };
+    },
+  }),
+});
+
 const messageOutput = z.object({
   id: z.uuid(),
   role: z.enum(["member", "assistant"]),

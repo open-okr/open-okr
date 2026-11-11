@@ -662,6 +662,7 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   "copilot.proposalApplied": () => "Applied a copilot proposal",
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "copilot.threadDeleted": () => "Deleted a copilot conversation",
   "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
   "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
   "webhook.secret_rotated": (p) =>

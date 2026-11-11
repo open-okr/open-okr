@@ -177,29 +177,54 @@ test("the conversation is there when the panel is reopened", async () => {
   const panel = page.getByRole("dialog", { name: "Copilot" });
   await expect(panel).toBeVisible();
 
-  // The thread's title is the question, shortened. A fresh panel opens empty
-  // with the earlier conversations listed, which is where it is.
-  await expect(panel.getByText("Earlier conversations")).toBeVisible({
-    timeout: 15_000,
-  });
-  const earlier = panel.getByRole("button", {
+  // The thread's title is the question, shortened, and History is where the
+  // member's conversations are listed (plan 0.8.1 CP2).
+  await panel.getByRole("button", { name: "History" }).click();
+  const history = panel.getByRole("navigation", { name: "History" });
+  await expect(history).toBeVisible({ timeout: 15_000 });
+  const earlier = history.getByRole("button", {
     name: QUESTION.slice(0, 40),
     exact: false,
   });
-  await expect(earlier.first()).toBeVisible();
+  await expect(earlier.first()).toBeVisible({ timeout: 15_000 });
 
   await earlier.first().click();
-  // **Wait for the list to go before looking for the question.** Loading a
-  // thread replaces "Earlier conversations" with the conversation itself, so
-  // until it is gone the only thing on the panel carrying this text is the list
-  // entry that was just clicked. Asserting before then passed whether or not
-  // the click did anything, and it failed on CI as a strict-mode violation the
-  // moment a retry created a second thread with the same title. The turn is
-  // what this test is about.
-  await expect(panel.getByText("Earlier conversations")).toBeHidden({
-    timeout: 15_000,
-  });
+  // **Wait for the list to go before looking for the question.** Opening a
+  // conversation replaces History with it, so until it is gone the only thing
+  // on the panel carrying this text is the entry that was just clicked.
+  // Asserting before then passed whether or not the click did anything, and it
+  // failed on CI as a strict-mode violation the moment a retry created a
+  // second thread with the same title. The turn is what this test is about.
+  await expect(history).toBeHidden({ timeout: 15_000 });
   await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * **The open conversation lives in the address** (plan 0.8.1 CP2).
+ *
+ * Acceptance criterion: given two earlier conversations, when the person opens
+ * History and picks one, then its turns show, the address carries
+ * `?copilot=<id>`, and reloading shows the same thread.
+ */
+test("the open conversation is in the address, and a reload comes back to it", async () => {
+  await expect(page).toHaveURL(/[?&]copilot=[0-9a-f-]{36}/);
+  await page.reload();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * Acceptance criterion: given a thread open, when the person presses New
+ * chat, then the thread is empty, the composer is focused, and the next
+ * question starts a new thread.
+ */
+test("New chat starts an empty conversation", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await panel.getByRole("button", { name: "New chat" }).click();
+  await expect(panel.getByText(QUESTION)).toBeHidden();
+  await expect(panel.getByRole("textbox")).toBeFocused();
+  await expect(page).not.toHaveURL(/[?&]copilot=/);
 });
 
 /**

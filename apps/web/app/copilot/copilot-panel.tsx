@@ -34,7 +34,7 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import { ArrowDown, Send, Square, X } from "lucide-react";
+import { ArrowDown, History, Send, Square, SquarePen, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -43,6 +43,7 @@ import {
   applyCopilotProposalAction,
   type CopilotAvailability,
   copilotAvailabilityAction,
+  deleteCopilotThreadAction,
   dismissCopilotProposalAction,
   listCopilotProposalsAction,
   listCopilotThreadsAction,
@@ -51,6 +52,7 @@ import {
   undoCopilotProposalAction,
 } from "./actions";
 import { type Proposal, ProposalCard } from "./proposal-card";
+import { ThreadList, type ThreadSummary } from "./thread-list";
 import {
   AssistantTurn,
   type Kept,
@@ -61,12 +63,8 @@ import {
   stepWords,
 } from "./turn";
 import { groupTurns } from "./turns";
+import { useCopilotAddress } from "./use-copilot-address";
 import { useStickToBottom } from "./use-stick-to-bottom";
-
-interface ThreadSummary {
-  readonly id: string;
-  readonly title: string | null;
-}
 
 type Availability = CopilotAvailability;
 
@@ -210,7 +208,11 @@ export function CopilotPanel({
 
   const [open, setOpen] = useState(false);
   const [availability, setAvailability] = useState(initialAvailability);
-  const [threads, setThreads] = useState<readonly ThreadSummary[]>([]);
+  /** The member's conversations for History. Null until read. */
+  const [threads, setThreads] = useState<readonly ThreadSummary[] | null>(null);
+  const [threadsFailed, setThreadsFailed] = useState(false);
+  /** The conversation, or the list of them (plan 0.8.1 CP2). */
+  const [view, setView] = useState<"chat" | "history">("chat");
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<readonly Message[]>([]);
   const [question, setQuestion] = useState("");
@@ -232,7 +234,25 @@ export function CopilotPanel({
   const shownThread = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const content = useRef<HTMLDivElement>(null);
-  const stick = useStickToBottom(scroller, content, `${open}:${threadId}`);
+  const stick = useStickToBottom(
+    scroller,
+    content,
+    `${open}:${view}:${threadId}`,
+  );
+  const { addressed, write } = useCopilotAddress();
+  /**
+   * What the address last said that the panel already acts on: what it wrote
+   * itself, or adopted. Anything else is Back, Forward, a reload or a link.
+   */
+  const written = useRef<string | null>(null);
+  /** The address, written by the panel and remembered as written. */
+  const address = useCallback(
+    (id: string | null, how: "push" | "replace") => {
+      written.current = id;
+      write(id, how);
+    },
+    [write],
+  );
 
   useKeyboardShortcut(
     {
@@ -241,7 +261,7 @@ export function CopilotPanel({
       description: t("copilot.copilotPanel.askTheCopilot"),
       group: "global",
     },
-    () => setOpen((was) => !was),
+    () => (open ? closePanel() : openPanel()),
     { key: "j", mod: true, allowInInputs: true },
   );
 
@@ -269,12 +289,37 @@ export function CopilotPanel({
         if (list) {
           setThreads(list);
         }
+        setThreadsFailed(list === null);
       }
     })();
     return () => {
       live = false;
     };
   }, [open]);
+
+  // History reads the list again each time it is shown, so a conversation
+  // started since the panel opened is in it.
+  useEffect(() => {
+    if (!open || view !== "history") {
+      return;
+    }
+    let live = true;
+    void listCopilotThreadsAction()
+      .then((list) => {
+        if (live) {
+          setThreads(list);
+          setThreadsFailed(false);
+        }
+      })
+      .catch(() => {
+        if (live) {
+          setThreadsFailed(true);
+        }
+      });
+    return () => {
+      live = false;
+    };
+  }, [open, view]);
 
   /** One conversation and its cards, read together. */
   const read = useCallback(
@@ -306,6 +351,96 @@ export function CopilotPanel({
       setNotice(null);
     },
     [read, show],
+  );
+
+  /** An empty conversation; the next question starts a new one. */
+  const clear = useCallback(() => {
+    shownThread.current = null;
+    setThreadId(null);
+    setMessages([]);
+    setProposals([]);
+    setKept({});
+    setRejoined({ text: "", step: null });
+    setNotice(null);
+  }, []);
+
+  /** Opens a conversation, saying so when it is not there any more. */
+  const openThread = useCallback(
+    async (id: string) => {
+      setView("chat");
+      try {
+        await loadThread(id);
+      } catch {
+        // Deleted, somebody else's, or never one: the read answers
+        // not-found for all three, and the panel says it plainly.
+        clear();
+        address(null, "replace");
+        setNotice(t("copilot.copilotPanel.notThere"));
+      }
+    },
+    [address, clear, loadThread, t],
+  );
+
+  const openPanel = useCallback(() => {
+    setOpen(true);
+    // The conversation it closed on goes back into the address.
+    if (shownThread.current) {
+      address(shownThread.current, "replace");
+    }
+  }, [address]);
+
+  const closePanel = useCallback(() => {
+    setOpen(false);
+    // Closed, a reload should not open it again.
+    address(null, "replace");
+  }, [address]);
+
+  const newChat = useCallback(() => {
+    clear();
+    setView("chat");
+    address(null, "replace");
+    inputRef.current?.focus();
+  }, [address, clear]);
+
+  /**
+   * The address changed under the panel: Back, Forward, a reload, or a link
+   * to a conversation. A conversation named opens the panel on it; none named
+   * where one was shown is Back past the step that opened it.
+   */
+  useEffect(() => {
+    if (addressed === written.current) {
+      return;
+    }
+    written.current = addressed;
+    if (addressed === null) {
+      clear();
+      return;
+    }
+    setOpen(true);
+    if (addressed !== shownThread.current) {
+      void openThread(addressed);
+    }
+  }, [addressed, clear, openThread]);
+
+  const deleteThread = useCallback(
+    async (id: string): Promise<string | null> => {
+      const { error } = await deleteCopilotThreadAction(id).catch(() => ({
+        error: t("copilot.copilotPanel.history.couldNotDelete"),
+      }));
+      if (error) {
+        return error;
+      }
+      if (id === shownThread.current) {
+        clear();
+        address(null, "replace");
+      }
+      const list = await listCopilotThreadsAction().catch(() => null);
+      setThreads(
+        list ?? ((was) => (was ? was.filter((one) => one.id !== id) : was)),
+      );
+      return null;
+    },
+    [address, clear, t],
   );
 
   /**
@@ -501,6 +636,11 @@ export function CopilotPanel({
               runningAnswer.current = event.answerMessageId ?? null;
               shownThread.current = event.threadId;
               setThreadId(event.threadId);
+              // A new conversation goes into the address the moment it
+              // exists, so a reload mid-answer comes back to it.
+              if (written.current !== event.threadId) {
+                address(event.threadId, "replace");
+              }
             } else if (event.kind === "step") {
               const { kind: _kind, ...step } = event;
               update({ step });
@@ -562,11 +702,11 @@ export function CopilotPanel({
         }
       }
     },
-    [busy, question, read, show, stick, t, threadId],
+    [address, busy, question, read, show, stick, t, threadId],
   );
 
   if (!open) {
-    return <CopilotTrigger onClick={() => setOpen(true)} />;
+    return <CopilotTrigger onClick={openPanel} />;
   }
 
   const canAsk = availability.available;
@@ -609,7 +749,7 @@ export function CopilotPanel({
 
   return (
     <>
-      <CopilotTrigger onClick={() => setOpen(false)} />
+      <CopilotTrigger onClick={closePanel} />
       {/* **Portalled to the body, and it has to be.** The trigger above lives in
           `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes an
           element the containing block for every `position: fixed` descendant, so
@@ -636,20 +776,64 @@ export function CopilotPanel({
             {availability.providerConfigured ? null : (
               <Chip tone="neutral">{t("copilot.copilotPanel.aiOff")}</Chip>
             )}
-            <Button
-              variant="ghost"
-              className="ml-auto"
-              onClick={() => setOpen(false)}
-              aria-label={t("copilot.copilotPanel.closeTheCopilot")}
-            >
-              <X className="size-4" />
-            </Button>
+            <div className="ml-auto flex items-center gap-1">
+              {/* A label beside the icon from 640px; below that the icon,
+                  with the same words for a screen reader. */}
+              <Button
+                variant="ghost"
+                onClick={newChat}
+                disabled={arriving !== null}
+                className="px-2"
+              >
+                <SquarePen className="size-4" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">
+                  {t("copilot.copilotPanel.newChat")}
+                </span>
+              </Button>
+              <Button
+                variant="ghost"
+                aria-pressed={view === "history"}
+                onClick={() =>
+                  setView((was) => (was === "history" ? "chat" : "history"))
+                }
+                className={`px-2 ${view === "history" ? "bg-raised" : ""}`}
+              >
+                <History className="size-4" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">
+                  {t("copilot.copilotPanel.history.title")}
+                </span>
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={closePanel}
+                aria-label={t("copilot.copilotPanel.closeTheCopilot")}
+                className="px-2"
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           </header>
 
           <div className="relative min-h-0 flex-1">
             <div ref={scroller} className="h-full overflow-y-auto px-4 py-3">
               <div ref={content} className="flex flex-col gap-4">
-                {empty ? (
+                {view === "history" ? (
+                  <ThreadList
+                    threads={threads}
+                    openId={threadId}
+                    loading={!threadsFailed}
+                    onOpen={(id) => {
+                      // A step Back can undo, as the OKR drawer's opening is.
+                      address(
+                        id,
+                        written.current === null ? "push" : "replace",
+                      );
+                      void openThread(id);
+                    }}
+                    onDelete={deleteThread}
+                  />
+                ) : null}
+                {view === "chat" && empty ? (
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col items-start gap-2 pt-2">
                       <AgentFace mood={mood} className="size-8" />
@@ -678,97 +862,82 @@ export function CopilotPanel({
                         ))}
                       </ul>
                     ) : null}
-                    {threads.length > 0 ? (
-                      <div>
-                        <p className="text-xs text-ink-4">
-                          {t("copilot.copilotPanel.earlierConversations")}
-                        </p>
-                        <ul className="mt-1 flex flex-col gap-1">
-                          {threads.map((thread) => (
-                            <li key={thread.id}>
-                              <button
-                                type="button"
-                                className="text-left text-xs text-ink-2 underline"
-                                onClick={() => void loadThread(thread.id)}
-                              >
-                                {thread.title ??
-                                  t("copilot.copilotPanel.untitled")}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : null}
                   </div>
                 ) : null}
 
-                {turns.map((turn) => {
-                  const answer = turn.answer;
-                  const extra = turn.question
-                    ? (kept[turn.question.id] ?? null)
-                    : null;
-                  const live = answer?.running === true;
-                  return (
-                    <div key={turn.key} className="flex flex-col gap-3">
-                      {turn.question ? (
-                        <MemberTurn text={turn.question.content} />
-                      ) : null}
-                      {answer || extra || turn.proposals.length > 0 ? (
+                {view === "chat" ? (
+                  <>
+                    {turns.map((turn) => {
+                      const answer = turn.answer;
+                      const extra = turn.question
+                        ? (kept[turn.question.id] ?? null)
+                        : null;
+                      const live = answer?.running === true;
+                      return (
+                        <div key={turn.key} className="flex flex-col gap-3">
+                          {turn.question ? (
+                            <MemberTurn text={turn.question.content} />
+                          ) : null}
+                          {answer || extra || turn.proposals.length > 0 ? (
+                            <AssistantTurn
+                              text={
+                                live ? rejoined.text : (answer?.content ?? "")
+                              }
+                              arriving={live}
+                              status={
+                                live
+                                  ? rejoined.step
+                                    ? stepWords(rejoined.step, t)
+                                    : t("copilot.copilotPanel.stillWriting")
+                                  : null
+                              }
+                              haltedReason={answer?.haltedReason ?? null}
+                              stopped={answer?.stopped ?? false}
+                              citations={answer?.citations ?? []}
+                              kept={extra}
+                              cards={cardsFor(turn.proposals)}
+                            />
+                          ) : null}
+                        </div>
+                      );
+                    })}
+
+                    {arriving ? (
+                      <div className="flex flex-col gap-3">
+                        <MemberTurn text={arriving.question} />
                         <AssistantTurn
-                          text={live ? rejoined.text : (answer?.content ?? "")}
-                          arriving={live}
-                          status={
-                            live
-                              ? rejoined.step
-                                ? stepWords(rejoined.step, t)
-                                : t("copilot.copilotPanel.stillWriting")
+                          text={arriving.text}
+                          arriving={!arriving.settled}
+                          status={stepWords(arriving.step, t)}
+                          haltedReason={null}
+                          stopped={false}
+                          citations={[]}
+                          // Passages are shown while arriving only when the run
+                          // has said no words are coming: then they are the
+                          // answer. Otherwise they wait for the recorded answer.
+                          kept={
+                            arriving.notice
+                              ? {
+                                  sources: arriving.sources,
+                                  notice: arriving.notice,
+                                }
                               : null
                           }
-                          haltedReason={answer?.haltedReason ?? null}
-                          stopped={answer?.stopped ?? false}
-                          citations={answer?.citations ?? []}
-                          kept={extra}
-                          cards={cardsFor(turn.proposals)}
+                          cards={cardsFor(afterLast)}
                         />
-                      ) : null}
-                    </div>
-                  );
-                })}
+                      </div>
+                    ) : null}
 
-                {arriving ? (
-                  <div className="flex flex-col gap-3">
-                    <MemberTurn text={arriving.question} />
-                    <AssistantTurn
-                      text={arriving.text}
-                      arriving={!arriving.settled}
-                      status={stepWords(arriving.step, t)}
-                      haltedReason={null}
-                      stopped={false}
-                      citations={[]}
-                      // Passages are shown while arriving only when the run
-                      // has said no words are coming: then they are the
-                      // answer. Otherwise they wait for the recorded answer.
-                      kept={
-                        arriving.notice
-                          ? {
-                              sources: arriving.sources,
-                              notice: arriving.notice,
-                            }
-                          : null
-                      }
-                      cards={cardsFor(afterLast)}
-                    />
-                  </div>
-                ) : null}
-
-                {notice ? (
-                  <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
-                    {notice}
-                  </p>
+                    {notice ? (
+                      <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
+                        {notice}
+                      </p>
+                    ) : null}
+                  </>
                 ) : null}
               </div>
             </div>
-            {stick.away && !empty ? (
+            {stick.away && !empty && view === "chat" ? (
               <Button
                 variant="default"
                 onClick={stick.toEnd}

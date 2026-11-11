@@ -245,6 +245,7 @@ the machine-readable document.
 | `copilot.ask`<br/>Records a question for the copilot, starting a conversation if this is the first one. | `POST /api/v1/copilot/ask` | writes |
 | `copilot.availability`<br/>Whether the copilot can answer, and why not when it cannot. | `GET /api/v1/copilot/availability` | reads |
 | `copilot.completeRun`<br/>Records the answer a background copilot run produced. | `POST /api/v1/copilot/completeRun` | writes |
+| `copilot.deleteThread`<br/>Deletes one of the caller's own copilot conversations. | `POST /api/v1/copilot/deleteThread` | destroys |
 | `copilot.dismissProposal`<br/>Dismisses one copilot proposal without applying it. | `POST /api/v1/copilot/dismissProposal` | writes |
 | `copilot.proposals`<br/>The proposals the copilot made in one conversation. | `GET /api/v1/copilot/proposals` | reads |
 | `copilot.recordAnswer`<br/>Records the copilot's answer to the last question in a conversation. | `POST /api/v1/copilot/recordAnswer` | writes |

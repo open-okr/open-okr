@@ -104,6 +104,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "copilot.applyProposal",
     "copilot.dismissProposal",
     "copilot.undoProposal",
+    "copilot.deleteThread",
     "notifications.unreadCount",
     "notifications.reasonCounts",
     "notifications.snooze",

@@ -78,6 +78,18 @@ async function openPanel(): Promise<void> {
   await expect(panel).toBeVisible({ timeout: 15_000 });
 }
 
+/** Opens one of the member's conversations from History (plan 0.8.1 CP2). */
+async function openConversation(title: string): Promise<void> {
+  await openPanel();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const history = panel.getByRole("navigation", { name: "History" });
+  if (!(await history.isVisible())) {
+    await panel.getByRole("button", { name: "History" }).click();
+  }
+  await history.getByRole("button", { name: title, exact: true }).click();
+  await expect(history).toBeHidden({ timeout: 15_000 });
+}
+
 test("sign in and land on the Work Map", async () => {
   await signIn(page);
   await expect(
@@ -167,12 +179,8 @@ test("a proposal is waiting in a conversation", async () => {
 });
 
 test("the panel shows it with its provenance, its preview and its reason", async () => {
-  await openPanel();
+  await openConversation("Onboarding objective");
   const panel = page.getByRole("dialog", { name: "Copilot" });
-
-  await panel
-    .getByRole("button", { name: "Onboarding objective" })
-    .click();
 
   const card = panel.getByRole("region", { name: "Proposed change" });
   await expect(card).toBeVisible({ timeout: 15_000 });
@@ -237,9 +245,8 @@ test("undoing it removes the objective and says so", async () => {
   // The previous test navigated to the objective's own page, so the panel is
   // closed and the shell has just rendered again.
   await page.goto("/");
-  await openPanel();
+  await openConversation("Onboarding objective");
   const panel = page.getByRole("dialog", { name: "Copilot" });
-  await panel.getByRole("button", { name: "Onboarding objective" }).click();
 
   const card = panel.getByRole("region", { name: "Proposed change" });
   await expect(card).toBeVisible({ timeout: 15_000 });
@@ -304,9 +311,8 @@ test("a long conversation opens at its newest turn", async () => {
   }
 
   await page.goto("/");
-  await openPanel();
+  await openConversation("A long conversation");
   const panel = page.getByRole("dialog", { name: "Copilot" });
-  await panel.getByRole("button", { name: "A long conversation" }).click();
 
   await expect(panel.getByText("Answer number 12.", { exact: false })).toBeInViewport({
     timeout: 15_000,
@@ -314,4 +320,45 @@ test("a long conversation opens at its newest turn", async () => {
   await expect(
     panel.getByText("Question number 1 about", { exact: false }),
   ).not.toBeInViewport();
+});
+
+/**
+ * **Deleting a conversation** (plan 0.8.1 CP2, review Q4).
+ *
+ * Acceptance criterion: given a conversation in History, when the person
+ * deletes it, then it leaves the list, an audit row records
+ * `copilot.deleteThread`, and its address answers not-found.
+ */
+test("a deleted conversation leaves History and its address says so", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const url = new URL(page.url());
+  const id = url.searchParams.get("copilot");
+  expect(id).toMatch(/^[0-9a-f-]{36}$/);
+
+  await panel.getByRole("button", { name: "History" }).click();
+  const history = panel.getByRole("navigation", { name: "History" });
+  await history
+    .getByRole("button", { name: "Delete A long conversation" })
+    .click();
+  // It asks first, in the row, because nothing brings it back.
+  await expect(history.getByText("It cannot be brought back.")).toBeVisible();
+  await history.getByRole("button", { name: "Delete", exact: true }).click();
+  // Gone from the list, which is after the delete answered: the row asking
+  // the question names it too, so its title is nowhere until both are gone.
+  await expect(
+    history.getByText("A long conversation", { exact: false }),
+  ).toHaveCount(0, { timeout: 15_000 });
+
+  const audit = await pool.query<{ action: string }>(
+    "select action from audit_events where target_id = $1",
+    [id],
+  );
+  expect(audit.rows.map((row) => row.action)).toContain("copilot.deleteThread");
+
+  await page.goto(`/?copilot=${id}`);
+  await expect(
+    page
+      .getByRole("dialog", { name: "Copilot" })
+      .getByText("That conversation is not there any more."),
+  ).toBeVisible({ timeout: 15_000 });
 });

@@ -20,11 +20,14 @@ import {
   callAction,
   hasPlanScreen,
   navigationFor,
+  OperationError,
   reportError,
 } from "@openokr/core";
 import { resolveAccessLevelFor } from "../../lib/access";
 import { getPool } from "../../lib/auth";
 import { resolveDrafterFor } from "../../lib/drafter";
+import { refusalOf } from "../../lib/refusal";
+import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
 import { type CopilotFix, copilotFixes } from "./fixes";
 
@@ -176,6 +179,32 @@ export async function stopCopilotRunAction(answerMessageId: string) {
 /** The proposals in one of the reader's own conversations. */
 export async function listCopilotProposalsAction(threadId: string) {
   return callAction(await context(), "copilot.proposals", { threadId });
+}
+
+/**
+ * Deletes one of the reader's own conversations (plan 0.8.1 CP2).
+ *
+ * Answers with a sentence rather than throwing, because a server action's
+ * thrown message does not reach a production browser. One already gone is
+ * not an error: the person wanted it gone, and it is.
+ */
+export async function deleteCopilotThreadAction(
+  threadId: string,
+): Promise<{ readonly error: string | null }> {
+  try {
+    await callAction(await context(), "copilot.deleteThread", { threadId });
+    return { error: null };
+  } catch (error) {
+    if (error instanceof OperationError && error.code === "not_found") {
+      return { error: null };
+    }
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    const { t } = await getTranslations();
+    return { error: t("copilot.copilotPanel.history.couldNotDelete") };
+  }
 }
 
 /** Applies one, as the reader. The proposed action's own access decides. */

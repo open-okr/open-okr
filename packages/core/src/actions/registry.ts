@@ -192,6 +192,7 @@ import {
 import {
   ask,
   completeRun,
+  deleteThread,
   readAvailability,
   readThread,
   readThreads,
@@ -660,6 +661,7 @@ export const ACTION_MAP = {
   "copilot.applyProposal": applyProposal,
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
+  "copilot.deleteThread": deleteThread,
   "blobs.prepareUpload": prepareUpload,
   "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.

@@ -15,6 +15,7 @@ const core = vi.hoisted(() => ({
   callAction: vi.fn(),
   hasPlanScreen: vi.fn(async () => false),
   navigationFor: vi.fn(() => [] as { href: string }[]),
+  OperationError: class OperationError extends Error {},
   reportError: vi.fn(),
 }));
 const drafter = vi.hoisted(() => ({ resolveDrafterFor: vi.fn() }));
@@ -22,6 +23,9 @@ const drafter = vi.hoisted(() => ({ resolveDrafterFor: vi.fn() }));
 vi.mock("@openokr/core", () => core);
 vi.mock("../lib/drafter", () => drafter);
 vi.mock("../lib/auth", () => ({ getPool: () => ({}) }));
+vi.mock("../lib/translations", () => ({
+  getTranslations: async () => ({ t: (key: string) => key }),
+}));
 vi.mock("../lib/access", () => ({
   resolveAccessLevelFor: vi.fn(async () => 50),
 }));

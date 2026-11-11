@@ -33,12 +33,19 @@ const actions = vi.hoisted(() => ({
   applyCopilotProposalAction: vi.fn(),
   copilotAvailabilityAction: vi.fn(),
   dismissCopilotProposalAction: vi.fn(),
+  deleteCopilotThreadAction: vi.fn(),
   listCopilotProposalsAction: vi.fn(async (): Promise<unknown[]> => []),
   listCopilotThreadsAction: vi.fn(async (): Promise<unknown[]> => []),
   readCopilotThreadAction: vi.fn(),
   undoCopilotProposalAction: vi.fn(),
 }));
 vi.mock("../app/copilot/actions", () => actions);
+// The address the panel reads and writes (plan 0.8.1 CP2): the window's own,
+// as Next's router reports it after a history call.
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => window.location.pathname,
+}));
 
 const { CopilotPanel } = await import("../app/copilot/copilot-panel");
 
@@ -138,6 +145,7 @@ beforeEach(() => {
   actions.listCopilotProposalsAction.mockResolvedValue([]);
   actions.listCopilotThreadsAction.mockResolvedValue([]);
   vi.stubGlobal("fetch", fetchMock);
+  window.history.replaceState(null, "", "/");
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
@@ -385,7 +393,11 @@ describe("turns (plan 0.8.1 CP3)", () => {
 
   test("a card sits in the turn whose question made it", async () => {
     actions.listCopilotThreadsAction.mockResolvedValue([
-      { id: THREAD, title: "Two requests" },
+      {
+        id: THREAD,
+        title: "Two requests",
+        updatedAt: "2026-11-12T10:01:05.000Z",
+      },
     ]);
     actions.readCopilotThreadAction.mockResolvedValue({
       id: THREAD,
@@ -429,6 +441,7 @@ describe("turns (plan 0.8.1 CP3)", () => {
     await render(AVAILABLE);
     await open();
     await settle();
+    await act(async () => byName("History").click());
     await act(async () => byName("Two requests").click());
     await settle();
 
@@ -448,7 +461,11 @@ describe("turns (plan 0.8.1 CP3)", () => {
     }
     vi.stubGlobal("EventSource", SilentEventSource);
     actions.listCopilotThreadsAction.mockResolvedValue([
-      { id: THREAD, title: "Still going" },
+      {
+        id: THREAD,
+        title: "Still going",
+        updatedAt: "2026-11-12T10:00:00.000Z",
+      },
     ]);
     actions.readCopilotThreadAction.mockResolvedValue({
       id: THREAD,
@@ -471,11 +488,122 @@ describe("turns (plan 0.8.1 CP3)", () => {
     await render(AVAILABLE);
     await open();
     await settle();
+    await act(async () => byName("History").click());
     await act(async () => byName("Still going").click());
     await settle();
 
     const articles = panel()?.querySelectorAll("article") ?? [];
     expect(articles).toHaveLength(1);
     expect(articles[0]?.getAttribute("aria-busy")).toBe("true");
+  });
+});
+
+describe("conversations (plan 0.8.1 CP2)", () => {
+  const threadOf = (id: string, title: string) => ({
+    id,
+    subjectType: null,
+    subjectId: null,
+    title,
+    messages: [
+      recorded(`${id}-q`, "member", `${title}?`, "2026-11-12T10:00:00.000Z"),
+      recorded(
+        `${id}-a`,
+        "assistant",
+        `About ${title}.`,
+        "2026-11-12T10:00:05.000Z",
+      ),
+    ],
+  });
+
+  test("New chat empties the conversation and the next question starts a new one", async () => {
+    window.history.replaceState(null, "", `/?copilot=${THREAD}`);
+    actions.readCopilotThreadAction.mockResolvedValue(
+      threadOf(THREAD, "Onboarding"),
+    );
+    await render(AVAILABLE);
+    await settle();
+    // The address opened the panel on its conversation.
+    expect(panel()?.textContent).toContain("About Onboarding.");
+
+    await act(async () => byName("New chat").click());
+    await settle();
+    expect(panel()?.querySelectorAll("article")).toHaveLength(0);
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+    expect(window.location.search).not.toContain("copilot=");
+
+    fetchMock.mockResolvedValue(
+      streamOf([
+        {
+          kind: "thread",
+          threadId: "00000000-0000-4000-8000-000000000009",
+          questionMessageId: QUESTION_ID,
+        },
+        { kind: "done", answerMessageId: null, stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue(
+      threadOf("00000000-0000-4000-8000-000000000009", "Blockers"),
+    );
+    await ask("What is blocking us?");
+    await settle();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "What is blocking us?",
+    });
+    expect(window.location.search).toContain(
+      "copilot=00000000-0000-4000-8000-000000000009",
+    );
+  });
+
+  test("History opens an older conversation and puts it in the address", async () => {
+    actions.listCopilotThreadsAction.mockResolvedValue([
+      { id: "t2", title: "Newer", updatedAt: new Date().toISOString() },
+      { id: "t1", title: "Older", updatedAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+    actions.readCopilotThreadAction.mockResolvedValue(threadOf("t1", "Older"));
+    await render(AVAILABLE);
+    await open();
+    await act(async () => byName("History").click());
+    await settle();
+    expect(panel()?.textContent).toContain("Today");
+    expect(panel()?.textContent).toContain("Earlier");
+
+    await act(async () => byName("Older").click());
+    await settle();
+    expect(actions.readCopilotThreadAction).toHaveBeenCalledWith("t1");
+    expect(panel()?.textContent).toContain("About Older.");
+    expect(window.location.search).toContain("copilot=t1");
+  });
+
+  test("deleting asks first, then takes it out of History", async () => {
+    actions.listCopilotThreadsAction.mockResolvedValue([
+      { id: "t1", title: "Older", updatedAt: "2026-01-01T00:00:00.000Z" },
+    ]);
+    actions.deleteCopilotThreadAction.mockResolvedValue({ error: null });
+    await render(AVAILABLE);
+    await open();
+    await act(async () => byName("History").click());
+    await settle();
+
+    await act(async () => byName("Delete Older").click());
+    expect(actions.deleteCopilotThreadAction).not.toHaveBeenCalled();
+    expect(panel()?.textContent).toContain("It cannot be brought back.");
+
+    actions.listCopilotThreadsAction.mockResolvedValue([]);
+    await act(async () => byName("Delete").click());
+    await settle();
+    expect(actions.deleteCopilotThreadAction).toHaveBeenCalledWith("t1");
+    expect(panel()?.textContent).toContain("No conversations yet.");
+  });
+
+  test("an address naming a conversation that is not there says so", async () => {
+    window.history.replaceState(null, "", `/?copilot=${THREAD}`);
+    actions.readCopilotThreadAction.mockRejectedValue(new Error("not found"));
+    await render(AVAILABLE);
+    await settle();
+    expect(panel()?.textContent).toContain(
+      "That conversation is not there any more.",
+    );
+    expect(window.location.search).not.toContain("copilot=");
   });
 });

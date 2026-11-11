@@ -23,6 +23,7 @@ const SELF_SERVICE = new Set([
   "copilot.applyProposal",
   "copilot.ask",
   "copilot.completeRun",
+  "copilot.deleteThread",
   "copilot.dismissProposal",
   "copilot.recordAnswer",
   "copilot.recordProposal",

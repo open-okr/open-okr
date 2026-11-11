@@ -73,14 +73,21 @@ test("a question is asked and the page is thrown away before anything returns", 
 });
 
 test("the run finished anyway, and the conversation says so", async () => {
-  await page.keyboard.press("ControlOrMeta+j");
   const panel = page.getByRole("dialog", { name: "Copilot" });
+  // The reload may already have opened it: a conversation in the address
+  // opens the panel on it (plan 0.8.1 CP2), and ⌘J would close it again.
+  if (!(await panel.isVisible())) {
+    await page.keyboard.press("ControlOrMeta+j");
+  }
   await expect(panel).toBeVisible();
 
-  await expect(panel.getByText("Earlier conversations")).toBeVisible({
-    timeout: 15_000,
-  });
-  const earlier = panel.getByRole("button", {
+  // The reload came back to the conversation the question started, because
+  // it is in the address (plan 0.8.1 CP2). Opened from History here all the
+  // same, which is the way back that works without the address too.
+  await panel.getByRole("button", { name: "History" }).click();
+  const history = panel.getByRole("navigation", { name: "History" });
+  await expect(history).toBeVisible({ timeout: 15_000 });
+  const earlier = history.getByRole("button", {
     name: QUESTION.slice(0, 40),
     exact: false,
   });
@@ -90,9 +97,7 @@ test("the run finished anyway, and the conversation says so", async () => {
   // Wait for the list to go before looking at the conversation, for the reason
   // `s39-copilot.spec.ts` writes out: until then the only thing carrying this
   // text is the entry that was clicked.
-  await expect(panel.getByText("Earlier conversations")).toBeHidden({
-    timeout: 15_000,
-  });
+  await expect(history).toBeHidden({ timeout: 15_000 });
   await expect(panel.getByText(QUESTION)).toBeVisible();
 
   // **The answer the reader never waited for.** With no provider the run halts
