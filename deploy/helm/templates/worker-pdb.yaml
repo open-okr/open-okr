@@ -1,0 +1,16 @@
+{{- /* Keeps one worker through a node drain once there are two (plan 0.8.0
+       H10e, D14). Not with one: a PDB that allows no disruption at all
+       blocks every drain of that node. */}}
+{{- if and (include "openokr.workerEnabled" .) .Values.podDisruptionBudget.enabled (gt (include "openokr.workerReplicas" . | int) 1) -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "openokr.fullname" . }}-worker
+  labels:
+    {{- include "openokr.workerLabels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "openokr.workerSelectorLabels" . | nindent 6 }}
+{{- end }}

@@ -36,6 +36,10 @@ dump() {
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/component=data-change --tail=40 2>&1 >&2 || true
   echo "--- app -------------------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr --tail=40 2>&1 >&2 || true
+  echo "--- worker ----------------------------------------------------" >&2
+  kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr-worker --tail=40 2>&1 >&2 || true
+  echo "--- object store ----------------------------------------------" >&2
+  kubectl logs -n "$NAMESPACE" deploy/minio --tail=20 2>&1 >&2 || true
   echo "--- request loop ----------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" pod/probe-loop --tail=10 2>&1 >&2 || true
   echo "---------------------------------------------------------------" >&2
@@ -357,5 +361,156 @@ if ! helm test "$RELEASE" --namespace "$NAMESPACE" --timeout 5m >/dev/null 2>&1;
 fi
 pass "the backup restored into a scratch database and verified"
 
+# --- background work on its own pods (plan 0.8.0 H10e) -----------------------
+# docs/design/worker-deployment.md D10 to D14. The worker needs storage every
+# pod shares, so a stand-in object store comes first: like the stand-in
+# Postgres, not part of the chart. Then an upgrade that keeps every value and
+# turns the worker on, which is how an operator would do it.
+MINIO_IMAGE="quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z"
+kubectl apply -n "$NAMESPACE" -f - >/dev/null <<YAML
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio
+spec:
+  ports:
+    - port: 9000
+  selector:
+    app: minio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: minio
+  template:
+    metadata:
+      labels:
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: $MINIO_IMAGE
+          args: ["server", "/data"]
+          env:
+            - name: MINIO_ROOT_USER
+              value: test-only-user
+            - name: MINIO_ROOT_PASSWORD
+              value: test-only-password
+          ports:
+            - containerPort: 9000
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: 9000
+            periodSeconds: 3
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+YAML
+kubectl wait -n "$NAMESPACE" --for=condition=available deployment/minio --timeout=180s >/dev/null \
+  || fail "the stand-in object store never became available"
+# The driver never creates a bucket (storage-s3.test.ts says why), so the
+# stand-in's own client makes it, as an operator makes theirs.
+kubectl run make-bucket -n "$NAMESPACE" --restart=Never --image="$MINIO_IMAGE" \
+  --command -- sh -c "mc alias set stand-in http://minio:9000 test-only-user test-only-password >/dev/null && mc mb --ignore-existing stand-in/openokr-files" >/dev/null \
+  || fail "the bucket could not be made"
+waited=0
+while :; do
+  phase=$(kubectl get pod make-bucket -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+  case "$phase" in Succeeded) break ;; Failed) kubectl logs -n "$NAMESPACE" pod/make-bucket >&2 || true; fail "the bucket could not be made" ;; esac
+  waited=$((waited + 2))
+  [ "$waited" -lt 120 ] || fail "making the bucket did not finish"
+  sleep 2
+done
+kubectl create secret generic okr-s3 -n "$NAMESPACE" \
+  --from-literal=access-key-id=test-only-user \
+  --from-literal=secret-access-key=test-only-password >/dev/null
+pass "a stand-in object store is running, with a bucket"
+
+helm upgrade "$RELEASE" . \
+  --namespace "$NAMESPACE" \
+  --reuse-values \
+  --set worker.enabled=true \
+  --set storage.s3.bucket=openokr-files \
+  --set storage.s3.endpoint=http://minio:9000 \
+  --set storage.s3.existingSecret=okr-s3 \
+  --wait --timeout 5m >/dev/null \
+  || fail "turning the worker on did not upgrade cleanly"
+kubectl rollout status -n "$NAMESPACE" "deployment/$RELEASE-openokr-worker" --timeout=180s >/dev/null \
+  || fail "the worker never became ready"
+pass "the worker is running beside the web pods"
+
+# The scheduler starts in the background after boot, so its line is polled.
+waited=0
+until kubectl logs -n "$NAMESPACE" "deploy/$RELEASE-openokr-worker" 2>/dev/null | grep -q "^scheduler: started"; do
+  waited=$((waited + 3))
+  [ "$waited" -lt 90 ] || fail "the worker's scheduler never said it started"
+  sleep 3
+done
+kubectl logs -n "$NAMESPACE" "deploy/$RELEASE-openokr-worker" 2>/dev/null | grep -q "^relay: started$" \
+  || fail "the worker's relay never said it started"
+pass "the worker's log says relay: started and scheduler: started"
+
+# Every web pod of the new revision, not one still terminating from the last.
+web_pods=$(kubectl get pods -n "$NAMESPACE" \
+  -l "app.kubernetes.io/name=openokr,app.kubernetes.io/instance=$RELEASE,!app.kubernetes.io/component" \
+  -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.deletionTimestamp}{"\n"}{end}' \
+  | awk 'NF == 1 { print $1 }')
+[ -n "$web_pods" ] || fail "found no web pod after turning the worker on"
+for pod in $web_pods; do
+  log=$(kubectl logs -n "$NAMESPACE" "pod/$pod" 2>/dev/null || true)
+  printf '%s\n' "$log" | grep -q "^relay: runs elsewhere (OPENOKR_RELAY=elsewhere)$" \
+    && printf '%s\n' "$log" | grep -q "^scheduler: runs elsewhere (OPENOKR_SCHEDULER=elsewhere)$" \
+    || fail "web pod $pod does not say the relay and the scheduler run elsewhere"
+done
+pass "every web pod says the relay and the scheduler run elsewhere"
+
+# Only the worker runs a scheduler now, so an audit row written now is chained
+# by the worker or by nothing. The row is a copy of the newest one with its
+# chain position cleared, written as the stand-in database's superuser: the
+# chain job gives it a position within a minute, as it does a sign-up's.
+psql_test() {
+  kubectl exec -n "$NAMESPACE" deploy/postgres -- \
+    psql -U openokr -d openokr -v ON_ERROR_STOP=1 -tAc "$1"
+}
+written=$(psql_test "create temp table fresh as select * from audit_events order by id desc limit 1;
+  update fresh set id = gen_random_uuid(), seq = null, prev_hash = null, row_hash = null;
+  insert into audit_events select * from fresh returning id;" 2>&1) \
+  || fail "could not write an unchained audit row: $written"
+printf '%s' "$written" | grep -qE '^[0-9a-f-]{36}$' \
+  || fail "there was no audit row to copy, so the sign-up wrote none: $written"
+waited=0
+until [ "$(psql_test "select count(*) from audit_events where seq is null" 2>/dev/null)" = "0" ]; do
+  waited=$((waited + 5))
+  [ "$waited" -lt 120 ] || fail "an audit row written with the worker on was not chained within two minutes"
+  sleep 5
+done
+pass "the worker's scheduler chained every audit row within two minutes"
+
+# The status through the Service, which reaches only web pods: each judges the
+# relay by the shared outbox and the scheduler by the stamp the worker writes.
+kill "$PORT_FORWARD_PID" 2>/dev/null || true
+kubectl port-forward -n "$NAMESPACE" "svc/$RELEASE-openokr" 18081:80 >/dev/null 2>&1 &
+PORT_FORWARD_PID=$!
+waited=0
+until status=$(curl -sf "http://127.0.0.1:18081/api/status" 2>/dev/null); do
+  waited=$((waited + 2))
+  [ "$waited" -lt 60 ] || fail "the status endpoint never answered through the Service"
+  sleep 2
+done
+case "$status" in
+  '{"status":"operational","components":{"database":{"status":"operational"},"relay":{"status":"operational"},"scheduler":{"status":"operational"}}'*)
+    pass "/api/status through the Service reports every component operational" ;;
+  *) fail "/api/status through the Service is not operational: $status" ;;
+esac
+
 echo ""
-echo "openokr: the chart installs, serves, registers a user, upgrades, and backs up cleanly."
+echo "openokr: the chart installs, serves, registers a user, upgrades, backs up, and runs its background work on a worker."

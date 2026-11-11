@@ -131,6 +131,38 @@ A long live stream, such as an open inbox, closes when the pod exits, and the
 browser reconnects to another pod by itself. The chart's README has
 [the whole sequence](../../deploy/helm/README.md#stopping-a-pod).
 
+## Background work on its own pods
+
+The outbox relay and the scheduler run in every pod by default. Both are safe
+to run several times over, and each copy polls the database, so once an
+instance runs several web pods it is cheaper to run them once, on their own:
+
+```sh
+helm upgrade openokr oci://ghcr.io/open-okr/charts/openokr --reuse-values \
+  --set worker.enabled=true
+```
+
+That adds the Deployment `<release>-openokr-worker`, one pod by default, with
+the same image, environment, service account and storage as the web pods. The
+web pods then only serve, and say so in their log: `relay: runs elsewhere` and
+`scheduler: runs elsewhere`. The worker's log says `relay: started` and
+`scheduler: started`, and it is where to look when mail, live updates or the
+agents go quiet:
+
+```sh
+kubectl -n openokr logs deploy/openokr-worker
+```
+
+| Before you turn it on | Why |
+|---|---|
+| A bucket (`storage.s3.bucket`) or a `ReadWriteMany` volume | The worker builds exports and scans uploads. The chart refuses the worker on a volume only one node can mount |
+| No `OPENOKR_RELAY` or `OPENOKR_SCHEDULER` in `extraEnv` | The chart sets both, and refuses a conflicting one |
+| Prometheus scraping each pod, not the Service | The job and delivery series are counted on the worker, which the Service never reaches |
+
+Two workers (`worker.replicaCount=2`) keep a node drain from skipping a
+scheduled run, and get a disruption budget that keeps one running. The
+chart's README has [the whole comparison](../../deploy/helm/README.md#background-work-on-its-own-pods).
+
 ## Behind PgBouncer
 
 Point the instance at Postgres directly. A connection pooler such as PgBouncer

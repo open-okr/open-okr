@@ -79,6 +79,20 @@ data-loss bug for one that does. To keep files:
   --set persistence.enabled=true
 {{- end }}
 
+{{- if include "openokr.workerEnabled" . }}
+
+The outbox relay and the scheduler run on the worker pods, the Deployment
+{{ include "openokr.fullname" . }}-worker ({{ include "openokr.workerReplicas" . }} replica{{ if gt (include "openokr.workerReplicas" . | int) 1 }}s{{ end }}). The web pods only serve, and their
+OPENOKR_RELAY and OPENOKR_SCHEDULER say elsewhere. Invitations, live
+updates, the agents and every job on a clock wait for the worker, so read its
+log when one of them goes quiet:
+
+  kubectl --namespace {{ .Release.Namespace }} logs deploy/{{ include "openokr.fullname" . }}-worker
+
+Scrape every pod's /api/metrics rather than the Service: the job, nudge and
+delivery series are counted where the work runs.
+{{- end }}
+
 {{- $dataChanges := .Values.dataChanges | default dict }}
 {{- $finish := printf "kubectl --namespace %s exec deploy/%s -- node --experimental-strip-types --no-warnings /app/migrator/packages/db/src/bin/data-change.ts" .Release.Namespace (include "openokr.fullname" .) }}
 {{- if dig "enabled" true $dataChanges }}

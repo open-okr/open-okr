@@ -777,6 +777,204 @@ else
   fail "the install notes are silent when nothing runs the data changes"
 fi
 
+# --- background work on its own pods (plan 0.8.0 H10e) -----------------------
+# docs/design/worker-deployment.md D10 to D15. Off by default, so the defaults
+# keep one Deployment whose pods run the relay and the scheduler themselves.
+# On, a second Deployment runs both and the web pods say `elsewhere`.
+
+# The `key: value` lines indented under the first line matching $2, without
+# their indentation. A selector, a label set, a matchLabels block.
+children() {
+  printf '%s\n' "$1" | awk -v want="$2" '
+    !on && $0 ~ want { on = 1; match($0, /^ */); base = RLENGTH; next }
+    on { match($0, /^ */); if (RLENGTH <= base || $0 ~ /^ *$/) exit; print substr($0, RLENGTH + 1) }'
+}
+
+# A container's env list, without comments and without the two flags, so the
+# web pods and the worker can be compared entry by entry.
+env_block() {
+  printf '%s\n' "$1" | awk '
+    /^          env:$/ { on = 1; next }
+    on && /^          [A-Za-z]/ { exit }
+    on && /^ *#/ { next }
+    on && /^            - name: OPENOKR_(RELAY|SCHEDULER)$/ { skip = 1; next }
+    on && skip && /^              value:/ { skip = 0; next }
+    on { skip = 0; print }'
+}
+
+# The value one env entry is given, quotes removed.
+env_value() {
+  printf '%s\n' "$1" | grep -A 1 "^ *- name: $2$" | sed -n 's/^ *value: "\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' | head -1
+}
+
+if printf '%s' "$defaults" | grep -q "name: openokr-worker$"; then
+  fail "a worker Deployment renders although worker.enabled is false"
+else
+  pass "no worker Deployment unless it is asked for"
+fi
+if render_one deployment.yaml | grep -q "name: OPENOKR_RELAY$\|name: OPENOKR_SCHEDULER$"; then
+  fail "the web Deployment sets OPENOKR_RELAY or OPENOKR_SCHEDULER with the worker off"
+else
+  pass "with the worker off the web pods set neither flag, so they run both"
+fi
+
+worker_on="--set worker.enabled=true --set storage.s3.bucket=openokr-files --set worker.replicaCount=2"
+# shellcheck disable=SC2086
+worker=$(render_one worker-deployment.yaml $worker_on || true)
+# shellcheck disable=SC2086
+web=$(render_one deployment.yaml $worker_on || true)
+if printf '%s' "$worker" | grep -q "^  name: openokr-worker$" \
+  && printf '%s' "$worker" | grep -q "^  replicas: 2$" \
+  && [ "$(env_value "$worker" OPENOKR_RELAY)" = "on" ] \
+  && [ "$(env_value "$worker" OPENOKR_SCHEDULER)" = "on" ]; then
+  pass "worker.enabled renders openokr-worker with worker.replicaCount pods, running the relay and the scheduler"
+else
+  fail "worker.enabled did not render openokr-worker with its replicas and both flags on"
+fi
+if [ "$(env_value "$web" OPENOKR_RELAY)" = "elsewhere" ] \
+  && [ "$(env_value "$web" OPENOKR_SCHEDULER)" = "elsewhere" ]; then
+  pass "with the worker on, the web pods say both run elsewhere"
+else
+  fail "with the worker on, the web pods do not say both run elsewhere"
+fi
+if ! printf '%s' "$worker" | grep -q "lifecycle:" \
+  && printf '%s' "$worker" | grep -q "^      terminationGracePeriodSeconds: 35$"; then
+  pass "the worker has no pause, nothing routes to it, and a grace period of drain + 15"
+else
+  fail "the worker pauses before SIGTERM, or its grace period is not drain + 15"
+fi
+if [ "$(printf '%s' "$worker" | sed -n 's/^ *serviceAccountName: //p')" = "$(printf '%s' "$web" | sed -n 's/^ *serviceAccountName: //p')" ]; then
+  pass "the worker uses the web pods' service account, so workload identity reaches it"
+else
+  fail "the worker uses a different service account from the web pods"
+fi
+
+web_env=$(env_block "$web")
+worker_env=$(env_block "$worker")
+if [ -n "$web_env" ] && [ "$web_env" = "$worker_env" ]; then
+  pass "the worker's environment equals the web pods', less the two flags"
+else
+  fail "the worker's environment differs from the web pods'"
+  diff_file=$(mktemp)
+  printf '%s\n' "$web_env" > "$diff_file"
+  printf '%s\n' "$worker_env" | diff "$diff_file" - | head -10 >&2 || true
+  rm -f "$diff_file"
+fi
+# shellcheck disable=SC2086
+everything_on=$(render_one worker-deployment.yaml $worker_on \
+  --set database.caBundle.configMap=rds-ca \
+  --set-json 'extraEnvFrom=[{"secretRef":{"name":"providers"}}]' \
+  --set storage.s3.existingSecret=openokr-s3 || true)
+if printf '%s' "$everything_on" | grep -q "name: NODE_EXTRA_CA_CERTS" \
+  && printf '%s' "$everything_on" | grep -A 1 "^            - name: db-ca$" | grep -q "mountPath: /etc/openokr/db-ca" \
+  && printf '%s' "$everything_on" | grep -q "name: providers" \
+  && printf '%s' "$everything_on" | grep -A 3 "name: OPENOKR_STORAGE_S3_ACCESS_KEY_ID" | grep -q "secretKeyRef"; then
+  pass "the worker mounts the CA bundle and reads extraEnvFrom and the S3 Secret, as the web pods do"
+else
+  fail "the worker lacks the CA bundle, extraEnvFrom or the S3 Secret"
+fi
+
+# The Service and the web PDB must never select a worker pod: the Service
+# would send it web traffic, and the PDB would count it as a web replica.
+worker_pod_labels=$(children "$worker" "^      labels:$")
+selected_by() {
+  [ -n "$1" ] || return 1
+  for pair in $(printf '%s\n' "$1" | tr -d ' '); do
+    printf '%s\n' "$worker_pod_labels" | tr -d ' ' | grep -qxF "$pair" || return 1
+  done
+  return 0
+}
+# shellcheck disable=SC2086
+service_selector=$(children "$(render_one service.yaml $worker_on || true)" "^  selector:$")
+# shellcheck disable=SC2086
+web_pdb_selector=$(children "$(render_one pdb.yaml $worker_on --set replicaCount=2 || true)" "^    matchLabels:$")
+if [ -n "$worker_pod_labels" ] && [ -n "$service_selector" ] && [ -n "$web_pdb_selector" ] \
+  && ! selected_by "$service_selector" && ! selected_by "$web_pdb_selector"; then
+  pass "neither the Service nor the web PDB selects a worker pod"
+else
+  fail "a worker pod's labels match the Service's selector or the web PDB's"
+fi
+
+if render_expecting_failure --set "database.url=$DB" --set worker.enabled=true \
+  | grep -q "worker.enabled needs storage every pod shares"; then
+  pass "refuses the worker on a ReadWriteOnce volume, naming the remedies"
+else
+  fail "allowed the worker on a ReadWriteOnce volume"
+fi
+if render_expecting_failure --set "database.url=$DB" --set worker.enabled=true \
+  --set persistence.enabled=false | grep -q "storage.s3.bucket"; then
+  pass "refuses the worker with persistence off and no bucket"
+else
+  fail "allowed the worker with each pod's files on its own emptyDir"
+fi
+if render_one worker-deployment.yaml --set worker.enabled=true \
+  --set persistence.accessMode=ReadWriteMany | grep -q "claimName: openokr-storage"; then
+  pass "a ReadWriteMany volume is shared storage, and the worker mounts it"
+else
+  fail "the worker was refused, or did not mount, a ReadWriteMany volume"
+fi
+if printf '%s' "$worker" | grep -q "claimName:"; then
+  fail "with a bucket the worker mounts the volume claim, which a ReadWriteOnce class ties to one node"
+else
+  pass "with a bucket the worker mounts no volume claim, so no node holds it"
+fi
+for variable in OPENOKR_SCHEDULER OPENOKR_RELAY; do
+  # shellcheck disable=SC2086
+  if render_expecting_failure --set "database.url=$DB" $worker_on \
+    --set-json "extraEnv=[{\"name\":\"$variable\",\"value\":\"off\"}]" \
+    | grep -q "extraEnv sets $variable"; then
+    pass "with the worker on, refuses an extraEnv that sets $variable"
+  else
+    fail "with the worker on, accepted an extraEnv that sets $variable"
+  fi
+done
+if render --set-json 'extraEnv=[{"name":"OPENOKR_SCHEDULER","value":"off"}]' >/dev/null 2>&1; then
+  pass "with the worker off, an extraEnv that sets OPENOKR_SCHEDULER still works"
+else
+  fail "refused an extraEnv OPENOKR_SCHEDULER a release may already be running"
+fi
+
+# shellcheck disable=SC2086
+if render_one worker-pdb.yaml $worker_on | grep -q "^  minAvailable: 1$"; then
+  pass "two workers get a PDB that keeps one through a node drain"
+else
+  fail "two workers have no PDB"
+fi
+if render_one worker-pdb.yaml --set worker.enabled=true --set storage.s3.bucket=f 2>&1 \
+  | grep -q "kind: PodDisruptionBudget"; then
+  fail "one worker got a PDB, which would block every node drain"
+else
+  pass "one worker gets no PDB"
+fi
+# shellcheck disable=SC2086
+if render_one worker-deployment.yaml $worker_on --set worker.resources.requests.cpu=250m \
+  | grep -A 2 "requests:" | grep -q "cpu: 250m" \
+  && printf '%s' "$worker" | grep -A 2 "requests:" | grep -q "cpu: 100m"; then
+  pass "the worker takes worker.resources, or the web pods' resources when it is empty"
+else
+  fail "the worker's resources are not worker.resources, nor resources when empty"
+fi
+
+# Values reused from 0.7.0 have no `worker` at all, and render as a fresh
+# install does: no worker, no flags.
+reused=$(render --set worker=null || true)
+if ! printf '%s' "$reused" | grep -q "name: openokr-worker$" \
+  && ! printf '%s' "$reused" | grep -q "name: OPENOKR_RELAY$"; then
+  pass "values reused from v0.7.0 keep one Deployment and set no flag"
+else
+  fail "values reused from v0.7.0 rendered a worker or a flag"
+fi
+
+# shellcheck disable=SC2086
+worker_notes=$(notes $worker_on || true)
+if printf '%s' "$worker_notes" | grep -q "run on the worker pods" \
+  && printf '%s' "$worker_notes" | grep -q "logs deploy/openokr-worker" \
+  && ! printf '%s' "$defaults" | grep -q "run on the worker pods"; then
+  pass "the install notes say where the background work runs and how to read its log"
+else
+  fail "the install notes do not say the worker runs the background work"
+fi
+
 # --- values reused from an older release -------------------------------------
 # `helm upgrade --reuse-values` keeps the old release's values and adds nothing
 # from the new chart, so every key a newer release introduced is missing. A

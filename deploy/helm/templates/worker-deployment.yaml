@@ -1,0 +1,149 @@
+{{- include "openokr.validate" . -}}
+{{- if include "openokr.workerEnabled" . }}
+{{- /* Background work on its own pods (plan 0.8.0 H10e,
+       docs/design/worker-deployment.md D10 to D14). The same image and the
+       same entry point as the web pods, with the relay and the scheduler on;
+       the web pods say `elsewhere`. Its HTTP server answers its probes and
+       /api/metrics, and nothing else reaches it: no Service selects its
+       labels. `dig` for values reused from a release older than 0.8. */}}
+{{- $worker := .Values.worker | default dict }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openokr.fullname" . }}-worker
+  labels:
+    {{- include "openokr.workerLabels" . | nindent 4 }}
+spec:
+  replicas: {{ include "openokr.workerReplicas" . }}
+  # A new worker starts before the old one stops. Two relays and two
+  # schedulers for a moment are safe: rows are claimed under a lease, and
+  # pg-boss hands each job to one of them.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      {{- include "openokr.workerSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "openokr.workerSelectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      # The web pods' account, so workload identity for object storage
+      # (plan 0.8.0 H9) reaches the worker too.
+      serviceAccountName: {{ include "openokr.serviceAccountName" . }}
+      # The drain and 15 seconds for the flushes. No pause: nothing routes
+      # here, so nothing has to stop sending before SIGTERM.
+      terminationGracePeriodSeconds: {{ include "openokr.workerTerminationGraceSeconds" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            # For the probes and a scrape of /api/metrics. No Service routes
+            # here: the Service selects the web pods' name label.
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- include "openokr.serverEnv" . | nindent 12 }}
+            # This Deployment runs both; the web pods say `elsewhere`.
+            - name: OPENOKR_RELAY
+              value: "on"
+            - name: OPENOKR_SCHEDULER
+              value: "on"
+          # The same probes as the web pods. Readiness decides when a
+          # rollout moves on, and a worker that cannot reach Postgres should
+          # hold it.
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 6
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          resources:
+            {{- toYaml (dig "resources" dict $worker | default .Values.resources) | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: cache
+              mountPath: /app/apps/web/.next/cache
+            # The same files the web pods see: the relay builds exports and
+            # scans uploads, and the scheduler removes orphaned ones. The
+            # chart refuses the worker without a bucket or a ReadWriteMany
+            # volume (D13).
+            - name: storage
+              mountPath: /app/storage
+            {{- with (include "openokr.dbCaMount" .) }}
+            {{- . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        # The claim only without a bucket, when it is the ReadWriteMany
+        # volume the files live on. With a bucket the files are there and
+        # the claim holds nothing, and a ReadWriteOnce claim would hold the
+        # worker to the node a web pod already has it on.
+        - name: storage
+          {{- if and .Values.persistence.enabled (not .Values.storage.s3.bucket) }}
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-storage" (include "openokr.fullname" .) }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- with (include "openokr.dbCaVolume" .) }}
+        {{- . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- /* Its own affinity, because the web pods' rules may name their labels. */}}
+      {{- with dig "affinity" dict $worker }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -104,6 +104,19 @@ work. Annotate the service account for that (serviceAccount.annotations).
 {{- fail "\n\ndataChanges.timeBudgetSeconds must be a whole number of seconds, 0 or more.\n\n0 runs the data changes to the end, under whatever --timeout Helm is given. 240 is the default.\n" -}}
 {{- end -}}
 
+{{- /* The worker (plan 0.8.0 H10e, docs/design/worker-deployment.md D13, D15). */ -}}
+{{- if include "openokr.workerEnabled" . -}}
+{{- if not (or .Values.storage.s3.bucket (and .Values.persistence.enabled (eq .Values.persistence.accessMode "ReadWriteMany"))) -}}
+{{- fail "\n\nworker.enabled needs storage every pod shares, and this release's is not.\n\nThe worker builds exports and scans uploads, and its scheduler removes orphaned ones, so it has to see the files the web pods see. A ReadWriteOnce volume cannot be mounted on two nodes, and with persistence off each pod writes to its own emptyDir.\n\nChoose one:\n  - use S3-compatible object storage: --set storage.s3.bucket=... (with storage.s3.existingSecret, or the pod's own role)\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - leave worker.enabled=false: the web pods then run the relay and the scheduler themselves\n" -}}
+{{- end -}}
+{{- /* extraEnv reaches both Deployments, so an old OPENOKR_SCHEDULER=off would quietly stop the worker's scheduler. */ -}}
+{{- range .Values.extraEnv -}}
+{{- if and (kindIs "map" .) (has (toString .name) (list "OPENOKR_RELAY" "OPENOKR_SCHEDULER")) -}}
+{{- fail (printf "\n\nextraEnv sets %s, and worker.enabled is true.\n\nWith the worker on, the chart sets OPENOKR_RELAY and OPENOKR_SCHEDULER itself: elsewhere on the web pods, on in the worker. extraEnv reaches both Deployments, so this would override one of them. Remove it from extraEnv.\n" (toString .name)) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{- if and .Values.ingress.enabled (not .Values.ingress.hosts) -}}
 {{- fail "\n\ningress.enabled is true but no hosts are set.\n" -}}
 {{- end -}}

@@ -307,6 +307,23 @@ dataChanges:
   # --timeout you pass.
   timeBudgetSeconds: 240
 
+# Background work on its own pods (plan 0.8.0 H10). Off keeps one Deployment
+# whose pods serve pages and also run the outbox relay and the scheduler. On,
+# a second Deployment, <release>-openokr-worker, runs both, and the web pods
+# only serve (OPENOKR_RELAY and OPENOKR_SCHEDULER say "elsewhere" there).
+# Needs shared storage: a bucket, or persistence with ReadWriteMany, because
+# the relay builds exports and scans uploads, and the scheduler removes
+# orphaned ones. With it on, extraEnv may not set either variable.
+worker:
+  enabled: false
+  # One is enough for the work. Two keep a node drain from leaving a minute
+  # with no scheduler, in which a due run is skipped; two get a PDB.
+  replicaCount: 1
+  # Empty means the same as `resources`.
+  resources: {}
+  # Not shared with the web pods, whose affinity rules may name their labels.
+  affinity: {}
+
 # Keeps the deployment available during a rolling update and a node drain.
 podDisruptionBudget:
   enabled: true
