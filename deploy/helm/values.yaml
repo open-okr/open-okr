@@ -307,6 +307,20 @@ dataChanges:
   # --timeout you pass.
   timeBudgetSeconds: 240
 
+# An autoscaler on the web Deployment (plan 0.8.0 H10). With it on,
+# replicaCount is ignored and the Deployment sets no replica count. The target
+# is a share of resources.requests.cpu, so raise that from 100m first, and keep
+# maxReplicas times OPENOKR_DB_POOL_MAX (20) under the database's
+# max_connections. Needs metrics-server. Without a bucket or a ReadWriteMany
+# volume, maxReplicas above 1 is refused, as replicaCount above 1 is.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+  # 0 means CPU only.
+  targetMemoryUtilizationPercentage: 0
+
 # Background work on its own pods (plan 0.8.0 H10). Off keeps one Deployment
 # whose pods serve pages and also run the outbox relay and the scheduler. On,
 # a second Deployment, <release>-openokr-worker, runs both, and the web pods

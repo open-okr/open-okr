@@ -67,8 +67,8 @@ ReadWriteMany class:
 WARNING: persistence is off, so uploaded files go to an emptyDir.
 
 They are deleted when a pod restarts, and nothing warns anybody when they go.
-{{- if gt (int .Values.replicaCount) 1 }}
-With {{ .Values.replicaCount }} replicas they are also invisible to the other
+{{- if gt (include "openokr.mostWebReplicas" . | int) 1 }}
+With {{ if include "openokr.autoscaling" . }}up to {{ end }}{{ include "openokr.mostWebReplicas" . }} replicas they are also invisible to the other
 pods: a file uploaded through one pod cannot be downloaded through another, and
 which pod serves a request is not something a user can influence.
 {{- end }}

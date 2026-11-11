@@ -6,7 +6,9 @@ metadata:
   labels:
     {{- include "openokr.labels" . | nindent 4 }}
 spec:
+  {{- if not (include "openokr.autoscaling" .) }}
   replicas: {{ .Values.replicaCount }}
+  {{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:

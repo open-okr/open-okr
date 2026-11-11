@@ -975,6 +975,99 @@ else
   fail "the install notes do not say the worker runs the background work"
 fi
 
+# --- an autoscaler on the web Deployment (plan 0.8.0 H10f) -------------------
+# docs/design/worker-deployment.md D16. Off by default. On, the autoscaler owns
+# the web Deployment's replica count, so the Deployment renders none, and the
+# storage rule and the PDB read the autoscaler's bounds.
+hpa_on="--set autoscaling.enabled=true --set storage.s3.bucket=openokr-files"
+# shellcheck disable=SC2086
+hpa=$(render_one hpa.yaml $hpa_on || true)
+# shellcheck disable=SC2086
+hpa_web=$(render_one deployment.yaml $hpa_on || true)
+if printf '%s' "$hpa" | grep -q "^apiVersion: autoscaling/v2$" \
+  && printf '%s' "$hpa" | grep -q "^kind: HorizontalPodAutoscaler$" \
+  && printf '%s' "$hpa" | grep -A 3 "scaleTargetRef:" | grep -q "kind: Deployment" \
+  && printf '%s' "$hpa" | grep -A 3 "scaleTargetRef:" | grep -q "name: openokr$" \
+  && printf '%s' "$hpa" | grep -q "^  minReplicas: 2$" \
+  && printf '%s' "$hpa" | grep -q "^  maxReplicas: 6$" \
+  && printf '%s' "$hpa" | grep -A 5 "name: cpu" | grep -q "averageUtilization: 70$" \
+  && ! printf '%s' "$hpa" | grep -q "name: memory"; then
+  pass "autoscaling.enabled scales the web Deployment from 2 to 6 replicas on CPU at 70 percent"
+else
+  fail "autoscaling.enabled did not render an autoscaling/v2 autoscaler on the web Deployment, 2 to 6 at 70 percent CPU"
+fi
+if [ -n "$hpa_web" ] && ! printf '%s' "$hpa_web" | grep -q "^  replicas:"; then
+  pass "with the autoscaler on, the web Deployment sets no replica count for it to fight"
+else
+  fail "with the autoscaler on, the web Deployment still sets replicas"
+fi
+# shellcheck disable=SC2086
+if render_one hpa.yaml $hpa_on --set autoscaling.targetMemoryUtilizationPercentage=80 2>&1 \
+  | grep -A 5 "name: memory" | grep -q "averageUtilization: 80$"; then
+  pass "a memory target adds a memory metric"
+else
+  fail "a memory target added no memory metric"
+fi
+if render_expecting_failure --set "database.url=$DB" --set autoscaling.enabled=true \
+  | grep -q "cannot be shared across nodes"; then
+  pass "refuses the autoscaler on a ReadWriteOnce volume, which several replicas cannot share"
+else
+  fail "allowed the autoscaler to scale pods onto a ReadWriteOnce volume"
+fi
+if render --set autoscaling.enabled=true --set autoscaling.minReplicas=1 \
+  --set autoscaling.maxReplicas=1 >/dev/null 2>&1; then
+  pass "an autoscaler held at one replica may keep a ReadWriteOnce volume"
+else
+  fail "refused an autoscaler that never goes past one replica"
+fi
+for bad in "autoscaling.minReplicas=2 --set autoscaling.maxReplicas=1" "autoscaling.minReplicas=0"; do
+  # shellcheck disable=SC2086
+  if render_expecting_failure --set "database.url=$DB" $hpa_on --set $bad \
+    | grep -q "autoscaling.minReplicas must be at least 1 and no more than autoscaling.maxReplicas"; then
+    pass "refuses $bad"
+  else
+    fail "accepted $bad"
+  fi
+done
+# shellcheck disable=SC2086
+if render_expecting_failure --set "database.url=$DB" $hpa_on --set autoscaling.targetCPUUtilizationPercentage=0 \
+  | grep -q "autoscaling.targetCPUUtilizationPercentage must be"; then
+  pass "refuses a CPU target of 0"
+else
+  fail "accepted a CPU target of 0"
+fi
+# shellcheck disable=SC2086
+if render_one pdb.yaml $hpa_on 2>&1 | grep -q "kind: PodDisruptionBudget"; then
+  pass "with the autoscaler's floor at 2, the web PDB renders"
+else
+  fail "with the autoscaler's floor at 2, the web PDB is missing"
+fi
+# shellcheck disable=SC2086
+if render_one pdb.yaml $hpa_on --set autoscaling.minReplicas=1 2>&1 | grep -q "kind: PodDisruptionBudget"; then
+  fail "with the autoscaler's floor at 1, a web PDB renders and would block a node drain"
+else
+  pass "with the autoscaler's floor at 1, no web PDB"
+fi
+if ! printf '%s' "$defaults" | grep -q "kind: HorizontalPodAutoscaler" \
+  && printf '%s' "$defaults" | grep -q "^  replicas: 1$"; then
+  pass "with no values, no autoscaler and one replica"
+else
+  fail "with no values, an autoscaler rendered or the replica count went"
+fi
+reused=$(render --set autoscaling=null || true)
+if ! printf '%s' "$reused" | grep -q "kind: HorizontalPodAutoscaler" \
+  && printf '%s' "$reused" | grep -q "^  replicas: 1$"; then
+  pass "values reused from v0.7.0 render no autoscaler and keep the replica count"
+else
+  fail "values reused from v0.7.0 rendered an autoscaler or lost the replica count"
+fi
+hpa_notes=$(notes --set autoscaling.enabled=true --set persistence.enabled=false || true)
+if printf '%s' "$hpa_notes" | grep -q "With up to 6 replicas they are also invisible"; then
+  pass "the emptyDir warning counts the autoscaler's ceiling"
+else
+  fail "the emptyDir warning does not count the autoscaler's ceiling"
+fi
+
 # --- values reused from an older release -------------------------------------
 # `helm upgrade --reuse-values` keeps the old release's values and adds nothing
 # from the new chart, so every key a newer release introduced is missing. A

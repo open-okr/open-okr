@@ -47,8 +47,27 @@ defaults no longer produce it, and NOTES.txt says what it costs.
 A named S3 bucket exempts the whole check: object storage is shared by
 definition, so the replica count stops mattering.
 */}}
-{{- if and (not .Values.storage.s3.bucket) .Values.persistence.enabled (gt (int .Values.replicaCount) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
+{{- /* With the autoscaler on, the count that matters is its ceiling (plan 0.8.0 H10f). */ -}}
+{{- if and (not .Values.storage.s3.bucket) .Values.persistence.enabled (gt (include "openokr.mostWebReplicas" . | int) 1) (eq .Values.persistence.accessMode "ReadWriteOnce") -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- fail "\n\npersistence.accessMode is ReadWriteOnce but autoscaling.maxReplicas is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - use S3-compatible object storage: --set storage.s3.bucket=... --set storage.s3.existingSecret=...\n  - leave autoscaling.enabled=false, which is the default\n" -}}
+{{- else -}}
 {{- fail "\n\npersistence.accessMode is ReadWriteOnce but replicaCount is greater than 1.\n\nA ReadWriteOnce volume cannot be shared across nodes, so uploads would land on one pod and be missing from the others.\n\nChoose one:\n  - set replicaCount=1, which is the default\n  - use a ReadWriteMany storage class: --set persistence.accessMode=ReadWriteMany\n  - use S3-compatible object storage: --set storage.s3.bucket=... --set storage.s3.existingSecret=...\n" -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* The autoscaler's bounds and targets (plan 0.8.0 H10f). Kubernetes refuses most of these too, but only after the release has started to roll. */ -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- $autoscaling := .Values.autoscaling | default dict -}}
+{{- if or (lt (include "openokr.minReplicas" . | int) 1) (gt (include "openokr.minReplicas" . | int) (include "openokr.maxReplicas" . | int)) -}}
+{{- fail "\n\nautoscaling.minReplicas must be at least 1 and no more than autoscaling.maxReplicas.\n\nThe defaults are 2 and 6.\n" -}}
+{{- end -}}
+{{- if lt (dig "targetCPUUtilizationPercentage" 70 $autoscaling | int) 1 -}}
+{{- fail "\n\nautoscaling.targetCPUUtilizationPercentage must be 1 or more.\n\nIt is a share of resources.requests.cpu. 70 is the default.\n" -}}
+{{- end -}}
+{{- if lt (dig "targetMemoryUtilizationPercentage" 0 $autoscaling | int) 0 -}}
+{{- fail "\n\nautoscaling.targetMemoryUtilizationPercentage must be 0 or more. 0 scales on CPU only.\n" -}}
+{{- end -}}
 {{- end -}}
 
 {{/*

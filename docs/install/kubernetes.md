@@ -163,6 +163,18 @@ Two workers (`worker.replicaCount=2`) keep a node drain from skipping a
 scheduled run, and get a disruption budget that keeps one running. The
 chart's README has [the whole comparison](../../deploy/helm/README.md#background-work-on-its-own-pods).
 
+## The autoscaler
+
+`autoscaling.enabled=true` scales the web pods between 2 and 6 on CPU. It
+needs metrics-server, shared storage once it can go above one pod, and a CPU
+request worth a share of: the default request is 100m, which an idle pod
+already uses, so raise `resources.requests.cpu` with it. Every pod holds up to
+20 database connections (`OPENOKR_DB_POOL_MAX`), so check the ceiling against
+the database's `max_connections`. Switch it on in a quiet moment, or scale the
+Deployment to the floor by hand first: Helm drops the replica count it set,
+and Kubernetes runs one pod until the autoscaler's next pass. The chart's
+README has [the checks and the commands](../../deploy/helm/README.md#the-autoscaler).
+
 ## Behind PgBouncer
 
 Point the instance at Postgres directly. A connection pooler such as PgBouncer

@@ -469,3 +469,44 @@ before SIGTERM. The drain and the 15 seconds for the flushes.
 {{- define "openokr.workerTerminationGraceSeconds" -}}
 {{- add (include "openokr.drainSeconds" . | int) 15 -}}
 {{- end -}}
+
+{{/*
+The autoscaler on the web Deployment (plan 0.8.0 H10f,
+docs/design/worker-deployment.md D16). `dig` with the values.yaml defaults,
+because a release from before 0.8 reuses values without `autoscaling`.
+*/}}
+{{- define "openokr.autoscaling" -}}
+{{- if dig "enabled" false (.Values.autoscaling | default dict) -}}true{{- end -}}
+{{- end -}}
+
+{{- define "openokr.minReplicas" -}}
+{{- dig "minReplicas" 2 (.Values.autoscaling | default dict) | int -}}
+{{- end -}}
+
+{{- define "openokr.maxReplicas" -}}
+{{- dig "maxReplicas" 6 (.Values.autoscaling | default dict) | int -}}
+{{- end -}}
+
+{{/*
+The most web pods there can be: the autoscaler's ceiling when it is on, the
+replica count otherwise. The storage rule and the install notes read this.
+*/}}
+{{- define "openokr.mostWebReplicas" -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- include "openokr.maxReplicas" . -}}
+{{- else -}}
+{{- .Values.replicaCount | int -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The fewest web pods there will be, which decides whether a PDB can keep one
+through a node drain.
+*/}}
+{{- define "openokr.fewestWebReplicas" -}}
+{{- if include "openokr.autoscaling" . -}}
+{{- include "openokr.minReplicas" . -}}
+{{- else -}}
+{{- .Values.replicaCount | int -}}
+{{- end -}}
+{{- end -}}

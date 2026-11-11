@@ -78,6 +78,10 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `dataChanges.enabled` | true | Runs the data changes after every install and upgrade, in a Job. See [Upgrading](#upgrading) |
 | `dataChanges.timeBudgetSeconds` | 240 | How long that Job runs before it stops between two batches and says what is left. Under Helm's default `--timeout` of 5 minutes. 0 runs to the end |
 | `shutdown.drainSeconds` | 20 | How long the server may finish its work in flight after SIGTERM (`OPENOKR_SHUTDOWN_SECONDS`, 1 to 300). The pod's grace period is the pause plus this plus 15 |
+| `autoscaling.enabled` | false | A HorizontalPodAutoscaler on the web Deployment, which then sets no replica count. Needs metrics-server. See [The autoscaler](#the-autoscaler) |
+| `autoscaling.minReplicas`, `autoscaling.maxReplicas` | 2, 6 | Its bounds. A web PDB renders when the floor is above 1; without a bucket or a `ReadWriteMany` volume a ceiling above 1 is refused |
+| `autoscaling.targetCPUUtilizationPercentage` | 70 | A share of `resources.requests.cpu`, which is 100m by default: raise that first |
+| `autoscaling.targetMemoryUtilizationPercentage` | 0 | Above 0 adds a memory target. 0 scales on CPU only |
 | `worker.enabled` | false | Runs the outbox relay and the scheduler on their own pods, `<release>-openokr-worker`, and only serves on the web pods. Needs a bucket or a `ReadWriteMany` volume. See [Background work on its own pods](#background-work-on-its-own-pods) |
 | `worker.replicaCount` | 1 | How many worker pods. Two keep a node drain from skipping a scheduled run, and get a PDB |
 | `worker.resources` | empty | The worker's requests and limits. Empty means the same as `resources` |
@@ -234,6 +238,34 @@ scheduled run due inside a gap of more than a minute is skipped until its next
 time; `worker.replicaCount=2` closes the gap. Scrape every pod's
 `/api/metrics` rather than the Service: the job, nudge and delivery series are
 counted where the work runs ([observability](../../docs/runbooks/observability.md#which-process-counts-what)).
+
+## The autoscaler
+
+`autoscaling.enabled=true` puts a HorizontalPodAutoscaler on the web
+Deployment, from `autoscaling.minReplicas` (2) to `autoscaling.maxReplicas`
+(6) on CPU at 70 percent, and the Deployment stops setting `replicas`. The
+worker is never autoscaled: its load follows the queue, not the traffic. A
+scale-down stops a pod like a rollout does, with the pause and the drain.
+
+Before turning it on:
+
+| Check | Why |
+|---|---|
+| Raise `resources.requests.cpu` from its 100m | The target is a share of the request, and a serving pod at rest sits near 100m, so 70 percent of it would scale out at once |
+| `maxReplicas` times `OPENOKR_DB_POOL_MAX` (20) stays under the database's `max_connections`, with room for the worker and the jobs | Every pod holds a pool of its own |
+| metrics-server runs in the cluster | Without it the autoscaler has no reading and never scales |
+| A bucket or a `ReadWriteMany` volume | The ceiling counts as the replica count for the storage rule, so a ceiling above 1 on a `ReadWriteOnce` volume is refused |
+
+**Turn it on in a quiet moment, or scale first.** Helm removes the
+`replicas` field it set before, and Kubernetes reads a missing field as one
+replica until the autoscaler's next pass, about 15 seconds later. Scaling the
+Deployment to `minReplicas` by hand first avoids the dip:
+
+```sh
+kubectl -n openokr scale deploy/openokr --replicas=2
+helm upgrade openokr oci://ghcr.io/open-okr/charts/openokr --reuse-values \
+  --set autoscaling.enabled=true --set resources.requests.cpu=500m
+```
 
 ## Upgrading
 
