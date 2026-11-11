@@ -179,23 +179,26 @@
   --motion-fast: 120ms;
   --motion-slow: 200ms;
 
-  /* Density (§2: "comfortable and compact densities, per user"). Every
-   * density-sensitive component reads one of these rather than a raw
-   * Tailwind spacing utility, so switching density is one attribute flip. */
-  --space-row-y: 10px;
-  --space-card-p: 16px;
-  --space-gap: 8px;
-
   /* The dropdown's chevron (SelectInput), drawn rather than the browser's
    * own, which sat 4px from the edge against the text's 8px and looked
    * pushed into the corner. --ink-4 at rest. */
   --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='m3 4.5 3 3 3-3' fill='none' stroke='%23617087' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-:root[data-density="compact"] {
-  --space-row-y: 6px;
-  --space-card-p: 12px;
-  --space-gap: 6px;
+/*
+ * Density (§2: "comfortable and compact densities, per user").
+ *
+ * Compact sets `--spacing`, the unit Tailwind builds every padding, gap,
+ * margin and size from, a fifth smaller, so the whole interface tightens at
+ * once and the choice is plain to see. It used to set three tokens nothing
+ * read, so Compact changed nothing (Akmal, 11 November 2026). From the
+ * tablet width up only: on a phone everything is tapped, and a smaller target
+ * is harder to hit.
+ */
+@media (min-width: 48rem) {
+  :root[data-density="compact"] {
+    --spacing: 0.2rem;
+  }
 }
 
 /*

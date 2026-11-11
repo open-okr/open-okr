@@ -94,6 +94,7 @@ export const TOOLSETS: Readonly<Record<ToolsetName, ReadonlySet<string>>> = {
     "goals.approveDraft",
   ]),
   work: new Set([
+    "initiatives.keyResults",
     "connections.mine",
     "connections.revoke",
     "copilot.ask",

@@ -16,6 +16,10 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { memberOption, namedOption } from "../../lib/entity-options.ts";
+import {
+  keyResultOption,
+  linkableKeyResults,
+} from "../../lib/linkable-key-results";
 import { searchHumans } from "../../lib/member-search.ts";
 import { NavSelect } from "../../lib/nav-select.tsx";
 import { pageTitle } from "../../lib/page-title.ts";
@@ -35,6 +39,9 @@ import {
   STATUS_LABEL,
   STATUS_OPTIONS,
 } from "./labels.ts";
+
+/** A key result id's shape, so a hand-edited address is ignored, not refused. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const generateMetadata = pageTitle("pageTitle.initiatives");
 
@@ -92,8 +99,21 @@ export default async function InitiativesPage({
   const spaces = await callAction(context, "spaces.list", {});
   const space = spaces.find((one) => one.id === query.space);
 
+  // The key results "Add an initiative" may name, by the rule every picker
+  // follows (plan 0.8.0 I1), and the one this list is narrowed to when it was
+  // opened from a key result's "View initiatives". An id that is not a key
+  // result's shape is ignored rather than refused.
+  const keyResultId =
+    query.keyResult && UUID.test(query.keyResult) ? query.keyResult : null;
+  const keyResults =
+    canEdit || keyResultId ? await linkableKeyResults(context) : [];
+  const keyResult = keyResultId
+    ? (keyResults.find((one) => one.id === keyResultId) ?? null)
+    : null;
+
   const initiatives = await callAction(context, "initiatives.list", {
     ...(space ? { spaceId: space.id } : {}),
+    ...(keyResultId ? { keyResultId } : {}),
     ...(status ? { status: status.value } : {}),
     ...(capacity && capacity.value !== ""
       ? { capacity: capacity.value as "fits" | "tight" | "exceeds" }
@@ -112,6 +132,7 @@ export default async function InitiativesPage({
   const href = (patch: Record<string, string | null>): string => {
     const next = new URLSearchParams();
     const merged = {
+      keyResult: keyResultId,
       space: space?.id ?? null,
       status: status?.value ?? null,
       capacity: capacity?.value ?? null,
@@ -129,7 +150,7 @@ export default async function InitiativesPage({
   // The difference between "nothing has been planned" and "your filters left
   // nothing" is knowable from the query alone, and getting it wrong is what
   // made the goals explorer claim an empty cycle that held two goals.
-  const filtered = Boolean(space || status || capacity);
+  const filtered = Boolean(space || status || capacity || keyResultId);
 
   return (
     <>
@@ -161,6 +182,27 @@ export default async function InitiativesPage({
           </CardHeader>
 
           <CardBody className="flex flex-col gap-3">
+            {keyResultId ? (
+              <p
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-2"
+                data-testid="initiatives-for-key-result"
+              >
+                <span>
+                  {keyResult
+                    ? t("initiatives.movingKeyResult", {
+                        keyResult: keyResult.title,
+                        objective: keyResult.goalTitle,
+                      })
+                    : t("initiatives.movingThisKeyResult")}
+                </span>
+                <Link
+                  href={href({ keyResult: null })}
+                  className="text-xs font-semibold text-brand-text hover:underline"
+                >
+                  {t("initiatives.showEveryInitiative")}
+                </Link>
+              </p>
+            ) : null}
             <Filters
               href={href}
               spaces={spaces}
@@ -237,6 +279,17 @@ export default async function InitiativesPage({
                     className="w-56"
                   />
 
+                  {/* Optional: the key result this work moves, by the rule
+                   * every picker follows, chosen already when the list was
+                   * opened from that key result (plan 0.8.0 I1). */}
+                  <EntityPicker
+                    label={t("initiatives.keyResultItMoves")}
+                    name="keyResultId"
+                    defaultValue={keyResult?.id ?? null}
+                    options={keyResults.map(keyResultOption)}
+                    noneLabel={t("initiatives.noKeyResultYet")}
+                    className="w-64"
+                  />
                   <DateRangeInput
                     startLabel={t("initiatives.starts")}
                     endLabel={t("initiatives.ends")}

@@ -16,6 +16,10 @@ import { resolveAccessLevelFor } from "../../lib/access";
 import { AreaTabs } from "../../lib/area-tabs.tsx";
 import { getPool } from "../../lib/auth";
 import { namedOption } from "../../lib/entity-options.ts";
+import {
+  keyResultOption,
+  linkableKeyResults,
+} from "../../lib/linkable-key-results";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -108,10 +112,11 @@ export default async function BoardPage({
   const scope = board.scope;
 
   // The key results a new card can name, read only for somebody who can add
-  // one: `cycles.current` is a workspace-wide read a guest may not make.
+  // one: `cycles.list` is a workspace-wide read a guest may not make. Every
+  // active cycle's, by the one rule every picker follows (plan 0.8.0 I1).
   const keyResults =
     canEdit && scope.kind !== "key_result"
-      ? await currentKeyResults(context)
+      ? await linkableKeyResults(context)
       : [];
 
   const cards = board.columns.flatMap((column) => column.cards);
@@ -264,10 +269,7 @@ export default async function BoardPage({
                         label={t("board.keyResultItMoves")}
                         name="keyResultId"
                         defaultValue={null}
-                        options={keyResults.map((one) => ({
-                          id: one.id,
-                          label: one.title,
-                        }))}
+                        options={keyResults.map(keyResultOption)}
                         noneLabel={t("board.noneYet")}
                         className="w-64"
                       />
@@ -346,28 +348,5 @@ export default async function BoardPage({
         </div>
       </div>
     </>
-  );
-}
-
-/** The current quarter's key results the reader can see, for the add form. */
-async function currentKeyResults(context: {
-  pool: ReturnType<typeof getPool>;
-  workspaceId: string;
-  actor: { kind: "human"; userId: string };
-}): Promise<{ id: string; title: string }[]> {
-  const current = await callAction(context, "cycles.current", {
-    mode: "quarterly",
-  });
-  const { goals } = current
-    ? await callAction(context, "goals.list", {
-        cycleId: current.id,
-        includeClosed: false,
-      })
-    : { goals: [] };
-  return goals.flatMap((goal) =>
-    goal.keyResults.map((keyResult) => ({
-      id: keyResult.id,
-      title: keyResult.title,
-    })),
   );
 }

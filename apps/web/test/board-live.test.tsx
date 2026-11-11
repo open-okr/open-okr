@@ -390,7 +390,7 @@ describe("moving a card with the keyboard", () => {
     await render();
     const described = handle("a")?.getAttribute("aria-describedby") ?? "";
     expect(document.getElementById(described)?.textContent).toContain(
-      "Press Space or Enter to pick this card up.",
+      "Press Space or Enter to pick this task up.",
     );
     expect(handle("a")?.getAttribute("aria-label")).toBe(
       "Reorder Rewrite the first-run screen",

@@ -325,6 +325,110 @@ describe("the link, which is what §5.5 asks a facilitator to record", () => {
   });
 });
 
+describe("the key results an initiative moves, named (plan 0.8.0 I1)", () => {
+  type Named = {
+    id: string;
+    title: string;
+    goalId: string;
+    goalTitle: string;
+    cycleName: string | null;
+  };
+
+  it("names each one with its objective and cycle, in its objective's order", async () => {
+    const created = await createInitiative({
+      keyResultIds: [secondKeyResult, firstKeyResult],
+    });
+    const named = (await call("initiatives.keyResults", {
+      id: created.id,
+    })) as Named[];
+    const cycle = (await call("cycles.current", { mode: "quarterly" })) as {
+      name: string;
+    };
+    expect(named).toEqual([
+      {
+        id: firstKeyResult,
+        title: "Weekly activation reaches sixty percent",
+        goalId,
+        goalTitle: "Make activation the reason teams stay",
+        cycleName: cycle.name,
+      },
+      {
+        id: secondKeyResult,
+        title: "Time to first value falls to two days",
+        goalId,
+        goalTitle: "Make activation the reason teams stay",
+        cycleName: cycle.name,
+      },
+    ]);
+  });
+
+  it("names one in another cycle too, which the initiative page used not to", async () => {
+    const year = (await call("cycles.create", {
+      on: `${new Date().getUTCFullYear()}-06-30`,
+      mode: "annual",
+    })) as { id: string; name: string };
+    const annual = (await call("goals.create", {
+      title: "Lead the market",
+      cycleId: year.id,
+      spaceId,
+      level: "team",
+      ownerKind: "space",
+      championId: ownerMemberId,
+      reviewerId: ownerMemberId,
+      weight: 1,
+    })) as { id: string };
+    const annualKeyResult = (
+      (await call("goals.addKeyResult", {
+        goalId: annual.id,
+        title: "Market share reaches a third",
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 0,
+        targetValue: 33,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    const created = await createInitiative({
+      keyResultIds: [annualKeyResult],
+    });
+    const named = (await call("initiatives.keyResults", {
+      id: created.id,
+    })) as Named[];
+    expect(named).toEqual([
+      expect.objectContaining({
+        id: annualKeyResult,
+        goalTitle: "Lead the market",
+        cycleName: year.name,
+      }),
+    ]);
+  });
+
+  it("leaves out a link that was removed", async () => {
+    const created = await createInitiative({
+      keyResultIds: [firstKeyResult, secondKeyResult],
+    });
+    await call("initiatives.unlinkKeyResult", {
+      id: created.id,
+      keyResultId: firstKeyResult,
+    });
+    const named = (await call("initiatives.keyResults", {
+      id: created.id,
+    })) as Named[];
+    expect(named.map((one) => one.id)).toEqual([secondKeyResult]);
+  });
+
+  it("is not found for somebody outside the workspace", async () => {
+    const created = await createInitiative({ keyResultIds: [firstKeyResult] });
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('initiative-outsider', 'Cy', 'initiative-outsider@example.com')",
+    );
+    await expect(
+      call("initiatives.keyResults", { id: created.id }, "initiative-outsider"),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+});
+
 describe("the capacity view the align-and-commit session reads", () => {
   // `exceeds` is gate five's question, which only committed work answers
   // (METHOD.md §5.5, P9-T11b-b); the objective here is committed.

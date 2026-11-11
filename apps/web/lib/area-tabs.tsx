@@ -24,7 +24,9 @@ export const AREAS = {
   ],
   work: [
     { href: "/initiatives", key: "areaTabs.work.initiatives" },
-    { href: "/board", key: "areaTabs.work.board" },
+    // Named for what it holds, the tasks, which the board shows by status
+    // (UIUX-PLAN §8, Akmal, 11 November 2026). The address stays /board.
+    { href: "/board", key: "areaTabs.work.tasks" },
   ],
 } as const;
 

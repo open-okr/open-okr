@@ -216,9 +216,10 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     navigation: [
       {
         id: "board",
-        label: "Board",
+        label: "Tasks",
         href: "/board",
-        // The Board tab of Work since the five areas.
+        // The Tasks tab of Work since the five areas, named for what it holds
+        // (UIUX-PLAN §8); the board is how it shows them.
         section: "inside",
         parent: "initiatives",
         // Every member reads the board. A shared record of what a team is

@@ -201,21 +201,37 @@ export async function linkKeyResultAction(
       fields: { keyResultId: t("initiatives.actions.pickTheKeyResult") },
     };
   }
-  return run(
+  const state = await run(
     (context) =>
       callAction(context, "initiatives.linkKeyResult", { id, keyResultId }),
     ["/initiatives", `/initiatives/${id}`, "/cycle"],
     refusedByField,
   );
+  return withObjectivePages(state);
+}
+
+/**
+ * The objective page lists a key result's initiatives and links them too
+ * (plan 0.8.0 I1), so a link or an unlink made on either side redraws it.
+ * Its address names the objective, which this write does not know, so every
+ * objective page is marked rather than one.
+ */
+function withObjectivePages(state: WriteState): WriteState {
+  if (state.error === null && !state.fields && !state.conflict) {
+    revalidatePath("/goals/[id]", "page");
+  }
+  return state;
 }
 
 export async function unlinkKeyResultAction(
   id: string,
   keyResultId: string,
 ): Promise<WriteState> {
-  return run(
-    (context) =>
-      callAction(context, "initiatives.unlinkKeyResult", { id, keyResultId }),
-    ["/initiatives", `/initiatives/${id}`, "/cycle"],
+  return withObjectivePages(
+    await run(
+      (context) =>
+        callAction(context, "initiatives.unlinkKeyResult", { id, keyResultId }),
+      ["/initiatives", `/initiatives/${id}`, "/cycle"],
+    ),
   );
 }

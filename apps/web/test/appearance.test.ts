@@ -27,6 +27,29 @@ const menu = at("../app/avatar-menu.tsx");
 // Your account carries the full control since plan 0.8.0 Y2, not the profile.
 const profile = at("../app/account/page.tsx");
 
+const tokens = at("../../../packages/ui/src/styles/tokens.css");
+
+describe("what the choices change (Akmal, 11 November 2026)", () => {
+  // Density switched an attribute that only three tokens followed, and no
+  // component read them, so Compact changed nothing anybody could see.
+  // Tailwind builds every padding, gap, margin and size from `--spacing`, so
+  // compact sets that, from the tablet width up, where nothing is tapped.
+  test("compact tightens the spacing everything is built from", () => {
+    expect(tokens).toMatch(
+      /@media \(min-width: 48rem\) \{\s*:root\[data-density="compact"\] \{\s*--spacing: 0\.2rem;/,
+    );
+    expect(tokens).not.toContain("--space-row-y");
+  });
+
+  test("the theme is three named icons", () => {
+    for (const icon of ["Sun", "Moon", "Monitor"]) {
+      expect(control).toContain(`<${icon}`);
+    }
+    // The word is the button's name and its tooltip, not its face.
+    expect(control).toContain("aria-label={t(option.label)}");
+  });
+});
+
 describe("the appearance control", () => {
   test("calls the provider methods nothing had ever called", () => {
     expect(control).toContain("setTheme(option.value)");

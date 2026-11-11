@@ -22,6 +22,7 @@
 import {
   activeOnly,
   CAPACITY_VERDICTS,
+  cycles,
   GOAL_KINDS,
   goals,
   INITIATIVE_STATUSES,
@@ -516,6 +517,97 @@ export const readInitiative = defineReadAction({
           );
         }
         return one;
+      },
+    );
+  },
+});
+
+/**
+ * The key results an initiative moves, each named with its objective and its
+ * cycle (plan 0.8.0 I1).
+ *
+ * `initiatives.read` carries only the ids, so the initiative's page named a
+ * key result from any cycle but the current quarter "A key result outside
+ * this cycle". This names every one the reader can see, through the same
+ * visibility the getter applies to an objective, and leaves out the rest
+ * rather than naming them: a title is the objective's to show. Ordered by
+ * objective, then by each key result's place on it.
+ */
+export const readInitiativeKeyResults = defineReadAction({
+  name: "initiatives.keyResults",
+  summary:
+    "The key results an initiative moves, each with its objective and cycle, for the ones you can see.",
+  input: z.object({ id: ADDRESS.initiative }),
+  output: z.array(
+    z.object({
+      id: z.uuid(),
+      title: z.string(),
+      goalId: z.uuid(),
+      goalTitle: z.string(),
+      cycleName: z.string().nullable(),
+    }),
+  ),
+  access: ACCESS_LEVELS.view,
+  async handler(context, input) {
+    const db = drizzle(context.pool);
+    const userId = context.actor.userId;
+    if (!userId) {
+      throw new OperationError("not_found", "No such initiative.");
+    }
+    return withContext(
+      db,
+      { workspaceId: context.workspaceId, userId },
+      async (rawTx) => {
+        const tx = rawTx as OperationTx;
+        const memberId = await actingMember(tx, context.workspaceId, userId);
+        await requireInitiative(
+          tx,
+          context.workspaceId,
+          memberId,
+          input.id,
+          ACCESS_LEVELS.view,
+        );
+        const rows = await tx
+          .select({
+            id: keyResults.id,
+            title: keyResults.title,
+            goalId: goals.id,
+            goalTitle: goals.title,
+            cycleName: cycles.name,
+          })
+          .from(initiativeKeyResults)
+          .innerJoin(
+            keyResults,
+            and(
+              eq(keyResults.id, initiativeKeyResults.keyResultId),
+              eq(keyResults.workspaceId, context.workspaceId),
+              isNull(keyResults.deletedAt),
+            ),
+          )
+          .innerJoin(
+            goals,
+            and(
+              eq(goals.id, keyResults.goalId),
+              eq(goals.workspaceId, context.workspaceId),
+              isNull(goals.deletedAt),
+            ),
+          )
+          .leftJoin(cycles, eq(cycles.id, goals.cycleId))
+          .where(
+            activeOnly(
+              initiativeKeyResults,
+              eq(initiativeKeyResults.workspaceId, context.workspaceId),
+              eq(initiativeKeyResults.initiativeId, input.id),
+            ),
+          )
+          .orderBy(asc(goals.title), asc(keyResults.position));
+        const visible = await visibleResourceIds(tx, {
+          workspaceId: context.workspaceId,
+          memberId,
+          resourceType: "goal",
+          ids: [...new Set(rows.map((row) => row.goalId))],
+        });
+        return rows.filter((row) => visible.has(row.goalId));
       },
     );
   },

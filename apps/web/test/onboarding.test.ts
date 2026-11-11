@@ -206,9 +206,18 @@ describe("the product tour on a first sign-in (L-08, plan 0.8.0 T1)", () => {
     ]) {
       expect(tour, selector).toContain(selector);
     }
-    expect(at("../app/work-map-header.tsx")).toContain(
+    // The shell's own strip under the top bar, shown while a cycle is being
+    // planned, and only that: the Work Map's phase strip stays after
+    // publishing and sits further down the page, so lighting it under the
+    // planning step's words put the step out of place (Akmal, 11 November
+    // 2026). Outside planning the step is left out, as T1 says.
+    expect(at("../../../packages/ui/src/shell/cycle-strip.tsx")).toContain(
       'data-tour-target="cycle-strip"',
     );
+    expect(at("../app/work-map-header.tsx")).not.toContain(
+      'data-tour-target="cycle-strip"',
+    );
+    expect(tour).not.toContain(".cycle-strip,");
     expect(at("../app/copilot/copilot-panel.tsx")).toContain(
       'data-tour-target="ask-ai"',
     );

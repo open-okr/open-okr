@@ -21,6 +21,7 @@ import {
   useQueryClient,
   useTranslations,
 } from "@openokr/ui";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { dayLabel } from "../../lib/day-label.ts";
@@ -1359,6 +1360,8 @@ function KeyResultRow({
             title={keyResult.title}
             href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
             onOpen={onOpen}
+            initiativesHref={`/initiatives?keyResult=${keyResult.id}`}
+            tasksHref={`/board?keyResult=${keyResult.id}`}
             openLabel={t("goals.editor.openKeyResult")}
             deleteLabel={t("goals.editor.deleteKeyResult")}
             canDelete={canAdminister}
@@ -1414,6 +1417,8 @@ function RowActions({
   href,
   onOpen,
   onCheckIn = null,
+  initiativesHref = null,
+  tasksHref = null,
   openLabel,
   deleteLabel,
   canDelete,
@@ -1426,6 +1431,16 @@ function RowActions({
   readonly onOpen: () => void;
   /** Objectives only; null where the reader may not check in. */
   readonly onCheckIn?: (() => void) | null;
+  /**
+   * Key results only: the initiatives that move this one, on their own list
+   * (plan 0.8.0 I1). Under "Open this key result" in the menu.
+   */
+  readonly initiativesHref?: string | null;
+  /**
+   * Key results only: the tasks behind this one, on its board, those naming
+   * it and those of its initiatives. Under View initiatives.
+   */
+  readonly tasksHref?: string | null;
   readonly openLabel: string;
   readonly deleteLabel: string;
   readonly canDelete: boolean;
@@ -1605,6 +1620,19 @@ function RowActions({
               <Menu.Item className={item} onClick={onOpen}>
                 {openLabel}
               </Menu.Item>
+              {initiativesHref ? (
+                <Menu.Item
+                  className={item}
+                  render={<Link href={initiativesHref} />}
+                >
+                  {t("okrList.viewInitiatives")}
+                </Menu.Item>
+              ) : null}
+              {tasksHref ? (
+                <Menu.Item className={item} render={<Link href={tasksHref} />}>
+                  {t("okrList.viewTasks")}
+                </Menu.Item>
+              ) : null}
               {onCheckIn ? (
                 <Menu.Item className={item} onClick={onCheckIn}>
                   {t("okrList.checkInOn")}

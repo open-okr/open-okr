@@ -15,6 +15,10 @@ import { getPool } from "../../../lib/auth";
 import { readConversation } from "../../../lib/conversation.ts";
 import { CopyLink } from "../../../lib/copy-link.tsx";
 import { DeleteControl } from "../../../lib/delete-control.tsx";
+import {
+  keyResultOption,
+  linkableKeyResults,
+} from "../../../lib/linkable-key-results";
 import { itemTitle } from "../../../lib/page-title.ts";
 import { PreviousNext } from "../../../lib/previous-next.tsx";
 import { shortLinkPath } from "../../../lib/short-links.ts";
@@ -144,39 +148,28 @@ export default async function InitiativePage({
   const documents = await readSubjectDocuments(context, "initiative", id);
   const conversation = await readConversation(context, "initiative", id);
 
-  // Every key result the reader can see, so the link picker offers real
-  // choices. Read through `goals.list`, which is already access-filtered.
-  const current = await callAction(context, "cycles.current", {
-    mode: "quarterly",
+  // The key results this initiative moves, each named with its objective
+  // and cycle, whatever cycle it is in (plan 0.8.0 I1). One the reader cannot
+  // see is not named; it is counted, so the list does not claim fewer links
+  // than there are.
+  const named = await callAction(context, "initiatives.keyResults", {
+    id: initiative.id,
   });
-  const { goals } = current
-    ? await callAction(context, "goals.list", {
-        cycleId: current.id,
-        includeClosed: false,
-      })
-    : { goals: [] };
-  const keyResults = goals.flatMap((goal) =>
-    goal.keyResults.map((keyResult) => ({
-      id: keyResult.id,
-      title: keyResult.title,
-      goalTitle: goal.title,
-    })),
-  );
-  const byId = new Map(keyResults.map((one) => [one.id, one]));
-  const linked = initiative.keyResultIds.map((keyResultId) => {
-    // A key result outside the current cycle is still linked and still worth
-    // naming as linked. Its title is not readable from this page's own list,
-    // and inventing one would be worse than saying so.
-    const known = byId.get(keyResultId);
-    return {
-      id: keyResultId,
-      title: known?.title ?? "A key result outside this cycle",
-      goalTitle: known?.goalTitle ?? "",
-    };
-  });
-  const linkable = keyResults.filter(
-    (one) => !initiative.keyResultIds.includes(one.id),
-  );
+  const linked = named.map((keyResult) => ({
+    id: keyResult.id,
+    title: keyResult.title,
+    goalTitle: keyResult.cycleName
+      ? `${keyResult.goalTitle} · ${keyResult.cycleName}`
+      : keyResult.goalTitle,
+  }));
+  const unseen = initiative.keyResultIds.length - linked.length;
+  // What the link picker offers: every active cycle's key results the reader
+  // can see, by the rule every picker follows, less those already linked.
+  const linkable = canEdit
+    ? (await linkableKeyResults(context)).filter(
+        (one) => !initiative.keyResultIds.includes(one.id),
+      )
+    : [];
 
   return (
     <div className="flex w-full flex-col gap-3.5">
@@ -293,7 +286,7 @@ export default async function InitiativePage({
           </h2>
         </CardHeader>
         <CardBody className="flex flex-col gap-3">
-          {linked.length === 0 ? (
+          {initiative.keyResultIds.length === 0 ? (
             <p className="rounded-md border border-line border-dashed px-3 py-4 text-center text-sm text-ink-3">
               {t("initiatives.detail.nothingYetAnInitiative")}
             </p>
@@ -316,7 +309,9 @@ export default async function InitiativePage({
                   </div>
                   {canEdit ? (
                     <UnlinkButton
-                      label={`Unlink ${keyResult.title}`}
+                      label={t("initiatives.detail.unlinkNamed", {
+                        title: keyResult.title,
+                      })}
                       onUnlink={unlinkKeyResultAction.bind(
                         null,
                         initiative.id,
@@ -326,6 +321,15 @@ export default async function InitiativePage({
                   ) : null}
                 </li>
               ))}
+              {unseen > 0 ? (
+                <li className="py-2 text-xs text-ink-3">
+                  {unseen === 1
+                    ? t("initiatives.detail.unseenKeyResultOne")
+                    : t("initiatives.detail.unseenKeyResultOther", {
+                        count: unseen,
+                      })}
+                </li>
+              ) : null}
             </ul>
           )}
 
@@ -342,10 +346,7 @@ export default async function InitiativePage({
                   hideLabel
                   name="keyResultId"
                   required
-                  options={linkable.map((one) => ({
-                    id: one.id,
-                    label: one.title,
-                  }))}
+                  options={linkable.map(keyResultOption)}
                 />
               </div>
               <SubmitButton
