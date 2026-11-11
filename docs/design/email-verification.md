@@ -483,8 +483,8 @@ Then she joins, and once the relay has run her account is confirmed
 And the instance chain holds auth.email_verified with via "invitation"
 
 Given the same invitation
-When an account other@example.com accepts it through REST
-Then it joins as today, nothing is enqueued and it stays unconfirmed
+When an account other@example.com tries to accept it through REST
+Then it is refused as today ("issued to a different email address") and nothing is enqueued
 
 Given a shared workspace link, or an account already confirmed
 When it is accepted through any surface
@@ -511,3 +511,19 @@ Then she was confirmed at once, and auth.email_verified appears once
 
 **"Design approved" by Akmal on 12 November 2026**, S5R-Q1 and S5R-Q2 as
 recommended.
+
+### 13.8 As built (S5-R)
+
+Built on 12 November 2026 on `release-0.8.1`.
+
+| Piece | Where |
+|---|---|
+| The decision, in the transaction that uses the link up | `invitations.acceptLink`: a personal link reaching the end was already compared with the account's address, so it enqueues `auth.confirm_invited_address` when the account is unconfirmed. Payload: workspace, account and link ids, nothing else |
+| The confirmation | `confirmInvitedAddress` in `packages/core/src/outbox/handlers.ts`. Skips an account that is gone or already confirmed, and one whose address is no longer the invitation's; with no writer it throws, so the row is retried rather than skipped |
+| The writer | `confirmAddressThrough(auth)` in `packages/core/src/auth/invited-address.ts`, given to the relay as `confirmUserEmail` by `apps/web/lib/relay.ts` |
+| Tests | `packages/core/test/invited-address-confirmed.test.ts`, "accepting a personal invitation on any surface". REST, the command line and an agent are projections that call `invitations.acceptLink`, so the action's test covers them; no separate route test |
+
+**Corrected while building.** §13.5 first said an account with another address
+joins unconfirmed through the same invitation. It cannot: `acceptLink` already
+refuses a personal invitation from any other address, on every surface. The
+criterion now says so.

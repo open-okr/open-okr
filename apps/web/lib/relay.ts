@@ -42,6 +42,7 @@ import {
 import { continueAgentRun } from "@openokr/agents";
 import { type Env, loadEnv } from "@openokr/config";
 import {
+  confirmAddressThrough,
   dispatchOutbox,
   memberEmail,
   memberExternalId,
@@ -173,6 +174,13 @@ async function relayDeps(delivery: OutboxDelivery): Promise<OutboxHandlerDeps> {
     // W7). Both always present: neither needs a service.
     ring: getKeyRing(),
     postWebhook,
+    // An address a personal invitation proved, confirmed through Better
+    // Auth's own adapter (plan 0.8.1 S5-R, D14). Imported when used, so the
+    // relay does not load sign-in until a row needs it.
+    async confirmUserEmail(userId) {
+      const { getAuth } = await import("./auth");
+      await confirmAddressThrough(getAuth())(userId);
+    },
     ...(mail
       ? {
           async sendMail(message) {

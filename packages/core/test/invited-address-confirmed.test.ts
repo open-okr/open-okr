@@ -3,11 +3,16 @@ import type { Pool } from "pg";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { createAuth } from "../src/auth/auth.ts";
-import { confirmByAcceptedInvitation } from "../src/auth/invited-address.ts";
+import {
+  CONFIRM_INVITED_ADDRESS_TOPIC,
+  confirmAddressThrough,
+  confirmByAcceptedInvitation,
+} from "../src/auth/invited-address.ts";
 import { authLimiterStorage } from "../src/auth/limiter-storage.ts";
 import { VERIFY_EMAIL_TOPIC } from "../src/auth/verification-links.ts";
 import { INVITE_COOKIE } from "../src/invitations/pending.ts";
 import { previewInvite } from "../src/invitations/preview.ts";
+import { dispatchOutbox } from "../src/outbox/handlers.ts";
 
 /**
  * An invited address arrives confirmed (plan 0.8.0 S5,
@@ -260,5 +265,151 @@ describe("accepting a personal invitation while signed in (S5-Q2)", () => {
       }),
     ).toBe(false);
     expect(await confirmedVia()).toEqual([]);
+  });
+});
+
+/**
+ * Every surface confirms an invited address (plan 0.8.1 S5-R,
+ * email-verification.md §13). `invitations.acceptLink` is what REST, the
+ * command line and an agent call, so driving it directly is driving them;
+ * the relay is driven the way it runs, through `dispatchOutbox`.
+ */
+describe("accepting a personal invitation on any surface (S5-R)", () => {
+  const unconfirmed = async () => {
+    expect((await signUp(INVITED)).status).toBe(200);
+    const user = await userRow(INVITED);
+    expect(user?.verified).toBe(false);
+    return user?.id as string;
+  };
+
+  const accept = (userId: string, token: string) =>
+    callAction(
+      { pool, workspaceId, actor: { kind: "human", userId } },
+      "invitations.acceptLink",
+      { token },
+    );
+
+  const queued = async () => {
+    const { rows } = await (await workerDb()).admin.query<{
+      topic: string;
+      payload: Record<string, unknown>;
+      idempotency_key: string;
+    }>("select topic, payload, idempotency_key from outbox where topic = $1", [
+      CONFIRM_INVITED_ADDRESS_TOPIC,
+    ]);
+    return rows;
+  };
+
+  /** Runs every queued confirmation the way the relay does. */
+  const relay = async (
+    options: { withWriter?: boolean; skipped?: string[] } = {},
+  ) => {
+    for (const row of await queued()) {
+      await dispatchOutbox(
+        {
+          topic: row.topic,
+          payload: row.payload,
+          idempotencyKey: row.idempotency_key,
+          attempts: 0,
+        },
+        {
+          pool,
+          ...(options.withWriter === false
+            ? {}
+            : { confirmUserEmail: confirmAddressThrough(auth) }),
+          onSkipped: (_delivery, reason) => options.skipped?.push(reason),
+        },
+      );
+    }
+  };
+
+  it("queues the confirmation in the acceptance and confirms the address once the relay runs", async () => {
+    const userId = await unconfirmed();
+    await accept(userId, await personalLink(INVITED));
+
+    const rows = await queued();
+    expect(rows).toHaveLength(1);
+    // Identifiers only, never the address.
+    expect(Object.keys(rows[0]?.payload ?? {}).sort()).toEqual([
+      "inviteLinkId",
+      "userId",
+      "workspaceId",
+    ]);
+    expect((await userRow(INVITED))?.verified).toBe(false);
+
+    await relay();
+    expect((await userRow(INVITED))?.verified).toBe(true);
+    expect(await confirmedVia()).toEqual([{ userId, via: "invitation" }]);
+  });
+
+  it("refuses an account with another address, as before, and queues nothing", async () => {
+    const userId = await unconfirmed();
+    await expect(
+      accept(userId, await personalLink("someone-else@example.com")),
+    ).rejects.toThrow("different email address");
+    expect(await queued()).toEqual([]);
+  });
+
+  it("queues nothing for a shared workspace link", async () => {
+    const userId = await unconfirmed();
+    const { token } = await callAction(
+      owner(),
+      "invitations.createWorkspaceLink",
+      {},
+    );
+    await accept(userId, token);
+    expect(await queued()).toEqual([]);
+    expect((await userRow(INVITED))?.verified).toBe(false);
+  });
+
+  it("queues nothing for an account already confirmed", async () => {
+    const userId = await unconfirmed();
+    await (await workerDb()).admin.query(
+      "update users set email_verified = true where id = $1",
+      [userId],
+    );
+    await accept(userId, await personalLink(INVITED));
+    expect(await queued()).toEqual([]);
+  });
+
+  it("records the confirmation once when the join page confirmed it first", async () => {
+    const userId = await unconfirmed();
+    const token = await personalLink(INVITED);
+    const invitation = await previewInvite(pool, { token, now: new Date() });
+    await accept(userId, token);
+    // The join page's own immediate call (§13.3), after the acceptance.
+    await confirmByAcceptedInvitation(auth, pool, {
+      userId,
+      email: INVITED,
+      emailVerified: false,
+      invitation,
+    });
+    const skipped: string[] = [];
+    await relay({ skipped });
+    expect(skipped).toEqual(["the address is already confirmed"]);
+    expect(await confirmedVia()).toEqual([{ userId, via: "invitation" }]);
+  });
+
+  it("confirms nothing when the account changed its address before the relay ran", async () => {
+    const userId = await unconfirmed();
+    await accept(userId, await personalLink(INVITED));
+    await (await workerDb()).admin.query(
+      "update users set email = 'priya.new@example.com' where id = $1",
+      [userId],
+    );
+    const skipped: string[] = [];
+    await relay({ skipped });
+    expect(skipped).toHaveLength(1);
+    expect((await userRow("priya.new@example.com"))?.verified).toBe(false);
+    expect(await confirmedVia()).toEqual([]);
+  });
+
+  it("waits for a relay that can confirm, rather than skipping", async () => {
+    const userId = await unconfirmed();
+    await accept(userId, await personalLink(INVITED));
+    await expect(relay({ withWriter: false })).rejects.toThrow(
+      "cannot confirm an address",
+    );
+    expect((await userRow(INVITED))?.verified).toBe(false);
   });
 });

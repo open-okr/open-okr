@@ -28,6 +28,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
+import { CONFIRM_INVITED_ADDRESS_TOPIC } from "../auth/invited-address.ts";
 import { refuseReason } from "../invitations/preview.ts";
 import { provisionMemberForInvite } from "../invitations/provisioning.ts";
 import {
@@ -515,7 +516,10 @@ export const acceptLink = defineWriteAction({
         id: string;
         name: string;
         email: string;
-      }>(sql`select id, name, email from users where id = ${userId}`);
+        email_verified: boolean;
+      }>(
+        sql`select id, name, email, email_verified from users where id = ${userId}`,
+      );
       const userRow = userResult.rows[0];
       if (!userRow) {
         throw new OperationError("forbidden", "No such account.");
@@ -603,8 +607,33 @@ export const acceptLink = defineWriteAction({
         })
         .where(activeOnly(inviteLinks, eq(inviteLinks.id, link.id)));
 
+      // **A personal invitation accepted here proves its address** (plan
+      // 0.8.1 S5-R, email-verification.md §13). The address was compared
+      // above, so a personal link reaching this line was sent to this
+      // account's own address. Decided here, in the transaction that uses the
+      // link up, on every surface: the join page, REST, the command line and
+      // an agent. Confirmed by the relay, through Better Auth (D14).
+      const confirmsAddress =
+        link.mode === "personal" && userRow.email_verified !== true;
+
       return {
         result: { memberId: provisioned.memberId },
+        ...(confirmsAddress
+          ? {
+              outbox: [
+                {
+                  topic: CONFIRM_INVITED_ADDRESS_TOPIC,
+                  // Identifiers only: the handler reads the address itself.
+                  payload: {
+                    workspaceId,
+                    userId: userRow.id,
+                    inviteLinkId: link.id,
+                  },
+                  idempotencyKey: `${CONFIRM_INVITED_ADDRESS_TOPIC}:${link.id}:${userRow.id}`,
+                },
+              ],
+            }
+          : {}),
         activity: {
           kind: "invitation.accepted",
           subjectType: "workspace_member",

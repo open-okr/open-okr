@@ -547,6 +547,8 @@ export {
 } from "./auth/caller-address.ts";
 export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
 export {
+  CONFIRM_INVITED_ADDRESS_TOPIC,
+  confirmAddressThrough,
   confirmByAcceptedInvitation,
   invitationConfirms,
 } from "./auth/invited-address.ts";
