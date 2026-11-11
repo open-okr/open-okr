@@ -18,11 +18,13 @@
  * key result (completeness review M-09, which found `goals.create` alone).
  *
  * **Only what the member may change is offered.** Every numbered list is
- * filtered through the access model at `edit` before the model sees it, so a
- * space, an objective or a key result the member may only read is not on the
- * list to be pointed at. Applying still runs the action as the member, whose
- * own authorisation decides again: the offer narrows what can be proposed, the
- * action decides what can be done.
+ * filtered through the access model before the model sees it, at the level the
+ * action itself asks for: `edit` on a space to create in it, `edit` on an
+ * objective to add a key result to it, and for work behind a key result, `edit`
+ * on the space the work lands in and `view` on the objective (plan 0.8.1 A1).
+ * Applying still runs the action as the member, whose own authorisation
+ * decides again: the offer narrows what can be proposed, the action decides
+ * what can be done.
  *
  * **Every entry declares its own reverse, or admits it has none.** A proposal
  * that cannot be undone is still applicable; the interface says so instead of
@@ -40,6 +42,7 @@ import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
 import type { ProposalDrop } from "../agents/drafter.ts";
+import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
@@ -341,6 +344,8 @@ const addKeyResult: ProposableAction = {
  * The space is the one the key result's objective belongs to, and only key
  * results in a space this member may create work in are offered, because an
  * initiative lives in a space and `initiatives.create` asks for `edit` there.
+ * The objective itself needs only `view` (plan 0.8.1 A1): a member who works
+ * in the Product space can start work behind its objective without owning it.
  */
 const startInitiative: ProposableAction = {
   action: "initiatives.create",
@@ -364,7 +369,7 @@ const startInitiative: ProposableAction = {
     },
   },
   async offer(scope) {
-    return { keyResults: await scope.editableKeyResults() };
+    return { keyResults: await scope.workKeyResults() };
   },
   async build(context, fields, choices) {
     const authored = fields as {
@@ -432,7 +437,7 @@ const addTask: ProposableAction = {
     },
   },
   async offer(scope) {
-    return { keyResults: await scope.editableKeyResults() };
+    return { keyResults: await scope.workKeyResults() };
   },
   async build(context, fields, choices) {
     const authored = fields as { title: string; keyResultNumber: number };
@@ -483,7 +488,8 @@ const CHOICE_LIMIT = 40;
 interface OfferScope {
   editableSpaces(): Promise<NumberedChoice[]>;
   editableObjectives(): Promise<NumberedChoice[]>;
-  editableKeyResults(): Promise<NumberedChoice[]>;
+  /** Key results new work may be tied to, in spaces the member may edit. */
+  workKeyResults(): Promise<NumberedChoice[]>;
 }
 
 function offerScope(context: ActionCallContext): OfferScope {
@@ -560,25 +566,46 @@ function offerScope(context: ActionCallContext): OfferScope {
         with: { cycleEndsOn },
       })),
     ),
-    editableKeyResults: once(async () => {
+    workKeyResults: once(async () => {
       const inSpaces = new Set((await spaces()).map((space) => space.id));
+      if (inSpaces.size === 0) {
+        return [];
+      }
       const choices: NumberedChoice[] = [];
-      for (const { goal } of await objectives()) {
-        // Work lives in a space. An objective owned by the workspace or by a
-        // person has nowhere to put an initiative or a task without somebody
-        // choosing one, and choosing is not the model's to do.
-        if (goal.spaceId === null || !inSpaces.has(goal.spaceId)) {
-          continue;
-        }
-        for (const keyResult of goal.keyResults) {
-          choices.push({
-            id: keyResult.id,
-            label: `${keyResult.title} (${goal.title})`,
-            with: { goalId: goal.id, spaceId: goal.spaceId },
-          });
+      // I1's rule, which the screens' pickers use (plan 0.8.1 A1): every cycle
+      // being planned or running, the running quarter first.
+      const cycles = cyclesOpenForWork(
+        await callAction(context, "cycles.list", {}),
+      );
+      for (const cycle of cycles) {
+        // `goals.list` is access-filtered at view, which is all creating work
+        // asks of a key result's objective (`assertWhatATaskNames`). Editing
+        // the objective is not needed: work changes the space, not the goal.
+        const { goals } = await callAction(context, "goals.list", {
+          cycleId: cycle.id,
+          includeClosed: false,
+        });
+        for (const goal of goals) {
+          // Work lives in a space, and creating it asks edit there. An
+          // objective owned by the workspace or by a person has nowhere to put
+          // an initiative or a task without somebody choosing one, and
+          // choosing is not the model's to do.
+          if (goal.spaceId === null || !inSpaces.has(goal.spaceId)) {
+            continue;
+          }
+          for (const keyResult of goal.keyResults) {
+            choices.push({
+              id: keyResult.id,
+              label: `${keyResult.title} (${goal.title}, ${cycle.name})`,
+              with: { goalId: goal.id, spaceId: goal.spaceId },
+            });
+            if (choices.length >= CHOICE_LIMIT) {
+              return choices;
+            }
+          }
         }
       }
-      return choices.slice(0, CHOICE_LIMIT);
+      return choices;
     }),
   };
 }

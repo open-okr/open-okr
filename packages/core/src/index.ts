@@ -852,6 +852,7 @@ export {
   reversalFor,
 } from "./copilot/proposals.ts";
 export { sweepEndedCycles } from "./cycles/closing.ts";
+export { cyclesOpenForWork, openForWork } from "./cycles/open-for-work.ts";
 export {
   type BuildDemoResult,
   buildDemoWorkspace,

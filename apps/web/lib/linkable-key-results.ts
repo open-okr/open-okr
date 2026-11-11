@@ -1,4 +1,4 @@
-import { callAction } from "@openokr/core";
+import { callAction, cyclesOpenForWork } from "@openokr/core";
 
 /**
  * The key results a person may tie work to (plan 0.8.0 I1, Akmal's answer to
@@ -25,22 +25,16 @@ export interface LinkableKeyResult {
 type Context = Parameters<typeof callAction>[0];
 
 /**
- * The running quarter first, where most work is tied, then the running year,
- * then cycles being planned. `cycles.list` is newest first, which put next
- * quarter's key results at the top of every picker while it was planned.
+ * The order and the filter are core's (`cyclesOpenForWork`), because the
+ * copilot offers the same key results to propose work behind (plan 0.8.1 A1)
+ * and the two must not disagree.
  */
-function rank(cycle: { readonly status: string; readonly mode: string }) {
-  return (
-    (cycle.status === "active" ? 0 : 2) + (cycle.mode === "quarterly" ? 0 : 1)
-  );
-}
-
 export async function linkableKeyResults(
   context: Context,
 ): Promise<LinkableKeyResult[]> {
-  const cycles = (await callAction(context, "cycles.list", {}))
-    .filter((cycle) => cycle.status === "planning" || cycle.status === "active")
-    .sort((one, other) => rank(one) - rank(other));
+  const cycles = cyclesOpenForWork(
+    await callAction(context, "cycles.list", {}),
+  );
   const lists = await Promise.all(
     cycles.map((cycle) =>
       callAction(context, "goals.list", {

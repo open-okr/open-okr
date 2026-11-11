@@ -193,7 +193,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | Row | Status | Note |
 |---|---|---|
 | M1 to M6 | merged | PR #210, `ea94d5a0` |
-| A1 | to do | A1-Q decided: I1's rule |
+| A1 | done | Key results of objectives the member can view, in spaces they can edit, from `cyclesOpenForWork` (I1's rule, moved into core so the pickers and the copilot share it). Found and fixed: with this quarter not yet started, the pickers put next quarter first; ties now go nearest first. Core 30 + 2, web suite 1397 |
 | A2 | to do | A2-Q decided: the proposal first |
 | A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |

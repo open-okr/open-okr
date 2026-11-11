@@ -634,8 +634,11 @@ describe("the rest of the catalogue", () => {
     expect(choices["goals.addKeyResult"]).toEqual({
       objectives: [GOAL_TITLE],
     });
+    const quarter = (await call("cycles.current", { mode: "quarterly" })) as {
+      name: string;
+    };
     expect(choices["initiatives.create"]).toEqual({
-      keyResults: [`${KEY_RESULT_TITLE} (${GOAL_TITLE})`],
+      keyResults: [`${KEY_RESULT_TITLE} (${GOAL_TITLE}, ${quarter.name})`],
     });
     // Labels only, for all four, and still no identifier to copy.
     expect(JSON.stringify(shown?.options)).not.toContain(goalId);
@@ -669,6 +672,79 @@ describe("the rest of the catalogue", () => {
     // And not an objective in that space either, which `goals.create` would
     // refuse there anyway.
     expect(offered).not.toContain("goals.create");
+  });
+
+  it("offers work behind an objective the member may only read, in a space they may edit (plan 0.8.1 A1)", async () => {
+    // Priya's case: she works in the space and does not own its objective.
+    await lowerOn("goal", goalId, 10);
+
+    const drafter = new ProposingDrafter(initiative());
+    const proposed = await propose(
+      drafter,
+      "Start an initiative for the conversion key result",
+    );
+    const offered = drafter.seen[0]?.options.map((option) => option.action);
+    expect(offered).toContain("initiatives.create");
+    expect(offered).toContain("tasks.create");
+    // Adding a key result changes the objective, so that still asks edit on it.
+    expect(offered).not.toContain("goals.addKeyResult");
+    expect(proposed?.action).toBe("initiatives.create");
+
+    const applied = (await call("copilot.applyProposal", {
+      id: proposed?.id,
+    })) as { result: { id: string } | null };
+    expect(applied.result?.id).toBeTypeOf("string");
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ key_result_id: string }>(
+      "select key_result_id from initiative_key_results where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ key_result_id: keyResultId }]);
+  });
+
+  it("offers key results from every cycle open for work, the running quarter first (plan 0.8.1 A1)", async () => {
+    const later = new Date(Date.now() + 100 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const planned = (await call("cycles.create", {
+      on: later,
+      mode: "quarterly",
+    })) as { id: string; name: string; status: string };
+    expect(planned.status).toBe("planning");
+    const plannedGoal = (
+      (await call("goals.create", {
+        title: "Open the partner channel",
+        cycleId: planned.id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    await call("goals.addKeyResult", {
+      goalId: plannedGoal,
+      title: "Sign three resellers",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 0,
+      targetValue: 3,
+      weight: 1,
+    });
+
+    const drafter = new ProposingDrafter(null);
+    await propose(drafter);
+    const shown = drafter.seen[0]?.options.find(
+      (option) => option.action === "tasks.create",
+    );
+    const quarter = (await call("cycles.current", { mode: "quarterly" })) as {
+      name: string;
+    };
+    expect(shown?.choices.keyResults).toEqual([
+      `${KEY_RESULT_TITLE} (${GOAL_TITLE}, ${quarter.name})`,
+      `Sign three resellers (Open the partner channel, ${planned.name})`,
+    ]);
   });
 
   it("offers nothing at all to a member who may edit nothing, and asks no model", async () => {

@@ -8,9 +8,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 
 const callAction = vi.fn();
-vi.mock("@openokr/core", () => ({
-  callAction: (...args: unknown[]) => callAction(...args),
-}));
+// The order is core's own (plan 0.8.1 A1), so the real one is used: the
+// copilot reads it too, and a stand-in here could agree with neither.
+vi.mock("@openokr/core", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@openokr/core")>();
+  return {
+    callAction: (...args: unknown[]) => callAction(...args),
+    cyclesOpenForWork: actual.cyclesOpenForWork,
+  };
+});
 
 const { linkableKeyResults } = await import("../lib/linkable-key-results");
 
