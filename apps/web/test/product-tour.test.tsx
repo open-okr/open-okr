@@ -218,6 +218,26 @@ describe("on a demo and when taken again", () => {
     await act(async () => startTourAgain());
     expect(stepId()).toBe("home");
   });
+
+  // UAT 0.8.0 F-07: the tour is started from a menu item, which is gone once
+  // the menu closes, so focus fell to the page instead of going back.
+  test("ending it gives focus back to the menu it was started from", async () => {
+    const trigger = document.createElement("button");
+    trigger.setAttribute("aria-haspopup", "menu");
+    trigger.setAttribute("aria-expanded", "true");
+    const menu = document.createElement("div");
+    menu.setAttribute("role", "menu");
+    const item = document.createElement("button");
+    item.setAttribute("role", "menuitem");
+    menu.appendChild(item);
+    shell.append(trigger, menu);
+    await render({ offered: false });
+    item.focus();
+    await act(async () => startTourAgain());
+    menu.remove();
+    await key("Escape");
+    expect(document.activeElement).toBe(trigger);
+  });
 });
 
 // UAT 0.8.0 F-02: on a phone the steps light the bottom bar, and the card was

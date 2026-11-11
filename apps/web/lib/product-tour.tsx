@@ -199,7 +199,14 @@ export function ProductTour({
   // Take the tour again, from the avatar menu.
   useEffect(() => {
     const again = () => {
-      returnTo.current = document.activeElement as HTMLElement | null;
+      // Started from a menu item, which is gone once the menu closes: the
+      // way back is the button that opened the menu (UAT 0.8.0, F-07).
+      const active = document.activeElement as HTMLElement | null;
+      returnTo.current = active?.closest('[role="menu"]')
+        ? document.querySelector<HTMLElement>(
+            '[aria-haspopup="menu"][aria-expanded="true"]',
+          )
+        : active;
       begin();
     };
     window.addEventListener(START_EVENT, again);
