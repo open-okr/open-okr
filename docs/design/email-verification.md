@@ -258,7 +258,8 @@ confirmed page:
 
 The person is already signed in, because Better Auth gives a session when
 confirmation is not required, so the button goes straight in rather than to
-sign-in. The same card shows on an instance that cannot send mail, which
+sign-in. Akmal chose this on 11 November 2026 over sending them to sign in
+again. The same card shows on an instance that cannot send mail, which
 also requires no confirmation, so sign-up ends one way wherever nothing is
 required. Before S4 those people were sent to the home page with no word.
 
