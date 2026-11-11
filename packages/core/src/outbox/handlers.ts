@@ -23,12 +23,13 @@ import {
   activeOnly,
   channelConnections,
   channelMessages,
+  includeDeleted,
   inviteLinks,
   users,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
@@ -520,8 +521,11 @@ const confirmInvitedAddress: OutboxHandler = async (delivery, deps) => {
       tx
         .select({ mode: inviteLinks.mode, email: inviteLinks.email })
         .from(inviteLinks)
+        // Deleted ones too: the inbox was proved when the link was accepted,
+        // and an administrator removing the used link since does not undo it.
         .where(
-          and(
+          includeDeleted(
+            inviteLinks,
             eq(inviteLinks.workspaceId, workspaceId),
             eq(inviteLinks.id, inviteLinkId),
           ),
