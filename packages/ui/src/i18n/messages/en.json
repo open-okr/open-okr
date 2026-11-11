@@ -2623,7 +2623,7 @@
   "goals.detail.unlinkInitiative": "Unlink {title}",
   "goals.detail.initiativeToLink": "Initiative to link to {title}",
   "goals.detail.newInitiativeForKeyResult": "New initiative for this key result",
-  "goals.detail.workBoardFor": "View the tasks behind {title}",
+  "goals.detail.workBoardFor": "View tasks for {title}",
   "goals.detail.writtenButEmpty": "Written, but empty.",
   "goals.editor.addCycle": "Add cycle",
   "goals.editor.addKeyResult": "Add key result",

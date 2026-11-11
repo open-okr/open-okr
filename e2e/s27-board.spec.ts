@@ -342,7 +342,7 @@ test("a key result's board holds the work behind it, one click from its goal", a
 
   await goTo(page, `/goals/${keyResult.goal_id}`);
   await page
-    .getByRole("link", { name: `View the tasks behind ${keyResult.title}` })
+    .getByRole("link", { name: `View tasks for ${keyResult.title}` })
     .click();
 
   await expect(
