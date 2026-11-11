@@ -66,11 +66,16 @@ export function AgentSetupPill({
       data-testid="agent-setup-pill"
       className="flex flex-wrap items-center justify-center gap-2"
     >
-      <span className="group inline-flex items-center">
+      {/* `max-w-full`, and below `sm` a pill that wraps: on a phone the
+          label and the five marks are wider than the screen, and the centred
+          pill was cut off on both sides at 390px (Q-10c, 0.8.0 acceptance
+          test). There the marks move to a line of their own, and a long
+          instance name or the Malay label wraps too. */}
+      <span className="group inline-flex max-w-full items-center">
         <CopyButton
           text={agentSetupLine({ instanceName, setupUrl })}
           title={t("home.agentPrompt.tooltip")}
-          className="h-11 cursor-pointer gap-3 rounded-full border-line bg-surface px-5 text-base font-medium text-ink shadow-none hover:translate-y-0 hover:border-line-2 hover:shadow-none"
+          className="h-auto min-h-11 cursor-pointer flex-wrap gap-x-3 gap-y-1.5 whitespace-normal rounded-full border-line bg-surface px-5 py-2 text-center text-sm font-medium text-ink shadow-none hover:translate-y-0 hover:border-line-2 hover:shadow-none sm:h-11 sm:flex-nowrap sm:gap-3 sm:whitespace-nowrap sm:py-0 sm:text-base"
         >
           {t("home.agentPrompt.label", { instanceName })}
           <span className="inline-flex items-center gap-1.5" aria-hidden="true">
