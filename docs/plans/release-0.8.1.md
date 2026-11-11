@@ -2,6 +2,8 @@
 
 Owner: Akmal. Started 11 November 2026, the day 0.8.0 was published, against `main` at `ea94d5a0` (PR #210 merged).
 
+Status: **approved by Akmal on 12 November 2026**: the plan, the L7 split it records in `docs/design/copilot-live-data.md`, and all five decisions in section 9 as recommended. S5-R's own design is still to be written, and its code waits for "design approved" on it.
+
 A quick patch release. It ships what was found after 0.8.0 was cut: the copilot's first fixes, the cycle page's input pack, two dependency alerts, an upgrade trap the demo server hit, and the follow-ups from Obed's 0.8.0 acceptance test. No new engine, no migration and no change to the method. One row needs a short design first (S5-R, section 6).
 
 It holds eight things:
@@ -40,8 +42,8 @@ The design's decision D9 put "the three bug fixes first (0.8.1)", which are M1 t
 
 | # | Gap | Effect today | Where | Change | Size |
 |---|---|---|---|---|---|
-| A1 | Initiatives and tasks are offered only under objectives the person can **edit**, but creating one needs edit only on its **space** | Priya, who edits the Product space but does not own its objective, can never get an initiative or a task proposed | `packages/core/src/copilot/proposals.ts`, `offerScope().editableKeyResults`, which builds on `objectives()` (edit on the goal) | Offer the key results of open objectives the member can **view**, in a space the member can **edit**. That is the rule `initiatives.create` and `tasks.create` apply when the proposal is applied, including I2's check in `assertWhatATaskNames` (a key result needs view on its objective). `goals.addKeyResult` keeps edit on the objective, because adding a key result changes the objective | S |
-| A2 | The answer does not know a proposal is coming | It says "I cannot create objectives" right above a working proposal card | `apps/web/app/copilot/actions.ts` (`proposeFromCopilotAction`), the streaming answer route, and the answer prompt in `packages/agents/src/drafter.ts` | The panel asks for the proposal first. The answer is then told in one line whether a card was made and what it proposes, so it can refer to it rather than deny it. With no card, the answer says plainly what the copilot cannot do yet. See A2-Q | S |
+| A1 | Initiatives and tasks are offered only under objectives the person can **edit**, but creating one needs edit only on its **space** | Priya, who edits the Product space but does not own its objective, can never get an initiative or a task proposed | `packages/core/src/copilot/proposals.ts`, `offerScope().editableKeyResults`, which builds on `objectives()` (edit on the goal) | Offer the key results of open objectives the member can **view**, in a space the member can **edit**, from every cycle being planned or running, the running quarter first (A1-Q). That is the rule `initiatives.create` and `tasks.create` apply when the proposal is applied, including I2's check in `assertWhatATaskNames` (a key result needs view on its objective). `goals.addKeyResult` keeps edit on the objective, because adding a key result changes the objective | S |
+| A2 | The answer does not know a proposal is coming | It says "I cannot create objectives" right above a working proposal card | `apps/web/app/copilot/actions.ts` (`proposeFromCopilotAction`), the streaming answer route, and the answer prompt in `packages/agents/src/drafter.ts` | The panel asks for the proposal first. The answer is then told in one line whether a card was made and what it proposes, so it can refer to it rather than deny it. With no card, the answer says plainly what the copilot cannot do yet. Decided in A2-Q | S |
 | A3 | A dropped proposal leaves no trace | When the model's reply is unusable, nothing is logged. That is why the strict-schema bug (M2) took live testing to find | `proposeAction` in `packages/agents/src/drafter.ts` returns null on six paths with no record: no proposal wanted, an action it was not offered, an empty reason, unusable fields, a thrown error, and `buildProposal`'s refusal in `packages/core/src/copilot/proposals.ts` | Each null path names its reason: `declined`, `not_offered`, `no_reason`, `fields_refused`, `build_refused`, `provider_error`. Every reason but `declined` writes one structured log line with the reason, the action named, the feature, the provider and the model. **Never the request text, the fields or the reply**: they are a member's words. `pnpm ai:evaluate` prints the reason for each fixture that expected a proposal and got none. No new table and no new column | S |
 
 Acceptance criteria:
@@ -54,14 +56,14 @@ Acceptance criteria:
 | A2 | A request for an edit the copilot cannot propose yet, such as a check-in (L4, 0.9.0) | The answer arrives | It says it cannot make that change yet and where the person makes it, with no card |
 | A3 | A model reply whose fields fail the schema | The proposal is dropped | One log line names `fields_refused`, the action and the model, and contains none of the member's words |
 
-**A2-Q: how the answer learns about the card.**
+**A2-Q: how the answer learns about the card. Decided by Akmal on 12 November 2026: the proposal first.**
 
-| Option | Cost | Recommendation |
+| Option | Cost | Outcome |
 |---|---|---|
-| **The proposal first, then the answer is told its outcome** | The answer starts about one to three seconds later on Luna, the time of one short structured call | **Recommended.** The answer can only say what is true |
-| The answer prompt says writes are offered as cards by a separate step, both still run at once | No delay | The answer must guess. When the proposal is dropped it points at a card that is not there |
+| **The proposal first, then the answer is told its outcome** | The answer starts about one to three seconds later on Luna, the time of one short structured call | **Chosen.** The answer can only say what is true |
+| The answer prompt says writes are offered as cards by a separate step, both still run at once | No delay | Not chosen. The answer must guess, and when the proposal is dropped it points at a card that is not there |
 
-**A1-Q: which cycles the key result choices come from.** Today the copilot offers only the current quarter. I1 decided that every picker on screen offers every cycle being planned or running, the running quarter first (`apps/web/lib/linkable-key-results.ts`). Recommended: the copilot's initiative and task choices follow the same rule, so the copilot never refuses what the screen allows. The choice list stays capped at its present limit, running quarter first.
+**A1-Q: which cycles the key result choices come from. Decided by Akmal on 12 November 2026: I1's rule.** Today the copilot offers only the current quarter. I1 decided that every picker on screen offers every cycle being planned or running, the running quarter first (`apps/web/lib/linkable-key-results.ts`). The copilot's initiative and task choices follow the same rule, so the copilot never refuses what the screen allows. The choice list stays capped at its present limit, running quarter first.
 
 ### 2.2 L7: tune the prompts to GPT-6 Luna
 
@@ -102,16 +104,16 @@ What upgrading demo.okrgoal.com found on 11 November 2026. Its first 0.8.0 attem
 
 | # | What | Where | Change | Size |
 |---|---|---|---|---|
-| U1 | **`pnpm db:change` refuses an argument it does not know since 0.8.0**, and 0.7.0 ignored it. The demo server's own wrapper passed `run`, so its upgrade stopped at the data changes. Nothing this repository ships or documents passes `run`, but an operator's script might, and early versions needed it | `packages/db/src/data-change-command.ts`; the comment in `packages/config/src/index.ts` that still says "db:change run" | Accept `run` as the spelling of the default, and say so in the usage line. Fix the comment. See U1-Q | S |
+| U1 | **`pnpm db:change` refuses an argument it does not know since 0.8.0**, and 0.7.0 ignored it. The demo server's own wrapper passed `run`, so its upgrade stopped at the data changes. Nothing this repository ships or documents passes `run`, but an operator's script might, and early versions needed it | `packages/db/src/data-change-command.ts`; the comment in `packages/config/src/index.ts` that still says "db:change run" | Accept `run` as the spelling of the default, and say so in the usage line. Fix the comment. Decided in U1-Q | S |
 | U2 | **`deploy/demo/reset.sh` never runs the data changes after the seed.** The demo server's wrapper has run them since 7 October 2026, because a seeded database still had work for 0001 (member time zones) and 0009 (agent bindings) | `deploy/demo/reset.sh` | Check first: a fresh database, `pnpm db:seed`, then `pnpm db:change --status`. If it names a script, the reset runs `pnpm db:change` after the seed and before `demo:prepare`. If it names none, close the row with that evidence | S |
 | U3 | The upgrade notes for 0.8.1 | `docs/runbooks/upgrade.md` | A "0.8.0 to 0.8.1" section: data change 0035 (M1), which Helm runs after the upgrade and `./openokr upgrade` runs unless `OPENOKR_SKIP_DATA_CHANGE=1`; the Luna default (M4) and how to keep another model; U1 | S |
 
-**U1-Q: accept `run`, or keep refusing it?**
+**U1-Q: accept `run`, or keep refusing it? Decided by Akmal on 12 November 2026: accept it.**
 
-| Option | Recommendation |
+| Option | Outcome |
 |---|---|
-| **Accept `run` as the default's name** | **Recommended.** One word, and a script written for an early version keeps working. A refusal halfway through an upgrade costs more than a lenient parser |
-| Keep refusing, and name it in the upgrade notes | Stricter. Anyone who missed the note meets it mid-upgrade, as the demo did |
+| **Accept `run` as the default's name** | **Chosen.** One word, and a script written for an early version keeps working. A refusal halfway through an upgrade costs more than a lenient parser |
+| Keep refusing, and name it in the upgrade notes | Not chosen. Anyone who missed the note meets it mid-upgrade, as the demo did |
 
 ## 6. Follow-ups from the 0.8.0 acceptance test
 
@@ -119,16 +121,16 @@ From `docs/report/uat-0.8.0-report.md`. Akmal answered "follow-up after the rele
 
 | # | Finding | Change | Size | Gate |
 |---|---|---|---|---|
-| Q-8 | Signed-out pages follow the instance language, not the browser's. A Malay browser sees English sign-in and confirmation pages | On a signed-out page, use the browser's language when the product ships it, otherwise the instance language. Signed in, the person's own choice still wins. See Q-8-Q | S | None |
+| Q-8 | Signed-out pages follow the instance language, not the browser's. A Malay browser sees English sign-in and confirmation pages | On a signed-out page, use the browser's language when the product ships it, otherwise the instance language. Signed in, the person's own choice still wins. Decided in Q-8-Q | S | None |
 | Q-9 | Turning the cloud flag on after workspaces exist shows "0 tenants" until the hourly adopt runs | The operator console's empty state says workspaces are waiting to be adopted and offers **Adopt now**, which runs the same adopt as `pnpm cloud:adopt`, audited | S | None |
 | Q-10a | "Sign out" in the avatar menu is a plain button, so arrow keys skip it | A menu item like the others | S | None |
 | Q-10b | The footer band is sticky on a phone and takes 63 px | Not sticky below the phone breakpoint | S | None |
 | Q-10c | The "Connect your AI agent" pill is cut off on both sides at 390 px | Fits at 390 px, checked with the overflow spec | S | None |
 | Q-10d | The role matrix truncates "Manage" to "Man" | The column fits its longest level in English and Malay | S | None |
 | Q-10e | `./openokr up` always ends with "Open ... to finish setup", also on an instance already set up | Read the instance state and print that line only when setup is unfinished | S | None |
-| S5-R | **S5-Q2 over REST.** Accepting a personal invitation through REST, the command line or an agent joins without confirming the address; only the join page confirms it | Confirm inside `invitations.acceptLink`, so every surface does what the join page does | S | **Design first**: it changes who counts as confirmed. A short section in `docs/design/email-verification.md` §12, then "design approved" |
+| S5-R | **S5-Q2 over REST.** Accepting a personal invitation through REST, the command line or an agent joins without confirming the address; only the join page confirms it | Confirm inside `invitations.acceptLink`, so every surface does what the join page does | S | **Design first**: it changes who counts as confirmed. A short section in `docs/design/email-verification.md` §12, then "design approved". Akmal asked for it in 0.8.1 on 12 November 2026 |
 
-**Q-8-Q: should the browser's language win on signed-out pages?** Recommended: yes, when the product ships that language. The instance language stays the fallback, and the person's own setting wins once signed in. The other way, a Malay visitor to an English instance reads its sign-in in English, which is what Obed reported.
+**Q-8-Q: should the browser's language win on signed-out pages? Decided by Akmal on 12 November 2026: yes**, when the product ships that language. The instance language stays the fallback, and the person's own setting wins once signed in. Otherwise a Malay visitor to an English instance reads its sign-in in English, which is what Obed reported.
 
 Retests from the same report, on a 0.8.1 image:
 
@@ -160,15 +162,17 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 | Twelve open CodeQL warnings and notes (trailing arguments, trivial conditionals, an unused variable) | None is a security finding. Worth a tidy-up change, not a patch |
 | The vector index (H5-Q4) and the direct database connection (H7) | Decided in 0.8.0: build when a deployment needs them |
 
-## 9. Decisions for Akmal
+## 9. Decisions
 
-| # | Question | Recommendation |
-|---|---|---|
-| A1-Q | Do the copilot's initiative and task choices follow I1's rule, every cycle being planned or running, running quarter first? | Yes |
-| A2-Q | Does the panel ask for the proposal before the answer, so the answer knows? | Yes, at one to three seconds' delay |
-| U1-Q | Does `pnpm db:change` accept `run` again? | Yes |
-| Q-8-Q | On signed-out pages, does the browser's language win over the instance's when the product ships it? | Yes |
-| S5-R | Write S5-R's short design now, for 0.8.1? | Yes. It is small, and the gap is an address counted unconfirmed on three surfaces |
+Akmal answered all five on 12 November 2026, each as recommended.
+
+| # | Question | Recommended | Akmal's answer |
+|---|---|---|---|
+| A1-Q | Do the copilot's initiative and task choices follow I1's rule, every cycle being planned or running, running quarter first? | Yes | **Yes** |
+| A2-Q | Does the panel ask for the proposal before the answer, so the answer knows? | Yes, at one to three seconds' delay | **Yes** |
+| U1-Q | Does `pnpm db:change` accept `run` again? | Yes | **Yes** |
+| Q-8-Q | On signed-out pages, does the browser's language win over the instance's when the product ships it? | Yes | **Yes** |
+| S5-R | Write S5-R's short design now, for 0.8.1? | Yes. It is small, and the gap is an address counted unconfirmed on three surfaces | **Yes**. The design is written next and needs its own "design approved" |
 
 ## 10. Suggested order
 
@@ -189,19 +193,19 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | Row | Status | Note |
 |---|---|---|
 | M1 to M6 | merged | PR #210, `ea94d5a0` |
-| A1 | to do | A1-Q |
-| A2 | to do | A2-Q |
+| A1 | to do | A1-Q decided: I1's rule |
+| A2 | to do | A2-Q decided: the proposal first |
 | A3 | to do | |
-| L7 | to do | After A1 and A2 |
+| L7 | to do | After A1 and A2. The split is approved |
 | K1 | to do | PR #211, open |
 | K2 | to do | |
 | K3 | to do | |
 | P1 | to do | |
 | P2 | to do | |
-| U1 | to do | U1-Q |
+| U1 | to do | U1-Q decided: accept `run` |
 | U2 | to do | Check first |
 | U3 | to do | Last |
-| Q-8 | to do | Q-8-Q |
+| Q-8 | to do | Q-8-Q decided: the browser's language when shipped |
 | Q-9 | to do | |
 | Q-10a to Q-10e | to do | |
-| S5-R | to do | Design first |
+| S5-R | to do | Design to write next, then "design approved" |
