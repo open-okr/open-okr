@@ -496,6 +496,9 @@ test("workspaces with no plan are marked, reviewed and moved onto the default pl
     await expect(
       operatorPage.getByRole("heading", { name: "Workspaces with no plan" }),
     ).toBeVisible({ timeout: 15_000 });
+    // The link lands on the review page itself, which is also how
+    // route-coverage.test.ts sees the route opened.
+    expect(new URL(operatorPage.url()).pathname).toBe("/operator/default-plan");
     await expect(
       operatorPage.getByTestId("default-plan-no-credits"),
     ).toContainText("Team includes no AI credits");

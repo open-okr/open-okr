@@ -286,7 +286,7 @@ pass "a second up leaves the public address alone"
 # compose call the helper makes hands Caddy the same ranges, space separated.
 [ "$(proxy_trusts)" = "127.0.0.1/32" ] \
   || fail "with nothing set the proxy trusts '$(proxy_trusts)', not loopback"
-app_log | grep -q "caller address: one forwarded address only" \
+app_log | grep -q "caller address: X-Forwarded-For, 1 proxy from the right" \
   || fail "the application did not say which caller address it reads"
 [ "$(caller_address_rows)" = "1" ] \
   || fail "the starting reading was not recorded once on the instance chain"

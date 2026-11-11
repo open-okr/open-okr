@@ -546,7 +546,8 @@ export function startRelay(): OutboxRelay | null {
     phase: "drain",
     async stop() {
       const { released, waited } = await relay.stop();
-      const rows = `${released} row${released === 1 ? "" : "s"}`;
+      // A count, never an inflected word (no-english-plurals.test.ts).
+      const rows = `rows: ${released}`;
       if (!waited) {
         return released === 0 ? "relay idle" : `relay released ${rows}`;
       }

@@ -996,7 +996,7 @@ export function startScheduler(): PgBossJobQueue | null {
       const handedBack = queue.running;
       return handedBack === 0
         ? "scheduler idle"
-        : `${handedBack} scheduled job${handedBack === 1 ? "" : "s"} handed back`;
+        : `scheduled jobs handed back: ${handedBack}`;
     },
   });
 

@@ -124,7 +124,7 @@ exits:
 
 ```
 shutdown: SIGTERM, draining for up to 20s
-shutdown: stopped after 1.4s: relay finished the row in flight and released 3 rows, scheduler idle, 0 actions in flight, error reports flushed, telemetry flushed
+shutdown: stopped after 1.4s: relay finished the row in flight and released rows: 3, scheduler idle, actions in flight: 0, error reports flushed, telemetry flushed
 ```
 
 | Work in flight | What a stop does with it |

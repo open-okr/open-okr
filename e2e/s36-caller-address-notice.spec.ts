@@ -2,12 +2,12 @@
  * The caller address notice on Admin, General (S-36, plan 0.8.0 H2,
  * docs/design/trusted-proxies.md D12).
  *
- * The suite's server runs with neither `OPENOKR_TRUSTED_PROXIES` nor
- * `OPENOKR_CLIENT_ADDRESS_HEADER` set, which is the shipped default: a
- * forwarded chain places nobody. A sign-in carrying one is what a visitor
- * behind a CDN and a load balancer sends, so after it this process has met a
- * caller it could not place, and the administrator is told what that costs
- * and which variable to set.
+ * The suite's server runs with nothing set, which is the shipped default:
+ * the `X-Forwarded-For` entry one place from the right is the caller
+ * (trusted-proxies.md §10). A load balancer that writes the port beside the
+ * address, as some do, leaves that entry something that is not an address,
+ * so after such a sign-in this process has met a caller it could not place,
+ * and the administrator is told what that costs and which variable to set.
  *
  * `e2e/hosting.ts` gives each person one forwarded address, which is still
  * read as theirs. The notice stays up for the rest of the shard, which no
@@ -17,7 +17,7 @@ import { expect, test } from "./fixtures.ts";
 import { RUN } from "./hosting.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
-test("a sign-in from behind an unnamed proxy shows the notice on General", async ({
+test("a sign-in nobody can place shows the notice on General", async ({
   page,
   playwright,
   baseURL,
@@ -26,8 +26,9 @@ test("a sign-in from behind an unnamed proxy shows the notice on General", async
     baseURL: baseURL ?? "",
     extraHTTPHeaders: {
       origin: baseURL ?? "",
-      // A caller-written entry, then the visitor as a load balancer saw them.
-      "x-forwarded-for": "203.0.113.66, 198.51.100.7",
+      // A caller-written entry, then the visitor as a load balancer that
+      // writes ports saw them. Without the port the hop count places them.
+      "x-forwarded-for": "203.0.113.66, 198.51.100.7:51234",
     },
   });
   // An address nobody has, so the wrong password counts against no account

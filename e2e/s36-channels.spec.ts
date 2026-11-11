@@ -20,7 +20,7 @@
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
-import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
+import { goTo, signIn } from "./instance-account.ts";
 
 const BOT_TOKEN = "xoxb-a-token-nobody-should-ever-see-on-a-screen";
 const SIGNING_SECRET = "8f742231b10e8888abcd99yyyzzz85a5";
@@ -225,9 +225,8 @@ test("quiet hours save, and the copy says a reminder waits rather than vanishes"
 test("saving your profile keeps the quiet hours set here", async () => {
   // The profile form's quiet-hours boxes were always empty, and an empty pair
   // means "off", so saving anything on the profile deleted this window.
-  await goTo(page, "/people");
-  await page.getByRole("link", { name: INSTANCE_ACCOUNT.name }).first().click();
-  await page.waitForURL(/\/people\//);
+  // Your own profile form is on Your account since plan 0.8.0 Y2.
+  await goTo(page, "/account");
   const profile = page
     .locator("form")
     .filter({ has: page.locator('input[name="quietStart"]') });

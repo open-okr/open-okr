@@ -139,14 +139,14 @@ describe("waiting for actions in flight", () => {
     });
 
     expect(Date.now() - began).toBeGreaterThanOrEqual(100);
-    expect(report.outcomes).toEqual(["0 actions in flight"]);
+    expect(report.outcomes).toEqual(["actions in flight: 0"]);
   });
 
   test("gives up at the budget and says how many it left", async () => {
     const report = await runShutdown([waitForActions(() => 2)], {
       budgetMs: 200,
     });
-    expect(report.outcomes).toEqual(["2 actions still in flight"]);
+    expect(report.outcomes).toEqual(["actions still in flight: 2"]);
   });
 });
 
@@ -169,7 +169,7 @@ describe("the signal", () => {
     const stopped = out.filter((line) => line.includes("stopped after"));
     expect(stopped).toHaveLength(1);
     expect(stopped[0]).toMatch(
-      /^shutdown: stopped after \d+\.\ds: relay idle, 0 actions in flight, error reports flushed\n$/,
+      /^shutdown: stopped after \d+\.\ds: relay idle, actions in flight: 0, error reports flushed\n$/,
     );
     expect(out[0]).toBe("shutdown: SIGTERM, draining for up to 20s\n");
   });

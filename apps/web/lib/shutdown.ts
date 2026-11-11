@@ -223,10 +223,11 @@ export function waitForActions(inFlight: () => number): ShutdownStep {
       for (;;) {
         const count = inFlight();
         if (count === 0) {
-          return "0 actions in flight";
+          return "actions in flight: 0";
         }
         if (Date.now() + ACTION_POLL_MS >= deadline) {
-          return `${count} action${count === 1 ? "" : "s"} still in flight`;
+          // A count, never an inflected word (no-english-plurals.test.ts).
+          return `actions still in flight: ${count}`;
         }
         await new Promise((resolve) => setTimeout(resolve, ACTION_POLL_MS));
       }
