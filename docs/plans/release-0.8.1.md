@@ -93,7 +93,26 @@ Asked for by Akmal on 12 November 2026, during the build: the answer should stre
 |---|---|---|---|---|
 | W1 | **Stream the background answer** | On every deployment that drains its queue, the reader sees nothing for several seconds and then the whole answer | `runCopilotAnswer` calls `streamGrounded` when the drafter has it and publishes the words as they come, joined for up to 60 ms or 1,000 characters so a token is not a NOTIFY of its own. Recorded once at the end, as now. A streamed answer now carries the token count and cost the provider reports when its stream ends, so streaming loses no cost record. A stream that stops partway keeps what arrived and says so. `docs/design/copilot-background-runs.md` updated | S |
 | W2 | **Say which step the copilot is on** | The panel shows an empty bubble until words arrive; with A2 the first word comes one to three seconds later | A `step` event, from the run itself, for each thing it really does: searching the workspace, found N passages, preparing a change, writing the answer. Fixed keys with words from the catalogues in English and Malay, never a model's text. The panel shows the current step as one live line (a polite live region), then folds the finished steps into a one-line summary above the answer. L2's read tools (0.9.0) add their own steps to the same line, "Reading New accounts reach value in their first week", which is design §3's reading status line arriving early | S |
-| W3 | **The panel, as a current chat product** | See the review | Rows W3a and on, from a review of S-39 against current chat products, run during the build. Added to this plan when it lands, with any decision it needs | To come |
+| W3 | **The panel, as a current chat product** | See the review: 7 rule breaks and 20 risks, three of them blockers | The CP rows below, from `docs/report/copilot-panel-review-0.8.1.md` (read-only review of S-39 against ChatGPT and Claude.ai, 12 November 2026) | About 6 builder days |
+| W4 | **Stop stops a background run** | On every deployment that drains its queue, Stop aborts the request and the server only unsubscribes; the panel re-reads, sees the run still going, subscribes again, and the answer arrives anyway (review F5) | A `copilot.stopRun` action stamps the answer as stopped; the run checks between pieces and ends there, keeping what arrived, marked stopped. The panel calls it before it aborts. Contract regenerated | S |
+
+**The W3 rows.** Each is detailed, with its evidence, files and acceptance criteria, in the review's section 3. Order is the review's: the defects first.
+
+| # | What | Fixes | Size | Release |
+|---|---|---|---|---|
+| CP8 | **Empty, AI off and capped.** Four suggested prompts that work before L2 (review Q9). With AI off, the passages and the reason stay on screen after the turn lands; the link S-39 asks for (AI settings, plan, or your own AI keys, by who may use it). A failed availability read makes the copilot unavailable, never the page (`app-shell.tsx`) | F1, F11, F14, F18 | < 1 day | 0.8.1 |
+| CP3 | **Turns, order and scroll.** One assistant turn for arriving and recorded answers, no reflow when it lands; cards inside the turn that made them (`createdAt` on `copilot.proposals`, no migration); stick to the bottom while text arrives, Jump to latest, an opened thread starts at its end | F3, F6, F7, F21 | 1 day | 0.8.1 |
+| CP2 | **Conversations.** New chat and History in the header, titles with relative dates, the open thread in the address (`?copilot=`), and delete as a new `copilot.deleteThread` (soft delete, audited, no migration) | F2, F19 | 1 to 1.5 days | 0.8.1 |
+| CP1 | **Frame and keyboard.** Base UI `Dialog`, not modal: Escape closes, focus returns to Ask. 512px wide in both densities with Expand to 768px, remembered in the browser; a full-screen sheet below 768px. The conversation is a log, with one polite status line | F4, F16, F26 | < 1 day | 0.8.1 |
+| CP6 | **Composer.** One rounded box holding the text and the button, growing to 40% of the panel; IME-safe Enter; typing allowed while an answer arrives; Send becomes Stop in place, offered only when it can stop (W4); a failed send puts the question back | F13, F17 | 0.5 day | 0.8.1 |
+| CP4 | **Formatted answers.** A small safe renderer in `packages/ui` for the subset models write (paragraphs, bold, italics, inline code, lists, code blocks with Copy). React elements only, never HTML, no link from model text; half-written markers show as typed. The answer prompt names the subset (with L7) | F8 | 1 day | 0.8.1 |
+| CP7 | **Answer actions and errors.** Copy on every answer, Retry on the last when it failed or stopped; errors under the turn they belong to; a card's error on the card; after Apply, the card links to what it made; separate busy flags for asking and deciding | F13, F20, F22, F23, F28 | 0.5 day | 0.8.1 |
+| CP9 | **The streaming look and the step line.** A caret at the end of arriving text; the W2 step line replaced in place, each step shown at least 400 ms, folding into a "Searched, found N" disclosure once words arrive; nothing moves under reduced motion; "Answer ready" or "Stopped" announced once | F5 (screen half), F27 | 1 day | 0.8.1 |
+| CP5 | Numbered citation chips, linked to every kind of source | F9, F10 | 1 day | 0.9.0, with L1 to L3 |
+| CP10 | Reasons as codes the panel translates, not English sentences | F15 | 1 day | 0.9.0 (review Q8) |
+| CP11 | "Ask about this page" | F12 | > 1 day | 0.9.0, after L2 (review Q9) |
+
+Not in either release yet: a copilot mockup (`docs/mockups/src/13-copilot.html`, review section 4), and the UIUX-PLAN S-39 text, which each CP row updates for its own part as it lands.
 
 **W2-Q: are the steps stored with the answer? Recommended: no, live only.** Storing them is a column on `ai_messages`, which is a migration, and this release has none. After a reload, the finished answer still shows its sources and its card, which say the same thing.
 
@@ -104,6 +123,7 @@ Acceptance criteria:
 | W1 | A deployment that drains its queue and a provider that streams | A member asks the copilot | The words appear as they are written, and the answer recorded at the end is the whole of it, with its token count and cost |
 | W1 | A provider that falls over after some words | The run ends | The words that arrived are kept, and the panel says the answer stopped partway |
 | W2 | Any question, with AI on | The member asks | Before the first word, the panel names each step as it happens: searching, what was found, preparing a change when it does, writing |
+| W4 | A background run that is writing an answer | The member presses Stop | Words stop arriving, the answer keeps what arrived marked as stopped, and a reload shows the same stopped answer |
 | W2 | AI off | The member asks | Searching and what was found, then the passages, with no step that implies a model |
 
 ## 3. The cycle page
@@ -197,6 +217,10 @@ Akmal answered the first five on 12 November 2026, each as recommended. W2-Q cam
 | Q-8-Q | On signed-out pages, does the browser's language win over the instance's when the product ships it? | Yes | **Yes** |
 | S5-R | Write S5-R's short design now, for 0.8.1? | Yes. It is small, and the gap is an address counted unconfirmed on three surfaces | **Yes**. The design is written next and needs its own "design approved" |
 | W2-Q | Are the copilot's steps stored with the answer? | No, live only: storing them is a migration, and the finished answer's sources and card say the same | Open |
+| W3-Q7 | How much of the panel review goes into 0.8.1? | Most of it: CP1 to CP4 and CP6 to CP9, plus W4; CP5, CP10 and CP11 in 0.9.0 with the read loop | **As recommended**, 12 November 2026 |
+| W3-Q1 | Side panel, or a full page like ChatGPT? | The side panel with Expand to 768px; a `/copilot` page later if people ask | **As recommended** |
+| W3-Q2 | How are formatted answers rendered? | A small in-house renderer for the subset, React elements only, no new dependency | **As recommended** |
+| W3-Q4 | Delete copilot conversations? | Now, as a soft-delete action with audit and no migration; rename later | **As recommended** |
 
 ## 10. Suggested order
 
@@ -223,7 +247,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | L7 | to do | After A1 and A2. The split is approved |
 | W1 | done | `streamInto` in the background run, joined for 60 ms or 1,000 characters; `streamGrounded`'s `done` carries the provider's count and cost; a stream that stops partway keeps what arrived. The mock evaluation's streaming fixtures now expect the count, as the whole-answer ones do. Core 26, agents 56, 24 sets |
 | W2 | done | `step` events (`searching`, `found` with a count, `proposing` only when offers exist, `writing`) from `streamAnswer` and the background run; `copilotStepFrom` checks them at both routes; the panel's fixed "Reading your workspace" is now the live step line, a polite status. Built live only, as W2-Q recommends. Core 30, web 23, catalogue tests |
-| W3 | to do | Rows from the S-39 review, to come |
+| W3 | to do | CP8, CP3, CP2, CP1, CP6, CP4, CP7, CP9 in that order; CP5, CP10, CP11 are 0.9.0 |
+| W4 | to do | Before CP6 wires Stop |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | to do | |
 | K3 | to do | |
