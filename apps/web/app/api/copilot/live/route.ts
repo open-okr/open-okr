@@ -21,7 +21,11 @@
  * as it is produced and persisted when it is finished. `copilot/background.ts`
  * says why a write per chunk is not the alternative.
  */
-import { callAction, copilotThreadChannel } from "@openokr/core";
+import {
+  callAction,
+  copilotStepFrom,
+  copilotThreadChannel,
+} from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../lib/auth";
 import { keepAlive } from "../../../../lib/keep-alive";
@@ -98,6 +102,14 @@ export async function GET(request: NextRequest) {
           }
           if (event.name === "copilot.text") {
             send("text", { kind: "text", text: String(data.text ?? "") });
+            return;
+          }
+          if (event.name === "copilot.step") {
+            // The step a rejoined run is on (plan 0.8.1 W2).
+            const step = copilotStepFrom(data);
+            if (step) {
+              send("step", { kind: "step", ...step });
+            }
             return;
           }
           if (event.name === "copilot.done") {

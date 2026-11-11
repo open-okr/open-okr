@@ -39,7 +39,7 @@ import { aiOffSentence } from "../ai/off-reason.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
-import { proposeBeforeAnswering } from "./proposals.ts";
+import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -308,6 +308,43 @@ export async function answerQuestion(
   };
 }
 
+/**
+ * The step a run is on, as a reader is told it (plan 0.8.1 W2).
+ *
+ * Fixed keys, each a thing the run really does, so the panel words them from
+ * its own catalogue and never shows a model's text as progress. Live only:
+ * nothing stores them (W2-Q), and the finished answer's sources and card say
+ * the same thing after a reload. L2's read tools (0.9.0) add their own.
+ */
+export type CopilotStep =
+  | { readonly step: "searching" }
+  | { readonly step: "found"; readonly count: number }
+  | { readonly step: "proposing" }
+  | { readonly step: "writing" };
+
+/**
+ * A published step, checked, or null. The routes forward what a background
+ * run published, and a payload off the wire is checked before it is sent on.
+ */
+export function copilotStepFrom(
+  data: Readonly<Record<string, unknown>>,
+): CopilotStep | null {
+  switch (data.step) {
+    case "searching":
+    case "proposing":
+    case "writing":
+      return { step: data.step };
+    case "found":
+      return typeof data.count === "number" &&
+        Number.isInteger(data.count) &&
+        data.count >= 0
+        ? { step: "found", count: data.count }
+        : null;
+    default:
+      return null;
+  }
+}
+
 /** What a streamed answer sends, in the order it sends it. */
 export type CopilotEvent =
   /** First, always: where the question was written. */
@@ -318,6 +355,8 @@ export type CopilotEvent =
     }
   /** What retrieval found. Sent before any prose, and sent when there is none. */
   | { readonly kind: "sources"; readonly sources: readonly AnswerSource[] }
+  /** The step the run is on now (plan 0.8.1 W2). */
+  | ({ readonly kind: "step" } & CopilotStep)
   /**
    * A change card was made for this question, before the answer (plan 0.8.1
    * A2). The panel reads the thread's proposals when it arrives, so the card
@@ -352,14 +391,31 @@ export async function* streamAnswer(
   input: AnswerQuestionInput,
   signal?: AbortSignal,
 ): AsyncGenerator<CopilotEvent> {
-  const prepared = await prepare(context, input, (drafter) =>
-    Boolean(drafter.streamGrounded),
-  );
+  // Recorded first, as `prepare` does, and split from the retrieval here so
+  // the reader is told the search has started while it runs (plan 0.8.1 W2).
+  const asked = await callAction(context, "copilot.ask", {
+    threadId: input.threadId,
+    subjectType: input.subjectType,
+    subjectId: input.subjectId,
+    question: input.question,
+    background: false,
+  });
   yield {
     kind: "thread",
-    threadId: prepared.threadId,
-    questionMessageId: prepared.questionMessageId,
+    threadId: asked.threadId,
+    questionMessageId: asked.messageId,
   };
+  yield { kind: "step", step: "searching" };
+  const prepared = await groundQuestion(
+    context,
+    {
+      threadId: asked.threadId,
+      questionMessageId: asked.messageId,
+      question: input.question,
+    },
+    (drafter) => Boolean(drafter.streamGrounded),
+  );
+  yield { kind: "step", step: "found", count: prepared.sources.length };
   yield { kind: "sources", sources: prepared.sources };
 
   // Through the drafter, for the reason `answerQuestion` records above.
@@ -376,14 +432,20 @@ export async function* streamAnswer(
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
-  const proposal = await proposeBeforeAnswering(context, {
-    threadId: prepared.threadId,
-    request: input.question,
-  });
+  const offers = await offersToPropose(context);
+  if (offers !== null) {
+    yield { kind: "step", step: "proposing" };
+  }
+  const proposal = await proposeBeforeAnswering(
+    context,
+    { threadId: prepared.threadId, request: input.question },
+    offers,
+  );
   if (proposal.proposalId !== null) {
     yield { kind: "proposal", proposalId: proposal.proposalId };
   }
   const ask = { ...prepared.ask, proposal: proposal.note };
+  yield { kind: "step", step: "writing" };
 
   let text = "";
   let cited: readonly number[] | null = null;

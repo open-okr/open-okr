@@ -824,6 +824,8 @@ export {
   type AnswerSource,
   answerQuestion,
   type CopilotEvent,
+  type CopilotStep,
+  copilotStepFrom,
   GROUNDING_LIMIT,
   streamAnswer,
 } from "./copilot/answer.ts";

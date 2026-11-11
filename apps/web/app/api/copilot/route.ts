@@ -33,6 +33,7 @@
 import {
   type CopilotEvent,
   callAction,
+  copilotStepFrom,
   copilotThreadChannel,
   streamAnswer,
 } from "@openokr/core";
@@ -247,6 +248,13 @@ data: ${JSON.stringify(event)}
           }
           if (event.name === "copilot.text") {
             send({ kind: "text", text: String(data.text ?? "") });
+            return;
+          }
+          if (event.name === "copilot.step") {
+            const step = copilotStepFrom(data);
+            if (step) {
+              send({ kind: "step", ...step });
+            }
             return;
           }
           if (event.name === "copilot.proposal") {

@@ -703,6 +703,8 @@ export async function buildProposal(
 export async function proposeFromRequest(
   context: ActionCallContext,
   input: { readonly threadId: string; readonly request: string },
+  /** Already read by the caller, so they are not read twice (plan 0.8.1 W2). */
+  preparedOffers?: readonly ProposalOffer[],
 ): Promise<{
   readonly id: string;
   readonly action: string;
@@ -714,7 +716,7 @@ export async function proposeFromRequest(
     return null;
   }
 
-  const offers = await proposalOffers(context);
+  const offers = preparedOffers ?? (await proposalOffers(context));
   if (offers.length === 0) {
     return null;
   }
@@ -804,15 +806,23 @@ export async function proposeFromRequest(
 export async function proposeBeforeAnswering(
   context: ActionCallContext,
   input: { readonly threadId: string; readonly request: string },
+  /**
+   * From `offersToPropose`, so the caller can say it is preparing a change
+   * only when it really will ask a model for one (plan 0.8.1 W2). Null means
+   * nothing can be proposed, and no model is asked.
+   */
+  offers: readonly ProposalOffer[] | null,
 ): Promise<{
   readonly note: ProposalNote;
   readonly proposalId: string | null;
 }> {
   let proposed: Awaited<ReturnType<typeof proposeFromRequest>> = null;
-  try {
-    proposed = await proposeFromRequest(context, input);
-  } catch {
-    proposed = null;
+  if (offers !== null) {
+    try {
+      proposed = await proposeFromRequest(context, input, offers);
+    } catch {
+      proposed = null;
+    }
   }
   if (!proposed) {
     return { note: { made: false }, proposalId: null };
@@ -825,4 +835,23 @@ export async function proposeBeforeAnswering(
     },
     proposalId: proposed.id,
   };
+}
+
+/**
+ * What this member may be offered, or null when no proposal will be asked for:
+ * no drafter that proposes, or nothing the member may change (plan 0.8.1 W2).
+ * Never throws; a failure to read is no proposal.
+ */
+export async function offersToPropose(
+  context: ActionCallContext,
+): Promise<readonly ProposalOffer[] | null> {
+  if (!context.drafter?.proposeAction) {
+    return null;
+  }
+  try {
+    const offers = await proposalOffers(context);
+    return offers.length === 0 ? null : offers;
+  } catch {
+    return null;
+  }
 }

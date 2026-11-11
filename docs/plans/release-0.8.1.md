@@ -222,7 +222,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |
 | W1 | done | `streamInto` in the background run, joined for 60 ms or 1,000 characters; `streamGrounded`'s `done` carries the provider's count and cost; a stream that stops partway keeps what arrived. The mock evaluation's streaming fixtures now expect the count, as the whole-answer ones do. Core 26, agents 56, 24 sets |
-| W2 | to do | W2-Q: live only, recommended |
+| W2 | done | `step` events (`searching`, `found` with a count, `proposing` only when offers exist, `writing`) from `streamAnswer` and the background run; `copilotStepFrom` checks them at both routes; the panel's fixed "Reading your workspace" is now the live step line, a polite status. Built live only, as W2-Q recommends. Core 30, web 23, catalogue tests |
 | W3 | to do | Rows from the S-39 review, to come |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | to do | |

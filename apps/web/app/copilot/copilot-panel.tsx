@@ -379,6 +379,34 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
   );
 }
 
+/** The step a run says it is on (plan 0.8.1 W2). Core's `CopilotStep`. */
+type Step =
+  | { readonly step: "searching" }
+  | { readonly step: "found"; readonly count: number }
+  | { readonly step: "proposing" }
+  | { readonly step: "writing" };
+
+/** A step in the reader's words, from the catalogue and never from a model. */
+function stepWords(
+  step: Step,
+  t: ReturnType<typeof useTranslations>["t"],
+): string {
+  switch (step.step) {
+    case "searching":
+      return t("copilot.copilotPanel.step.searching");
+    case "found":
+      return step.count === 0
+        ? t("copilot.copilotPanel.step.foundNone")
+        : step.count === 1
+          ? t("copilot.copilotPanel.step.foundOne", { count: step.count })
+          : t("copilot.copilotPanel.step.foundOther", { count: step.count });
+    case "proposing":
+      return t("copilot.copilotPanel.step.proposing");
+    case "writing":
+      return t("copilot.copilotPanel.step.writing");
+  }
+}
+
 export function CopilotPanel({
   initialAvailability,
 }: {
@@ -398,6 +426,8 @@ export function CopilotPanel({
   const [sources, setSources] = useState<readonly Source[]>([]);
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  /** What the run says it is doing, while no words have arrived (W2). */
+  const [step, setStep] = useState<Step | null>(null);
   const [busy, setBusy] = useState(false);
   // Which proposal button started the decision in flight. Cleared with `busy`,
   // because `busy` is also set while a question is sent.
@@ -480,6 +510,9 @@ export function CopilotPanel({
       const data = JSON.parse(event.data) as { text?: string };
       setStreaming((was) => (was ?? "") + (data.text ?? ""));
     };
+    const onStep = (event: MessageEvent) => {
+      setStep(JSON.parse(event.data) as Step);
+    };
     const onDone = () => {
       source.close();
       // Re-read rather than assembling the final message here: the thread read
@@ -488,9 +521,11 @@ export function CopilotPanel({
       void loadThread(threadId);
     };
     source.addEventListener("text", onText);
+    source.addEventListener("step", onStep);
     source.addEventListener("done", onDone);
     return () => {
       source.removeEventListener("text", onText);
+      source.removeEventListener("step", onStep);
       source.removeEventListener("done", onDone);
       source.close();
     };
@@ -544,6 +579,10 @@ export function CopilotPanel({
     setNotice(null);
     setSources([]);
     setStreaming("");
+    // The first thing every run does. Said at once rather than when the event
+    // arrives, because a background run may publish it before the panel has
+    // subscribed (plan 0.8.1 W2).
+    setStep({ step: "searching" });
     // Shown straight away rather than after the round trip. The id is the
     // server's, so this turn is replaced when the thread is re-read.
     setMessages((current) => [
@@ -601,12 +640,15 @@ export function CopilotPanel({
             | { kind: "thread"; threadId: string }
             | { kind: "sources"; sources: readonly Source[] }
             | { kind: "proposal"; proposalId: string }
+            | ({ kind: "step" } & Step)
             | { kind: "unavailable"; reason: string }
             | { kind: "text"; text: string }
             | { kind: "done" };
           if (event.kind === "thread") {
             landedThreadId = event.threadId;
             setThreadId(event.threadId);
+          } else if (event.kind === "step") {
+            setStep(event);
           } else if (event.kind === "proposal" && landedThreadId) {
             // The card was made before the answer (plan 0.8.1 A2), so it is
             // shown while the answer is still being written.
@@ -636,6 +678,7 @@ export function CopilotPanel({
       abort.current = null;
       setBusy(false);
       setStreaming(null);
+      setStep(null);
       if (landedThreadId) {
         // The recorded thread, with citations filtered against access now,
         // replaces everything drawn optimistically above. A proposal was asked
@@ -763,11 +806,16 @@ export function CopilotPanel({
                 {streaming !== null ? (
                   <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
                     {streaming === "" ? (
-                      <span className="flex items-center gap-2 text-ink-4">
+                      // One line, replaced in place as the run moves on, and
+                      // read out politely (plan 0.8.1 W2).
+                      <span
+                        role="status"
+                        className="flex items-center gap-2 text-ink-4"
+                      >
                         {/* The face is the progress indicator here, so it
                             loops while the answer has not started. */}
                         <AgentFace mood="thinking" live className="size-4" />
-                        {t("copilot.copilotPanel.readingYourWorkspace")}
+                        {stepWords(step ?? { step: "searching" }, t)}
                       </span>
                     ) : (
                       streaming

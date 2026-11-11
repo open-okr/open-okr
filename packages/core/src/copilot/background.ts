@@ -44,8 +44,13 @@ import type {
 } from "../agents/drafter.ts";
 import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
-import { type AnswerSource, citationsFrom, groundQuestion } from "./answer.ts";
-import { proposeBeforeAnswering } from "./proposals.ts";
+import {
+  type AnswerSource,
+  type CopilotStep,
+  citationsFrom,
+  groundQuestion,
+} from "./answer.ts";
+import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
 
 /** The channel one copilot conversation's prose is published on. */
 export function copilotThreadChannel(
@@ -176,6 +181,12 @@ export async function runCopilotAnswer(
     );
   }
 
+  // Each step as it happens, so the reader is told what the run is doing
+  // rather than watching an empty answer (plan 0.8.1 W2).
+  const step = (data: CopilotStep) =>
+    publish("copilot.step", { answerMessageId: job.answerMessageId, ...data });
+
+  await step({ step: "searching" });
   const prepared = await groundQuestion(
     context,
     {
@@ -185,6 +196,7 @@ export async function runCopilotAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded ?? drafter.answerGrounded),
   );
+  await step({ step: "found", count: prepared.sources.length });
   await publish("copilot.sources", {
     answerMessageId: job.answerMessageId,
     sources: prepared.sources,
@@ -201,10 +213,15 @@ export async function runCopilotAnswer(
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
-  const proposal = await proposeBeforeAnswering(context, {
-    threadId: job.threadId,
-    request: job.question,
-  });
+  const offers = await offersToPropose(context);
+  if (offers !== null) {
+    await step({ step: "proposing" });
+  }
+  const proposal = await proposeBeforeAnswering(
+    context,
+    { threadId: job.threadId, request: job.question },
+    offers,
+  );
   if (proposal.proposalId !== null) {
     await publish("copilot.proposal", {
       answerMessageId: job.answerMessageId,
@@ -212,6 +229,7 @@ export async function runCopilotAnswer(
     });
   }
   const ask = { ...prepared.ask, proposal: proposal.note };
+  await step({ step: "writing" });
 
   const answered = drafter?.streamGrounded
     ? await streamInto(drafter, ask, (text) =>

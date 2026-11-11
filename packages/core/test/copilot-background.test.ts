@@ -168,6 +168,10 @@ const answers = async () => {
   return rows;
 };
 
+/** The events in order, without the steps, which have their own test (W2). */
+const eventsOf = (published: readonly { event: string }[]) =>
+  published.map((one) => one.event).filter((event) => event !== "copilot.step");
+
 /** Drives the enqueued run the way the relay does, and collects what it published. */
 const drive = async (
   drafter: AgentDrafter | null,
@@ -328,7 +332,7 @@ describe("the run, with nobody watching", () => {
     expect(answer?.run_halted_reason).toBeNull();
     expect(answer?.cost).toBe("0.010000");
 
-    expect(published.map((one) => one.event)).toEqual([
+    expect(eventsOf(published)).toEqual([
       "copilot.sources",
       "copilot.text",
       "copilot.done",
@@ -346,7 +350,7 @@ describe("the run, with nobody watching", () => {
       new StreamingDrafter(["Sixty ", "per cent ", "by June."]),
     );
 
-    expect(published.map((one) => one.event)).toEqual([
+    expect(eventsOf(published)).toEqual([
       "copilot.sources",
       "copilot.text",
       "copilot.text",
@@ -377,6 +381,25 @@ describe("the run, with nobody watching", () => {
       event: "copilot.done",
       data: { haltedReason: expect.stringContaining("stopped partway") },
     });
+  });
+
+  it("publishes each step before the first word (plan 0.8.1 W2)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(new FixedDrafter("Sixty per cent by June."));
+    const steps = published
+      .filter((one) => one.event === "copilot.step")
+      .map((one) => one.data?.step);
+    expect(steps).toEqual(["searching", "found", "writing"]);
+    const lastStep = published.findLastIndex(
+      (one) => one.event === "copilot.step",
+    );
+    const firstText = published.findIndex(
+      (one) => one.event === "copilot.text",
+    );
+    expect(lastStep).toBeLessThan(firstText);
+    expect(
+      published.find((one) => one.data?.step === "found")?.data?.count,
+    ).toBe(1);
   });
 
   it("is safe to run twice, because the relay delivers at least once", async () => {
@@ -437,7 +460,7 @@ describe("the run, with nobody watching", () => {
       const drafter = new ProposingDrafter(true);
       const published = await drive(drafter);
 
-      expect(published.map((one) => one.event)).toEqual([
+      expect(eventsOf(published)).toEqual([
         "copilot.sources",
         "copilot.proposal",
         "copilot.text",
@@ -461,9 +484,7 @@ describe("the run, with nobody watching", () => {
       const drafter = new ProposingDrafter(false);
       const published = await drive(drafter);
 
-      expect(published.map((one) => one.event)).not.toContain(
-        "copilot.proposal",
-      );
+      expect(eventsOf(published)).not.toContain("copilot.proposal");
       expect(drafter.seen[0]?.proposal).toEqual({ made: false });
       expect(await storedProposals()).toEqual([]);
     });
