@@ -341,3 +341,69 @@ Then they see the same welcome card, and no mail is queued
 | S4-B3 | One card, `apps/web/lib/email-confirmation-card.tsx`, for Admin, General and S-47, each with its own action checking its own grant | The two screens cannot drift apart |
 | S4-B4 | The browser suite's sign-ups now meet the welcome card, so the helpers that sign up press Get started (`getStarted` in `e2e/instance-account.ts`) | The suite's instance sends no mail, so every successful sign-up there ends on it |
 
+## 12. An invited address arrives confirmed (plan 0.8.0 S5)
+
+Asked for by Akmal on 11 November 2026, after the browser suite showed what a
+real instance with mail does: a person invited by email to a workspace that
+requires confirmation signs up through the invitation, and is then asked to
+confirm the very address the invitation reached. Security, so this section
+needs "design approved" before the code.
+
+### 12.1 The rule
+
+| Invitation | Arrives confirmed |
+|---|---|
+| Personal (`invite_links.mode = 'personal'`), with an `email`, and the sign-up address equals it, compared lower-cased and trimmed | **Yes.** Opening its link proves the inbox exactly as a confirmation link would |
+| Personal, but the sign-up address differs | No. The person proved a different inbox |
+| A shared workspace link (`mode = 'workspace'`), with or without `allowed_domains` | No. It names no address and can be forwarded |
+| The operator's "New workspace" for a first administrator with no account | Yes, when it is a personal invitation as in the first row, which it is |
+| Expired, revoked or used up | Refused already, as today |
+
+The decision is made in the same `user.create.before` hook that already reads
+the invitation cookie to admit an invited sign-up on a closed instance
+(`packages/core/src/auth/auth.ts`, "An invitation is the exception"), so the
+invitation is read once and the two can never disagree. It returns the user
+with `emailVerified: true`, as the claim does (BUG-028), so Better Auth gives a
+session and no link is queued.
+
+### 12.2 What it changes and what it does not
+
+| Changes | Stays |
+|---|---|
+| An invited sign-up with the invited address skips the check-your-email card, wherever confirmation is required, and ends on S4's welcome card | Everybody else, as S1 to S4 say |
+| `auth.email_verified` is appended with `via: "invitation"` | The other two ways an address is confirmed: a link, and a completed reset |
+| Joining by trusted domain becomes possible at once for that person, because their address is confirmed | Trusted-domain joining still refuses an unconfirmed address |
+
+### 12.3 Acceptance criteria
+
+```
+Given confirmation is required and an administrator invites priya@example.com
+When Priya opens the invitation and signs up as priya@example.com
+Then her account is confirmed, she is signed in at once and sees the welcome
+And the instance chain holds auth.email_verified with via "invitation"
+And no confirmation link is queued
+
+Given the same invitation
+When somebody signs up through it as other@example.com
+Then that account is not confirmed and gets the check-your-email card
+
+Given a shared workspace link
+When somebody signs up through it
+Then their account is not confirmed by it
+```
+
+### 12.4 Tests
+
+| Test | Kind |
+|---|---|
+| Each row of §12.1, with confirmation required | Core, against a real database, beside `email-verification.test.ts` |
+| An invited sign-up on an instance with mail ends on the welcome card | End to end: `e2e/hosting-group.spec.ts` already joins invited people on such an instance and accepts either ending, so assert the welcome there |
+
+### 12.5 Questions
+
+| # | Question | Recommended |
+|---|---|---|
+| S5-Q1 | Only a personal invitation whose address matches exactly? | **Yes.** A shared link proves nothing about one inbox |
+| S5-Q2 | An unconfirmed account that is already signed in and accepts a personal invitation to its own address: confirm it then too? | **Yes**, in the same change. It is the same proof, reached by the person who signed up before they were invited |
+| S5-Q3 | Record it as `auth.email_verified` with `via: "invitation"`? | **Yes**, so the trail says how every address was confirmed |
+
