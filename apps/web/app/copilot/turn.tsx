@@ -25,6 +25,7 @@ import {
 import { Copy, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { StepLine, StepSummary } from "./step-line";
 
 export interface Citation {
   readonly entityType: string;
@@ -162,7 +163,7 @@ export interface Kept {
 export function AssistantTurn({
   text,
   arriving,
-  status,
+  steps,
   haltedReason,
   stopped,
   citations,
@@ -177,8 +178,11 @@ export function AssistantTurn({
   readonly text: string;
   /** Words are still coming, here or in a background run being rejoined. */
   readonly arriving: boolean;
-  /** What the run is doing, while no words have arrived. */
-  readonly status: string | null;
+  /**
+   * What the run did, in order, while it is known: live only, so null after
+   * a reload (plan 0.8.1 W2-Q). The last one is what it is doing now.
+   */
+  readonly steps: readonly Step[] | null;
   readonly haltedReason: string | null;
   readonly stopped: boolean;
   readonly citations: readonly Citation[];
@@ -208,12 +212,21 @@ export function AssistantTurn({
         {t("copilot.copilotPanel.copilot")}
       </p>
       {cards}
-      {arriving && text === "" && status ? (
-        // One line, replaced in place as the run moves on, and read out
-        // politely (plan 0.8.1 W2).
-        <p role="status" className="text-sm text-ink-4">
-          {status}
-        </p>
+      {/* While no words have come: one line saying what it is doing, replaced
+          in place (plan 0.8.1 CP9). Once they come, the steps fold into one
+          quiet line above them. Neither is a live region: the panel's status
+          line says the steps, at most one every two seconds. */}
+      {arriving && text === "" ? (
+        steps && steps.length > 0 ? (
+          <StepLine steps={steps} />
+        ) : (
+          <p className="copilot-shimmer text-sm text-ink-3">
+            {t("copilot.copilotPanel.stillWriting")}
+          </p>
+        )
+      ) : null}
+      {text !== "" && steps && steps.length > 0 ? (
+        <StepSummary steps={steps} />
       ) : null}
       {text === "" ? null : (
         // The subset of formatting the copilot writes, drawn as elements
@@ -222,6 +235,12 @@ export function AssistantTurn({
         <AnswerText
           text={text}
           className="max-w-[68ch] text-sm leading-relaxed text-ink"
+          // A caret after the last word while more may come (CP9).
+          trailing={
+            arriving ? (
+              <span className="copilot-caret" aria-hidden="true" />
+            ) : undefined
+          }
         />
       )}
       {haltedReason ? (

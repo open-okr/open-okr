@@ -49,6 +49,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { CopilotPanel } = await import("../app/copilot/copilot-panel");
+const { nextShownStep } = await import("../app/copilot/step-line");
 
 const AVAILABLE: CopilotAvailability = {
   available: true,
@@ -1043,5 +1044,161 @@ describe("answer actions and errors (plan 0.8.1 CP7)", () => {
     );
     const region = panel()?.querySelector('[aria-label="Proposed change"]');
     expect(region?.querySelector("a")?.getAttribute("href")).toBe("/goals/g1");
+  });
+});
+
+describe("the streaming look (plan 0.8.1 CP9)", () => {
+  /** A stream the test feeds frame by frame. */
+  const feed = () => {
+    const encoder = new TextEncoder();
+    let push: (event: Record<string, unknown>) => void = () => undefined;
+    let end: () => void = () => undefined;
+    const response = new Response(
+      new ReadableStream<Uint8Array>({
+        start(controller) {
+          push = (event) =>
+            controller.enqueue(
+              encoder.encode(
+                `event: ${String(event.kind)}\ndata: ${JSON.stringify(event)}\n\n`,
+              ),
+            );
+          end = () => controller.close();
+        },
+      }),
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+    return {
+      response,
+      push: (event: Record<string, unknown>) => push(event),
+      end: () => end(),
+    };
+  };
+
+  test("says it is checking for a change it can make before the card shows", async () => {
+    const stream = feed();
+    fetchMock.mockResolvedValue(stream.response);
+    await render(AVAILABLE);
+    await open();
+    await ask("Add a task to one of my key results");
+    await settle();
+    stream.push({
+      kind: "thread",
+      threadId: THREAD,
+      questionMessageId: QUESTION_ID,
+    });
+    stream.push({ kind: "step", step: "found", count: 2 });
+    stream.push({ kind: "step", step: "proposing" });
+    // Longer than every step's dwell, so the line has reached the last one.
+    for (let wait = 0; wait < 4; wait += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      });
+    }
+    const turn = panel()?.querySelector("article");
+    expect(turn?.textContent).toContain(
+      "Checking whether this is a change I can make…",
+    );
+    expect(turn?.querySelector('[aria-label="Proposed change"]')).toBeNull();
+    stream.end();
+    await settle();
+  });
+
+  test("folds the steps once words arrive, and ends the words in a caret", async () => {
+    const stream = feed();
+    fetchMock.mockResolvedValue(stream.response);
+    await render(AVAILABLE);
+    await open();
+    await ask("What have people said about onboarding?");
+    await settle();
+    stream.push({
+      kind: "thread",
+      threadId: THREAD,
+      questionMessageId: QUESTION_ID,
+    });
+    stream.push({ kind: "step", step: "found", count: 3 });
+    stream.push({ kind: "step", step: "writing" });
+    stream.push({ kind: "text", text: "People asked for " });
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    const summary = turn?.querySelector("details > summary");
+    expect(summary?.textContent).toBe(
+      "Searched your workspace, found 3 passages",
+    );
+    expect(turn?.querySelector("details")?.hasAttribute("open")).toBe(false);
+    expect(turn?.querySelector(".copilot-caret")).not.toBeNull();
+    stream.end();
+    await settle();
+  });
+
+  test("moves on from a step no sooner than 400 milliseconds", () => {
+    expect(nextShownStep(3, -1, 0)).toBe(0);
+    expect(nextShownStep(3, 0, 120)).toBe(0);
+    expect(nextShownStep(3, 0, 400)).toBe(1);
+    expect(nextShownStep(3, 2, 900)).toBe(2);
+    expect(nextShownStep(0, -1, 0)).toBe(-1);
+  });
+});
+
+describe("a stopped answer (plan 0.8.1 CP9 with W4)", () => {
+  test("keeps its words on screen, marked stopped, until the run has recorded them", async () => {
+    const encoder = new TextEncoder();
+    fetchMock.mockImplementation(
+      async (_url: string, init: RequestInit) =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              for (const event of [
+                {
+                  kind: "thread",
+                  threadId: THREAD,
+                  questionMessageId: QUESTION_ID,
+                  answerMessageId: "a1",
+                },
+                { kind: "text", text: "Activation is up four" },
+              ]) {
+                controller.enqueue(
+                  encoder.encode(
+                    `event: ${event.kind}\ndata: ${JSON.stringify(event)}\n\n`,
+                  ),
+                );
+              }
+              init.signal?.addEventListener("abort", () =>
+                controller.error(new DOMException("aborted", "AbortError")),
+              );
+            },
+          }),
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+    );
+    // The run has been told to stop and has not written its words yet.
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Activation",
+      messages: [
+        recorded(
+          QUESTION_ID,
+          "member",
+          "How is activation?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        {
+          ...recorded("a1", "assistant", "", "2026-11-12T10:00:00.000Z"),
+          stopped: true,
+        },
+      ],
+    });
+    await render(AVAILABLE);
+    await open();
+    await ask("How is activation?");
+    await settle();
+    await act(async () => byName("Stop the answer").click());
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    expect(turn?.textContent).toContain("Activation is up four");
+    expect(turn?.textContent).toContain("Stopped");
   });
 });

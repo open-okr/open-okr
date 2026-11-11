@@ -176,3 +176,51 @@
     border-radius: var(--radius-lg, 0.5rem);
   }
 }
+
+/* The copilot's answer while it arrives (plan 0.8.1 CP9, UIUX-PLAN §2's
+ * "caret in an actively edited field"): a 2px caret after the last word,
+ * blinking at one second, and a slow shimmer across the line that says what
+ * it is doing. The reduced-motion rule in tokens.css stops the caret where it
+ * shows; the shimmer is plain text under it. */
+@layer components {
+  @keyframes copilot-caret {
+    50% {
+      opacity: 0;
+    }
+  }
+  .copilot-caret {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    margin-left: 1px;
+    vertical-align: text-bottom;
+    background: var(--ink-3);
+    animation: copilot-caret 1s step-end infinite;
+  }
+  @keyframes copilot-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+  .copilot-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--ink-3) 35%,
+      var(--ink) 50%,
+      var(--ink-3) 65%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    color: transparent;
+    animation: copilot-shimmer 2.4s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .copilot-shimmer {
+      background: none;
+      color: var(--ink-3);
+    }
+  }
+}

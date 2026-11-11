@@ -387,3 +387,50 @@ test("⌘J still works after a reload, so the shortcut is really registered", as
   await page.keyboard.press("ControlOrMeta+j");
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeVisible();
 });
+
+/**
+ * **The streaming look holds still under reduced motion** (plan 0.8.1 CP9).
+ *
+ * Acceptance criterion: given reduced motion, when an answer arrives, then
+ * the caret and the step line do not move. This instance has no provider, so
+ * no answer arrives word by word here; the two classes the arriving answer
+ * wears are measured as the browser draws them, with motion allowed and
+ * without. The words and the steps themselves are proved in
+ * `apps/web/test/copilot-panel.test.tsx` against a scripted stream.
+ */
+test("the caret blinks and the step line shimmers, and neither moves under reduced motion", async () => {
+  const measure = () =>
+    page.evaluate(() => {
+      const caret = document.createElement("span");
+      caret.className = "copilot-caret";
+      const line = document.createElement("p");
+      line.className = "copilot-shimmer";
+      line.textContent = "Searching your workspace…";
+      document.body.append(caret, line);
+      const caretStyle = getComputedStyle(caret);
+      const lineStyle = getComputedStyle(line);
+      const measured = {
+        caretName: caretStyle.animationName,
+        caretRuns: caretStyle.animationIterationCount,
+        caretSeconds: Number.parseFloat(caretStyle.animationDuration),
+        lineImage: lineStyle.backgroundImage,
+        lineRuns: lineStyle.animationIterationCount,
+      };
+      caret.remove();
+      line.remove();
+      return measured;
+    });
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const moving = await measure();
+  expect(moving.caretName).toBe("copilot-caret");
+  expect(moving.caretRuns).toBe("infinite");
+  expect(moving.lineImage).not.toBe("none");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const still = await measure();
+  expect(still.caretRuns).toBe("1");
+  expect(still.caretSeconds).toBeLessThan(0.01);
+  expect(still.lineImage).toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+});

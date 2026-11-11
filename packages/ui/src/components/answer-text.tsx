@@ -321,7 +321,14 @@ function Inlines({ parts }: { readonly parts: readonly Inline[] }) {
 }
 
 /** Lines of one paragraph or list item, broken where the model broke them. */
-function Lines({ lines }: { readonly lines: readonly (readonly Inline[])[] }) {
+function Lines({
+  lines,
+  trailing,
+}: {
+  readonly lines: readonly (readonly Inline[])[];
+  /** Drawn after the last line, inside it. */
+  readonly trailing?: ReactNode;
+}) {
   const out: ReactNode[] = [];
   lines.forEach((line, index) => {
     if (index > 0) {
@@ -331,7 +338,12 @@ function Lines({ lines }: { readonly lines: readonly (readonly Inline[])[] }) {
     // biome-ignore lint/suspicious/noArrayIndexKey: as above.
     out.push(<Inlines key={`line-${index}`} parts={line} />);
   });
-  return <>{out}</>;
+  return (
+    <>
+      {out}
+      {trailing}
+    </>
+  );
 }
 
 /**
@@ -341,27 +353,42 @@ function Lines({ lines }: { readonly lines: readonly (readonly Inline[])[] }) {
 export function AnswerText({
   text,
   className,
+  trailing,
 }: {
   readonly text: string;
   readonly className?: string;
+  /**
+   * Drawn at the very end of the text, inside its last line: the caret of an
+   * answer still arriving (plan 0.8.1 CP9). After a block of its own would
+   * put it on a line of its own, which reads as a cursor waiting for input.
+   */
+  readonly trailing?: ReactNode;
 }) {
   const { t } = useTranslations();
+  const blocks = parseAnswer(text);
+  const lastBlock = blocks.length - 1;
   return (
     <div className={cn("flex flex-col gap-2 break-words", className)}>
-      {parseAnswer(text).map((block, index) => {
+      {blocks.map((block, index) => {
+        const end = index === lastBlock ? trailing : undefined;
         switch (block.kind) {
           case "paragraph":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: blocks only grow at the end while an answer arrives.
               <p key={index}>
-                <Lines lines={block.lines} />
+                <Lines lines={block.lines} trailing={end} />
               </p>
             );
           case "list": {
             const items = block.items.map((item, itemIndex) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: as above.
               <li key={itemIndex} className="pl-0.5">
-                <Lines lines={item} />
+                <Lines
+                  lines={item}
+                  trailing={
+                    itemIndex === block.items.length - 1 ? end : undefined
+                  }
+                />
               </li>
             ));
             return block.ordered ? (
@@ -387,6 +414,7 @@ export function AnswerText({
               <div key={index} className="flex flex-col gap-1">
                 <pre className="overflow-x-auto rounded-md border border-line bg-raised px-3 py-2 font-mono text-xs leading-relaxed">
                   <code>{block.text}</code>
+                  {end}
                 </pre>
                 {/* Only once it is whole: half a block copied is a bug
                     pasted somewhere else. */}

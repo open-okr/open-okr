@@ -195,20 +195,49 @@ interface Arriving {
   readonly question: string;
   /** The words so far. */
   readonly text: string;
-  readonly step: Step;
+  /** Every step the run has said, in order; the last is the one it is on. */
+  readonly steps: readonly Step[];
   /** What retrieval found, shown as the answer only when no words come. */
   readonly sources: readonly Source[];
   /** Why no words are coming, when the run says so. */
   readonly notice: string | null;
   /** The request ended and the re-read did not land, so this is all there is. */
   readonly settled: boolean;
+  /** The reader stopped it, and the run has not recorded what it kept yet. */
+  readonly stopped?: boolean;
 }
 
 /** A background run being rejoined after a reload (P4-T14b-b). */
 interface Rejoined {
   readonly text: string;
-  readonly step: Step | null;
+  readonly steps: readonly Step[];
 }
+
+/** The steps with one more, unless it is the one already last. */
+const withStep = (steps: readonly Step[], step: Step): readonly Step[] =>
+  JSON.stringify(steps.at(-1)) === JSON.stringify(step)
+    ? steps
+    : [...steps, step];
+
+/** How long a stopped run is given to record what it kept. */
+const STOPPED_RECORDED_AFTER_MS = 1_500;
+
+/** The recorded words of the answer to one question, or "" for none yet. */
+const recordedAnswer = (
+  messages: readonly {
+    readonly id: string;
+    readonly role: string;
+    readonly content: string;
+  }[],
+  questionId: string | null,
+): string => {
+  const index = messages.findIndex((message) => message.id === questionId);
+  const answer = index === -1 ? undefined : messages[index + 1];
+  return answer?.role === "assistant" ? answer.content : "";
+};
+
+/** How often the status line may say a step, at most (plan 0.8.1 CP9). */
+const STEP_SAID_EVERY_MS = 2_000;
 
 type Thread = Awaited<ReturnType<typeof readCopilotThreadAction>>;
 
@@ -269,7 +298,7 @@ export function CopilotPanel({
   const [messages, setMessages] = useState<readonly Message[]>([]);
   const [question, setQuestion] = useState("");
   const [arriving, setArriving] = useState<Arriving | null>(null);
-  const [rejoined, setRejoined] = useState<Rejoined>({ text: "", step: null });
+  const [rejoined, setRejoined] = useState<Rejoined>({ text: "", steps: [] });
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   /**
@@ -277,6 +306,10 @@ export function CopilotPanel({
    * holds it again (plan 0.8.1 CP6, review F13).
    */
   const [sendError, setSendError] = useState<string | null>(null);
+  /** The steps each question's run went through, this session (CP9). */
+  const [stepsKept, setStepsKept] = useState<
+    Readonly<Record<string, readonly Step[]>>
+  >({});
   /** Passages and reasons kept beside the questions they answered (CP8). */
   const [kept, setKept] = useState<Readonly<Record<string, Kept>>>({});
   const [busy, setBusy] = useState(false);
@@ -295,6 +328,8 @@ export function CopilotPanel({
   const popupRef = useRef<HTMLDivElement>(null);
   /** An input method is composing in the box, so Escape and Enter are its. */
   const composing = useRef(false);
+  /** When the status line last said something about a run's progress. */
+  const stepSaidAt = useRef(0);
   /** The turn ended with focus in the panel, so the box takes it back. */
   const refocus = useRef(false);
   /** The thread whose messages are on screen, so `kept` is cleared on a change. */
@@ -344,6 +379,23 @@ export function CopilotPanel({
       inputRef.current?.focus();
     }
   }, [busy]);
+
+  // The step the run is on, said at most every two seconds and only until
+  // the words start: "Answering" was said when it began, and "Answer ready"
+  // is said when it ends (plan 0.8.1 CP9).
+  const latestStep = arriving?.text === "" ? arriving.steps.at(-1) : undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: said when the step changes, and `t` is stable for the session.
+  useEffect(() => {
+    if (!latestStep) {
+      return;
+    }
+    const now = Date.now();
+    if (now - stepSaidAt.current < STEP_SAID_EVERY_MS) {
+      return;
+    }
+    stepSaidAt.current = now;
+    setAnnouncement(stepWords(latestStep, t));
+  }, [JSON.stringify(latestStep)]);
 
   useEffect(() => {
     if (announcement === "") {
@@ -424,12 +476,13 @@ export function CopilotPanel({
     // What was kept belongs to the conversation it was asked in.
     if (shownThread.current !== thread.id) {
       setKept({});
+      setStepsKept({});
     }
     shownThread.current = thread.id;
     setThreadId(thread.id);
     setMessages(thread.messages);
     setProposals(listed);
-    setRejoined({ text: "", step: null });
+    setRejoined({ text: "", steps: [] });
   }, []);
 
   const loadThread = useCallback(
@@ -448,7 +501,8 @@ export function CopilotPanel({
     setMessages([]);
     setProposals([]);
     setKept({});
-    setRejoined({ text: "", step: null });
+    setStepsKept({});
+    setRejoined({ text: "", steps: [] });
     setNotice(null);
   }, []);
 
@@ -558,8 +612,10 @@ export function CopilotPanel({
       setRejoined((was) => ({ ...was, text: was.text + (data.text ?? "") }));
     };
     const onStep = (event: MessageEvent) => {
-      const step = JSON.parse(event.data) as Step;
-      setRejoined((was) => ({ ...was, step }));
+      const { kind: _kind, ...step } = JSON.parse(event.data) as {
+        kind?: string;
+      } & Step;
+      setRejoined((was) => ({ ...was, steps: withStep(was.steps, step) }));
     };
     const onProposal = () => {
       void listCopilotProposalsAction(threadId)
@@ -648,13 +704,14 @@ export function CopilotPanel({
       setNotice(null);
       setSendError(null);
       setAnnouncement(t("copilot.copilotPanel.announce.answering"));
+      stepSaidAt.current = Date.now();
       // Shown straight away rather than after the round trip, with the first
       // thing every run does: a background run may publish that step before
       // the panel has subscribed (plan 0.8.1 W2).
       setArriving({
         question: asked,
         text: "",
-        step: { step: "searching" },
+        steps: [{ step: "searching" }],
         sources: [],
         notice: null,
         settled: false,
@@ -669,6 +726,8 @@ export function CopilotPanel({
       let landedThreadId = threadId;
       // What this question was given, kept past the re-read when no words came.
       let questionId: string | null = null;
+      // The steps, kept with the question once it lands (live only, W2-Q).
+      let stepsSoFar: readonly Step[] = [{ step: "searching" }];
       let text = "";
       let found: readonly Source[] = [];
       let said: string | null = null;
@@ -736,7 +795,8 @@ export function CopilotPanel({
               }
             } else if (event.kind === "step") {
               const { kind: _kind, ...step } = event;
-              update({ step });
+              stepsSoFar = withStep(stepsSoFar, step);
+              update({ steps: stepsSoFar });
             } else if (event.kind === "proposal" && landedThreadId) {
               // The card was made before the answer (plan 0.8.1 A2), so it is
               // shown while the answer is still being written.
@@ -787,6 +847,26 @@ export function CopilotPanel({
           setArriving(null);
           setQuestion((current) => (current.trim() === "" ? asked : current));
           setSendError(t("copilot.copilotPanel.couldNotBeReached"));
+        } else if (
+          landed &&
+          stopped &&
+          text.trim() !== "" &&
+          recordedAnswer(landed[0].messages, questionId) === ""
+        ) {
+          // Stopped in the background, and the run has not written what it
+          // kept yet (plan 0.8.1 W4): the words stay where they are, marked
+          // stopped, and the recorded answer replaces them a moment later,
+          // rather than the answer leaving the screen until a reload.
+          update({ settled: true, stopped: true });
+          const id = landedThreadId as string;
+          setTimeout(() => {
+            void read(id)
+              .then((again) => {
+                show(...again);
+                setArriving(null);
+              })
+              .catch(() => undefined);
+          }, STOPPED_RECORDED_AFTER_MS);
         } else if (landed) {
           show(...landed);
           setArriving(null);
@@ -813,6 +893,13 @@ export function CopilotPanel({
           focused === null ||
           focused === document.body ||
           popupRef.current?.contains(focused) === true;
+        // The steps stay folded above the answer for this session, so the
+        // line above it does not vanish when the recorded turn replaces it.
+        const askedId = questionId;
+        if (askedId) {
+          const steps = stepsSoFar;
+          setStepsKept((was) => ({ ...was, [askedId]: steps }));
+        }
         // With no words, the passages and the reason were the answer, and the
         // thread holds neither (plan 0.8.1 CP8, review F1). Kept beside the
         // question until another conversation is opened.
@@ -1067,12 +1154,12 @@ export function CopilotPanel({
                                   live ? rejoined.text : (answer?.content ?? "")
                                 }
                                 arriving={live}
-                                status={
+                                steps={
                                   live
-                                    ? rejoined.step
-                                      ? stepWords(rejoined.step, t)
-                                      : t("copilot.copilotPanel.stillWriting")
-                                    : null
+                                    ? rejoined.steps
+                                    : asked && turn.question
+                                      ? (stepsKept[turn.question.id] ?? null)
+                                      : null
                                 }
                                 haltedReason={answer?.haltedReason ?? null}
                                 stopped={answer?.stopped ?? false}
@@ -1111,9 +1198,9 @@ export function CopilotPanel({
                           <AssistantTurn
                             text={arriving.text}
                             arriving={!arriving.settled}
-                            status={stepWords(arriving.step, t)}
+                            steps={arriving.steps}
                             haltedReason={null}
-                            stopped={false}
+                            stopped={arriving.stopped === true}
                             citations={[]}
                             // Passages are shown while arriving only when the run
                             // has said no words are coming: then they are the
