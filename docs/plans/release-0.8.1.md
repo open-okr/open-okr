@@ -193,7 +193,7 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 | Lock the origin to Cloudflare with a secret header, then read `cf-connecting-ip` | Me, then Akmal | Until then, the hop count is the safe rule |
 | The 0.8.0 after-release checks still open: a clean Compose install from the quickstart, and a Compose upgrade from 0.7.0 with data in it | Me | The Helm upgrade from 0.7.0 ran for real on staging and production on 11 November 2026, and the kind test passed during the build |
 | okrgoal.com: the rows of `docs/site-changes-2026-11-03.md` marked "Next release" | The site session | Check each against 0.8.0 and 0.8.1 |
-| Remove the superseded copilot branches and worktrees, and the 0.8.0 build worktrees and their test stacks | Me | Local only: `fix/copilot-index-check-ins`, `fix/copilot-proposals-strict-output`, `fix/chat-ask-answers`, `docs/copilot-live-data`, `backup/copilot-live-test`, `r8-auth`, `r8-infra`, `release-0.8.0` |
+| Remove the superseded copilot branches and worktrees, and the 0.8.0 build worktrees and their test stacks | Me | **Done 12 November 2026**: the seven worktrees and eight branches, each clean and on `main` by content or superseded there; the builders' stacks had no volumes left. The `openokr-r8` stack is kept: it holds the local `openokr_dev` database |
 
 ## 8. Left out on purpose
 
