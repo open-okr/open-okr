@@ -407,6 +407,8 @@ export const raiseBlocker = defineWriteAction({
           subjectType: "goal",
           subjectId: keyResult.goalId,
           payload: { keyResultId: input.keyResultId, type: input.type },
+          // The activity names the goal; the index needs the blocker's words.
+          embed: { entityType: "blocker", entityId: id },
         },
         audit: {
           action: "blockers.raise",

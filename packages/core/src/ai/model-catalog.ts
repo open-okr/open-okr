@@ -304,8 +304,33 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     embeddingDimensions: 768,
     tiers: ["embed"],
   },
-  // OpenRouter — routes to any model behind one key; these three are a
-  // starting point, not an exhaustive list of what it actually offers.
+  // OpenRouter — routes to any model behind one key; these are a starting
+  // point, not an exhaustive list of what it actually offers. Each tier has
+  // one default here (apps/web/test/ai-catalogue.test.ts); a model listing no
+  // tier is still one an administrator can choose.
+  //
+  // GPT-6 Luna is the default for `fast` and `balanced` (Akmal, 11 November
+  // 2026). Live on that day, through OpenRouter, it filled every copilot
+  // proposal and passed 23 of the 24 evaluation sets, the 24th since mended,
+  // at about a thirtieth of Sonnet 4.5's price: fifteen copilot questions cost
+  // $0.004 against $0.126. Prices read from OpenRouter's model list that day.
+  {
+    provider: "openrouter",
+    modelId: "openai/gpt-6-luna",
+    displayName: "GPT-6 Luna (via OpenRouter)",
+    // Its window is 1,050,000, but OpenRouter charges about double above
+    // 272,000 input tokens, so the window the product plans for is the one
+    // these prices hold for.
+    contextWindow: 272_000,
+    costInPerMillion: 0.1,
+    costOutPerMillion: 0.5,
+    costCachedInPerMillion: 0.01,
+    supportsTools: true,
+    supportsVision: true,
+    supportsJsonMode: true,
+    supportsStreaming: true,
+    tiers: ["fast", "balanced"],
+  },
   {
     provider: "openrouter",
     modelId: "meta-llama/llama-3.1-8b-instruct",
@@ -317,7 +342,8 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     supportsVision: false,
     supportsJsonMode: true,
     supportsStreaming: true,
-    tiers: ["fast"],
+    // The `fast` default until GPT-6 Luna, and still a choice on the AI page.
+    tiers: [],
   },
   {
     provider: "openrouter",
@@ -330,7 +356,9 @@ export const SEEDED_MODELS: readonly SeededModel[] = [
     supportsVision: true,
     supportsJsonMode: true,
     supportsStreaming: true,
-    tiers: ["balanced", "deep"],
+    // Still the `deep` default, for the few assists that ask for it. An
+    // administrator can route `balanced` back here on the AI page.
+    tiers: ["deep"],
   },
   // Ollama — local, the air-gap default. Cost is zero because there is no
   // metered vendor call; context windows vary by how the model was pulled

@@ -9,6 +9,7 @@ import {
 import { desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { createGoalInTx, createKeyResultInTx } from "../goals/service.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
+import { queueContentInTx } from "../operations/queue-content.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import {
   corridorOf,
@@ -395,6 +396,13 @@ export async function launchRecoveryInTx(
     input.kpiId,
     now,
   );
+
+  // The launch's activity names the KPI, and one activity names one thing, so
+  // the objective and key results made here queue themselves for both indexes.
+  await queueContentInTx(tx, input.workspaceId, "goal", goal.id);
+  for (const id of keyResultIds) {
+    await queueContentInTx(tx, input.workspaceId, "key_result", id);
+  }
 
   return { goalId: goal.id, keyResultIds, startedPct, state: recomputed.state };
 }

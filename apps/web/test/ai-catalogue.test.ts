@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
  * workspace with no AI, because an unpriced model is refused.
  */
 describe("the model catalogue", () => {
-  it.each(["anthropic", "openai", "google"] as const)(
+  it.each(["anthropic", "openai", "google", "openrouter"] as const)(
     "%s routes each chat tier to the model its driver names, and prices it",
     (provider) => {
       for (const tier of ["fast", "balanced", "deep"] as const) {

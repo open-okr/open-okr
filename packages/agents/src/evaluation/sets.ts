@@ -963,8 +963,12 @@ const PROPOSAL: ProposalRequestContext = {
       action: "goals.addKeyResult",
       label: "Add a key result",
       whatItDoes: "Adds a key result to an objective you may edit.",
+      // Required, as every action core offers says, so a live reply that
+      // leaves them empty is no answer rather than an empty proposal.
       fields: {
         type: "object",
+        additionalProperties: false,
+        required: ["title", "objective"],
         properties: {
           title: { type: "string" },
           objective: { type: "integer" },

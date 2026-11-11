@@ -289,8 +289,21 @@ jobs:
       # Chromium only, and the headless shell rather than the full browser.
       # The suite exists for the claims a browser has to settle, not for
       # cross-browser coverage, which would cost minutes on every push.
+      #
+      # **The system packages are a nicety, so a mirror outage does not stop
+      # the suite.** `--with-deps` installs Chromium's libraries and fonts
+      # through apt. GitHub's Ubuntu image already carries Chrome and its
+      # libraries, and no spec compares screenshots, so the fonts change
+      # nothing a test asserts. On 11 November 2026 the runners could not
+      # resolve the Ubuntu mirrors for over an hour, and every shard failed
+      # here before running a test; now the step installs the browser alone
+      # and says why.
       - name: Install Chromium
-        run: pnpm test:e2e:install
+        run: |
+          if ! pnpm test:e2e:install; then
+            echo "::warning::apt could not install Chromium's system packages; installing the browser alone, on the runner image's own libraries."
+            pnpm exec playwright install chromium
+          fi
 
       - name: Build the application
         # The suite runs `next start`, so what it tests is what ships.
