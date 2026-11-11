@@ -85,6 +85,73 @@ export function navBlocks(
   }).filter((block) => block.items.length > 0);
 }
 
+/**
+ * Every key the labels below are read from, written out whole. The catalogue's
+ * coverage test counts a key as consumed only where its full name appears in
+ * the source, so a key built as `nav.item.${id}` read as unused and failed CI
+ * (UAT 0.8.0, F-08). An id with no key here falls back to the registry's own
+ * English, which `nav-labels.test.ts` holds equal to the catalogue's.
+ */
+/** One `nav.item.*` key per registry item. */
+const ITEM_KEYS: Readonly<Record<string, string>> = {
+  overview: "nav.item.overview",
+  inbox: "nav.item.inbox",
+  review: "nav.item.review",
+  goals: "nav.item.goals",
+  kpis: "nav.item.kpis",
+  map: "nav.item.map",
+  initiatives: "nav.item.initiatives",
+  board: "nav.item.board",
+  search: "nav.item.search",
+  scorecard: "nav.item.scorecard",
+  "check-in": "nav.item.check-in",
+  sessions: "nav.item.sessions",
+  spaces: "nav.item.spaces",
+  cycle: "nav.item.cycle",
+  "account-profile": "nav.item.account-profile",
+  "account-channels": "nav.item.account-channels",
+  "account-security": "nav.item.account-security",
+  "account-api-tokens": "nav.item.account-api-tokens",
+  "account-connections": "nav.item.account-connections",
+  "account-ai": "nav.item.account-ai",
+  "admin-general": "nav.item.admin-general",
+  "admin-plan": "nav.item.admin-plan",
+  "admin-roles": "nav.item.admin-roles",
+  "admin-support": "nav.item.admin-support",
+  "admin-sso": "nav.item.admin-sso",
+  "admin-directory": "nav.item.admin-directory",
+  "admin-audit": "nav.item.admin-audit",
+  "admin-branding": "nav.item.admin-branding",
+  "admin-practice": "nav.item.admin-practice",
+  "admin-rhythm": "nav.item.admin-rhythm",
+  "admin-channels": "nav.item.admin-channels",
+  "admin-nudges": "nav.item.admin-nudges",
+  "admin-invitations": "nav.item.admin-invitations",
+  "admin-deleted": "nav.item.admin-deleted",
+  "admin-imports": "nav.item.admin-imports",
+  "admin-backups": "nav.item.admin-backups",
+  "admin-ai": "nav.item.admin-ai",
+  "admin-agents": "nav.item.admin-agents",
+  "admin-connections": "nav.item.admin-connections",
+  "admin-webhooks": "nav.item.admin-webhooks",
+};
+
+/** One `nav.group.*` key per headed block. */
+const GROUP_KEYS: Readonly<Record<string, string>> = {
+  okr: "nav.group.okr",
+  work: "nav.group.work",
+  spaces: "nav.group.spaces",
+  account: "nav.group.account",
+};
+
+/** One `role.builtin.*` key per built-in role. */
+const ROLE_KEYS: Readonly<Record<string, string>> = {
+  owner: "role.builtin.owner",
+  admin: "role.builtin.admin",
+  member: "role.builtin.member",
+  viewer: "role.builtin.viewer",
+};
+
 /** What the shell translates with, narrowed so these stay testable. */
 type Translate = (key: string) => string;
 
@@ -103,7 +170,11 @@ export function navText(
 ): string {
   const term = TERM_ITEMS[item.id];
   const label = term ? renamed[term[0]]?.[term[1]] : undefined;
-  return label === undefined ? t(`nav.item.${item.id}`) : asHeading(label);
+  if (label !== undefined) {
+    return asHeading(label);
+  }
+  const key = ITEM_KEYS[item.id];
+  return key === undefined ? item.label : t(key);
 }
 
 /** A sidebar block's heading in the reader's language; `primary` has none. */
@@ -111,7 +182,8 @@ export function navGroupLabel(
   id: NavigationGroup,
   t: Translate,
 ): string | undefined {
-  return LABELS[id] === undefined ? undefined : t(`nav.group.${id}`);
+  const key = GROUP_KEYS[id];
+  return LABELS[id] === undefined || key === undefined ? LABELS[id] : t(key);
 }
 
 /**
@@ -124,5 +196,6 @@ export function builtinRoleLabel(
   name: string | null,
   t: Translate,
 ): string | null {
-  return builtinKey ? t(`role.builtin.${builtinKey}`) : name;
+  const key = builtinKey ? ROLE_KEYS[builtinKey] : undefined;
+  return key === undefined ? name : t(key);
 }
