@@ -87,7 +87,7 @@ test("closing it holds for the login session", async () => {
 
 test("a new sign-in brings it back", async () => {
   await page.getByRole("button", { name: "Account menu" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
   await expect(page).toHaveURL(/\/sign-in/);
 
   await signIn(page);

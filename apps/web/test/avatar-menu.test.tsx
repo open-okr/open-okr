@@ -24,7 +24,7 @@ vi.mock("next/link", () => ({
 vi.mock("../app/tour-actions", () => ({ finishTour: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
-const { AvatarMenu } = await import("../app/avatar-menu");
+const { AvatarMenu, SignOutItem } = await import("../app/avatar-menu");
 
 let host: HTMLDivElement;
 let root: Root;
@@ -112,5 +112,34 @@ describe("the avatar menu", () => {
       document.body.appendChild(host);
       root = createRoot(host);
     }
+  });
+
+  // Q-10a (0.8.0 acceptance test): "Sign out" was a plain button inside the
+  // menu, so the arrow keys went past it and only Tab reached it.
+  test("Sign out is a menu item the arrow keys reach, and it submits its form", async () => {
+    const action = vi.fn(async () => {});
+    await render({ signOut: <SignOutItem action={action} /> });
+    await open();
+
+    const signOut = [
+      ...document.querySelectorAll<HTMLElement>('[role="menuitem"]'),
+    ].find((item) => item.textContent === "Sign out");
+    expect(signOut).toBeDefined();
+    // A submit button, so it still works as a form without JavaScript.
+    expect(signOut?.tagName).toBe("BUTTON");
+    expect(signOut?.getAttribute("type")).toBe("submit");
+    expect(signOut?.closest("form")).not.toBeNull();
+
+    // Down from the row above it, the source code link, lands on it.
+    const source = document.querySelector<HTMLElement>(
+      'a[href="https://github.com/open-okr/open-okr"]',
+    );
+    await act(async () => source?.focus());
+    await act(async () => {
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+    });
+    expect(document.activeElement).toBe(signOut);
   });
 });

@@ -1,7 +1,13 @@
 "use client";
 
 import { Menu } from "@base-ui-components/react/menu";
-import { Avatar, Chip, initialsOf, useTranslations } from "@openokr/ui";
+import {
+  Avatar,
+  Chip,
+  initialsOf,
+  SubmitButton,
+  useTranslations,
+} from "@openokr/ui";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -9,14 +15,41 @@ import { startTourAgain } from "../lib/product-tour.tsx";
 import { menuRowClass } from "./menu-row-class.ts";
 
 /**
- * One row in the avatar menu.
+ * The avatar menu's last row: signing out.
  *
- * Exported because the sign-out row is a form submission rather than a
- * `Menu.Item` (see below), and a bare `<button>` inherits the body's 16px
- * while its neighbours sit at 13px. It shipped that way: "Sign out" was
- * visibly larger than "API tokens" above it. Two rows in one menu need one
- * source of truth for how a row looks, not two.
+ * A `Menu.Item` like its neighbours, so the arrow keys reach it (Q-10a, 0.8.0
+ * acceptance test: it was a plain button inside the menu, and only Tab found
+ * it). It is still a submit button in a real form, so signing out works
+ * without JavaScript, and the server action is passed in from `sign-out.tsx`.
+ *
+ * `closeOnClick` is off because closing unmounts the popup, and a form that
+ * leaves the page before the browser submits it is never submitted. The
+ * action redirects to the sign-in page, which closes the menu anyway, and the
+ * row's spinner shows in the meantime.
  */
+export function SignOutItem({
+  action,
+}: {
+  readonly action: () => Promise<void>;
+}) {
+  const { t } = useTranslations();
+  return (
+    <form action={action}>
+      {/* `flex` replaces the row's `block`: the button holds a spinner beside
+       * its label, and a block would put the spinner on its own line. */}
+      <Menu.Item
+        nativeButton
+        closeOnClick={false}
+        render={<SubmitButton bare />}
+        className={`${menuRowClass} flex justify-start`}
+        data-testid="sign-out"
+      >
+        {t("signOut.signOut")}
+      </Menu.Item>
+    </form>
+  );
+}
+
 /**
  * The topbar's avatar menu (UIUX-PLAN.md §3). Base UI's `Menu` supplies the
  * keyboard and focus behaviour (§2: "all accessibility behaviour... comes
@@ -165,11 +198,8 @@ export function AvatarMenu({
                 className="size-3.5 text-ink-4"
               />
             </Menu.Item>
-            {/* Not a Menu.Item: signing out is a real form submission (a
-             * Server Function), and Base UI's item semantics expect to be
-             * the interactive element itself rather than wrap one. The row
-             * styling comes from `menuRowClass` inside `SignOut` so it reads
-             * as one of the rows above it. */}
+            {/* `SignOutItem`, drawn by the server's `SignOut` so the action
+             * that revokes the session stays on the server. */}
             {signOut}
           </Menu.Popup>
         </Menu.Positioner>

@@ -34,7 +34,6 @@ const BareSubmitButton = forwardRef<
   return (
     <button
       ref={ref}
-      type="submit"
       className={cn(
         "inline-flex items-center justify-center gap-1.5",
         className,
@@ -44,6 +43,10 @@ const BareSubmitButton = forwardRef<
       aria-busy={spinning || undefined}
       onClick={guardPress(sending, onClick)}
       {...props}
+      // After the spread: a Base UI part that renders this button merges in
+      // its own `type="button"`, and the avatar menu's Sign out (Q-10a) then
+      // stopped submitting its form.
+      type="submit"
     >
       {showSpinner ? (
         <LoaderCircle
