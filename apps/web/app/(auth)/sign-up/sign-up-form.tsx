@@ -78,6 +78,26 @@ export function SignUpForm({
     // new person to sign in with nothing said about the mail they had been
     // sent.
     if (data && !data.token) {
+      // **Unless an invitation confirmed the address** (plan 0.8.0 S5,
+      // email-verification.md §12). A personal invitation to this address
+      // proved the inbox, so the account was created confirmed; Better Auth
+      // still signs nobody in at sign-up while confirmation is required, so
+      // the form signs in with the password just typed, as the setup
+      // wizard's claim does, and the person gets the welcome.
+      const confirmed = (data.user as { emailVerified?: boolean } | undefined)
+        ?.emailVerified;
+      if (
+        confirmed &&
+        !(
+          await authClient.signIn.email({
+            email,
+            password: String(form.get("password")),
+          })
+        ).error
+      ) {
+        setCreated(true);
+        return;
+      }
       setSentTo(email);
       return;
     }

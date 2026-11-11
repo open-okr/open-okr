@@ -541,6 +541,10 @@ export {
   unresolvedCallersSeen,
 } from "./auth/caller-address.ts";
 export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
+export {
+  confirmByAcceptedInvitation,
+  invitationConfirms,
+} from "./auth/invited-address.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
 export { resolveCanSendMail } from "./auth/mail-capability.ts";

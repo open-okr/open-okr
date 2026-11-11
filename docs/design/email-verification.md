@@ -408,3 +408,22 @@ Then their account is not confirmed by it
 | S5-Q2 | An unconfirmed account that is already signed in and accepts a personal invitation to its own address: confirm it then too? | **Yes**, decided, in the same change. It is the same proof, reached by the person who signed up before they were invited |
 | S5-Q3 | Record it as `auth.email_verified` with `via: "invitation"`? | **Yes**, decided, so the trail says how every address was confirmed |
 
+
+### 12.6 As built
+
+Built on 11 November 2026 on `release-0.8.0`.
+
+| Piece | Where |
+|---|---|
+| The one predicate, the record and S5-Q2 | `packages/core/src/auth/invited-address.ts` (`invitationConfirms`, `invitationInCookieConfirms`, `recordConfirmedByInvitation`, `confirmByAcceptedInvitation`) |
+| Created confirmed | `createAuth`'s user-create `before` hook, after the registration policy has admitted the sign-up |
+| `auth.email_verified` with `via: "invitation"` | The user-create `after` hook, asked before the invitation is accepted, since accepting a single-use link uses it up |
+| S5-Q2 | `acceptInvitation` in `apps/web/app/join/[token]/actions.ts`, after `invitations.acceptLink`, through Better Auth's own adapter as a reset confirms an address (D14). Never fatal: the person has joined either way |
+| Tests | `packages/core/test/invited-address-confirmed.test.ts`; `e2e/hosting-group.spec.ts` asserts that each invited person's sign-up ends on the welcome |
+
+**One reading the design did not foresee.** While confirmation is required,
+Better Auth signs nobody in at sign-up, even an account created confirmed, so
+the answer carries the confirmed account and no session. The sign-up form
+then signs in with the password just typed, as the setup wizard's claim
+already does, and shows S4's welcome card. Without it the person was confirmed
+and still shown "check your email".

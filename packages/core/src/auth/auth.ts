@@ -67,6 +67,10 @@ import {
 } from "./email-change.ts";
 import { DISABLED_AUTH_PATHS } from "./endpoints.ts";
 import {
+  invitationInCookieConfirms,
+  recordConfirmedByInvitation,
+} from "./invited-address.ts";
+import {
   type AuthLimiterStorage,
   inProcessLimiter,
   routedByPath,
@@ -1431,6 +1435,24 @@ export function createAuth(options: AuthOptions) {
               // account exists, so saying it hides nothing worth hiding.
               throw new APIError("UNPROCESSABLE_ENTITY", { message: refusal });
             }
+            // **An invited address arrives confirmed** (plan 0.8.0 S5,
+            // email-verification.md §12). A personal invitation reached this
+            // inbox, which is the proof a confirmation link gives, so the
+            // person is not asked to give it twice. Confirmed here, before
+            // the row exists, because Better Auth decides on the row it
+            // created whether to sign them in; `sendVerificationEmail`
+            // already sends nothing to a confirmed account. A shared link
+            // names no address and confirms nothing.
+            if (
+              !user.emailVerified &&
+              (await invitationInCookieConfirms(
+                options.pool,
+                cookieHeaderFrom(hookContext),
+                user.email,
+              ))
+            ) {
+              return { data: { ...user, emailVerified: true } };
+            }
             return;
           },
           /**
@@ -1467,6 +1489,27 @@ export function createAuth(options: AuthOptions) {
             const timezone = browserTimezoneFromCookies(cookies);
             const token = inviteTokenFromCookies(cookies);
             if (token) {
+              // Asked before accepting, which uses a single-use link up
+              // (plan 0.8.0 S5): whether the address arrived confirmed
+              // because of this invitation, for the instance chain.
+              const confirmedByInvitation =
+                user.emailVerified &&
+                (await invitationInCookieConfirms(
+                  options.pool,
+                  cookies,
+                  user.email,
+                ).catch(() => false));
+              if (confirmedByInvitation) {
+                await recordConfirmedByInvitation(options.pool, user.id).catch(
+                  (error: unknown) => {
+                    // The address is confirmed already; a missing row never
+                    // undoes it, as with a confirmation link.
+                    process.stderr.write(
+                      `auth: could not record an invited address: ${error instanceof Error ? error.message : String(error)}\n`,
+                    );
+                  },
+                );
+              }
               await acceptPendingInvitation(
                 options.pool,
                 token,

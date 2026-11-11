@@ -264,17 +264,23 @@ export async function roleIn(
  * keeps it required whatever the setting says (Q13), for a newcomer by
  * invitation too, so a spec on one passes its catcher.
  */
+/**
+ * Which way a sign-up ended: on the welcome card, or by confirming from the
+ * mail. A spec that knows which its instance gives says so with the answer.
+ */
+export type SignUpEnding = "welcome" | "confirmed_by_mail";
+
 async function throughSignUpEnding(
   page: Page,
   person: Person,
   mail?: MailCatcher,
-): Promise<void> {
+): Promise<SignUpEnding> {
   const welcome = page.getByTestId("get-started");
   const checkEmail = page.getByTestId("check-email");
   await expect(welcome.or(checkEmail)).toBeVisible({ timeout: 30_000 });
   if (!(await checkEmail.isVisible())) {
     await welcome.click();
-    return;
+    return "welcome";
   }
   if (!mail) {
     throw new Error(
@@ -293,6 +299,7 @@ async function throughSignUpEnding(
   await page.getByLabel("Email").fill(person.email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in", exact: true }).first().click();
+  return "confirmed_by_mail";
 }
 
 /**
@@ -353,7 +360,7 @@ export async function joinAsNewcomer(
   joinPath: string,
   person: Person,
   mail?: MailCatcher,
-): Promise<void> {
+): Promise<SignUpEnding> {
   await goTo(page, joinPath);
   await expect(
     page.getByRole("heading", { name: /You have been invited/ }),
@@ -363,7 +370,7 @@ export async function joinAsNewcomer(
   await page.getByLabel("Email").fill(person.email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Create account" }).click();
-  await throughSignUpEnding(page, person, mail);
+  const ending = await throughSignUpEnding(page, person, mail);
   await page.waitForURL(
     (url) => url.pathname === "/" || url.pathname === "/welcome",
     { timeout: 30_000 },
@@ -372,6 +379,7 @@ export async function joinAsNewcomer(
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({
     timeout: 30_000,
   });
+  return ending;
 }
 
 /**
