@@ -177,6 +177,11 @@ const proposalOutput = z.object({
   undone: z.boolean(),
   /** False when this action has no reverse, so no undo is offered. */
   reversible: z.boolean(),
+  /**
+   * When it was made, as an ISO time. A card is made for the question before
+   * it, so this is what places it in its turn (plan 0.8.1 CP3).
+   */
+  createdAt: z.string(),
 });
 
 /** The proposals in one of the reader's own conversations, newest first. */
@@ -218,6 +223,7 @@ export const readProposals = defineReadAction({
             status: proposedChanges.status,
             result: proposedChanges.result,
             undoneAt: proposedChanges.undoneAt,
+            createdAt: proposedChanges.createdAt,
           })
           .from(proposedChanges)
           .where(
@@ -242,6 +248,7 @@ export const readProposals = defineReadAction({
             // reverse, so the answer is about the action, not this row.
             reversible:
               reversalFor(row.action, row.result ?? { id: "probe" }) !== null,
+            createdAt: row.createdAt.toISOString(),
           };
         });
       },

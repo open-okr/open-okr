@@ -194,9 +194,13 @@ describe("a proposal the model authored", () => {
       why: string;
       status: string;
       reversible: boolean;
+      createdAt: string;
     }[];
     expect(listed[0]?.status).toBe("pending");
     expect(listed[0]?.reversible).toBe(true);
+    // When it was made, so the panel places it in the turn whose question
+    // made it (plan 0.8.1 CP3).
+    expect(Date.parse(listed[0]?.createdAt ?? "")).not.toBeNaN();
     expect(listed[0]?.why).toContain("activation objective");
     // Every identifier in the payload is the product's; the preview reads in
     // words, including the space the model only ever saw as a number.

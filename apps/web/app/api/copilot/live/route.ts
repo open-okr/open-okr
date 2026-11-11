@@ -12,7 +12,7 @@
  * anything. A copilot thread belongs to one member, and `copilot.thread`
  * refuses anybody else's, so that check is the whole of what this needs.
  *
- * **What crosses the wire is the same three events the POST forwards**, so the
+ * **What crosses the wire is the same events the POST forwards**, so the
  * panel reads one protocol whether it asked the question in this page load or
  * in the one before it.
  *
@@ -109,6 +109,16 @@ export async function GET(request: NextRequest) {
             const step = copilotStepFrom(data);
             if (step) {
               send("step", { kind: "step", ...step });
+            }
+            return;
+          }
+          if (event.name === "copilot.proposal") {
+            // A card made for the question being rejoined (plan 0.8.1 CP3),
+            // so it shows while the answer is still being written, as it
+            // does in the request that asked.
+            const proposalId = data.proposalId;
+            if (typeof proposalId === "string" && proposalId !== "") {
+              send("proposal", { kind: "proposal", proposalId });
             }
             return;
           }

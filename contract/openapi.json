@@ -10833,6 +10833,9 @@
                           },
                           "reversible": {
                             "type": "boolean"
+                          },
+                          "createdAt": {
+                            "type": "string"
                           }
                         },
                         "required": [
@@ -10842,7 +10845,8 @@
                           "why",
                           "status",
                           "undone",
-                          "reversible"
+                          "reversible",
+                          "createdAt"
                         ],
                         "additionalProperties": false
                       }

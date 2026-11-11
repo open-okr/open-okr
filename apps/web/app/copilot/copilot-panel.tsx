@@ -15,7 +15,9 @@
  * **The thread is re-read from the server after every turn.** The streamed text
  * is what the reader watches; the recorded message, with its citations filtered
  * against their access at that moment, is what they keep. Drawing the stream
- * forever would show citations nobody checked again.
+ * forever would show citations nobody checked again. The recorded turn replaces
+ * the arriving one in the same render, drawn by the same component, so nothing
+ * leaves the screen or moves when it does (plan 0.8.1 CP3).
  *
  * **Three states before a question is possible.** Empty is the first open with
  * nothing asked. AI off is a provider that cannot write prose, and it still
@@ -32,7 +34,7 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import { Check, Send, Square, Undo2, X } from "lucide-react";
+import { ArrowDown, Send, Square, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -48,24 +50,18 @@ import {
   stopCopilotRunAction,
   undoCopilotProposalAction,
 } from "./actions";
-
-interface Citation {
-  readonly entityType: string;
-  readonly entityId: string;
-  readonly label: string;
-}
-
-interface Message {
-  readonly id: string;
-  readonly role: "member" | "assistant";
-  readonly content: string;
-  readonly citations: readonly Citation[];
-  readonly stopped: boolean;
-  /** A background run is still producing this answer (P4-T14b-b). */
-  readonly running?: boolean;
-  /** Why the run stopped early, in words. Null when it did not. */
-  readonly haltedReason?: string | null;
-}
+import { type Proposal, ProposalCard } from "./proposal-card";
+import {
+  AssistantTurn,
+  type Kept,
+  MemberTurn,
+  type Message,
+  type Source,
+  type Step,
+  stepWords,
+} from "./turn";
+import { groupTurns } from "./turns";
+import { useStickToBottom } from "./use-stick-to-bottom";
 
 interface ThreadSummary {
   readonly id: string;
@@ -73,265 +69,6 @@ interface ThreadSummary {
 }
 
 type Availability = CopilotAvailability;
-
-interface Source {
-  readonly entityType: string;
-  readonly entityId: string;
-  readonly label: string;
-}
-
-/**
- * Where a cited or retrieved thing lives.
- *
- * Only the types that have a page of their own are linked. Everything else is
- * named without a link, which is honest: a retro note has no address, and a link
- * to nowhere is worse than plain text.
- */
-function hrefFor(entityType: string, entityId: string): string | null {
-  switch (entityType) {
-    case "goal":
-      return `/goals/${entityId}`;
-    case "kpi":
-      return `/kpis/${entityId}`;
-    default:
-      return null;
-  }
-}
-
-/** How a source or citation reads: its own first line, or its type. */
-const labelFor = (item: Source | Citation) =>
-  item.label === "" ? item.entityType.replace("_", " ") : item.label;
-
-function SourceList({
-  title,
-  items,
-}: {
-  readonly title: string;
-  readonly items: readonly (Source | Citation)[];
-}) {
-  if (items.length === 0) {
-    return null;
-  }
-  return (
-    <div className="mt-2">
-      <p className="text-xs text-ink-4">{title}</p>
-      <ul className="mt-1 flex flex-col gap-1">
-        {items.map((item) => {
-          const href = hrefFor(item.entityType, item.entityId);
-          return (
-            <li key={`${item.entityType}:${item.entityId}`} className="text-xs">
-              {href ? (
-                <Link href={href} className="text-ink-2 underline">
-                  {labelFor(item)}
-                </Link>
-              ) : (
-                <span className="text-ink-3">{labelFor(item)}</span>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-function Turn({ message }: { readonly message: Message }) {
-  const { t } = useTranslations();
-
-  const mine = message.role === "member";
-  return (
-    <div className={mine ? "text-right" : ""}>
-      <div
-        className={`inline-block max-w-[46ch] whitespace-pre-wrap rounded-lg px-3 py-2 text-left text-sm ${
-          mine ? "bg-raised text-ink" : "bg-surface text-ink"
-        }`}
-      >
-        {message.content}
-        {message.running ? (
-          <span className="mt-1 block">
-            <Chip tone="info">{t("copilot.copilotPanel.stillWriting")}</Chip>
-          </span>
-        ) : null}
-        {message.haltedReason ? (
-          <span className="mt-1 block text-xs text-ink-3">
-            {message.haltedReason}
-          </span>
-        ) : null}
-        {message.stopped ? (
-          <span className="mt-1 block">
-            <Chip tone="warn">{t("copilot.copilotPanel.stopped")}</Chip>
-          </span>
-        ) : null}
-      </div>
-      {mine ? null : (
-        <SourceList
-          title={t("copilot.copilotPanel.sources")}
-          items={message.citations}
-        />
-      )}
-    </div>
-  );
-}
-
-interface Proposal {
-  readonly id: string;
-  readonly action: string;
-  readonly preview: readonly {
-    readonly label: string;
-    readonly value: string;
-  }[];
-  readonly why: string;
-  readonly status: "pending" | "applied" | "dismissed";
-  readonly undone: boolean;
-  readonly reversible: boolean;
-}
-
-/**
- * What each proposable action is called on screen (completeness review M-09).
- *
- * The card printed the registry name, `goals.create`, which P8-G11d's rule
- * keeps out of the interface. With one action it was one string; with four it
- * is a reader wondering what `initiatives.create` means. An action without a
- * name here, which the catalogue in `packages/core` would have to gain first,
- * reads as a proposed change rather than as its identifier.
- */
-const ACTION_NAME_KEYS: Readonly<Record<string, string>> = {
-  "goals.create": "copilot.copilotPanel.actions.newObjective",
-  "goals.addKeyResult": "copilot.copilotPanel.actions.newKeyResult",
-  "initiatives.create": "copilot.copilotPanel.actions.newInitiative",
-  "tasks.create": "copilot.copilotPanel.actions.newTask",
-};
-
-/**
- * The preview's labels, as the reader's language.
- *
- * Core builds the preview in English words because it is stored with the
- * proposal and read back on any surface; the panel is where it meets a
- * reader. A label not listed here is shown as it was stored.
- */
-const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
-  Objective: "copilot.copilotPanel.preview.objective",
-  Description: "copilot.copilotPanel.preview.description",
-  Level: "copilot.copilotPanel.preview.level",
-  Space: "copilot.copilotPanel.preview.space",
-  Cycle: "copilot.copilotPanel.preview.cycle",
-  "Key result": "copilot.copilotPanel.preview.keyResult",
-  Baseline: "copilot.copilotPanel.preview.baseline",
-  Target: "copilot.copilotPanel.preview.target",
-  Direction: "copilot.copilotPanel.preview.direction",
-  Indicator: "copilot.copilotPanel.preview.indicator",
-  Initiative: "copilot.copilotPanel.preview.initiative",
-  Task: "copilot.copilotPanel.preview.task",
-};
-
-/**
- * One proposal, with what it would do and what may be done about it.
- *
- * **The buttons are offered whether or not the reader may use them.** A member
- * who cannot create an objective sees Apply and gets the permission layer's own
- * refusal, which is the S-39 requirement and the opposite of hiding it. The one
- * thing that is not offered is an undo for an action with no reverse, because
- * that is a fact about the action rather than about the reader.
- */
-function ProposalCard({
-  proposal,
-  busy,
-  acting,
-  onApply,
-  onDismiss,
-  onUndo,
-}: {
-  readonly proposal: Proposal;
-  readonly busy: boolean;
-  /** The button that started the work in flight, so only that one spins. */
-  readonly acting: string | null;
-  readonly onApply: () => void;
-  readonly onDismiss: () => void;
-  readonly onUndo: () => void;
-}) {
-  const { t } = useTranslations();
-
-  return (
-    <section
-      aria-label={t("copilot.copilotPanel.proposedChange")}
-      className="rounded-lg border border-line bg-surface p-3"
-    >
-      <header className="flex items-center gap-2">
-        <Chip tone="agent">{t("common.ai")}</Chip>
-        <span className="text-xs font-semibold text-ink-2">
-          {t(
-            ACTION_NAME_KEYS[proposal.action] ??
-              "copilot.copilotPanel.proposedChange",
-          )}
-        </span>
-        {proposal.status === "applied" ? (
-          <Chip tone={proposal.undone ? "neutral" : "ok"}>
-            {proposal.undone
-              ? t("copilot.copilotPanel.undone")
-              : t("copilot.copilotPanel.applied")}
-          </Chip>
-        ) : null}
-        {proposal.status === "dismissed" ? (
-          <Chip tone="neutral">{t("copilot.copilotPanel.dismissed")}</Chip>
-        ) : null}
-      </header>
-      <p className="mt-2 text-xs text-ink-3">{proposal.why}</p>
-      <dl className="mt-2 flex flex-col gap-1">
-        {proposal.preview.map((row) => (
-          <div key={row.label} className="flex gap-2 text-xs">
-            <dt className="w-20 flex-none text-ink-4">
-              {PREVIEW_LABEL_KEYS[row.label]
-                ? t(PREVIEW_LABEL_KEYS[row.label] as string)
-                : row.label}
-            </dt>
-            <dd className="min-w-0 text-ink-2">{row.value}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="mt-3 flex items-center gap-2">
-        {proposal.status === "pending" ? (
-          <>
-            <Button
-              variant="primary"
-              disabled={busy}
-              pending={busy && acting === `apply:${proposal.id}`}
-              onClick={onApply}
-            >
-              <Check className="size-4" />
-              {t("common.apply")}
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={busy}
-              pending={busy && acting === `dismiss:${proposal.id}`}
-              onClick={onDismiss}
-            >
-              {t("common.dismiss")}
-            </Button>
-          </>
-        ) : null}
-        {proposal.status === "applied" &&
-        !proposal.undone &&
-        proposal.reversible ? (
-          <Button
-            variant="ghost"
-            disabled={busy}
-            pending={busy && acting === `undo:${proposal.id}`}
-            onClick={onUndo}
-          >
-            <Undo2 className="size-4" />
-            {t("copilot.copilotPanel.undo")}
-          </Button>
-        ) : null}
-        {proposal.status === "applied" && !proposal.reversible ? (
-          <p className="text-xs text-ink-4">
-            {t("copilot.copilotPanel.thisOneCannotBe")}
-          </p>
-        ) : null}
-      </div>
-    </section>
-  );
-}
 
 /**
  * The topbar's trigger. The shortcut hint sits beside the button, not inside
@@ -375,34 +112,6 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
       <Kbd className="hidden md:inline-flex">⌘J</Kbd>
     </span>
   );
-}
-
-/** The step a run says it is on (plan 0.8.1 W2). Core's `CopilotStep`. */
-type Step =
-  | { readonly step: "searching" }
-  | { readonly step: "found"; readonly count: number }
-  | { readonly step: "proposing" }
-  | { readonly step: "writing" };
-
-/** A step in the reader's words, from the catalogue and never from a model. */
-function stepWords(
-  step: Step,
-  t: ReturnType<typeof useTranslations>["t"],
-): string {
-  switch (step.step) {
-    case "searching":
-      return t("copilot.copilotPanel.step.searching");
-    case "found":
-      return step.count === 0
-        ? t("copilot.copilotPanel.step.foundNone")
-        : step.count === 1
-          ? t("copilot.copilotPanel.step.foundOne", { count: step.count })
-          : t("copilot.copilotPanel.step.foundOther", { count: step.count });
-    case "proposing":
-      return t("copilot.copilotPanel.step.proposing");
-    case "writing":
-      return t("copilot.copilotPanel.step.writing");
-  }
 }
 
 /**
@@ -469,53 +178,27 @@ function Unavailable({
   );
 }
 
-/**
- * What arrived for a question and is not in the recorded thread (plan 0.8.1
- * CP8, review F1). With AI off the passages and the reason are the answer, and
- * nothing records them, so the re-read that follows every turn used to take
- * them off the screen.
- */
-interface Kept {
+/** The question being answered in this page, and what has come for it. */
+interface Arriving {
+  readonly question: string;
+  /** The words so far. */
+  readonly text: string;
+  readonly step: Step;
+  /** What retrieval found, shown as the answer only when no words come. */
   readonly sources: readonly Source[];
+  /** Why no words are coming, when the run says so. */
   readonly notice: string | null;
+  /** The request ended and the re-read did not land, so this is all there is. */
+  readonly settled: boolean;
 }
 
-/**
- * The passages and the reason a question was given, after the turn landed.
- * The reason is left out when the recorded answer already says it.
- */
-function KeptAnswer({
-  kept,
-  said,
-}: {
-  readonly kept: Kept;
-  /** What the recorded answer says about why it stopped, if anything. */
-  readonly said: string | null;
-}) {
-  const { t } = useTranslations();
-  return (
-    <div data-testid="copilot-kept">
-      {kept.notice && kept.notice !== said ? (
-        <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
-          {kept.notice}
-        </p>
-      ) : null}
-      <SourceList
-        title={t("copilot.copilotPanel.passagesThatMatch")}
-        items={kept.sources}
-      />
-    </div>
-  );
+/** A background run being rejoined after a reload (P4-T14b-b). */
+interface Rejoined {
+  readonly text: string;
+  readonly step: Step | null;
 }
 
-/** The answer a question was given, when the next message is one. */
-const answerTo = (
-  messages: readonly Message[],
-  index: number,
-): Message | null => {
-  const next = messages[index + 1];
-  return next?.role === "assistant" ? next : null;
-};
+type Thread = Awaited<ReturnType<typeof readCopilotThreadAction>>;
 
 export function CopilotPanel({
   initialAvailability,
@@ -531,15 +214,12 @@ export function CopilotPanel({
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<readonly Message[]>([]);
   const [question, setQuestion] = useState("");
-  /** The answer as it arrives. Replaced by the recorded message when it lands. */
-  const [streaming, setStreaming] = useState<string | null>(null);
-  const [sources, setSources] = useState<readonly Source[]>([]);
+  const [arriving, setArriving] = useState<Arriving | null>(null);
+  const [rejoined, setRejoined] = useState<Rejoined>({ text: "", step: null });
   const [proposals, setProposals] = useState<readonly Proposal[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   /** Passages and reasons kept beside the questions they answered (CP8). */
   const [kept, setKept] = useState<Readonly<Record<string, Kept>>>({});
-  /** What the run says it is doing, while no words have arrived (W2). */
-  const [step, setStep] = useState<Step | null>(null);
   const [busy, setBusy] = useState(false);
   // Which proposal button started the decision in flight. Cleared with `busy`,
   // because `busy` is also set while a question is sent.
@@ -550,6 +230,9 @@ export function CopilotPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   /** The thread whose messages are on screen, so `kept` is cleared on a change. */
   const shownThread = useRef<string | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const stick = useStickToBottom(scroller, content, `${open}:${threadId}`);
 
   useKeyboardShortcut(
     {
@@ -593,11 +276,18 @@ export function CopilotPanel({
     };
   }, [open]);
 
-  const loadThread = useCallback(async (id: string) => {
-    const [thread, listed] = await Promise.all([
-      readCopilotThreadAction(id),
-      listCopilotProposalsAction(id),
-    ]);
+  /** One conversation and its cards, read together. */
+  const read = useCallback(
+    async (id: string) =>
+      Promise.all([
+        readCopilotThreadAction(id),
+        listCopilotProposalsAction(id),
+      ]),
+    [],
+  );
+
+  /** Puts a conversation on screen. Called in the render that swaps it in. */
+  const show = useCallback((thread: Thread, listed: readonly Proposal[]) => {
     // What was kept belongs to the conversation it was asked in.
     if (shownThread.current !== thread.id) {
       setKept({});
@@ -606,10 +296,17 @@ export function CopilotPanel({
     setThreadId(thread.id);
     setMessages(thread.messages);
     setProposals(listed);
-    setStreaming(null);
-    setSources([]);
-    setNotice(null);
+    setRejoined({ text: "", step: null });
   }, []);
+
+  const loadThread = useCallback(
+    async (id: string) => {
+      const [thread, listed] = await read(id);
+      show(thread, listed);
+      setNotice(null);
+    },
+    [read, show],
+  );
 
   /**
    * Rejoins a run that is still going (P4-T14b-b).
@@ -617,12 +314,11 @@ export function CopilotPanel({
    * **This is the acceptance criterion.** The member asked something that
    * takes a minute, the run went to the background, and the page they come
    * back to has an answer still being written. The thread read says so, and
-   * this subscribes to the rest of it.
+   * this subscribes to the rest of it, drawn in the recorded answer's own turn
+   * rather than in a second one beside it (plan 0.8.1 CP3, review F21).
    *
    * What it cannot do is replay: prose already published is gone, and the
    * whole answer arrives when the run completes and the thread is re-read.
-   * The chip says the answer is still being written, which is true and is
-   * better than an empty bubble that looks finished.
    */
   const running = messages.some(
     (message) => message.role === "assistant" && message.running,
@@ -636,24 +332,32 @@ export function CopilotPanel({
     );
     const onText = (event: MessageEvent) => {
       const data = JSON.parse(event.data) as { text?: string };
-      setStreaming((was) => (was ?? "") + (data.text ?? ""));
+      setRejoined((was) => ({ ...was, text: was.text + (data.text ?? "") }));
     };
     const onStep = (event: MessageEvent) => {
-      setStep(JSON.parse(event.data) as Step);
+      const step = JSON.parse(event.data) as Step;
+      setRejoined((was) => ({ ...was, step }));
+    };
+    const onProposal = () => {
+      void listCopilotProposalsAction(threadId)
+        .then(setProposals)
+        .catch(() => undefined);
     };
     const onDone = () => {
       source.close();
       // Re-read rather than assembling the final message here: the thread read
       // is what resolves citations against this reader's access, and a message
       // built in the browser would be one that skipped that.
-      void loadThread(threadId);
+      void loadThread(threadId).catch(() => undefined);
     };
     source.addEventListener("text", onText);
     source.addEventListener("step", onStep);
+    source.addEventListener("proposal", onProposal);
     source.addEventListener("done", onDone);
     return () => {
       source.removeEventListener("text", onText);
       source.removeEventListener("step", onStep);
+      source.removeEventListener("proposal", onProposal);
       source.removeEventListener("done", onDone);
       source.close();
     };
@@ -686,11 +390,13 @@ export function CopilotPanel({
         setBusy(false);
         setActing(null);
         if (threadId) {
-          await loadThread(threadId).catch(() => undefined);
+          await read(threadId)
+            .then(([thread, listed]) => show(thread, listed))
+            .catch(() => undefined);
         }
       }
     },
-    [loadThread, t, threadId],
+    [read, show, t, threadId],
   );
 
   const stop = useCallback(() => {
@@ -714,33 +420,31 @@ export function CopilotPanel({
       }
       setBusy(true);
       setNotice(null);
-      setSources([]);
-      setStreaming("");
-      // The first thing every run does. Said at once rather than when the event
-      // arrives, because a background run may publish it before the panel has
-      // subscribed (plan 0.8.1 W2).
-      setStep({ step: "searching" });
-      // Shown straight away rather than after the round trip. The id is the
-      // server's, so this turn is replaced when the thread is re-read.
-      setMessages((current) => [
-        ...current,
-        {
-          id: `pending-${current.length}`,
-          role: "member",
-          content: asked,
-          citations: [],
-          stopped: false,
-        },
-      ]);
+      // Shown straight away rather than after the round trip, with the first
+      // thing every run does: a background run may publish that step before
+      // the panel has subscribed (plan 0.8.1 W2).
+      setArriving({
+        question: asked,
+        text: "",
+        step: { step: "searching" },
+        sources: [],
+        notice: null,
+        settled: false,
+      });
+      // Asking is reading the end of the conversation.
+      stick.toEnd();
+      const update = (patch: Partial<Arriving>) =>
+        setArriving((was) => (was ? { ...was, ...patch } : was));
 
       const controller = new AbortController();
       abort.current = controller;
       let landedThreadId = threadId;
       // What this question was given, kept past the re-read when no words came.
       let questionId: string | null = null;
-      let arrived = "";
+      let text = "";
       let found: readonly Source[] = [];
       let said: string | null = null;
+      let reached = true;
       try {
         const response = await fetch("/api/copilot", {
           method: "POST",
@@ -752,6 +456,7 @@ export function CopilotPanel({
           signal: controller.signal,
         });
         if (!response.ok || !response.body) {
+          reached = false;
           setNotice(t("copilot.copilotPanel.couldNotBeReached"));
           return;
         }
@@ -759,7 +464,6 @@ export function CopilotPanel({
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
-        let text = "";
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -767,8 +471,8 @@ export function CopilotPanel({
           }
           buffer += decoder.decode(value, { stream: true });
           // Server-Sent Events: frames are separated by a blank line, and only
-          // the `data:` line is parsed. The `event:` line names the same kind the
-          // payload carries, so nothing is read twice.
+          // the `data:` line is parsed. The `event:` line names the same kind
+          // the payload carries, so nothing is read twice.
           const frames = buffer.split("\n\n");
           buffer = frames.pop() ?? "";
           for (const frame of frames) {
@@ -795,9 +499,11 @@ export function CopilotPanel({
               landedThreadId = event.threadId;
               questionId = event.questionMessageId;
               runningAnswer.current = event.answerMessageId ?? null;
+              shownThread.current = event.threadId;
               setThreadId(event.threadId);
             } else if (event.kind === "step") {
-              setStep(event);
+              const { kind: _kind, ...step } = event;
+              update({ step });
             } else if (event.kind === "proposal" && landedThreadId) {
               // The card was made before the answer (plan 0.8.1 A2), so it is
               // shown while the answer is still being written.
@@ -809,14 +515,13 @@ export function CopilotPanel({
               }
             } else if (event.kind === "sources") {
               found = event.sources;
-              setSources(event.sources);
+              update({ sources: event.sources });
             } else if (event.kind === "unavailable") {
               said = event.reason;
-              setNotice(event.reason);
+              update({ notice: event.reason });
             } else if (event.kind === "text") {
               text += event.text;
-              arrived = text;
-              setStreaming(text);
+              update({ text });
             }
           }
         }
@@ -829,20 +534,27 @@ export function CopilotPanel({
       } finally {
         abort.current = null;
         runningAnswer.current = null;
-        setBusy(false);
-        setStreaming(null);
-        setStep(null);
-        if (landedThreadId) {
-          // The recorded thread, with citations filtered against access now,
-          // replaces everything drawn optimistically above. A proposal was asked
-          // for on the server before the answer (plan 0.8.1 A2), so it is in it.
-          await loadThread(landedThreadId).catch(() => undefined);
+        // The recorded thread, with citations filtered against access now,
+        // replaces everything drawn optimistically above, in one render so
+        // the answer never leaves the screen. A proposal was asked for on the
+        // server before the answer (plan 0.8.1 A2), so it is in it.
+        const landed = landedThreadId
+          ? await read(landedThreadId).catch(() => null)
+          : null;
+        if (landed) {
+          show(...landed);
+          setArriving(null);
+        } else if (reached) {
+          update({ settled: true });
+        } else {
+          setArriving(null);
         }
+        setBusy(false);
         // With no words, the passages and the reason were the answer, and the
         // thread holds neither (plan 0.8.1 CP8, review F1). Kept beside the
         // question until another conversation is opened.
         const id = questionId;
-        if (id && arrived.trim() === "" && (found.length > 0 || said)) {
+        if (id && text.trim() === "" && (found.length > 0 || said)) {
           setKept((was) => ({
             ...was,
             [id]: { sources: found, notice: said },
@@ -850,7 +562,7 @@ export function CopilotPanel({
         }
       }
     },
-    [busy, loadThread, question, t, threadId],
+    [busy, question, read, show, stick, t, threadId],
   );
 
   if (!open) {
@@ -867,6 +579,33 @@ export function CopilotPanel({
       : notice
         ? "sad"
         : "idle";
+
+  const { turns, afterLast } = groupTurns(
+    messages,
+    proposals,
+    arriving !== null,
+  );
+  const cardsFor = (listed: readonly Proposal[]) =>
+    listed.length === 0
+      ? null
+      : listed.map((proposal) => (
+          <ProposalCard
+            key={proposal.id}
+            proposal={proposal}
+            busy={busy}
+            acting={acting}
+            onApply={() =>
+              void decide("apply", proposal.id, applyCopilotProposalAction)
+            }
+            onDismiss={() =>
+              void decide("dismiss", proposal.id, dismissCopilotProposalAction)
+            }
+            onUndo={() =>
+              void decide("undo", proposal.id, undoCopilotProposalAction)
+            }
+          />
+        ));
+  const empty = turns.length === 0 && arriving === null;
 
   return (
     <>
@@ -907,152 +646,138 @@ export function CopilotPanel({
             </Button>
           </header>
 
-          <div className="flex-1 overflow-y-auto px-4 py-3">
-            {messages.length === 0 && streaming === null ? (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col items-start gap-2 pt-2">
-                  <AgentFace mood={mood} className="size-8" />
-                  <p className="text-sm text-ink-3">
-                    {t("copilot.copilotPanel.askAboutThisWorkspace")}
-                  </p>
-                </div>
-                {/* Only where an answer can come: with AI off a suggestion
-                    would be a search for a sentence (plan 0.8.1 CP8). */}
-                {canAsk ? (
-                  <ul
-                    aria-label={t("copilot.copilotPanel.suggestions")}
-                    className="flex flex-col gap-1.5"
-                  >
-                    {SUGGESTIONS.map((key) => (
-                      <li key={key}>
-                        <Button
-                          variant="default"
-                          disabled={busy}
-                          onClick={() => void send(t(key))}
-                          className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
-                        >
-                          {t(key)}
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-                {threads.length > 0 ? (
-                  <div>
-                    <p className="text-xs text-ink-4">
-                      {t("copilot.copilotPanel.earlierConversations")}
-                    </p>
-                    <ul className="mt-1 flex flex-col gap-1">
-                      {threads.map((thread) => (
-                        <li key={thread.id}>
-                          <button
-                            type="button"
-                            className="text-left text-xs text-ink-2 underline"
-                            onClick={() => void loadThread(thread.id)}
-                          >
-                            {thread.title ?? t("copilot.copilotPanel.untitled")}
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+          <div className="relative min-h-0 flex-1">
+            <div ref={scroller} className="h-full overflow-y-auto px-4 py-3">
+              <div ref={content} className="flex flex-col gap-4">
+                {empty ? (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col items-start gap-2 pt-2">
+                      <AgentFace mood={mood} className="size-8" />
+                      <p className="text-sm text-ink-3">
+                        {t("copilot.copilotPanel.askAboutThisWorkspace")}
+                      </p>
+                    </div>
+                    {/* Only where an answer can come: with AI off a suggestion
+                        would be a search for a sentence (plan 0.8.1 CP8). */}
+                    {canAsk ? (
+                      <ul
+                        aria-label={t("copilot.copilotPanel.suggestions")}
+                        className="flex flex-col gap-1.5"
+                      >
+                        {SUGGESTIONS.map((key) => (
+                          <li key={key}>
+                            <Button
+                              variant="default"
+                              disabled={busy}
+                              onClick={() => void send(t(key))}
+                              className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
+                            >
+                              {t(key)}
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {threads.length > 0 ? (
+                      <div>
+                        <p className="text-xs text-ink-4">
+                          {t("copilot.copilotPanel.earlierConversations")}
+                        </p>
+                        <ul className="mt-1 flex flex-col gap-1">
+                          {threads.map((thread) => (
+                            <li key={thread.id}>
+                              <button
+                                type="button"
+                                className="text-left text-xs text-ink-2 underline"
+                                onClick={() => void loadThread(thread.id)}
+                              >
+                                {thread.title ??
+                                  t("copilot.copilotPanel.untitled")}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {messages.map((message, index) => {
-                  // After the answer to its question, or in the answer's
-                  // place when the run recorded none (relay off, AI off).
-                  const asked = messages[index - 1];
-                  const extra =
-                    message.role === "assistant"
-                      ? asked?.role === "member"
-                        ? kept[asked.id]
-                        : undefined
-                      : answerTo(messages, index) === null
-                        ? kept[message.id]
-                        : undefined;
+
+                {turns.map((turn) => {
+                  const answer = turn.answer;
+                  const extra = turn.question
+                    ? (kept[turn.question.id] ?? null)
+                    : null;
+                  const live = answer?.running === true;
                   return (
-                    <div key={message.id} className="contents">
-                      <Turn message={message} />
-                      {extra ? (
-                        <KeptAnswer
-                          kept={extra}
-                          said={
-                            message.role === "assistant"
-                              ? (message.haltedReason ?? null)
+                    <div key={turn.key} className="flex flex-col gap-3">
+                      {turn.question ? (
+                        <MemberTurn text={turn.question.content} />
+                      ) : null}
+                      {answer || extra || turn.proposals.length > 0 ? (
+                        <AssistantTurn
+                          text={live ? rejoined.text : (answer?.content ?? "")}
+                          arriving={live}
+                          status={
+                            live
+                              ? rejoined.step
+                                ? stepWords(rejoined.step, t)
+                                : t("copilot.copilotPanel.stillWriting")
                               : null
                           }
+                          haltedReason={answer?.haltedReason ?? null}
+                          stopped={answer?.stopped ?? false}
+                          citations={answer?.citations ?? []}
+                          kept={extra}
+                          cards={cardsFor(turn.proposals)}
                         />
                       ) : null}
                     </div>
                   );
                 })}
-                {proposals.map((proposal) => (
-                  <ProposalCard
-                    key={proposal.id}
-                    proposal={proposal}
-                    busy={busy}
-                    acting={acting}
-                    onApply={() =>
-                      void decide(
-                        "apply",
-                        proposal.id,
-                        applyCopilotProposalAction,
-                      )
-                    }
-                    onDismiss={() =>
-                      void decide(
-                        "dismiss",
-                        proposal.id,
-                        dismissCopilotProposalAction,
-                      )
-                    }
-                    onUndo={() =>
-                      void decide(
-                        "undo",
-                        proposal.id,
-                        undoCopilotProposalAction,
-                      )
-                    }
-                  />
-                ))}
-                {streaming !== null ? (
-                  <div className="whitespace-pre-wrap rounded-lg bg-surface px-3 py-2 text-sm text-ink">
-                    {streaming === "" ? (
-                      // One line, replaced in place as the run moves on, and
-                      // read out politely (plan 0.8.1 W2).
-                      <span
-                        role="status"
-                        className="flex items-center gap-2 text-ink-4"
-                      >
-                        {/* The face is the progress indicator here, so it
-                            loops while the answer has not started. */}
-                        <AgentFace mood="thinking" live className="size-4" />
-                        {stepWords(step ?? { step: "searching" }, t)}
-                      </span>
-                    ) : (
-                      streaming
-                    )}
+
+                {arriving ? (
+                  <div className="flex flex-col gap-3">
+                    <MemberTurn text={arriving.question} />
+                    <AssistantTurn
+                      text={arriving.text}
+                      arriving={!arriving.settled}
+                      status={stepWords(arriving.step, t)}
+                      haltedReason={null}
+                      stopped={false}
+                      citations={[]}
+                      // Passages are shown while arriving only when the run
+                      // has said no words are coming: then they are the
+                      // answer. Otherwise they wait for the recorded answer.
+                      kept={
+                        arriving.notice
+                          ? {
+                              sources: arriving.sources,
+                              notice: arriving.notice,
+                            }
+                          : null
+                      }
+                      cards={cardsFor(afterLast)}
+                    />
                   </div>
                 ) : null}
-              </div>
-            )}
 
-            {/* Only when it says something the footer does not. With the provider
-                off the stream's reason and the footer's reason are the same
-                sentence, and printing it twice reads as two problems. */}
-            {notice && notice !== availability.reason ? (
-              <p className="mt-3 rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
-                {notice}
-              </p>
+                {notice ? (
+                  <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
+                    {notice}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            {stick.away && !empty ? (
+              <Button
+                variant="default"
+                onClick={stick.toEnd}
+                aria-label={t("copilot.copilotPanel.jumpToLatest")}
+                className="absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg"
+              >
+                <ArrowDown className="size-4" aria-hidden="true" />
+              </Button>
             ) : null}
-            {/* The passages, shown whether or not a model used them. With the
-                provider off this is the answer. */}
-            <SourceList
-              title={t("copilot.copilotPanel.passagesThatMatch")}
-              items={sources}
-            />
           </div>
 
           <footer className="flex-none border-t border-line px-4 py-3">

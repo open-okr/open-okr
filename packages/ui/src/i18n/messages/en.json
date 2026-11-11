@@ -1893,6 +1893,7 @@
   "copilot.copilotPanel.fix.aiSettings": "Open AI settings",
   "copilot.copilotPanel.fix.personalKeys": "Your AI keys",
   "copilot.copilotPanel.fix.plan": "Choose a plan",
+  "copilot.copilotPanel.jumpToLatest": "Jump to latest",
   "copilot.copilotPanel.liftsOn": "The copilot can answer again on {date}.",
   "copilot.copilotPanel.passagesThatMatch": "Passages that match",
   "copilot.copilotPanel.preview.baseline": "Baseline",

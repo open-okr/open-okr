@@ -1893,6 +1893,7 @@
   "copilot.copilotPanel.fix.aiSettings": "Buka tetapan AI",
   "copilot.copilotPanel.fix.personalKeys": "Kunci AI anda",
   "copilot.copilotPanel.fix.plan": "Pilih pelan",
+  "copilot.copilotPanel.jumpToLatest": "Lompat ke yang terkini",
   "copilot.copilotPanel.liftsOn": "Copilot boleh menjawab semula pada {date}.",
   "copilot.copilotPanel.passagesThatMatch": "Petikan yang sepadan",
   "copilot.copilotPanel.preview.baseline": "Garis dasar",

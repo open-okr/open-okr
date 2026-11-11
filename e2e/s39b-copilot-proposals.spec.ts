@@ -269,3 +269,49 @@ test("undoing it removes the objective and says so", async () => {
   expect(proposal.rows[0]?.status).toBe("applied");
   expect(proposal.rows[0]?.undone_at).not.toBeNull();
 });
+
+/**
+ * **A long conversation opens at its end** (plan 0.8.1 CP3, review F3).
+ *
+ * Acceptance criterion: given a thread taller than the panel, when the person
+ * opens it, then the last turn is in view. The panel had no scroll handling,
+ * so an opened thread started at its top and its newest turn was below the
+ * fold. Written with SQL for the reason the file's header gives: no browser
+ * here can make the copilot answer.
+ */
+test("a long conversation opens at its newest turn", async () => {
+  const long = (
+    await pool.query<{ id: string }>(
+      `insert into ai_threads (id, workspace_id, member_id, title)
+       values (gen_random_uuid(), $1, $2, 'A long conversation')
+       returning id`,
+      [workspaceId, memberId],
+    )
+  ).rows[0]?.id as string;
+  for (let turn = 1; turn <= 12; turn += 1) {
+    await pool.query(
+      `insert into ai_messages (id, workspace_id, thread_id, role, content, created_at)
+       values (gen_random_uuid(), $1, $2, 'member', $3, now() - make_interval(mins => $4)),
+              (gen_random_uuid(), $1, $2, 'assistant', $5, now() - make_interval(mins => $4) + interval '5 seconds')`,
+      [
+        workspaceId,
+        long,
+        `Question number ${turn} about the onboarding quarter`,
+        30 - turn,
+        `Answer number ${turn}. ${"The onboarding work moved on this week, and the notes say why. ".repeat(4)}`,
+      ],
+    );
+  }
+
+  await page.goto("/");
+  await openPanel();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await panel.getByRole("button", { name: "A long conversation" }).click();
+
+  await expect(panel.getByText("Answer number 12.", { exact: false })).toBeInViewport({
+    timeout: 15_000,
+  });
+  await expect(
+    panel.getByText("Question number 1 about", { exact: false }),
+  ).not.toBeInViewport();
+});

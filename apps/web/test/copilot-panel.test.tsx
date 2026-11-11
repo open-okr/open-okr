@@ -33,8 +33,8 @@ const actions = vi.hoisted(() => ({
   applyCopilotProposalAction: vi.fn(),
   copilotAvailabilityAction: vi.fn(),
   dismissCopilotProposalAction: vi.fn(),
-  listCopilotProposalsAction: vi.fn(async () => []),
-  listCopilotThreadsAction: vi.fn(async () => []),
+  listCopilotProposalsAction: vi.fn(async (): Promise<unknown[]> => []),
+  listCopilotThreadsAction: vi.fn(async (): Promise<unknown[]> => []),
   readCopilotThreadAction: vi.fn(),
   undoCopilotProposalAction: vi.fn(),
 }));
@@ -229,6 +229,7 @@ describe("AI off (plan 0.8.1 CP8)", () => {
           stopped: false,
           running: false,
           haltedReason: null,
+          createdAt: "2026-11-12T10:00:00.000Z",
         },
       ],
     });
@@ -283,5 +284,198 @@ describe("AI off (plan 0.8.1 CP8)", () => {
     expect(panel()?.textContent).toContain(
       "The copilot can answer again on 1 Dec 2026.",
     );
+  });
+});
+
+/** A member message or an answer, as the thread read returns one. */
+const recorded = (
+  id: string,
+  role: "member" | "assistant",
+  content: string,
+  createdAt: string,
+) => ({
+  id,
+  role,
+  content,
+  citations: [],
+  stopped: false,
+  running: false,
+  haltedReason: null,
+  createdAt,
+});
+
+/** Types into the box and presses Send. */
+const ask = async (text: string) => {
+  const box = panel()?.querySelector("textarea");
+  if (!box) {
+    throw new Error("no box");
+  }
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype,
+      "value",
+    )?.set;
+    setter?.call(box, text);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await act(async () => byName("Send the question").click());
+};
+
+describe("turns (plan 0.8.1 CP3)", () => {
+  test("the answer stays on screen while the recorded one replaces it", async () => {
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "text", text: "Activation is up " },
+        { kind: "text", text: "four points." },
+        { kind: "done", answerMessageId: "a1", stopped: false },
+      ]),
+    );
+    let land: (value: unknown) => void = () => undefined;
+    actions.readCopilotThreadAction.mockReturnValue(
+      new Promise((resolve) => {
+        land = resolve;
+      }),
+    );
+    await render(AVAILABLE);
+    await open();
+    await ask("How is activation?");
+    await settle();
+
+    // The stream has ended and the re-read has not landed: the words are
+    // still there, in the copilot's turn.
+    const articles = () => [...(panel()?.querySelectorAll("article") ?? [])];
+    expect(articles()).toHaveLength(1);
+    expect(articles()[0]?.textContent).toContain(
+      "Activation is up four points.",
+    );
+
+    await act(async () =>
+      land({
+        id: THREAD,
+        subjectType: null,
+        subjectId: null,
+        title: "How is activation?",
+        messages: [
+          recorded(
+            QUESTION_ID,
+            "member",
+            "How is activation?",
+            "2026-11-12T10:00:00.000Z",
+          ),
+          recorded(
+            "a1",
+            "assistant",
+            "Activation is up four points.",
+            "2026-11-12T10:00:04.000Z",
+          ),
+        ],
+      }),
+    );
+    await settle();
+
+    // One turn, the recorded one, and the question drawn once.
+    expect(articles()).toHaveLength(1);
+    expect(articles()[0]?.getAttribute("aria-busy")).toBeNull();
+    expect(articles()[0]?.textContent).toContain(
+      "Activation is up four points.",
+    );
+    expect(panel()?.textContent?.split("How is activation?").length).toBe(2);
+  });
+
+  test("a card sits in the turn whose question made it", async () => {
+    actions.listCopilotThreadsAction.mockResolvedValue([
+      { id: THREAD, title: "Two requests" },
+    ]);
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Two requests",
+      messages: [
+        recorded(
+          "q1",
+          "member",
+          "Create an onboarding objective",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        recorded(
+          "a1",
+          "assistant",
+          "Here is a card for it.",
+          "2026-11-12T10:00:05.000Z",
+        ),
+        recorded(
+          "q2",
+          "member",
+          "What is blocking it?",
+          "2026-11-12T10:01:00.000Z",
+        ),
+        recorded("a2", "assistant", "Nothing yet.", "2026-11-12T10:01:05.000Z"),
+      ],
+    });
+    actions.listCopilotProposalsAction.mockResolvedValue([
+      {
+        id: "p1",
+        action: "goals.create",
+        preview: [{ label: "Objective", value: "Onboard in two days" }],
+        why: "You asked for one.",
+        status: "pending",
+        undone: false,
+        reversible: true,
+        createdAt: "2026-11-12T10:00:02.000Z",
+      },
+    ]);
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    await act(async () => byName("Two requests").click());
+    await settle();
+
+    const text = panel()?.textContent ?? "";
+    const card = text.indexOf("Onboard in two days");
+    expect(card).toBeGreaterThan(
+      text.indexOf("Create an onboarding objective"),
+    );
+    expect(card).toBeLessThan(text.indexOf("What is blocking it?"));
+  });
+
+  test("a rejoined run draws one turn", async () => {
+    class SilentEventSource {
+      addEventListener() {}
+      removeEventListener() {}
+      close() {}
+    }
+    vi.stubGlobal("EventSource", SilentEventSource);
+    actions.listCopilotThreadsAction.mockResolvedValue([
+      { id: THREAD, title: "Still going" },
+    ]);
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Still going",
+      messages: [
+        recorded(
+          "q1",
+          "member",
+          "Which goals are behind?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        {
+          ...recorded("a1", "assistant", "", "2026-11-12T10:00:00.000Z"),
+          running: true,
+        },
+      ],
+    });
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    await act(async () => byName("Still going").click());
+    await settle();
+
+    const articles = panel()?.querySelectorAll("article") ?? [];
+    expect(articles).toHaveLength(1);
+    expect(articles[0]?.getAttribute("aria-busy")).toBe("true");
   });
 });
