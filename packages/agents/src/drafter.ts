@@ -40,6 +40,7 @@ import type {
   ParsedFilter,
   PlannedRun,
   PlanRunContext,
+  ProposalDropReason,
   ProposalRequestContext,
   ProposedAction,
   ProposedImportMapping,
@@ -1094,6 +1095,12 @@ export interface ProviderDrafterOptions {
    * candidate here, which is how it runs exactly the code a workspace runs.
    */
   readonly systemPrompts?: Readonly<Record<string, string>>;
+  /**
+   * The provider's name as the workspace configured it (`openrouter`,
+   * `anthropic` and so on), for the log lines that must say which one answered
+   * (plan 0.8.1 A3). Never sent anywhere.
+   */
+  readonly providerName?: string;
 }
 
 /** Editor JSON from one paragraph of plain text, which is all a model returns. */
@@ -1369,6 +1376,24 @@ export function createProviderDrafter(
       if (!affordable() || context.options.length === 0) {
         return null;
       }
+      // Each null below says why (plan 0.8.1 A3). Core writes the log line,
+      // with none of the request, the fields or the reply in it.
+      const dropped = (
+        reason: ProposalDropReason,
+        action: string | null,
+        errorName?: string,
+      ): null => {
+        try {
+          context.onDropped?.({
+            reason,
+            action,
+            ...(errorName === undefined ? {} : { errorName }),
+          });
+        } catch {
+          // A listener that fails is not a reason to fail the request.
+        }
+        return null;
+      };
       try {
         const reply = await extractStructured({
           provider: forFeature("proposeAction"),
@@ -1393,7 +1418,7 @@ export function createProviderDrafter(
           ],
         });
         if (!reply.propose) {
-          return null;
+          return dropped("declined", null);
         }
         // The action name is checked against the offered list here as well as in
         // core, so a model naming something it was not offered never becomes a
@@ -1402,24 +1427,29 @@ export function createProviderDrafter(
           (option) => option.action === reply.action,
         );
         if (!offered) {
-          return null;
+          return dropped("not_offered", reply.action);
         }
         if (reply.why.trim() === "") {
           // A proposal with no stated reason is a proposal a reviewer cannot
           // judge. Refused rather than shown with a blank line.
-          return null;
+          return dropped("no_reason", reply.action);
         }
         const fields = fieldsFor(offered, reply.fields);
         if (!fields) {
-          return null;
+          return dropped("fields_refused", reply.action);
         }
         return {
           action: reply.action,
           fields,
           why: reply.why,
         };
-      } catch {
-        return null;
+      } catch (error) {
+        // The call failed, or no reply fit the shape even after the one repair.
+        return dropped(
+          "provider_error",
+          null,
+          error instanceof Error ? error.name : "Error",
+        );
       }
     },
 
@@ -2269,5 +2299,10 @@ export function createProviderDrafter(
     },
 
     spentUsd: () => spent,
+
+    identity: {
+      provider: options.providerName ?? "unknown",
+      model: options.model,
+    },
   };
 }

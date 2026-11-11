@@ -18,7 +18,7 @@
  */
 import type { AgentDrafter, ProposalRequestContext } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { proposeFromRequest } from "../src/copilot/proposals.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -244,6 +244,71 @@ describe("a proposal the model authored", () => {
       await propose(new ProposingDrafter(objective({ level: "galactic" }))),
     ).toBeNull();
     expect(await storedProposals()).toEqual([]);
+  });
+
+  it("logs why it was dropped, with none of the member's words (plan 0.8.1 A3)", async () => {
+    const written: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(String(chunk));
+        return true;
+      });
+    try {
+      const drafter = Object.assign(
+        new ProposingDrafter(objective({ spaceNumber: 4 })),
+        { identity: { provider: "openrouter", model: "openai/gpt-6-luna" } },
+      );
+      expect(
+        await propose(drafter, "Create an objective for Priya's onboarding"),
+      ).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+    const lines = written
+      .filter((line) => line.includes("copilot.proposal_dropped"))
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toEqual([
+      expect.objectContaining({
+        reason: "build_refused",
+        action: "goals.create",
+        provider: "openrouter",
+        model: "openai/gpt-6-luna",
+      }),
+    ]);
+    const all = written.join("");
+    expect(all).not.toContain("Priya");
+    expect(all).not.toContain("mid-market");
+  });
+
+  it("logs a drafter that throws as a provider error", async () => {
+    const written: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(String(chunk));
+        return true;
+      });
+    try {
+      const throwing: AgentDrafter = {
+        async proposeAction() {
+          throw new RangeError("Create an objective for mid-market activation");
+        },
+        spentUsd: () => 0,
+      };
+      expect(await propose(throwing)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+    const line = written.find((one) =>
+      one.includes("copilot.proposal_dropped"),
+    );
+    expect(JSON.parse(line ?? "{}")).toMatchObject({
+      reason: "provider_error",
+      error: "RangeError",
+      provider: "unknown",
+    });
+    expect(line).not.toContain("mid-market");
   });
 });
 

@@ -114,6 +114,7 @@ export type {
   DraftedInitiative,
   DraftedKeyResult,
   DraftedObjective,
+  DrafterIdentity,
   FilterContext,
   GroundedAnswer,
   GroundedChunk,
@@ -128,6 +129,8 @@ export type {
   ParsedFilter,
   PlannedRun,
   PlanRunContext,
+  ProposalDrop,
+  ProposalDropReason,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
@@ -146,6 +149,7 @@ export type {
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
+export { PROPOSAL_DROP_REASONS } from "./agents/drafter.ts";
 export {
   AGENT_RUN_CHANGED_TOPIC,
   type AgentRunChangedEvent,

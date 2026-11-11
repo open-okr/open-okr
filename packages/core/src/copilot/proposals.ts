@@ -39,7 +39,9 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import type { ProposalDrop } from "../agents/drafter.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
 /** One thing the model may be shown and point at by number. */
 export interface NumberedChoice {
@@ -668,7 +670,8 @@ export async function buildProposal(
  * would be a copilot nobody trusts with the apply button. Null also covers the
  * provider being off, the model naming an action outside the list, and fields
  * the schema refuses: from a reviewer's point of view all four are the same, in
- * that there is nothing to review.
+ * that there is nothing to review. From an operator's they are not, so every
+ * one but a plain decline writes a log line naming why (plan 0.8.1 A3).
  */
 export async function proposeFromRequest(
   context: ActionCallContext,
@@ -689,10 +692,17 @@ export async function proposeFromRequest(
     return null;
   }
 
+  // Every null below names its reason in the log, except a plain decline
+  // (plan 0.8.1 A3). The drafter reports the ones it decides; this function
+  // reports the two it decides itself.
+  const dropped = (drop: ProposalDrop) =>
+    logProposalDrop(drop, drafter.identity);
+
   let authored: Awaited<ReturnType<NonNullable<typeof drafter.proposeAction>>> =
     null;
   try {
     authored = await drafter.proposeAction({
+      onDropped: dropped,
       request: input.request,
       // Labels only. No identifier reaches the model.
       options: offers.map((offer) => ({
@@ -709,7 +719,14 @@ export async function proposeFromRequest(
       })),
       sources: [],
     });
-  } catch {
+  } catch (error) {
+    // The provider drafter catches its own failures and reports them; a host's
+    // drafter that throws instead is reported here.
+    dropped({
+      reason: "provider_error",
+      action: null,
+      errorName: errorNameOf(error),
+    });
     return null;
   }
   if (!authored) {
@@ -723,6 +740,7 @@ export async function proposeFromRequest(
     // A model that named an action outside the list, wrote a field the schema
     // refuses, or indexed past the end of a list it was shown. No proposal,
     // rather than a proposal built on a guess.
+    dropped({ reason: "build_refused", action: authored.action });
     return null;
   }
 

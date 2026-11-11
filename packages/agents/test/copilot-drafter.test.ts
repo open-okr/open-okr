@@ -590,6 +590,109 @@ describe("proposing an action", () => {
     expect(await ask(drafter)).toBeNull();
     expect(provider.requests).toEqual([]);
   });
+
+  describe("says why it proposed nothing (plan 0.8.1 A3)", () => {
+    const askNoting = async (drafter: AgentDrafter) => {
+      const drops: unknown[] = [];
+      const result = await drafter.proposeAction?.({
+        request: "Create an objective for mid-market activation",
+        options: OPTIONS,
+        sources: [],
+        onDropped: (drop) => drops.push(drop),
+      });
+      return { result, drops };
+    };
+
+    it.each([
+      [
+        "a decline",
+        { propose: false, action: "none", fields: {}, why: "" },
+        { reason: "declined", action: null },
+      ],
+      [
+        "an action it was not offered",
+        {
+          propose: true,
+          action: "people.erase",
+          fields: { memberId: "someone" },
+          why: "Tidying up.",
+        },
+        { reason: "not_offered", action: "people.erase" },
+      ],
+      [
+        "an empty reason",
+        {
+          propose: true,
+          action: "goals.create",
+          fields: { title: "Raise activation", level: "team", spaceNumber: 1 },
+          why: "  ",
+        },
+        { reason: "no_reason", action: "goals.create" },
+      ],
+      [
+        "fields the action cannot use",
+        {
+          propose: true,
+          action: "goals.create",
+          fields: { title: null, level: null, spaceNumber: null },
+          why: "You asked for an objective.",
+        },
+        { reason: "fields_refused", action: "goals.create" },
+      ],
+    ])("names %s", async (_name, reply, expected) => {
+      const { drafter } = request(reply);
+      const { result, drops } = await askNoting(drafter);
+      expect(result).toBeNull();
+      expect(drops).toEqual([expected]);
+    });
+
+    it("names a provider that failed, by its error's class and nothing else", async () => {
+      class Refusing extends ExtractingProvider {
+        override async extract(): Promise<ChatResponse> {
+          throw new TypeError("Create an objective for mid-market activation");
+        }
+      }
+      const drafter = createProviderDrafter({
+        provider: new Refusing("{}"),
+        model: "test-model",
+        costCapUsd: 2,
+        costInPerMillion: 1,
+        costOutPerMillion: 2,
+      });
+      const { result, drops } = await askNoting(drafter);
+      expect(result).toBeNull();
+      expect(drops).toEqual([
+        { reason: "provider_error", action: null, errorName: "TypeError" },
+      ]);
+    });
+
+    it("reports nothing when it proposes something", async () => {
+      const { drafter } = request({
+        propose: true,
+        action: "goals.create",
+        fields: { title: "Raise activation", level: "team", spaceNumber: 2 },
+        why: "You asked for one and the cycle has none.",
+      });
+      const { result, drops } = await askNoting(drafter);
+      expect(result).not.toBeNull();
+      expect(drops).toEqual([]);
+    });
+
+    it("says which provider and model it calls, for the log line", () => {
+      const drafter = createProviderDrafter({
+        provider: new ExtractingProvider("{}"),
+        providerName: "openrouter",
+        model: "openai/gpt-6-luna",
+        costCapUsd: 2,
+        costInPerMillion: 1,
+        costOutPerMillion: 2,
+      });
+      expect(drafter.identity).toEqual({
+        provider: "openrouter",
+        model: "openai/gpt-6-luna",
+      });
+    });
+  });
 });
 
 /**

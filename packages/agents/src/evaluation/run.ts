@@ -79,7 +79,11 @@ interface EvaluationFixture {
   readonly reply: string | readonly string[];
   /** The capability's result after the product's own checks. Null to refuse. */
   readonly expected: unknown;
-  run(drafter: AgentDrafter): Promise<unknown>;
+  /**
+   * `note` is how a capability says why it answered nothing (plan 0.8.1 A3):
+   * a dropped proposal's reason. Printed beside a `result` failure only.
+   */
+  run(drafter: AgentDrafter, note: (text: string) => void): Promise<unknown>;
 }
 
 /** One capability's fixtures, and the limits they are held to. */
@@ -261,12 +265,16 @@ function judge(
     readonly threw: unknown;
     readonly ms: number;
     readonly requests: readonly Recorded[];
+    /** What the capability said about an empty answer, if anything. */
+    readonly notes: readonly string[];
   },
   options: EvaluateOptions & { readonly expectedPrompt: string | null },
 ): EvaluationFailure[] {
   const failures: EvaluationFailure[] = [];
   const fail = (check: EvaluationCheck, detail: string) =>
     failures.push({ check, detail });
+  const why =
+    outcome.notes.length === 0 ? "" : ` (${outcome.notes.join("; ")})`;
 
   // result
   if (outcome.result === MISSING) {
@@ -280,12 +288,12 @@ function judge(
     );
   } else if (options.live) {
     if (outcome.result === null || outcome.result === undefined) {
-      fail("result", "no answer the schema accepted came back");
+      fail("result", `no answer the schema accepted came back${why}`);
     }
   } else if (!isDeepStrictEqual(outcome.result, fixture.expected)) {
     fail(
       "result",
-      `it returned ${quoted(outcome.result)}, not ${quoted(fixture.expected)}`,
+      `it returned ${quoted(outcome.result)}, not ${quoted(fixture.expected)}${why}`,
     );
   }
 
@@ -384,9 +392,10 @@ async function evaluateFixture(
 
   let result: unknown;
   let threw: unknown;
+  const notes: string[] = [];
   const started = performance.now();
   try {
-    result = await fixture.run(drafter);
+    result = await fixture.run(drafter, (text) => notes.push(text));
   } catch (error) {
     threw = error ?? new Error("an empty throw");
   }
@@ -395,7 +404,7 @@ async function evaluateFixture(
   const failures = judge(
     set,
     fixture,
-    { result, threw, ms, requests: recording.requests },
+    { result, threw, ms, requests: recording.requests, notes },
     options,
   );
   const [first] = recording.requests;

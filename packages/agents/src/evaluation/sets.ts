@@ -50,7 +50,7 @@ import {
 } from "./run.ts";
 
 /** A capability the drafter offers. */
-type Capability = Exclude<keyof AgentDrafter, "spentUsd">;
+type Capability = Exclude<keyof AgentDrafter, "spentUsd" | "identity">;
 
 interface FixtureSpec<C> {
   readonly name: string;
@@ -67,6 +67,7 @@ function evaluationSet<C>(spec: {
   readonly call: (
     drafter: AgentDrafter,
     context: C,
+    note: (text: string) => void,
   ) => Promise<unknown> | undefined;
   readonly fixtures: readonly FixtureSpec<C>[];
 }): EvaluationSet {
@@ -78,7 +79,8 @@ function evaluationSet<C>(spec: {
       name: fixture.name,
       reply: fixture.reply,
       expected: fixture.expected,
-      run: (drafter) => missingAs(spec.call(drafter, fixture.context)),
+      run: (drafter, note) =>
+        missingAs(spec.call(drafter, fixture.context, note)),
     })),
   };
 }
@@ -989,7 +991,16 @@ const PROPOSED_ACTION = {
 const proposeAction = evaluationSet<ProposalRequestContext>({
   capability: "proposeAction",
   inputBudgetTokens: 4_000,
-  call: (drafter, context) => drafter.proposeAction?.(context),
+  // Says why a proposal was dropped, so a live run that expected one and got
+  // none prints the reason beside the failure (plan 0.8.1 A3).
+  call: (drafter, context, note) =>
+    drafter.proposeAction?.({
+      ...context,
+      onDropped: (drop) =>
+        note(
+          `dropped as ${drop.reason}${drop.action ? `, naming ${drop.action}` : ""}`,
+        ),
+    }),
   fixtures: [
     {
       name: "a request for an offered action",

@@ -60,7 +60,7 @@ describe("every set, against the built-in prompts", () => {
       costOutPerMillion: 0,
     });
     const offered = Object.keys(drafter)
-      .filter((name) => name !== "spentUsd")
+      .filter((name) => name !== "spentUsd" && name !== "identity")
       .sort();
     const covered = EVALUATION_SETS.map((set) => set.capability).sort();
     expect(covered).toEqual(offered);
@@ -230,8 +230,8 @@ describe("the checks that are about the product, not the prompt", () => {
       fixtures: [
         {
           ...first,
-          run: (drafter) =>
-            first.run({ ...drafter, draftObjective: undefined }),
+          run: (drafter, note) =>
+            first.run({ ...drafter, draftObjective: undefined }, note),
         },
       ],
     });
@@ -239,6 +239,37 @@ describe("the checks that are about the product, not the prompt", () => {
       check: "result",
       detail: "the drafter has no draftNothing",
     });
+  });
+
+  it("prints why a proposal it expected was dropped (plan 0.8.1 A3)", async () => {
+    const set = EVALUATION_SETS.find(
+      (one) => one.capability === "proposeAction",
+    );
+    const [first] = set?.fixtures ?? [];
+    if (!set || !first) {
+      throw new Error("No proposal fixture.");
+    }
+    // What the strict-output bug looked like: a proposal with nothing in it.
+    const report = await evaluateSet({
+      ...set,
+      fixtures: [
+        {
+          ...first,
+          reply: JSON.stringify({
+            propose: true,
+            action: "goals.addKeyResult",
+            fields: { title: null, objective: null },
+            why: "You asked for this measure.",
+          }),
+        },
+      ],
+    });
+    const result = report.outcomes[0]?.failures.find(
+      (failure) => failure.check === "result",
+    );
+    expect(result?.detail).toContain(
+      "(dropped as fields_refused, naming goals.addKeyResult)",
+    );
   });
 
   it("fails `latency` past the ceiling", async () => {

@@ -195,7 +195,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | M1 to M6 | merged | PR #210, `ea94d5a0` |
 | A1 | to do | A1-Q decided: I1's rule |
 | A2 | to do | A2-Q decided: the proposal first |
-| A3 | to do | |
+| A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | to do | |
