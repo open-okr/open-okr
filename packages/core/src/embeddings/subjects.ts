@@ -11,12 +11,19 @@
  * Two ways a write opts in:
  *
  * - It sets nothing, and the pipeline enqueues because the activity's own
- *   subject is embeddable. This covers goals, key results, check-ins, blockers
- *   and anything else whose activity points at the content that changed.
+ *   subject is embeddable. This covers goals, comments, documents, KPIs and
+ *   anything else whose activity points at the content that changed.
  * - It sets `activity.embed` explicitly, naming the content. This is for writes
  *   whose activity points at a container rather than at what changed: a retro
  *   note's activity names the space, a narrative's names the goal, and embedding
- *   the container would be embedding the wrong thing.
+ *   the container would be embedding the wrong thing. **Check-ins, key results
+ *   and blockers are all in this group**: every one of their activities names
+ *   the goal or the space. Until 0.8.1 none of them said so, and none reached
+ *   either index (test/content-indexed-as-itself.test.ts).
+ *
+ * A write that creates several things at once, the carry of kept objectives or
+ * a KPI's recovery, cannot name them all in one activity, so the function that
+ * creates them queues each one through `queueContentInTx`.
  *
  * **A cycle is not in either list.** It is a period with a name and no prose, so
  * embedding "Q1 2026" would put a retrieval hit in the index that answers

@@ -43,6 +43,7 @@ import { digestNoteDocument } from "./0031_digest_note_document.ts";
 import { revalidationNoteDocuments } from "./0032_revalidation_note_documents.ts";
 import { attachmentRowsFromText } from "./0033_attachment_rows_from_text.ts";
 import { shortIds } from "./0034_short_ids.ts";
+import { indexContentNeverQueued } from "./0035_index_content_never_queued.ts";
 
 export function registeredDataChanges(
   encryptionKey: string | undefined,
@@ -97,5 +98,9 @@ export function registeredDataChanges(
     // have none, after migration 0163 (short-ids.md S3). 0.8.0's not-null
     // migration waits for this.
     shortIds,
+    // 0.8.1: the check-ins, key results, blockers and objectives no write ever
+    // queued for the copilot's index or search, because each write named the
+    // goal, the space, the cycle or the KPI instead.
+    indexContentNeverQueued,
   ];
 }

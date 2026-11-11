@@ -386,9 +386,22 @@ export async function joinAsNewcomer(
  * A fresh workspace sends its owner to its setup, and only once the front door
  * has settled, so arriving on `/` is not yet the answer. Waits for either the
  * shell or the setup, then skips the setup if that is what came.
+ *
+ * **Asked again as a whole page when the answer was `/`.** The home page
+ * sends an owner who has not set up to `/welcome` with a server redirect, but
+ * reached by an in-app navigation, which is how sign-up arrives, the layout's
+ * shell paints first and the redirect lands about 300 ms later. A look in
+ * between sees the shell on `/` and skips nothing, and the setup then covers
+ * the shell: the first CI run of PR #210 failed exactly so, twice in a row.
+ * `networkidle` cannot close the gap, because the page reached it long before
+ * this navigation and it returns at once. A document request follows the
+ * redirect before anything paints, so the address it ends on is the answer.
  */
 async function skipSetupIfAsked(page: Page): Promise<void> {
   await page.waitForLoadState("networkidle").catch(() => undefined);
+  if (new URL(page.url()).pathname === "/") {
+    await goTo(page, "/");
+  }
   await expect(
     page
       .getByRole("navigation", { name: "Primary" })

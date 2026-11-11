@@ -2984,6 +2984,8 @@ export const createSessionBlocker = defineWriteAction({
             keyResultId: input.keyResultId,
             type: input.type,
           },
+          // The activity names the space; the index needs the blocker's words.
+          embed: { entityType: "blocker", entityId: id },
         },
         audit: {
           action: "sessions.createBlocker",
