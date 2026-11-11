@@ -346,8 +346,9 @@ Then they see the same welcome card, and no mail is queued
 Asked for by Akmal on 11 November 2026, after the browser suite showed what a
 real instance with mail does: a person invited by email to a workspace that
 requires confirmation signs up through the invitation, and is then asked to
-confirm the very address the invitation reached. Security, so this section
-needs "design approved" before the code.
+confirm the very address the invitation reached. Security, so it waited for
+"design approved", which Akmal gave on 11 November 2026 with S5-Q1 to Q3 all
+as recommended.
 
 ### 12.1 The rule
 
@@ -403,7 +404,7 @@ Then their account is not confirmed by it
 
 | # | Question | Recommended |
 |---|---|---|
-| S5-Q1 | Only a personal invitation whose address matches exactly? | **Yes.** A shared link proves nothing about one inbox |
-| S5-Q2 | An unconfirmed account that is already signed in and accepts a personal invitation to its own address: confirm it then too? | **Yes**, in the same change. It is the same proof, reached by the person who signed up before they were invited |
-| S5-Q3 | Record it as `auth.email_verified` with `via: "invitation"`? | **Yes**, so the trail says how every address was confirmed |
+| S5-Q1 | Only a personal invitation whose address matches exactly? | **Yes**, decided. A shared link proves nothing about one inbox |
+| S5-Q2 | An unconfirmed account that is already signed in and accepts a personal invitation to its own address: confirm it then too? | **Yes**, decided, in the same change. It is the same proof, reached by the person who signed up before they were invited |
+| S5-Q3 | Record it as `auth.email_verified` with `via: "invitation"`? | **Yes**, decided, so the trail says how every address was confirmed |
 

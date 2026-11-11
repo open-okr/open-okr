@@ -125,8 +125,8 @@ cannot hold either way.
 **So no index is built in H5.** At the size the decision named, the measurement is
 not plainly over. What it does show is that a large workspace will be, and that
 the second option is bigger than written: pgvector's hnsw takes at most 2,000
-dimensions on `vector`, so a 3072 model's index needs `halfvec`. That is
-H5-Q4 in §7, for Akmal.
+dimensions on `vector`, so a 3072 model's index needs `halfvec`. H5-Q4 in §7
+asked when to build it, and Akmal decided to leave it until it is needed.
 
 ### 3.4 The two neighbouring faults
 
@@ -198,7 +198,7 @@ Then only chunks of the query's size are compared, and nothing raises
 | H5-Q1 | May 0031 change? | A, B or C in §2 | **A.** It is the only option that fixes a fresh install on managed Postgres without breaking an instance that already upgraded, and the sanction is one named file with its reason |
 | H5-Q2 | Convert the column for an instance that adds pgvector later? | A new migration plus a runbook step; the runbook step only; nothing | **A new migration plus the runbook step.** The migration covers the common case, the step covers adding it later, and §3.4 keeps both safe meanwhile |
 | H5-Q3 | Build an approximate index now? | None, unless the measurement in §3.3 is over budget; partial HNSW indexes on `embedding::vector(n)` for the configured model's size, built by an operator command | **None unless the measurement says otherwise.** An index needs the model's size, which migrations cannot know, and an exact search is correct |
-| H5-Q4 | Opened by the build, not decided. §3.3 measured the vector query under budget at the decided scale for 1536 and at the line for 3072, and about one to two seconds by extrapolation for the full §13.1 dataset. Build the index option, and when? | Leave it until a deployment is near the size that needs it; or design H5-Q3's second option now, with `halfvec` for models over 2,000 dimensions | Akmal's |
+| H5-Q4 | Opened by the build, not decided. §3.3 measured the vector query under budget at the decided scale for 1536 and at the line for 3072, and about one to two seconds by extrapolation for the full §13.1 dataset. Build the index option, and when? | Leave it until a deployment is near the size that needs it; or design H5-Q3's second option now, with `halfvec` for models over 2,000 dimensions | **Leave it** (Akmal, 11 November 2026). No deployment is near 60,000 chunks, OKRGoal runs without pgvector, and §3.3 measured synthetic embeddings, so a design now would rest on guesses. Revisit when `pnpm perf:budgets` puts search suggestions over 300 ms, or a deployment passes about 50,000 chunks; that design is a schema change and starts with this document |
 
 ## 8. As built
 
