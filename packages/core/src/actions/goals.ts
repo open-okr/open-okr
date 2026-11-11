@@ -2409,6 +2409,8 @@ export const createKeyResult = defineWriteAction({
               ? { addedMidCycle: true, reason: input.reason ?? null }
               : {}),
           },
+          // The activity names the goal; both indexes need the key result.
+          embed: { entityType: "key_result", entityId: created.id },
         },
         audit: {
           action: "goals.addKeyResult",
@@ -2600,6 +2602,7 @@ export const updateKeyResult = defineWriteAction({
           subjectType: "goal",
           subjectId: owner.goalId,
           payload: { ...baselineMoved },
+          embed: { entityType: "key_result", entityId: input.id },
         },
         audit: {
           action: "goals.updateKeyResult",

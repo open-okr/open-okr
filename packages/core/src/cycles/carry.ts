@@ -38,6 +38,7 @@ import {
 } from "../goals/service.ts";
 import { recomputeKpi } from "../kpis/service.ts";
 import type { OperationTx } from "../operations/operation.ts";
+import { queueContentInTx } from "../operations/queue-content.ts";
 import { midCycleInTx } from "../practice/policy.ts";
 import { recomputeUnitQualityInTx } from "../quality/service.ts";
 import { recomputeForGoal } from "../scoring/recompute.ts";
@@ -385,6 +386,9 @@ export async function carryKeptObjectivesInTx(
       draftState: running ? "draft" : null,
       carriedFromGoalId: source.id,
     });
+    // Every write that carries names the cycle in its activity, and one
+    // activity names one thing, so each draft queues itself for both indexes.
+    await queueContentInTx(tx, workspaceId, "goal", created.id);
 
     for (const keyResult of sourceKeyResults.filter(
       (row) => row.goalId === source.id,
@@ -399,7 +403,7 @@ export async function carryKeptObjectivesInTx(
       if (!start) {
         continue;
       }
-      await createKeyResultInTx(tx, {
+      const copy = await createKeyResultInTx(tx, {
         workspaceId,
         goalId: created.id,
         title: keyResult.title,
@@ -417,6 +421,7 @@ export async function carryKeptObjectivesInTx(
         kpiId: keyResult.kpiId,
         addedMidCycleAt: running ? now : null,
       });
+      await queueContentInTx(tx, workspaceId, "key_result", copy.id);
     }
 
     await seedGoalFrequencyInTx(tx, {

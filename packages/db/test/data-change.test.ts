@@ -57,6 +57,7 @@ import { digestNoteDocument } from "../src/data-changes/0031_digest_note_documen
 import { revalidationNoteDocuments } from "../src/data-changes/0032_revalidation_note_documents.ts";
 import { attachmentRowsFromText } from "../src/data-changes/0033_attachment_rows_from_text.ts";
 import { shortIds } from "../src/data-changes/0034_short_ids.ts";
+import { indexContentNeverQueued } from "../src/data-changes/0035_index_content_never_queued.ts";
 import { plainTextDocument } from "../src/data-changes/plain-text-document.ts";
 import { registeredDataChanges } from "../src/data-changes/registry.ts";
 import { runMigrations } from "../src/migrate.ts";
@@ -2988,5 +2989,207 @@ describe("0034: a short identifier on every addressable row that has none", () =
         expect(await nullable(owner)).toEqual([]);
       });
     }, 60_000);
+  });
+});
+
+describe("0035: queues the check-ins, key results, blockers and objectives neither index holds", () => {
+  /**
+   * One workspace with an objective both indexes already hold, and beside it
+   * what no write ever queued until 0.8.1: a key result, a published check-in
+   * and a blocker. A draft check-in, a deleted key result and a resolved
+   * blocker's text are there too, to prove what is left alone.
+   */
+  /** A fresh short id, in the alphabet the column accepts: no 0, l, I or O. */
+  const SHORT_ID = "translate(left(md5(random()::text), 10), '0', '1')";
+
+  async function seedWorkspace(db: DataChangeClient, slug: string) {
+    const { rows } = await db.query<{ id: string }>(
+      "select gen_random_uuid() as id",
+    );
+    const workspaceId = rows[0]?.id as string;
+    await db.query("select set_config('app.workspace_id', $1, false)", [
+      workspaceId,
+    ]);
+    const ids = await db.query<{
+      goal_id: string;
+      key_result_id: string;
+      deleted_key_result_id: string;
+      published_id: string;
+      draft_id: string;
+      blocker_id: string;
+    }>(
+      `with w as (
+         insert into workspaces (id, name, slug) values ($1, $2, $2)
+         returning id
+       ), m as (
+         insert into workspace_members (id, workspace_id, name, kind, status)
+         select gen_random_uuid(), w.id, 'Ana', 'human', 'active' from w
+         returning id, workspace_id
+       ), g as (
+         insert into goals (id, workspace_id, title, level, owner_kind,
+                            champion_id, reviewer_id, timeframe, short_id)
+         select gen_random_uuid(), m.workspace_id, 'Keep customers',
+                'company', 'workspace', m.id, m.id,
+                '{"start": "2026-01-01", "end": "2026-03-31"}'::jsonb,
+                ${SHORT_ID}
+           from m
+         returning id, workspace_id
+       ), k as (
+         insert into key_results (id, workspace_id, goal_id, title, direction,
+                                  indicator_type, baseline_value,
+                                  target_value, current_value, short_id)
+         select gen_random_uuid(), g.workspace_id, g.id, 'Raise retention',
+                'increase', 'lagging', 0, 10, 0, ${SHORT_ID}
+           from g
+         returning id
+       ), kd as (
+         insert into key_results (id, workspace_id, goal_id, title, direction,
+                                  indicator_type, baseline_value,
+                                  target_value, current_value, deleted_at,
+                                  short_id)
+         select gen_random_uuid(), g.workspace_id, g.id, 'Gone', 'increase',
+                'lagging', 0, 10, 0, now(), ${SHORT_ID}
+           from g
+         returning id
+       ), cp as (
+         insert into check_ins (id, workspace_id, subject_id, author_member_id,
+                                state, published_at, status, confidence,
+                                narrative)
+         select gen_random_uuid(), g.workspace_id, g.id, m.id, 'published',
+                now(), 'on_track', 0.7,
+                '{"type": "doc", "content": []}'::jsonb
+           from g, m
+         returning id
+       ), cd as (
+         insert into check_ins (id, workspace_id, subject_id, author_member_id,
+                                state)
+         select gen_random_uuid(), g.workspace_id, g.id, m.id, 'draft'
+           from g, m
+         returning id
+       ), b as (
+         insert into blockers (id, workspace_id, goal_id, type, owner_id,
+                               next_action, opened_at, due_at)
+         select gen_random_uuid(), g.workspace_id, g.id, 'dependency', m.id,
+                'Ask billing for a date', now(), now()
+           from g, m
+         returning id
+       )
+       select g.id as goal_id, k.id as key_result_id,
+              kd.id as deleted_key_result_id, cp.id as published_id,
+              cd.id as draft_id, b.id as blocker_id
+         from g, k, kd, cp, cd, b`,
+      [workspaceId, slug],
+    );
+    const seeded = ids.rows[0] as NonNullable<(typeof ids.rows)[0]>;
+    // The objective is in both indexes already, as goals.create left it.
+    await db.query(
+      `insert into embeddings (id, workspace_id, entity_type, entity_id,
+                               content, content_hash)
+       values (gen_random_uuid(), $1, 'goal', $2, 'Keep customers', 'h')`,
+      [workspaceId, seeded.goal_id],
+    );
+    await db.query(
+      `insert into search_documents (workspace_id, entity_type, entity_id,
+                                     title)
+       values ($1, 'goal', $2, 'Keep customers')`,
+      [workspaceId, seeded.goal_id],
+    );
+    await db.query("select set_config('app.workspace_id', '', false)");
+    return { workspaceId, ...seeded };
+  }
+
+  /** Every queued job, as topic, type and id, with the workspace it carries. */
+  async function queuedJobs(db: DataChangeClient) {
+    const { rows } = await db.query<{
+      topic: string;
+      entity_type: string;
+      entity_id: string;
+      workspace_id: string | null;
+      payload_workspace: string;
+    }>(
+      `select topic, payload->>'entityType' as entity_type,
+              payload->>'entityId' as entity_id, workspace_id,
+              payload->>'workspaceId' as payload_workspace
+         from outbox order by topic, payload->>'entityType'`,
+    );
+    return rows;
+  }
+
+  it("queues each missing one for the index that lacks it, leaves the rest, and runs again as nothing", async () => {
+    await runMigrations(client, { dirs: [MIGRATIONS] });
+    const acme = await seedWorkspace(client, "acme");
+    const other = await seedWorkspace(client, "other");
+
+    const [outcome] = await runDataChanges(client, {
+      scripts: [indexContentNeverQueued],
+    });
+    // Per workspace: the key result and the published check-in for both
+    // indexes, and the blocker for the copilot's, which search does not hold.
+    expect(outcome?.rowsChanged).toBe(10);
+
+    const jobs = await queuedJobs(client);
+    for (const seeded of [acme, other]) {
+      const mine = jobs
+        .filter((job) => job.payload_workspace === seeded.workspaceId)
+        .map((job) => `${job.topic} ${job.entity_type} ${job.entity_id}`)
+        .sort();
+      expect(mine).toEqual(
+        [
+          `content.embed blocker ${seeded.blocker_id}`,
+          `content.embed check_in ${seeded.published_id}`,
+          `content.embed key_result ${seeded.key_result_id}`,
+          `content.index check_in ${seeded.published_id}`,
+          `content.index key_result ${seeded.key_result_id}`,
+        ].sort(),
+      );
+      // Queued under the workspace's own setting, so the relay's fair
+      // ordering sees whose row it is.
+      expect(
+        jobs
+          .filter((job) => job.payload_workspace === seeded.workspaceId)
+          .every((job) => job.workspace_id === seeded.workspaceId),
+      ).toBe(true);
+    }
+    const everyId = jobs.map((job) => job.entity_id);
+    for (const seeded of [acme, other]) {
+      // In both indexes already, a draft nobody else may read, and a key
+      // result somebody deleted.
+      expect(everyId).not.toContain(seeded.goal_id);
+      expect(everyId).not.toContain(seeded.draft_id);
+      expect(everyId).not.toContain(seeded.deleted_key_result_id);
+    }
+
+    await client.query("delete from _data_changes");
+    const [again] = await runDataChanges(client, {
+      scripts: [indexContentNeverQueued],
+    });
+    expect(again?.rowsChanged).toBe(0);
+    expect(await queuedJobs(client)).toHaveLength(10);
+  });
+
+  it("sees every workspace when it runs as the table owner, under the tenant floor", async () => {
+    const wb = await workerDb();
+    const ownerDb = `${scratchDb}_owner`;
+    await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    await wb.admin.query(
+      `create database ${ownerDb} owner ${testDbEnv.ownerRole} ` +
+        `encoding 'UTF8' lc_collate 'C' lc_ctype 'C' template template0`,
+    );
+    const owner = new pg.Client(
+      connectionOptions(ownerDb, testDbEnv.ownerRole),
+    );
+    await owner.connect();
+    try {
+      await runMigrations(owner, { dirs: [MIGRATIONS] });
+      await seedWorkspace(owner, "acme");
+      await seedWorkspace(owner, "other");
+      const [outcome] = await runDataChanges(owner, {
+        scripts: [indexContentNeverQueued],
+      });
+      expect(outcome?.rowsChanged).toBe(10);
+    } finally {
+      await owner.end();
+      await wb.admin.query(`drop database if exists ${ownerDb} with (force)`);
+    }
   });
 });

@@ -291,6 +291,9 @@ export const publishDraftedCheckIn = defineWriteAction({
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
+          // The activity names the goal, whose text a check-in does not
+          // change; what both indexes need is the check-in's own words.
+          embed: { entityType: "check_in", entityId: draft.checkInId },
         },
         audit: {
           action: "goals.publishDraftedCheckIn",
@@ -383,6 +386,8 @@ export const publishCheckIn = defineWriteAction({
           },
           // The goal's watchers hear about it (completeness review H-13).
           notify: true,
+          // The check-in's words, not the goal the activity names.
+          embed: { entityType: "check_in", entityId: input.id },
         },
         audit: {
           action: "goals.publishCheckIn",
@@ -479,6 +484,7 @@ export const editCheckIn = defineWriteAction({
           subjectType: "goal",
           subjectId: goalId,
           payload: {},
+          embed: { entityType: "check_in", entityId: input.id },
         },
         audit: {
           action: "goals.editCheckIn",
@@ -538,6 +544,9 @@ export const deleteCheckIn = defineWriteAction({
           subjectType: "goal",
           subjectId: result.goalId,
           payload: { rolledBack: result.rolledBack },
+          // The search worker finds nothing to index for a deleted check-in
+          // and removes its entry, which is the point of naming it here.
+          embed: { entityType: "check_in", entityId: input.id },
         },
         audit: {
           action: "goals.deleteCheckIn",
@@ -1277,6 +1286,7 @@ export const importCheckIn = defineWriteAction({
             valuesWritten: published.valuesWritten,
             checkInId,
           },
+          embed: { entityType: "check_in", entityId: checkInId },
         },
         audit: {
           action: "goals.importCheckIn",
