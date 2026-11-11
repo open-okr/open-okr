@@ -1,6 +1,10 @@
 "use server";
 
-import { createWorkspaceAsOperator } from "@openokr/core";
+import {
+  adoptWorkspacesAsOperator,
+  createWorkspaceAsOperator,
+  OperationError,
+} from "@openokr/core";
 import { revalidatePath } from "next/cache";
 import { requireOperator } from "../../lib/operator";
 import { getPool } from "../../lib/pool";
@@ -45,5 +49,40 @@ export async function createWorkspace(
       throw error;
     }
     return refused;
+  }
+}
+
+/**
+ * Adopt now, on S-45 (Q-9, plan 0.8.1): the workspaces made before this
+ * instance became a cloud, adopted on the operator's word rather than at the
+ * next hourly run. The same adopt as `pnpm cloud:adopt`; the grant is checked
+ * here and again at the domain door, which also writes the instance audit row.
+ */
+export interface AdoptState {
+  readonly error?: string;
+  readonly done?: string;
+}
+
+export async function adoptWaitingWorkspaces(): Promise<AdoptState> {
+  const operator = await requireOperator();
+  const { t } = await getTranslations();
+  try {
+    const adopted = await adoptWorkspacesAsOperator(getPool(), {
+      operatorUserId: operator.userId,
+    });
+    revalidatePath("/operator");
+    return {
+      done:
+        adopted === 0
+          ? t("operator.workspaces.adoptedNone")
+          : adopted === 1
+            ? t("operator.workspaces.adoptedOne")
+            : t("operator.workspaces.adoptedOther", { count: adopted }),
+    };
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { error: error.message };
+    }
+    throw error;
   }
 }

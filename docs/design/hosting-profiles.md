@@ -77,7 +77,7 @@ The install guide says so in those words.
 | Change | Detail |
 |---|---|
 | Plan screen | With an empty catalogue, not-found at the route and absent from the navigation and the palette, the same as flag off |
-| Existing workspaces | The scheduler gives any live workspace without one a tenant row every hour, through `listLiveWorkspaces`. `pnpm cloud:adopt` does it now, for `OPENOKR_SCHEDULER=off`. Idempotent, and only with the flag on. An `./openokr operator adopt` was designed and dropped: it would have needed most of the domain in the image's pruned sources, and the scheduler already does it on that target |
+| Existing workspaces | The scheduler gives any live workspace without one a tenant row every hour, through `listLiveWorkspaces`. `pnpm cloud:adopt` does it now, for `OPENOKR_SCHEDULER=off`. Idempotent, and only with the flag on. An `./openokr operator adopt` was designed and dropped: it would have needed most of the domain in the image's pruned sources, and the scheduler already does it on that target. **The console says so too** (Q-9, plan 0.8.1): until the first run, S-45 read "0 tenants" with nothing to say why. It now counts the live workspaces with no tenant row, says they were made before the instance became a cloud, and offers **Adopt now**, which runs the same adopt for an operator with a live grant and writes one instance audit row, `operator.workspaces_adopted`, naming the operator and how many. A truly empty instance keeps its empty state |
 | Usage figures | The scheduler also refreshes the snapshot the console and the plan screen read, every hour. Not in the first draft of this design: nothing refreshed it unless somebody ran `pnpm cloud:usage`, so a provider's console would have read empty |
 
 ## 6. Not in this design
@@ -106,3 +106,4 @@ The install guide says so in those words.
 7. **Given** the flag on and `ai.allowPrivateEndpoints` off, **when** a base URL names a private address, **then** the request is refused. **Given** it on, **then** it goes.
 8. **Given** an instance with workspaces and the flag newly on, **when** the scheduler runs, **then** each workspace has one tenant row, and a second run changes nothing.
 9. **Given** every setting at its default, **when** the hosting setup suite runs, **then** the single-workspace install behaves exactly as before.
+10. **Given** an instance with workspaces and the flag newly on, **when** an operator opens S-45 before the scheduler has run, **then** it says how many workspaces are not in the list yet, and **when** they press Adopt now, **then** each gets one tenant row, the list shows them, and the instance chain holds one `operator.workspaces_adopted` row naming the operator (Q-9, plan 0.8.1).

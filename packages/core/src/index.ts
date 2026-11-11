@@ -1144,7 +1144,9 @@ export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
+  adoptWorkspacesAsOperator,
   type CloudPreflightWarning,
+  countWorkspacesAwaitingAdoption,
   createSiteMessage,
   createWorkspaceAsOperator,
   type DefaultPlanFillResult,
