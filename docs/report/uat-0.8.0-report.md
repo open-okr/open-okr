@@ -23,6 +23,24 @@ Rounds, because some settings need a restart or a fresh database:
 | C | A plus `OPENOKR_CLOUD=true`, a catalogue (Free with 0 credits, Team with 2,000), a fake provider key, then `OPENOKR_CLOUD_DEFAULT_PLAN=team` | V2, O2, O1 (plan reason), S4 on a cloud |
 | D | Destroyed and rebuilt with `OPENOKR_REGISTRATION=invite_only` | H3 |
 
+## Fix status
+
+Fixed on `release-0.8.0` on 11 November 2026, one commit per finding, each with a changeset, and checked again in a browser on an image rebuilt from `b803f7e7`.
+
+| Finding | Commit | Checked in the browser |
+|---|---|---|
+| F-01 Uploads above 10 MB | `700c2584` | A 24 MB file attaches |
+| F-02 Tour card off screen on a phone | `4cbaf8ed` | All three phone steps show the card above the lit tab, finished by tapping |
+| F-03 Admin has no way to the cycle page | `edd81ba9` | An Admin sees Cycle and the phase strip; a Member still does not |
+| F-04 Viewer role cannot lower an invited member's Edit | Open | Left for Akmal (Q-1). `cycles.setupAccess` records the Edit binding as deliberate ("every member holds `edit` for self-service"), which points at L2's `canEdit` reading the workspace level |
+| F-05 "No plan" shown as "Free" | `ae15cbde` | S-46, the console filter and the Plan page say "No plan" with a catalogue |
+| F-06 Facilitator item focuses the Sponsor picker | `33951929` | Each item focuses its own picker |
+| F-07 Focus lost after Take the tour again | `081468d9` | Escape returns focus to the account menu button |
+| F-08 Malay gaps | `b803f7e7` | Sidebar, bottom bar, menu rows and the role ("Ahli") in Malay. Wording not reviewed by a native speaker |
+| F-09 "not configured" chip beside the plan reason | `9dbcaf59` | The chip is gone while the plan sentence shows |
+| F-10 Focus after sign-up | `e914fbdf` | Focus is on the card's heading; Tab reaches Send the link again |
+| F-11 4 px overflow at phone width | `2de81a71` | Nothing past 390 px on `/cycle` or `/account` |
+
 ## Findings
 
 Ranked by severity.
