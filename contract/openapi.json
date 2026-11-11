@@ -10836,6 +10836,12 @@
                           },
                           "createdAt": {
                             "type": "string"
+                          },
+                          "href": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
                           }
                         },
                         "required": [
@@ -10846,7 +10852,8 @@
                           "status",
                           "undone",
                           "reversible",
-                          "createdAt"
+                          "createdAt",
+                          "href"
                         ],
                         "additionalProperties": false
                       }

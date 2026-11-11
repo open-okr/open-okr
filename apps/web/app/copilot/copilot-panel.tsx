@@ -283,6 +283,10 @@ export function CopilotPanel({
   // Which proposal button started the decision in flight. Cleared with `busy`,
   // because `busy` is also set while a question is sent.
   const [acting, setActing] = useState<string | null>(null);
+  /** Why the last decision on each card was refused, by card (CP7). */
+  const [cardErrors, setCardErrors] = useState<
+    Readonly<Record<string, string>>
+  >({});
   const abort = useRef<AbortController | null>(null);
   /** The answer a background run is writing, so Stop can stop it (W4). */
   const runningAnswer = useRef<string | null>(null);
@@ -585,34 +589,37 @@ export function CopilotPanel({
   /**
    * Applies, dismisses or undoes one, then re-reads.
    *
-   * The refusal is shown as it arrives. A member who may not create an objective
-   * gets `goals.create`'s own words, not a disabled button and no explanation.
+   * The refusal is shown as it arrives, on the card it is about (plan 0.8.1
+   * CP7). A member who may not create an objective gets `goals.create`'s own
+   * words, not a disabled button and no explanation.
+   *
+   * **Deciding does not hold up asking, nor asking deciding.** One busy flag
+   * for both disabled Apply while an answer arrived and the box while a card
+   * was decided (review F23); a decision has its own, `acting`.
    */
   const decide = useCallback(
     async (
       name: string,
       id: string,
-      decision: (id: string) => Promise<unknown>,
+      decision: (id: string) => Promise<{ readonly error: string | null }>,
     ): Promise<void> => {
-      setBusy(true);
       setActing(`${name}:${id}`);
-      setNotice(null);
-      try {
-        await decision(id);
-      } catch (error) {
-        setNotice(
-          error instanceof Error
-            ? error.message
-            : t("copilot.copilotPanel.couldNotBeDone"),
-        );
-      } finally {
-        setBusy(false);
-        setActing(null);
-        if (threadId) {
-          await read(threadId)
-            .then(([thread, listed]) => show(thread, listed))
-            .catch(() => undefined);
-        }
+      setCardErrors((was) => {
+        const { [id]: _gone, ...rest } = was;
+        return rest;
+      });
+      const error = await decision(id).then(
+        (answered) => answered.error,
+        () => t("copilot.copilotPanel.couldNotBeDone"),
+      );
+      if (error) {
+        setCardErrors((was) => ({ ...was, [id]: error }));
+      }
+      setActing(null);
+      if (threadId) {
+        await read(threadId)
+          .then(([thread, listed]) => show(thread, listed))
+          .catch(() => undefined);
       }
     },
     [read, show, t, threadId],
@@ -844,8 +851,9 @@ export function CopilotPanel({
           <ProposalCard
             key={proposal.id}
             proposal={proposal}
-            busy={busy}
+            busy={acting !== null}
             acting={acting}
+            error={cardErrors[proposal.id] ?? null}
             onApply={() =>
               void decide("apply", proposal.id, applyCopilotProposalAction)
             }
@@ -1030,18 +1038,30 @@ export function CopilotPanel({
                       aria-live="off"
                       className="flex flex-col gap-4"
                     >
-                      {turns.map((turn) => {
+                      {turns.map((turn, index) => {
                         const answer = turn.answer;
                         const extra = turn.question
                           ? (kept[turn.question.id] ?? null)
                           : null;
                         const live = answer?.running === true;
+                        // The last turn, with nothing asked after it, is
+                        // where an error is said and Retry offered (CP7).
+                        const last =
+                          arriving === null && index === turns.length - 1;
+                        const asked = turn.question?.content ?? null;
+                        const fellShort =
+                          answer?.stopped === true ||
+                          Boolean(answer?.haltedReason) ||
+                          (last && notice !== null);
                         return (
                           <div key={turn.key} className="flex flex-col gap-3">
                             {turn.question ? (
                               <MemberTurn text={turn.question.content} />
                             ) : null}
-                            {answer || extra || turn.proposals.length > 0 ? (
+                            {answer ||
+                            extra ||
+                            turn.proposals.length > 0 ||
+                            (last && notice) ? (
                               <AssistantTurn
                                 text={
                                   live ? rejoined.text : (answer?.content ?? "")
@@ -1059,6 +1079,26 @@ export function CopilotPanel({
                                 citations={answer?.citations ?? []}
                                 kept={extra}
                                 cards={cardsFor(turn.proposals)}
+                                copyText={
+                                  !live &&
+                                  answer &&
+                                  answer.content.trim() !== ""
+                                    ? answer.content
+                                    : null
+                                }
+                                onRetry={
+                                  // Not with AI off: a retry would only
+                                  // search again for the same passages.
+                                  last &&
+                                  fellShort &&
+                                  asked &&
+                                  !live &&
+                                  availability.providerConfigured
+                                    ? () => void send(asked)
+                                    : null
+                                }
+                                retryDisabled={busy || !availability.available}
+                                error={last ? notice : null}
                               />
                             ) : null}
                           </div>
@@ -1091,7 +1131,9 @@ export function CopilotPanel({
                         </div>
                       ) : null}
 
-                      {notice ? (
+                      {/* With no turn to say it under, such as a
+                          conversation that is not there any more. */}
+                      {notice && turns.length === 0 && arriving === null ? (
                         <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
                           {notice}
                         </p>

@@ -29,6 +29,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { reversalFor } from "../copilot/proposals.ts";
+import { subjectPath } from "../notifications/links.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { askingMemberId } from "./copilot.ts";
 import { defineReadAction, defineWriteAction } from "./define.ts";
@@ -74,6 +75,46 @@ async function ownProposal(
     throw new OperationError("not_found", "No such proposal.");
   }
   return row;
+}
+
+/**
+ * Where the thing an applied card made lives (plan 0.8.1 CP7, review F28).
+ *
+ * The card said Applied and nothing else, so the person had to go and find
+ * the objective or task it had just made. Built from the action and what it
+ * returned, through the one map of subject paths, so the card and the inbox
+ * agree about where an objective is. A key result has no page of its own: it
+ * is a row on its objective's page, anchored as `#kr-<id>`.
+ */
+function madeHref(
+  action: string,
+  payload: Readonly<Record<string, unknown>>,
+  result: unknown,
+): string | null {
+  const id =
+    typeof result === "object" && result !== null
+      ? (result as { id?: unknown }).id
+      : undefined;
+  if (typeof id !== "string") {
+    return null;
+  }
+  switch (action) {
+    case "goals.create":
+      return subjectPath("goal", id);
+    case "goals.addKeyResult": {
+      const goal = subjectPath(
+        "goal",
+        typeof payload.goalId === "string" ? payload.goalId : null,
+      );
+      return goal ? `${goal}#kr-${id}` : null;
+    }
+    case "initiatives.create":
+      return subjectPath("initiative", id);
+    case "tasks.create":
+      return subjectPath("task", id);
+    default:
+      return null;
+  }
 }
 
 const previewSchema = z.array(
@@ -186,6 +227,11 @@ const proposalOutput = z.object({
    * it, so this is what places it in its turn (plan 0.8.1 CP3).
    */
   createdAt: z.string(),
+  /**
+   * Where what it made lives, once applied and not undone (plan 0.8.1 CP7).
+   * Null before then, after an undo, and for an action with no page.
+   */
+  href: z.string().nullable(),
 });
 
 /** The proposals in one of the reader's own conversations, newest first. */
@@ -253,6 +299,10 @@ export const readProposals = defineReadAction({
             reversible:
               reversalFor(row.action, row.result ?? { id: "probe" }) !== null,
             createdAt: row.createdAt.toISOString(),
+            href:
+              row.status === "applied" && row.undoneAt === null
+                ? madeHref(row.action, payload, row.result)
+                : null,
           };
         });
       },

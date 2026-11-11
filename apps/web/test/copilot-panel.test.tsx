@@ -905,3 +905,143 @@ describe("formatted answers (plan 0.8.1 CP4)", () => {
     expect(answer?.querySelector("a")).toBeNull();
   });
 });
+
+describe("answer actions and errors (plan 0.8.1 CP7)", () => {
+  const openWith = async (
+    messages: readonly ReturnType<typeof recorded>[],
+    proposals: readonly unknown[] = [],
+  ) => {
+    window.history.replaceState(null, "", `/?copilot=${THREAD}`);
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "Open",
+      messages,
+    });
+    actions.listCopilotProposalsAction.mockResolvedValue([...proposals]);
+    await render(AVAILABLE);
+    await settle();
+  };
+
+  test("Copy puts the answer on the clipboard and says so", async () => {
+    const writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    await openWith([
+      recorded(
+        "q1",
+        "member",
+        "How is activation?",
+        "2026-11-12T10:00:00.000Z",
+      ),
+      recorded(
+        "a1",
+        "assistant",
+        "Activation is **up**.",
+        "2026-11-12T10:00:05.000Z",
+      ),
+    ]);
+    await act(async () => byName("Copy the answer").click());
+    await settle();
+    expect(writeText).toHaveBeenCalledWith("Activation is **up**.");
+    expect(panel()?.textContent).toContain("Copied");
+  });
+
+  test("Retry asks the last question again when its answer stopped", async () => {
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: "q2" },
+        { kind: "done", answerMessageId: null, stopped: false },
+      ]),
+    );
+    await openWith([
+      recorded(
+        "q1",
+        "member",
+        "How is activation?",
+        "2026-11-12T10:00:00.000Z",
+      ),
+      {
+        ...recorded(
+          "a1",
+          "assistant",
+          "Activation is",
+          "2026-11-12T10:00:05.000Z",
+        ),
+        stopped: true,
+      },
+    ]);
+    await act(async () => byName("Retry").click());
+    await settle();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      question: "How is activation?",
+      threadId: THREAD,
+    });
+  });
+
+  test("offers no Retry on an answer that finished", async () => {
+    await openWith([
+      recorded(
+        "q1",
+        "member",
+        "How is activation?",
+        "2026-11-12T10:00:00.000Z",
+      ),
+      recorded(
+        "a1",
+        "assistant",
+        "Activation is up.",
+        "2026-11-12T10:00:05.000Z",
+      ),
+    ]);
+    expect(() => byName("Retry")).toThrow();
+  });
+
+  const card = (over: Record<string, unknown> = {}) => ({
+    id: "p1",
+    action: "goals.create",
+    preview: [{ label: "Objective", value: "Onboard in two days" }],
+    why: "You asked for one.",
+    status: "pending",
+    undone: false,
+    reversible: true,
+    createdAt: "2026-11-12T10:00:02.000Z",
+    href: null,
+    ...over,
+  });
+
+  test("a refused Apply says why on the card itself", async () => {
+    actions.applyCopilotProposalAction.mockResolvedValue({
+      error: "You cannot create an objective in this space.",
+    });
+    await openWith(
+      [
+        recorded("q1", "member", "Create one", "2026-11-12T10:00:00.000Z"),
+        recorded("a1", "assistant", "Here it is.", "2026-11-12T10:00:05.000Z"),
+      ],
+      [card()],
+    );
+    await act(async () => byName("Apply").click());
+    await settle();
+    const region = panel()?.querySelector('[aria-label="Proposed change"]');
+    expect(region?.querySelector('[role="alert"]')?.textContent).toBe(
+      "You cannot create an objective in this space.",
+    );
+  });
+
+  test("an applied card links to what it made", async () => {
+    await openWith(
+      [
+        recorded("q1", "member", "Create one", "2026-11-12T10:00:00.000Z"),
+        recorded("a1", "assistant", "Here it is.", "2026-11-12T10:00:05.000Z"),
+      ],
+      [card({ status: "applied", href: "/goals/g1" })],
+    );
+    const region = panel()?.querySelector('[aria-label="Proposed change"]');
+    expect(region?.querySelector("a")?.getAttribute("href")).toBe("/goals/g1");
+  });
+});

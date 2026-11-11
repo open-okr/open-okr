@@ -217,6 +217,11 @@ test("applying it creates the objective through the normal Operation", async () 
   ).rows[0];
   expect(goal?.title).toBe(TITLE);
 
+  // And the card links to what it made (plan 0.8.1 CP7, review F28).
+  await expect(
+    card.getByRole("link", { name: "Open the objective" }),
+  ).toHaveAttribute("href", `/goals/${goal?.id}`);
+
   // Through the pipeline means an audit row for the goal's own creation, not
   // only for the decision to apply it.
   const audit = await pool.query<{ action: string }>(

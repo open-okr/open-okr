@@ -6,7 +6,8 @@
  * went into the turns that made them (plan 0.8.1 CP3).
  */
 import { Button, Chip, useTranslations } from "@openokr/ui";
-import { Check, Undo2 } from "lucide-react";
+import { ArrowUpRight, Check, Undo2 } from "lucide-react";
+import Link from "next/link";
 
 export interface Proposal {
   readonly id: string;
@@ -21,7 +22,17 @@ export interface Proposal {
   readonly reversible: boolean;
   /** When it was made, which places it in the turn whose question made it. */
   readonly createdAt: string;
+  /** Where what it made lives, once applied and not undone (CP7). */
+  readonly href: string | null;
 }
+
+/** What the link to the made thing says, by action (plan 0.8.1 CP7). */
+const OPEN_KEYS: Readonly<Record<string, string>> = {
+  "goals.create": "copilot.copilotPanel.open.objective",
+  "goals.addKeyResult": "copilot.copilotPanel.open.keyResult",
+  "initiatives.create": "copilot.copilotPanel.open.initiative",
+  "tasks.create": "copilot.copilotPanel.open.task",
+};
 
 /**
  * What each proposable action is called on screen (completeness review M-09).
@@ -77,6 +88,7 @@ export function ProposalCard({
   onApply,
   onDismiss,
   onUndo,
+  error,
 }: {
   readonly proposal: Proposal;
   readonly busy: boolean;
@@ -85,6 +97,8 @@ export function ProposalCard({
   readonly onApply: () => void;
   readonly onDismiss: () => void;
   readonly onUndo: () => void;
+  /** Why the last decision on this card was refused, on the card itself. */
+  readonly error: string | null;
 }) {
   const { t } = useTranslations();
 
@@ -165,7 +179,21 @@ export function ProposalCard({
             {t("copilot.copilotPanel.thisOneCannotBe")}
           </p>
         ) : null}
+        {proposal.href ? (
+          <Link
+            href={proposal.href}
+            className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-brand-text hover:underline"
+          >
+            {t(OPEN_KEYS[proposal.action] ?? "copilot.copilotPanel.open.made")}
+            <ArrowUpRight className="size-3.5" aria-hidden="true" />
+          </Link>
+        ) : null}
       </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-xs font-medium text-bad">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

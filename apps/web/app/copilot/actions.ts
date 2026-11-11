@@ -207,16 +207,41 @@ export async function deleteCopilotThreadAction(
   }
 }
 
+/**
+ * A decision on a card, answered with the refusal's own sentence (plan 0.8.1
+ * CP7). A server action's thrown message does not reach a production
+ * browser, so a member who may not create an objective was told nothing
+ * useful; the card shows this instead. Anything that is not a refusal is
+ * thrown on, to be said as "could not be done".
+ */
+async function decided(
+  run: () => Promise<unknown>,
+): Promise<{ readonly error: string | null }> {
+  try {
+    await run();
+    return { error: null };
+  } catch (error) {
+    const refused = refusalOf(error);
+    if (refused) {
+      return { error: refused };
+    }
+    throw error;
+  }
+}
+
 /** Applies one, as the reader. The proposed action's own access decides. */
 export async function applyCopilotProposalAction(id: string) {
-  return callAction(await context(), "copilot.applyProposal", { id });
+  const base = await context();
+  return decided(() => callAction(base, "copilot.applyProposal", { id }));
 }
 
 export async function dismissCopilotProposalAction(id: string) {
-  return callAction(await context(), "copilot.dismissProposal", { id });
+  const base = await context();
+  return decided(() => callAction(base, "copilot.dismissProposal", { id }));
 }
 
 /** Reverses an applied one, where the action it applied has a reverse. */
 export async function undoCopilotProposalAction(id: string) {
-  return callAction(await context(), "copilot.undoProposal", { id });
+  const base = await context();
+  return decided(() => callAction(base, "copilot.undoProposal", { id }));
 }

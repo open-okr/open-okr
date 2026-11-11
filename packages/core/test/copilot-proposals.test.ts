@@ -201,6 +201,8 @@ describe("a proposal the model authored", () => {
     // When it was made, so the panel places it in the turn whose question
     // made it (plan 0.8.1 CP3).
     expect(Date.parse(listed[0]?.createdAt ?? "")).not.toBeNaN();
+    // Nothing to link to until it is applied (plan 0.8.1 CP7).
+    expect((listed[0] as { href?: unknown } | undefined)?.href).toBeNull();
     expect(listed[0]?.why).toContain("activation objective");
     // Every identifier in the payload is the product's; the preview reads in
     // words, including the space the model only ever saw as a number.
@@ -435,7 +437,19 @@ describe("undoing one", () => {
     })) as { result: { id: string } | null };
     const goalId = applied.result?.id as string;
 
+    // An applied card links to what it made (plan 0.8.1 CP7).
+    const listedApplied = (await call("copilot.proposals", { threadId })) as {
+      href: string | null;
+    }[];
+    expect(listedApplied[0]?.href).toBe(`/goals/${goalId}`);
+
     await call("copilot.undoProposal", { id: proposed?.id as string });
+
+    // And not once it is undone: what it made is gone.
+    const listedUndone = (await call("copilot.proposals", { threadId })) as {
+      href: string | null;
+    }[];
+    expect(listedUndone[0]?.href).toBeNull();
 
     // Gone from every read, because soft delete is the default scope.
     await expect(call("goals.read", { id: goalId })).rejects.toThrow();

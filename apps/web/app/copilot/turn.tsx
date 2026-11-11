@@ -14,7 +14,15 @@
  * prose across the panel under its face, the way current chat products set
  * them, because an answer is read and a question is only recognised.
  */
-import { AgentFace, AnswerText, Chip, useTranslations } from "@openokr/ui";
+import {
+  AgentFace,
+  AnswerText,
+  Button,
+  Chip,
+  CopyButton,
+  useTranslations,
+} from "@openokr/ui";
+import { Copy, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -160,6 +168,10 @@ export function AssistantTurn({
   citations,
   kept,
   cards,
+  copyText = null,
+  onRetry = null,
+  retryDisabled = false,
+  error = null,
 }: {
   /** The recorded answer, or the words that have arrived so far. */
   readonly text: string;
@@ -173,6 +185,13 @@ export function AssistantTurn({
   /** The passages and reason kept for this question with AI off (CP8). */
   readonly kept: Kept | null;
   readonly cards: ReactNode;
+  /** The finished answer, offered to Copy (plan 0.8.1 CP7). */
+  readonly copyText?: string | null;
+  /** Asks the same question again, on the last answer when it fell short. */
+  readonly onRetry?: (() => void) | null;
+  readonly retryDisabled?: boolean;
+  /** What went wrong with this turn, said where it happened. */
+  readonly error?: string | null;
 }) {
   const { t } = useTranslations();
   return (
@@ -219,6 +238,39 @@ export function AssistantTurn({
           items={citations}
         />
       )}
+      {error ? (
+        <p role="alert" className="text-xs font-medium text-bad">
+          {error}
+        </p>
+      ) : null}
+      {copyText || onRetry ? (
+        <div className="flex items-center gap-1">
+          {copyText ? (
+            <CopyButton
+              text={copyText}
+              variant="ghost"
+              size="sm"
+              aria-label={t("copilot.copilotPanel.copyAnswer")}
+              className="px-1.5 text-ink-3"
+            >
+              <Copy className="size-3.5" aria-hidden="true" />
+              {t("copilot.copilotPanel.copy")}
+            </CopyButton>
+          ) : null}
+          {onRetry ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={retryDisabled}
+              onClick={onRetry}
+              className="px-1.5 text-ink-3"
+            >
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              {t("copilot.copilotPanel.retry")}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       {kept ? (
         <div data-testid="copilot-kept" className="flex flex-col gap-2">
           {/* The reason, unless the recorded answer already says it. */}
