@@ -1,5 +1,6 @@
 import { PHASE_GUIDANCE } from "@openokr/method";
 import { Bar, Card, CardBody, CardHeader, Chip } from "@openokr/ui";
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { phaseProgress } from "../../lib/phase-progress.ts";
 import { getTranslations } from "../../lib/translations";
@@ -39,10 +40,10 @@ async function Mark({
     return (
       <span
         role="img"
-        className={`${base} bg-ok text-white`}
+        className={`${base} bg-ok text-on-ok`}
         aria-label={t("cycle.phaseRail.phaseIsComplete", { phase })}
       >
-        ✓
+        <Check aria-hidden="true" strokeWidth={3} className="size-3.5" />
       </span>
     );
   }

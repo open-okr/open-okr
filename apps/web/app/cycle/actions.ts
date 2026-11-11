@@ -73,7 +73,14 @@ export async function savePackNote(
   const cycleId = String(formData.get("cycleId") ?? "");
   const itemKey = Number(formData.get("itemKey") ?? 0);
   const note = String(formData.get("note") ?? "").trim();
-  const gathered = formData.get("gathered") === "true";
+  // The first note written into an empty item gathers it, because saying
+  // where an item is, or who is bringing it, is how most people record that
+  // they have it; a saved note beside a red Missing chip read as a fault (11
+  // November 2026). After that the box decides, so an edited note never moves
+  // the status. Only a form that says it was drawn empty counts: one that
+  // posts nothing about it was drawn before this rule.
+  const firstNote = formData.get("hadNote") === "false" && note !== "";
+  const gathered = formData.get("gathered") === "true" || firstNote;
   return run((context) =>
     callAction(context, "workflow.setPackItem", {
       cycleId,
