@@ -7978,6 +7978,33 @@
       }
     },
     {
+      "name": "initiatives.keyResults",
+      "description": "The key results an initiative moves, each with its objective and cycle, for the ones you can see.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The initiative's id or short id, from initiatives.list."
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "scope": "read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      },
+      "example": {
+        "id": "…"
+      }
+    },
+    {
       "name": "initiatives.create",
       "description": "Creates an initiative in a space, owned by one member.",
       "inputSchema": {

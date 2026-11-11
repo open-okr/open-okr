@@ -93,6 +93,23 @@ export interface OkrDetail {
   >;
 }
 
+/**
+ * The initiatives that move one key result, for the drawer (plan 0.8.0 I1):
+ * their names, each a link, beside "View initiatives". `initiatives.list`
+ * filters them to those the reader can see.
+ */
+export async function readKeyResultInitiatives(input: {
+  readonly keyResultId: string;
+}): Promise<readonly { readonly id: string; readonly title: string }[]> {
+  const initiatives = await callAction(await context(), "initiatives.list", {
+    keyResultId: input.keyResultId,
+  });
+  return initiatives.map((initiative) => ({
+    id: initiative.id,
+    title: initiative.title,
+  }));
+}
+
 /** The newest check-ins and values the drawer lists; the page has the rest. */
 const DETAIL_CHECK_INS = 10;
 const DETAIL_VALUES = 12;

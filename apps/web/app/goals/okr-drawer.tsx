@@ -34,6 +34,7 @@ import {
 } from "../../lib/okr-tree/cache.ts";
 import {
   type OkrHandle,
+  useKeyResultInitiatives,
   useOkrDetail,
   usePendingOkrIds,
 } from "../../lib/okr-tree/use-okr-tree.ts";
@@ -878,7 +879,53 @@ function DrawerKeyResult({
           onCancel={cells.cancelReason}
         />
       ) : null}
+      <DrawerKeyResultInitiatives keyResultId={keyResult.id} />
     </article>
+  );
+}
+
+/**
+ * The initiatives that move a key result, by name, and the way to their list
+ * (plan 0.8.0 I1, I1-Q2). The objective page holds linking and unlinking; the
+ * drawer says what there is and where to go.
+ */
+function DrawerKeyResultInitiatives({
+  keyResultId,
+}: {
+  readonly keyResultId: string;
+}) {
+  const { t } = useTranslations();
+  const initiatives = useKeyResultInitiatives(keyResultId);
+  return (
+    <p
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3"
+      data-testid={`drawer-kr-initiatives-${keyResultId}`}
+    >
+      <span className="font-semibold text-ink-2">
+        {t("goals.detail.initiatives")}
+      </span>
+      {initiatives.data === undefined ? (
+        <span aria-busy="true">…</span>
+      ) : initiatives.data.length === 0 ? (
+        <span>{t("goals.detail.noInitiativeMovesThis")}</span>
+      ) : (
+        initiatives.data.map((initiative) => (
+          <Link
+            key={initiative.id}
+            href={`/initiatives/${initiative.id}`}
+            className="text-brand-text hover:underline"
+          >
+            {initiative.title}
+          </Link>
+        ))
+      )}
+      <Link
+        href={`/initiatives?keyResult=${keyResultId}`}
+        className="font-semibold text-brand-text hover:underline"
+      >
+        {t("okrList.viewInitiatives")}
+      </Link>
+    </p>
   );
 }
 

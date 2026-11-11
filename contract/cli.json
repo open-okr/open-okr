@@ -6915,6 +6915,23 @@
       "pages": false
     },
     {
+      "name": "initiatives keyResults",
+      "action": "initiatives.keyResults",
+      "method": "GET",
+      "path": "/initiatives/keyResults",
+      "scope": "read",
+      "summary": "The key results an initiative moves, each with its objective and cycle, for the ones you can see.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "initiatives create",
       "action": "initiatives.create",
       "method": "POST",

@@ -67,6 +67,7 @@ import { closeGoal, editGoal, reassignRole, reopenGoal } from "./actions.ts";
 import { CoachStrip } from "./coach-strip";
 import { DecomposeKeyResult } from "./decompose.tsx";
 import { GoalWrites } from "./goal-writes.tsx";
+import { KeyResultInitiatives } from "./key-result-initiatives.tsx";
 import { AddKeyResult, KeyResultUpdate } from "./key-result-update.tsx";
 import { Rail } from "./rail.tsx";
 import { RetrospectiveField } from "./retrospective-field.tsx";
@@ -307,6 +308,26 @@ export default async function GoalPage({
         id: space.id,
         name: space.name,
       }))
+    : [];
+
+  // The initiatives that move each key result (UIUX-PLAN S-14, plan 0.8.0
+  // I1), and for a writer of an open objective every initiative they can see,
+  // of which those not linked yet are offered.
+  const initiativesByKeyResult = new Map(
+    await Promise.all(
+      goal.keyResults.map(
+        async (keyResult) =>
+          [
+            keyResult.id,
+            await callAction(context, "initiatives.list", {
+              keyResultId: keyResult.id,
+            }),
+          ] as const,
+      ),
+    ),
+  );
+  const linkableInitiatives = open
+    ? await callAction(context, "initiatives.list", {})
     : [];
 
   // What the last check-in said, which a confidence changed here carries
@@ -560,6 +581,15 @@ export default async function GoalPage({
                           defaultSpaceId={goal.spaceId}
                         />
                       ) : null}
+                      <KeyResultInitiatives
+                        keyResultId={keyResult.id}
+                        keyResultTitle={keyResult.title}
+                        initiatives={
+                          initiativesByKeyResult.get(keyResult.id) ?? []
+                        }
+                        linkable={linkableInitiatives}
+                        canLink={open}
+                      />
                     </span>
                     <span className="flex flex-none flex-col items-end gap-1">
                       <span className="text-sm font-bold text-ink">

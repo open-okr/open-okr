@@ -384,7 +384,22 @@ Asked on 10 November 2026: how does somebody set a cycle's sponsor? Read from th
 
 The specification gains it in TECHNICAL-PLAN §4.1, the role matrix's note on the workspace domain, and in `docs/design/workspace-roles.md`.
 
-## 11. Suggested order
+## 11. Initiatives and key results, linked from both sides
+
+Asked for by Akmal on 11 November 2026, after checking whether an initiative can be linked to a key result from either side. It can only from the initiative's page, and only to a key result of the current quarter. UIUX-PLAN S-14 already lists "linked initiatives" on the objective page and S-26 promises a list of initiatives "per key result"; neither was built. The server has every read and write this needs (`initiatives.list` by key result, `initiatives.linkKeyResult`, `initiatives.unlinkKeyResult`, `initiatives.create` with key results).
+
+| # | What | Where | Change | Size | Design |
+|---|---|---|---|---|---|
+| I1 | **An initiative and the key results it moves are linked, and read, from both sides.** (1) "Add an initiative" offers an optional **Key result it moves**. (2) A key result's row menu on Goals gains **View initiatives**, under "Open this key result", which opens `/initiatives?keyResult=<id>`: the initiatives that move it, with "Add an initiative" arriving with that key result chosen. (3) The objective page's key result row lists its initiatives, each a link with Unlink, offers a picker to link an existing one and **New initiative for this key result**; the drawer's key result shows their names and View initiatives. (4) One rule decides which key results every picker offers, the Board's included: those of open objectives in every cycle being planned or running, quarterly and annual, that the reader can see. (5) The initiative's page names a linked key result from any cycle with its title and objective, through a new read, `initiatives.keyResults`, rather than "A key result outside this cycle" | `apps/web/app/initiatives/page.tsx`, `initiatives/[id]/page.tsx`, `goals/[id]/page.tsx`, `goals/okr-table.tsx`, `goals/okr-drawer.tsx`, `board/page.tsx`; `packages/core/src/actions/initiatives.ts` | As described. No migration and no new write; one read added to the registry | M | None: interface over existing reads and writes. Akmal's two answers below |
+
+| # | Question | Akmal's answer |
+|---|---|---|
+| I1-Q1 | Which key results do the pickers offer? | **Every active cycle**: open objectives in each cycle being planned or running, quarterly and annual, that the reader can see. The Board's picker follows the same rule |
+| I1-Q2 | Where does a key result list its initiatives? | **Both**: the full list with link, unlink and New initiative on the objective page's key result row, and the names with View initiatives in the drawer |
+
+The specification gains it in UIUX-PLAN S-13 (the row menu and the drawer), S-14 (the key result row), S-26 (the list per key result and the add form's key result) and S-27 (which key results the add form offers).
+
+## 12. Suggested order
 
 1. C1, early in the release, because a migration that refuses on bad data is best met on a test instance first.
 2. H15, already done, then O3, O1 and H4. All small, no design, and they fix what a running cloud instance gets wrong today.
@@ -398,10 +413,11 @@ The specification gains it in TECHNICAL-PLAN §4.1, the role matrix's note on th
 10. O2's design and code. Q6 is decided.
 11. The designs for H5, H7 and H10. H10 is split into rows once designed, and changing migration 0031 for H5 is Akmal's decision.
 12. The design for Y7, which follows the answers in section 2.5, then the code. Last, because it is the largest and the only one that cannot be undone.
+15. I1, added on 11 November 2026 by Akmal: no design, one commit.
 14. S5, added on 11 November 2026: its design, then the code, on its own branch by pull request into `release-0.8.0`.
 13. S4, added on 11 November 2026: its design, as a section of `docs/design/email-verification.md`, then the code. It builds on S3, which is done.
 
-## 12. Build log
+## 13. Build log
 
 Statuses: **to do**; **design written**, waiting for "design approved"; **design approved**; **done**, committed and the local tier green; **yours**, a decision or action only you can take.
 
@@ -444,6 +460,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **design
 | S3 | done | The confirmation mail goes through the outbox (`account.verifyEmail`), its address and link removed once delivered. "Send the link again" on the check-your-email card, the link page and sign-in, held per address and per network; a repeat sign-up of an unconfirmed address sends a fresh link; a link lasts 24 hours; a completed reset confirms the address. Deviations in `email-verification.md` §10. `s35f-email-confirmed.spec.ts` |
 | S4 | done | `auth.emailVerification` (`auto` or `off`, `OPENOKR_EMAIL_VERIFICATION`), on Admin, General or, on a cloud, only the operator's S-47; refused under `company_domains`; followed without a restart. With nothing waiting, sign-up ends on the welcome card with Get started and nothing about confirming; where mail works, the link goes worded as optional. As built in the design's §11.7. `e2e/s35g-confirmation-off.spec.ts` |
 | S5 | done | Built on 11 November 2026 on `release-0.8.0` rather than by Obed, who ran the acceptance test that day (Akmal's choice). `docs/design/email-verification.md` §12.6 As built: a personal invitation to the sign-up's own address creates the account confirmed in the user-create hook, `auth.email_verified` with `via: "invitation"`, and S5-Q2 on the join page. The form signs in after such a sign-up, because Better Auth signs nobody in at sign-up while confirmation is required. Answers the acceptance test's Q-3 |
+| I1 | done | Built on 11 November 2026. One rule for every key result picker in `apps/web/lib/linkable-key-results.ts`: open objectives in every cycle being planned or running, the running quarter first, then the running year, then cycles being planned (the order keeps the current quarter's key results at the top, where `cycles.list` put next quarter's). The objective page's key result rows (`goals/[id]/key-result-initiatives.tsx`) reuse the initiative's own link and unlink actions, which now refresh objective pages too. The drawer reads one key result's initiatives under its own query key. New read `initiatives.keyResults`, in the MCP `work` toolset. `e2e/s26-initiatives.spec.ts` walks the menu, the prefilled form, the objective page and the drawer |
 | T1 | done | `apps/web/lib/product-tour.tsx`, mounted by the shell; the Work Map card and its CSS removed. Browser memory under `openokr.tour.ended`; the suite's contexts start with it set (`TOUR_COOKIE` opts back in). Unit tests for every step and ending; the claim spec walks it with the keyboard and scans both dialogs |
 | R1 | done | Setup writes (`cycles.create`, `cycles.update`, `frame.set`, `workflow.publish`, `cycles.setClosing`, `cycles.close`) ask `edit` on the `workspace` domain; archive and `rhythm.update` stay `full`. The page asks `cycles.setupAccess`, its own read rather than a `workflow.read` field so the create shows before any cycle exists (design updated). Core, unit and browser tests (`s04b-admin-sets-up-cycle.spec.ts`) |
 | Q1 to Q5 | decided | 10 November 2026, section 2.3 |

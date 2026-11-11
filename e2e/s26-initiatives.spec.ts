@@ -23,7 +23,7 @@ import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
 import pg from "pg";
 import { goTo, INSTANCE_ACCOUNT, signIn } from "./instance-account.ts";
-import { chooseAt } from "./pickers.ts";
+import { choose, chooseAt } from "./pickers.ts";
 
 const CONNECTION = process.env.DATABASE_URL
   ? { connectionString: process.env.DATABASE_URL }
@@ -337,4 +337,121 @@ test("the initiative carries documents and a discussion", async () => {
     );
     expect(rows.map((row) => row.subject_type)).toEqual(["initiative"]);
   }).toPass({ timeout: 15_000 });
+});
+
+/**
+ * Initiatives and key results, from the key result's side (plan 0.8.0 I1).
+ *
+ * Acceptance criteria:
+ *   Given a key result on Goals, when its menu's View initiatives is chosen,
+ *   then its initiatives are listed and Add an initiative arrives with that
+ *   key result chosen; an initiative added there moves it.
+ *   Given the objective page, then the key result's row lists its
+ *   initiatives, and one is unlinked and linked again from there.
+ *   Given the drawer opened at that key result, then it names them and leads
+ *   to their list.
+ */
+const MOVES = "Instrument the activation funnel";
+
+/** The key result the initiative serves, read from the link it made. */
+async function servedKeyResult(): Promise<{
+  id: string;
+  title: string;
+  goalId: string;
+}> {
+  const { rows } = await pool.query<{
+    id: string;
+    title: string;
+    goal_id: string;
+  }>(
+    `select k.id, k.title, k.goal_id from initiative_key_results ik
+       join initiatives i on i.id = ik.initiative_id
+       join key_results k on k.id = ik.key_result_id
+      where i.workspace_id = $1 and i.title = $2
+        and ik.deleted_at is null and i.deleted_at is null
+      limit 1`,
+    [workspaceId, TITLE],
+  );
+  const served = rows[0];
+  if (!served) {
+    throw new Error("The initiative serves no key result. Did linking run?");
+  }
+  return { id: served.id, title: served.title, goalId: served.goal_id };
+}
+
+test("a key result's menu leads to its initiatives, and adds one already tied to it", async () => {
+  const keyResult = await servedKeyResult();
+  await goTo(page, "/goals?scope=all");
+  const trigger = page
+    .getByRole("main")
+    .getByRole("button", { name: `More actions for ${keyResult.title}` })
+    .first();
+  await trigger.hover();
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "View initiatives" }).click();
+  await page.waitForURL(/\/initiatives\?keyResult=/, { timeout: 15_000 });
+  expect(new URL(page.url()).searchParams.get("keyResult")).toBe(
+    keyResult.id,
+  );
+
+  await expect(page.getByTestId("initiatives-for-key-result")).toContainText(
+    keyResult.title,
+    { timeout: 15_000 },
+  );
+  await expect(
+    page.getByTestId("initiative").filter({ hasText: TITLE }),
+  ).toBeVisible();
+  const picker = page.getByLabel("Key result it moves");
+  await expect(picker).toHaveValue(keyResult.title);
+
+  await page.getByLabel("What work is this").fill(MOVES);
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(
+    page.getByTestId("initiative").filter({ hasText: MOVES }),
+  ).toBeVisible({ timeout: 15_000 });
+  const { rows } = await pool.query<{ key_result_id: string }>(
+    `select ik.key_result_id from initiative_key_results ik
+       join initiatives i on i.id = ik.initiative_id
+      where i.workspace_id = $1 and i.title = $2 and ik.deleted_at is null`,
+    [workspaceId, MOVES],
+  );
+  expect(rows).toEqual([{ key_result_id: keyResult.id }]);
+});
+
+test("the objective page lists a key result's initiatives, and unlinks and links them", async () => {
+  const keyResult = await servedKeyResult();
+  await goTo(page, `/goals/${keyResult.goalId}`);
+  const block = page.getByTestId(`key-result-initiatives-${keyResult.id}`);
+  await expect(block.getByRole("link", { name: TITLE })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(block.getByRole("link", { name: MOVES })).toBeVisible();
+
+  await block.getByRole("button", { name: `Unlink ${MOVES}` }).click();
+  await expect(block.getByRole("link", { name: MOVES })).toHaveCount(0, {
+    timeout: 15_000,
+  });
+
+  await choose(
+    block.getByLabel(`Initiative to link to ${keyResult.title}`),
+    MOVES,
+  );
+  await block.getByRole("button", { name: "Link", exact: true }).click();
+  await expect(block.getByRole("link", { name: MOVES })).toBeVisible({
+    timeout: 15_000,
+  });
+});
+
+test("the drawer names a key result's initiatives and leads to their list", async () => {
+  const keyResult = await servedKeyResult();
+  await goTo(page, `/goals?okr=${keyResult.goalId}&kr=${keyResult.id}`);
+  const named = page
+    .getByTestId("okr-drawer")
+    .getByTestId(`drawer-kr-initiatives-${keyResult.id}`);
+  await expect(named.getByRole("link", { name: TITLE })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(
+    named.getByRole("link", { name: "View initiatives" }),
+  ).toHaveAttribute("href", `/initiatives?keyResult=${keyResult.id}`);
 });

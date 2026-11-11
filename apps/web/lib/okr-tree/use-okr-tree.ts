@@ -39,6 +39,7 @@ import {
   type OkrDetail,
   type OkrMutation,
   type OkrOutcome,
+  readKeyResultInitiatives,
   readOkrDetail,
   readOkrTree,
   runOkrMutation,
@@ -383,6 +384,18 @@ export function useOkrDetail(goal: OkrGoal, enabled: boolean) {
     queryKey: okrDetailKey(goal.id, keyResultIds),
     queryFn: () => readOkrDetail({ goalId: goal.id, keyResultIds }),
     enabled,
+    meta: { persist: false },
+  });
+}
+
+/**
+ * One key result's initiatives, for the drawer (plan 0.8.0 I1). Under the
+ * drawer's own key, so any write that refreshes the drawer refreshes this.
+ */
+export function useKeyResultInitiatives(keyResultId: string) {
+  return useQuery({
+    queryKey: [...OKR_DETAIL_ALL, "initiatives", keyResultId],
+    queryFn: () => readKeyResultInitiatives({ keyResultId }),
     meta: { persist: false },
   });
 }
