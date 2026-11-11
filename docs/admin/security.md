@@ -54,6 +54,22 @@ until the instance is told which proxies to trust, so the five a minute is
 then shared by everybody. The per-address limit is not affected. A per-visitor
 rate limit at the CDN holds it off meanwhile.
 
+### Changing a password
+
+A signed-in person changes their password on Security: the current one, the
+new one twice, and **Sign out my other devices**, ticked. An account that
+signs in only by single sign-on can **set** a password there instead, within
+ten minutes of signing in.
+
+| Question | Answer |
+|---|---|
+| What does "Sign out my other devices" end? | Every other session. This browser gets a new one. API tokens, device tokens and connected apps keep working; revoke those on their own pages |
+| Does a wrong current password count? | Yes, toward the same hold as a wrong sign-in, and so does every other password check behind a session: turning a one-time code on or off and making new backup codes |
+| Who is told? | The account's address, by mail, every time a password is changed, set or reset, through the outbox. The mail says when and whether other devices were signed out, and links to the page that asks for a reset link |
+| What is recorded? | `auth.password_changed` on the instance audit chain, with how (`change`, `set`, `reset`) and the caller's network address. A record that could not be written counts in `openokr_account_change_record_failures_total`; the new password works either way |
+| Who cannot? | A demonstration account, whose password is published, and an account single sign-on claims, which signs in with its provider anyway. A demonstration account cannot turn a one-time code on either |
+| How often? | Ten requests a minute from one network, counted in the database so every replica shares the count |
+
 ### Authentication endpoints that are off
 
 Everything under `/api/auth` is Better Auth, the sign-in library. It serves

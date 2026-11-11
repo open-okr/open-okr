@@ -48,8 +48,16 @@ type Note = {
 
 export function SecuritySettings({
   twoFactorEnabled,
+  demo = false,
 }: {
   twoFactorEnabled: boolean;
+  /**
+   * A demonstration account, whose password is published, so a one-time
+   * code any visitor turned on would lock every other visitor out until the
+   * nightly rebuild (account-self-service.md AS-Q8). The endpoint refuses it
+   * too; this says why in place of the form.
+   */
+  demo?: boolean;
 }) {
   const { t, locale } = useTranslations();
 
@@ -282,6 +290,10 @@ export function SecuritySettings({
           {twoFactorEnabled ? (
             <p className="max-w-prose text-sm text-ink-3">
               {t("account.security.securitySettings.oneTimeCodesAre")}
+            </p>
+          ) : demo ? (
+            <p className="max-w-prose text-sm text-ink-3">
+              {t("account.security.securitySettings.demoKeepsSignIn")}
             </p>
           ) : totpUri ? (
             <>

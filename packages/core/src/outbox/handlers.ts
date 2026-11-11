@@ -46,6 +46,11 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  PASSWORD_CHANGE_VIAS,
+  PASSWORD_CHANGED_TOPIC,
+  type PasswordChangeVia,
+} from "../auth/password-change.ts";
+import {
   EMAIL_VERIFICATION_LINK_SECONDS,
   VERIFY_EMAIL_TOPIC,
 } from "../auth/verification-links.ts";
@@ -69,7 +74,7 @@ import {
   parseExportJob,
   runExportJob,
 } from "../exports/worker.ts";
-import { verifyEmailMail } from "../mail/account.ts";
+import { passwordChangedMail, verifyEmailMail } from "../mail/account.ts";
 import {
   closureMail,
   erasureReminderMail,
@@ -498,6 +503,61 @@ const sendVerificationLink: OutboxHandler = async (delivery, deps) => {
     to,
     url,
     hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells an account holder that its password changed (docs/design/
+ * account-self-service.md §4.2, D9, D13).
+ *
+ * **Sent to the address the account had when the password changed**, which
+ * the row carries and which is gone from it once delivered. Skipped when the
+ * account is gone, because a mail about an account nobody holds helps nobody.
+ * Otherwise sent even when the address has changed since: that is exactly
+ * when the old address should hear of it.
+ */
+const sendPasswordChanged: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const via = asString(delivery.payload.via);
+  const at = new Date(asString(delivery.payload.at) ?? "");
+  if (
+    !userId ||
+    !to ||
+    !PASSWORD_CHANGE_VIAS.includes(via as PasswordChangeVia) ||
+    Number.isNaN(at.getTime())
+  ) {
+    throw new PermanentDispatchError(
+      "A password notice needs an account, an address, how the password changed and when, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{ id: string }>(
+    "select id from users where id = $1",
+    [userId],
+  );
+  if (rows.length === 0) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = passwordChangedMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    via: via as PasswordChangeVia,
+    otherSessionsEnded: delivery.payload.otherSessionsEnded === true,
+    at,
+    baseUrl: deps.baseUrl,
   });
   await deps.sendMail({ to, ...built });
 };
@@ -1323,6 +1383,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // The link that confirms an address, queued by `createAuth` rather than
   // sent inside the sign-up request (email-verification.md D1, S3).
   [VERIFY_EMAIL_TOPIC]: sendVerificationLink,
+  // A password was changed, set or reset (account-self-service.md D9).
+  [PASSWORD_CHANGED_TOPIC]: sendPasswordChanged,
   // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
   // outside the package barrel from P2-T06 until this row existed.
   [DIGEST_TOPIC]: sendDigest,
@@ -1418,6 +1480,8 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   // (email-verification.md D4). A dead-lettered row keeps both until the
   // daily purge, by which time the link has expired.
   [VERIFY_EMAIL_TOPIC]: ["to", "url"],
+  // The address a password notice went to (account-self-service.md §4.2).
+  [PASSWORD_CHANGED_TOPIC]: ["to"],
   // Of a customer the provider no longer has. Nothing needs it once it is gone.
   [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };

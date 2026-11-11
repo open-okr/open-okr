@@ -138,6 +138,42 @@ describe("the address limiter across processes", () => {
     );
     expect(call).toMatchObject({ limit: 5, windowSeconds: 60 });
   });
+
+  it("counts password changes from one network on two instances as one, ten a minute", async () => {
+    // account-self-service.md D11: it used to fall under the catch-all, a
+    // hundred a minute counted in each process.
+    const first = await build();
+    const second = await build();
+    const change = (auth: Awaited<ReturnType<typeof build>>) =>
+      auth.handler(
+        new Request(`${BASE_URL}/api/auth/change-password`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-forwarded-for": "203.0.113.93",
+          },
+          body: JSON.stringify({
+            currentPassword: "not signed in",
+            newPassword: "not signed in either",
+          }),
+        }),
+      );
+    const statuses: number[] = [];
+    for (let attempt = 0; attempt < 5; attempt++) {
+      statuses.push((await change(first)).status);
+      statuses.push((await change(second)).status);
+    }
+    // No session, so each reaches the endpoint and is refused there.
+    expect(statuses.every((status) => status === 401)).toBe(true);
+
+    const eleventh = await change(first);
+    expect(eleventh.status).toBe(429);
+    expect(Number(eleventh.headers.get("x-retry-after"))).toBeGreaterThan(0);
+    const call = cache.calls.find((entry) =>
+      entry.key.includes("/change-password"),
+    );
+    expect(call).toMatchObject({ limit: 10, windowSeconds: 60 });
+  });
 });
 
 describe("what is shared and what stays in the process", () => {

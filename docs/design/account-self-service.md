@@ -1,6 +1,6 @@
 # Your account: password, sign-in email, name, and the endpoints nobody uses
 
-Status: **approved by Akmal on 11 November 2026**, AS-Q1 to AS-Q8 as recommended, and Y6's endpoint switch-off to land first, as its own commit. Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
+Status: **approved by Akmal on 11 November 2026**, AS-Q1 to AS-Q8 as recommended, and Y6's endpoint switch-off to land first, as its own commit. **Y6 and Y3 built** (Y3: §2.2's notes). Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
 
 **No migration**, unless AS-Q3 chooses option (b). No new table, no new setting, no new runtime dependency. Every Better Auth import named here comes from `better-auth` itself (`better-auth/api`, `better-auth/crypto`), which `packages/core` already depends on.
 
@@ -80,6 +80,19 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 | D12 | **Set a password** replaces the Password card when the account has no password. Refused for a demo account or an enforced one. Needs D2's recent sign-in. Two fields and a Save; the server action calls `auth.api.setPassword` and then D9 | The plan's row. The reset path already gives such an account a password through the mailbox; this is the signed-in way, held to the same freshness Y7 uses |
 | D13 | **A completed reset mails too** (D9, `via: "reset"`) | It is a change of password. Somebody with brief access to the mailbox should not be able to take the account in silence |
 
+**Built (Y3, 11 November 2026), with these differences from the table as first written:**
+
+| Where | As built |
+|---|---|
+| Homes | `recordPasswordChange`, `accountHasPassword` and the 12 and 128 limits are in `packages/core/src/auth/password-change.ts`; `passwordCardFor` (what the card draws) and `setOwnPassword` (D12) in `account-self-service.ts`; `signedInRecently` in `recent-sign-in.ts` (D2); D1's test is `isDemoAccount` in `packages/core/src/demo/personas.ts`, which the avatar menu's Demo account chip now reads too |
+| The 403s | Carry a code as well as the sentence: `DEMO_ACCOUNT` and `SSO_ENFORCED`. `maxPasswordLength: 128` is now set explicitly, beside the minimum |
+| D3 and sessions | A session the password change or a second factor creates marks no address as known, in `databaseHooks.session.create.after` as well as the after hook. Otherwise ticking the box would have marked the caller's network as a desk the account counter never holds |
+| D9's failure | Counted in `openokr_account_change_record_failures_total`, by `via` |
+| The fields | The kit's password field is `SecretInput`; there is no `PasswordInput` |
+| The demo one-time code (AS-Q8) | `/two-factor/disable` is refused for a demonstration account too, with the same sentence |
+| Set a password with no provider linked | The card shows the sign-in-again sentence with no button. An account with no password and no provider link has no way to have signed in except a passkey, which `/sign-in` offers |
+| The limiter's 429 | Its `auth.rate_limited` row is the route wrapper's, as for every other path; the core test proves the shared count and the 429 |
+
 ### 2.3 Y4: change your sign-in email
 
 | # | Decision | Why |
@@ -114,7 +127,7 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 
 57 paths when every plugin is mounted: 30 stay on, 27 go off. "Today" is on for all of them; `/change-email` and `/delete-user` answer an error from their handler rather than 404.
 
-**Built (Y6, 11 November 2026), with one change from the table as first written.** It listed 59 paths, two of them `/sso/request-domain-verification` and `/sso/verify-domain`. The SSO plugin mounts those only when its `domainVerification` option is on, and `createAuth` never sets it, so they are not served and the inventory test (D27) refused them as listed in vain. They are left out. If a later change turns domain verification on, the same test fails naming both, and they are classified then. The inventory is `AUTH_ENDPOINTS` in `packages/core/src/auth/endpoints.ts`. Until Y3 lands, `/change-password` stays on without its guard, as it was before Y6.
+**Built (Y6, 11 November 2026), with one change from the table as first written.** It listed 59 paths, two of them `/sso/request-domain-verification` and `/sso/verify-domain`. The SSO plugin mounts those only when its `domainVerification` option is on, and `createAuth` never sets it, so they are not served and the inventory test (D27) refused them as listed in vain. They are left out. If a later change turns domain verification on, the same test fails naming both, and they are classified then. The inventory is `AUTH_ENDPOINTS` in `packages/core/src/auth/endpoints.ts`. `/change-password` stayed on without its guard until Y3, which brought it (D3, D8, D9, D11).
 
 | Path | Method | After Y6 | Why |
 |---|---|---|---|

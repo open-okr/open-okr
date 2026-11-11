@@ -2,8 +2,8 @@ import { loadEnv } from "@openokr/config";
 import {
   ACCESS_LEVELS,
   callAction,
-  DEMO_PERSONAS,
   hasPlanScreen,
+  isDemoAccount,
   liveSupportSession,
   mayCreateOwnWorkspace,
   navigationFor,
@@ -136,7 +136,7 @@ async function accountBadge(
   if (kind === "guest") {
     return "guest";
   }
-  if (DEMO_PERSONAS.some((persona) => persona.email === email)) {
+  if (isDemoAccount(email)) {
     return "demo";
   }
   return null;

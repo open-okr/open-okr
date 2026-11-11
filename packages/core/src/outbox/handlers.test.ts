@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CHANNEL_MESSAGE_TOPIC } from "../actions/channels.ts";
 import { agentRunChangedEvent } from "../agents/live.ts";
 import { AGENT_RUN_STEP_TOPIC } from "../agents/run-steps.ts";
+import { PASSWORD_CHANGED_TOPIC } from "../auth/password-change.ts";
 import { VERIFY_EMAIL_TOPIC } from "../auth/verification-links.ts";
 import { EMBED_TOPIC } from "../embeddings/subjects.ts";
 import {
@@ -249,6 +250,44 @@ describe("a confirmation link", () => {
   });
 });
 
+/**
+ * The notice that a password changed (account-self-service.md §4.2). Reading
+ * the account needs a database and is in `packages/core/test/
+ * password-change.test.ts`.
+ */
+describe("a password notice", () => {
+  const notice = (over: Record<string, unknown> = {}) =>
+    delivery(PASSWORD_CHANGED_TOPIC, {
+      userId: "u1",
+      to: "amara@example.com",
+      via: "change",
+      otherSessionsEnded: true,
+      at: new Date().toISOString(),
+      ...over,
+    });
+
+  it("fails permanently when the row cannot say how the password changed", async () => {
+    const { deps } = recorder();
+    await expect(
+      dispatchOutbox(notice({ via: "guessed" }), deps),
+    ).rejects.toMatchObject({ name: "PermanentDispatchError" });
+  });
+
+  it("skips when no mail is configured, before reading anything", async () => {
+    const { skipped, sent, deps } = recorder();
+    const { sendMail: _sendMail, ...withoutMail } = deps;
+    await dispatchOutbox(notice(), withoutMail);
+    expect(sent).toEqual([]);
+    expect(skipped).toEqual([
+      [PASSWORD_CHANGED_TOPIC, "no mail transport is configured"],
+    ]);
+  });
+
+  it("loses the address once delivered", () => {
+    expect(OUTBOX_REDACT_ON_DELIVERY[PASSWORD_CHANGED_TOPIC]).toEqual(["to"]);
+  });
+});
+
 describe("topics with no consumer yet", () => {
   it("acknowledges a rename rather than dead-lettering every one of them", async () => {
     const { skipped, deps } = recorder();
@@ -372,5 +411,7 @@ describe("the table against the code that enqueues", () => {
     expect(AGENT_RUN_STEP_TOPIC in OUTBOX_HANDLERS).toBe(true);
     // Queued by the confirmation callback in `createAuth` (S3).
     expect(VERIFY_EMAIL_TOPIC in OUTBOX_HANDLERS).toBe(true);
+    // Queued by every password change (account-self-service.md D9).
+    expect(PASSWORD_CHANGED_TOPIC in OUTBOX_HANDLERS).toBe(true);
   });
 });

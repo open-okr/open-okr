@@ -43,6 +43,30 @@ const en = {
   "verify.footer":
     "Did not sign up? Ignore this email. Nothing is confirmed unless the link is opened.",
 
+  // A password was changed, set or reset (account-self-service.md D9, D13).
+  // Never the password, and never a link that changes it.
+  "passwordChanged.subjectChange": "Your {instance} password was changed",
+  "passwordChanged.subjectSet": "A password was set on your {instance} account",
+  "passwordChanged.subjectReset": "Your {instance} password was reset",
+  "passwordChanged.preheader": "If this was not you, reset your password now.",
+  "passwordChanged.eyebrow": "Account security",
+  "passwordChanged.headingChange": "Your password was changed",
+  "passwordChanged.headingSet": "A password was set",
+  "passwordChanged.headingReset": "Your password was reset",
+  "passwordChanged.bodyBefore": "The password for ",
+  "passwordChanged.bodyChange": " was changed on {date} at {time} UTC.",
+  "passwordChanged.bodySet": " was set on {date} at {time} UTC.",
+  "passwordChanged.bodyReset": " was reset on {date} at {time} UTC.",
+  "passwordChanged.signedOutOthers":
+    "Your other devices were signed out. API tokens and connected apps keep working.",
+  "passwordChanged.signedOutEverywhere":
+    "Every device was signed out. API tokens and connected apps keep working.",
+  "passwordChanged.stayedSignedIn": "Your other devices stay signed in.",
+  "passwordChanged.notYou": "If this was not you, reset your password now.",
+  "passwordChanged.action": "Reset your password",
+  "passwordChanged.footer":
+    "Sent by {instance} at {host} whenever the password of this account changes. It never contains a password.",
+
   // A run of wrong passwords began an account hold (account-lockout.md Q2).
   "held.subject": "Somebody is trying to sign in to your {instance} account",
   "held.preheader":
@@ -192,6 +216,33 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verify.notice": "Pautan ini berfungsi selama {hours} jam.",
   "verify.footer":
     "Tidak mendaftar? Abaikan e-mel ini. Tiada apa yang disahkan melainkan pautan ini dibuka.",
+
+  "passwordChanged.subjectChange": "Kata laluan {instance} anda telah ditukar",
+  "passwordChanged.subjectSet":
+    "Kata laluan telah ditetapkan pada akaun {instance} anda",
+  "passwordChanged.subjectReset":
+    "Kata laluan {instance} anda telah ditetapkan semula",
+  "passwordChanged.preheader":
+    "Jika ini bukan anda, tetapkan semula kata laluan anda sekarang.",
+  "passwordChanged.eyebrow": "Keselamatan akaun",
+  "passwordChanged.headingChange": "Kata laluan anda telah ditukar",
+  "passwordChanged.headingSet": "Kata laluan telah ditetapkan",
+  "passwordChanged.headingReset": "Kata laluan anda telah ditetapkan semula",
+  "passwordChanged.bodyBefore": "Kata laluan bagi ",
+  "passwordChanged.bodyChange": " telah ditukar pada {date} jam {time} UTC.",
+  "passwordChanged.bodySet": " telah ditetapkan pada {date} jam {time} UTC.",
+  "passwordChanged.bodyReset":
+    " telah ditetapkan semula pada {date} jam {time} UTC.",
+  "passwordChanged.signedOutOthers":
+    "Peranti anda yang lain telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi.",
+  "passwordChanged.signedOutEverywhere":
+    "Semua peranti telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi.",
+  "passwordChanged.stayedSignedIn": "Peranti anda yang lain kekal log masuk.",
+  "passwordChanged.notYou":
+    "Jika ini bukan anda, tetapkan semula kata laluan anda sekarang.",
+  "passwordChanged.action": "Tetapkan semula kata laluan",
+  "passwordChanged.footer":
+    "Dihantar oleh {instance} di {host} setiap kali kata laluan akaun ini berubah. Ia tidak pernah mengandungi kata laluan.",
 
   "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
   "held.preheader":

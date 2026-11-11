@@ -247,6 +247,13 @@ export const METRIC = {
    * proxies in front of the instance need naming.
    */
   callerAddressesTotal: "openokr_caller_addresses_total",
+  /**
+   * Account changes whose record could not be written: the audit row and the
+   * mail that say a password was changed, by `via` (`change`, `set`,
+   * `reset`) (account-self-service.md D9, plan 0.8.0 Y3). The change itself
+   * stands; any count here is a change nobody was told about.
+   */
+  accountChangeRecordFailures: "openokr_account_change_record_failures_total",
 
   /** Tokens spent, by provider, model and whether they were in or out. */
   aiTokensTotal: "openokr_ai_tokens_total",

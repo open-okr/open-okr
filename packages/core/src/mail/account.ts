@@ -1,6 +1,7 @@
 /**
- * The account mail the relay sends: the link that confirms an email address
- * (docs/design/email-verification.md D6, D18; email-templates.md §5).
+ * The account mails the relay sends: the link that confirms an email address
+ * (docs/design/email-verification.md D6, D18; email-templates.md §5), and the
+ * notice that a password changed (account-self-service.md D9).
  *
  * **Built here, not in the web app,** because the relay's handlers live in
  * this package and may not import `apps/web`. The reset and the held-sign-in
@@ -56,4 +57,89 @@ export function verifyEmailMail(input: {
     ],
   );
   return { subject: t("verify.subject", { instance }), html, text };
+}
+
+/**
+ * The password of this account changed (docs/design/account-self-service.md
+ * §4.2, D9, D13): changed while signed in, set where there was none, or reset
+ * through the mailbox.
+ *
+ * It says when, to the minute in UTC, and whether other devices were signed
+ * out. **Never the password, and never a link that changes it**: the one
+ * button goes to the page that asks for a reset link, as the held-sign-in
+ * notice does, so the mail itself is no credential.
+ */
+export function passwordChangedMail(input: {
+  readonly instanceName: string;
+  readonly locale: MailLocale;
+  readonly to: string;
+  readonly via: "change" | "set" | "reset";
+  readonly otherSessionsEnded: boolean;
+  readonly at: Date;
+  /** The instance's public origin, where `/forgot-password` lives. */
+  readonly baseUrl: string;
+}): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const resetUrl = new URL("/forgot-password", input.baseUrl).toString();
+  const host = new URL(resetUrl).host;
+  const date = input.at.toLocaleDateString(
+    input.locale === "ms" ? "ms-MY" : "en-GB",
+    { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" },
+  );
+  const time = input.at.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+    timeZone: "UTC",
+  });
+  const words = {
+    change: {
+      subject: t("passwordChanged.subjectChange", { instance }),
+      heading: t("passwordChanged.headingChange"),
+      body: t("passwordChanged.bodyChange", { date, time }),
+    },
+    set: {
+      subject: t("passwordChanged.subjectSet", { instance }),
+      heading: t("passwordChanged.headingSet"),
+      body: t("passwordChanged.bodySet", { date, time }),
+    },
+    reset: {
+      subject: t("passwordChanged.subjectReset", { instance }),
+      heading: t("passwordChanged.headingReset"),
+      body: t("passwordChanged.bodyReset", { date, time }),
+    },
+  }[input.via];
+  // A reset ends every session, the one that asked included; a change with
+  // the box ticked ends every other one.
+  const sessions = !input.otherSessionsEnded
+    ? t("passwordChanged.stayedSignedIn")
+    : input.via === "reset"
+      ? t("passwordChanged.signedOutEverywhere")
+      : t("passwordChanged.signedOutOthers");
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("passwordChanged.preheader"),
+      footer: [t("passwordChanged.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("passwordChanged.eyebrow") },
+      { kind: "heading", text: words.heading },
+      {
+        kind: "paragraph",
+        parts: [
+          t("passwordChanged.bodyBefore"),
+          { bold: input.to },
+          words.body,
+        ],
+      },
+      { kind: "paragraph", parts: [sessions] },
+      { kind: "notice", parts: [t("passwordChanged.notYou")] },
+      { kind: "action", label: t("passwordChanged.action"), href: resetUrl },
+    ],
+  );
+  return { subject: words.subject, html, text };
 }

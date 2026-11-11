@@ -508,6 +508,13 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export {
+  type PasswordCard,
+  passwordCardFor,
+  type SetPasswordOutcome,
+  type SignInAgainProvider,
+  setOwnPassword,
+} from "./auth/account-self-service.ts";
+export {
   type Auth,
   type AuthOptions,
   createAuth,
@@ -519,6 +526,15 @@ export {
 export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
+export {
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  PASSWORD_CHANGED_TOPIC,
+} from "./auth/password-change.ts";
+export {
+  RECENT_SIGN_IN_SECONDS,
+  signedInRecently,
+} from "./auth/recent-sign-in.ts";
 export {
   syncAllSamlProviders,
   syncSamlProvider,
@@ -798,6 +814,7 @@ export {
   DEMO_PERSONAS,
   type DemoPersona,
   demoPersonasOn,
+  isDemoAccount,
   type PrepareDemoPersonasInput,
   type PrepareDemoPersonasResult,
   type PreparedPersona,

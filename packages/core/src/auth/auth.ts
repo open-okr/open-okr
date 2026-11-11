@@ -18,13 +18,18 @@ import { authSchema } from "@openokr/db";
 import type { BetterAuthPlugin } from "better-auth";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError, createAuthMiddleware } from "better-auth/api";
+import {
+  APIError,
+  createAuthMiddleware,
+  getSessionFromCtx,
+} from "better-auth/api";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { twoFactor } from "better-auth/plugins/two-factor";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
 import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
+import { isDemoAccount } from "../demo/personas.ts";
 import {
   cookieHeaderFrom,
   inviteTokenFromCookies,
@@ -51,11 +56,18 @@ import {
   routedByPath,
 } from "./limiter-storage.ts";
 import { clearSignInAttempts, recordPasswordAttempt } from "./lockout.ts";
+import {
+  accountHasPassword,
+  MAX_PASSWORD_LENGTH,
+  MIN_PASSWORD_LENGTH,
+  recordPasswordChange,
+} from "./password-change.ts";
 import { currentProvisioningAuthority } from "./provisioning-authority.ts";
 import { withSecondFactorLockAudit } from "./second-factor-lock.ts";
 import { withHashedSessionTokens } from "./session-hashing.ts";
 import { providerIdFromCallback } from "./sso.ts";
 import {
+  type EnforcingProvider,
   enforcedProviderForEmail,
   enforcedProviderForUser,
   enforcementMessage,
@@ -91,6 +103,78 @@ const CREDENTIAL_PATHS = new Set([
   "/sign-up/email",
   "/request-password-reset",
 ]);
+
+/**
+ * **Every password check behind a session** (docs/design/
+ * account-self-service.md D3, plan 0.8.0 Y3). Each counts toward the same
+ * hold a sign-in does, and a success clears it. Counting only the password
+ * change would leave four uncounted ways to test a password with a stolen
+ * session cookie. `/verify-password` is off over HTTP, so what reaches it is
+ * a server call (`auth.api.verifyPassword`), which runs these hooks too.
+ *
+ * This changes account-lockout.md §7, which said such checks were not
+ * counted.
+ */
+const SESSION_PASSWORD_PATHS = new Set([
+  "/change-password",
+  "/verify-password",
+  "/two-factor/enable",
+  "/two-factor/disable",
+  "/two-factor/generate-backup-codes",
+]);
+
+/**
+ * **What a demonstration account may not change** (account-self-service.md
+ * D1, D8 and AS-Q8). Its password is published, so one visitor changing it,
+ * or turning a one-time code on, would lock every other visitor out until
+ * the nightly rebuild.
+ */
+const DEMO_REFUSALS: Readonly<Record<string, string>> = {
+  "/change-password":
+    "Demonstration accounts keep their password. Anyone can sign in to them, so anyone could change it.",
+  "/two-factor/enable":
+    "Demonstration accounts keep their sign-in as it is. Anyone can sign in to them.",
+  "/two-factor/disable":
+    "Demonstration accounts keep their sign-in as it is. Anyone can sign in to them.",
+};
+
+/**
+ * The password a session path checks, or null when Better Auth would refuse
+ * the request before checking anything (D3). A malformed request is never
+ * counted: a new password outside 12 to 128 characters, or a checked one
+ * that is missing or past the maximum.
+ */
+function checkedPassword(path: string, body: unknown): string | null {
+  const fields = (body ?? {}) as Record<string, unknown>;
+  const checked =
+    path === "/change-password" ? fields.currentPassword : fields.password;
+  if (
+    typeof checked !== "string" ||
+    checked === "" ||
+    checked.length > MAX_PASSWORD_LENGTH
+  ) {
+    return null;
+  }
+  if (path === "/change-password") {
+    const next = fields.newPassword;
+    if (
+      typeof next !== "string" ||
+      next.length < MIN_PASSWORD_LENGTH ||
+      next.length > MAX_PASSWORD_LENGTH
+    ) {
+      return null;
+    }
+  }
+  return checked;
+}
+
+/** The refusal for an account single sign-on claims (D8). */
+function enforcedRefusal(provider: EnforcingProvider): APIError {
+  return new APIError("FORBIDDEN", {
+    message: enforcementMessage(provider),
+    code: "SSO_ENFORCED",
+  });
+}
 
 /**
  * The answer to a held attempt (account-lockout.md D12). The same words for
@@ -378,6 +462,14 @@ const LIMIT_RULES = {
   // Better Auth's own default was three in each process. The per-address
   // allowance is counted separately, in the hook below (D9).
   "/send-verification-email": { window: SIGN_IN_WINDOW_SECONDS, max: 5 },
+  // Changing a password while signed in (account-self-service.md D11). Ten a
+  // minute per network, in the shared count, where it fell under the
+  // hundred-a-minute catch-all counted in each process. The hold counts each
+  // wrong current password on top (D3).
+  "/change-password": {
+    window: SIGN_IN_WINDOW_SECONDS,
+    max: SIGN_IN_ATTEMPTS,
+  },
 } as const;
 
 export function createAuth(options: AuthOptions) {
@@ -524,7 +616,8 @@ export function createAuth(options: AuthOptions) {
       // decides, resolved by the caller at boot (P8-T02b): the question is
       // whether a link can arrive, not whether this is a managed cloud.
       requireEmailVerification,
-      minPasswordLength: 12,
+      minPasswordLength: MIN_PASSWORD_LENGTH,
+      maxPasswordLength: MAX_PASSWORD_LENGTH,
       // A completed reset signs every device out (email-verification.md
       // D15). With D14 below it is what lets the owner of an address take it
       // back from somebody who signed up with it first: their reset confirms
@@ -541,13 +634,24 @@ export function createAuth(options: AuthOptions) {
       // A completed reset ends any hold on the account at once
       // (account-lockout.md D7). No caller is marked as known: whoever opens
       // a reset link has proved the mailbox, not the network.
-      onPasswordReset: async ({ user }) => {
+      onPasswordReset: async ({ user }, request) => {
         if (lockoutEnabled) {
           await clearSignInAttempts(options.pool, {
             secret: options.secret,
             email: user.email,
           });
         }
+        // **A completed reset is a password change** (account-self-service.md
+        // D9, D13): one audit row, and a mail to the account's address.
+        // Somebody with brief access to the mailbox should not be able to
+        // take the account in silence. Every session ended with it (D15 of
+        // email-verification.md). Never throws.
+        await recordPasswordChange(options.pool, {
+          userId: user.id,
+          via: "reset",
+          otherSessionsEnded: true,
+          address: callerAddress(request?.headers ?? new Headers()),
+        });
         // **A completed reset confirms the address** (email-verification.md
         // D14). The reset link reached the mailbox, which is the same proof a
         // confirmation link gives, and it is the second way out for an
@@ -730,6 +834,71 @@ export function createAuth(options: AuthOptions) {
           return;
         }
 
+        /**
+         * **A password checked behind a session** (account-self-service.md
+         * D3, D8). In this order: a demonstration account and an account
+         * single sign-on claims are refused before anything is checked, so
+         * Better Auth never ends sessions for a change that cannot stand;
+         * a request Better Auth would refuse unchecked is let through
+         * uncounted; then the attempt is counted against the account's hold,
+         * exactly as a sign-in is, and a held one is refused unchecked.
+         */
+        if (SESSION_PASSWORD_PATHS.has(hookContext.path)) {
+          const session = await getSessionFromCtx(hookContext);
+          if (!session) {
+            // No session: the endpoint answers 401 itself.
+            return;
+          }
+          const user = session.user as { id: string; email: string };
+          const demoRefusal = DEMO_REFUSALS[hookContext.path];
+          if (demoRefusal && isDemoAccount(user.email)) {
+            throw new APIError("FORBIDDEN", {
+              message: demoRefusal,
+              code: "DEMO_ACCOUNT",
+            });
+          }
+          if (hookContext.path === "/change-password") {
+            const provider = await enforcedProviderForUser(
+              options.pool,
+              user.id,
+            );
+            if (provider) {
+              throw enforcedRefusal(provider);
+            }
+          }
+          if (
+            !lockoutEnabled ||
+            checkedPassword(hookContext.path, hookContext.body) === null ||
+            !(await accountHasPassword(options.pool, user.id))
+          ) {
+            return;
+          }
+          const verdict = await recordPasswordAttempt(options.pool, {
+            secret: options.secret,
+            email: user.email,
+            callerAddress: callerAddress(hookContext.headers ?? new Headers()),
+          });
+          if (verdict.held) {
+            defaultMetrics().count(METRIC.signInHeldTotal, {
+              scope: verdict.scope,
+            });
+            throw heldRefusal(verdict.retryAfterSeconds);
+          }
+          if (verdict.accountHoldBegan) {
+            void announceAccountHold(options.pool, {
+              email: user.email,
+              ...verdict.accountHoldBegan,
+              baseUrl: options.baseUrl,
+              send: options.sendSignInHeldNotice,
+            }).catch((error: unknown) => {
+              process.stderr.write(
+                `auth: could not record a sign-in hold: ${error instanceof Error ? error.message : String(error)}\n`,
+              );
+            });
+          }
+          return;
+        }
+
         if (!CREDENTIAL_PATHS.has(hookContext.path)) {
           return;
         }
@@ -784,6 +953,50 @@ export function createAuth(options: AuthOptions) {
        * password matched. The session hook below covers every other factor.
        */
       after: createAuthMiddleware(async (hookContext) => {
+        /**
+         * **A password checked behind a session, and accepted** (account-
+         * self-service.md D3, D9). Only a success clears the account's
+         * counts: clearing on anything but a wrong password would let a
+         * guesser reset the count with a deliberately broken request. No
+         * address is marked as known; that is a sign-in's to do.
+         *
+         * A changed password is recorded and mailed here, so the screen and a
+         * direct call to the endpoint are recorded alike.
+         */
+        if (SESSION_PASSWORD_PATHS.has(hookContext.path)) {
+          const returned = hookContext.context.returned;
+          if (returned === undefined || returned instanceof Error) {
+            return;
+          }
+          const sessionUser = (
+            hookContext.context.session as {
+              user?: { id?: unknown; email?: unknown };
+            } | null
+          )?.user;
+          const changedUser = (returned as { user?: { id?: unknown } }).user;
+          const email = sessionUser?.email;
+          if (lockoutEnabled && typeof email === "string") {
+            await clearSignInAttempts(options.pool, {
+              secret: options.secret,
+              email,
+            });
+          }
+          if (hookContext.path === "/change-password") {
+            const userId = changedUser?.id ?? sessionUser?.id;
+            if (typeof userId === "string") {
+              await recordPasswordChange(options.pool, {
+                userId,
+                via: "change",
+                otherSessionsEnded:
+                  (hookContext.body as { revokeOtherSessions?: unknown })
+                    ?.revokeOtherSessions === true,
+                address: callerAddress(hookContext.headers ?? new Headers()),
+              });
+            }
+          }
+          return;
+        }
+
         if (!lockoutEnabled || hookContext.path !== "/sign-in/email") {
           return;
         }
@@ -867,7 +1080,10 @@ export function createAuth(options: AuthOptions) {
               await clearSignInAttempts(options.pool, {
                 secret: options.secret,
                 email,
-                ...(hookContext?.headers
+                // A session a password change or a second factor made is not
+                // a sign-in, so it marks no address as known (D3).
+                ...(hookContext?.headers &&
+                !SESSION_PASSWORD_PATHS.has(hookContext.path ?? "")
                   ? { callerAddress: callerAddress(hookContext.headers) }
                   : {}),
               });

@@ -114,7 +114,7 @@ Primary key `(account_key, caller_key)`. Marked `openokr:not-tenant-scoped` and 
 ## 7. What this does not do
 
 - No CAPTCHA, no device fingerprint and no trusted-device cookie.
-- No count on password checks behind a signed-in session (change password, enabling a second factor). The address limiter covers them, and a session must exist first.
+- ~~No count on password checks behind a signed-in session (change password, enabling a second factor).~~ **Changed by [account-self-service](account-self-service.md) D3 (plan 0.8.0 Y3, approved 11 November 2026):** every password check behind a session now counts toward the same pair and account counters a sign-in does: `/change-password`, `/verify-password` (a server call since Y6), `/two-factor/enable`, `/two-factor/disable` and `/two-factor/generate-backup-codes`. A held one gets the same 429 `SIGN_IN_HELD` unchecked; a request Better Auth refuses before checking anything is not counted; only a success clears the counts, and it marks no address as known.
 - No screen or command to lift a hold.
 - No per-user limits on the API, channels or exports, which §8.2 also lists. Tokens are not passwords.
 - `auth.rate_limited` still writes one row per limiter refusal. Bounding it is a separate change.

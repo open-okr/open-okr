@@ -63,7 +63,7 @@ export const AUTH_ENDPOINTS: readonly AuthEndpoint[] = [
   on(
     "/change-password",
     ["POST"],
-    "Y3's Password card on Security, which brings its guard (D3, D8, D9, D11)",
+    "Security's Password card; guarded, counted, recorded and mailed in createAuth's hooks (D3, D8, D9, D11)",
   ),
   off(
     "/change-email",
@@ -128,18 +128,22 @@ export const AUTH_ENDPOINTS: readonly AuthEndpoint[] = [
   off("/ok", ["GET"], "No screen and no probe uses it"),
 
   // The two-factor plugin.
-  on("/two-factor/enable", ["POST"], "Security's one-time code form"),
+  on(
+    "/two-factor/enable",
+    ["POST"],
+    "Security's one-time code form; counted (D3), refused for a demo account (AS-Q8)",
+  ),
   on("/two-factor/verify-totp", ["POST"], "Sign-in and enrolment"),
   on("/two-factor/verify-backup-code", ["POST"], "Sign-in"),
   on(
     "/two-factor/disable",
     ["POST"],
-    "No screen, but the only way to turn a second factor off",
+    "No screen, but the only way to turn a second factor off; counted (D3)",
   ),
   on(
     "/two-factor/generate-backup-codes",
     ["POST"],
-    "No screen, but the only way to get new codes",
+    "No screen, but the only way to get new codes; counted (D3)",
   ),
   off("/two-factor/get-totp-uri", ["POST"], "No screen; enabling returns it"),
   off("/two-factor/send-otp", ["POST"], "No code sender is configured"),
@@ -185,7 +189,7 @@ export const AUTH_ENDPOINTS: readonly AuthEndpoint[] = [
   off(
     "/sso/register",
     ["POST"],
-    "Let any signed-in person register up to ten providers (§6). providersLimit is 0 as well",
+    "Let any signed-in person register up to ten providers. providersLimit is 0 as well",
   ),
   off(
     "/sso/providers",

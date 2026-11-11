@@ -15,7 +15,12 @@ export interface CurrentSession {
     readonly emailVerified: boolean;
     readonly twoFactorEnabled: boolean | null | undefined;
   };
-  readonly session: { readonly id: string; readonly expiresAt: Date };
+  readonly session: {
+    readonly id: string;
+    readonly expiresAt: Date;
+    /** When somebody signed in, which a recent sign-in is judged by. */
+    readonly createdAt: Date;
+  };
 }
 
 /**

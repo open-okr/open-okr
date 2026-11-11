@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { verifyEmailMail } from "../src/mail/account.ts";
+import { passwordChangedMail, verifyEmailMail } from "../src/mail/account.ts";
 import {
   invitationMail,
   notificationDigestMail,
@@ -222,5 +222,69 @@ describe("the confirmation mail", () => {
     expect(built.subject).toBe("Sahkan alamat e-mel anda untuk Northwind OKR");
     expect(built.html).toContain('<html lang="ms">');
     expect(built.text).toContain("Pautan ini berfungsi selama 24 jam.");
+  });
+});
+
+/**
+ * The notice that a password changed (account-self-service.md §4.2, D9, D13):
+ * when, to the minute in UTC, whether other devices were signed out, and one
+ * button to the page that asks for a reset link. Never the password, and
+ * never a link that changes it.
+ */
+describe("the password notice", () => {
+  const AT = new Date("2026-11-11T07:05:00Z");
+  const notice = (over: Partial<Parameters<typeof passwordChangedMail>[0]>) =>
+    passwordChangedMail({
+      instanceName: "Northwind OKR",
+      locale: "en",
+      to: "amara@example.com",
+      via: "change",
+      otherSessionsEnded: true,
+      at: AT,
+      baseUrl: BASE,
+      ...over,
+    });
+
+  it("says what changed and when, and links only to the reset request", () => {
+    const built = notice({});
+    expect(built.subject).toBe("Your Northwind OKR password was changed");
+    expect(built.html).toContain("<b>amara@example.com</b>");
+    expect(built.text).toContain(
+      "The password for amara@example.com was changed on 11 November 2026 at 07:05 UTC.",
+    );
+    expect(built.text).toContain(
+      "Your other devices were signed out. API tokens and connected apps keep working.",
+    );
+    expect(built.text).toContain(
+      "If this was not you, reset your password now.",
+    );
+    expect(hrefs(built.html)).toEqual([
+      `${BASE}/forgot-password`,
+      `${BASE}/forgot-password`,
+    ]);
+  });
+
+  it("says a set and a reset in their own words, and who stays signed in", () => {
+    const set = notice({ via: "set", otherSessionsEnded: false });
+    expect(set.subject).toBe(
+      "A password was set on your Northwind OKR account",
+    );
+    expect(set.text).toContain("was set on 11 November 2026 at 07:05 UTC.");
+    expect(set.text).toContain("Your other devices stay signed in.");
+
+    const reset = notice({ via: "reset" });
+    expect(reset.subject).toBe("Your Northwind OKR password was reset");
+    expect(reset.text).toContain("was reset on 11 November 2026");
+    expect(reset.text).toContain("Every device was signed out.");
+  });
+
+  it("is written in the instance's language", () => {
+    const built = notice({ locale: "ms" });
+    expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
+    expect(built.html).toContain('<html lang="ms">');
+    expect(built.text).toContain(
+      "telah ditukar pada 11 November 2026 jam 07:05 UTC.",
+    );
+    expect(built.text).toContain("Tetapkan semula kata laluan");
   });
 });

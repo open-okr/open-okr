@@ -110,6 +110,26 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
 ];
 
 /**
+ * Whether an account is one `pnpm demo:prepare` made (docs/design/
+ * account-self-service.md D1).
+ *
+ * Its address is one of the personas', which can belong to nobody else:
+ * `@northwind.example` is reserved by RFC 2606. The password is published, so
+ * a visitor who changed the password, the name or how the account signs in
+ * would break the demo for every other visitor until the nightly rebuild.
+ * The avatar menu's Demo account chip asks the same question.
+ */
+export function isDemoAccount(email: string | null | undefined): boolean {
+  if (!email) {
+    return false;
+  }
+  const address = email.trim().toLowerCase();
+  return DEMO_PERSONAS.some(
+    (persona) => persona.email.toLowerCase() === address,
+  );
+}
+
+/**
  * The personas a visitor can sign in as on a local date: everybody the year
  * has brought in by then. Placed on the real calendar the way the seed places
  * the year, so the list and the accounts `demo:prepare` gives agree: Yuki,
