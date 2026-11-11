@@ -128,6 +128,18 @@ export BETTER_AUTH_SECRET
 log "seeding the Northwind year as of today"
 ( cd "$REPO" && pnpm db:seed ) || fail "the seed failed"
 
+# The data changes, after the seed and before the cast (plan 0.8.1 U2). A
+# freshly seeded year still has work for them: checked on 12 November 2026,
+# 0001 filled two members' time zones, 0005 gave 156 check-ins their
+# reviewer, and 0035 queued 1,337 items for search and the copilot. Without
+# them the copilot cannot find a check-in the story wrote. The root key is
+# needed by the script that seals stored identity-provider tokens.
+OPENOKR_ENCRYPTION_KEY=$(grep '^OPENOKR_ENCRYPTION_KEY=' "$REPO/deploy/docker/secrets/app.env" | cut -d= -f2-)
+[ -n "$OPENOKR_ENCRYPTION_KEY" ] || fail "could not read the instance's root key"
+export OPENOKR_ENCRYPTION_KEY
+log "running the data changes"
+( cd "$REPO" && pnpm db:change ) || fail "the data changes failed"
+
 log "giving the cast accounts and running the agents"
 ( cd "$REPO" && pnpm demo:prepare ) || fail "demo:prepare failed"
 
