@@ -143,6 +143,42 @@ seals identity-provider tokens stored before they were encrypted needs the
 root key, and refuses to finish without it rather than report them sealed.
 [Security](../admin/security.md#what-is-encrypted-at-rest) says more.
 
+## 0.8.0 to 0.8.1
+
+A patch release: no migration, one data change, and nothing to set.
+
+- **Run the data changes after the upgrade.** Data change 0035 queues every
+  check-in, key result, blocker and objective that neither search nor the
+  copilot's index holds; before 0.8.1 those were never indexed, so the copilot
+  could not find a single check-in. `./openokr upgrade` runs it for you (with
+  `OPENOKR_SKIP_DATA_CHANGE=1` it waits for `./openokr data-change`), the Helm
+  chart's data-change Job runs it, and from a checkout it is `pnpm db:change`.
+  The relay then indexes them in the background. An instance whose AI provider
+  can embed text pays for those embeddings once.
+- **`pnpm db:change run` works again.** 0.8.0 refused `run` as an unknown
+  argument, so an upgrade script written for an earlier version stopped at the
+  data changes. It is accepted as the name of the default from 0.8.1.
+- **On OpenRouter, the fast and balanced tiers default to GPT-6 Luna**, and the
+  deep tier stays on Claude Sonnet 4.5. Only where nobody chose a model: a
+  model picked per tier on Admin, AI, or in `ai.deployment.tierModels` for the
+  deployment's own provider, is kept. To stay on another model, choose it there.
+- **The copilot's answers stream on every deployment, and Stop stops them.**
+  Until 0.8.1 a deployment that runs background work, which is the usual setup,
+  showed each answer whole at the end and kept writing after Stop. Nothing to
+  set.
+- **Accepting a personal invitation confirms the address on every surface.**
+  Over REST, the command line or an agent, the relay confirms it a moment after
+  the acceptance, as the join page always did. During a rolling upgrade, an
+  older relay still running does not know the new outbox row and dead-letters
+  it; that person stays unconfirmed until they use the confirmation link, as
+  before 0.8.1.
+- **Signed-out pages follow the visitor's browser language** when the product
+  ships it (English and Malay today), then the instance's. A Malay browser now
+  sees a Malay sign-in on an English instance. Signed in, a person's own choice
+  still wins.
+- **`./openokr up` says "finish setup" only while setup is unfinished.** On an
+  instance already set up it now says where it is ready.
+
 ## 0.7 to 0.8
 
 - **Every short identifier is now required.** Migration 0165 makes
