@@ -508,3 +508,6 @@ Then she was confirmed at once, and auth.email_verified appears once
 |---|---|---|
 | S5R-Q1 | How does the action get the address confirmed? | **A, the outbox**: decided in the action's own transaction, confirmed by the relay through Better Auth (D14) |
 | S5R-Q2 | Does the join page keep its immediate confirmation? | **Yes**: the person in front of the browser lands on the welcome, and the handler then does nothing |
+
+**"Design approved" by Akmal on 12 November 2026**, S5R-Q1 and S5R-Q2 as
+recommended.
