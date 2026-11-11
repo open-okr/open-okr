@@ -118,6 +118,9 @@ describe("sign-up", () => {
     expect(router.push).not.toHaveBeenCalled();
     // The address is shown, never put in the address bar.
     expect(window.location.search).not.toContain("priya");
+    // The form it replaced had the focus; the card's heading takes it, so a
+    // screen reader reads the card and Tab starts from it (UAT 0.8.0 F-10).
+    expect(document.activeElement?.textContent).toBe("Check your email");
   });
 
   test("says the account was created, and nothing about confirming, when nothing waits (plan 0.8.0 S4)", async () => {
@@ -133,6 +136,9 @@ describe("sign-up", () => {
       "Your account has been created. You can use it right away.",
     );
     expect(host.textContent).not.toMatch(/confirm|check your email/i);
+    expect(document.activeElement?.textContent).toBe(
+      "Welcome to Northwind OKRs",
+    );
     // Signed in already, so Get started goes straight in.
     expect(router.push).not.toHaveBeenCalled();
     await act(async () => {

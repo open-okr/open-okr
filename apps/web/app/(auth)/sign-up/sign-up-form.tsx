@@ -4,7 +4,7 @@ import type { LegalLinks } from "@openokr/core";
 import { Button, EmailInput, SecretInput, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { authClient } from "../../../lib/auth-client";
 import { AuthCard, Field, FormError } from "../auth-card";
 import { ResendLink } from "../resend-link";
@@ -43,6 +43,13 @@ export function SignUpForm({
   const [sentTo, setSentTo] = useState<string | null>(null);
   // The account works at once: no confirmation was asked for (plan 0.8.0 S4).
   const [created, setCreated] = useState(false);
+  // The card that replaces the form takes the focus the form had.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (created || sentTo !== null) {
+      titleRef.current?.focus();
+    }
+  }, [created, sentTo]);
 
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -86,6 +93,7 @@ export function SignUpForm({
     return (
       <AuthCard
         title={t("auth.emailConfirmed.welcome", { instance: instanceName })}
+        titleRef={titleRef}
       >
         <div
           className="flex flex-col gap-3.5 text-sm text-ink-2"
@@ -110,6 +118,7 @@ export function SignUpForm({
     return (
       <AuthCard
         title={t("auth.signUp.checkEmail.title")}
+        titleRef={titleRef}
         footer={
           <Link
             href="/sign-in"

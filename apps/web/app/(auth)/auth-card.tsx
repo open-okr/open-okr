@@ -1,5 +1,5 @@
 import { Card, CardBody, TextInput, type TextInputProps } from "@openokr/ui";
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 /**
  * The single clean card every authentication screen sits in (screen S-35,
@@ -27,6 +27,7 @@ export function AuthCard({
   children,
   footer,
   badge,
+  titleRef,
 }: {
   title: string;
   description?: string;
@@ -34,13 +35,25 @@ export function AuthCard({
   footer?: ReactNode;
   /** A mark beside the heading, such as the demo pill (plan 0.8.0 D1). */
   badge?: ReactNode;
+  /**
+   * Makes the heading focusable, for a card that replaces a form the reader
+   * was typing in: focus moves to it so the change is read out and Tab starts
+   * from the card rather than the top of the page (UAT 0.8.0 F-10).
+   */
+  titleRef?: Ref<HTMLHeadingElement>;
 }) {
   return (
     <main className="flex min-h-screen items-center justify-center bg-bg p-4.5">
       <Card className="w-full max-w-sm">
         <CardBody className="flex flex-col gap-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-ink">{title}</h1>
+            <h1
+              ref={titleRef}
+              tabIndex={titleRef ? -1 : undefined}
+              className="text-lg font-bold text-ink outline-none"
+            >
+              {title}
+            </h1>
             {badge}
           </div>
           {description ? (
