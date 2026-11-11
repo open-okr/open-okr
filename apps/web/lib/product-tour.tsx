@@ -293,7 +293,11 @@ export function ProductTour({
     }
     if (phase === "touring" && event.key === "ArrowRight") {
       event.preventDefault();
-      next();
+      // Forward only: on the last step the next thing is leaving the page
+      // or finishing, which is the button's to do (UAT 0.8.0 Q-5).
+      if (!last) {
+        next();
+      }
       return;
     }
     if (phase === "touring" && event.key === "ArrowLeft") {

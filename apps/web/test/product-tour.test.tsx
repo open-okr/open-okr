@@ -189,6 +189,23 @@ describe("the steps", () => {
     expect(host.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  // UAT 0.8.0 Q-5: ArrowRight walks the steps, and on the last one it used
+  // to press "Start drafting OKRs" and leave the page. Leaving is a choice
+  // made with the button, never the side effect of an arrow.
+  test("ArrowRight on the last step stays on it", async () => {
+    await render();
+    await press("tour-start");
+    for (let step = 0; step < 4; step += 1) {
+      await key("ArrowRight");
+    }
+    expect(stepId()).toBe("ask");
+    await key("ArrowRight");
+    expect(stepId()).toBe("ask");
+    expect(router.push).not.toHaveBeenCalled();
+    expect(actions.finishTour).not.toHaveBeenCalled();
+    expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  });
+
   test("end with Finish for somebody who cannot draft, and stay put", async () => {
     await render({ canDraft: false });
     await press("tour-start");
