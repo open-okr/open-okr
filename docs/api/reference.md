@@ -477,7 +477,7 @@ the machine-readable document.
 | `people.setMemberLeave`<br/>Sets another member's leave, each span with the delegate who stands in. For an administrator. | `POST /api/v1/people/setMemberLeave` | writes |
 | `people.suspend`<br/>Suspend a member, removing every access they had. | `POST /api/v1/people/suspend` | destroys |
 | `people.updateMember`<br/>Update another member's name, title or manager (org fields). | `POST /api/v1/people/updateMember` | writes |
-| `people.updateOwnProfile`<br/>Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours. | `POST /api/v1/people/updateOwnProfile` | writes |
+| `people.updateOwnProfile`<br/>Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours. | `POST /api/v1/people/updateOwnProfile` | writes |
 
 ## practice
 

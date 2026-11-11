@@ -16,7 +16,7 @@
  */
 import { APIError } from "better-auth/api";
 import type { Pool } from "pg";
-import { isDemoAccount } from "../demo/personas.ts";
+import { isDemoAccount } from "../demo/persona-list.ts";
 import type { Auth } from "./auth.ts";
 import { callerAddress } from "./caller-address.ts";
 import {

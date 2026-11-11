@@ -1837,7 +1837,7 @@
     "/people/updateOwnProfile": {
       "post": {
         "operationId": "people.updateOwnProfile",
-        "summary": "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+        "summary": "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
         "tags": [
           "people"
         ],
@@ -1971,6 +1971,11 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
                   "timezone": {
                     "type": "string"
                   },

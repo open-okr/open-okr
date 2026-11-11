@@ -254,8 +254,14 @@
       "method": "POST",
       "path": "/people/updateOwnProfile",
       "scope": "write",
-      "summary": "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+      "summary": "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
       "flags": [
+        {
+          "name": "name",
+          "field": "name",
+          "type": "string",
+          "required": false
+        },
         {
           "name": "timezone",
           "field": "timezone",

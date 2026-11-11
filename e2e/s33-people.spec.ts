@@ -158,7 +158,8 @@ test("the profile page loads for the signed-in member", async () => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Your account" }),
   ).toBeVisible();
-  await expect(page.getByTestId("account-name")).toHaveText(
+  // A field since plan 0.8.0 Y5: the member renames themselves here.
+  await expect(page.getByTestId("account-name")).toHaveValue(
     INSTANCE_ACCOUNT.name,
   );
   await expect(

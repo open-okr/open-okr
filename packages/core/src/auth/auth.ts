@@ -29,7 +29,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { callAction } from "../actions/registry.ts";
 import { recordInstanceAuditEvent } from "../audit/instance-chain.ts";
-import { isDemoAccount } from "../demo/personas.ts";
+import { isDemoAccount } from "../demo/persona-list.ts";
 import {
   cookieHeaderFrom,
   inviteTokenFromCookies,

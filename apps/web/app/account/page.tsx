@@ -1,4 +1,4 @@
-import { callAction } from "@openokr/core";
+import { callAction, isDemoAccount } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { Avatar, Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
@@ -11,9 +11,11 @@ import { AvatarForm } from "../people/[id]/avatar-form.tsx";
 import { ProfileForm } from "../people/[id]/profile-form.tsx";
 import {
   removeAvatar,
+  updateOwnName,
   updateProfile,
   uploadAvatar,
 } from "../people/actions.ts";
+import { NameForm } from "./name-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.account");
 
@@ -28,12 +30,12 @@ export const generateMetadata = pageTitle("pageTitle.account");
  *
  * **Who they are in this workspace**: picture, name, title and manager, then
  * the profile form (time zone, how to reach them, bio) and appearance (theme,
- * density, language). The name, title and manager are shown read only: an
- * administrator sets them today, and changing your own name is plan row Y5.
+ * density, language). The name is theirs to change (plan 0.8.0 Y5); title
+ * and manager stay read only, because an administrator sets them. A
+ * demonstration account keeps its name, because anybody can sign in to it.
  *
- * **How they sign in**: their email, and Security for the password. Changing
- * the email or the password from here are rows Y4 and Y3, which wait for
- * their design.
+ * **How they sign in**: their email, and Security for the password (Y3).
+ * Changing the email from here is row Y4.
  */
 export default async function AccountPage() {
   const { t } = await getTranslations();
@@ -48,6 +50,7 @@ export default async function AccountPage() {
     callAction(context, "people.directory", {}),
     callAction(context, "channels.mySettings", {}),
   ]);
+  const demo = isDemoAccount(session.user.email);
   const manager = member.managerId
     ? (directory.find((one) => one.id === member.managerId) ?? null)
     : null;
@@ -70,22 +73,35 @@ export default async function AccountPage() {
             {t("account.profile.seeAsOthersDo")}
           </Link>
         </CardHeader>
-        <CardBody className="flex items-center gap-3">
+        <CardBody className="flex items-start gap-3">
           <Avatar name={member.name} src={avatarUrl ?? undefined} size="lg" />
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-ink-3">{t("common.name")}</dt>
-            <dd className="text-ink" data-testid="account-name">
-              {member.name}
-            </dd>
-            <dt className="text-ink-3">{t("account.profile.jobTitle")}</dt>
-            <dd className="text-ink">
-              {member.title ?? t("account.profile.none")}
-            </dd>
-            <dt className="text-ink-3">{t("common.manager")}</dt>
-            <dd className="text-ink">
-              {manager?.name ?? t("account.profile.none")}
-            </dd>
-          </dl>
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            {demo ? (
+              <div className="flex flex-col gap-1 text-sm">
+                <p>
+                  <span className="text-ink-3">{t("common.name")} </span>
+                  <span className="text-ink" data-testid="account-name">
+                    {member.name}
+                  </span>
+                </p>
+                <p className="text-xs text-ink-3">
+                  {t("account.profile.demoKeepsName")}
+                </p>
+              </div>
+            ) : (
+              <NameForm name={member.name} action={updateOwnName} />
+            )}
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="text-ink-3">{t("account.profile.jobTitle")}</dt>
+              <dd className="text-ink">
+                {member.title ?? t("account.profile.none")}
+              </dd>
+              <dt className="text-ink-3">{t("common.manager")}</dt>
+              <dd className="text-ink">
+                {manager?.name ?? t("account.profile.none")}
+              </dd>
+            </dl>
+          </div>
         </CardBody>
         <CardBody className="border-line border-t pt-3 text-xs text-ink-3">
           {t("account.profile.setByAdministrator")}

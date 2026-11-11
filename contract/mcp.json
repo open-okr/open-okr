@@ -118,10 +118,15 @@
     },
     {
       "name": "people.updateOwnProfile",
-      "description": "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+      "description": "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
       "inputSchema": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "timezone": {
             "type": "string"
           },

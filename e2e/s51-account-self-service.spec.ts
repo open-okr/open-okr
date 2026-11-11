@@ -1,6 +1,6 @@
 /**
  * Your account, the parts a person changes about themselves (screens S-51
- * and S-35, docs/design/account-self-service.md §9, plan 0.8.0 Y3).
+ * and S-35, docs/design/account-self-service.md §9, plan 0.8.0 Y3 and Y5).
  *
  * **A person of its own, invited through the product.** Every other spec
  * signs in as the account that claimed the instance, and this one changes a
@@ -9,8 +9,9 @@
  * and everything here happens to them. A spec may rely on the claim and
  * nothing else, and this relies on nothing else.
  *
- * The integration suite (`packages/core/test/password-change.test.ts`) holds
- * the rows and the mail; this is what a person sees.
+ * The integration suites (`packages/core/test/password-change.test.ts` and
+ * `people-own-name.test.ts`) hold the rows and the mail; this is what a
+ * person sees.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -19,6 +20,7 @@ import { signIn } from "./instance-account.ts";
 const PERSON = {
   email: `self-service-${Date.now()}@example.com`,
   name: "Sam Self-Service",
+  renamed: "Samira Self-Service",
   password: "a first passphrase of mine",
   newPassword: "a second and better passphrase",
 };
@@ -73,6 +75,28 @@ test("the owner invites somebody, and they join", async ({
   await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible({
     timeout: 30_000,
   });
+});
+
+test("they rename themselves, and the avatar menu says the new name", async () => {
+  await page.goto("/account");
+  const form = page.getByTestId("own-name");
+  const name = form.getByLabel("Name");
+  await expect(name).toHaveValue(PERSON.name);
+
+  await name.fill("   ");
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByText("A member needs a name.")).toBeVisible();
+
+  await name.fill(PERSON.renamed);
+  await form.getByRole("button", { name: "Save" }).click();
+  await expect(form.getByRole("status")).toHaveText("Your name is saved.");
+  await expect(form.getByLabel("Name")).toHaveValue(PERSON.renamed);
+
+  await page.getByTestId("account-menu").click();
+  await expect(page.getByTestId("account-menu-header")).toContainText(
+    PERSON.renamed,
+  );
+  await page.keyboard.press("Escape");
 });
 
 test("a wrong current password is refused with its sentence", async () => {

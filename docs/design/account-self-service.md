@@ -1,6 +1,6 @@
 # Your account: password, sign-in email, name, and the endpoints nobody uses
 
-Status: **approved by Akmal on 11 November 2026**, AS-Q1 to AS-Q8 as recommended, and Y6's endpoint switch-off to land first, as its own commit. **Y6 and Y3 built** (Y3: §2.2's notes). Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
+Status: **approved by Akmal on 11 November 2026**, AS-Q1 to AS-Q8 as recommended, and Y6's endpoint switch-off to land first, as its own commit. **Y6, Y3 and Y5 built** (Y3: §2.2's notes; Y5: §2.4's). Plan 0.8.0 rows Y3, Y4, Y5 and Y6 (`docs/plans/release-0.8.0.md` §2). Gate: design first, because all four touch authentication or access, and Y4 changes stored user data (CLAUDE.md).
 
 **No migration**, unless AS-Q3 chooses option (b). No new table, no new setting, no new runtime dependency. Every Better Auth import named here comes from `better-auth` itself (`better-auth/api`, `better-auth/crypto`), which `packages/core` already depends on.
 
@@ -84,7 +84,7 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 
 | Where | As built |
 |---|---|
-| Homes | `recordPasswordChange`, `accountHasPassword` and the 12 and 128 limits are in `packages/core/src/auth/password-change.ts`; `passwordCardFor` (what the card draws) and `setOwnPassword` (D12) in `account-self-service.ts`; `signedInRecently` in `recent-sign-in.ts` (D2); D1's test is `isDemoAccount` in `packages/core/src/demo/personas.ts`, which the avatar menu's Demo account chip now reads too |
+| Homes | `recordPasswordChange`, `accountHasPassword` and the 12 and 128 limits are in `packages/core/src/auth/password-change.ts`; `passwordCardFor` (what the card draws) and `setOwnPassword` (D12) in `account-self-service.ts`; `signedInRecently` in `recent-sign-in.ts` (D2); D1's test is `isDemoAccount` in `packages/core/src/demo/persona-list.ts`, which the avatar menu's Demo account chip now reads too. The persona list moved there from `personas.ts` with Y5, because the people actions asking the question made an import cycle through the action registry |
 | The 403s | Carry a code as well as the sentence: `DEMO_ACCOUNT` and `SSO_ENFORCED`. `maxPasswordLength: 128` is now set explicitly, beside the minimum |
 | D3 and sessions | A session the password change or a second factor creates marks no address as known, in `databaseHooks.session.create.after` as well as the after hook. Otherwise ticking the box would have marked the caller's network as a desk the account counter never holds |
 | D9's failure | Counted in `openokr_account_change_record_failures_total`, by `via` |
@@ -114,6 +114,15 @@ Better Auth paths below are in the installed 1.7.18. `better-auth` means `node_m
 | D23 | **The screen**: the name on Your account becomes the kit's `TextInput` with Save, in the "who you are" card. Title and manager stay read only, and the note under them names only those two | Q5 put the self-edit forms on Your account |
 | D24 | **An administrator's rename stays local**: `people.updateMember` changes this workspace's member row only, never `users.name`. An administrator renames themselves on Your account like anybody else; the profile card stays hidden on their own profile | The account's name is the person's own. One workspace's administrator does not decide what the next workspace sees |
 | D25 | **`/update-user` goes off** (Y6), so `users.name` has two writers: account creation and D22 | A write nobody records is the problem the plan names |
+
+**Built (Y5, 11 November 2026), with these differences from the table as first written:**
+
+| Where | As built |
+|---|---|
+| The name rule | One schema, `memberName` in `packages/core/src/actions/people.ts`, for both actions. `people.updateMember`'s over-long name now says "Use at most 200 characters." too, where it said Zod's own words |
+| The demo refusal | `OperationError("forbidden")` from the action's load, before anything is written, read from the member's account address with D1's `isDemoAccount`. The screen does not offer the field to a demonstration account: it shows the name with the sentence |
+| The screen | The name field sits beside the avatar with Save, above the read-only title and manager. A save revalidates the whole layout, because the avatar menu in the shell says the name. The `account-name` test id moved to the field, so `s33-people` reads its value |
+| An administrator on their own profile | Unchanged: the administrator's card stays hidden there, and Your account is where they rename themselves (D24) |
 
 ### 2.5 Y6: the endpoints nobody uses
 

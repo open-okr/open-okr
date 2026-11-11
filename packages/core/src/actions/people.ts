@@ -1,14 +1,24 @@
 /**
  * People actions (TECHNICAL-PLAN §4.1, screen S-33, P2-T03).
  *
- * **Self versus others.** `updateOwnProfile` is timezone, avatar and bio: the
- * fields that are nobody else's business. `updateMember` is name, title and
- * manager: the org-structural fields, editable only by someone holding
- * `full` on the workspace's own context, which today means whoever
- * provisioning gave a personal binding to. This split is this task's own
- * reading of "self-versus-others editable field sets" — TECHNICAL-PLAN
- * §4.1 names the property without drawing the line, so it is recorded here
- * and in STATUS.md for a human to confirm rather than assumed silently.
+ * **Self versus others.** `updateOwnProfile` is the member's own name,
+ * timezone, avatar, bio and the rest of what is nobody else's business.
+ * `updateMember` is somebody else's name, title and manager, editable only by
+ * someone holding `full` on the workspace's own context. Title and manager
+ * stay the administrator's; the name is both (plan 0.8.0 Q2).
+ *
+ * **Who writes which name** (docs/design/account-self-service.md D22 to D25,
+ * plan 0.8.0 Y5). A person has two: `users.name` belongs to the account and
+ * is what a new workspace's member row starts from, and
+ * `workspace_members.name` is what each workspace shows. The member's own
+ * change writes this workspace's row and `users.name` together, so the next
+ * workspace starts from their latest choice; other workspaces keep the name
+ * they have, because their administrators may have set it. An
+ * administrator's change writes this workspace's row only. Nothing else
+ * writes `users.name` after the account is made: Better Auth's
+ * `/update-user` is off (Y6), and a directory never writes a name, so a
+ * member a directory manages may still rename themselves (AS-Q1). A
+ * demonstration account may not, because anybody can sign in to it.
  *
  * **Suspend, restore, convert, erase** all require `full` and, except
  * restore, all refuse to act on the workspace's last full-access holder
@@ -19,6 +29,7 @@ import {
   accessBindings,
   activeOnly,
   softDeleteRows,
+  users,
   withContext,
   withWorkspace,
   workspaceMembers,
@@ -46,6 +57,7 @@ import {
   resolveSubjectContext,
 } from "../access/reads.ts";
 import { moveAdministratorRole } from "../access/roles.ts";
+import { isDemoAccount } from "../demo/persona-list.ts";
 import { findLegacyRowInTx, legacyKey } from "../imports/legacy.ts";
 import { OperationError } from "../operations/operation.ts";
 import { eraseAccountIfAlone, sweepPersonalData } from "../people/erasure.ts";
@@ -98,6 +110,20 @@ const bioInputSchema = markedAsRichText(
     }),
 ).optional();
 
+/**
+ * A member's name, as both the member's own form and an administrator's take
+ * it (docs/design/account-self-service.md D22, §5).
+ */
+const memberName = z
+  .string()
+  .trim()
+  .min(1, "A member needs a name.")
+  .max(200, "Use at most 200 characters.");
+
+/** Said to a demonstration account that tries to rename itself (D1). */
+const DEMO_KEEPS_NAME =
+  "Demonstration accounts keep their name. Anyone can sign in to them, so anyone could change it.";
+
 const memberSummary = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -120,8 +146,13 @@ const memberSummary = z.object({
 export const updateOwnProfile = defineWriteAction({
   name: "people.updateOwnProfile",
   summary:
-    "Update the signed-in member's own timezone, avatar, bio, primary channel or quiet hours.",
+    "Update the signed-in member's own name, timezone, avatar, bio, primary channel or quiet hours.",
   input: z.object({
+    /**
+     * Their own name (plan 0.8.0 Y5). Written to this workspace's member row
+     * and to the account's name, never to another workspace's row.
+     */
+    name: memberName.optional(),
     // On the list the profile offers, trimmed first (docs/design/
     // guided-inputs.md §4.6). A name the runtime merely resolves, such as
     // `EST`, was stored as typed.
@@ -195,7 +226,10 @@ export const updateOwnProfile = defineWriteAction({
         throw new OperationError("forbidden", "No member to update.");
       }
       const [current] = await tx
-        .select({ avatarBlobId: workspaceMembers.avatarBlobId })
+        .select({
+          avatarBlobId: workspaceMembers.avatarBlobId,
+          userId: workspaceMembers.userId,
+        })
         .from(workspaceMembers)
         .where(
           activeOnly(
@@ -208,11 +242,29 @@ export const updateOwnProfile = defineWriteAction({
       if (!current) {
         throw new OperationError("not_found", "No such member.");
       }
+      // A demonstration account keeps its name (account-self-service.md D1):
+      // anybody can sign in to it, so one visitor's rename is every
+      // visitor's until the nightly rebuild.
+      if (input.name !== undefined && current.userId) {
+        const [account] = await tx
+          .select({ email: users.email })
+          .from(users)
+          .where(eq(users.id, current.userId))
+          .limit(1);
+        if (isDemoAccount(account?.email)) {
+          throw new OperationError("forbidden", DEMO_KEEPS_NAME);
+        }
+      }
       if (!input.avatarBlobId) {
-        return { previousAvatarBlobId: current.avatarBlobId, avatar: null };
+        return {
+          previousAvatarBlobId: current.avatarBlobId,
+          userId: current.userId,
+          avatar: null,
+        };
       }
       return {
         previousAvatarBlobId: current.avatarBlobId,
+        userId: current.userId,
         avatar: await requireAvatarImage(tx, {
           workspaceId,
           memberId: actor.memberId,
@@ -228,6 +280,10 @@ export const updateOwnProfile = defineWriteAction({
       // Which facts changed, by name and never by value, for the audit row:
       // a bio is somebody's own words and does not belong in the trail.
       const changed: string[] = [];
+      if (input.name !== undefined) {
+        patch.name = input.name;
+        changed.push("name");
+      }
       if (input.timezone !== undefined) {
         patch.timezone = input.timezone;
         changed.push("timezone");
@@ -293,6 +349,19 @@ export const updateOwnProfile = defineWriteAction({
       if (!updated) {
         throw new OperationError("not_found", "No such member.");
       }
+      // **The account's name follows the member's own choice** (D22), in
+      // this transaction, so the two never disagree about what the person
+      // last chose. Other workspaces' rows are left as they are.
+      if (input.name !== undefined && loaded.userId) {
+        // openokr:allow-mutation: this Operation's own transaction. The
+        // account is identity data outside any workspace, and this is the
+        // one write after sign-up that may change its name, as erasure's is
+        // the one that may anonymise it.
+        await tx
+          .update(users)
+          .set({ name: input.name, updatedAt: new Date() })
+          .where(eq(users.id, loaded.userId));
+      }
 
       return {
         result: updated,
@@ -322,12 +391,10 @@ export const updateMember = defineWriteAction({
   summary: "Update another member's name, title or manager (org fields).",
   input: z.object({
     memberId: z.uuid(),
-    name: z
-      .string()
-      .trim()
-      .min(1, "A member needs a name.")
-      .max(200)
-      .optional(),
+    // This workspace's row only, never the account's name (account-self-
+    // service.md D24): one workspace's administrator does not decide what the
+    // next workspace sees.
+    name: memberName.optional(),
     title: z.string().trim().max(200).nullable().optional(),
     managerId: z.uuid().nullable().optional(),
   }),
