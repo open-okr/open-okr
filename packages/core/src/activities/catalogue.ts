@@ -101,6 +101,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   }),
   "channel.templateUnmapped": z.object({ ruleKey: z.string() }),
   "connection.revoked": z.object({ grantId: z.string() }),
+  // A directory-sync token was minted. The label only: never the token or its
+  // digest.
+  "directory.token_created": z.object({ label: z.string() }),
   "api_token.created": z.object({
     name: z.string(),
     audience: z.string(),
@@ -164,12 +167,24 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   // name people see on the sign-in button, snapshotted because a removed
   // connection has no row left to look it up in. Never a client id, a domain
   // or a secret: the audit row carries what an administrator needs.
+  "sso.connection_created": z.object({ name: z.string() }),
   "sso.connection_updated": z.object({ name: z.string() }),
   "sso.connection_switched": z.object({
     name: z.string(),
     enabled: z.boolean(),
   }),
   "sso.connection_removed": z.object({ name: z.string() }),
+  // A single sign-on domain's proof (docs/design/sso-domain-verification.md).
+  // The domain only: never a token, its hash or a record's value.
+  "sso.domain_verification_started": z.object({ domain: z.string() }),
+  "sso.domain_checked": z.object({ domain: z.string() }),
+  "sso.domain_verified": z.object({
+    domain: z.string(),
+    by: z.enum(["administrator"]).optional(),
+  }),
+  "sso.domain_check_failed": z.object({ domain: z.string() }),
+  "sso.domain_check_recovered": z.object({ domain: z.string() }),
+  "sso.domain_unverified": z.object({ domain: z.string() }),
   // Channels (P5-T01b-a). The provider, never a credential and never a
   // message body: an activity row is read by people.
   "channel.connected": z.object({ provider: z.string() }),

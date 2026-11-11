@@ -1,3 +1,5 @@
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import {
   checkUrl,
@@ -5,6 +7,7 @@ import {
   isBlockedAddress,
   OutboundRefusedError,
   outboundFetch,
+  pinnedLookup,
 } from "../src/outbound/guard.ts";
 
 /**
@@ -122,6 +125,31 @@ describe("checking a URL before fetching it", () => {
     if (!outcome.ok) {
       expect(outcome.refusal).toBe("address_not_allowed");
     }
+  });
+
+  it("accepts a name that does not resolve only when asked to, and still refuses a private answer", async () => {
+    const none = async () => [];
+    const strict = await checkUrl("https://idp.example/sso", { resolve: none });
+    expect(strict.ok).toBe(false);
+    if (!strict.ok) {
+      expect(strict.refusal).toBe("unreachable");
+    }
+
+    const lenient = await checkUrl("https://idp.example/sso", {
+      resolve: none,
+      allowUnresolved: true,
+    });
+    expect(lenient.ok).toBe(true);
+
+    const privateAnswer = await checkUrl("https://idp.example/sso", {
+      resolve: async () => ["10.0.0.5"],
+      allowUnresolved: true,
+    });
+    expect(privateAnswer.ok).toBe(false);
+    const literal = await checkUrl("https://10.0.0.5/sso", {
+      allowUnresolved: true,
+    });
+    expect(literal.ok).toBe(false);
   });
 
   it("refuses a literal IPv6 address that embeds a private IPv4 address", async () => {
@@ -444,5 +472,82 @@ describe("a webhook's request", () => {
         }),
       }),
     ).toMatchObject({ ok: false, refusal: "address_not_allowed" });
+  });
+});
+
+/**
+ * DNS rebinding (docs/design/hardening-batch-2026-11.md H-C). A name that
+ * answers with an allowed address for the check and a forbidden one when the
+ * connection resolves it again must not reach the forbidden one.
+ */
+describe("connecting only to a checked address", () => {
+  const listen = async (seen: string[]) => {
+    const server = createServer((req, res) => {
+      seen.push(String(req.headers.host));
+      res.end("pinned");
+    });
+    await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
+    return { server, port: (server.address() as AddressInfo).port };
+  };
+
+  it("never asks the resolver a second time, so a rebinding answer is not used", async () => {
+    const seen: string[] = [];
+    const { server, port } = await listen(seen);
+    let calls = 0;
+    // First answer is the one that is checked; every later one is the metadata
+    // address a rebinding attacker wants the connection to reach.
+    const resolve = async () => {
+      calls += 1;
+      return calls === 1 ? ["127.0.0.1"] : ["169.254.169.254"];
+    };
+    try {
+      const result = await outboundFetch(`http://rebind.test:${port}/doc`, {
+        resolve,
+        allowPrivate: true,
+      });
+      expect(result).toMatchObject({ ok: true, body: "pinned" });
+      expect(calls).toBe(1);
+      // The hostname, not the address, stays in the Host header.
+      expect(seen).toEqual([`rebind.test:${port}`]);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("uses the same pinned connection for a guarded fetch", async () => {
+    const seen: string[] = [];
+    const { server, port } = await listen(seen);
+    let calls = 0;
+    const guarded = createGuardedFetch({
+      allowPrivate: true,
+      resolve: async () => {
+        calls += 1;
+        return calls === 1 ? ["127.0.0.1"] : ["169.254.169.254"];
+      },
+    });
+    try {
+      const response = await guarded(`http://rebind.test:${port}/v1`);
+      expect(await response.text()).toBe("pinned");
+      expect(calls).toBe(1);
+    } finally {
+      server.close();
+    }
+  });
+
+  it("answers a lookup with checked addresses only", () => {
+    const lookup = pinnedLookup(["93.184.216.34", "2606:4700::1111"]);
+    let single: unknown;
+    lookup("anything.test", {}, (_e, address, family) => {
+      single = [address, family];
+    });
+    expect(single).toEqual(["93.184.216.34", 4]);
+    let all: unknown;
+    lookup("anything.test", { all: true }, (_e, list) => {
+      all = list;
+    });
+    expect(all).toEqual([
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:4700::1111", family: 6 },
+    ]);
   });
 });

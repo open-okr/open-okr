@@ -211,6 +211,18 @@ export interface ActionCallContext {
    */
   readonly billing?: BillingGateway;
   /**
+   * Looks up a DNS TXT record, for proving that a workspace owns an email
+   * domain (docs/design/sso-domain-verification.md, rule 5).
+   *
+   * One method rather than the whole `DnsResolver` port, because
+   * `packages/core` does not depend on `packages/adapters` and the driver
+   * satisfies this structurally. Absent means the host has no resolver, and
+   * `sso.verifyDomain` says so rather than pretending the record is missing.
+   */
+  readonly dns?: {
+    resolveTxt(name: string): Promise<string[][]>;
+  };
+  /**
    * Checks an address before it is stored as somewhere this server will
    * send to: a webhook's URL (docs/design/outbound-webhooks.md W7).
    *
@@ -222,7 +234,11 @@ export interface ActionCallContext {
    */
   readonly checkOutboundUrl?: (
     url: string,
-    options: { readonly allowPrivate: boolean },
+    options: {
+      readonly allowPrivate: boolean;
+      /** Accept a name that does not resolve yet. Save-time checks only. */
+      readonly allowUnresolved?: boolean;
+    },
   ) => Promise<
     { readonly ok: true } | { readonly ok: false; readonly detail: string }
   >;

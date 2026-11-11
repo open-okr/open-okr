@@ -3,9 +3,10 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { listSSOProviders, loadSSOConnections } from "../src/auth/sso.ts";
-import { createSCIMToken, resolveToken } from "../src/directory-sync/tokens.ts";
+import { resolveToken } from "../src/directory-sync/tokens.ts";
 import { encryptSecret, parseKeyRing } from "../src/secrets/key-ring.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { createSCIMToken } from "./sso-create-helper.ts";
 
 /**
  * The tenant floor and the reads that run before a workspace is known

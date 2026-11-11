@@ -11,19 +11,22 @@
  * instead, and decrypts only when it changed.
  */
 import { X509Certificate } from "node:crypto";
-import { withSSOLookup, withWorkspace } from "@openokr/db";
+import {
+  activeOnly,
+  ssoDomains,
+  type WorkspaceTx,
+  withSSOLookup,
+} from "@openokr/db";
 import { isDomain, isSlug, isWebUrl } from "@openokr/formats";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   decryptSecret,
-  encryptSecret,
   type KeyRing,
   type SealedSecret,
 } from "../secrets/key-ring.ts";
 import { withoutTrailingSlashes } from "../urls.ts";
-import { syncSamlProvider } from "./saml-sync.ts";
 
 /** The shape the sign-in page needs to show SSO buttons. No secrets. */
 export interface SSOProviderInfo {
@@ -632,108 +635,46 @@ export function validateSSOConnectionInput(
   return null;
 }
 
+/** The domains in a connection's comma-separated list. */
+export function splitDomains(list: string): string[] {
+  return list
+    .split(",")
+    .map((one) => one.trim().toLowerCase())
+    .filter(Boolean);
+}
+
 /**
- * Creates a connection for a workspace, whichever protocol it speaks.
- *
- * **This exists because the route that used to do it could never work**
- * (audit, 18 September 2026). It inserted with
- * `current_setting('app.workspace_id')::uuid` on a bare pool, and
- * `current_setting` without the missing-ok flag raises rather than returning
- * null, so every attempt ended in `unrecognized configuration parameter`. The
- * admin screen posts there and nowhere else, so no provider could be
- * configured on any instance, which made P8-T07a, P8-T07b and P8-T07c-a all
- * unreachable: each of them is downstream of a provider existing.
- *
- * The workspace is passed in rather than asked of the connection, which is the
- * same shape `createSCIMToken` has used since P8-T08a. That row fixed one of
- * the pair and left this one.
- *
- * **A SAML row's derived provider row is written here** (P8-T07c-b).
- * `syncAllSamlProviders` was built at P8-T07c-a and no running process ever
- * called it, so `sso_providers` stayed empty on every instance and the plugin
- * had nothing to answer a sign-in with. Writing it beside the authority is
- * what makes a provider configured today work at the next sign-in rather than
- * after somebody notices (L-15).
+ * Rule 3: `enforce` needs every domain verified, said at the moment somebody
+ * can still fix it. Runs in the transaction that would store the change.
  */
-export async function createSSOConnection(
-  pool: Pool,
+export async function assertDomainsVerified(
+  tx: Pick<WorkspaceTx, "select">,
   workspaceId: string,
-  ring: KeyRing,
-  input: CreateSSOConnectionInput,
-  baseUrl: string,
-): Promise<{ id: string; providerId: string }> {
-  const problem = validateSSOConnectionInput(input);
-  if (problem) {
-    throw new SSOConnectionRejected(problem);
+  domains: readonly string[],
+): Promise<void> {
+  if (domains.length === 0) {
+    return;
   }
-
-  const kind = input.kind === "saml" ? "saml" : "oidc";
-  // A SAML provider has no client secret. The three secret columns are not
-  // null from 0091, so an empty one is sealed and stored: nothing reads it,
-  // and making them nullable would mean every OIDC read had to handle a null
-  // only SAML can produce.
-  const sealed = encryptSecret(ring, input.clientSecret ?? "");
-  const certificate =
-    kind === "saml" ? normaliseCertificate(input.samlCertificate ?? "") : null;
-
-  const row = await withWorkspace(drizzle(pool), workspaceId, async (tx) => {
-    // openokr:allow-mutation: an instance configuration write with no acting
-    // member, the same arrangement `createSCIMToken` uses. The admin endpoint
-    // that calls this is access-checked before it is reached.
-    const inserted = await tx.execute<{ id: string }>(sql`
-      insert into sso_connections (
-        workspace_id, kind, provider_id, display_name,
-        discovery_url, authorization_url, token_url, user_info_url,
-        client_id, secret_ciphertext, secret_data_key, secret_key_id,
-        scopes, email_domains, enforce,
-        saml_entry_point, saml_issuer, saml_certificate, saml_audience
-      ) values (
-        ${workspaceId}, ${kind}, ${input.providerId}, ${input.displayName},
-        ${input.discoveryUrl ?? null}, ${input.authorizationUrl ?? null},
-        ${input.tokenUrl ?? null}, ${input.userInfoUrl ?? null},
-        ${input.clientId ?? ""}, ${sealed.ciphertext}, ${sealed.dataKey},
-        ${sealed.keyId},
-        ${input.scopes ?? "openid email profile"},
-        ${input.emailDomains ?? ""}, ${input.enforce ?? false},
-        ${input.samlEntryPoint ?? null}, ${input.samlIssuer ?? null},
-        ${certificate}, ${input.samlAudience ?? null}
-      )
-      returning id`);
-    return inserted.rows[0];
-  });
-
-  if (!row) {
-    throw new Error("The SSO connection insert returned no row");
-  }
-
-  const providerId = derivedProviderId(input.providerId, workspaceId);
-
-  if (kind === "saml") {
-    await syncSamlProvider(
-      pool,
-      {
-        kind: "saml",
-        id: row.id,
-        providerId,
-        displayName: input.displayName,
-        workspaceId,
-        clientId: "",
-        clientSecret: "",
-        scopes: [],
-        emailDomains: (input.emailDomains ?? "")
-          .split(",")
-          .map((one) => one.trim().toLowerCase())
-          .filter(Boolean),
-        enforce: input.enforce ?? false,
-        samlEntryPoint: input.samlEntryPoint ?? undefined,
-        samlIssuer: input.samlIssuer ?? undefined,
-        samlCertificate: certificate ?? undefined,
-        ...(input.samlAudience ? { samlAudience: input.samlAudience } : {}),
-        samlWantAssertionsSigned: true,
-      },
-      baseUrl,
+  const rows = await tx
+    .select({ domain: ssoDomains.domain })
+    .from(ssoDomains)
+    .where(
+      activeOnly(
+        ssoDomains,
+        and(
+          eq(ssoDomains.workspaceId, workspaceId),
+          sql`${ssoDomains.verifiedAt} is not null`,
+        ),
+      ),
     );
+  const verified = new Set(rows.map((row) => row.domain));
+  const missing = domains.filter((domain) => !verified.has(domain));
+  if (missing.length > 0) {
+    throw new SSOConnectionRejected({
+      field: "enforce",
+      message:
+        `Verify ${missing.join(", ")} before enforcing. Enforcement is ` +
+        "available for domains this workspace has proved it owns.",
+    });
   }
-
-  return { id: row.id, providerId };
 }

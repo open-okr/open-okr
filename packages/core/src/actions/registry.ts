@@ -240,6 +240,7 @@ import {
 import type { ActionCallContext, ActionDefinition } from "./define.ts";
 import { listDeletedItems } from "./deleted-items.ts";
 import { postDigest } from "./digest-posts.ts";
+import { createDirectoryToken } from "./directory-token.ts";
 import {
   attachFile,
   createDocument,
@@ -511,11 +512,18 @@ import {
   updateSpaceSettings,
 } from "./spaces.ts";
 import {
+  createSSOConnectionAction,
   listSSOConnections,
   removeSSOConnection,
   setSSOConnectionEnabled,
   updateSSOConnection,
 } from "./sso.ts";
+import {
+  listSSODomains,
+  markSSODomainVerified,
+  startSSODomainVerification,
+  verifySSODomain,
+} from "./sso-domains.ts";
 import {
   addChecklistItem,
   assignTask,
@@ -722,10 +730,16 @@ export const ACTION_MAP = {
   "ai.updatePrivacySettings": updatePrivacySettings,
   // Single sign-on connections. Adding one is still `POST /api/v1/admin/sso`,
   // which predates these; changing, switching and removing one are here.
+  "directory.createToken": createDirectoryToken,
   "sso.listConnections": listSSOConnections,
+  "sso.createConnection": createSSOConnectionAction,
   "sso.updateConnection": updateSSOConnection,
   "sso.setConnectionEnabled": setSSOConnectionEnabled,
   "sso.removeConnection": removeSSOConnection,
+  "sso.listDomains": listSSODomains,
+  "sso.startDomainVerification": startSSODomainVerification,
+  "sso.verifyDomain": verifySSODomain,
+  "sso.markDomainVerified": markSSODomainVerified,
   "agents.list": readAgents,
   "agents.create": createAgent,
   "agents.setAutonomy": setAgentAutonomy,

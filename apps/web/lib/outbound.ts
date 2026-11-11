@@ -12,11 +12,17 @@ import type { OutboxHandlerDeps } from "@openokr/core";
  */
 export async function checkOutboundUrl(
   url: string,
-  options: { readonly allowPrivate: boolean },
+  options: {
+    readonly allowPrivate: boolean;
+    readonly allowUnresolved?: boolean;
+  },
 ): Promise<
   { readonly ok: true } | { readonly ok: false; readonly detail: string }
 > {
-  const checked = await checkUrl(url, { allowPrivate: options.allowPrivate });
+  const checked = await checkUrl(url, {
+    allowPrivate: options.allowPrivate,
+    allowUnresolved: options.allowUnresolved,
+  });
   return checked.ok ? { ok: true } : { ok: false, detail: checked.detail };
 }
 

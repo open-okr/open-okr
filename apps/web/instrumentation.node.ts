@@ -206,8 +206,8 @@ export async function resolveAdmission(): Promise<void> {
  * (completeness review H-01).
  *
  * Not fatal. An existing install that connects as a superuser must keep
- * serving through an upgrade, and `/admin` and `/api/health` carry the same
- * finding for anybody who does not read the log. The Compose target no longer
+ * serving through an upgrade, and `/admin/general` shows an administrator the
+ * same finding as a notice, so nobody has to read the log to learn it. The Compose target no longer
  * does this; a Helm install pointed at a superuser URL still can.
  */
 export async function checkTenantFloor(): Promise<void> {

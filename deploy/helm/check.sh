@@ -601,6 +601,34 @@ for tag in $(printf '%s\n' "v0.5.0" "$previous" | sort -u | grep .); do
   fi
 done
 
+# --- proxies in front of the application --------------------------------------
+# The sign-in limits count the caller this many entries from the right of
+# X-Forwarded-For. 0 is a real answer, so it must not fall back to the default,
+# and a release from before the key existed must read as 1.
+hops_of() {
+  render_one deployment.yaml "$@" | grep -A1 "OPENOKR_TRUSTED_PROXY_HOPS" | grep -o '"[0-9]*"'
+}
+if [ "$(hops_of)" = '"1"' ]; then
+  pass "one proxy is the default"
+else
+  fail "the default hop count is not 1"
+fi
+if [ "$(hops_of --set instance.trustedProxyHops=2)" = '"2"' ]; then
+  pass "a load balancer in front of the ingress is passed on as 2"
+else
+  fail "a hop count of 2 is not passed on"
+fi
+if [ "$(hops_of --set instance.trustedProxyHops=0)" = '"0"' ]; then
+  pass "zero proxies stays zero"
+else
+  fail "a hop count of 0 fell back to the default"
+fi
+if [ "$(hops_of --set instance.trustedProxyHops=null)" = '"1"' ]; then
+  pass "a release from before the hop count existed reads as 1"
+else
+  fail "a release without a hop count does not read as 1"
+fi
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "openokr: $FAILURES chart check(s) failed." >&2

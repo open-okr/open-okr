@@ -3475,6 +3475,23 @@
       "pages": false
     },
     {
+      "name": "directory createToken",
+      "action": "directory.createToken",
+      "method": "POST",
+      "path": "/directory/createToken",
+      "scope": "write",
+      "summary": "Mints this workspace's directory-sync (SCIM) token, shown once, and revokes the one before it.",
+      "flags": [
+        {
+          "name": "label",
+          "field": "label",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "sso listConnections",
       "action": "sso.listConnections",
       "method": "GET",
@@ -3482,6 +3499,117 @@
       "scope": "read",
       "summary": "This workspace's single sign-on connections, turned-off ones included, with every setting except the client secret.",
       "flags": [],
+      "pages": false
+    },
+    {
+      "name": "sso createConnection",
+      "action": "sso.createConnection",
+      "method": "POST",
+      "path": "/sso/createConnection",
+      "scope": "write",
+      "summary": "Adds a single sign-on connection, OIDC or SAML, to this workspace. The client secret is sealed on the way in and never shown again.",
+      "flags": [
+        {
+          "name": "kind",
+          "field": "kind",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "oidc",
+            "saml"
+          ]
+        },
+        {
+          "name": "provider-id",
+          "field": "providerId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "display-name",
+          "field": "displayName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "client-id",
+          "field": "clientId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "client-secret",
+          "field": "clientSecret",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "discovery-url",
+          "field": "discoveryUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "authorization-url",
+          "field": "authorizationUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "token-url",
+          "field": "tokenUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "user-info-url",
+          "field": "userInfoUrl",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "scopes",
+          "field": "scopes",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "email-domains",
+          "field": "emailDomains",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "enforce",
+          "field": "enforce",
+          "type": "boolean",
+          "required": false
+        },
+        {
+          "name": "saml-entry-point",
+          "field": "samlEntryPoint",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-issuer",
+          "field": "samlIssuer",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-certificate",
+          "field": "samlCertificate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "saml-audience",
+          "field": "samlAudience",
+          "type": "string",
+          "required": false
+        }
+      ],
       "pages": false
     },
     {
@@ -3619,6 +3747,73 @@
         {
           "name": "id",
           "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso listDomains",
+      "action": "sso.listDomains",
+      "method": "GET",
+      "path": "/sso/listDomains",
+      "scope": "read",
+      "summary": "The email domains this workspace's single sign-on connections list or have started to verify, each with its verification state and the DNS record name.",
+      "flags": [],
+      "pages": false
+    },
+    {
+      "name": "sso startDomainVerification",
+      "action": "sso.startDomainVerification",
+      "method": "POST",
+      "path": "/sso/startDomainVerification",
+      "scope": "write",
+      "summary": "Starts proving that this workspace owns an email domain. Returns the DNS TXT record to publish, including a token that is shown this once. Calling it again for an unverified domain issues a new token.",
+      "flags": [
+        {
+          "name": "domain",
+          "field": "domain",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso verifyDomain",
+      "action": "sso.verifyDomain",
+      "method": "POST",
+      "path": "/sso/verifyDomain",
+      "scope": "write",
+      "summary": "Looks up the DNS TXT record for a domain this workspace started verifying and marks the domain verified when it carries the token. On a verified domain whose daily check is failing, a match clears the failure and a miss changes nothing. A domain on the free-mail list cannot be verified, and neither can one another workspace on this instance already verified.",
+      "flags": [
+        {
+          "name": "domain",
+          "field": "domain",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "sso markDomainVerified",
+      "action": "sso.markDomainVerified",
+      "method": "POST",
+      "path": "/sso/markDomainVerified",
+      "scope": "write",
+      "summary": "Marks a domain verified without a DNS record, for a self-hosted instance with no public DNS. Refused on a managed cloud, where only the operator may. A reason is required and the audit row records it.",
+      "flags": [
+        {
+          "name": "domain",
+          "field": "domain",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "reason",
+          "field": "reason",
           "type": "string",
           "required": true
         }

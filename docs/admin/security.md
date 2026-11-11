@@ -286,6 +286,19 @@ follows no redirect, and caps size and time. An instance with nothing
 configured makes no outbound request at all, which is what makes an air-gapped
 install work. See [the air-gap guide](../runbooks/air-gap.md).
 
+The request connects only to an address that was checked. The name is resolved
+once, and the connection goes to one of the addresses that passed, with the
+original name kept for the Host header and TLS. A name that answers differently
+the second time cannot redirect it.
+
+A single sign-on connection's discovery, token and user-info addresses are
+checked when you save them. On the managed cloud a private address is refused
+there. The cloud metadata addresses are refused everywhere. **The check is made
+at save time only.** The sign-in library fetches the discovery document and the
+user-info endpoint itself, and it takes no guarded `fetch`, so a name that
+changes its answer after saving is not caught at sign-in. Addresses saved
+before this check existed are not re-checked until they are edited.
+
 ## Chat webhooks
 
 Slack, Microsoft Teams, WhatsApp and Telegram deliver to this instance's

@@ -44,6 +44,8 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { BrowserContext, Page } from "@playwright/test";
+import { connectionOptions, testDbEnv } from "@openokr/test-support/db";
+import pg from "pg";
 import { expect, test } from "./fixtures.ts";
 import { goTo, signIn } from "./instance-account.ts";
 
@@ -203,6 +205,39 @@ const GLOBEX = {
   domain: "globex.test",
 };
 
+/**
+ * Marks the connection's domain verified, past the screen.
+ *
+ * Enforcement is only allowed over a domain the workspace has proved with a
+ * DNS record (docs/design/sso-domain-verification.md, rule 3), and no record
+ * can be published from a test. The screen that does the proof is the next
+ * change's, with its own spec; this one is about changing, switching and
+ * removing a connection, so it is given the proof directly.
+ */
+async function markGlobexDomainVerified(): Promise<void> {
+  const pool = new pg.Pool(
+    process.env.DATABASE_URL
+      ? { connectionString: process.env.DATABASE_URL }
+      : connectionOptions(
+          process.env.E2E_DATABASE ?? "openokr_e2e",
+          testDbEnv.superuser,
+        ),
+  );
+  try {
+    await pool.query(
+      `insert into sso_domains
+         (workspace_id, domain, token_hash, verified_at, verified_by)
+       select workspace_id, $1, 'e2e', now(), 'dns'
+         from sso_connections
+        where provider_id = $2 and deleted_at is null
+       on conflict do nothing`,
+      [GLOBEX.domain, GLOBEX.providerId],
+    );
+  } finally {
+    await pool.end();
+  }
+}
+
 /** The connection's row on the screen, found by the ID that never changes. */
 const globexRow = () =>
   page.getByTestId(`sso-connection-${GLOBEX.providerId}`);
@@ -234,6 +269,8 @@ test("a connection is changed from the screen, with its secret kept and its prov
     .fill(GLOBEX.domain);
   await page.getByRole("button", { name: "Add provider" }).click();
   await expect(page.getByRole("status")).toContainText("Provider saved");
+
+  await markGlobexDomainVerified();
 
   await goTo(page, "/admin/sso");
   const row = globexRow();

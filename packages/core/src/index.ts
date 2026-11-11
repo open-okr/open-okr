@@ -67,6 +67,7 @@ export {
   updateWorkspaceGeneralSettings,
 } from "./actions/settings.ts";
 export type { SSOConnectionDetails } from "./actions/sso.ts";
+export type { SSODomainDetails } from "./actions/sso-domains.ts";
 export {
   ACTIVITY_PAYLOAD_SCHEMAS,
   type ActivityKind,
@@ -530,7 +531,6 @@ export {
 export { resolveRequireEmailVerification } from "./auth/signup-policy.ts";
 export {
   type CreateSSOConnectionInput,
-  createSSOConnection,
   derivedProviderId,
   listSSOProviders,
   loadSSOConnections,
@@ -547,6 +547,18 @@ export {
   validateSSOConnectionInput,
 } from "./auth/sso.ts";
 export {
+  type DomainRecheckResult,
+  recheckSSODomains,
+} from "./auth/sso-domain-recheck.ts";
+export {
+  DOMAIN_FAILURE_LIMIT,
+  DOMAIN_RECORD_LABEL,
+  DOMAIN_RECORD_PREFIX,
+  type DomainResolver,
+  normaliseDomain,
+  recordFor,
+} from "./auth/sso-domains.ts";
+export {
   type EnforcingConnection,
   type EnforcingProvider,
   enforcedProviderForEmail,
@@ -554,6 +566,7 @@ export {
   enforcementMessage,
   enforcingProviderFor,
   listEnforcingConnections,
+  verifiedEnforcedProviderForSignUp,
 } from "./auth/sso-enforcement.ts";
 export {
   followSSOProviders,
@@ -807,10 +820,7 @@ export {
   scimList,
   scimUserResource,
 } from "./directory-sync/scim.ts";
-export {
-  createSCIMToken,
-  resolveToken as resolveSCIMToken,
-} from "./directory-sync/tokens.ts";
+export { resolveToken as resolveSCIMToken } from "./directory-sync/tokens.ts";
 export {
   type DirectoryDeps,
   type DirectoryMember,
@@ -1063,6 +1073,7 @@ export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
+  type CloudPreflightWarning,
   createSiteMessage,
   createWorkspaceAsOperator,
   deleteSiteMessage,
@@ -1077,9 +1088,12 @@ export {
   listTenantsAsOperator,
   liveSiteMessagesFor,
   liveSupportSession,
+  type MarkDomainVerifiedInput,
+  markDomainVerifiedAsOperator,
   measureAllWorkspaces,
   OperatorGrantError,
   readBillingAsOperator,
+  readCloudPreflight,
   readInstanceFlags,
   readUsageAsOperator,
   readWorkspaceLimitsAsOperator,

@@ -29,6 +29,28 @@ const optional = <T extends z.ZodTypeAny>(schema: T) =>
     schema,
   );
 
+/** Proxies in front of the server: a whole number from 0 to 10, default 1. */
+const trustedProxyHopsSchema = z.coerce
+  .number()
+  .int()
+  .min(0)
+  .max(10)
+  .default(1);
+
+/**
+ * `OPENOKR_TRUSTED_PROXY_HOPS` alone, for a caller that needs it on every
+ * request and must not pay for validating the whole environment. A bad value
+ * falls back to the default here, and `parseEnv` refuses it at boot, so a typo
+ * is reported once and never changes whose address a limit counts.
+ */
+export function trustedProxyHops(
+  source: NodeJS.ProcessEnv | Record<string, unknown> = process.env,
+): number {
+  const raw = source.OPENOKR_TRUSTED_PROXY_HOPS;
+  const parsed = optional(trustedProxyHopsSchema).safeParse(raw);
+  return parsed.success ? (parsed.data as number) : 1;
+}
+
 /**
  * The development stand-in for `BETTER_AUTH_SECRET`. Deliberately obvious:
  * it names itself in logs and error messages, and production refuses to boot
@@ -216,6 +238,16 @@ const envSchema = z
      * holds one schedule per name however many hosts declare it, and a job is
      * handed to one worker. Set `off` on the replicas you do not want polling. */
     OPENOKR_SCHEDULER: optional(z.enum(["on", "off"]).default("on")),
+
+    /** How many reverse proxies sit between the internet and this server. The
+     * caller's address is the `X-Forwarded-For` entry that many places from the
+     * right, because the rightmost entry is the one the nearest proxy wrote and
+     * a caller cannot forge it. Both shipped topologies put one proxy in front
+     * (Caddy in Compose, one ingress controller in Helm), so `1` is right for
+     * them and nothing has to be set. A cloud load balancer in front of the
+     * ingress makes it `2`. `0` means no proxy: the header is ignored and every
+     * caller shares one unresolved sign-in limit (docs/design/sign-in-rate-limit.md). */
+    OPENOKR_TRUSTED_PROXY_HOPS: optional(trustedProxyHopsSchema),
 
     /** Whether this instance is a public demonstration (P8-T13c). Off by
      * default, and it is a claim about the deployment rather than a feature

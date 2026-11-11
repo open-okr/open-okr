@@ -18,7 +18,8 @@ then open http://localhost:8080
 
 The instance has not been set up. The first person to open it gets the
 first-run wizard, creates the owner account, and registration closes behind
-them.
+them. Finish setup right after the first start: until then, anyone who reaches
+this address can claim the instance.
 
 {{- if not .Values.secrets.existingSecret }}
 

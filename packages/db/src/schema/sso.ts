@@ -1,4 +1,11 @@
-import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  integer,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { newId } from "../id.ts";
 import { workspaces } from "./workspaces.ts";
 
@@ -63,3 +70,33 @@ export const ssoConnections = pgTable("sso_connections", {
 });
 
 export type SSOConnection = typeof ssoConnections.$inferSelect;
+
+/**
+ * A domain a workspace has proved it owns, or has started to (docs/design/
+ * sso-domain-verification.md). Migration 0165 holds the row-level security,
+ * the per-workspace uniqueness and the instance-wide one over verified rows.
+ */
+export const ssoDomains = pgTable("sso_domains", {
+  id: uuid("id").primaryKey().$defaultFn(newId),
+  workspaceId: uuid("workspace_id")
+    .notNull()
+    .references(() => workspaces.id, { onDelete: "cascade" }),
+  /** Lowercase. Exact match: a subdomain is a separate domain. */
+  domain: text("domain").notNull(),
+  /** SHA-256 of the token. The token itself is shown once and not stored. */
+  tokenHash: text("token_hash").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }),
+  /** `dns`, or the instance administrator's user id for a manual mark. */
+  verifiedBy: text("verified_by"),
+  lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+  failedChecks: integer("failed_checks").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+});
+
+export type SSODomain = typeof ssoDomains.$inferSelect;

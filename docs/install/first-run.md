@@ -5,7 +5,8 @@ What the wizard does, and what is worth doing next.
 ## The wizard asks for one thing
 
 An account. Name, email address, and a password of at least twelve characters.
-That account owns the instance.
+That account owns the instance. Finish this right after the first start: until
+it is done, anyone who reaches the address can create that account.
 
 The screen also asks what the instance should be called. It is filled in with
 `OPENOKR_INSTANCE_NAME` when your deployment sets it, or `OpenOKR` when it does

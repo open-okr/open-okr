@@ -67,7 +67,7 @@ a laptop and wrong for a server anybody else reaches.
 
 **3. Finish setup in the browser.**
 
-Open the address it printed. The wizard asks for one thing: the account that
+Open the address it printed, right after the first start. Until somebody finishes setup, anyone who reaches that address can create the owner account, and `./openokr up` prints the setup link with a reminder of that. The wizard asks for one thing: the account that
 owns the instance. Name, address, and a password of at least twelve
 characters. The instance's name is on the same form, already filled in.
 
@@ -86,7 +86,7 @@ are already members of it.
 | Split the database roles | The server connects as `openokr_app`, which row-level security binds, so one workspace can never read another's rows even if the code forgets to ask. The Postgres image's own role is kept for migrations and backups only, and the server never holds it. An instance installed before this split is moved over on its next `up` or `upgrade`, and its previous `app.env` is kept beside the new one |
 | Started PostgreSQL | In a container, on a named volume. Nothing is exposed outside the machine |
 | Ran migrations | From the image, at boot. An upgrade re-runs them the same way |
-| Started the application | Then waited for it to report healthy, rather than reporting success at the moment it started a process. `/api/health` also says whether the scheduler started and whether the tenant floor is enforced, and `/admin/general` warns if either is not |
+| Started the application | Then waited for it to report healthy, rather than reporting success at the moment it started a process. `/admin/general` warns an administrator if the scheduler did not start or the tenant floor is not enforced, and the boot log says so too |
 | Started the proxy | Caddy, which terminates TLS and fetches a certificate when you named a domain |
 | Checked the proxy is running | An application that is healthy behind a crash-looping proxy is not a reachable instance, and saying "ready" there would be a check that checks nothing |
 
@@ -116,6 +116,7 @@ Every one of these has a working default, and none of them blocks the install.
 | `OPENOKR_DOMAIN` | unset, plain HTTP on localhost | The instance has a real name |
 | `OPENOKR_HTTP_PORT`, `OPENOKR_HTTPS_PORT` | 80 and 443 | The machine already runs something on those ports. Automatic certificates need the standard ports, so moving them assumes your own proxy sits in front |
 | `OPENOKR_IMAGE` | `ghcr.io/open-okr/open-okr:latest` | Pinning a release, running an image you built yourself, or running from a mirror |
+| `OPENOKR_TRUSTED_PROXY_HOPS` | 1 | Your own proxy or load balancer sits in front of the bundled Caddy. The sign-in limits count the caller by the `X-Forwarded-For` entry that many places from the right, so the bundled Caddy alone is 1 and one more proxy in front is 2. Add the line to `secrets/app.env`, then `./openokr up`. Wrong in either direction, callers share limits or can pick their own |
 | Mail | The console driver: messages go to the log | You want invitations and reset links delivered. See [Settings](../admin/settings.md) |
 | AI | Off. Every AI affordance is hidden | You want drafting and rewriting. Bring your own key, or a local model |
 | The setup | One organisation with one workspace | You want several workspaces, a workspace per company, or a cloud of your own. See [Choose a setup](setups.md) |

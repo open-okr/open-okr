@@ -119,6 +119,9 @@ describe("the run table", () => {
   // W10): it deletes delivery bookkeeping past thirty days, as the outbox
   // purge does, and a caller emptying a hook's log would be hiding what it
   // sent.
+  // `sso.recheckDomains` since single sign-on domain proof
+  // (sso-domain-verification.md): a clock looking the DNS records up again,
+  // and an API caller starting it would only be asking for a lookup.
   const NOT_REGISTRY_ACTIONS = new Set([
     "audit.chain",
     "outbox.purge",
@@ -131,6 +134,7 @@ describe("the run table", () => {
     "cycles.sweepEnded",
     "alignment.fillScores",
     "webhooks.purgeDeliveries",
+    "sso.recheckDomains",
   ]);
 
   test("names a real action for every run", () => {
@@ -164,6 +168,7 @@ describe("the run table", () => {
       "cycles.sweepEnded",
       "alignment.fillScores",
       "webhooks.purgeDeliveries",
+      "sso.recheckDomains",
     ]);
     const off = SCHEDULED_RUNS.filter((run) =>
       NOT_REGISTRY_ACTIONS.has(run.action),
@@ -178,6 +183,7 @@ describe("the run table", () => {
       "cloud.sweepTrials",
       "cycles.sweepEnded",
       "outbox.purge",
+      "sso.recheckDomains",
       "support.sweepExpired",
       "tenancy.adopt",
       "webhooks.purgeDeliveries",
