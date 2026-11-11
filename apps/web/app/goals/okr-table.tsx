@@ -1361,6 +1361,7 @@ function KeyResultRow({
             href={`/goals/${keyResult.goalId}#kr-${keyResult.id}`}
             onOpen={onOpen}
             initiativesHref={`/initiatives?keyResult=${keyResult.id}`}
+            tasksHref={`/board?keyResult=${keyResult.id}`}
             openLabel={t("goals.editor.openKeyResult")}
             deleteLabel={t("goals.editor.deleteKeyResult")}
             canDelete={canAdminister}
@@ -1417,6 +1418,7 @@ function RowActions({
   onOpen,
   onCheckIn = null,
   initiativesHref = null,
+  tasksHref = null,
   openLabel,
   deleteLabel,
   canDelete,
@@ -1434,6 +1436,11 @@ function RowActions({
    * (plan 0.8.0 I1). Under "Open this key result" in the menu.
    */
   readonly initiativesHref?: string | null;
+  /**
+   * Key results only: the tasks behind this one, on its board, those naming
+   * it and those of its initiatives. Under View initiatives.
+   */
+  readonly tasksHref?: string | null;
   readonly openLabel: string;
   readonly deleteLabel: string;
   readonly canDelete: boolean;
@@ -1619,6 +1626,11 @@ function RowActions({
                   render={<Link href={initiativesHref} />}
                 >
                   {t("okrList.viewInitiatives")}
+                </Menu.Item>
+              ) : null}
+              {tasksHref ? (
+                <Menu.Item className={item} render={<Link href={tasksHref} />}>
+                  {t("okrList.viewTasks")}
                 </Menu.Item>
               ) : null}
               {onCheckIn ? (

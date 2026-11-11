@@ -89,13 +89,13 @@ test("the sidebar reaches it, and it says what it is for when empty", async () =
   // The empty state names the rule rather than shrugging, which is the
   // difference between a screen and a blank page.
   await expect(page.getByTestId("initiative-count")).toContainText(
-    "No work is recorded",
+    "No initiative is recorded",
   );
 });
 
 test("adding one puts it in the list with its owner and its space", async () => {
   await goTo(page, "/initiatives");
-  await page.getByLabel("What work is this").fill(TITLE);
+  await page.getByLabel("What project is this").fill(TITLE);
   await page.getByRole("button", { name: "Add" }).click();
 
   const row = page.getByTestId("initiative").filter({ hasText: TITLE });
@@ -112,7 +112,7 @@ test("adding one puts it in the list with its owner and its space", async () => 
 test("its dates are one range, and the form is empty again after a save", async () => {
   const dated = "Move the help centre";
   await goTo(page, "/initiatives");
-  await page.getByLabel("What work is this").fill(dated);
+  await page.getByLabel("What project is this").fill(dated);
   const starts = page.getByLabel("Starts", { exact: true });
   const ends = page.getByLabel("Ends", { exact: true });
   await starts.fill("2026-11-09");
@@ -388,6 +388,11 @@ test("a key result's menu leads to its initiatives, and adds one already tied to
     .first();
   await trigger.hover();
   await trigger.click();
+  // Its tasks are one step further, on its board (the words for work,
+  // UIUX-PLAN §8).
+  await expect(
+    page.getByRole("menuitem", { name: "View tasks" }),
+  ).toHaveAttribute("href", `/board?keyResult=${keyResult.id}`);
   await page.getByRole("menuitem", { name: "View initiatives" }).click();
   await page.waitForURL(/\/initiatives\?keyResult=/, { timeout: 15_000 });
   expect(new URL(page.url()).searchParams.get("keyResult")).toBe(
@@ -404,7 +409,7 @@ test("a key result's menu leads to its initiatives, and adds one already tied to
   const picker = page.getByLabel("Key result it moves");
   await expect(picker).toHaveValue(keyResult.title);
 
-  await page.getByLabel("What work is this").fill(MOVES);
+  await page.getByLabel("What project is this").fill(MOVES);
   await page.getByRole("button", { name: "Add" }).click();
   await expect(
     page.getByTestId("initiative").filter({ hasText: MOVES }),

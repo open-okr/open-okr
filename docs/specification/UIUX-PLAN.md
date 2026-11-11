@@ -389,6 +389,14 @@ Specified only enough that the v1 data model does not block them: a saved query 
 - A pseudo-locale build check catches hardcoded strings in continuous integration. Keys are namespaced per module.
 - Coaching prompts, rule names, band labels and taxonomy labels all live in the catalogues, sourced from `packages/method`.
 - Right-to-left is not required for v1, but use logical CSS properties anyway.
+- **The words for work** (Akmal, 11 November 2026), in every screen, message and catalogue:
+
+  | Word | Means | Not |
+  |---|---|---|
+  | Task | One item of work: a card on a board, with assignees, a status, a due date and a checklist | "Work" or "card" for one task |
+  | Initiative | A project made of several tasks, moving one or more key results | "Work" for one initiative |
+  | Board | The tasks of a space, an initiative or a key result, grouped by status: Backlog, To do, In progress, Done | A thing of its own; it is a view of tasks |
+  | Work | Everything done to move the OKRs: initiatives and tasks together, as the Work area and "Linked work" mean it | Either one alone |
 
 ## 9. Quality gates for every UI task
 

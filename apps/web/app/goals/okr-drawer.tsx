@@ -925,6 +925,12 @@ function DrawerKeyResultInitiatives({
       >
         {t("okrList.viewInitiatives")}
       </Link>
+      <Link
+        href={`/board?keyResult=${keyResultId}`}
+        className="font-semibold text-brand-text hover:underline"
+      >
+        {t("okrList.viewTasks")}
+      </Link>
     </p>
   );
 }

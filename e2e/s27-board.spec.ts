@@ -100,7 +100,7 @@ test("the sidebar reaches the board, and it says so when empty", async () => {
   await expect(
     page.getByRole("heading", { level: 1, name: "Board" }),
   ).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByTestId("board-count")).toContainText("No work");
+  await expect(page.getByTestId("board-count")).toContainText("No tasks");
   // Four columns, always, whether or not anything is in them.
   for (const label of ["Backlog", "To do", "In progress", "Done"]) {
     await expect(page.getByRole("region", { name: label })).toBeVisible();
@@ -342,7 +342,7 @@ test("a key result's board holds the work behind it, one click from its goal", a
 
   await goTo(page, `/goals/${keyResult.goal_id}`);
   await page
-    .getByRole("link", { name: `The board of work behind ${keyResult.title}` })
+    .getByRole("link", { name: `View the tasks behind ${keyResult.title}` })
     .click();
 
   await expect(
