@@ -24,6 +24,7 @@
  * offers the passages, which is §2.4's own degradation rather than a dead panel.
  * Capped is a budget or a switch, and it says which.
  */
+import { Dialog } from "@base-ui-components/react/dialog";
 import {
   AgentFace,
   type AgentMood,
@@ -34,10 +35,23 @@ import {
   useKeyboardShortcut,
   useTranslations,
 } from "@openokr/ui";
-import { ArrowDown, History, Send, Square, SquarePen, X } from "lucide-react";
+import {
+  ArrowDown,
+  History,
+  Maximize2,
+  Send,
+  Square,
+  SquarePen,
+  X,
+} from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { dayLabel } from "../../lib/day-label";
 import {
   applyCopilotProposalAction,
@@ -75,7 +89,14 @@ type Availability = CopilotAvailability;
  * and "⌘J" inside a button named "Ask the copilot" broke that. The button
  * also announces the shortcut itself, through `aria-keyshortcuts`.
  */
-function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
+function CopilotTrigger({
+  onClick,
+  buttonRef,
+}: {
+  readonly onClick: () => void;
+  /** Where focus goes back to when the panel closes (plan 0.8.1 CP1). */
+  readonly buttonRef: RefObject<HTMLButtonElement | null>;
+}) {
   const { t } = useTranslations();
 
   // One pill, so the hint reads as part of the control rather than a stray
@@ -96,6 +117,7 @@ function CopilotTrigger({ onClick }: { readonly onClick: () => void }) {
       data-tour-target="ask-ai"
     >
       <Button
+        ref={buttonRef}
         variant="ghost"
         onClick={onClick}
         aria-label={t("copilot.copilotPanel.askTheCopilot")}
@@ -198,6 +220,36 @@ interface Rejoined {
 
 type Thread = Awaited<ReturnType<typeof readCopilotThreadAction>>;
 
+/** Where this browser remembers that the panel was widened (plan 0.8.1 CP1). */
+const EXPANDED_KEY = "openokr.copilot.expanded";
+
+/**
+ * Whether this browser widened the panel last time. Storage can be refused,
+ * in a private window or with site data blocked, and then the panel is narrow.
+ */
+function readExpanded(): boolean {
+  try {
+    return window.localStorage.getItem(EXPANDED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function rememberExpanded(expanded: boolean): void {
+  try {
+    if (expanded) {
+      window.localStorage.setItem(EXPANDED_KEY, "1");
+    } else {
+      window.localStorage.removeItem(EXPANDED_KEY);
+    }
+  } catch {
+    // Not remembered, which costs one press next time.
+  }
+}
+
+/** How long an announcement stays in the status line before it is cleared. */
+const ANNOUNCED_FOR_MS = 4_000;
+
 export function CopilotPanel({
   initialAvailability,
 }: {
@@ -207,6 +259,14 @@ export function CopilotPanel({
   const { t } = useTranslations();
 
   const [open, setOpen] = useState(false);
+  /** 768px rather than 512px (plan 0.8.1 CP1). Read once the panel opens. */
+  const [expanded, setExpanded] = useState(false);
+  /**
+   * What the polite status line says once: "Answering", "Answer ready",
+   * "Stopped" or why not (plan 0.8.1 CP1). Cleared after a moment, so the
+   * same words a turn later are said again.
+   */
+  const [announcement, setAnnouncement] = useState("");
   const [availability, setAvailability] = useState(initialAvailability);
   /** The member's conversations for History. Null until read. */
   const [threads, setThreads] = useState<readonly ThreadSummary[] | null>(null);
@@ -230,6 +290,12 @@ export function CopilotPanel({
   /** The answer a background run is writing, so Stop can stop it (W4). */
   const runningAnswer = useRef<string | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+  /** An input method is composing in the box, so Escape and Enter are its. */
+  const composing = useRef(false);
+  /** The turn ended with focus in the panel, so the box takes it back. */
+  const refocus = useRef(false);
   /** The thread whose messages are on screen, so `kept` is cleared on a change. */
   const shownThread = useRef<string | null>(null);
   const scroller = useRef<HTMLDivElement>(null);
@@ -264,6 +330,27 @@ export function CopilotPanel({
     () => (open ? closePanel() : openPanel()),
     { key: "j", mod: true, allowInInputs: true },
   );
+
+  useEffect(() => {
+    if (open) {
+      setExpanded(readExpanded());
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!busy && refocus.current) {
+      refocus.current = false;
+      inputRef.current?.focus();
+    }
+  }, [busy]);
+
+  useEffect(() => {
+    if (announcement === "") {
+      return;
+    }
+    const timer = setTimeout(() => setAnnouncement(""), ANNOUNCED_FOR_MS);
+    return () => clearTimeout(timer);
+  }, [announcement]);
 
   // Re-read availability and the thread list on every open: a budget spent in
   // another tab, or a conversation started on another device, should be visible
@@ -555,6 +642,7 @@ export function CopilotPanel({
       }
       setBusy(true);
       setNotice(null);
+      setAnnouncement(t("copilot.copilotPanel.announce.answering"));
       // Shown straight away rather than after the round trip, with the first
       // thing every run does: a background run may publish that step before
       // the panel has subscribed (plan 0.8.1 W2).
@@ -580,6 +668,7 @@ export function CopilotPanel({
       let found: readonly Source[] = [];
       let said: string | null = null;
       let reached = true;
+      let stopped = false;
       try {
         const response = await fetch("/api/copilot", {
           method: "POST",
@@ -668,7 +757,9 @@ export function CopilotPanel({
       } catch (error) {
         // An abort is the stop control working, not a failure. What arrived was
         // recorded by the server, and the re-read below shows it.
-        if (!(error instanceof DOMException && error.name === "AbortError")) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          stopped = true;
+        } else {
           setNotice(t("copilot.copilotPanel.answerStoppedEarly"));
         }
       } finally {
@@ -690,6 +781,25 @@ export function CopilotPanel({
           setArriving(null);
         }
         setBusy(false);
+        // Said once, politely: the words themselves were never read out as
+        // they arrived (plan 0.8.1 CP1).
+        setAnnouncement(
+          stopped
+            ? t("copilot.copilotPanel.stopped")
+            : !reached
+              ? t("copilot.copilotPanel.couldNotBeReached")
+              : text.trim() !== ""
+                ? t("copilot.copilotPanel.announce.ready")
+                : (said ?? t("copilot.copilotPanel.announce.ready")),
+        );
+        // Focus stays in the composer for the next question, unless the
+        // reader has gone somewhere else on the page meanwhile. Given back
+        // once the box is drawn usable again, below.
+        const focused = document.activeElement;
+        refocus.current =
+          focused === null ||
+          focused === document.body ||
+          popupRef.current?.contains(focused) === true;
         // With no words, the passages and the reason were the answer, and the
         // thread holds neither (plan 0.8.1 CP8, review F1). Kept beside the
         // question until another conversation is opened.
@@ -704,10 +814,6 @@ export function CopilotPanel({
     },
     [address, busy, question, read, show, stick, t, threadId],
   );
-
-  if (!open) {
-    return <CopilotTrigger onClick={openPanel} />;
-  }
 
   const canAsk = availability.available;
   // The copilot's face, in the order a reader would want the reason: off
@@ -749,255 +855,313 @@ export function CopilotPanel({
 
   return (
     <>
-      <CopilotTrigger onClick={closePanel} />
-      {/* **Portalled to the body, and it has to be.** The trigger above lives in
-          `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes an
-          element the containing block for every `position: fixed` descendant, so
-          rendered in place the panel's `inset-y-0` resolved against the 50px
-          topbar: a 49px strip with its content spilling over the page and no
-          background painted under it. `document.body` is safe to read here
-          because `open` starts false, so this branch is only ever reached after
-          a click or the shortcut, which is to say only in a browser. */}
-      {createPortal(
-        <aside
-          role="dialog"
-          aria-label={t("copilot.copilotPanel.copilot")}
-          className="fixed inset-y-0 right-0 z-40 flex w-full max-w-100 flex-col border-l border-line bg-bg shadow-lg"
-        >
-          <header className="flex flex-none items-center gap-2 border-b border-line px-4 py-3">
-            {/* Blinks while idle, and plays any other change once and
+      <CopilotTrigger
+        buttonRef={triggerRef}
+        onClick={open ? closePanel : openPanel}
+      />
+      {/*
+       * A Base UI dialog that is not modal, the OKR drawer's pattern
+       * (plan 0.8.1 CP1, review F4): the page stays usable beside it, Escape
+       * closes it, and focus goes back to Ask. Escape is the box's own while
+       * something is typed in it, or while an input method is composing.
+       *
+       * **Portalled to the body, and it has to be.** The trigger lives in
+       * `Topbar`, which carries `backdrop-blur-md`. A backdrop filter makes an
+       * element the containing block for every `position: fixed` descendant,
+       * so rendered in place the panel resolved against the 50px topbar.
+       */}
+      <Dialog.Root
+        open={open}
+        modal={false}
+        disablePointerDismissal
+        onOpenChange={(next, details) => {
+          if (next) {
+            return;
+          }
+          if (
+            details.reason === "escape-key" &&
+            (composing.current || question.trim() !== "")
+          ) {
+            return;
+          }
+          closePanel();
+        }}
+      >
+        <Dialog.Portal>
+          <Dialog.Popup
+            ref={popupRef}
+            initialFocus={inputRef}
+            finalFocus={triggerRef}
+            // 512px, widened to 768px, on the container scale so compact
+            // density does not narrow it; a full-screen sheet below 768px.
+            className={`fixed inset-y-0 right-0 z-40 flex w-full flex-col border-l border-line bg-bg shadow-lg outline-none ${
+              expanded ? "md:max-w-3xl" : "md:max-w-lg"
+            }`}
+          >
+            <header className="flex flex-none items-center gap-2 border-b border-line px-4 pt-[max(0.75rem,env(safe-area-inset-top))] pb-3">
+              {/* Blinks while idle, and plays any other change once and
                 rests. The face in the reply is the one that keeps moving
                 while the answer is on its way, and one moving face in a
                 panel is enough. */}
-            <AgentFace mood={mood} />
-            <h2 className="text-sm font-medium text-ink">
-              {t("copilot.copilotPanel.copilot")}
-            </h2>
-            {availability.providerConfigured ? null : (
-              <Chip tone="neutral">{t("copilot.copilotPanel.aiOff")}</Chip>
-            )}
-            <div className="ml-auto flex items-center gap-1">
-              {/* A label beside the icon from 640px; below that the icon,
+              <AgentFace mood={mood} />
+              <Dialog.Title className="text-sm font-medium text-ink">
+                {t("copilot.copilotPanel.copilot")}
+              </Dialog.Title>
+              {availability.providerConfigured ? null : (
+                <Chip tone="neutral">{t("copilot.copilotPanel.aiOff")}</Chip>
+              )}
+              <div className="ml-auto flex items-center gap-1">
+                {/* A label beside the icon from 640px; below that the icon,
                   with the same words for a screen reader. */}
-              <Button
-                variant="ghost"
-                onClick={newChat}
-                disabled={arriving !== null}
-                className="px-2"
-              >
-                <SquarePen className="size-4" aria-hidden="true" />
-                <span className="sr-only sm:not-sr-only">
-                  {t("copilot.copilotPanel.newChat")}
-                </span>
-              </Button>
-              <Button
-                variant="ghost"
-                aria-pressed={view === "history"}
-                onClick={() =>
-                  setView((was) => (was === "history" ? "chat" : "history"))
-                }
-                className={`px-2 ${view === "history" ? "bg-raised" : ""}`}
-              >
-                <History className="size-4" aria-hidden="true" />
-                <span className="sr-only sm:not-sr-only">
-                  {t("copilot.copilotPanel.history.title")}
-                </span>
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={closePanel}
-                aria-label={t("copilot.copilotPanel.closeTheCopilot")}
-                className="px-2"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-          </header>
-
-          <div className="relative min-h-0 flex-1">
-            <div ref={scroller} className="h-full overflow-y-auto px-4 py-3">
-              <div ref={content} className="flex flex-col gap-4">
-                {view === "history" ? (
-                  <ThreadList
-                    threads={threads}
-                    openId={threadId}
-                    loading={!threadsFailed}
-                    onOpen={(id) => {
-                      // A step Back can undo, as the OKR drawer's opening is.
-                      address(
-                        id,
-                        written.current === null ? "push" : "replace",
-                      );
-                      void openThread(id);
-                    }}
-                    onDelete={deleteThread}
-                  />
-                ) : null}
-                {view === "chat" && empty ? (
-                  <div className="flex flex-col gap-3">
-                    <div className="flex flex-col items-start gap-2 pt-2">
-                      <AgentFace mood={mood} className="size-8" />
-                      <p className="text-sm text-ink-3">
-                        {t("copilot.copilotPanel.askAboutThisWorkspace")}
-                      </p>
-                    </div>
-                    {/* Only where an answer can come: with AI off a suggestion
-                        would be a search for a sentence (plan 0.8.1 CP8). */}
-                    {canAsk ? (
-                      <ul
-                        aria-label={t("copilot.copilotPanel.suggestions")}
-                        className="flex flex-col gap-1.5"
-                      >
-                        {SUGGESTIONS.map((key) => (
-                          <li key={key}>
-                            <Button
-                              variant="default"
-                              disabled={busy}
-                              onClick={() => void send(t(key))}
-                              className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
-                            >
-                              {t(key)}
-                            </Button>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {view === "chat" ? (
-                  <>
-                    {turns.map((turn) => {
-                      const answer = turn.answer;
-                      const extra = turn.question
-                        ? (kept[turn.question.id] ?? null)
-                        : null;
-                      const live = answer?.running === true;
-                      return (
-                        <div key={turn.key} className="flex flex-col gap-3">
-                          {turn.question ? (
-                            <MemberTurn text={turn.question.content} />
-                          ) : null}
-                          {answer || extra || turn.proposals.length > 0 ? (
-                            <AssistantTurn
-                              text={
-                                live ? rejoined.text : (answer?.content ?? "")
-                              }
-                              arriving={live}
-                              status={
-                                live
-                                  ? rejoined.step
-                                    ? stepWords(rejoined.step, t)
-                                    : t("copilot.copilotPanel.stillWriting")
-                                  : null
-                              }
-                              haltedReason={answer?.haltedReason ?? null}
-                              stopped={answer?.stopped ?? false}
-                              citations={answer?.citations ?? []}
-                              kept={extra}
-                              cards={cardsFor(turn.proposals)}
-                            />
-                          ) : null}
-                        </div>
-                      );
-                    })}
-
-                    {arriving ? (
-                      <div className="flex flex-col gap-3">
-                        <MemberTurn text={arriving.question} />
-                        <AssistantTurn
-                          text={arriving.text}
-                          arriving={!arriving.settled}
-                          status={stepWords(arriving.step, t)}
-                          haltedReason={null}
-                          stopped={false}
-                          citations={[]}
-                          // Passages are shown while arriving only when the run
-                          // has said no words are coming: then they are the
-                          // answer. Otherwise they wait for the recorded answer.
-                          kept={
-                            arriving.notice
-                              ? {
-                                  sources: arriving.sources,
-                                  notice: arriving.notice,
-                                }
-                              : null
-                          }
-                          cards={cardsFor(afterLast)}
-                        />
-                      </div>
-                    ) : null}
-
-                    {notice ? (
-                      <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
-                        {notice}
-                      </p>
-                    ) : null}
-                  </>
-                ) : null}
-              </div>
-            </div>
-            {stick.away && !empty && view === "chat" ? (
-              <Button
-                variant="default"
-                onClick={stick.toEnd}
-                aria-label={t("copilot.copilotPanel.jumpToLatest")}
-                className="absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg"
-              >
-                <ArrowDown className="size-4" aria-hidden="true" />
-              </Button>
-            ) : null}
-          </div>
-
-          <footer className="flex-none border-t border-line px-4 py-3">
-            {canAsk ? null : <Unavailable availability={availability} />}
-            <div className="flex items-end gap-2">
-              <TextArea
-                label={t("copilot.copilotPanel.yourQuestion")}
-                hideLabel
-                ref={inputRef}
-                rows={2}
-                value={question}
-                disabled={busy}
-                onChange={(event) => setQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void send();
-                  }
-                }}
-                placeholder={
-                  canAsk
-                    ? t("copilot.copilotPanel.askAQuestion")
-                    : t("copilot.copilotPanel.searchForMatchingPassages")
-                }
-                maxLength={4000}
-                className="flex-1"
-                inputClassName="resize-none placeholder:text-ink-4"
-              />
-              {busy && availability.streaming ? (
                 <Button
                   variant="ghost"
-                  onClick={stop}
-                  aria-label={t("copilot.copilotPanel.stopTheAnswer")}
+                  onClick={newChat}
+                  disabled={arriving !== null}
+                  className="px-2"
                 >
-                  <Square className="size-4" />
-                  {t("copilot.copilotPanel.stop")}
+                  <SquarePen className="size-4" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">
+                    {t("copilot.copilotPanel.newChat")}
+                  </span>
                 </Button>
-              ) : (
                 <Button
-                  onClick={() => void send()}
-                  disabled={busy || question.trim() === ""}
-                  aria-label={t("copilot.copilotPanel.sendTheQuestion")}
+                  variant="ghost"
+                  aria-pressed={view === "history"}
+                  onClick={() =>
+                    setView((was) => (was === "history" ? "chat" : "history"))
+                  }
+                  className={`px-2 ${view === "history" ? "bg-raised" : ""}`}
                 >
-                  <Send className="size-4" />
+                  <History className="size-4" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">
+                    {t("copilot.copilotPanel.history.title")}
+                  </span>
                 </Button>
-              )}
+                {/* Wider for a long answer or a table of cards. Only where
+                  there is room: below 768px the panel is the whole screen. */}
+                <Button
+                  variant="ghost"
+                  aria-label={t("copilot.copilotPanel.expand")}
+                  aria-pressed={expanded}
+                  onClick={() => {
+                    setExpanded(!expanded);
+                    rememberExpanded(!expanded);
+                  }}
+                  className={`hidden px-2 md:inline-flex ${expanded ? "bg-raised" : ""}`}
+                >
+                  <Maximize2 className="size-4" aria-hidden="true" />
+                </Button>
+                <Dialog.Close
+                  aria-label={t("copilot.copilotPanel.closeTheCopilot")}
+                  className="flex size-7.5 flex-none items-center justify-center rounded-control text-ink-2 hover:bg-raised focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </Dialog.Close>
+              </div>
+            </header>
+
+            <div className="relative min-h-0 flex-1">
+              <div ref={scroller} className="h-full overflow-y-auto px-4 py-3">
+                {/* The conversation is a log, and says nothing as it grows:
+                  the status line below announces a finished answer, a stop
+                  and an error once, where a live log would read every word
+                  as it arrived (plan 0.8.1 CP1). */}
+                <div ref={content} className="flex flex-col gap-4">
+                  {view === "history" ? (
+                    <ThreadList
+                      threads={threads}
+                      openId={threadId}
+                      loading={!threadsFailed}
+                      onOpen={(id) => {
+                        // A step Back can undo, as the OKR drawer's opening is.
+                        address(
+                          id,
+                          written.current === null ? "push" : "replace",
+                        );
+                        void openThread(id);
+                      }}
+                      onDelete={deleteThread}
+                    />
+                  ) : null}
+                  {view === "chat" && empty ? (
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col items-start gap-2 pt-2">
+                        <AgentFace mood={mood} className="size-8" />
+                        <p className="text-sm text-ink-3">
+                          {t("copilot.copilotPanel.askAboutThisWorkspace")}
+                        </p>
+                      </div>
+                      {/* Only where an answer can come: with AI off a suggestion
+                        would be a search for a sentence (plan 0.8.1 CP8). */}
+                      {canAsk ? (
+                        <ul
+                          aria-label={t("copilot.copilotPanel.suggestions")}
+                          className="flex flex-col gap-1.5"
+                        >
+                          {SUGGESTIONS.map((key) => (
+                            <li key={key}>
+                              <Button
+                                variant="default"
+                                disabled={busy}
+                                onClick={() => void send(t(key))}
+                                className="h-auto w-full justify-start whitespace-normal py-2 text-left font-normal"
+                              >
+                                {t(key)}
+                              </Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {view === "chat" ? (
+                    <div
+                      role="log"
+                      aria-label={t("copilot.copilotPanel.conversation")}
+                      aria-live="off"
+                      className="flex flex-col gap-4"
+                    >
+                      {turns.map((turn) => {
+                        const answer = turn.answer;
+                        const extra = turn.question
+                          ? (kept[turn.question.id] ?? null)
+                          : null;
+                        const live = answer?.running === true;
+                        return (
+                          <div key={turn.key} className="flex flex-col gap-3">
+                            {turn.question ? (
+                              <MemberTurn text={turn.question.content} />
+                            ) : null}
+                            {answer || extra || turn.proposals.length > 0 ? (
+                              <AssistantTurn
+                                text={
+                                  live ? rejoined.text : (answer?.content ?? "")
+                                }
+                                arriving={live}
+                                status={
+                                  live
+                                    ? rejoined.step
+                                      ? stepWords(rejoined.step, t)
+                                      : t("copilot.copilotPanel.stillWriting")
+                                    : null
+                                }
+                                haltedReason={answer?.haltedReason ?? null}
+                                stopped={answer?.stopped ?? false}
+                                citations={answer?.citations ?? []}
+                                kept={extra}
+                                cards={cardsFor(turn.proposals)}
+                              />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+
+                      {arriving ? (
+                        <div className="flex flex-col gap-3">
+                          <MemberTurn text={arriving.question} />
+                          <AssistantTurn
+                            text={arriving.text}
+                            arriving={!arriving.settled}
+                            status={stepWords(arriving.step, t)}
+                            haltedReason={null}
+                            stopped={false}
+                            citations={[]}
+                            // Passages are shown while arriving only when the run
+                            // has said no words are coming: then they are the
+                            // answer. Otherwise they wait for the recorded answer.
+                            kept={
+                              arriving.notice
+                                ? {
+                                    sources: arriving.sources,
+                                    notice: arriving.notice,
+                                  }
+                                : null
+                            }
+                            cards={cardsFor(afterLast)}
+                          />
+                        </div>
+                      ) : null}
+
+                      {notice ? (
+                        <p className="rounded-md bg-raised px-3 py-2 text-xs text-ink-3">
+                          {notice}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {stick.away && !empty && view === "chat" ? (
+                <Button
+                  variant="default"
+                  onClick={stick.toEnd}
+                  aria-label={t("copilot.copilotPanel.jumpToLatest")}
+                  className="absolute bottom-3 left-1/2 size-8 -translate-x-1/2 rounded-full px-0 shadow-lg"
+                >
+                  <ArrowDown className="size-4" aria-hidden="true" />
+                </Button>
+              ) : null}
             </div>
-          </footer>
-        </aside>,
-        document.body,
-      )}
+
+            <p role="status" className="sr-only">
+              {announcement}
+            </p>
+            <footer className="flex-none border-t border-line px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              {canAsk ? null : <Unavailable availability={availability} />}
+              <div className="flex items-end gap-2">
+                <TextArea
+                  label={t("copilot.copilotPanel.yourQuestion")}
+                  hideLabel
+                  ref={inputRef}
+                  rows={2}
+                  value={question}
+                  disabled={busy}
+                  onChange={(event) => setQuestion(event.target.value)}
+                  onCompositionStart={() => {
+                    composing.current = true;
+                  }}
+                  onCompositionEnd={() => {
+                    composing.current = false;
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void send();
+                    }
+                  }}
+                  placeholder={
+                    canAsk
+                      ? t("copilot.copilotPanel.askAQuestion")
+                      : t("copilot.copilotPanel.searchForMatchingPassages")
+                  }
+                  maxLength={4000}
+                  className="flex-1"
+                  inputClassName="resize-none placeholder:text-ink-4"
+                />
+                {busy && availability.streaming ? (
+                  <Button
+                    variant="ghost"
+                    onClick={stop}
+                    aria-label={t("copilot.copilotPanel.stopTheAnswer")}
+                  >
+                    <Square className="size-4" />
+                    {t("copilot.copilotPanel.stop")}
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={() => void send()}
+                    disabled={busy || question.trim() === ""}
+                    aria-label={t("copilot.copilotPanel.sendTheQuestion")}
+                  >
+                    <Send className="size-4" />
+                  </Button>
+                )}
+              </div>
+            </footer>
+          </Dialog.Popup>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

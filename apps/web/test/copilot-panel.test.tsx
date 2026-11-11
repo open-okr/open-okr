@@ -607,3 +607,121 @@ describe("conversations (plan 0.8.1 CP2)", () => {
     expect(window.location.search).not.toContain("copilot=");
   });
 });
+
+describe("the frame and the keyboard (plan 0.8.1 CP1)", () => {
+  const pressEscape = async () => {
+    await act(async () => {
+      (document.activeElement ?? document.body).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+    });
+    await settle();
+  };
+
+  test("Escape with nothing typed closes it, and focus goes back to Ask", async () => {
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+    await pressEscape();
+    expect(panel()).toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(
+      "Ask the copilot",
+    );
+  });
+
+  test("Escape with something typed stays, because it is the box's", async () => {
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    const box = panel()?.querySelector("textarea");
+    if (!box) {
+      throw new Error("no box");
+    }
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        "value",
+      )?.set;
+      setter?.call(box, "Half a question");
+      box.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await pressEscape();
+    expect(panel()).not.toBeNull();
+  });
+
+  test("the close button gives focus back to Ask", async () => {
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    await act(async () => byName("Close the copilot").click());
+    await settle();
+    expect(panel()).toBeNull();
+    expect(document.activeElement?.getAttribute("aria-label")).toBe(
+      "Ask the copilot",
+    );
+  });
+
+  test("Expand widens it, and the browser remembers", async () => {
+    window.localStorage.clear();
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    expect(panel()?.className).toContain("md:max-w-lg");
+    await act(async () => byName("Expand the copilot").click());
+    expect(panel()?.className).toContain("md:max-w-3xl");
+
+    await act(async () => byName("Close the copilot").click());
+    await settle();
+    await open();
+    await settle();
+    expect(panel()?.className).toContain("md:max-w-3xl");
+    expect(byName("Expand the copilot").getAttribute("aria-pressed")).toBe(
+      "true",
+    );
+  });
+
+  test("a finished answer is announced once, and focus stays in the box", async () => {
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "text", text: "Activation is up." },
+        { kind: "done", answerMessageId: "a1", stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "How is activation?",
+      messages: [
+        recorded(
+          QUESTION_ID,
+          "member",
+          "How is activation?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        recorded(
+          "a1",
+          "assistant",
+          "Activation is up.",
+          "2026-11-12T10:00:04.000Z",
+        ),
+      ],
+    });
+    await render(AVAILABLE);
+    await open();
+    await settle();
+    await ask("How is activation?");
+    await settle();
+
+    const statuses = [...(panel()?.querySelectorAll('[role="status"]') ?? [])];
+    expect(statuses.map((status) => status.textContent)).toContain(
+      "Answer ready",
+    );
+    // The conversation itself is a log that says nothing as it grows.
+    const log = panel()?.querySelector('[role="log"]');
+    expect(log?.getAttribute("aria-live")).toBe("off");
+    expect(document.activeElement?.tagName).toBe("TEXTAREA");
+  });
+});

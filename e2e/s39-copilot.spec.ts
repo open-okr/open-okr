@@ -126,6 +126,80 @@ test("⌘J closes it again", async () => {
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeHidden();
 });
 
+/**
+ * **Frame and keyboard** (plan 0.8.1 CP1, review F4 and F16).
+ *
+ * Acceptance criteria:
+ *   Given the panel open and focus in the composer with nothing typed, when
+ *   the person presses Escape, then the panel closes and focus is on "Ask the
+ *   copilot".
+ *   Given the panel open, when the person presses the close button, then
+ *   focus is on "Ask the copilot".
+ */
+test("Escape closes it, and focus goes back to Ask", async () => {
+  const ask = page.getByRole("button", { name: "Ask the copilot" });
+  await ask.click();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("textbox")).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(ask).toBeFocused();
+});
+
+test("the close button gives focus back to Ask too", async () => {
+  const ask = page.getByRole("button", { name: "Ask the copilot" });
+  await ask.click();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+  await expect(panel).toBeHidden();
+  await expect(ask).toBeFocused();
+});
+
+/**
+ * Acceptance criteria:
+ *   Given compact density at 1440, when the panel opens, then it is 512px
+ *   wide, the same as comfortable.
+ *   Given the panel open at 1440, when the person presses Expand, closes,
+ *   reloads and opens it again, then it opens 768px wide.
+ */
+test("it is 512 pixels wide in either density, and Expand stays expanded", async () => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
+
+  await page.getByRole("button", { name: "Ask the copilot" }).click();
+  await expect(panel).toBeVisible();
+  expect(await width()).toBe(512);
+
+  // Compact density shrinks the spacing unit; the panel is on the container
+  // scale, so it does not narrow with it.
+  await page.evaluate(() =>
+    document.documentElement.setAttribute("data-density", "compact"),
+  );
+  expect(await width()).toBe(512);
+
+  await panel.getByRole("button", { name: "Expand the copilot" }).click();
+  await expect.poll(width).toBe(768);
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Ask the copilot" }).click();
+  await expect(panel).toBeVisible();
+  await expect.poll(width).toBe(768);
+
+  // Back to the default, so the measurements in the rest of this file are
+  // of the panel as most people see it.
+  await panel.getByRole("button", { name: "Expand the copilot" }).click();
+  await expect.poll(width).toBe(512);
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+  await expect(panel).toBeHidden();
+});
+
 test("a question is recorded and answered with what is there to find", async () => {
   await page.keyboard.press("ControlOrMeta+j");
   const panel = page.getByRole("dialog", { name: "Copilot" });
@@ -150,10 +224,14 @@ test("a question is recorded and answered with what is there to find", async () 
   // the answer's own sentence, which the footer never says.
   await expect(panel.getByRole("textbox")).toBeEnabled({ timeout: 30_000 });
   await expect(
-    panel.getByText("these are the passages that match your question", {
-      exact: false,
-    }),
+    panel
+      .getByRole("log", { name: "Conversation" })
+      .getByText("these are the passages that match your question", {
+        exact: false,
+      }),
   ).toBeVisible();
+  // And the composer has focus again for the next question (plan 0.8.1 CP1).
+  await expect(panel.getByRole("textbox")).toBeFocused();
 });
 
 test("the conversation is there when the panel is reopened", async () => {
