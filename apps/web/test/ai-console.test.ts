@@ -199,3 +199,16 @@ describe("the AI console's second half (P6-G12b)", () => {
     );
   });
 });
+
+// UAT 0.8.0 F-09: plan 0.8.0 O1 named "Not configured" on this page as part
+// of the wrong reason AI was off. The plan's sentence now says why, and the
+// chip beside it said "not configured" still, so it is left out there.
+describe("the AI console when a plan is why AI is off", () => {
+  test("shows the plan's sentence and not the not-configured chip", () => {
+    expect(pageSource).toContain(
+      'const planIsWhy = hosted.kind === "none" && configured.length === 0;',
+    );
+    expect(pageSource).toContain("{planIsWhy ? (");
+    expect(pageSource).toContain("{planIsWhy ? null : (");
+  });
+});
