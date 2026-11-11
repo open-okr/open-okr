@@ -37,9 +37,20 @@
  */
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import type {
+  AgentDrafter,
+  GroundedAnswer,
+  GroundedQuestionContext,
+} from "../agents/drafter.ts";
 import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
-import { type AnswerSource, citationsFrom, groundQuestion } from "./answer.ts";
+import {
+  type AnswerSource,
+  type CopilotStep,
+  citationsFrom,
+  groundQuestion,
+} from "./answer.ts";
+import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
 
 /** The channel one copilot conversation's prose is published on. */
 export function copilotThreadChannel(
@@ -155,6 +166,15 @@ export async function runCopilotAnswer(
    * P5-T09. Saying so is half the requirement: a run that stopped silently
    * leaves a short answer that looks finished.
    */
+  // **A redelivered row stops here** (plan 0.8.1 A2). Asking for the proposal
+  // writes a card, and `copilot.completeRun` refusing the second answer comes
+  // too late to stop a second card. An answer no longer running was written,
+  // or its member stopped it before the run began (W4): either way there is
+  // nothing to do and nothing to pay for.
+  if (await alreadyAnswered(context, job)) {
+    return { answered: false, haltedReason: null, sources: [] };
+  }
+
   const capUsd = await resolveAgentRunCostCap(context.pool, job.workspaceId);
   if (capUsd <= 0) {
     return halt(
@@ -163,6 +183,12 @@ export async function runCopilotAnswer(
     );
   }
 
+  // Each step as it happens, so the reader is told what the run is doing
+  // rather than watching an empty answer (plan 0.8.1 W2).
+  const step = (data: CopilotStep) =>
+    publish("copilot.step", { answerMessageId: job.answerMessageId, ...data });
+
+  await step({ step: "searching" });
   const prepared = await groundQuestion(
     context,
     {
@@ -170,14 +196,16 @@ export async function runCopilotAnswer(
       questionMessageId: job.questionMessageId,
       question: job.question,
     },
-    (drafter) => Boolean(drafter.answerGrounded),
+    (drafter) => Boolean(drafter.streamGrounded ?? drafter.answerGrounded),
   );
+  await step({ step: "found", count: prepared.sources.length });
   await publish("copilot.sources", {
     answerMessageId: job.answerMessageId,
     sources: prepared.sources,
   });
 
-  if (!prepared.ask || !context.drafter?.answerGrounded) {
+  const drafter = context.drafter;
+  if (!prepared.ask || !(drafter?.streamGrounded ?? drafter?.answerGrounded)) {
     // The relay passes no reason, so this reads as no provider, as before. It
     // only happens when AI went off between the question and this run.
     return halt(
@@ -186,36 +214,82 @@ export async function runCopilotAnswer(
     );
   }
 
-  let answer: Awaited<
-    ReturnType<NonNullable<typeof context.drafter.answerGrounded>>
-  >;
-  try {
-    // Through the drafter, never as a detached function: a host's drafter is
-    // often a class instance and `const f = drafter.answerGrounded` loses
-    // `this`. The comment in `answerQuestion` says what that cost once.
-    answer = await context.drafter.answerGrounded(prepared.ask);
-  } catch {
+  // The proposal first, so the answer is told whether a card exists (A2).
+  const offers = await offersToPropose(context);
+  if (offers !== null) {
+    await step({ step: "proposing" });
+  }
+  const proposal = await proposeBeforeAnswering(
+    context,
+    { threadId: job.threadId, request: job.question },
+    offers,
+  );
+  if (proposal.proposalId !== null) {
+    await publish("copilot.proposal", {
+      answerMessageId: job.answerMessageId,
+      proposalId: proposal.proposalId,
+    });
+  }
+  const ask = { ...prepared.ask, proposal: proposal.note };
+  await step({ step: "writing" });
+
+  // A member may stop the run while it works (plan 0.8.1 W4). Asked between
+  // pieces, at most every `STOP_CHECK_EVERY_MS`, and once more before the
+  // answer starts, since a stop pressed during the search lands here first.
+  const stopped = stopCheck(context, job);
+  const answered = (await stopped(true))
+    ? ({ kind: "stopped", text: "" } as const)
+    : drafter?.streamGrounded
+      ? await streamInto(
+          drafter,
+          ask,
+          (text) =>
+            publish("copilot.text", {
+              answerMessageId: job.answerMessageId,
+              text,
+            }),
+          stopped,
+        )
+      : await wholeInto(drafter, ask, (text) =>
+          publish("copilot.text", {
+            answerMessageId: job.answerMessageId,
+            text,
+          }),
+        );
+
+  if (answered.kind === "stopped") {
+    // What arrived goes into a message that already reads as stopped. Nothing
+    // is said about it: the member pressed the button and knows.
+    await callAction(context, "copilot.completeRun", {
+      answerMessageId: job.answerMessageId,
+      text: answered.text,
+      citations: [],
+    });
+    await publish("copilot.done", {
+      answerMessageId: job.answerMessageId,
+      haltedReason: null,
+      stopped: true,
+    });
+    return { answered: false, haltedReason: null, sources: prepared.sources };
+  }
+  if (answered.kind === "failed") {
     return halt(
       "The provider did not answer. These are the passages that match your question.",
     );
   }
-  if (!answer || answer.text.trim() === "") {
+  if (answered.kind === "empty") {
     return halt(
       "The copilot had nothing to add. These are the passages that match your question.",
     );
   }
 
-  // One event with the whole answer rather than a token at a time. The drafter
-  // port answers whole; streaming it would mean a streaming port, and that is
-  // a change to `packages/adapters` this row does not need. The reader still
-  // gets it without the request they asked on, which is the point.
-  await publish("copilot.text", {
-    answerMessageId: job.answerMessageId,
-    text: answer.text,
-  });
-
+  const answer = answered.answer;
   const spent = answer.costUsd ?? 0;
   const overBudget = spent > capUsd;
+  const stoppedPartway =
+    answered.kind === "partial"
+      ? "The provider stopped partway through this answer. What arrived is kept."
+      : null;
 
   await callAction(context, "copilot.completeRun", {
     answerMessageId: job.answerMessageId,
@@ -232,12 +306,14 @@ export async function runCopilotAnswer(
             `${capUsd}. The next run will halt before starting until an ` +
             "administrator raises it.",
         }
-      : {}),
+      : stoppedPartway === null
+        ? {}
+        : { haltedReason: stoppedPartway }),
   });
 
   await publish("copilot.done", {
     answerMessageId: job.answerMessageId,
-    haltedReason: null,
+    haltedReason: stoppedPartway,
   });
 
   return {
@@ -245,4 +321,166 @@ export async function runCopilotAnswer(
     haltedReason: null,
     sources: prepared.sources,
   };
+}
+
+/** How long published words wait to be joined by the next ones, at most. */
+const PUBLISH_EVERY_MS = 60;
+
+/**
+ * How much text one published event may carry. NOTIFY refuses a payload past
+ * 8000 bytes and a character may take four, so this stays well under it.
+ */
+const PUBLISH_AT_CHARACTERS = 1_000;
+
+type Answered =
+  | { readonly kind: "whole"; readonly answer: GroundedAnswer }
+  | { readonly kind: "partial"; readonly answer: GroundedAnswer }
+  | { readonly kind: "stopped"; readonly text: string }
+  | { readonly kind: "empty" }
+  | { readonly kind: "failed" };
+
+/** How often a running answer asks whether its member pressed Stop (W4). */
+const STOP_CHECK_EVERY_MS = 750;
+
+/**
+ * Whether the member stopped this run, asked no more often than
+ * `STOP_CHECK_EVERY_MS` unless `now` is true. Read through the thread, the
+ * member's own read, rather than by a query of its own. A read that fails is
+ * not a stop: the answer carries on.
+ */
+function stopCheck(
+  context: ActionCallContext,
+  job: CopilotRunJob,
+): (now?: boolean) => Promise<boolean> {
+  let askedAt = 0;
+  return async (now = false) => {
+    if (!now && Date.now() - askedAt < STOP_CHECK_EVERY_MS) {
+      return false;
+    }
+    askedAt = Date.now();
+    try {
+      const thread = await callAction(context, "copilot.thread", {
+        threadId: job.threadId,
+      });
+      return (
+        thread.messages.find((message) => message.id === job.answerMessageId)
+          ?.stopped ?? false
+      );
+    } catch {
+      return false;
+    }
+  };
+}
+
+/**
+ * The answer, published as it is written (plan 0.8.1 W1).
+ *
+ * Every answer on a deployment that drains its queue comes this way, and it
+ * used to arrive in one piece at the end: the reader watched nothing for
+ * seconds and then the whole answer. Pieces are joined for up to
+ * `PUBLISH_EVERY_MS`, so a token does not cost a NOTIFY of its own, and the
+ * reader still sees the words come.
+ *
+ * A stream that stops without its `done` keeps what arrived, marked as
+ * stopped partway, which is what the inline path does too.
+ */
+async function streamInto(
+  drafter: AgentDrafter,
+  ask: GroundedQuestionContext,
+  publishText: (text: string) => Promise<void>,
+  stopped: () => Promise<boolean>,
+): Promise<Answered> {
+  let text = "";
+  let pending = "";
+  let flushedAt = 0;
+  let done: GroundedAnswer | null = null;
+  const flush = async () => {
+    if (pending === "") {
+      return;
+    }
+    const piece = pending;
+    pending = "";
+    flushedAt = Date.now();
+    await publishText(piece);
+  };
+  try {
+    // Through the drafter, for the reason `answerQuestion` records.
+    for await (const chunk of drafter.streamGrounded?.(ask) ?? []) {
+      if (chunk.kind === "done") {
+        done = chunk.answer;
+        continue;
+      }
+      text += chunk.text;
+      pending += chunk.text;
+      if (
+        Date.now() - flushedAt >= PUBLISH_EVERY_MS ||
+        pending.length >= PUBLISH_AT_CHARACTERS
+      ) {
+        await flush();
+      }
+      if (await stopped()) {
+        // Leaving the loop ends the provider's stream as well: nothing more
+        // is generated, so nothing more is paid for.
+        await flush();
+        return { kind: "stopped", text: text.trim() };
+      }
+    }
+  } catch {
+    // Handled below by what arrived: nothing, or a partial answer.
+  }
+  await flush();
+  if (done !== null) {
+    return done.text.trim() === ""
+      ? { kind: "empty" }
+      : { kind: "whole", answer: done };
+  }
+  if (text.trim() === "") {
+    return { kind: "failed" };
+  }
+  return {
+    kind: "partial",
+    answer: { text: text.trim(), usedSourceIndexes: [] },
+  };
+}
+
+/** A drafter that cannot stream answers whole, published as one piece. */
+async function wholeInto(
+  drafter: AgentDrafter | undefined,
+  ask: GroundedQuestionContext,
+  publishText: (text: string) => Promise<void>,
+): Promise<Answered> {
+  let answer: GroundedAnswer | null;
+  try {
+    // Through the drafter, never as a detached function: a host's drafter is
+    // often a class instance and `const f = drafter.answerGrounded` loses
+    // `this`. The comment in `answerQuestion` says what that cost once.
+    answer = (await drafter?.answerGrounded?.(ask)) ?? null;
+  } catch {
+    return { kind: "failed" };
+  }
+  if (!answer || answer.text.trim() === "") {
+    return { kind: "empty" };
+  }
+  await publishText(answer.text);
+  return { kind: "whole", answer };
+}
+
+/** Whether this run's answer was already written, by an earlier delivery. */
+async function alreadyAnswered(
+  context: ActionCallContext,
+  job: CopilotRunJob,
+): Promise<boolean> {
+  try {
+    const thread = await callAction(context, "copilot.thread", {
+      threadId: job.threadId,
+    });
+    const answer = thread.messages.find(
+      (message) => message.id === job.answerMessageId,
+    );
+    return answer !== undefined && !answer.running;
+  } catch {
+    // Unreadable is not proof it was answered. The run goes ahead, and
+    // `copilot.completeRun` still refuses a second answer.
+    return false;
+  }
 }

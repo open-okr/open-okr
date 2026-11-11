@@ -664,6 +664,16 @@ describe("parseDataChangeArgs", () => {
     });
   });
 
+  it("reads `run` as the name of the default (plan 0.8.1 U1)", () => {
+    // Early versions needed it, and an operator's upgrade script may still
+    // pass it: the demo server's did, and its 0.8.0 upgrade stopped on it.
+    expect(parseDataChangeArgs(["run"])).toEqual({ status: false });
+    expect(parseDataChangeArgs(["run", "--max-seconds", "240"])).toEqual({
+      status: false,
+      maxSeconds: 240,
+    });
+  });
+
   it.each([
     [["--max-seconds"]],
     [["--max-seconds", "0"]],
@@ -671,6 +681,10 @@ describe("parseDataChangeArgs", () => {
     [["--max-seconds", "2.5"]],
     [["--status", "--max-seconds", "60"]],
     [["--fast"]],
+    // `run` and `--status` ask for opposite things.
+    [["run", "--status"]],
+    [["run", "run"]],
+    [["--status", "run"]],
   ])("refuses %j as a usage error", (argv) => {
     expect(parseDataChangeArgs(argv)).toHaveProperty("usage");
   });

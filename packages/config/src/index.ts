@@ -14,5 +14,5 @@ export {
   trustedProxyHops,
   // The extension is required. Bundlers resolve it either way, but a plain
   // `node --experimental-strip-types` entry point does not, and that is how
-  // db:migrate, db:seed and db:change run.
+  // the db:migrate, db:seed and db:change commands are started.
 } from "./env.ts";

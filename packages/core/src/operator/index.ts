@@ -5,6 +5,10 @@
  * `docs/design/operator-console.md`.
  */
 export {
+  adoptWorkspacesAsOperator,
+  countWorkspacesAwaitingAdoption,
+} from "./adopt.ts";
+export {
   type DefaultPlanFillResult,
   type DefaultPlanReview,
   fillDefaultPlanAsOperator,

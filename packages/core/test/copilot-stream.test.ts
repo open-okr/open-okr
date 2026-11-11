@@ -196,6 +196,18 @@ afterAll(async () => {
   await wb.close();
 });
 
+/** The kinds in order, without the steps, which have their own tests (W2). */
+const kindsOf = (events: readonly CopilotEvent[]) =>
+  events.map((event) => event.kind).filter((kind) => kind !== "step");
+
+/** The steps alone, as the reader is told them (plan 0.8.1 W2). */
+const stepsOf = (events: readonly CopilotEvent[]) =>
+  events.flatMap((event) =>
+    event.kind === "step"
+      ? [event.step === "found" ? `found ${event.count}` : event.step]
+      : [],
+  );
+
 const finished: readonly GroundedChunk[] = [
   { kind: "text", text: "Activation is at 41 per cent" },
   { kind: "text", text: " against a target of sixty." },
@@ -211,20 +223,109 @@ const finished: readonly GroundedChunk[] = [
   },
 ];
 
+describe("the proposal comes first (plan 0.8.1 A2)", () => {
+  /** Streams the finished answer, after proposing whatever it was built with. */
+  class ProposingDrafter extends ScriptedDrafter {
+    readonly #proposal: Awaited<
+      ReturnType<NonNullable<AgentDrafter["proposeAction"]>>
+    >;
+
+    constructor(
+      proposal: Awaited<ReturnType<NonNullable<AgentDrafter["proposeAction"]>>>,
+    ) {
+      super(finished);
+      this.#proposal = proposal;
+    }
+
+    async proposeAction() {
+      return this.#proposal;
+    }
+  }
+
+  it("sends the card before the words, and tells the answer what it proposes", async () => {
+    const drafter = new ProposingDrafter({
+      action: "goals.create",
+      fields: {
+        title: "Open the partner channel",
+        level: "team",
+        spaceNumber: 1,
+      },
+      why: "You asked for an objective on partners.",
+    });
+    const events = await drain(
+      drafter,
+      "Create an objective for the partner channel",
+    );
+    expect(kindsOf(events)).toEqual([
+      "thread",
+      "sources",
+      "proposal",
+      "text",
+      "text",
+      "done",
+    ]);
+    expect(drafter.seen[0]?.proposal).toMatchObject({
+      made: true,
+      label: "Create an objective",
+    });
+  });
+
+  it("tells the answer no card was made, and sends none", async () => {
+    const drafter = new ProposingDrafter(null);
+    const events = await drain(drafter, "Record a check-in of 42%");
+    expect(kindsOf(events)).not.toContain("proposal");
+    expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+  });
+});
+
+describe("the steps a reader is told (plan 0.8.1 W2)", () => {
+  it("names each step before the first word, in the order they happen", async () => {
+    class Proposing extends ScriptedDrafter {
+      async proposeAction() {
+        return null;
+      }
+    }
+    const events = await drain(new Proposing(finished), "How is activation?");
+    expect(stepsOf(events)).toEqual([
+      "searching",
+      "found 1",
+      "proposing",
+      "writing",
+    ]);
+    // Every step comes before the first word.
+    const firstText = events.findIndex((event) => event.kind === "text");
+    const lastStep = events.findLastIndex((event) => event.kind === "step");
+    expect(lastStep).toBeLessThan(firstText);
+  });
+
+  it("does not say it is preparing a change when nothing could be proposed", async () => {
+    const events = await drain(
+      new ScriptedDrafter(finished),
+      "How is activation?",
+    );
+    expect(stepsOf(events)).toEqual(["searching", "found 1", "writing"]);
+  });
+
+  it("with AI off, says what it searched and found, and nothing that implies a model", async () => {
+    const events = await drain(undefined, "How is activation?");
+    expect(stepsOf(events)).toEqual(["searching", "found 1"]);
+  });
+});
+
 describe("a stream that finishes", () => {
   it("opens with the thread, then the passages, then the words", async () => {
     const events = await drain(
       new ScriptedDrafter(finished),
       "How is mid-market activation?",
     );
-    expect(events.map((event) => event.kind)).toEqual([
+    expect(kindsOf(events)).toEqual([
       "thread",
       "sources",
       "text",
       "text",
       "done",
     ]);
-    const sources = events[1];
+    const sources = events.find((event) => event.kind === "sources");
     if (sources?.kind !== "sources") {
       throw new Error("the second event was not the passages");
     }
@@ -383,13 +484,13 @@ describe("a stopped answer is still a turn", () => {
 describe("with no streaming provider", () => {
   it("sends the passages and says why there is no prose", async () => {
     const events = await drain(undefined, "How is activation?");
-    expect(events.map((event) => event.kind)).toEqual([
+    expect(kindsOf(events)).toEqual([
       "thread",
       "sources",
       "unavailable",
       "done",
     ]);
-    const reason = events[2];
+    const reason = events.find((event) => event.kind === "unavailable");
     if (reason?.kind !== "unavailable") {
       throw new Error("the third event was not the reason");
     }

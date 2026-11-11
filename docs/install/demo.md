@@ -104,15 +104,21 @@ COMPOSE_FILE=compose.yaml:../demo/compose.demo.yaml \
 ```
 
 Then register the first account at the instance's address, and from the
-repository root, with `DATABASE_URL` pointing at the container's Postgres:
+repository root, with `DATABASE_URL` pointing at the container's Postgres and
+`OPENOKR_ENCRYPTION_KEY` set to the instance's own (in
+`deploy/docker/secrets/app.env`):
 
 ```
 pnpm db:seed
+pnpm db:change
 pnpm demo:prepare
 ```
 
 `pnpm db:seed` writes the Northwind year as of today, which takes a minute or
-two. `pnpm demo:prepare` gives the cast accounts, the seven of the one-quarter
+two. `pnpm db:change` runs the data changes the seeded story still needs: it
+fills members' time zones and check-ins' reviewers, and queues the story's
+check-ins and key results for search and the copilot, which cannot find them
+otherwise. `pnpm demo:prepare` gives the cast accounts, the seven of the one-quarter
 demo and the five the year adds, runs the Coach and the Champion once so the
 nudges on screen are ones the product produced, and then puts both agents in
 sandbox. Ben, who leaves in May, is not given one: he is suspended, and could

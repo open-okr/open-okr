@@ -166,6 +166,47 @@ const collect = async (chunks: AsyncIterable<GroundedChunk>) => {
   return { text, joined: text.join(""), done };
 };
 
+describe("what the answer is told about the card (plan 0.8.1 A2)", () => {
+  const lastSent = (provider: ScriptedProvider) =>
+    provider.requests[0]?.messages.at(-1)?.content ?? "";
+
+  it("names the card it may refer to, in the card's own words", async () => {
+    const { drafter, provider } = drafterOver(["There is a card below."]);
+    await collect(
+      streamOf(drafter, {
+        ...question,
+        proposal: {
+          made: true,
+          label: "Add a task",
+          preview: [
+            { label: "Task", value: "Draft the handover note" },
+            { label: "Key result", value: "Trial to paid from 18% to 30%" },
+          ],
+        },
+      }),
+    );
+    const sent = lastSent(provider);
+    expect(sent).toContain('It proposes "Add a task"');
+    expect(sent).toContain("Task: Draft the handover note");
+    expect(sent).toContain("Do not say you cannot make this change");
+  });
+
+  it("says no card was made, and where the person makes the change", async () => {
+    const { drafter, provider } = drafterOver(["I cannot do that yet."]);
+    await drafter.answerGrounded?.({ ...question, proposal: { made: false } });
+    const sent = lastSent(provider);
+    expect(sent).toContain("no change card was made");
+    expect(sent).toContain("a check-in under Check in");
+    expect(sent).toContain("Never describe or promise a card");
+  });
+
+  it("says nothing about cards where none can be shown", async () => {
+    const { drafter, provider } = drafterOver(["Activation is at 41%."]);
+    await drafter.answerGrounded?.(question);
+    expect(lastSent(provider)).not.toContain("change card");
+  });
+});
+
 describe("which feature asked", () => {
   it("is said on every call, for the usage row", async () => {
     const { drafter, provider } = drafterOver(["An answer."]);
@@ -208,7 +249,7 @@ describe("the sentinel line", () => {
     expect(joined.trim()).toBe(
       "Activation is at 41 per cent [1], behind the target.",
     );
-    expect(done).toEqual({
+    expect(done).toMatchObject({
       kind: "done",
       answer: {
         text: "Activation is at 41 per cent [1], behind the target.",
@@ -217,6 +258,39 @@ describe("the sentinel line", () => {
         model: "test-model",
       },
     });
+  });
+
+  it("carries what the provider counted at the end, and its cost (plan 0.8.1 W1)", async () => {
+    const { drafter } = drafterOver(["Behind.\nSOURCES: 1"]);
+    const { done } = await collect(streamOf(drafter, question));
+    if (done?.kind !== "done") {
+      throw new Error("no done chunk");
+    }
+    expect(done.answer.tokensIn).toBe(400);
+    expect(done.answer.tokensOut).toBe(60);
+    expect(done.answer.costUsd).toBeGreaterThan(0);
+    expect(done.answer.costUsd).toBe(drafter.spentUsd());
+  });
+
+  it("carries no count when the provider never reported one", async () => {
+    class Silent extends ScriptedProvider {
+      override async *stream(request: ChatRequest): AsyncIterable<string> {
+        yield* super.stream(request);
+      }
+    }
+    const drafter = createProviderDrafter({
+      provider: new Silent(["Behind.\nSOURCES: 1"]),
+      model: "test-model",
+      costCapUsd: 2,
+      costInPerMillion: 1,
+      costOutPerMillion: 2,
+    });
+    const { done } = await collect(streamOf(drafter, question));
+    if (done?.kind !== "done") {
+      throw new Error("no done chunk");
+    }
+    expect(done.answer.tokensIn).toBeUndefined();
+    expect(done.answer.costUsd).toBeUndefined();
   });
 
   it("arriving whole in one piece is still held back", async () => {
@@ -589,6 +663,109 @@ describe("proposing an action", () => {
     });
     expect(await ask(drafter)).toBeNull();
     expect(provider.requests).toEqual([]);
+  });
+
+  describe("says why it proposed nothing (plan 0.8.1 A3)", () => {
+    const askNoting = async (drafter: AgentDrafter) => {
+      const drops: unknown[] = [];
+      const result = await drafter.proposeAction?.({
+        request: "Create an objective for mid-market activation",
+        options: OPTIONS,
+        sources: [],
+        onDropped: (drop) => drops.push(drop),
+      });
+      return { result, drops };
+    };
+
+    it.each([
+      [
+        "a decline",
+        { propose: false, action: "none", fields: {}, why: "" },
+        { reason: "declined", action: null },
+      ],
+      [
+        "an action it was not offered",
+        {
+          propose: true,
+          action: "people.erase",
+          fields: { memberId: "someone" },
+          why: "Tidying up.",
+        },
+        { reason: "not_offered", action: "people.erase" },
+      ],
+      [
+        "an empty reason",
+        {
+          propose: true,
+          action: "goals.create",
+          fields: { title: "Raise activation", level: "team", spaceNumber: 1 },
+          why: "  ",
+        },
+        { reason: "no_reason", action: "goals.create" },
+      ],
+      [
+        "fields the action cannot use",
+        {
+          propose: true,
+          action: "goals.create",
+          fields: { title: null, level: null, spaceNumber: null },
+          why: "You asked for an objective.",
+        },
+        { reason: "fields_refused", action: "goals.create" },
+      ],
+    ])("names %s", async (_name, reply, expected) => {
+      const { drafter } = request(reply);
+      const { result, drops } = await askNoting(drafter);
+      expect(result).toBeNull();
+      expect(drops).toEqual([expected]);
+    });
+
+    it("names a provider that failed, by its error's class and nothing else", async () => {
+      class Refusing extends ExtractingProvider {
+        override async extract(): Promise<ChatResponse> {
+          throw new TypeError("Create an objective for mid-market activation");
+        }
+      }
+      const drafter = createProviderDrafter({
+        provider: new Refusing("{}"),
+        model: "test-model",
+        costCapUsd: 2,
+        costInPerMillion: 1,
+        costOutPerMillion: 2,
+      });
+      const { result, drops } = await askNoting(drafter);
+      expect(result).toBeNull();
+      expect(drops).toEqual([
+        { reason: "provider_error", action: null, errorName: "TypeError" },
+      ]);
+    });
+
+    it("reports nothing when it proposes something", async () => {
+      const { drafter } = request({
+        propose: true,
+        action: "goals.create",
+        fields: { title: "Raise activation", level: "team", spaceNumber: 2 },
+        why: "You asked for one and the cycle has none.",
+      });
+      const { result, drops } = await askNoting(drafter);
+      expect(result).not.toBeNull();
+      expect(drops).toEqual([]);
+    });
+
+    it("says which provider and model it calls, for the log line", () => {
+      const drafter = createProviderDrafter({
+        provider: new ExtractingProvider("{}"),
+        providerName: "openrouter",
+        model: "openai/gpt-6-luna",
+        costCapUsd: 2,
+        costInPerMillion: 1,
+        costOutPerMillion: 2,
+      });
+      expect(drafter.identity).toEqual({
+        provider: "openrouter",
+        model: "openai/gpt-6-luna",
+      });
+    });
   });
 });
 

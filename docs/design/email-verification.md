@@ -427,3 +427,103 @@ the answer carries the confirmed account and no session. The sign-up form
 then signs in with the password just typed, as the setup wizard's claim
 already does, and shows S4's welcome card. Without it the person was confirmed
 and still shown "check your email".
+
+## 13. Every surface confirms an invited address (plan 0.8.1 S5-R)
+
+S5-Q2 was built on the join page only. Accepting the same personal invitation
+through REST (`POST /api/v1/invitations/accept-link`), the command line
+(`okr invitations accept-link`) or an agent joins the workspace and leaves the
+address unconfirmed, so the same proof counts on one surface and not on three
+(Obed's follow-up after the 0.8.0 acceptance test). Akmal asked for it in 0.8.1
+on 12 November 2026. It changes who counts as confirmed, so it waits for
+"design approved".
+
+### 13.1 Why it cannot simply move into the action
+
+`invitations.acceptLink` runs inside the Operation pipeline's transaction. D14
+says an address is confirmed only through Better Auth's own adapter
+(`$context.internalAdapter.updateUser`), so its user-update hooks run, and never
+by an update of our own. That adapter writes on its own connection, outside the
+transaction, and core may not hold Better Auth anyway. So the action cannot
+confirm the address itself; it can only decide that the address should be, in
+the same transaction that uses the invitation up.
+
+### 13.2 Options
+
+| Option | How | Cost | Outcome |
+|---|---|---|---|
+| **A. The outbox (recommended)** | `acceptLink` reads the account's address and confirmation in its transaction. When the link is personal, its address equals the account's (`invitationConfirms`, the S5 rule) and the account is unconfirmed, it enqueues `auth.confirm_invited_address` with the user id and the link id, in the same transaction. The relay's handler confirms through Better Auth's adapter and appends `auth.email_verified` with `via: "invitation"`, and does nothing for an account already confirmed | One outbox topic and handler; the relay is given the user writer it needs, as it is given the mailer | Every surface, one rule, one place it is decided. Through REST the address is confirmed a moment after the join rather than at once. With `OPENOKR_RELAY=off` nothing drains the queue, so REST leaves it unconfirmed there until a relay runs |
+| B. A post-commit hook on the pipeline | Teach `defineWriteAction` a step that runs after commit, with a user writer on the call context | A change to the pipeline every write goes through, for one action | Immediate on every surface, and a new way for a side effect to bypass the outbox, which CLAUDE.md forbids |
+| C. An update of our own in the transaction | Set `users.email_verified` in `acceptLink` | None | Breaks D14: Better Auth's hooks do not run |
+
+### 13.3 The join page
+
+It keeps its own immediate call (§12.6), because the person is in front of the
+browser and the welcome is the page they land on. The outbox row is still
+written, and its handler finds the address confirmed and does nothing, so
+`auth.email_verified` is appended once. The page could drop its call and rely
+on the handler, at the cost of a few seconds and of nothing on `OPENOKR_RELAY=off`;
+recommended: keep it.
+
+### 13.4 Security
+
+The proof is the one S5 accepted: the invitation's token reached that mailbox.
+Over REST the caller is a signed-in account or one of its tokens, which is the
+account the join page would have, and the address must still equal the
+invitation's. A shared link, a different address and an already confirmed
+account enqueue nothing. The payload carries identifiers only, so nothing needs
+redacting on delivery.
+
+### 13.5 Acceptance criteria
+
+```
+Given an unconfirmed account priya@example.com and a personal invitation to that address
+When Priya accepts it through REST or `okr invitations accept-link`
+Then she joins, and once the relay has run her account is confirmed
+And the instance chain holds auth.email_verified with via "invitation"
+
+Given the same invitation
+When an account other@example.com tries to accept it through REST
+Then it is refused as today ("issued to a different email address") and nothing is enqueued
+
+Given a shared workspace link, or an account already confirmed
+When it is accepted through any surface
+Then nothing is enqueued
+
+Given Priya accepts on the join page
+When the relay later runs the row
+Then she was confirmed at once, and auth.email_verified appears once
+```
+
+### 13.6 Tests
+
+| Test | Kind |
+|---|---|
+| Each criterion of §13.5, driving `acceptLink` and then the handler through `dispatchOutbox` | Core, against a real database, beside `invited-address-confirmed.test.ts` |
+| The REST route enqueues the row | `apps/web` route test |
+
+### 13.7 Questions
+
+| # | Question | Recommended |
+|---|---|---|
+| S5R-Q1 | How does the action get the address confirmed? | **A, the outbox**: decided in the action's own transaction, confirmed by the relay through Better Auth (D14) |
+| S5R-Q2 | Does the join page keep its immediate confirmation? | **Yes**: the person in front of the browser lands on the welcome, and the handler then does nothing |
+
+**"Design approved" by Akmal on 12 November 2026**, S5R-Q1 and S5R-Q2 as
+recommended.
+
+### 13.8 As built (S5-R)
+
+Built on 12 November 2026 on `release-0.8.1`.
+
+| Piece | Where |
+|---|---|
+| The decision, in the transaction that uses the link up | `invitations.acceptLink`: a personal link reaching the end was already compared with the account's address, so it enqueues `auth.confirm_invited_address` when the account is unconfirmed. Payload: workspace, account and link ids, nothing else |
+| The confirmation | `confirmInvitedAddress` in `packages/core/src/outbox/handlers.ts`. Skips an account that is gone or already confirmed, and one whose address is no longer the invitation's; with no writer it throws, so the row is retried rather than skipped |
+| The writer | `confirmAddressThrough(auth)` in `packages/core/src/auth/invited-address.ts`, given to the relay as `confirmUserEmail` by `apps/web/lib/relay.ts` |
+| Tests | `packages/core/test/invited-address-confirmed.test.ts`, "accepting a personal invitation on any surface". REST, the command line and an agent are projections that call `invitations.acceptLink`, so the action's test covers them; no separate route test |
+
+**Corrected while building.** §13.5 first said an account with another address
+joins unconfirmed through the same invitation. It cannot: `acceptLink` already
+refuses a personal invitation from any other address, on every surface. The
+criterion now says so.

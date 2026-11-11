@@ -119,7 +119,34 @@ export interface GroundedQuestionContext {
   }[];
   /** What retrieval found. An empty list means answer from nothing. */
   readonly sources: readonly GroundingSource[];
+  /**
+   * Whether a change card was made for this question, asked before the answer
+   * (plan 0.8.1 A2). Absent where no card can be shown, such as a chat
+   * channel's Ask, and the answer then says nothing about cards either way.
+   */
+  readonly proposal?: ProposalNote;
 }
+
+/**
+ * What the answer is told about the card beside it (plan 0.8.1 A2).
+ *
+ * The answer used to be written at the same time as the proposal, so it could
+ * only guess, and it said "I cannot create objectives" right above a working
+ * card. Now the proposal comes first and the answer is told the outcome, so it
+ * can only say what is true.
+ */
+export type ProposalNote =
+  | {
+      readonly made: true;
+      /** What the card proposes, in the words the card uses: "Add a task". */
+      readonly label: string;
+      /** The card's own preview lines. */
+      readonly preview: readonly {
+        readonly label: string;
+        readonly value: string;
+      }[];
+    }
+  | { readonly made: false };
 
 /** A grounded answer, with what it actually used and what it cost. */
 export interface GroundedAnswer {
@@ -174,6 +201,39 @@ export interface ProposalOption {
   readonly choices: Readonly<Record<string, readonly string[]>>;
 }
 
+/**
+ * Why a request ended with no proposal (plan 0.8.1 A3).
+ *
+ * `declined` is the model saying the request is not a change, which is the
+ * common case and is not logged. Every other reason is a reply or a call the
+ * product could not use, and those are the ones nobody saw until a live test
+ * found the strict-output bug (M2).
+ */
+export const PROPOSAL_DROP_REASONS = [
+  "declined",
+  "not_offered",
+  "no_reason",
+  "fields_refused",
+  "build_refused",
+  "provider_error",
+] as const;
+
+export type ProposalDropReason = (typeof PROPOSAL_DROP_REASONS)[number];
+
+/**
+ * One dropped proposal, as the drafter reports it.
+ *
+ * **Never the member's words, the fields or the reply.** `action` is a registry
+ * name or null, and `errorName` is a class name. Anything else a model wrote is
+ * a member's request quoted back, and a log is the wrong place for it.
+ */
+export interface ProposalDrop {
+  readonly reason: ProposalDropReason;
+  readonly action: string | null;
+  /** For `provider_error` only: the thrown error's class name. */
+  readonly errorName?: string;
+}
+
 /** What the copilot is asked to turn into a proposal. */
 export interface ProposalRequestContext {
   /** What the member asked for, in their words. */
@@ -181,6 +241,11 @@ export interface ProposalRequestContext {
   readonly options: readonly ProposalOption[];
   /** What retrieval found, so a proposal can build on what is already there. */
   readonly sources: readonly GroundingSource[];
+  /**
+   * Told why, each time the answer is null (plan 0.8.1 A3). Optional, so a
+   * caller that does not care, and a drafter that cannot say, both still work.
+   */
+  readonly onDropped?: (drop: ProposalDrop) => void;
 }
 
 /**
@@ -768,4 +833,15 @@ export interface AgentDrafter {
   ): Promise<readonly DraftedInitiative[] | null>;
   /** Dollars spent so far, for the run row and the §4.14 cap. */
   spentUsd(): number;
+  /**
+   * Which provider and model this drafter calls, for a log line that has to
+   * say (plan 0.8.1 A3). Not a capability: nothing asks it for language.
+   */
+  readonly identity?: DrafterIdentity;
+}
+
+/** The provider's name, as a workspace configured it, and the model's id. */
+export interface DrafterIdentity {
+  readonly provider: string;
+  readonly model: string;
 }

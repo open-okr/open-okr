@@ -308,7 +308,9 @@ export async function AppShellLayout({
 
   // Read here rather than inside the panel so the first open needs no round
   // trip, and so a provider-off workspace renders its own state on the server
-  // instead of flashing an input it cannot use.
+  // instead of flashing an input it cannot use. It never throws past the
+  // session check (plan 0.8.1 CP8): a failure is the copilot unavailable,
+  // never this page.
   const copilot = await copilotAvailabilityAction();
   // The same question for the palette's Related group (completeness review
   // M-21): asked here so a workspace with no embedding model, or one whose

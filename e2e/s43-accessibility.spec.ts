@@ -520,6 +520,43 @@ for (const route of CHECKED) {
   });
 }
 
+/**
+ * **The copilot panel, in the states a person meets** (plan 0.8.1 W3).
+ *
+ * The panel is not a route, so the walk above never opens it. Scanned here
+ * empty with AI off, in History, and holding a conversation, which is every
+ * state this instance can reach without an AI provider.
+ */
+test("the copilot panel has no serious accessibility findings", async () => {
+  await goTo(page, "/");
+  await expect(
+    page.getByRole("navigation", { name: "Primary" }).first(),
+  ).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Ask the copilot" }).click();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  await assertAccessible("copilot panel, empty", page);
+
+  await panel
+    .getByRole("textbox")
+    .fill("What have people said about onboarding?");
+  await panel.getByRole("button", { name: "Send the question" }).click();
+  await expect(panel.getByRole("log", { name: "Conversation" })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(panel.locator("article[aria-busy]")).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  await assertAccessible("copilot panel, a conversation", page);
+
+  await panel.getByRole("button", { name: "History" }).click();
+  await expect(panel.getByRole("navigation", { name: "History" })).toBeVisible(
+    { timeout: 15_000 },
+  );
+  await assertAccessible("copilot panel, History", page);
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+});
+
 for (const route of SIGNED_OUT) {
   test(`${route}, signed out, has no serious accessibility findings`, async ({
     browser,

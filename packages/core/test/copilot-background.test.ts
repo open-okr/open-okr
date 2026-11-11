@@ -17,7 +17,11 @@
  * handler is wired the same way. A row enqueued with no handler dead-letters,
  * and a test that skipped the dispatcher would not notice.
  */
-import type { AgentDrafter, GroundedQuestionContext } from "@openokr/core";
+import type {
+  AgentDrafter,
+  GroundedChunk,
+  GroundedQuestionContext,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -64,6 +68,48 @@ class BrokenDrafter implements AgentDrafter {
   async answerGrounded(): Promise<never> {
     throw new Error("the provider fell over");
   }
+  spentUsd() {
+    return 0;
+  }
+}
+
+/**
+ * Streams its pieces with a pause between them, as a model writes (plan 0.8.1
+ * W1). With `stopAfter`, the stream falls over after that many pieces.
+ */
+class StreamingDrafter implements AgentDrafter {
+  readonly #pieces: readonly string[];
+  readonly #stopAfter: number | null;
+
+  constructor(pieces: readonly string[], stopAfter: number | null = null) {
+    this.#pieces = pieces;
+    this.#stopAfter = stopAfter;
+  }
+
+  async *streamGrounded(): AsyncIterable<GroundedChunk> {
+    let sent = 0;
+    for (const piece of this.#pieces) {
+      if (this.#stopAfter !== null && sent === this.#stopAfter) {
+        throw new Error("the provider fell over");
+      }
+      // Longer than the run's joining window, so each piece is its own event.
+      await new Promise((resolve) => setTimeout(resolve, 90));
+      sent += 1;
+      yield { kind: "text", text: piece };
+    }
+    yield {
+      kind: "done",
+      answer: {
+        text: this.#pieces.join(""),
+        usedSourceIndexes: [0],
+        model: "test-model",
+        tokensIn: 300,
+        tokensOut: 40,
+        costUsd: 0.002,
+      },
+    };
+  }
+
   spentUsd() {
     return 0;
   }
@@ -122,6 +168,10 @@ const answers = async () => {
   return rows;
 };
 
+/** The events in order, without the steps, which have their own test (W2). */
+const eventsOf = (published: readonly { event: string }[]) =>
+  published.map((one) => one.event).filter((event) => event !== "copilot.step");
+
 /** Drives the enqueued run the way the relay does, and collects what it published. */
 const drive = async (
   drafter: AgentDrafter | null,
@@ -129,6 +179,8 @@ const drive = async (
     readonly skipped?: string[];
     /** Who the host was asked to build the drafter for (M-36). */
     readonly askedFor?: (readonly [string, string | undefined])[];
+    /** Called with each event as it is published, before the run goes on. */
+    readonly onPublish?: (event: string) => Promise<void>;
   } = {},
 ) => {
   const wb = await workerDb();
@@ -136,7 +188,11 @@ const drive = async (
   if (!row) {
     throw new Error("nothing enqueued a copilot run");
   }
-  const published: { channel: string; event: string }[] = [];
+  const published: {
+    channel: string;
+    event: string;
+    data?: Record<string, unknown>;
+  }[] = [];
   await dispatchOutbox(
     {
       topic: row.topic,
@@ -150,8 +206,9 @@ const drive = async (
         options.askedFor?.push([id, forUser]);
         return drafter;
       },
-      async publish(channel, event) {
-        published.push({ channel, event });
+      async publish(channel, event, data) {
+        published.push({ channel, event, data });
+        await options.onPublish?.(event);
       },
       onSkipped: (_delivery, reason) => options.skipped?.push(reason),
     },
@@ -278,7 +335,7 @@ describe("the run, with nobody watching", () => {
     expect(answer?.run_halted_reason).toBeNull();
     expect(answer?.cost).toBe("0.010000");
 
-    expect(published.map((one) => one.event)).toEqual([
+    expect(eventsOf(published)).toEqual([
       "copilot.sources",
       "copilot.text",
       "copilot.done",
@@ -288,6 +345,170 @@ describe("the run, with nobody watching", () => {
         `workspace:${workspaceId}:copilot:${started.threadId}`,
       );
     }
+  });
+
+  it("publishes the words as they are written (plan 0.8.1 W1)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(
+      new StreamingDrafter(["Sixty ", "per cent ", "by June."]),
+    );
+
+    expect(eventsOf(published)).toEqual([
+      "copilot.sources",
+      "copilot.text",
+      "copilot.text",
+      "copilot.text",
+      "copilot.done",
+    ]);
+    expect(
+      published
+        .filter((one) => one.event === "copilot.text")
+        .map((one) => one.data?.text),
+    ).toEqual(["Sixty ", "per cent ", "by June."]);
+    // Recorded whole at the end, with what the provider counted.
+    const [answer] = await answers();
+    expect(answer?.content).toBe("Sixty per cent by June.");
+    expect(answer?.cost).toBe("0.002000");
+  });
+
+  it("keeps what arrived when the provider stops partway, and says so (plan 0.8.1 W1)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(
+      new StreamingDrafter(["Sixty ", "per cent ", "by June."], 2),
+    );
+
+    const [answer] = await answers();
+    expect(answer?.content).toBe("Sixty per cent");
+    expect(answer?.run_halted_reason).toContain("stopped partway");
+    expect(published.at(-1)).toMatchObject({
+      event: "copilot.done",
+      data: { haltedReason: expect.stringContaining("stopped partway") },
+    });
+  });
+
+  it("publishes each step before the first word (plan 0.8.1 W2)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(new FixedDrafter("Sixty per cent by June."));
+    const steps = published
+      .filter((one) => one.event === "copilot.step")
+      .map((one) => one.data?.step);
+    expect(steps).toEqual(["searching", "found", "writing"]);
+    const lastStep = published.findLastIndex(
+      (one) => one.event === "copilot.step",
+    );
+    const firstText = published.findIndex(
+      (one) => one.event === "copilot.text",
+    );
+    expect(lastStep).toBeLessThan(firstText);
+    expect(
+      published.find((one) => one.data?.step === "found")?.data?.count,
+    ).toBe(1);
+  });
+
+  describe("Stop (plan 0.8.1 W4)", () => {
+    const PIECES = Array.from({ length: 14 }, (_, at) => `piece${at + 1} `);
+
+    it("ends the run where the member stopped it, keeping what arrived", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { threadId: string; answerMessageId: string };
+
+      let stopped = false;
+      const published = await drive(new StreamingDrafter(PIECES), {
+        // The member presses Stop once the first words are on screen.
+        onPublish: async (event) => {
+          if (event === "copilot.text" && !stopped) {
+            stopped = true;
+            const result = (await call("copilot.stopRun", {
+              answerMessageId: started.answerMessageId,
+            })) as { stopped: boolean };
+            expect(result.stopped).toBe(true);
+          }
+        },
+      });
+
+      const [answer] = await answers();
+      expect(answer?.content.startsWith("piece1")).toBe(true);
+      // Fewer pieces than the model would have written.
+      expect(answer?.content.split(" ").length).toBeLessThan(PIECES.length);
+      expect(answer?.run_completed_at).not.toBeNull();
+      expect(answer?.run_halted_reason).toBeNull();
+      expect(published.at(-1)).toMatchObject({
+        event: "copilot.done",
+        data: { stopped: true },
+      });
+
+      const thread = (await call("copilot.thread", {
+        threadId: started.threadId,
+      })) as {
+        messages: { role: string; stopped: boolean; running: boolean }[];
+      };
+      const turn = thread.messages.find((one) => one.role === "assistant");
+      expect(turn).toMatchObject({ stopped: true, running: false });
+    });
+
+    it("stops before a word is written when pressed during the search", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      await call("copilot.stopRun", {
+        answerMessageId: started.answerMessageId,
+      });
+
+      // A run that is no longer running when it starts does nothing at all:
+      // no search, no proposal, nothing paid for.
+      const published = await drive(new StreamingDrafter(PIECES));
+      expect(published).toEqual([]);
+      const [answer] = await answers();
+      expect(answer?.content).toBe("");
+    });
+
+    it("says it stopped nothing when the answer had already ended", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      await drive(new FixedDrafter("Sixty per cent by June."));
+
+      const result = (await call("copilot.stopRun", {
+        answerMessageId: started.answerMessageId,
+      })) as { stopped: boolean };
+      expect(result.stopped).toBe(false);
+      const [answer] = await answers();
+      expect(answer?.content).toBe("Sixty per cent by June.");
+    });
+
+    it("cannot be pressed by anybody but the member who asked", async () => {
+      const started = (await call("copilot.ask", {
+        question: QUESTION,
+        background: true,
+      })) as { answerMessageId: string };
+      const wb = await workerDb();
+      // Another member of the same workspace, as the proposals test makes one.
+      await wb.admin.query(
+        "insert into users (id, name, email) values ('background-other', 'Other', 'background-other@example.com')",
+      );
+      await wb.admin.query(
+        `insert into workspace_members (id, workspace_id, user_id, name, status)
+         values (gen_random_uuid(), $1, 'background-other', 'Other', 'active')`,
+        [workspaceId],
+      );
+      await expect(
+        callAction(
+          {
+            pool: wb.appPool,
+            workspaceId,
+            actor: { kind: "human", userId: "background-other" },
+          },
+          "copilot.stopRun",
+          { answerMessageId: started.answerMessageId },
+        ),
+      ).rejects.toThrow();
+      const [answer] = await answers();
+      expect(answer?.run_completed_at).toBeNull();
+    });
   });
 
   it("is safe to run twice, because the relay delivers at least once", async () => {
@@ -303,6 +524,93 @@ describe("the run, with nobody watching", () => {
     const rows = await answers();
     expect(rows).toHaveLength(1);
     expect(rows[0]?.content).toBe("Once.");
+  });
+
+  describe("the proposal comes first (plan 0.8.1 A2)", () => {
+    /** Proposes an objective in the first space, then answers. */
+    class ProposingDrafter extends FixedDrafter {
+      proposals = 0;
+      readonly #propose: boolean;
+
+      constructor(propose: boolean) {
+        super("There is a card for that below.");
+        this.#propose = propose;
+      }
+
+      async proposeAction() {
+        this.proposals += 1;
+        return this.#propose
+          ? {
+              action: "goals.create",
+              fields: {
+                title: "Open the partner channel",
+                level: "team",
+                spaceNumber: 1,
+              },
+              why: "You asked for an objective on partners.",
+            }
+          : null;
+      }
+    }
+
+    const storedProposals = async () => {
+      const wb = await workerDb();
+      const { rows } = await wb.admin.query<{ action: string }>(
+        "select action from proposed_changes",
+      );
+      return rows;
+    };
+
+    it("tells the answer about the card, and publishes it before the answer", async () => {
+      await call("copilot.ask", {
+        question: "Create an objective for the partner channel",
+        background: true,
+      });
+      const drafter = new ProposingDrafter(true);
+      const published = await drive(drafter);
+
+      expect(eventsOf(published)).toEqual([
+        "copilot.sources",
+        "copilot.proposal",
+        "copilot.text",
+        "copilot.done",
+      ]);
+      expect(drafter.seen[0]?.proposal).toMatchObject({
+        made: true,
+        label: "Create an objective",
+        preview: expect.arrayContaining([
+          { label: "Objective", value: "Open the partner channel" },
+        ]),
+      });
+      expect(await storedProposals()).toEqual([{ action: "goals.create" }]);
+    });
+
+    it("tells the answer when no card was made", async () => {
+      await call("copilot.ask", {
+        question: "Record a check-in of 42% on activation",
+        background: true,
+      });
+      const drafter = new ProposingDrafter(false);
+      const published = await drive(drafter);
+
+      expect(eventsOf(published)).not.toContain("copilot.proposal");
+      expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+      expect(await storedProposals()).toEqual([]);
+    });
+
+    it("makes no second card when the run is delivered twice", async () => {
+      await call("copilot.ask", {
+        question: "Create an objective for the partner channel",
+        background: true,
+      });
+      await drive(new ProposingDrafter(true));
+      const again = new ProposingDrafter(true);
+      await drive(again);
+
+      expect(again.proposals).toBe(0);
+      expect(await storedProposals()).toHaveLength(1);
+      expect(await answers()).toHaveLength(1);
+    });
   });
 
   it("says so when the provider will not answer", async () => {

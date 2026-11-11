@@ -114,6 +114,7 @@ export type {
   DraftedInitiative,
   DraftedKeyResult,
   DraftedObjective,
+  DrafterIdentity,
   FilterContext,
   GroundedAnswer,
   GroundedChunk,
@@ -128,6 +129,9 @@ export type {
   ParsedFilter,
   PlannedRun,
   PlanRunContext,
+  ProposalDrop,
+  ProposalDropReason,
+  ProposalNote,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,
@@ -146,6 +150,7 @@ export type {
   TrendContext,
   TrendPoint,
 } from "./agents/drafter.ts";
+export { PROPOSAL_DROP_REASONS } from "./agents/drafter.ts";
 export {
   AGENT_RUN_CHANGED_TOPIC,
   type AgentRunChangedEvent,
@@ -542,6 +547,8 @@ export {
 } from "./auth/caller-address.ts";
 export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
 export {
+  CONFIRM_INVITED_ADDRESS_TOPIC,
+  confirmAddressThrough,
   confirmByAcceptedInvitation,
   invitationConfirms,
 } from "./auth/invited-address.ts";
@@ -819,6 +826,8 @@ export {
   type AnswerSource,
   answerQuestion,
   type CopilotEvent,
+  type CopilotStep,
+  copilotStepFrom,
   GROUNDING_LIMIT,
   streamAnswer,
 } from "./copilot/answer.ts";
@@ -848,6 +857,7 @@ export {
   reversalFor,
 } from "./copilot/proposals.ts";
 export { sweepEndedCycles } from "./cycles/closing.ts";
+export { cyclesOpenForWork, openForWork } from "./cycles/open-for-work.ts";
 export {
   type BuildDemoResult,
   buildDemoWorkspace,
@@ -1136,7 +1146,9 @@ export { type Comparable, sameField } from "./operations/unchanged.ts";
 // The cloud operator console (P8-T03a, P8-T03b). Two modules, and the
 // boundary gate lets only these touch `tenants`.
 export {
+  adoptWorkspacesAsOperator,
   type CloudPreflightWarning,
+  countWorkspacesAwaitingAdoption,
   createSiteMessage,
   createWorkspaceAsOperator,
   type DefaultPlanFillResult,

@@ -206,7 +206,13 @@ export function RoleMatrix({
                                 }),
                               )
                             }
-                            inputClassName="h-7 px-1.5 text-xs"
+                            // `w-auto`, so the browser sizes the select to its
+                            // widest choice in whatever language is showing.
+                            // At the kit's `w-full` a percentage width counts
+                            // as nothing when the table shares out its width,
+                            // and the columns shrank until "Manage" read
+                            // "Man" (Q-10d, 0.8.0 acceptance test).
+                            inputClassName="h-7 w-auto px-1.5 text-xs"
                           >
                             {LEVELS.map((entry) => (
                               <option key={entry.value} value={entry.value}>

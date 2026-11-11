@@ -213,6 +213,25 @@ Each row is one change and one commit.
 
 L4 does not need the loop and can be built first if edits matter more than answers.
 
+**L7 split, Akmal, 11 November 2026.** L7 moved into 0.8.1 for the two prompts that exist then, the answer and the proposal, measured by the evaluation sets and a live run of the §1 questions (`docs/plans/release-0.8.1.md` §2.2). The tool loop's prompt is tuned as **L7b** once L2 and L5 land, in 0.9.0.
+
+**L7 as built, 12 November 2026.** Run live as Priya on a freshly seeded
+Northwind year, the design's §1 questions through the real path (search, the
+proposal first, the streamed answer), before and after:
+
+| Misread on Luna | Prompt change | After |
+|---|---|---|
+| "What did my last check-in say?" answered with somebody else's check-in, as "your last check-in said" | A passage is nobody's in particular unless it says so; say when the passages do not show which is theirs | "The passages don't identify which check-in is yours" |
+| With a card on screen: "the passages don't specify an objective" | The product's note about a card is true; a card means the change is prepared for review, said first | "A change card is prepared for your review" on every card |
+| A request naming a key result not on the list got a card on the nearest one | Propose nothing when the request names an item that is not on the list | Requests that name what is on the list get exactly that card; "my activation key result" with none open still maps to the setup key result, a defensible reading the answer names |
+| Answers wrote Markdown the panel showed raw | The answer may use bold, italics, lists and inline code, never headings, tables or links (rendered by CP4) | |
+
+Each misread is a fixture in `packages/agents/src/evaluation/sets.ts`. Reading
+answers about values, health, owners and statuses still say the passages do
+not hold them, which is L1 to L3's work. The first word arrives six to ten
+seconds after the question on Luna, most of it the proposal call A2 put first;
+the W2 step line says what is happening meanwhile.
+
 ## 9. Acceptance criteria
 
 1. **Given** Priya's objective at 34.74% and on track, **when** she asks how it is doing, **then** the answer gives the progress and health, names its two key results with their values and targets, and links each.
@@ -239,5 +258,5 @@ L4 does not need the loop and can be built first if edits matter more than answe
 | D6 | Recording the copilot's reads | **In `ai_tool_calls`, beside the agent surface's (migration 1)** | Not recorded. Cheaper, but nobody can see what the model read on whose behalf |
 | D7 | Limits | **Fixed: 4 rounds, 6 reads a round, 6,000 characters a result. Not settings** | Make them workspace settings. Every setting is something to explain and default; these have no reason to differ between workspaces yet |
 | D8 | Model | Recommended: Sonnet 5.5 for `balanced`. **Chosen: GPT-6 Luna as the default for `fast` and `balanced` on OpenRouter**, with the prompts tuned to it (L7). Live on 11 November it filled every proposal and, with one token budget raised, passed all 24 evaluation sets; on reading questions it misread more than the Claude models, which is what L7 is for | Sonnet 4.5 or 5.5: more careful readers, thirty times the price |
-| D9 | Order | **The three bug fixes first (0.8.1), then L4, then L1 to L3, L5, L6, L7 (0.9.0)** | The loop first. Answers matter more to you than edits, but edits need no port change and are the smaller, safer step |
+| D9 | Order | **The three bug fixes first (0.8.1), then L4, then L1 to L3, L5, L6, L7 (0.9.0)**. On 11 November 2026 Akmal also put L7, for the answer and proposal prompts, in 0.8.1; the loop's prompt follows as L7b (§8) | The loop first. Answers matter more to you than edits, but edits need no port change and are the smaller, safer step |
 | D10 | A reason mid-cycle | **The model writes it from the person's words, or the card asks for it (§4.3)**. Proposed beside D8 on 11 November and approved with the design | Leave it to the refusal. Apply then fails with a sentence the panel gives no way to answer |

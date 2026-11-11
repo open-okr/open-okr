@@ -192,10 +192,12 @@ import {
 import {
   ask,
   completeRun,
+  deleteThread,
   readAvailability,
   readThread,
   readThreads,
   recordAnswer,
+  stopRun,
 } from "./copilot.ts";
 import {
   applyProposal,
@@ -649,6 +651,7 @@ export const ACTION_MAP = {
   "tokens.approveDevice": decideDevice,
   "copilot.ask": ask,
   "copilot.completeRun": completeRun,
+  "copilot.stopRun": stopRun,
   "copilot.recordAnswer": recordAnswer,
   "copilot.thread": readThread,
   "copilot.threads": readThreads,
@@ -658,6 +661,7 @@ export const ACTION_MAP = {
   "copilot.applyProposal": applyProposal,
   "copilot.dismissProposal": dismissProposal,
   "copilot.undoProposal": undoProposal,
+  "copilot.deleteThread": deleteThread,
   "blobs.prepareUpload": prepareUpload,
   "blobs.reapOrphans": reapOrphanedBlobs,
   // P6-T04c. Reserves a blob for a file an import found, keeping its uploader.

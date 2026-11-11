@@ -12,7 +12,7 @@
  * anything. A copilot thread belongs to one member, and `copilot.thread`
  * refuses anybody else's, so that check is the whole of what this needs.
  *
- * **What crosses the wire is the same three events the POST forwards**, so the
+ * **What crosses the wire is the same events the POST forwards**, so the
  * panel reads one protocol whether it asked the question in this page load or
  * in the one before it.
  *
@@ -21,7 +21,11 @@
  * as it is produced and persisted when it is finished. `copilot/background.ts`
  * says why a write per chunk is not the alternative.
  */
-import { callAction, copilotThreadChannel } from "@openokr/core";
+import {
+  callAction,
+  copilotStepFrom,
+  copilotThreadChannel,
+} from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getPool } from "../../../../lib/auth";
 import { keepAlive } from "../../../../lib/keep-alive";
@@ -100,6 +104,24 @@ export async function GET(request: NextRequest) {
             send("text", { kind: "text", text: String(data.text ?? "") });
             return;
           }
+          if (event.name === "copilot.step") {
+            // The step a rejoined run is on (plan 0.8.1 W2).
+            const step = copilotStepFrom(data);
+            if (step) {
+              send("step", { kind: "step", ...step });
+            }
+            return;
+          }
+          if (event.name === "copilot.proposal") {
+            // A card made for the question being rejoined (plan 0.8.1 CP3),
+            // so it shows while the answer is still being written, as it
+            // does in the request that asked.
+            const proposalId = data.proposalId;
+            if (typeof proposalId === "string" && proposalId !== "") {
+              send("proposal", { kind: "proposal", proposalId });
+            }
+            return;
+          }
           if (event.name === "copilot.done") {
             const halted = data.haltedReason;
             if (typeof halted === "string" && halted !== "") {
@@ -108,7 +130,7 @@ export async function GET(request: NextRequest) {
             send("done", {
               kind: "done",
               answerMessageId: data.answerMessageId ?? null,
-              stopped: false,
+              stopped: data.stopped === true,
             });
             subscription.unsubscribe().catch(() => undefined);
             controller.close();

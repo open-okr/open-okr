@@ -512,6 +512,91 @@ export const completeRun = defineWriteAction({
 });
 
 /**
+ * Stops a background run, keeping what it has written (plan 0.8.1 W4).
+ *
+ * **Stop used to stop nothing on most deployments.** It cancelled the reader's
+ * request, and a background run is not attached to one: the panel re-read the
+ * thread, saw the run still going and subscribed again, and the answer arrived
+ * anyway. This stamps the answer as stopped. The run checks between pieces of
+ * the answer and ends there, and `copilot.completeRun` then writes what had
+ * arrived into a message that already reads as stopped.
+ *
+ * **Stopping what has already ended is not an error**, because the reader and
+ * the run race: the answer may finish in the same second the button is
+ * pressed. `stopped` says whether this call stopped anything.
+ */
+export const stopRun = defineWriteAction({
+  name: "copilot.stopRun",
+  agentSurface: false,
+  summary: "Stops a background copilot run, keeping what it has written.",
+  input: z.object({ answerMessageId: z.uuid() }),
+  output: z.object({ messageId: z.uuid(), stopped: z.boolean() }),
+  access: ACCESS_LEVELS.comment,
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      const [message] = await tx
+        .select({
+          id: aiMessages.id,
+          threadId: aiMessages.threadId,
+          runStartedAt: aiMessages.runStartedAt,
+          runCompletedAt: aiMessages.runCompletedAt,
+          stoppedAt: aiMessages.stoppedAt,
+        })
+        .from(aiMessages)
+        .where(
+          activeOnly(
+            aiMessages,
+            eq(aiMessages.workspaceId, workspaceId),
+            eq(aiMessages.id, input.answerMessageId),
+          ),
+        )
+        .limit(1);
+      if (!message?.runStartedAt) {
+        throw new OperationError("not_found", "There is no such run.");
+      }
+      // Only the member whose conversation it is may stop it.
+      await ownThread(tx, workspaceId, memberId, message.threadId);
+
+      const running =
+        message.runCompletedAt === null && message.stoppedAt === null;
+      if (running) {
+        await tx
+          .update(aiMessages)
+          .set({ stoppedAt: new Date(), updatedAt: new Date() })
+          .where(
+            activeOnly(
+              aiMessages,
+              eq(aiMessages.workspaceId, workspaceId),
+              eq(aiMessages.id, message.id),
+            ),
+          );
+      }
+
+      return {
+        result: { messageId: message.id, stopped: running },
+        activity: {
+          kind: "copilot.stopped",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          payload: { threadId: message.threadId, stopped: running },
+        },
+        audit: {
+          action: "copilot.stopRun",
+          targetType: "ai_message",
+          targetId: message.id,
+          payload: { threadId: message.threadId, stopped: running },
+        },
+      };
+    },
+  }),
+});
+
+/**
  * Records the answer to the thread's last question.
  *
  * **Citations are stored as the answer's claim about what it used**, filtered
@@ -626,6 +711,70 @@ export const recordAnswer = defineWriteAction({
             citations: citations.length,
             stopped: input.stopped,
           },
+        },
+      };
+    },
+  }),
+});
+
+/**
+ * Deletes one of the caller's own conversations (plan 0.8.1 CP2, review Q4).
+ *
+ * **Soft, on the thread's own `deleted_at`**, so no migration and nothing is
+ * lost to an audit: the messages stay where they are, and every read of a
+ * thread is scoped to live ones, so the conversation leaves the list and its
+ * address answers not-found. Its cards go with it, because a proposal is
+ * reached through its thread.
+ *
+ * Destructive in the registry's sense: it removes something a person can see,
+ * and nothing gives it back, so a token needs the destructive scope for it.
+ * Access is `comment`, the level that asked the questions in it, because the
+ * conversation is the member's own and nobody else's to keep or delete.
+ */
+export const deleteThread = defineWriteAction({
+  name: "copilot.deleteThread",
+  summary: "Deletes one of the caller's own copilot conversations.",
+  input: z.object({ threadId: z.uuid() }),
+  output: z.object({ id: z.uuid() }),
+  access: ACCESS_LEVELS.comment,
+  safety: "destructive",
+  operation: (_context, input) => ({
+    requires: ACCESS_LEVELS.comment,
+    async execute({ tx, workspaceId, actor }) {
+      const memberId = actor.memberId;
+      if (!memberId) {
+        throw new OperationError("not_found", "No such workspace.");
+      }
+      // Somebody else's, or one already deleted, is not-found: the second
+      // press of a slow button records nothing a second time.
+      const thread = await ownThread(tx, workspaceId, memberId, input.threadId);
+
+      await tx
+        .update(aiThreads)
+        .set({ deletedAt: new Date(), updatedAt: new Date() })
+        .where(
+          activeOnly(
+            aiThreads,
+            eq(aiThreads.workspaceId, workspaceId),
+            eq(aiThreads.id, thread.id),
+          ),
+        );
+
+      return {
+        result: { id: thread.id },
+        activity: {
+          kind: "copilot.threadDeleted",
+          subjectType: "workspace",
+          subjectId: workspaceId,
+          // Not the title: it is the member's question, and the activity feed
+          // is the workspace's, for the reason `copilot.ask` gives.
+          payload: { threadId: thread.id },
+        },
+        audit: {
+          action: "copilot.deleteThread",
+          targetType: "ai_thread",
+          targetId: thread.id,
+          payload: {},
         },
       };
     },
@@ -860,6 +1009,12 @@ export const readAvailability = defineReadAction({
      * than showing a stop control for something that cannot be stopped.
      */
     streaming: z.boolean(),
+    /**
+     * When a budget that stopped the copilot lifts by itself, as an ISO time
+     * (plan 0.8.1 CP8). Null when nothing will lift it on its own: no
+     * provider, a switch an administrator turned off, or available.
+     */
+    resetsAt: z.string().nullable(),
   }),
   access: ACCESS_LEVELS.view,
   async handler(context) {
@@ -878,6 +1033,8 @@ export const readAvailability = defineReadAction({
           reason: paused,
           searchAvailable: true,
           streaming: false,
+          // The sentence says "until the 1st" itself.
+          resetsAt: null,
         };
       }
       return {
@@ -890,6 +1047,7 @@ export const readAvailability = defineReadAction({
         // Full-text retrieval needs no provider at all (P4-T13b).
         searchAvailable: true,
         streaming: false,
+        resetsAt: null,
       };
     }
 
@@ -908,6 +1066,10 @@ export const readAvailability = defineReadAction({
       reason: availability.available ? null : (availability.reason ?? null),
       searchAvailable: true,
       streaming,
+      resetsAt:
+        availability.available || !availability.resetsAt
+          ? null
+          : availability.resetsAt.toISOString(),
     };
   },
 });

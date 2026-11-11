@@ -25,6 +25,13 @@ import {
 const VERIFIED_ACTION = "auth.email_verified";
 
 /**
+ * The outbox topic that confirms an invited address after an acceptance on any
+ * surface (plan 0.8.1 S5-R, email-verification.md §13). The action decides in
+ * its own transaction; the relay confirms through Better Auth (D14).
+ */
+export const CONFIRM_INVITED_ADDRESS_TOPIC = "auth.confirm_invited_address";
+
+/**
  * Whether this invitation proves this address: a usable personal invitation
  * issued to it, compared without case or surrounding spaces, as acceptance
  * compares them (`addressMayAccept`).
@@ -73,7 +80,7 @@ export async function recordConfirmedByInvitation(
 }
 
 /** The part of Better Auth's instance this needs: its own user writer. */
-interface UserWriter {
+export interface UserWriter {
   readonly $context: Promise<{
     readonly internalAdapter: {
       updateUser(
@@ -115,4 +122,18 @@ export async function confirmByAcceptedInvitation(
   });
   await recordConfirmedByInvitation(pool, input.userId);
   return true;
+}
+
+/**
+ * Confirms an account's address through Better Auth's own adapter, so its
+ * user-update hooks run (D14). What the relay is given for
+ * `CONFIRM_INVITED_ADDRESS_TOPIC`, built by the host that holds Better Auth.
+ */
+export function confirmAddressThrough(
+  auth: UserWriter,
+): (userId: string) => Promise<void> {
+  return async (userId) => {
+    const context = await auth.$context;
+    await context.internalAdapter.updateUser(userId, { emailVerified: true });
+  };
 }

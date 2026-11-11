@@ -20,10 +20,13 @@
   .pstep.done .nm { color: var(--ink-2); }
   .pk { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); align-items: flex-start; }
   .pk:last-child { border-bottom: 0 }
-  .box { width: 16px; height: 16px; border-radius: 4px; border: 1.5px solid var(--line-2); flex: none; margin-top: 1px;
+  /* The input pack's box as K1 built it (plan 0.8.1): a 24px outline that
+     reads as a checkbox, and a gathered item filled with lucide's Check. The
+     Missing chip beside it says the state, so the box is not red. */
+  .box { width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line-2); flex: none;
     display: grid; place-items: center; background: #fff; }
-  .box.y { background: var(--ok-dot); border-color: var(--ok-dot); }
-  .box.n { border-color: var(--bad-dot); border-style: dashed; }
+  .box.y { background: var(--ok); border-color: var(--ok); }
+  .box svg { width: 14px; height: 14px; color: #fff; }
   .pk .t { font-size: 12.5px; font-weight: 570; }
   .pk .d { font-size: 11.5px; color: var(--ink-3); }
   .blocked { background: var(--warn-bg); border: 1px solid var(--warn-dot); border-radius: var(--r); padding: 11px 12px; }
@@ -75,7 +78,7 @@
         <div class="card" style="overflow:hidden">
           <div class="card-h"><div class="h3">The cycle</div><span class="chip brand" style="margin-left:auto">2 of 8 done</span></div>
           <div class="card-b stagger" style="padding:8px">
-            <div class="pstep done"><div class="mark">✓</div><div><div class="nm">0 · Annual strategy</div><div class="out">The frame for FY2026</div></div></div>
+            <div class="pstep done"><div class="mark"><svg style="width:11px;height:11px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div><div><div class="nm">0 · Annual strategy</div><div class="out">The frame for FY2026</div></div></div>
             <div class="pstep on"><div class="mark">1</div><div><div class="nm">1 · Prepare</div><div class="out">Roles, dates, input pack</div>
               <div class="row" style="margin-top:5px"><div class="bar grow" style="height:5px"><i style="width:57%"></i></div><span class="tiny num mut">57%</span></div></div></div>
             <div class="pstep"><div class="mark">2</div><div><div class="nm">2 · Diagnose</div><div class="out">Scores, baselines, ranked issues</div></div></div>
@@ -105,19 +108,19 @@
           <div class="card grow" style="min-height:0">
             <div class="card-h"><div class="h3">Input pack</div><span class="chip warn" style="margin-left:auto"><i class="dot"></i>4 of 7</span></div>
             <div class="card-b stagger" style="padding:4px 14px">
-              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+              <div class="pk"><div class="box y"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                 <div class="grow"><div class="t">Last cycle's scores and retrospective</div><div class="d">Carried forward automatically from Q2 FY2026</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
-              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+              <div class="pk"><div class="box y"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                 <div class="grow"><div class="t">The annual strategy and annual OKRs</div><div class="d">FY2026 frame · 3 strategies · 4 annual objectives</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
-              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+              <div class="pk"><div class="box y"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                 <div class="grow"><div class="t">KPI baselines and current health</div><div class="d">18 KPIs · 2 outside their corridor</div></div><span class="chip ok"><i class="dot"></i>Auto</span></div>
-              <div class="pk"><div class="box y"><svg style="width:11px;height:11px;color:#fff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><path d="m5 12 5 5L20 7"/></svg></div>
+              <div class="pk"><div class="box y"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
                 <div class="grow"><div class="t">Financial and operational plan</div><div class="d">Uploaded by Sofia Lim · 2 days ago</div></div><span class="chip ok"><i class="dot"></i>Done</span></div>
-              <div class="pk"><div class="box n"></div>
+              <div class="pk"><div class="box"></div>
                 <div class="grow"><div class="t">Customer and market signal</div><div class="d">Assigned to Priya Nair · due in 3 days</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
-              <div class="pk"><div class="box n"></div>
+              <div class="pk"><div class="box"></div>
                 <div class="grow"><div class="t">Capacity and known constraints</div><div class="d">Assigned to Marc Reyes · due in 3 days</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
-              <div class="pk"><div class="box n"></div>
+              <div class="pk"><div class="box"></div>
                 <div class="grow"><div class="t">Confirmed distribution to every participant</div><div class="d">Distribute at least 3 working days before session one</div></div><span class="chip bad"><i class="dot"></i>Missing</span></div>
             </div>
           </div>

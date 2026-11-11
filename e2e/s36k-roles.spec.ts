@@ -74,6 +74,65 @@ test("the four built-in roles are there, and Owner is fixed", async () => {
   ).toHaveCount(0);
 });
 
+/**
+ * How much room each level select in the matrix has left once its widest
+ * choice is drawn, in pixels. Negative means the label is cut.
+ */
+const levelRoom = () =>
+  page.evaluate(() => {
+    const context = document.createElement("canvas").getContext("2d");
+    if (!context) {
+      throw new Error("No canvas to measure the labels with.");
+    }
+    return [...document.querySelectorAll("table select")].map((node) => {
+      const select = node as HTMLSelectElement;
+      const style = getComputedStyle(select);
+      context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const widest = Math.max(
+        ...[...select.options].map(
+          (option) => context.measureText(option.text).width,
+        ),
+      );
+      const room =
+        select.clientWidth -
+        Number.parseFloat(style.paddingLeft) -
+        Number.parseFloat(style.paddingRight);
+      return Math.floor(room - widest);
+    });
+  });
+
+// Q-10d (0.8.0 acceptance test): the columns shrank until "Manage" read
+// "Man". Every cell fits the widest level, in English and in Malay.
+test("every level select fits its widest choice, in English and Malay", async () => {
+  const english = await levelRoom();
+  expect(english.length).toBeGreaterThan(0);
+  expect(Math.min(...english)).toBeGreaterThanOrEqual(0);
+
+  // Malay for this member, then back, so no later spec reads Malay labels.
+  await goTo(page, "/account");
+  await page.getByTestId("language-ms").click();
+  await expect(page.locator("html")).toHaveAttribute("lang", "ms", {
+    timeout: 15_000,
+  });
+  try {
+    await goTo(page, "/admin/roles");
+    await expect(page.locator("table select option").first()).toHaveText(
+      "Tiada",
+      { timeout: 15_000 },
+    );
+    const malay = await levelRoom();
+    expect(malay.length).toBeGreaterThan(0);
+    expect(Math.min(...malay)).toBeGreaterThanOrEqual(0);
+  } finally {
+    await goTo(page, "/account");
+    await page.getByTestId("language-en").click();
+    await expect(page.locator("html")).toHaveAttribute("lang", "en", {
+      timeout: 15_000,
+    });
+    await goTo(page, "/admin/roles");
+  }
+});
+
 test("a cell is changed and read back", async () => {
   // **Written so a retry means the same thing as a first run.** The file runs
   // serial, so a later failure makes Playwright replay the whole of it; the

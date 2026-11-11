@@ -18,7 +18,7 @@
  */
 import type { AgentDrafter, ProposalRequestContext } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { proposeFromRequest } from "../src/copilot/proposals.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
@@ -194,9 +194,15 @@ describe("a proposal the model authored", () => {
       why: string;
       status: string;
       reversible: boolean;
+      createdAt: string;
     }[];
     expect(listed[0]?.status).toBe("pending");
     expect(listed[0]?.reversible).toBe(true);
+    // When it was made, so the panel places it in the turn whose question
+    // made it (plan 0.8.1 CP3).
+    expect(Date.parse(listed[0]?.createdAt ?? "")).not.toBeNaN();
+    // Nothing to link to until it is applied (plan 0.8.1 CP7).
+    expect((listed[0] as { href?: unknown } | undefined)?.href).toBeNull();
     expect(listed[0]?.why).toContain("activation objective");
     // Every identifier in the payload is the product's; the preview reads in
     // words, including the space the model only ever saw as a number.
@@ -244,6 +250,71 @@ describe("a proposal the model authored", () => {
       await propose(new ProposingDrafter(objective({ level: "galactic" }))),
     ).toBeNull();
     expect(await storedProposals()).toEqual([]);
+  });
+
+  it("logs why it was dropped, with none of the member's words (plan 0.8.1 A3)", async () => {
+    const written: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(String(chunk));
+        return true;
+      });
+    try {
+      const drafter = Object.assign(
+        new ProposingDrafter(objective({ spaceNumber: 4 })),
+        { identity: { provider: "openrouter", model: "openai/gpt-6-luna" } },
+      );
+      expect(
+        await propose(drafter, "Create an objective for Priya's onboarding"),
+      ).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+    const lines = written
+      .filter((line) => line.includes("copilot.proposal_dropped"))
+      .map((line) => JSON.parse(line) as Record<string, unknown>);
+    expect(lines).toEqual([
+      expect.objectContaining({
+        reason: "build_refused",
+        action: "goals.create",
+        provider: "openrouter",
+        model: "openai/gpt-6-luna",
+      }),
+    ]);
+    const all = written.join("");
+    expect(all).not.toContain("Priya");
+    expect(all).not.toContain("mid-market");
+  });
+
+  it("logs a drafter that throws as a provider error", async () => {
+    const written: string[] = [];
+    const spy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation((chunk: string | Uint8Array) => {
+        written.push(String(chunk));
+        return true;
+      });
+    try {
+      const throwing: AgentDrafter = {
+        async proposeAction() {
+          throw new RangeError("Create an objective for mid-market activation");
+        },
+        spentUsd: () => 0,
+      };
+      expect(await propose(throwing)).toBeNull();
+    } finally {
+      spy.mockRestore();
+    }
+    const line = written.find((one) =>
+      one.includes("copilot.proposal_dropped"),
+    );
+    expect(JSON.parse(line ?? "{}")).toMatchObject({
+      reason: "provider_error",
+      error: "RangeError",
+      provider: "unknown",
+    });
+    expect(line).not.toContain("mid-market");
   });
 });
 
@@ -366,7 +437,19 @@ describe("undoing one", () => {
     })) as { result: { id: string } | null };
     const goalId = applied.result?.id as string;
 
+    // An applied card links to what it made (plan 0.8.1 CP7).
+    const listedApplied = (await call("copilot.proposals", { threadId })) as {
+      href: string | null;
+    }[];
+    expect(listedApplied[0]?.href).toBe(`/goals/${goalId}`);
+
     await call("copilot.undoProposal", { id: proposed?.id as string });
+
+    // And not once it is undone: what it made is gone.
+    const listedUndone = (await call("copilot.proposals", { threadId })) as {
+      href: string | null;
+    }[];
+    expect(listedUndone[0]?.href).toBeNull();
 
     // Gone from every read, because soft delete is the default scope.
     await expect(call("goals.read", { id: goalId })).rejects.toThrow();
@@ -569,8 +652,11 @@ describe("the rest of the catalogue", () => {
     expect(choices["goals.addKeyResult"]).toEqual({
       objectives: [GOAL_TITLE],
     });
+    const quarter = (await call("cycles.current", { mode: "quarterly" })) as {
+      name: string;
+    };
     expect(choices["initiatives.create"]).toEqual({
-      keyResults: [`${KEY_RESULT_TITLE} (${GOAL_TITLE})`],
+      keyResults: [`${KEY_RESULT_TITLE} (${GOAL_TITLE}, ${quarter.name})`],
     });
     // Labels only, for all four, and still no identifier to copy.
     expect(JSON.stringify(shown?.options)).not.toContain(goalId);
@@ -604,6 +690,79 @@ describe("the rest of the catalogue", () => {
     // And not an objective in that space either, which `goals.create` would
     // refuse there anyway.
     expect(offered).not.toContain("goals.create");
+  });
+
+  it("offers work behind an objective the member may only read, in a space they may edit (plan 0.8.1 A1)", async () => {
+    // Priya's case: she works in the space and does not own its objective.
+    await lowerOn("goal", goalId, 10);
+
+    const drafter = new ProposingDrafter(initiative());
+    const proposed = await propose(
+      drafter,
+      "Start an initiative for the conversion key result",
+    );
+    const offered = drafter.seen[0]?.options.map((option) => option.action);
+    expect(offered).toContain("initiatives.create");
+    expect(offered).toContain("tasks.create");
+    // Adding a key result changes the objective, so that still asks edit on it.
+    expect(offered).not.toContain("goals.addKeyResult");
+    expect(proposed?.action).toBe("initiatives.create");
+
+    const applied = (await call("copilot.applyProposal", {
+      id: proposed?.id,
+    })) as { result: { id: string } | null };
+    expect(applied.result?.id).toBeTypeOf("string");
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ key_result_id: string }>(
+      "select key_result_id from initiative_key_results where workspace_id = $1",
+      [workspaceId],
+    );
+    expect(rows).toEqual([{ key_result_id: keyResultId }]);
+  });
+
+  it("offers key results from every cycle open for work, the running quarter first (plan 0.8.1 A1)", async () => {
+    const later = new Date(Date.now() + 100 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const planned = (await call("cycles.create", {
+      on: later,
+      mode: "quarterly",
+    })) as { id: string; name: string; status: string };
+    expect(planned.status).toBe("planning");
+    const plannedGoal = (
+      (await call("goals.create", {
+        title: "Open the partner channel",
+        cycleId: planned.id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    await call("goals.addKeyResult", {
+      goalId: plannedGoal,
+      title: "Sign three resellers",
+      direction: "increase",
+      indicatorType: "lagging",
+      baselineValue: 0,
+      targetValue: 3,
+      weight: 1,
+    });
+
+    const drafter = new ProposingDrafter(null);
+    await propose(drafter);
+    const shown = drafter.seen[0]?.options.find(
+      (option) => option.action === "tasks.create",
+    );
+    const quarter = (await call("cycles.current", { mode: "quarterly" })) as {
+      name: string;
+    };
+    expect(shown?.choices.keyResults).toEqual([
+      `${KEY_RESULT_TITLE} (${GOAL_TITLE}, ${quarter.name})`,
+      `Sign three resellers (Open the partner channel, ${planned.name})`,
+    ]);
   });
 
   it("offers nothing at all to a member who may edit nothing, and asks no model", async () => {

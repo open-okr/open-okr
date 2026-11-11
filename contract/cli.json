@@ -1598,6 +1598,23 @@
       "pages": false
     },
     {
+      "name": "copilot stopRun",
+      "action": "copilot.stopRun",
+      "method": "POST",
+      "path": "/copilot/stopRun",
+      "scope": "write",
+      "summary": "Stops a background copilot run, keeping what it has written.",
+      "flags": [
+        {
+          "name": "answer-message-id",
+          "field": "answerMessageId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "copilot recordAnswer",
       "action": "copilot.recordAnswer",
       "method": "POST",
@@ -1827,6 +1844,23 @@
         {
           "name": "id",
           "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
+      "name": "copilot deleteThread",
+      "action": "copilot.deleteThread",
+      "method": "POST",
+      "path": "/copilot/deleteThread",
+      "scope": "destructive",
+      "summary": "Deletes one of the caller's own copilot conversations.",
+      "flags": [
+        {
+          "name": "thread-id",
+          "field": "threadId",
           "type": "string",
           "required": true
         }

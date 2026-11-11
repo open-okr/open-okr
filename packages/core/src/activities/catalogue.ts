@@ -823,6 +823,8 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     /** The relay delivered the same run twice and the second found it done. */
     redelivered: z.boolean().optional(),
   }),
+  /** A member stopped a background run (plan 0.8.1 W4). False when it had ended. */
+  "copilot.stopped": z.object({ threadId: z.string(), stopped: z.boolean() }),
   // The action name travels; the payload does not. A proposal's content is the
   // member's own conversation, and the audit row already holds what an
   // administrator needs (P4-T14b-a).
@@ -833,6 +835,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
   "copilot.proposalApplied": z.object({ action: z.string() }),
   "copilot.proposalDismissed": z.object({ action: z.string() }),
   "copilot.proposalUndone": z.object({ action: z.string() }),
+  // A member deleting one of their own conversations (plan 0.8.1 CP2). The
+  // id, never the title, which is their question.
+  "copilot.threadDeleted": z.object({ threadId: z.string() }),
   // Outbound webhooks (outbound-webhooks.md, plan 0.7.0 D5). The name, never
   // the address, which can carry a receiver's own token, and never a secret.
   "webhook.created": z.object({ name: z.string() }),
@@ -871,6 +876,7 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "billing.requested",
   "copilot.asked",
   "copilot.answered",
+  "copilot.stopped",
   // A proposal is a suggestion in one member's conversation. What it *does* when
   // applied writes its own activity through the applied action's own operation,
   // and that one belongs in the feed because the change does (P4-T14b-a).
@@ -878,6 +884,7 @@ export const PRIVATE_ACTIVITY_KINDS: ReadonlySet<string> = new Set([
   "copilot.proposalApplied",
   "copilot.proposalDismissed",
   "copilot.proposalUndone",
+  "copilot.threadDeleted",
   // A request one member's assist or question made, withheld or redacted
   // (M-10). Which member asked is theirs; the audit row is where an
   // administrator reads that the control acted.

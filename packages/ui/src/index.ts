@@ -6,6 +6,7 @@ export const DEPENDS_ON = [FORMATS, METHOD] as const;
 
 export * from "./components/agent-face.tsx";
 export * from "./components/agent-face-kinds.ts";
+export * from "./components/answer-text.tsx";
 export * from "./components/avatar.tsx";
 export * from "./components/bar.tsx";
 export * from "./components/button.tsx";

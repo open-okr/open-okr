@@ -8,11 +8,17 @@
  *
  * | Arguments | Does | Exit |
  * |---|---|---|
- * | none | Every script not yet complete, to the end, waiting for another run's lock | 0, or 1 when a script fails |
+ * | none, or `run` | Every script not yet complete, to the end, waiting for another run's lock | 0, or 1 when a script fails |
  * | `--status` | Nothing. Names each script not yet complete | 0 |
  * | `--max-seconds <n>` | The same run, stopped between batches once `n` seconds have passed, and nothing at all when another run holds the lock. Ends with what `--status` says | 0, or 1 when a script fails |
  *
  * A usage error is 2 and is decided before anything connects.
+ *
+ * **`run` is accepted as the name of the default** (plan 0.8.1 U1). Early
+ * versions needed it and 0.7.0 ignored anything it did not know, so an
+ * operator's upgrade script could pass it for years. 0.8.0 refused it as an
+ * unknown argument, and the demo server's upgrade stopped halfway on exactly
+ * that. A refusal in the middle of an upgrade costs more than a lenient word.
  */
 import {
   type DataChangeClient,
@@ -29,16 +35,21 @@ export type DataChangeCommand =
   | { readonly status: false; readonly maxSeconds?: number };
 
 const USAGE =
-  "Usage: data-change.ts [--status | --max-seconds <whole seconds, 1 or more>]";
+  "Usage: data-change.ts [run] [--status | --max-seconds <whole seconds, 1 or more>]";
 
 /** The command line, or why it is not one. */
 export function parseDataChangeArgs(
   argv: readonly string[],
 ): DataChangeCommand | { readonly usage: string } {
   let status = false;
+  let run = false;
   let maxSeconds: number | undefined;
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index] as string;
+    if (arg === "run" && index === 0) {
+      run = true;
+      continue;
+    }
     if (arg === "--status") {
       status = true;
       continue;
@@ -59,6 +70,9 @@ export function parseDataChangeArgs(
   }
   if (status && maxSeconds !== undefined) {
     return { usage: `--status runs nothing, so it takes no budget.\n${USAGE}` };
+  }
+  if (status && run) {
+    return { usage: `run and --status ask for opposite things.\n${USAGE}` };
   }
   return status
     ? { status: true }

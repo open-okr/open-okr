@@ -23,6 +23,7 @@ import {
   activeOnly,
   channelConnections,
   channelMessages,
+  includeDeleted,
   inviteLinks,
   users,
   withWorkspace,
@@ -56,6 +57,10 @@ import {
   EMAIL_CHANGE_NOTICE_TOPIC,
   EMAIL_CHANGE_TAKEN_TOPIC,
 } from "../auth/email-change.ts";
+import {
+  CONFIRM_INVITED_ADDRESS_TOPIC,
+  recordConfirmedByInvitation,
+} from "../auth/invited-address.ts";
 import {
   PASSWORD_CHANGE_VIAS,
   PASSWORD_CHANGED_TOPIC,
@@ -290,6 +295,13 @@ export interface OutboxHandlerDeps {
    */
   readonly ring?: KeyRing;
   /**
+   * Confirms an account's address through Better Auth's own adapter (plan
+   * 0.8.1 S5-R, email-verification.md D14). A function because Better Auth
+   * belongs to the host. Absent, a confirmation waits for a relay that has
+   * one rather than being skipped.
+   */
+  readonly confirmUserEmail?: (userId: string) => Promise<void>;
+  /**
    * Posts one signed webhook body through the outbound guard (W7). A
    * function rather than the guard, which lives in `packages/adapters`.
    */
@@ -462,6 +474,84 @@ const sendInvitation: OutboxHandler = async (delivery, deps) => {
     expiresAt: context?.invite?.expiresAt ?? null,
   });
   await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Confirms an address a personal invitation proved (plan 0.8.1 S5-R,
+ * email-verification.md §13).
+ *
+ * `invitations.acceptLink` decided it in the transaction that used the link
+ * up, on whichever surface accepted it. This makes it true, through Better
+ * Auth's adapter, and appends `auth.email_verified` with `via: "invitation"`.
+ *
+ * **Checks again before it confirms, and skips rather than fails.** The
+ * account may be gone, already confirmed (the join page confirms at once,
+ * §13.3), or have changed its sign-in address in the seconds between: the
+ * invitation proved the address it was sent to, and nothing else.
+ */
+const confirmInvitedAddress: OutboxHandler = async (delivery, deps) => {
+  const workspaceId = asString(delivery.payload.workspaceId);
+  const userId = asString(delivery.payload.userId);
+  const inviteLinkId = asString(delivery.payload.inviteLinkId);
+  if (!workspaceId || !userId || !inviteLinkId) {
+    throw new PermanentDispatchError(
+      "Confirming an invited address needs a workspace, an account and an invitation, and this row is missing one.",
+    );
+  }
+
+  // `users` has no tenant policy and no soft delete.
+  const { rows } = await deps.pool.query<{
+    email: string;
+    email_verified: boolean;
+  }>("select email, email_verified from users where id = $1", [userId]);
+  const account = rows[0];
+  if (!account) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+  if (account.email_verified) {
+    deps.onSkipped?.(delivery, "the address is already confirmed");
+    return;
+  }
+
+  const [invitation] = await withWorkspace(
+    drizzle(deps.pool),
+    workspaceId,
+    (tx) =>
+      tx
+        .select({ mode: inviteLinks.mode, email: inviteLinks.email })
+        .from(inviteLinks)
+        // Deleted ones too: the inbox was proved when the link was accepted,
+        // and an administrator removing the used link since does not undo it.
+        .where(
+          includeDeleted(
+            inviteLinks,
+            eq(inviteLinks.workspaceId, workspaceId),
+            eq(inviteLinks.id, inviteLinkId),
+          ),
+        )
+        .limit(1),
+  );
+  const sentTo = invitation?.mode === "personal" ? invitation.email : null;
+  if (
+    sentTo === null ||
+    sentTo.trim().toLowerCase() !== account.email.trim().toLowerCase()
+  ) {
+    deps.onSkipped?.(
+      delivery,
+      "the account's address is no longer the one the invitation was sent to",
+    );
+    return;
+  }
+
+  if (!deps.confirmUserEmail) {
+    // Retried, not skipped: a relay that holds Better Auth will confirm it.
+    throw new Error(
+      "This relay cannot confirm an address. One that holds the application's sign-in will.",
+    );
+  }
+  await deps.confirmUserEmail(userId);
+  await recordConfirmedByInvitation(deps.pool, userId);
 };
 
 /**
@@ -1604,6 +1694,8 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   // The link that confirms an address, queued by `createAuth` rather than
   // sent inside the sign-up request (email-verification.md D1, S3).
   [VERIFY_EMAIL_TOPIC]: sendVerificationLink,
+  // An address a personal invitation proved, on any surface (S5-R).
+  [CONFIRM_INVITED_ADDRESS_TOPIC]: confirmInvitedAddress,
   // A password was changed, set or reset (account-self-service.md D9).
   [PASSWORD_CHANGED_TOPIC]: sendPasswordChanged,
   // A change of sign-in email (account-self-service.md §4.2, plan 0.8.0

@@ -187,6 +187,7 @@ export async function measureActions(input: {
   const counting = new Counting(input.provider);
   const drafter = createProviderDrafter({
     provider: counting,
+    providerName: input.providerKind,
     model: input.model,
     // A measurement, not a budget: the point is to see what it costs.
     costCapUsd: 1_000,

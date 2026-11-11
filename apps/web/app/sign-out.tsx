@@ -1,9 +1,7 @@
-import { SubmitButton } from "@openokr/ui";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "../lib/auth";
-import { getTranslations } from "../lib/translations";
-import { menuRowClass } from "./menu-row-class.ts";
+import { SignOutItem } from "./avatar-menu.tsx";
 
 /**
  * Signing out.
@@ -26,20 +24,7 @@ async function signOut(): Promise<void> {
   redirect("/sign-in");
 }
 
-export async function SignOut() {
-  const { t } = await getTranslations();
-
-  return (
-    <form action={signOut}>
-      {/* `menuRowClass` rather than a class list of its own: this button sits
-       * directly under three menu rows, and an unstyled one inherited the
-       * body's 16px next to their 13px. */}
-      {/* `flex` replaces the row's `block`: the bare button holds a spinner
-       * beside its label, and a block would put the spinner on its own line.
-       * `justify-start` keeps the label where the other menu rows have it. */}
-      <SubmitButton bare className={`${menuRowClass} flex justify-start`}>
-        {t("signOut.signOut")}
-      </SubmitButton>
-    </form>
-  );
+/** The avatar menu's sign-out row, a menu item like the rows above it. */
+export function SignOut() {
+  return <SignOutItem action={signOut} />;
 }

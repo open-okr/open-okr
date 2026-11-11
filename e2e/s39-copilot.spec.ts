@@ -93,6 +93,11 @@ test("⌘J opens the panel, and it says the copilot cannot write prose", async (
   // The box still invites a question, and its placeholder says what asking will
   // actually do here: search, not answer.
   await expect(panel.getByPlaceholder("Search your workspace")).toBeVisible();
+  // S-39's "AI off with a link for admins" (plan 0.8.1 CP8). The instance's
+  // owner can open the AI page, so it is linked.
+  await expect(
+    panel.getByRole("link", { name: "Open AI settings" }),
+  ).toHaveAttribute("href", "/admin/ai");
 });
 
 /**
@@ -121,6 +126,80 @@ test("⌘J closes it again", async () => {
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeHidden();
 });
 
+/**
+ * **Frame and keyboard** (plan 0.8.1 CP1, review F4 and F16).
+ *
+ * Acceptance criteria:
+ *   Given the panel open and focus in the composer with nothing typed, when
+ *   the person presses Escape, then the panel closes and focus is on "Ask the
+ *   copilot".
+ *   Given the panel open, when the person presses the close button, then
+ *   focus is on "Ask the copilot".
+ */
+test("Escape closes it, and focus goes back to Ask", async () => {
+  const ask = page.getByRole("button", { name: "Ask the copilot" });
+  await ask.click();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("textbox")).toBeFocused();
+
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(ask).toBeFocused();
+});
+
+test("the close button gives focus back to Ask too", async () => {
+  const ask = page.getByRole("button", { name: "Ask the copilot" });
+  await ask.click();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+  await expect(panel).toBeHidden();
+  await expect(ask).toBeFocused();
+});
+
+/**
+ * Acceptance criteria:
+ *   Given compact density at 1440, when the panel opens, then it is 512px
+ *   wide, the same as comfortable.
+ *   Given the panel open at 1440, when the person presses Expand, closes,
+ *   reloads and opens it again, then it opens 768px wide.
+ */
+test("it is 512 pixels wide in either density, and Expand stays expanded", async () => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const width = async () => Math.round((await panel.boundingBox())?.width ?? 0);
+
+  await page.getByRole("button", { name: "Ask the copilot" }).click();
+  await expect(panel).toBeVisible();
+  expect(await width()).toBe(512);
+
+  // Compact density shrinks the spacing unit; the panel is on the container
+  // scale, so it does not narrow with it.
+  await page.evaluate(() =>
+    document.documentElement.setAttribute("data-density", "compact"),
+  );
+  expect(await width()).toBe(512);
+
+  await panel.getByRole("button", { name: "Expand the copilot" }).click();
+  await expect.poll(width).toBe(768);
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Work map" }),
+  ).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("button", { name: "Ask the copilot" }).click();
+  await expect(panel).toBeVisible();
+  await expect.poll(width).toBe(768);
+
+  // Back to the default, so the measurements in the rest of this file are
+  // of the panel as most people see it.
+  await panel.getByRole("button", { name: "Expand the copilot" }).click();
+  await expect.poll(width).toBe(512);
+  await panel.getByRole("button", { name: "Close the copilot" }).click();
+  await expect(panel).toBeHidden();
+});
+
 test("a question is recorded and answered with what is there to find", async () => {
   await page.keyboard.press("ControlOrMeta+j");
   const panel = page.getByRole("dialog", { name: "Copilot" });
@@ -138,6 +217,73 @@ test("a question is recorded and answered with what is there to find", async () 
   await expect(
     panel.getByText("No AI provider is configured", { exact: false }).first(),
   ).toBeVisible({ timeout: 15_000 });
+
+  // **And it stays once the turn has landed** (plan 0.8.1 CP8, review F1).
+  // The re-read after a turn used to take the reason and the passages off the
+  // screen, and the assertion above passed on the footer's sentence. This is
+  // the answer's own sentence, which the footer never says.
+  // Landed: no turn is still waiting for words. The box itself stays usable
+  // throughout (plan 0.8.1 CP6), so it is no signal.
+  await expect(panel.locator("article[aria-busy]")).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  await expect(
+    panel
+      .getByRole("log", { name: "Conversation" })
+      .getByText("these are the passages that match your question", {
+        exact: false,
+      }),
+  ).toBeVisible();
+  // And the composer has focus again for the next question (plan 0.8.1 CP1).
+  await expect(panel.getByRole("textbox")).toBeFocused();
+});
+
+/**
+ * **The composer** (plan 0.8.1 CP6, review F13 and F17).
+ *
+ * Acceptance criteria:
+ *   Given the composer focused, when the person types twenty lines, then the
+ *   box grows to 40% of the panel, then scrolls inside.
+ *   Given the server refuses the request, when the person presses Send, then
+ *   the question is back in the box and an error under it says why.
+ */
+test("the box grows to 40% of the panel, then scrolls inside", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  const box = panel.getByRole("textbox");
+  const resting = (await box.boundingBox())?.height ?? 0;
+  await box.fill(
+    Array.from({ length: 20 }, (_, line) => `Line ${line + 1}`).join("\n"),
+  );
+  const panelHeight = (await panel.boundingBox())?.height ?? 0;
+  const grown = (await box.boundingBox())?.height ?? 0;
+  expect(grown).toBeGreaterThan(resting * 3);
+  expect(grown).toBeLessThanOrEqual(panelHeight * 0.4 + 2);
+  expect(
+    await box.evaluate((area) => area.scrollHeight > area.clientHeight),
+  ).toBe(true);
+  await box.fill("");
+});
+
+test("a refused question comes back to the box, with why", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await page.route("**/api/copilot", (route) =>
+    route.fulfill({ status: 400, body: "Bad request" }),
+  );
+  const box = panel.getByRole("textbox");
+  await box.fill("A question the server refuses");
+  await panel.getByRole("button", { name: "Send the question" }).click();
+  // Under the box, as the field's own error.
+  await expect(
+    panel
+      .getByRole("alert")
+      .filter({
+        hasText:
+          "The copilot could not be reached. Your question was not saved.",
+      }),
+  ).toBeVisible({ timeout: 15_000 });
+  await expect(box).toHaveValue("A question the server refuses");
+  await page.unroute("**/api/copilot");
+  await box.fill("");
 });
 
 test("the conversation is there when the panel is reopened", async () => {
@@ -161,29 +307,54 @@ test("the conversation is there when the panel is reopened", async () => {
   const panel = page.getByRole("dialog", { name: "Copilot" });
   await expect(panel).toBeVisible();
 
-  // The thread's title is the question, shortened. A fresh panel opens empty
-  // with the earlier conversations listed, which is where it is.
-  await expect(panel.getByText("Earlier conversations")).toBeVisible({
-    timeout: 15_000,
-  });
-  const earlier = panel.getByRole("button", {
+  // The thread's title is the question, shortened, and History is where the
+  // member's conversations are listed (plan 0.8.1 CP2).
+  await panel.getByRole("button", { name: "History" }).click();
+  const history = panel.getByRole("navigation", { name: "History" });
+  await expect(history).toBeVisible({ timeout: 15_000 });
+  const earlier = history.getByRole("button", {
     name: QUESTION.slice(0, 40),
     exact: false,
   });
-  await expect(earlier.first()).toBeVisible();
+  await expect(earlier.first()).toBeVisible({ timeout: 15_000 });
 
   await earlier.first().click();
-  // **Wait for the list to go before looking for the question.** Loading a
-  // thread replaces "Earlier conversations" with the conversation itself, so
-  // until it is gone the only thing on the panel carrying this text is the list
-  // entry that was just clicked. Asserting before then passed whether or not
-  // the click did anything, and it failed on CI as a strict-mode violation the
-  // moment a retry created a second thread with the same title. The turn is
-  // what this test is about.
-  await expect(panel.getByText("Earlier conversations")).toBeHidden({
-    timeout: 15_000,
-  });
+  // **Wait for the list to go before looking for the question.** Opening a
+  // conversation replaces History with it, so until it is gone the only thing
+  // on the panel carrying this text is the entry that was just clicked.
+  // Asserting before then passed whether or not the click did anything, and it
+  // failed on CI as a strict-mode violation the moment a retry created a
+  // second thread with the same title. The turn is what this test is about.
+  await expect(history).toBeHidden({ timeout: 15_000 });
   await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * **The open conversation lives in the address** (plan 0.8.1 CP2).
+ *
+ * Acceptance criterion: given two earlier conversations, when the person opens
+ * History and picks one, then its turns show, the address carries
+ * `?copilot=<id>`, and reloading shows the same thread.
+ */
+test("the open conversation is in the address, and a reload comes back to it", async () => {
+  await expect(page).toHaveURL(/[?&]copilot=[0-9a-f-]{36}/);
+  await page.reload();
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  await expect(panel.getByText(QUESTION)).toBeVisible({ timeout: 15_000 });
+});
+
+/**
+ * Acceptance criterion: given a thread open, when the person presses New
+ * chat, then the thread is empty, the composer is focused, and the next
+ * question starts a new thread.
+ */
+test("New chat starts an empty conversation", async () => {
+  const panel = page.getByRole("dialog", { name: "Copilot" });
+  await panel.getByRole("button", { name: "New chat" }).click();
+  await expect(panel.getByText(QUESTION)).toBeHidden();
+  await expect(panel.getByRole("textbox")).toBeFocused();
+  await expect(page).not.toHaveURL(/[?&]copilot=/);
 });
 
 /**
@@ -215,4 +386,51 @@ test("⌘J still works after a reload, so the shortcut is really registered", as
   await page.waitForLoadState("networkidle");
   await page.keyboard.press("ControlOrMeta+j");
   await expect(page.getByRole("dialog", { name: "Copilot" })).toBeVisible();
+});
+
+/**
+ * **The streaming look holds still under reduced motion** (plan 0.8.1 CP9).
+ *
+ * Acceptance criterion: given reduced motion, when an answer arrives, then
+ * the caret and the step line do not move. This instance has no provider, so
+ * no answer arrives word by word here; the two classes the arriving answer
+ * wears are measured as the browser draws them, with motion allowed and
+ * without. The words and the steps themselves are proved in
+ * `apps/web/test/copilot-panel.test.tsx` against a scripted stream.
+ */
+test("the caret blinks and the step line shimmers, and neither moves under reduced motion", async () => {
+  const measure = () =>
+    page.evaluate(() => {
+      const caret = document.createElement("span");
+      caret.className = "copilot-caret";
+      const line = document.createElement("p");
+      line.className = "copilot-shimmer";
+      line.textContent = "Searching your workspace…";
+      document.body.append(caret, line);
+      const caretStyle = getComputedStyle(caret);
+      const lineStyle = getComputedStyle(line);
+      const measured = {
+        caretName: caretStyle.animationName,
+        caretRuns: caretStyle.animationIterationCount,
+        caretSeconds: Number.parseFloat(caretStyle.animationDuration),
+        lineImage: lineStyle.backgroundImage,
+        lineRuns: lineStyle.animationIterationCount,
+      };
+      caret.remove();
+      line.remove();
+      return measured;
+    });
+
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const moving = await measure();
+  expect(moving.caretName).toBe("copilot-caret");
+  expect(moving.caretRuns).toBe("infinite");
+  expect(moving.lineImage).not.toBe("none");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const still = await measure();
+  expect(still.caretRuns).toBe("1");
+  expect(still.caretSeconds).toBeLessThan(0.01);
+  expect(still.lineImage).toBe("none");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
 });

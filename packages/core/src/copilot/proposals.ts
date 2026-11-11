@@ -18,11 +18,13 @@
  * key result (completeness review M-09, which found `goals.create` alone).
  *
  * **Only what the member may change is offered.** Every numbered list is
- * filtered through the access model at `edit` before the model sees it, so a
- * space, an objective or a key result the member may only read is not on the
- * list to be pointed at. Applying still runs the action as the member, whose
- * own authorisation decides again: the offer narrows what can be proposed, the
- * action decides what can be done.
+ * filtered through the access model before the model sees it, at the level the
+ * action itself asks for: `edit` on a space to create in it, `edit` on an
+ * objective to add a key result to it, and for work behind a key result, `edit`
+ * on the space the work lands in and `view` on the objective (plan 0.8.1 A1).
+ * Applying still runs the action as the member, whose own authorisation
+ * decides again: the offer narrows what can be proposed, the action decides
+ * what can be done.
  *
  * **Every entry declares its own reverse, or admits it has none.** A proposal
  * that cannot be undone is still applicable; the interface says so instead of
@@ -39,7 +41,10 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
+import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
+import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
 
 /** One thing the model may be shown and point at by number. */
 export interface NumberedChoice {
@@ -339,6 +344,8 @@ const addKeyResult: ProposableAction = {
  * The space is the one the key result's objective belongs to, and only key
  * results in a space this member may create work in are offered, because an
  * initiative lives in a space and `initiatives.create` asks for `edit` there.
+ * The objective itself needs only `view` (plan 0.8.1 A1): a member who works
+ * in the Product space can start work behind its objective without owning it.
  */
 const startInitiative: ProposableAction = {
   action: "initiatives.create",
@@ -362,7 +369,7 @@ const startInitiative: ProposableAction = {
     },
   },
   async offer(scope) {
-    return { keyResults: await scope.editableKeyResults() };
+    return { keyResults: await scope.workKeyResults() };
   },
   async build(context, fields, choices) {
     const authored = fields as {
@@ -430,7 +437,7 @@ const addTask: ProposableAction = {
     },
   },
   async offer(scope) {
-    return { keyResults: await scope.editableKeyResults() };
+    return { keyResults: await scope.workKeyResults() };
   },
   async build(context, fields, choices) {
     const authored = fields as { title: string; keyResultNumber: number };
@@ -481,7 +488,8 @@ const CHOICE_LIMIT = 40;
 interface OfferScope {
   editableSpaces(): Promise<NumberedChoice[]>;
   editableObjectives(): Promise<NumberedChoice[]>;
-  editableKeyResults(): Promise<NumberedChoice[]>;
+  /** Key results new work may be tied to, in spaces the member may edit. */
+  workKeyResults(): Promise<NumberedChoice[]>;
 }
 
 function offerScope(context: ActionCallContext): OfferScope {
@@ -558,25 +566,46 @@ function offerScope(context: ActionCallContext): OfferScope {
         with: { cycleEndsOn },
       })),
     ),
-    editableKeyResults: once(async () => {
+    workKeyResults: once(async () => {
       const inSpaces = new Set((await spaces()).map((space) => space.id));
+      if (inSpaces.size === 0) {
+        return [];
+      }
       const choices: NumberedChoice[] = [];
-      for (const { goal } of await objectives()) {
-        // Work lives in a space. An objective owned by the workspace or by a
-        // person has nowhere to put an initiative or a task without somebody
-        // choosing one, and choosing is not the model's to do.
-        if (goal.spaceId === null || !inSpaces.has(goal.spaceId)) {
-          continue;
-        }
-        for (const keyResult of goal.keyResults) {
-          choices.push({
-            id: keyResult.id,
-            label: `${keyResult.title} (${goal.title})`,
-            with: { goalId: goal.id, spaceId: goal.spaceId },
-          });
+      // I1's rule, which the screens' pickers use (plan 0.8.1 A1): every cycle
+      // being planned or running, the running quarter first.
+      const cycles = cyclesOpenForWork(
+        await callAction(context, "cycles.list", {}),
+      );
+      for (const cycle of cycles) {
+        // `goals.list` is access-filtered at view, which is all creating work
+        // asks of a key result's objective (`assertWhatATaskNames`). Editing
+        // the objective is not needed: work changes the space, not the goal.
+        const { goals } = await callAction(context, "goals.list", {
+          cycleId: cycle.id,
+          includeClosed: false,
+        });
+        for (const goal of goals) {
+          // Work lives in a space, and creating it asks edit there. An
+          // objective owned by the workspace or by a person has nowhere to put
+          // an initiative or a task without somebody choosing one, and
+          // choosing is not the model's to do.
+          if (goal.spaceId === null || !inSpaces.has(goal.spaceId)) {
+            continue;
+          }
+          for (const keyResult of goal.keyResults) {
+            choices.push({
+              id: keyResult.id,
+              label: `${keyResult.title} (${goal.title}, ${cycle.name})`,
+              with: { goalId: goal.id, spaceId: goal.spaceId },
+            });
+            if (choices.length >= CHOICE_LIMIT) {
+              return choices;
+            }
+          }
         }
       }
-      return choices.slice(0, CHOICE_LIMIT);
+      return choices;
     }),
   };
 }
@@ -668,11 +697,14 @@ export async function buildProposal(
  * would be a copilot nobody trusts with the apply button. Null also covers the
  * provider being off, the model naming an action outside the list, and fields
  * the schema refuses: from a reviewer's point of view all four are the same, in
- * that there is nothing to review.
+ * that there is nothing to review. From an operator's they are not, so every
+ * one but a plain decline writes a log line naming why (plan 0.8.1 A3).
  */
 export async function proposeFromRequest(
   context: ActionCallContext,
   input: { readonly threadId: string; readonly request: string },
+  /** Already read by the caller, so they are not read twice (plan 0.8.1 W2). */
+  preparedOffers?: readonly ProposalOffer[],
 ): Promise<{
   readonly id: string;
   readonly action: string;
@@ -684,15 +716,22 @@ export async function proposeFromRequest(
     return null;
   }
 
-  const offers = await proposalOffers(context);
+  const offers = preparedOffers ?? (await proposalOffers(context));
   if (offers.length === 0) {
     return null;
   }
+
+  // Every null below names its reason in the log, except a plain decline
+  // (plan 0.8.1 A3). The drafter reports the ones it decides; this function
+  // reports the two it decides itself.
+  const dropped = (drop: ProposalDrop) =>
+    logProposalDrop(drop, drafter.identity);
 
   let authored: Awaited<ReturnType<NonNullable<typeof drafter.proposeAction>>> =
     null;
   try {
     authored = await drafter.proposeAction({
+      onDropped: dropped,
       request: input.request,
       // Labels only. No identifier reaches the model.
       options: offers.map((offer) => ({
@@ -709,7 +748,14 @@ export async function proposeFromRequest(
       })),
       sources: [],
     });
-  } catch {
+  } catch (error) {
+    // The provider drafter catches its own failures and reports them; a host's
+    // drafter that throws instead is reported here.
+    dropped({
+      reason: "provider_error",
+      action: null,
+      errorName: errorNameOf(error),
+    });
     return null;
   }
   if (!authored) {
@@ -723,6 +769,7 @@ export async function proposeFromRequest(
     // A model that named an action outside the list, wrote a field the schema
     // refuses, or indexed past the end of a list it was shown. No proposal,
     // rather than a proposal built on a guess.
+    dropped({ reason: "build_refused", action: authored.action });
     return null;
   }
 
@@ -742,4 +789,69 @@ export async function proposeFromRequest(
     preview: built.preview,
     why: authored.why,
   };
+}
+
+/**
+ * Asks for the proposal before the answer, and says what came of it (plan
+ * 0.8.1 A2, decided by Akmal on 12 November 2026: the proposal first).
+ *
+ * The answer used to be written beside the proposal and could only guess: it
+ * said "I cannot create objectives" above a working card. The cost is the time
+ * of one short structured call before the first word, one to three seconds on
+ * GPT-6 Luna, which the panel shows as a step.
+ *
+ * **Never throws.** A proposal is the smaller half of the turn, and an answer
+ * must not be lost to it: anything going wrong is no card.
+ */
+export async function proposeBeforeAnswering(
+  context: ActionCallContext,
+  input: { readonly threadId: string; readonly request: string },
+  /**
+   * From `offersToPropose`, so the caller can say it is preparing a change
+   * only when it really will ask a model for one (plan 0.8.1 W2). Null means
+   * nothing can be proposed, and no model is asked.
+   */
+  offers: readonly ProposalOffer[] | null,
+): Promise<{
+  readonly note: ProposalNote;
+  readonly proposalId: string | null;
+}> {
+  let proposed: Awaited<ReturnType<typeof proposeFromRequest>> = null;
+  if (offers !== null) {
+    try {
+      proposed = await proposeFromRequest(context, input, offers);
+    } catch {
+      proposed = null;
+    }
+  }
+  if (!proposed) {
+    return { note: { made: false }, proposalId: null };
+  }
+  return {
+    note: {
+      made: true,
+      label: proposableAction(proposed.action)?.label ?? proposed.action,
+      preview: proposed.preview,
+    },
+    proposalId: proposed.id,
+  };
+}
+
+/**
+ * What this member may be offered, or null when no proposal will be asked for:
+ * no drafter that proposes, or nothing the member may change (plan 0.8.1 W2).
+ * Never throws; a failure to read is no proposal.
+ */
+export async function offersToPropose(
+  context: ActionCallContext,
+): Promise<readonly ProposalOffer[] | null> {
+  if (!context.drafter?.proposeAction) {
+    return null;
+  }
+  try {
+    const offers = await proposalOffers(context);
+    return offers.length === 0 ? null : offers;
+  } catch {
+    return null;
+  }
 }

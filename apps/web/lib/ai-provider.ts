@@ -60,6 +60,8 @@ export interface RoutedProvider {
    * that can only fail.
    */
   readonly provider: GuardedAIProvider;
+  /** The provider's configured name, for log lines that must say which answered. */
+  readonly providerName: string;
   readonly modelId: string;
   /** What is left on the provider's own key, when this call would spend credits. */
   readonly spendCeilingUsd?: number;
@@ -237,6 +239,7 @@ export async function resolveProviderForTier(
         ...attribution,
       }),
     }),
+    providerName: route.provider,
     modelId: route.modelId,
     ...(left === null ? {} : { spendCeilingUsd: left }),
     costInPerMillion: priced.costInPerMillion,

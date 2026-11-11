@@ -97,6 +97,13 @@ test("the instance has no AI provider for this member", async () => {
   const panel = page.getByRole("dialog", { name: "Copilot" });
   await expect(panel).toBeVisible();
   await expect(panel.getByText("AI off")).toBeVisible();
+  // And whoever can fix it is told where (UIUX-PLAN S-39, plan 0.8.1 CP8).
+  // The instance's owner holds `manage_ai`, so the AI page is linked.
+  await expect(
+    panel.getByRole("link", { name: "Open AI settings" }),
+  ).toHaveAttribute("href", "/admin/ai");
+  // No suggested question is offered where it could only be searched for.
+  await expect(panel.getByRole("list", { name: "Suggested questions" })).toHaveCount(0);
   await page.keyboard.press("ControlOrMeta+j");
   await expect(panel).toBeHidden();
 });

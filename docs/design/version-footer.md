@@ -122,7 +122,7 @@ The owner asked for the footer to be separated from the content by a rule and a 
 | Right, everyone | ⌘K Search, and ⌘J Ask only while the copilot can answer (an AI affordance is hidden when the provider is off). Hidden on a phone, which has no ⌘ key |
 | Right, everyone | The running version (plan 0.8.0 V1) |
 | Right, full access | The newer release as a brand chip, as §3 |
-| Position | Sticky to the foot of the content pane, always in view while the page scrolls under it (the owner asked for it to stay put). On a phone it sits on the fixed tab bar |
+| Position | On a wide screen, sticky to the foot of the content pane, always in view while the page scrolls under it (the owner asked for it to stay put). Below the phone breakpoint (768px) it is not sticky: it ends the page, because its two lines took 63px of a phone's height on every screen on top of the tab bar (Q-10b, 0.8.0 acceptance test) |
 | Phone | Two lines, left aligned, above the tab bar |
 
 The footer is therefore shown to every member; only the notice is gated as §3 says. `apps/web/lib/app-footer.tsx` draws the band, `version-footer.tsx` the version and the notice, and `newest-release.ts` holds the one checker per process.

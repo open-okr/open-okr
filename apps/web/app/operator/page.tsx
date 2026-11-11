@@ -1,4 +1,5 @@
 import {
+  countWorkspacesAwaitingAdoption,
   erasureDateFor,
   listTenantsAsOperator,
   readPlans,
@@ -27,8 +28,9 @@ import {
 import { pageTitle } from "../../lib/page-title.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
+import { AdoptWaiting } from "./adopt-waiting";
 import { NewWorkspaceForm } from "./new-workspace-form";
-import { createWorkspace } from "./workspace-actions";
+import { adoptWaitingWorkspaces, createWorkspace } from "./workspace-actions";
 
 export const generateMetadata = pageTitle("pageTitle.operator");
 
@@ -102,11 +104,14 @@ export default async function OperatorWorkspacesPage({
   const operator = await requireOperator();
   const pool = getPool();
 
-  const [tenants, usage, plans, defaultPlan] = await Promise.all([
+  const [tenants, usage, plans, defaultPlan, waiting] = await Promise.all([
     listTenantsAsOperator(pool, operator.userId),
     readUsageAsOperator(pool, operator.userId),
     readPlans(pool),
     resolveDefaultPlan(pool),
+    // Live workspaces with no tenant record: made before this instance became
+    // a cloud, and not adopted yet (Q-9, plan 0.8.1).
+    countWorkspacesAwaitingAdoption(pool, operator.userId),
   ]);
   // With a catalogue, a workspace with no plan may not use the provider's AI
   // key (ai-credits.md §3), and until 0.8.0 nothing here said so (plan 0.8.0
@@ -212,12 +217,21 @@ export default async function OperatorWorkspacesPage({
 
       <NewWorkspaceForm action={createWorkspace} />
 
+      {/* Before the list, and in place of the empty state when the list is
+       * empty: "0 tenants" on an instance whose workspaces were made before
+       * the cloud flag read as if they were gone (Q-9, plan 0.8.1). Always
+       * drawn, so the answer to Adopt now outlives the count it zeroes. */}
+      <AdoptWaiting count={waiting} action={adoptWaitingWorkspaces} />
+
       {tenants.length === 0 ? (
         // An empty state that is a statement rather than an error. A fresh
-        // cloud instance has no tenants, and that is not a problem.
-        <p className="rounded-lg border border-line bg-surface p-6 text-ink-2 text-sm">
-          {t("operator.workspaces.none")}
-        </p>
+        // cloud instance has no tenants, and that is not a problem. Only a
+        // truly empty one: workspaces waiting to be adopted are said above.
+        waiting === 0 ? (
+          <p className="rounded-lg border border-line bg-surface p-6 text-ink-2 text-sm">
+            {t("operator.workspaces.none")}
+          </p>
+        ) : null
       ) : (
         <section className="flex flex-col gap-3">
           {/* A plain GET form, so the filter is a link an operator can paste

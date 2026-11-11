@@ -536,3 +536,73 @@ test("workspaces with no plan are marked, reviewed and moved onto the default pl
     );
   }
 });
+
+/**
+ * Workspaces made before the cloud (Q-9, plan 0.8.1).
+ *
+ * This file turns the flag on after the claim made the instance account's
+ * workspace, which is exactly the instance the 0.8.0 acceptance test met: the
+ * console read "0 tenants" until the hourly adopt ran. It now says how many
+ * wait and adopts them on the operator's word. Last in the file, so the
+ * default-plan review above never meets a workspace this adopted, and what it
+ * adopts is put back without a tenant record, as the flag found it.
+ */
+test("workspaces made before the cloud wait in the console, and Adopt now lists them", async () => {
+  const untenanted = async () =>
+    (
+      await pool.query<{ id: string; name: string }>(
+        `select w.id, w.name from workspaces w
+          where w.deleted_at is null
+            and not exists (
+              select 1 from tenants t
+               where t.workspace_id = w.id and t.deleted_at is null)`,
+      )
+    ).rows;
+  let waiting = await untenanted();
+  if (waiting.length === 0) {
+    // The scheduler's hourly adopt reached them while this file ran. Its row
+    // for the instance account's workspace carries no plan, and taking it
+    // away is the state before the flag.
+    await pool.query(
+      `delete from tenants t using workspace_members m, users u
+        where t.workspace_id = m.workspace_id and m.user_id = u.id
+          and u.email = $1 and t.plan_key is null`,
+      [INSTANCE_ACCOUNT.email],
+    );
+    waiting = await untenanted();
+  }
+  expect(waiting.length).toBeGreaterThan(0);
+  try {
+    await goTo(operatorPage, "/operator");
+    const notice = operatorPage.getByTestId("adoption-waiting");
+    await expect(notice).toContainText(
+      waiting.length === 1
+        ? "1 workspace is not in this list yet."
+        : `${waiting.length} workspaces are not in this list yet.`,
+      { timeout: 15_000 },
+    );
+    await notice.getByRole("button", { name: "Adopt now" }).click();
+    await expect(operatorPage.getByTestId("adoption-result")).toHaveText(
+      /^Adopted \d+ workspaces?\.$/,
+      { timeout: 15_000 },
+    );
+    for (const one of waiting) {
+      await expect(
+        operatorPage.getByRole("link", { name: one.name, exact: true }).first(),
+      ).toBeVisible();
+    }
+    // Audited at the instance, naming the operator who pressed it.
+    const { rows } = await pool.query<{ payload: Record<string, unknown> }>(
+      `select payload from instance_audit_events
+        where action = 'operator.workspaces_adopted' order by seq desc limit 1`,
+    );
+    expect(rows[0]?.payload).toMatchObject({
+      operatorUserId: await userId(OPERATOR.email),
+    });
+  } finally {
+    await pool.query(
+      "delete from tenants where workspace_id = any($1::uuid[]) and plan_key is null",
+      [waiting.map((one) => one.id)],
+    );
+  }
+});

@@ -280,6 +280,15 @@ announce_unclaimed() {
   return 0
 }
 
+# Whether the setup wizard has finished, by the one marker the application
+# itself reads (`setup.completed_at`, packages/core/src/setup/state.ts). A
+# question that cannot be answered counts as not finished, which only ever
+# prints the reminder an unfinished instance would get (plan 0.8.1 Q-10e).
+setup_finished() {
+  finished="$(compose exec -T db psql -U openokr -d openokr -tAc "select count(*) from system_settings where key = 'setup.completed_at'" 2>/dev/null | tr -d '[:space:]' || true)"
+  [ "$finished" = "1" ]
+}
+
 # The origin the browser will use. Passkeys are bound to it, and so are the
 # links in any mail the instance sends, so getting it wrong is not cosmetic.
 #
@@ -445,8 +454,14 @@ case "${1:-help}" in
       exit 1
     fi
 
-    log "ready. Open $(instance_url) to finish setup."
-    announce_unclaimed
+    # "Finish setup" only while it is unfinished: on an instance already set
+    # up the line sent operators looking for a wizard that is closed.
+    if setup_finished; then
+      log "ready at $(instance_url)."
+    else
+      log "ready. Open $(instance_url) to finish setup."
+      announce_unclaimed
+    fi
     ;;
 
   down)

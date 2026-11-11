@@ -45,6 +45,9 @@ test("an administrator sees the running version at the foot of the content", asy
   const footer = page.getByTestId("version-footer");
   await expect(footer).toContainText(`v${version}`);
   await expect(footer).not.toContainText("available");
+  // On a wide screen the band stays in view as the page scrolls. A phone's
+  // does not (Q-10b), which s01-mobile-navigation.spec.ts checks.
+  await expect(page.getByTestId("app-footer")).toHaveCSS("position", "sticky");
 });
 
 test("Admin, General offers the switch, off from the environment here", async () => {

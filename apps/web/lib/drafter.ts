@@ -121,6 +121,7 @@ export async function resolveDrafterFor(
   const drafter = createProviderDrafter({
     systemPrompts,
     provider: routed.provider,
+    providerName: routed.providerName,
     model: routed.modelId,
     // §4.14's `agentRunCostCapUsd`, read from the workspace rather than from a
     // constant, so a workspace that lowered it stops the drafter mid-run

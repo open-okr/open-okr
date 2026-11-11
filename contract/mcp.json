@@ -1500,6 +1500,31 @@
       }
     },
     {
+      "name": "copilot.deleteThread",
+      "description": "Deletes one of the caller's own copilot conversations.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "scope": "destructive",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "idempotentHint": false
+      },
+      "example": {
+        "threadId": "00000000-0000-4000-8000-000000000000"
+      }
+    },
+    {
       "name": "blobs.prepareUpload",
       "description": "Reserve a storage key for an upload, after validating it.",
       "inputSchema": {

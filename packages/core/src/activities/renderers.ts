@@ -657,10 +657,12 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
   // screen ever wants them (P4-T14a-a).
   "copilot.asked": () => "Asked the copilot a question",
   "copilot.answered": () => "The copilot answered",
+  "copilot.stopped": () => "Stopped a copilot answer",
   "copilot.proposed": () => "The copilot proposed a change",
   "copilot.proposalApplied": () => "Applied a copilot proposal",
   "copilot.proposalDismissed": () => "Dismissed a copilot proposal",
   "copilot.proposalUndone": () => "Undid a copilot proposal",
+  "copilot.threadDeleted": () => "Deleted a copilot conversation",
   "webhook.created": (p) => `Added the webhook "${asString(p.name)}"`,
   "webhook.updated": (p) => `Changed the webhook "${asString(p.name)}"`,
   "webhook.secret_rotated": (p) =>
