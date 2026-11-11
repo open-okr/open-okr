@@ -61,6 +61,8 @@ const READS: Readonly<Record<string, unknown>> = {
   "cycles.current": { id: CYCLE },
   "spaces.list": [{ id: SPACE, name: "Revenue", isCompany: false }],
   "goals.list": { goals: [] },
+  // Whether the reader may draft, for Start drafting (workspace-roles.md §13).
+  "goals.createAccess": { canCreate: true },
   "workflow.read": null,
   "alignment.score": {
     score: 82,
