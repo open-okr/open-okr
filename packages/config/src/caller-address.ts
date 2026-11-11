@@ -56,7 +56,10 @@ const isIPv6 = (value: string) => IPV6.safeParse(value).success;
 /** The eight 16-bit groups of an IPv6 address, a dotted tail included. */
 function ipv6Groups(address: string): number[] {
   let text = address.toLowerCase();
-  const dotted = /(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(text);
+  // Bounded: the caller has already checked this is IPv6, so a dotted tail's
+  // parts are at most three digits, and an unbounded run would let a long
+  // string of digits take quadratic time (CodeQL js/polynomial-redos).
+  const dotted = /(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(text);
   if (dotted) {
     const [a, b, c, d] = dotted.slice(1).map(Number) as [
       number,
