@@ -42,7 +42,6 @@ import {
   dismissCopilotProposalAction,
   listCopilotProposalsAction,
   listCopilotThreadsAction,
-  proposeFromCopilotAction,
   readCopilotThreadAction,
   undoCopilotProposalAction,
 } from "./actions";
@@ -601,12 +600,22 @@ export function CopilotPanel({
           const event = JSON.parse(line.slice(6)) as
             | { kind: "thread"; threadId: string }
             | { kind: "sources"; sources: readonly Source[] }
+            | { kind: "proposal"; proposalId: string }
             | { kind: "unavailable"; reason: string }
             | { kind: "text"; text: string }
             | { kind: "done" };
           if (event.kind === "thread") {
             landedThreadId = event.threadId;
             setThreadId(event.threadId);
+          } else if (event.kind === "proposal" && landedThreadId) {
+            // The card was made before the answer (plan 0.8.1 A2), so it is
+            // shown while the answer is still being written.
+            const listed = await listCopilotProposalsAction(
+              landedThreadId,
+            ).catch(() => null);
+            if (listed) {
+              setProposals(listed);
+            }
           } else if (event.kind === "sources") {
             setSources(event.sources);
           } else if (event.kind === "unavailable") {
@@ -628,11 +637,9 @@ export function CopilotPanel({
       setBusy(false);
       setStreaming(null);
       if (landedThreadId) {
-        // A request to change something, offered as a proposal rather than
-        // done. Null is the ordinary answer and means this was a question.
-        await proposeFromCopilotAction(landedThreadId, asked).catch(() => null);
         // The recorded thread, with citations filtered against access now,
-        // replaces everything drawn optimistically above.
+        // replaces everything drawn optimistically above. A proposal was asked
+        // for on the server before the answer (plan 0.8.1 A2), so it is in it.
         await loadThread(landedThreadId).catch(() => undefined);
       }
     }

@@ -39,6 +39,7 @@ import { aiOffSentence } from "../ai/off-reason.ts";
 import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
+import { proposeBeforeAnswering } from "./proposals.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -317,6 +318,12 @@ export type CopilotEvent =
     }
   /** What retrieval found. Sent before any prose, and sent when there is none. */
   | { readonly kind: "sources"; readonly sources: readonly AnswerSource[] }
+  /**
+   * A change card was made for this question, before the answer (plan 0.8.1
+   * A2). The panel reads the thread's proposals when it arrives, so the card
+   * is on screen while the answer is still being written.
+   */
+  | { readonly kind: "proposal"; readonly proposalId: string }
   /** No prose is coming, and this is why, in words for the reader. */
   | { readonly kind: "unavailable"; readonly reason: string }
   | { readonly kind: "text"; readonly text: string }
@@ -368,6 +375,16 @@ export async function* streamAnswer(
     return;
   }
 
+  // The proposal first, so the answer is told whether a card exists (A2).
+  const proposal = await proposeBeforeAnswering(context, {
+    threadId: prepared.threadId,
+    request: input.question,
+  });
+  if (proposal.proposalId !== null) {
+    yield { kind: "proposal", proposalId: proposal.proposalId };
+  }
+  const ask = { ...prepared.ask, proposal: proposal.note };
+
   let text = "";
   let cited: readonly number[] | null = null;
   let model: string | undefined;
@@ -403,7 +420,7 @@ export async function* streamAnswer(
   };
 
   try {
-    for await (const chunk of drafter.streamGrounded(prepared.ask, signal)) {
+    for await (const chunk of drafter.streamGrounded(ask, signal)) {
       if (chunk.kind === "text") {
         text += chunk.text;
         yield { kind: "text", text: chunk.text };

@@ -211,6 +211,61 @@ const finished: readonly GroundedChunk[] = [
   },
 ];
 
+describe("the proposal comes first (plan 0.8.1 A2)", () => {
+  /** Streams the finished answer, after proposing whatever it was built with. */
+  class ProposingDrafter extends ScriptedDrafter {
+    readonly #proposal: Awaited<
+      ReturnType<NonNullable<AgentDrafter["proposeAction"]>>
+    >;
+
+    constructor(
+      proposal: Awaited<ReturnType<NonNullable<AgentDrafter["proposeAction"]>>>,
+    ) {
+      super(finished);
+      this.#proposal = proposal;
+    }
+
+    async proposeAction() {
+      return this.#proposal;
+    }
+  }
+
+  it("sends the card before the words, and tells the answer what it proposes", async () => {
+    const drafter = new ProposingDrafter({
+      action: "goals.create",
+      fields: {
+        title: "Open the partner channel",
+        level: "team",
+        spaceNumber: 1,
+      },
+      why: "You asked for an objective on partners.",
+    });
+    const events = await drain(
+      drafter,
+      "Create an objective for the partner channel",
+    );
+    expect(events.map((event) => event.kind)).toEqual([
+      "thread",
+      "sources",
+      "proposal",
+      "text",
+      "text",
+      "done",
+    ]);
+    expect(drafter.seen[0]?.proposal).toMatchObject({
+      made: true,
+      label: "Create an objective",
+    });
+  });
+
+  it("tells the answer no card was made, and sends none", async () => {
+    const drafter = new ProposingDrafter(null);
+    const events = await drain(drafter, "Record a check-in of 42%");
+    expect(events.map((event) => event.kind)).not.toContain("proposal");
+    expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+  });
+});
+
 describe("a stream that finishes", () => {
   it("opens with the thread, then the passages, then the words", async () => {
     const events = await drain(

@@ -249,6 +249,13 @@ data: ${JSON.stringify(event)}
             send({ kind: "text", text: String(data.text ?? "") });
             return;
           }
+          if (event.name === "copilot.proposal") {
+            const proposalId = data.proposalId;
+            if (typeof proposalId === "string" && proposalId !== "") {
+              send({ kind: "proposal", proposalId });
+            }
+            return;
+          }
           if (event.name === "copilot.done") {
             const halted = data.haltedReason;
             if (typeof halted === "string" && halted !== "") {

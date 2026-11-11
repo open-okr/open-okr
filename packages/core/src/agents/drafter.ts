@@ -119,7 +119,34 @@ export interface GroundedQuestionContext {
   }[];
   /** What retrieval found. An empty list means answer from nothing. */
   readonly sources: readonly GroundingSource[];
+  /**
+   * Whether a change card was made for this question, asked before the answer
+   * (plan 0.8.1 A2). Absent where no card can be shown, such as a chat
+   * channel's Ask, and the answer then says nothing about cards either way.
+   */
+  readonly proposal?: ProposalNote;
 }
+
+/**
+ * What the answer is told about the card beside it (plan 0.8.1 A2).
+ *
+ * The answer used to be written at the same time as the proposal, so it could
+ * only guess, and it said "I cannot create objectives" right above a working
+ * card. Now the proposal comes first and the answer is told the outcome, so it
+ * can only say what is true.
+ */
+export type ProposalNote =
+  | {
+      readonly made: true;
+      /** What the card proposes, in the words the card uses: "Add a task". */
+      readonly label: string;
+      /** The card's own preview lines. */
+      readonly preview: readonly {
+        readonly label: string;
+        readonly value: string;
+      }[];
+    }
+  | { readonly made: false };
 
 /** A grounded answer, with what it actually used and what it cost. */
 export interface GroundedAnswer {

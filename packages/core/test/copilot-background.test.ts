@@ -305,6 +305,95 @@ describe("the run, with nobody watching", () => {
     expect(rows[0]?.content).toBe("Once.");
   });
 
+  describe("the proposal comes first (plan 0.8.1 A2)", () => {
+    /** Proposes an objective in the first space, then answers. */
+    class ProposingDrafter extends FixedDrafter {
+      proposals = 0;
+      readonly #propose: boolean;
+
+      constructor(propose: boolean) {
+        super("There is a card for that below.");
+        this.#propose = propose;
+      }
+
+      async proposeAction() {
+        this.proposals += 1;
+        return this.#propose
+          ? {
+              action: "goals.create",
+              fields: {
+                title: "Open the partner channel",
+                level: "team",
+                spaceNumber: 1,
+              },
+              why: "You asked for an objective on partners.",
+            }
+          : null;
+      }
+    }
+
+    const storedProposals = async () => {
+      const wb = await workerDb();
+      const { rows } = await wb.admin.query<{ action: string }>(
+        "select action from proposed_changes",
+      );
+      return rows;
+    };
+
+    it("tells the answer about the card, and publishes it before the answer", async () => {
+      await call("copilot.ask", {
+        question: "Create an objective for the partner channel",
+        background: true,
+      });
+      const drafter = new ProposingDrafter(true);
+      const published = await drive(drafter);
+
+      expect(published.map((one) => one.event)).toEqual([
+        "copilot.sources",
+        "copilot.proposal",
+        "copilot.text",
+        "copilot.done",
+      ]);
+      expect(drafter.seen[0]?.proposal).toMatchObject({
+        made: true,
+        label: "Create an objective",
+        preview: expect.arrayContaining([
+          { label: "Objective", value: "Open the partner channel" },
+        ]),
+      });
+      expect(await storedProposals()).toEqual([{ action: "goals.create" }]);
+    });
+
+    it("tells the answer when no card was made", async () => {
+      await call("copilot.ask", {
+        question: "Record a check-in of 42% on activation",
+        background: true,
+      });
+      const drafter = new ProposingDrafter(false);
+      const published = await drive(drafter);
+
+      expect(published.map((one) => one.event)).not.toContain(
+        "copilot.proposal",
+      );
+      expect(drafter.seen[0]?.proposal).toEqual({ made: false });
+      expect(await storedProposals()).toEqual([]);
+    });
+
+    it("makes no second card when the run is delivered twice", async () => {
+      await call("copilot.ask", {
+        question: "Create an objective for the partner channel",
+        background: true,
+      });
+      await drive(new ProposingDrafter(true));
+      const again = new ProposingDrafter(true);
+      await drive(again);
+
+      expect(again.proposals).toBe(0);
+      expect(await storedProposals()).toHaveLength(1);
+      expect(await answers()).toHaveLength(1);
+    });
+  });
+
   it("says so when the provider will not answer", async () => {
     await call("copilot.ask", { question: QUESTION, background: true });
 

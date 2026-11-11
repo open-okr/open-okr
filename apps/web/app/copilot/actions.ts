@@ -7,15 +7,17 @@
  * are not here: they happen inside the streaming route, because the question and
  * the answer belong to the same request the reader can stop. What is here is
  * every read the panel makes, plus the proposal decisions, which are ordinary
- * writes with nothing to stream (P4-T14b-a).
+ * writes with nothing to stream (P4-T14b-a). Asking for a proposal is not here
+ * either since plan 0.8.1 A2: it happens in the answer's own run, before the
+ * answer, so the answer knows whether a card was made.
  *
  * Every one of these resolves the caller from the session cookie and goes
  * through `callAction`, so the panel cannot reach a thread that is not the
  * reader's: the actions answer not-found for somebody else's.
  */
-import { callAction, proposeFromRequest } from "@openokr/core";
+import { callAction } from "@openokr/core";
 import { getPool } from "../../lib/auth";
-import { drafterFor, resolveDrafterFor } from "../../lib/drafter";
+import { resolveDrafterFor } from "../../lib/drafter";
 import { requireWorkspace } from "../../lib/workspace";
 
 async function context() {
@@ -66,30 +68,6 @@ export async function copilotAvailabilityAction() {
     "copilot.availability",
     {},
   );
-}
-
-/**
- * Asks the copilot to turn a request into a proposal, and records it if it does.
- *
- * A server action rather than part of the streaming route, because a proposal is
- * not prose: there is nothing to stream, and the panel needs the built preview
- * before it can offer anything. Null is the ordinary answer.
- */
-export async function proposeFromCopilotAction(
-  threadId: string,
-  request: string,
-) {
-  const base = await context();
-  const drafter = await drafterFor(
-    base.workspaceId,
-    "balanced",
-    base.actor.userId,
-    { source: "copilot" },
-  );
-  if (!drafter) {
-    return null;
-  }
-  return proposeFromRequest({ ...base, drafter }, { threadId, request });
 }
 
 /** The proposals in one of the reader's own conversations. */

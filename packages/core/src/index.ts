@@ -131,6 +131,7 @@ export type {
   PlanRunContext,
   ProposalDrop,
   ProposalDropReason,
+  ProposalNote,
   ProposalOption,
   ProposalRequestContext,
   ProposedAction,

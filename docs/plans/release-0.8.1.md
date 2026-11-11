@@ -194,7 +194,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 |---|---|---|
 | M1 to M6 | merged | PR #210, `ea94d5a0` |
 | A1 | done | Key results of objectives the member can view, in spaces they can edit, from `cyclesOpenForWork` (I1's rule, moved into core so the pickers and the copilot share it). Found and fixed: with this quarter not yet started, the pickers put next quarter first; ties now go nearest first. Core 30 + 2, web suite 1397 |
-| A2 | to do | A2-Q decided: the proposal first |
+| A2 | done | Server side rather than in the panel: a new conversation has no thread until the answer route makes one, so `streamAnswer` and the background run call `proposeBeforeAnswering` after recording the question and pass a `ProposalNote` to the answer prompt. A `proposal` event shows the card before the words. The panel's own `proposeFromCopilotAction` is gone. A redelivered background run now stops before proposing, so it makes no second card. Core 54, agents 54, web 39 |
 | A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |
 | K1 | merged | PR #211, `079d37d5`, before this build started |

@@ -41,7 +41,7 @@ import { ACCESS_LEVELS } from "../access/levels.ts";
 import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
-import type { ProposalDrop } from "../agents/drafter.ts";
+import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
 import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import { errorNameOf, logProposalDrop } from "./proposal-drops.ts";
@@ -786,5 +786,43 @@ export async function proposeFromRequest(
     action: built.action,
     preview: built.preview,
     why: authored.why,
+  };
+}
+
+/**
+ * Asks for the proposal before the answer, and says what came of it (plan
+ * 0.8.1 A2, decided by Akmal on 12 November 2026: the proposal first).
+ *
+ * The answer used to be written beside the proposal and could only guess: it
+ * said "I cannot create objectives" above a working card. The cost is the time
+ * of one short structured call before the first word, one to three seconds on
+ * GPT-6 Luna, which the panel shows as a step.
+ *
+ * **Never throws.** A proposal is the smaller half of the turn, and an answer
+ * must not be lost to it: anything going wrong is no card.
+ */
+export async function proposeBeforeAnswering(
+  context: ActionCallContext,
+  input: { readonly threadId: string; readonly request: string },
+): Promise<{
+  readonly note: ProposalNote;
+  readonly proposalId: string | null;
+}> {
+  let proposed: Awaited<ReturnType<typeof proposeFromRequest>> = null;
+  try {
+    proposed = await proposeFromRequest(context, input);
+  } catch {
+    proposed = null;
+  }
+  if (!proposed) {
+    return { note: { made: false }, proposalId: null };
+  }
+  return {
+    note: {
+      made: true,
+      label: proposableAction(proposed.action)?.label ?? proposed.action,
+      preview: proposed.preview,
+    },
+    proposalId: proposed.id,
   };
 }

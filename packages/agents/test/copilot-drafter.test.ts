@@ -166,6 +166,47 @@ const collect = async (chunks: AsyncIterable<GroundedChunk>) => {
   return { text, joined: text.join(""), done };
 };
 
+describe("what the answer is told about the card (plan 0.8.1 A2)", () => {
+  const lastSent = (provider: ScriptedProvider) =>
+    provider.requests[0]?.messages.at(-1)?.content ?? "";
+
+  it("names the card it may refer to, in the card's own words", async () => {
+    const { drafter, provider } = drafterOver(["There is a card below."]);
+    await collect(
+      streamOf(drafter, {
+        ...question,
+        proposal: {
+          made: true,
+          label: "Add a task",
+          preview: [
+            { label: "Task", value: "Draft the handover note" },
+            { label: "Key result", value: "Trial to paid from 18% to 30%" },
+          ],
+        },
+      }),
+    );
+    const sent = lastSent(provider);
+    expect(sent).toContain('It proposes "Add a task"');
+    expect(sent).toContain("Task: Draft the handover note");
+    expect(sent).toContain("Do not say you cannot make this change");
+  });
+
+  it("says no card was made, and where the person makes the change", async () => {
+    const { drafter, provider } = drafterOver(["I cannot do that yet."]);
+    await drafter.answerGrounded?.({ ...question, proposal: { made: false } });
+    const sent = lastSent(provider);
+    expect(sent).toContain("no change card was made");
+    expect(sent).toContain("a check-in under Check in");
+    expect(sent).toContain("Never describe or promise a card");
+  });
+
+  it("says nothing about cards where none can be shown", async () => {
+    const { drafter, provider } = drafterOver(["Activation is at 41%."]);
+    await drafter.answerGrounded?.(question);
+    expect(lastSent(provider)).not.toContain("change card");
+  });
+});
+
 describe("which feature asked", () => {
   it("is said on every call, for the usage row", async () => {
     const { drafter, provider } = drafterOver(["An answer."]);

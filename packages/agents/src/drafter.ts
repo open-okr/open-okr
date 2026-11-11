@@ -178,24 +178,70 @@ export const passagesFor = (context: GroundedQuestionContext): string =>
     )
     .join(NEWLINE + NEWLINE);
 
+/**
+ * Where a person makes a change the copilot cannot propose yet, by the menu's
+ * own names (plan 0.8.1 A2). The edits themselves are L4, in 0.9.0.
+ */
+const WHERE_CHANGES_ARE_MADE =
+  "a check-in under Check in; a KPI's value on that KPI's page under KPIs; " +
+  "renaming or editing an objective or a key result on its own page under " +
+  "Goals; a task's status under Tasks; an initiative's status on its page " +
+  "under Work";
+
+/**
+ * What the answer is told about the card beside it (plan 0.8.1 A2).
+ *
+ * Said by the product, after the question, so the answer can refer to a card
+ * that exists and never to one that does not. Absent, it says nothing, which
+ * is what a chat channel's Ask gets: no card can be shown there.
+ */
+function proposalNoteFor(
+  note: GroundedQuestionContext["proposal"],
+): string | null {
+  if (note === undefined) {
+    return null;
+  }
+  if (note.made) {
+    const lines = note.preview
+      .map((line) => `${line.label}: ${line.value}`)
+      .join("; ");
+    return (
+      "From the product, not the person: a change card is shown with your " +
+      `answer. It proposes "${note.label}" (${lines}). The person reviews it ` +
+      "and applies it there. Mention it in one short sentence. Do not say you " +
+      "cannot make this change, and do not say it is already done."
+    );
+  }
+  return (
+    "From the product, not the person: no change card was made for this " +
+    "message. If it asks you to create or change something, say plainly that " +
+    "you cannot make that change from here yet, and say where the person " +
+    `makes it: ${WHERE_CHANGES_ARE_MADE}. Never describe or promise a card.`
+  );
+}
+
 /** The conversation so far, then the passages, then the question. */
-const copilotMessages = (context: GroundedQuestionContext) => [
-  { role: "system" as const, content: COPILOT_SYSTEM },
-  ...context.history.map((turn) => ({
-    role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
-    content: turn.content,
-  })),
-  {
-    role: "user" as const,
-    content:
-      (context.sources.length === 0
-        ? "There are no passages for this question."
-        : `Passages:${NEWLINE}${passagesFor(context)}`) +
-      NEWLINE +
-      NEWLINE +
-      `Question: ${context.question}`,
-  },
-];
+const copilotMessages = (context: GroundedQuestionContext) => {
+  const note = proposalNoteFor(context.proposal);
+  return [
+    { role: "system" as const, content: COPILOT_SYSTEM },
+    ...context.history.map((turn) => ({
+      role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
+      content: turn.content,
+    })),
+    {
+      role: "user" as const,
+      content:
+        (context.sources.length === 0
+          ? "There are no passages for this question."
+          : `Passages:${NEWLINE}${passagesFor(context)}`) +
+        NEWLINE +
+        NEWLINE +
+        `Question: ${context.question}` +
+        (note === null ? "" : NEWLINE + NEWLINE + note),
+    },
+  ];
+};
 
 /**
  * The numbers on the sentinel line, as zero-based indexes.

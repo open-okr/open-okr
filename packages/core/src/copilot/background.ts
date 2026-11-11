@@ -40,6 +40,7 @@ import { callAction } from "../actions/registry.ts";
 import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
 import { type AnswerSource, citationsFrom, groundQuestion } from "./answer.ts";
+import { proposeBeforeAnswering } from "./proposals.ts";
 
 /** The channel one copilot conversation's prose is published on. */
 export function copilotThreadChannel(
@@ -155,6 +156,13 @@ export async function runCopilotAnswer(
    * P5-T09. Saying so is half the requirement: a run that stopped silently
    * leaves a short answer that looks finished.
    */
+  // **A redelivered row stops here** (plan 0.8.1 A2). Asking for the proposal
+  // writes a card, and `copilot.completeRun` refusing the second answer comes
+  // too late to stop a second card. An answer no longer running was written.
+  if (await alreadyAnswered(context, job)) {
+    return { answered: false, haltedReason: null, sources: [] };
+  }
+
   const capUsd = await resolveAgentRunCostCap(context.pool, job.workspaceId);
   if (capUsd <= 0) {
     return halt(
@@ -186,6 +194,18 @@ export async function runCopilotAnswer(
     );
   }
 
+  // The proposal first, so the answer is told whether a card exists (A2).
+  const proposal = await proposeBeforeAnswering(context, {
+    threadId: job.threadId,
+    request: job.question,
+  });
+  if (proposal.proposalId !== null) {
+    await publish("copilot.proposal", {
+      answerMessageId: job.answerMessageId,
+      proposalId: proposal.proposalId,
+    });
+  }
+
   let answer: Awaited<
     ReturnType<NonNullable<typeof context.drafter.answerGrounded>>
   >;
@@ -193,7 +213,10 @@ export async function runCopilotAnswer(
     // Through the drafter, never as a detached function: a host's drafter is
     // often a class instance and `const f = drafter.answerGrounded` loses
     // `this`. The comment in `answerQuestion` says what that cost once.
-    answer = await context.drafter.answerGrounded(prepared.ask);
+    answer = await context.drafter.answerGrounded({
+      ...prepared.ask,
+      proposal: proposal.note,
+    });
   } catch {
     return halt(
       "The provider did not answer. These are the passages that match your question.",
@@ -245,4 +268,24 @@ export async function runCopilotAnswer(
     haltedReason: null,
     sources: prepared.sources,
   };
+}
+
+/** Whether this run's answer was already written, by an earlier delivery. */
+async function alreadyAnswered(
+  context: ActionCallContext,
+  job: CopilotRunJob,
+): Promise<boolean> {
+  try {
+    const thread = await callAction(context, "copilot.thread", {
+      threadId: job.threadId,
+    });
+    const answer = thread.messages.find(
+      (message) => message.id === job.answerMessageId,
+    );
+    return answer !== undefined && !answer.running;
+  } catch {
+    // Unreadable is not proof it was answered. The run goes ahead, and
+    // `copilot.completeRun` still refuses a second answer.
+    return false;
+  }
 }
