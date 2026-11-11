@@ -17,7 +17,11 @@
  * handler is wired the same way. A row enqueued with no handler dead-letters,
  * and a test that skipped the dispatcher would not notice.
  */
-import type { AgentDrafter, GroundedQuestionContext } from "@openokr/core";
+import type {
+  AgentDrafter,
+  GroundedChunk,
+  GroundedQuestionContext,
+} from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
@@ -64,6 +68,48 @@ class BrokenDrafter implements AgentDrafter {
   async answerGrounded(): Promise<never> {
     throw new Error("the provider fell over");
   }
+  spentUsd() {
+    return 0;
+  }
+}
+
+/**
+ * Streams its pieces with a pause between them, as a model writes (plan 0.8.1
+ * W1). With `stopAfter`, the stream falls over after that many pieces.
+ */
+class StreamingDrafter implements AgentDrafter {
+  readonly #pieces: readonly string[];
+  readonly #stopAfter: number | null;
+
+  constructor(pieces: readonly string[], stopAfter: number | null = null) {
+    this.#pieces = pieces;
+    this.#stopAfter = stopAfter;
+  }
+
+  async *streamGrounded(): AsyncIterable<GroundedChunk> {
+    let sent = 0;
+    for (const piece of this.#pieces) {
+      if (this.#stopAfter !== null && sent === this.#stopAfter) {
+        throw new Error("the provider fell over");
+      }
+      // Longer than the run's joining window, so each piece is its own event.
+      await new Promise((resolve) => setTimeout(resolve, 90));
+      sent += 1;
+      yield { kind: "text", text: piece };
+    }
+    yield {
+      kind: "done",
+      answer: {
+        text: this.#pieces.join(""),
+        usedSourceIndexes: [0],
+        model: "test-model",
+        tokensIn: 300,
+        tokensOut: 40,
+        costUsd: 0.002,
+      },
+    };
+  }
+
   spentUsd() {
     return 0;
   }
@@ -136,7 +182,11 @@ const drive = async (
   if (!row) {
     throw new Error("nothing enqueued a copilot run");
   }
-  const published: { channel: string; event: string }[] = [];
+  const published: {
+    channel: string;
+    event: string;
+    data?: Record<string, unknown>;
+  }[] = [];
   await dispatchOutbox(
     {
       topic: row.topic,
@@ -150,8 +200,8 @@ const drive = async (
         options.askedFor?.push([id, forUser]);
         return drafter;
       },
-      async publish(channel, event) {
-        published.push({ channel, event });
+      async publish(channel, event, data) {
+        published.push({ channel, event, data });
       },
       onSkipped: (_delivery, reason) => options.skipped?.push(reason),
     },
@@ -288,6 +338,45 @@ describe("the run, with nobody watching", () => {
         `workspace:${workspaceId}:copilot:${started.threadId}`,
       );
     }
+  });
+
+  it("publishes the words as they are written (plan 0.8.1 W1)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(
+      new StreamingDrafter(["Sixty ", "per cent ", "by June."]),
+    );
+
+    expect(published.map((one) => one.event)).toEqual([
+      "copilot.sources",
+      "copilot.text",
+      "copilot.text",
+      "copilot.text",
+      "copilot.done",
+    ]);
+    expect(
+      published
+        .filter((one) => one.event === "copilot.text")
+        .map((one) => one.data?.text),
+    ).toEqual(["Sixty ", "per cent ", "by June."]);
+    // Recorded whole at the end, with what the provider counted.
+    const [answer] = await answers();
+    expect(answer?.content).toBe("Sixty per cent by June.");
+    expect(answer?.cost).toBe("0.002000");
+  });
+
+  it("keeps what arrived when the provider stops partway, and says so (plan 0.8.1 W1)", async () => {
+    await call("copilot.ask", { question: QUESTION, background: true });
+    const published = await drive(
+      new StreamingDrafter(["Sixty ", "per cent ", "by June."], 2),
+    );
+
+    const [answer] = await answers();
+    expect(answer?.content).toBe("Sixty per cent");
+    expect(answer?.run_halted_reason).toContain("stopped partway");
+    expect(published.at(-1)).toMatchObject({
+      event: "copilot.done",
+      data: { haltedReason: expect.stringContaining("stopped partway") },
+    });
   });
 
   it("is safe to run twice, because the relay delivers at least once", async () => {

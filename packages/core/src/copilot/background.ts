@@ -37,6 +37,11 @@
  */
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
+import type {
+  AgentDrafter,
+  GroundedAnswer,
+  GroundedQuestionContext,
+} from "../agents/drafter.ts";
 import { aiOffSentence } from "../ai/off-reason.ts";
 import { resolveAgentRunCostCap } from "../ai/resolve.ts";
 import { type AnswerSource, citationsFrom, groundQuestion } from "./answer.ts";
@@ -178,14 +183,15 @@ export async function runCopilotAnswer(
       questionMessageId: job.questionMessageId,
       question: job.question,
     },
-    (drafter) => Boolean(drafter.answerGrounded),
+    (drafter) => Boolean(drafter.streamGrounded ?? drafter.answerGrounded),
   );
   await publish("copilot.sources", {
     answerMessageId: job.answerMessageId,
     sources: prepared.sources,
   });
 
-  if (!prepared.ask || !context.drafter?.answerGrounded) {
+  const drafter = context.drafter;
+  if (!prepared.ask || !(drafter?.streamGrounded ?? drafter?.answerGrounded)) {
     // The relay passes no reason, so this reads as no provider, as before. It
     // only happens when AI went off between the question and this run.
     return halt(
@@ -205,40 +211,34 @@ export async function runCopilotAnswer(
       proposalId: proposal.proposalId,
     });
   }
+  const ask = { ...prepared.ask, proposal: proposal.note };
 
-  let answer: Awaited<
-    ReturnType<NonNullable<typeof context.drafter.answerGrounded>>
-  >;
-  try {
-    // Through the drafter, never as a detached function: a host's drafter is
-    // often a class instance and `const f = drafter.answerGrounded` loses
-    // `this`. The comment in `answerQuestion` says what that cost once.
-    answer = await context.drafter.answerGrounded({
-      ...prepared.ask,
-      proposal: proposal.note,
-    });
-  } catch {
+  const answered = drafter?.streamGrounded
+    ? await streamInto(drafter, ask, (text) =>
+        publish("copilot.text", { answerMessageId: job.answerMessageId, text }),
+      )
+    : await wholeInto(drafter, ask, (text) =>
+        publish("copilot.text", { answerMessageId: job.answerMessageId, text }),
+      );
+
+  if (answered.kind === "failed") {
     return halt(
       "The provider did not answer. These are the passages that match your question.",
     );
   }
-  if (!answer || answer.text.trim() === "") {
+  if (answered.kind === "empty") {
     return halt(
       "The copilot had nothing to add. These are the passages that match your question.",
     );
   }
 
-  // One event with the whole answer rather than a token at a time. The drafter
-  // port answers whole; streaming it would mean a streaming port, and that is
-  // a change to `packages/adapters` this row does not need. The reader still
-  // gets it without the request they asked on, which is the point.
-  await publish("copilot.text", {
-    answerMessageId: job.answerMessageId,
-    text: answer.text,
-  });
-
+  const answer = answered.answer;
   const spent = answer.costUsd ?? 0;
   const overBudget = spent > capUsd;
+  const stoppedPartway =
+    answered.kind === "partial"
+      ? "The provider stopped partway through this answer. What arrived is kept."
+      : null;
 
   await callAction(context, "copilot.completeRun", {
     answerMessageId: job.answerMessageId,
@@ -255,12 +255,14 @@ export async function runCopilotAnswer(
             `${capUsd}. The next run will halt before starting until an ` +
             "administrator raises it.",
         }
-      : {}),
+      : stoppedPartway === null
+        ? {}
+        : { haltedReason: stoppedPartway }),
   });
 
   await publish("copilot.done", {
     answerMessageId: job.answerMessageId,
-    haltedReason: null,
+    haltedReason: stoppedPartway,
   });
 
   return {
@@ -268,6 +270,107 @@ export async function runCopilotAnswer(
     haltedReason: null,
     sources: prepared.sources,
   };
+}
+
+/** How long published words wait to be joined by the next ones, at most. */
+const PUBLISH_EVERY_MS = 60;
+
+/**
+ * How much text one published event may carry. NOTIFY refuses a payload past
+ * 8000 bytes and a character may take four, so this stays well under it.
+ */
+const PUBLISH_AT_CHARACTERS = 1_000;
+
+type Answered =
+  | { readonly kind: "whole"; readonly answer: GroundedAnswer }
+  | { readonly kind: "partial"; readonly answer: GroundedAnswer }
+  | { readonly kind: "empty" }
+  | { readonly kind: "failed" };
+
+/**
+ * The answer, published as it is written (plan 0.8.1 W1).
+ *
+ * Every answer on a deployment that drains its queue comes this way, and it
+ * used to arrive in one piece at the end: the reader watched nothing for
+ * seconds and then the whole answer. Pieces are joined for up to
+ * `PUBLISH_EVERY_MS`, so a token does not cost a NOTIFY of its own, and the
+ * reader still sees the words come.
+ *
+ * A stream that stops without its `done` keeps what arrived, marked as
+ * stopped partway, which is what the inline path does too.
+ */
+async function streamInto(
+  drafter: AgentDrafter,
+  ask: GroundedQuestionContext,
+  publishText: (text: string) => Promise<void>,
+): Promise<Answered> {
+  let text = "";
+  let pending = "";
+  let flushedAt = 0;
+  let done: GroundedAnswer | null = null;
+  const flush = async () => {
+    if (pending === "") {
+      return;
+    }
+    const piece = pending;
+    pending = "";
+    flushedAt = Date.now();
+    await publishText(piece);
+  };
+  try {
+    // Through the drafter, for the reason `answerQuestion` records.
+    for await (const chunk of drafter.streamGrounded?.(ask) ?? []) {
+      if (chunk.kind === "done") {
+        done = chunk.answer;
+        continue;
+      }
+      text += chunk.text;
+      pending += chunk.text;
+      if (
+        Date.now() - flushedAt >= PUBLISH_EVERY_MS ||
+        pending.length >= PUBLISH_AT_CHARACTERS
+      ) {
+        await flush();
+      }
+    }
+  } catch {
+    // Handled below by what arrived: nothing, or a partial answer.
+  }
+  await flush();
+  if (done !== null) {
+    return done.text.trim() === ""
+      ? { kind: "empty" }
+      : { kind: "whole", answer: done };
+  }
+  if (text.trim() === "") {
+    return { kind: "failed" };
+  }
+  return {
+    kind: "partial",
+    answer: { text: text.trim(), usedSourceIndexes: [] },
+  };
+}
+
+/** A drafter that cannot stream answers whole, published as one piece. */
+async function wholeInto(
+  drafter: AgentDrafter | undefined,
+  ask: GroundedQuestionContext,
+  publishText: (text: string) => Promise<void>,
+): Promise<Answered> {
+  let answer: GroundedAnswer | null;
+  try {
+    // Through the drafter, never as a detached function: a host's drafter is
+    // often a class instance and `const f = drafter.answerGrounded` loses
+    // `this`. The comment in `answerQuestion` says what that cost once.
+    answer = (await drafter?.answerGrounded?.(ask)) ?? null;
+  } catch {
+    return { kind: "failed" };
+  }
+  if (!answer || answer.text.trim() === "") {
+    return { kind: "empty" };
+  }
+  await publishText(answer.text);
+  return { kind: "whole", answer };
 }
 
 /** Whether this run's answer was already written, by an earlier delivery. */

@@ -249,7 +249,7 @@ describe("the sentinel line", () => {
     expect(joined.trim()).toBe(
       "Activation is at 41 per cent [1], behind the target.",
     );
-    expect(done).toEqual({
+    expect(done).toMatchObject({
       kind: "done",
       answer: {
         text: "Activation is at 41 per cent [1], behind the target.",
@@ -258,6 +258,39 @@ describe("the sentinel line", () => {
         model: "test-model",
       },
     });
+  });
+
+  it("carries what the provider counted at the end, and its cost (plan 0.8.1 W1)", async () => {
+    const { drafter } = drafterOver(["Behind.\nSOURCES: 1"]);
+    const { done } = await collect(streamOf(drafter, question));
+    if (done?.kind !== "done") {
+      throw new Error("no done chunk");
+    }
+    expect(done.answer.tokensIn).toBe(400);
+    expect(done.answer.tokensOut).toBe(60);
+    expect(done.answer.costUsd).toBeGreaterThan(0);
+    expect(done.answer.costUsd).toBe(drafter.spentUsd());
+  });
+
+  it("carries no count when the provider never reported one", async () => {
+    class Silent extends ScriptedProvider {
+      override async *stream(request: ChatRequest): AsyncIterable<string> {
+        yield* super.stream(request);
+      }
+    }
+    const drafter = createProviderDrafter({
+      provider: new Silent(["Behind.\nSOURCES: 1"]),
+      model: "test-model",
+      costCapUsd: 2,
+      costInPerMillion: 1,
+      costOutPerMillion: 2,
+    });
+    const { done } = await collect(streamOf(drafter, question));
+    if (done?.kind !== "done") {
+      throw new Error("no done chunk");
+    }
+    expect(done.answer.tokensIn).toBeUndefined();
+    expect(done.answer.costUsd).toBeUndefined();
   });
 
   it("arriving whole in one piece is still held back", async () => {

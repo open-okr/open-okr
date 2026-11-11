@@ -1121,7 +1121,9 @@ const streamGrounded = evaluationSet<GroundedQuestionContext>({
         answer: {
           text: "Activation is at 41%, behind the target [1].",
           usedSourceIndexes: [0],
-          model: "evaluation",
+          // What the mock counted, now that a streamed answer carries it
+          // (plan 0.8.1 W1), as a whole answer always has.
+          ...MOCK_ANSWER,
         },
       },
     },
@@ -1134,7 +1136,9 @@ const streamGrounded = evaluationSet<GroundedQuestionContext>({
         answer: {
           text: "Nothing in the passages says that.",
           usedSourceIndexes: [],
-          model: "evaluation",
+          // What the mock counted, now that a streamed answer carries it
+          // (plan 0.8.1 W1), as a whole answer always has.
+          ...MOCK_ANSWER,
         },
       },
     },

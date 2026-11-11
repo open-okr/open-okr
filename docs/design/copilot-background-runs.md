@@ -104,6 +104,15 @@ no words in it is still refused.
 **when** the second delivery arrives,
 **then** it finds the work done and no second answer is charged.
 
+**Given** a provider that streams (plan 0.8.1 W1),
+**when** a background run answers,
+**then** the words are published as they are written, and the answer is
+recorded whole at the end with what the provider counted.
+
+**Given** a provider that falls over partway through (plan 0.8.1 W1),
+**when** some words have arrived,
+**then** they are kept, and the run says it stopped partway.
+
 **Given** an instance with `OPENOKR_RELAY=off`,
 **when** a member asks,
 **then** the answer streams inline exactly as it did before.
@@ -128,10 +137,16 @@ rather than dead-lettering in production.
 
 ## What this does not do
 
-- **No streaming from the provider.** The drafter port answers whole, so the
-  job publishes one `copilot.text` with the answer in it. Streaming would mean
-  a streaming port, which is a change to `packages/adapters` this row does not
-  need and which the inline path already has for its own case.
+- ~~No streaming from the provider.~~ **Streams since plan 0.8.1 W1.** The job
+  used to call `answerGrounded` and publish one `copilot.text` with the whole
+  answer, so on every deployment that drains its queue the reader watched
+  nothing for seconds and then saw the answer at once. It now calls
+  `streamGrounded` when the drafter has it and publishes the words as they
+  come, joined for up to 60 ms (or 1,000 characters) so a token does not cost
+  a NOTIFY of its own. The answer is still written once, at the end, with the
+  token count and cost the provider reported when its stream ended. A stream
+  that stops without finishing keeps what arrived and says it stopped
+  partway. A drafter that cannot stream still answers whole, as before.
 - **No stop control on a background run.** Stopping used to be cancelling the
   request; there is no request now. A member who wants a run to stop has
   nothing to press, and that is a gap worth a row rather than something to

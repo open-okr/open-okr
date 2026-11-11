@@ -1332,13 +1332,14 @@ export function createProviderDrafter(
     /**
      * The same answer, streamed.
      *
-     * **A streamed turn records no token count, and that is the port's shape
-     * rather than an omission here.** `AIProvider.stream` yields text and no
-     * usage, so there is nothing truthful to put in `tokensIn`, `tokensOut` or
-     * `costUsd`. Estimating them would put a made-up number in a cost report.
-     * The cap is still honoured at the door, so a workspace that has spent its
-     * budget cannot start a stream; what it cannot do is stop one part way
-     * through on cost. Recorded on the P4-T14a-b row.
+     * **The token count is what the provider reported at the end, or none.**
+     * `AIProvider.stream` tells `onUsage` once the stream has ended, and some
+     * OpenAI-compatible endpoints never do. When it is told, the `done` chunk
+     * carries the count and the cost, as a whole answer does (plan 0.8.1 W1,
+     * since every background answer now streams). When it is not, they are
+     * left out rather than estimated: a made-up number in a cost report is
+     * worse than a missing one. The cap is still honoured at the door, so a
+     * workspace that has spent its budget cannot start a stream.
      *
      * The sentinel line is held back rather than filtered afterwards: the
      * reader must never watch `SOURCES: 1, 3` appear and then vanish. Anything
@@ -1361,6 +1362,8 @@ export function createProviderDrafter(
         prose += text;
         return { kind: "text", text };
       };
+      const before = spent;
+      let usage: { inputTokens: number; outputTokens: number } | null = null;
       try {
         for await (const piece of forFeature("streamGrounded").stream(
           {
@@ -1369,7 +1372,13 @@ export function createProviderDrafter(
             messages: copilotMessages(context),
             maxTokens: COPILOT_MAX_TOKENS,
           },
-          charge,
+          (reported) => {
+            charge(reported);
+            usage = {
+              inputTokens: reported.inputTokens,
+              outputTokens: reported.outputTokens,
+            };
+          },
         )) {
           if (signal?.aborted) {
             // Return rather than throw: what arrived is a real partial answer
@@ -1406,12 +1415,25 @@ export function createProviderDrafter(
       if (sentinel === "" && buffer !== "") {
         yield send(buffer);
       }
+      // Assigned inside the callback, which flow analysis cannot see, so it
+      // would read as always null without restating the type here.
+      const counted = usage as {
+        inputTokens: number;
+        outputTokens: number;
+      } | null;
       yield {
         kind: "done",
         answer: {
           text: prose.trim(),
           usedSourceIndexes: sentinel === "" ? [] : parseSources(sentinel),
           model: options.model,
+          ...(counted === null
+            ? {}
+            : {
+                tokensIn: counted.inputTokens,
+                tokensOut: counted.outputTokens,
+                costUsd: spent - before,
+              }),
         },
       };
     },

@@ -221,7 +221,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | A2 | done | Server side rather than in the panel: a new conversation has no thread until the answer route makes one, so `streamAnswer` and the background run call `proposeBeforeAnswering` after recording the question and pass a `ProposalNote` to the answer prompt. A `proposal` event shows the card before the words. The panel's own `proposeFromCopilotAction` is gone. A redelivered background run now stops before proposing, so it makes no second card. Core 54, agents 54, web 39 |
 | A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |
-| W1 | to do | Added by Akmal on 12 November 2026 |
+| W1 | done | `streamInto` in the background run, joined for 60 ms or 1,000 characters; `streamGrounded`'s `done` carries the provider's count and cost; a stream that stops partway keeps what arrived. The mock evaluation's streaming fixtures now expect the count, as the whole-answer ones do. Core 26, agents 56, 24 sets |
 | W2 | to do | W2-Q: live only, recommended |
 | W3 | to do | Rows from the S-39 review, to come |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
