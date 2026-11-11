@@ -3300,7 +3300,6 @@
   "operator.defaultPlan.notMoved": "{name} tidak dipindahkan: {reason}",
   "operator.defaultPlan.people": "{count} orang",
   "operator.defaultPlan.peopleOfSeats": "{count} daripada {seats} tempat duduk",
-  "operator.defaultPlan.reasonDefault": "Diletakkan pada pelan lalai dari konsol",
   "operator.defaultPlan.refusedFor": "{name}: {count} orang, pelan ini ada {seats} tempat duduk",
   "operator.defaultPlan.refusedHelp": "Pindahkan ruang kerja ini satu demi satu di halamannya sendiri, di mana anda boleh menamakan bilangan tempat duduk.",
   "operator.defaultPlan.title": "Ruang kerja tanpa pelan",

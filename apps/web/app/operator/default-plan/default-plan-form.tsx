@@ -87,7 +87,6 @@ export function DefaultPlanForm({
         id="default-plan-reason"
         maxLength={500}
         name="reason"
-        defaultValue={t("operator.defaultPlan.reasonDefault")}
         error={state?.fields?.reason}
         required
         rows={2}

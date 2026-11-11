@@ -506,6 +506,16 @@ test("workspaces with no plan are marked, reviewed and moved onto the default pl
       operatorPage.getByTestId("default-plan-will-move"),
     ).toContainText(CUSTOMER_WORKSPACE);
 
+    // Nothing moves without the operator's own reason (UAT 0.8.0 Q-6): the
+    // field arrives empty, and an empty one is refused before it is sent.
+    const reason = operatorPage.getByLabel("Reason");
+    await expect(reason).toHaveValue("");
+    expect(
+      await reason.evaluate(
+        (field) => (field as HTMLTextAreaElement).validity.valueMissing,
+      ),
+    ).toBe(true);
+    await reason.fill("Workspaces made before plans existed");
     await operatorPage.getByTestId("default-plan-confirm").click();
     await expect(operatorPage.getByTestId("default-plan-result")).toContainText(
       "moved to Team",

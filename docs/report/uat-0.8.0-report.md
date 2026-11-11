@@ -192,3 +192,19 @@ Things I am not sure are bugs.
 - **Q-9.** Turning the cloud flag on after workspaces exist shows "0 tenants" until the hourly adopt runs or `pnpm cloud:adopt` is run. Documented, but an operator following the O2 story would meet it.
 - **Q-10.** Not new in 0.8.0, seen while testing: "Sign out" in the avatar menu is a plain button inside the menu, so arrow keys skip it; the footer band is sticky on a phone and takes 63 px; the "Connect your AI agent" pill is cut off on both sides at 390 px; the role matrix truncates "Manage" to "Man"; `./openokr up` always ends with "Open ... to finish setup", also on a set-up instance.
 - **Q-11.** Local only: this checkout had an untracked symlink `apps/web/.env -> ../../.env`. `.dockerignore` excludes only the root `.env`, so the symlink went into the build context and `next build` stopped on it. A nested `.env` holding real values would be copied into the build stage. I moved it aside for the run.
+
+## Answers
+
+Akmal's answers on 11 November 2026, and what was done with each.
+
+| Question | Answer | Done in |
+|---|---|---|
+| Q-1 | The Edit binding stays, as `workspace-roles.md` §11 says; creating an objective now asks the role's goal level (§13). F-04 was a server gap as well as a screen one: a Viewer's company objective was created | `fcd1c4ed` |
+| Q-2 | Yes: the version moves when the release pull request applies the changesets | Nothing to change |
+| Q-3 | S5 is in 0.8.0: a personal invitation to the sign-up's own address arrives confirmed and lands in the workspace | `416eb66c` |
+| Q-4 | Intended for 0.8.0. A cycle's facilitator can be a Member, so the input pack stays open; gating it to Owner, Admin and the named facilitator is for later | Follow-up |
+| Q-5 | No: ArrowRight stops at the last step, and leaving is the button's choice | `514ef263` |
+| Q-6 | Yes: the bulk move asks for the operator's own reason, empty until written, as a single change does | The commit that adds this table |
+| Q-7 | The person's own timezone, named | `508a4b62` |
+| Q-8, Q-9, Q-10 | Not new in 0.8.0; follow-up issues after the release | Follow-up |
+| Q-11 | Every nested env file is left out of the build | `7460cd96` |

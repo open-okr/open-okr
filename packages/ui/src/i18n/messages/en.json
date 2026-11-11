@@ -3300,7 +3300,6 @@
   "operator.defaultPlan.notMoved": "{name} did not move: {reason}",
   "operator.defaultPlan.people": "{count} people",
   "operator.defaultPlan.peopleOfSeats": "{count} of {seats} seats",
-  "operator.defaultPlan.reasonDefault": "Put on the default plan from the console",
   "operator.defaultPlan.refusedFor": "{name}: {count} people, the plan has {seats} seats",
   "operator.defaultPlan.refusedHelp": "Move these one at a time on the workspace's own page, where you can name the seats.",
   "operator.defaultPlan.title": "Workspaces with no plan",

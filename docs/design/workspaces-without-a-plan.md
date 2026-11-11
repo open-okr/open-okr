@@ -45,7 +45,7 @@ to every workspace (§3's first row).
 
 | Step | Route | What happens |
 |---|---|---|
-| Review | `/operator/default-plan` (GET) | Lists every workspace with no plan, each with its people in use against the default plan's seats, split into "Will move" and "Will be refused: {used} people, the plan has {seats} seats". Names the default plan and its AI credits a month. When those are zero it says so before anything else: "{plan} includes no AI credits, so moving these workspaces sets a seat limit and does not give them AI." A reason field, prefilled with "Put on the default plan from the console", required as on S-46 |
+| Review | `/operator/default-plan` (GET) | Lists every workspace with no plan, each with its people in use against the default plan's seats, split into "Will move" and "Will be refused: {used} people, the plan has {seats} seats". Names the default plan and its AI credits a month. When those are zero it says so before anything else: "{plan} includes no AI credits, so moving these workspaces sets a seat limit and does not give them AI." A reason field, empty and required as on S-46: the operator writes why these workspaces move (UAT 0.8.0 Q-6, Akmal, 11 November 2026; it was prefilled with "Put on the default plan from the console", which recorded the same sentence whatever the reason) |
 | Confirm | A server action on that page | Applies the plan to exactly the workspaces the review listed under "Will move", then shows the result per workspace |
 
 **One Operation per workspace, the one S-46 already runs.** Each move is
