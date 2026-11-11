@@ -218,6 +218,35 @@ describe("server calls behind a path that is off", () => {
     ).rejects.toMatchObject({ body: { code: "CHANGE_EMAIL_DISABLED" } });
   });
 
+  it("turns the change of email on from server code only, where mail can be sent (Y4)", async () => {
+    const wb = await workerDb();
+    const withMail = createAuth({
+      pool: wb.appPool,
+      secret: SECRET,
+      baseUrl: BASE_URL,
+      rateLimit: { enabled: false },
+      canSendMail: true,
+    });
+    await expect(
+      withMail.api.changeEmail({
+        headers: headers(),
+        body: { newEmail: "moved@example.com" },
+      }),
+    ).resolves.toEqual({ status: true });
+    const response = await withMail.handler(
+      new Request(`${BASE_URL}/api/auth/change-email`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: BASE_URL,
+          cookie,
+        },
+        body: JSON.stringify({ newEmail: "elsewhere@example.com" }),
+      }),
+    );
+    expect(response.status).toBe(404);
+  });
+
   it("still revokes a session from server code, as Security does", async () => {
     const second = cookieFrom(
       await send("POST", "/sign-in/email", {

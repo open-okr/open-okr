@@ -4,6 +4,7 @@ import {
   createAuth,
   type EmailConfirmation,
   followSSOProviders,
+  resolveCanSendMail,
   resolveEmailConfirmation,
   type SSOFollowingAuth,
   type SSOProviderConfig,
@@ -50,6 +51,7 @@ const globals = globalThis as typeof globalThis & {
   openokrRequireEmailVerification?: boolean;
   openokrOptionalVerificationLinks?: boolean;
   openokrConfirmationCheckedAt?: number;
+  openokrCanSendMail?: boolean;
   openokrAuthInstanceName?: string;
 };
 
@@ -129,6 +131,28 @@ export async function resolveSignupPolicy(): Promise<void> {
         `stays off: ${error instanceof Error ? error.message : String(error)}\n`,
     );
   }
+  // Whether mail can be sent at all, which turns on changing the sign-in
+  // email (account-self-service.md D14, plan 0.8.0 Y4). Its own answer, so a
+  // later rule about confirming addresses at sign-up does not move it.
+  try {
+    globals.openokrCanSendMail = await resolveCanSendMail(getPool());
+  } catch (error) {
+    process.stderr.write(
+      `auth: could not resolve the mail transport, so changing a sign-in ` +
+        `email stays off: ${error instanceof Error ? error.message : String(error)}\n`,
+    );
+  }
+}
+
+/**
+ * Whether this instance can send mail, as boot resolved it (account-self-
+ * service.md D14, plan 0.8.0 Y4). Your account offers the change of sign-in
+ * email only where this is true, and `createAuth` turns Better Auth's change
+ * on from the same answer, so the card and the endpoint never disagree.
+ * False until boot has run, and after a failed read.
+ */
+export function canSendMail(): boolean {
+  return globals.openokrCanSendMail ?? false;
 }
 
 /**
@@ -187,6 +211,9 @@ function buildAuth(
     // nothing waiting on it (plan 0.8.0 S4).
     optionalVerificationLinks:
       globals.openokrOptionalVerificationLinks ?? false,
+    // Resolved at boot from `mail.transport` too, and read by Your account
+    // through `canSendMail()` (account-self-service.md D14).
+    canSendMail: canSendMail(),
     // From sso_connections, as last read (P8-T07, L-15).
     ssoProviders: providers,
     // Lets a server action set and clear the session cookie. Framework glue,

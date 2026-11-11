@@ -13,12 +13,29 @@
  * call meet one guard, in `createAuth`'s hooks (D7, D8). What is here is what
  * the card needs to know before it draws, and Set a password, which goes
  * through Better Auth's server-only `setPassword` (D12).
+ *
+ * **Changing the sign-in email is here** (plan 0.8.0 Y4, D14 to D17).
+ * `/change-email` is off over HTTP, so the server action is the only way in,
+ * and it runs every refusal, the password and the limits before it calls
+ * `auth.api.changeEmail`. The link and its completion are in `createAuth`'s
+ * hooks and `email-change.ts`.
  */
 import { APIError } from "better-auth/api";
 import type { Pool } from "pg";
 import { isDemoAccount } from "../demo/persona-list.ts";
 import type { Auth } from "./auth.ts";
 import { callerAddress } from "./caller-address.ts";
+import {
+  addressHasAccount,
+  auditedAddress,
+  EMAIL_CHANGE_ANSWER_FLOOR_MS,
+  EMAIL_CHANGE_CALLBACK,
+  emailChangeAllowance,
+  emailChangeBlock,
+  newAddressRefusal,
+  recordEmailChangeRequest,
+} from "./email-change.ts";
+import type { AuthLimiterStorage } from "./limiter-storage.ts";
 import {
   accountHasPassword,
   MAX_PASSWORD_LENGTH,
@@ -31,6 +48,7 @@ import {
   enforcedProviderForUser,
   enforcementMessage,
 } from "./sso-enforcement.ts";
+import { EMAIL_VERIFICATION_LINK_SECONDS } from "./verification-links.ts";
 
 /** An identity provider the account can sign in again with (D2). */
 export interface SignInAgainProvider {
@@ -194,4 +212,257 @@ export async function setOwnPassword(
     address: callerAddress(input.headers),
   });
   return { ok: true, providers: await linkedProviders(pool, user.id) };
+}
+
+/** What Your account's email card shows for this account (D14, D16 (1)). */
+export type EmailCard =
+  /** The instance cannot send mail, so the change is not offered (D14). */
+  | { readonly kind: "no_mail" }
+  /** A demonstration account keeps its email (D1). */
+  | { readonly kind: "demo" }
+  /** A directory manages the account (AS-Q3). */
+  | { readonly kind: "directory" }
+  /** Single sign-on claims the address's domain (D16). */
+  | {
+      readonly kind: "enforced";
+      readonly provider: string;
+      readonly domain: string;
+    }
+  /**
+   * The form: the new address, and the current password where the account
+   * has one. An account with none needs a recent sign-in instead (D2), and
+   * is offered its providers to sign in again with until it has one.
+   */
+  | {
+      readonly kind: "change";
+      readonly hasPassword: boolean;
+      readonly recent: boolean;
+      readonly providers: readonly SignInAgainProvider[];
+    };
+
+/**
+ * What the email card draws for the signed-in account. Every refusal here
+ * depends only on the asker's own account, so the card says why before any
+ * address is typed.
+ */
+export async function emailCardFor(
+  pool: Pool,
+  input: {
+    readonly userId: string;
+    readonly email: string;
+    /** `canSendMail()`, the same answer Better Auth was built with (D14). */
+    readonly canSendMail: boolean;
+    readonly sessionCreatedAt: Date | string;
+    readonly now?: Date;
+  },
+): Promise<EmailCard> {
+  if (!input.canSendMail) {
+    return { kind: "no_mail" };
+  }
+  const block = await emailChangeBlock(pool, input);
+  if (block?.kind === "enforced") {
+    return {
+      kind: "enforced",
+      provider: block.provider.displayName,
+      domain: block.provider.domain,
+    };
+  }
+  if (block) {
+    return { kind: block.kind };
+  }
+  const hasPassword = await accountHasPassword(pool, input.userId);
+  return {
+    kind: "change",
+    hasPassword,
+    recent: signedInRecently({ createdAt: input.sessionCreatedAt }, input.now),
+    providers: hasPassword ? [] : await linkedProviders(pool, input.userId),
+  };
+}
+
+/** Why a change of sign-in email was refused, or that it was accepted. */
+export type EmailChangeOutcome =
+  | {
+      readonly ok: true;
+      /** The address the link went to, or would have. */
+      readonly to: string;
+      /** The address that still signs in until the link is opened. */
+      readonly current: string;
+      /** How long the link works, in hours. */
+      readonly hours: number;
+    }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "signed_out"
+        | "no_mail"
+        | "demo"
+        | "directory"
+        | "invalid"
+        | "same"
+        | "company"
+        | "wrong_password"
+        | "account_limit"
+        | "address_limit";
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "enforced";
+      readonly provider: string;
+      readonly domain: string;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "held";
+      readonly retryAfterSeconds: number;
+    }
+  | {
+      readonly ok: false;
+      readonly reason: "not_recent";
+      readonly providers: readonly SignInAgainProvider[];
+    };
+
+/** Waits until `ms` milliseconds have passed since `started` (D17). */
+async function answerNoSoonerThan(started: number, ms: number): Promise<void> {
+  const remaining = ms - (Date.now() - started);
+  if (remaining > 0) {
+    await new Promise((resolve) => setTimeout(resolve, remaining));
+  }
+}
+
+/**
+ * Asks to change the signed-in account's sign-in email (D16, D17).
+ *
+ * **In this order.** (1) The account itself: mail can be sent, then demo,
+ * directory-managed, single sign-on. (2) The new address: well formed, not
+ * the current one, and allowed by the address rule. (3) Proof: the current
+ * password through `auth.api.verifyPassword`, which counts toward the sign-in
+ * hold (D3), or a sign-in in the last ten minutes for an account with no
+ * password. (4) Three requests a day per account, and three per new address.
+ * (5) One branch: an address another account holds is told nothing changed
+ * (AS-Q5); a free one gets Better Auth's link. Either way the current
+ * address is told and the request recorded, before any link exists.
+ * (6) The same answer, no sooner than 500 ms after the request began.
+ *
+ * Every refusal before the address depends only on the asker's account, the
+ * address rule only on the domain, and the per-address limit counts every
+ * address alike, so no answer here says whether another account exists.
+ */
+export async function changeOwnEmail(
+  auth: Pick<Auth, "api" | "options" | "$context">,
+  pool: Pool,
+  input: {
+    readonly headers: Headers;
+    readonly newEmail: string;
+    /** The current password. Ignored for an account that has none. */
+    readonly password: string;
+    /** Where the daily limits are counted: the shared cache in the web app. */
+    readonly limits: AuthLimiterStorage;
+    readonly now?: Date;
+  },
+): Promise<EmailChangeOutcome> {
+  const started = Date.now();
+  const session = await auth.api.getSession({ headers: input.headers });
+  if (!session) {
+    return { ok: false, reason: "signed_out" };
+  }
+  const user = session.user as { id: string; email: string };
+
+  // (1) The account itself.
+  if (auth.options.user?.changeEmail?.enabled !== true) {
+    return { ok: false, reason: "no_mail" };
+  }
+  const block = await emailChangeBlock(pool, {
+    userId: user.id,
+    email: user.email,
+  });
+  if (block?.kind === "enforced") {
+    return {
+      ok: false,
+      reason: "enforced",
+      provider: block.provider.displayName,
+      domain: block.provider.domain,
+    };
+  }
+  if (block) {
+    return { ok: false, reason: block.kind };
+  }
+
+  // (2) The address.
+  const next = input.newEmail.trim().toLowerCase();
+  const refusal = await newAddressRefusal(pool, {
+    current: user.email,
+    next,
+  });
+  if (refusal) {
+    return { ok: false, reason: refusal };
+  }
+
+  // (3) Proof.
+  if (await accountHasPassword(pool, user.id)) {
+    if (input.password === "") {
+      return { ok: false, reason: "wrong_password" };
+    }
+    try {
+      await auth.api.verifyPassword({
+        headers: input.headers,
+        body: { password: input.password },
+      });
+    } catch (error) {
+      const body = (error instanceof APIError ? error.body : undefined) as
+        | { code?: unknown; retryAfterSeconds?: unknown }
+        | undefined;
+      if (body?.code === "SIGN_IN_HELD") {
+        const seconds = Number(body.retryAfterSeconds);
+        return {
+          ok: false,
+          reason: "held",
+          retryAfterSeconds: Number.isFinite(seconds) ? seconds : 60,
+        };
+      }
+      if (body?.code === "INVALID_PASSWORD") {
+        return { ok: false, reason: "wrong_password" };
+      }
+      throw error;
+    }
+  } else if (!signedInRecently(session.session, input.now)) {
+    return {
+      ok: false,
+      reason: "not_recent",
+      providers: await linkedProviders(pool, user.id),
+    };
+  }
+
+  // (4) The limits.
+  const { secret } = await auth.$context;
+  const allowance = await emailChangeAllowance(input.limits, {
+    userId: user.id,
+    toKey: auditedAddress(secret, next).key,
+  });
+  if (allowance !== "allowed") {
+    return { ok: false, reason: allowance };
+  }
+
+  // (5) One branch. Recorded first, so the owner is told of every link.
+  const taken = await addressHasAccount(pool, next, user.id);
+  await recordEmailChangeRequest(pool, secret, {
+    userId: user.id,
+    from: user.email,
+    to: next,
+    outcome: taken ? "address_taken" : "link_sent",
+  });
+  if (!taken) {
+    await auth.api.changeEmail({
+      headers: input.headers,
+      body: { newEmail: next, callbackURL: EMAIL_CHANGE_CALLBACK },
+    });
+  }
+
+  // (6) The same answer.
+  await answerNoSoonerThan(started, EMAIL_CHANGE_ANSWER_FLOOR_MS);
+  return {
+    ok: true,
+    to: next,
+    current: user.email,
+    hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+  };
 }

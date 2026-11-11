@@ -508,6 +508,10 @@ export {
 } from "./audit/instance-chain.ts";
 export { verifyAllChains, verifyWorkspaceChain } from "./audit/verify.ts";
 export {
+  changeOwnEmail,
+  type EmailCard,
+  type EmailChangeOutcome,
+  emailCardFor,
   type PasswordCard,
   passwordCardFor,
   type SetPasswordOutcome,
@@ -526,6 +530,7 @@ export {
 export { recordCallerAddressReading } from "./auth/caller-address-audit.ts";
 export { authLimiterStorage } from "./auth/limiter-storage.ts";
 export { purgeStaleSignInAttempts } from "./auth/lockout.ts";
+export { resolveCanSendMail } from "./auth/mail-capability.ts";
 export {
   MAX_PASSWORD_LENGTH,
   MIN_PASSWORD_LENGTH,
@@ -838,6 +843,7 @@ export {
   syncDirectoryGroup,
   unmapDirectoryGroup,
 } from "./directory-sync/groups.ts";
+export { directoryManagesAccount } from "./directory-sync/managed.ts";
 export {
   displayName as scimDisplayName,
   logSyncOperation,

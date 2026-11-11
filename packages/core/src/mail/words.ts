@@ -77,6 +77,53 @@ const en = {
   "verifyOptional.bodyAfter":
     " with the link below. It lets you join workspaces that admit people by their company's email domain.",
   "verifyOptional.action": "Confirm this address",
+  // A change of sign-in email (account-self-service.md §4.2, plan 0.8.0 Y4).
+  // The link to the new address.
+  "changeEmail.subject": "Confirm your new sign-in email for {instance}",
+  "changeEmail.preheader":
+    "Open the link and this becomes the email you sign in with.",
+  "changeEmail.eyebrow": "Account security",
+  "changeEmail.heading": "Confirm your new sign-in email",
+  "changeEmail.bodyBefore": "Open this link to make ",
+  "changeEmail.bodyAfter": " the email you sign in to {instance} with.",
+  "changeEmail.action": "Use this email to sign in",
+  "changeEmail.notice":
+    "It works for {hours} hours, in a browser where you are signed in to {instance}.",
+  "changeEmail.footer":
+    "Did not ask for this? Ignore this email and nothing changes.",
+
+  // The notice to the current address. The same words whether or not the
+  // new address has an account.
+  "emailChangeNotice.subject":
+    "A change of sign-in email was asked for on your {instance} account",
+  "emailChangeNotice.preheader":
+    "If this was not you, change your password and sign out your other devices.",
+  "emailChangeNotice.eyebrow": "Account security",
+  "emailChangeNotice.heading": "A new sign-in email was asked for",
+  "emailChangeNotice.bodyBefore":
+    "Somebody signed in to your account asked to make ",
+  "emailChangeNotice.bodyAfter": " its sign-in email, on {date} at {time} UTC.",
+  "emailChangeNotice.ifYou": "If that was you, follow the email sent to {to}.",
+  "emailChangeNotice.notYou":
+    "If it was not, change your password and sign out your other devices: an unopened link then stops working.",
+  "emailChangeNotice.action": "Change your password",
+  "emailChangeNotice.footer":
+    "Sent by {instance} at {host} whenever somebody asks to change this account's sign-in email.",
+
+  // An address that already has an account (AS-Q5 (b)).
+  "emailChangeTaken.subject":
+    "Somebody asked to use this address on {instance}",
+  "emailChangeTaken.preheader":
+    "This address already has an account. Nothing changed.",
+  "emailChangeTaken.eyebrow": "Account security",
+  "emailChangeTaken.heading": "This address already has an account",
+  "emailChangeTaken.body":
+    "Somebody asked to make this address the sign-in email of an account on {instance}. It already has an account here, so nothing changed.",
+  "emailChangeTaken.forgot":
+    "If you have forgotten your password, you can reset it.",
+  "emailChangeTaken.action": "Reset your password",
+  "emailChangeTaken.footer":
+    "Sent by {instance} at {host}. You do not need to do anything.",
 
   // A run of wrong passwords began an account hold (account-lockout.md Q2).
   "held.subject": "Somebody is trying to sign in to your {instance} account",
@@ -263,6 +310,50 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "verifyOptional.bodyAfter":
     " dengan pautan di bawah. Ia membolehkan anda menyertai ruang kerja yang menerima orang melalui domain e-mel syarikat mereka.",
   "verifyOptional.action": "Sahkan alamat ini",
+  "changeEmail.subject": "Sahkan e-mel log masuk baharu anda untuk {instance}",
+  "changeEmail.preheader":
+    "Buka pautan ini dan ia menjadi e-mel yang anda gunakan untuk log masuk.",
+  "changeEmail.eyebrow": "Keselamatan akaun",
+  "changeEmail.heading": "Sahkan e-mel log masuk baharu anda",
+  "changeEmail.bodyBefore": "Buka pautan ini untuk menjadikan ",
+  "changeEmail.bodyAfter":
+    " e-mel yang anda gunakan untuk log masuk ke {instance}.",
+  "changeEmail.action": "Gunakan e-mel ini untuk log masuk",
+  "changeEmail.notice":
+    "Ia berfungsi selama {hours} jam, dalam pelayar yang anda telah log masuk ke {instance}.",
+  "changeEmail.footer":
+    "Tidak meminta ini? Abaikan e-mel ini dan tiada apa yang berubah.",
+
+  "emailChangeNotice.subject":
+    "Pertukaran e-mel log masuk telah diminta pada akaun {instance} anda",
+  "emailChangeNotice.preheader":
+    "Jika ini bukan anda, tukar kata laluan anda dan log keluar peranti anda yang lain.",
+  "emailChangeNotice.eyebrow": "Keselamatan akaun",
+  "emailChangeNotice.heading": "E-mel log masuk baharu telah diminta",
+  "emailChangeNotice.bodyBefore":
+    "Seseorang yang log masuk ke akaun anda meminta untuk menjadikan ",
+  "emailChangeNotice.bodyAfter":
+    " e-mel log masuknya, pada {date} jam {time} UTC.",
+  "emailChangeNotice.ifYou": "Jika itu anda, ikut e-mel yang dihantar ke {to}.",
+  "emailChangeNotice.notYou":
+    "Jika bukan, tukar kata laluan anda dan log keluar peranti anda yang lain: pautan yang belum dibuka kemudian tidak lagi berfungsi.",
+  "emailChangeNotice.action": "Tukar kata laluan anda",
+  "emailChangeNotice.footer":
+    "Dihantar oleh {instance} di {host} setiap kali seseorang meminta untuk menukar e-mel log masuk akaun ini.",
+
+  "emailChangeTaken.subject":
+    "Seseorang meminta untuk menggunakan alamat ini di {instance}",
+  "emailChangeTaken.preheader":
+    "Alamat ini sudah mempunyai akaun. Tiada apa yang berubah.",
+  "emailChangeTaken.eyebrow": "Keselamatan akaun",
+  "emailChangeTaken.heading": "Alamat ini sudah mempunyai akaun",
+  "emailChangeTaken.body":
+    "Seseorang meminta untuk menjadikan alamat ini e-mel log masuk sebuah akaun di {instance}. Alamat ini sudah mempunyai akaun di sini, jadi tiada apa yang berubah.",
+  "emailChangeTaken.forgot":
+    "Jika anda terlupa kata laluan anda, anda boleh menetapkannya semula.",
+  "emailChangeTaken.action": "Tetapkan semula kata laluan",
+  "emailChangeTaken.footer":
+    "Dihantar oleh {instance} di {host}. Anda tidak perlu berbuat apa-apa.",
 
   "held.subject": "Seseorang cuba log masuk ke akaun {instance} anda",
   "held.preheader":

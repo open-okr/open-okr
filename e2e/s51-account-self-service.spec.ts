@@ -1,6 +1,7 @@
 /**
  * Your account, the parts a person changes about themselves (screens S-51
- * and S-35, docs/design/account-self-service.md §9, plan 0.8.0 Y3 and Y5).
+ * and S-35, docs/design/account-self-service.md §9, plan 0.8.0 Y3, Y4 and
+ * Y5).
  *
  * **A person of its own, invited through the product.** Every other spec
  * signs in as the account that claimed the instance, and this one changes a
@@ -9,9 +10,9 @@
  * and everything here happens to them. A spec may rely on the claim and
  * nothing else, and this relies on nothing else.
  *
- * The integration suites (`packages/core/test/password-change.test.ts` and
- * `people-own-name.test.ts`) hold the rows and the mail; this is what a
- * person sees.
+ * The integration suites (`packages/core/test/password-change.test.ts`,
+ * `email-change.test.ts` and `people-own-name.test.ts`) hold the rows and the
+ * mail; this is what a person sees.
  */
 import type { BrowserContext, Page } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -98,6 +99,30 @@ test("they rename themselves, and the avatar menu says the new name", async () =
     PERSON.renamed,
   );
   await page.keyboard.press("Escape");
+});
+
+test("changing the sign-in email is not offered where mail cannot be sent, and the card says why", async () => {
+  // The suite's servers run the console mail transport, so the new address's
+  // link could never arrive (plan 0.8.0 Y4, Q3). The change itself is the
+  // integration suite's (`email-change.test.ts`) and staging's, on SMTP.
+  await page.goto("/account");
+  await expect(page.getByTestId("account-email")).toHaveText(PERSON.email);
+  await expect(page.getByTestId("email-card")).toHaveText(
+    "Changing your sign-in email needs this instance to send mail, and it does not yet. Ask whoever runs it to set up mail.",
+  );
+  await expect(page.getByLabel("New email")).toHaveCount(0);
+});
+
+test("a change link opened signed out says to sign in and open it again", async ({
+  browser,
+}) => {
+  const signedOut = await browser.newContext();
+  const visitor = await signedOut.newPage();
+  await visitor.goto("/sign-in?notice=email-change");
+  await expect(visitor.getByTestId("open-link-again")).toHaveText(
+    "Sign in, then open the link in your email again.",
+  );
+  await signedOut.close();
 });
 
 test("a wrong current password is refused with its sentence", async () => {

@@ -1,6 +1,9 @@
 "use client";
 
-import type { PasswordCard as PasswordCardState } from "@openokr/core";
+import type {
+  PasswordCard as PasswordCardState,
+  SignInAgainProvider,
+} from "@openokr/core";
 import {
   Button,
   Card,
@@ -74,7 +77,11 @@ export function PasswordCard({
         ) : card.recent ? (
           <SetPassword setPassword={setPassword} />
         ) : (
-          <SignInAgain providers={card.providers} />
+          <SignInAgain
+            providers={card.providers}
+            intro={t("account.security.password.signInAgainFirst")}
+            callbackURL="/account/security"
+          />
         )}
       </CardBody>
     </Card>
@@ -326,12 +333,19 @@ function SetPassword({
 
 /**
  * No recent sign-in yet: one button per identity provider the account is
- * linked to, each coming back to this card (D2).
+ * linked to, each coming back to the card that asked (D2). Your account's
+ * email card uses it too, for an account with no password (plan 0.8.0 Y4).
  */
-function SignInAgain({
+export function SignInAgain({
   providers,
+  intro,
+  callbackURL,
 }: {
-  readonly providers: Extract<PasswordCardState, { kind: "set" }>["providers"];
+  readonly providers: readonly SignInAgainProvider[];
+  /** Why a fresh sign-in is needed, in the asking card's words. */
+  readonly intro: string;
+  /** Where the provider brings the person back to. */
+  readonly callbackURL: string;
 }) {
   const { t } = useTranslations();
   const [acting, setActing] = useState<string | null>(null);
@@ -348,11 +362,11 @@ function SignInAgain({
         provider.kind === "saml"
           ? await authClient.signIn.sso({
               providerId: provider.id,
-              callbackURL: "/account/security",
+              callbackURL,
             })
           : await authClient.signIn.social({
               provider: provider.id as "github",
-              callbackURL: "/account/security",
+              callbackURL,
             });
     } finally {
       setActing(null);
@@ -368,9 +382,7 @@ function SignInAgain({
 
   return (
     <>
-      <p className="max-w-prose text-sm text-ink-3">
-        {t("account.security.password.signInAgainFirst")}
-      </p>
+      <p className="max-w-prose text-sm text-ink-3">{intro}</p>
       {providers.map((provider) => (
         <Button
           key={provider.id}

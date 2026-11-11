@@ -1,9 +1,9 @@
-import { callAction, isDemoAccount } from "@openokr/core";
+import { callAction, emailCardFor, isDemoAccount } from "@openokr/core";
 import { listTimezones } from "@openokr/formats";
 import { Avatar, Card, CardBody, CardHeader } from "@openokr/ui";
 import Link from "next/link";
 import { AppearanceControl } from "../../lib/appearance.tsx";
-import { getPool } from "../../lib/auth";
+import { canSendMail, getPool } from "../../lib/auth";
 import { pageTitle } from "../../lib/page-title.ts";
 import { getTranslations } from "../../lib/translations";
 import { requireWorkspace } from "../../lib/workspace";
@@ -15,6 +15,8 @@ import {
   updateProfile,
   uploadAvatar,
 } from "../people/actions.ts";
+import { changeEmail } from "./email-actions.ts";
+import { EmailCard } from "./email-card.tsx";
 import { NameForm } from "./name-form.tsx";
 
 export const generateMetadata = pageTitle("pageTitle.account");
@@ -34,21 +36,33 @@ export const generateMetadata = pageTitle("pageTitle.account");
  * and manager stay read only, because an administrator sets them. A
  * demonstration account keeps its name, because anybody can sign in to it.
  *
- * **How they sign in**: their email, and Security for the password (Y3).
- * Changing the email from here is row Y4.
+ * **How they sign in**: their email, which they change here (Y4), and
+ * Security for the password (Y3). An opened change link lands back here, and
+ * says what became of it.
  */
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ emailChange?: string; error?: string }>;
+}) {
   const { t } = await getTranslations();
   const { session, workspace } = await requireWorkspace();
+  const opened = linkOutcome(await searchParams, session.user.email, t);
   const context = {
     pool: getPool(),
     workspaceId: workspace.workspaceId,
     actor: { kind: "human" as const, userId: session.user.id },
   };
-  const [member, directory, delivery] = await Promise.all([
+  const [member, directory, delivery, emailCard] = await Promise.all([
     callAction(context, "people.readMember", { memberId: workspace.memberId }),
     callAction(context, "people.directory", {}),
     callAction(context, "channels.mySettings", {}),
+    emailCardFor(getPool(), {
+      userId: session.user.id,
+      email: session.user.email,
+      canSendMail: canSendMail(),
+      sessionCreatedAt: session.session.createdAt,
+    }),
   ]);
   const demo = isDemoAccount(session.user.email);
   const manager = member.managerId
@@ -144,13 +158,28 @@ export default async function AccountPage() {
             {t("account.profile.signIn")}
           </h2>
         </CardHeader>
-        <CardBody className="flex flex-col gap-2 text-sm">
+        <CardBody className="flex flex-col gap-3 text-sm">
           <p>
             <span className="text-ink-3">{t("account.profile.email")} </span>
             <span className="text-ink" data-testid="account-email">
               {session.user.email}
             </span>
           </p>
+          <div role="status" aria-live="polite" className="contents">
+            {opened ? (
+              <p
+                data-testid="email-change-outcome"
+                className={
+                  opened.ok
+                    ? "max-w-prose rounded-md bg-ok-bg px-2.5 py-1.5 text-xs font-medium text-ok"
+                    : "max-w-prose rounded-md bg-bad-bg px-2.5 py-1.5 text-xs font-medium text-bad"
+                }
+              >
+                {opened.message}
+              </p>
+            ) : null}
+          </div>
+          <EmailCard card={emailCard} action={changeEmail} />
           <Link
             href="/account/security"
             className="text-xs font-semibold text-brand-text hover:underline"
@@ -161,4 +190,46 @@ export default async function AccountPage() {
       </Card>
     </div>
   );
+}
+
+/**
+ * What became of an opened change link (account-self-service.md §5, D19).
+ * Better Auth lands a refused link on its callback with `error`, and the
+ * completion hook lands its own refusals with the reason in `emailChange`.
+ * The new address is never in the address bar: "taken" names no address.
+ */
+function linkOutcome(
+  params: { readonly emailChange?: string; readonly error?: string },
+  email: string,
+  t: Awaited<ReturnType<typeof getTranslations>>["t"],
+): { readonly ok: boolean; readonly message: string } | null {
+  if (params.emailChange === undefined) {
+    return null;
+  }
+  if (params.error !== undefined) {
+    switch (params.error) {
+      case "TOKEN_EXPIRED":
+        return { ok: false, message: t("account.email.linkExpired") };
+      case "INVALID_USER":
+        return { ok: false, message: t("account.email.linkOtherAccount") };
+      default:
+        return { ok: false, message: t("account.email.linkInvalid") };
+    }
+  }
+  switch (params.emailChange) {
+    case "changed":
+      return { ok: true, message: t("account.email.changed", { email }) };
+    case "taken":
+      return { ok: false, message: t("account.email.linkTaken") };
+    case "demo":
+      return { ok: false, message: t("account.email.linkDemo") };
+    case "directory":
+      return { ok: false, message: t("account.email.linkDirectory") };
+    case "enforced":
+      return { ok: false, message: t("account.email.linkEnforced") };
+    case "company":
+      return { ok: false, message: t("account.email.linkCompany") };
+    default:
+      return null;
+  }
 }

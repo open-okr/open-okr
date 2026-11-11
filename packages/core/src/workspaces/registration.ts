@@ -128,6 +128,28 @@ async function policyInForce(
   return (await isCloudEnabled(pool)) ? "open" : read.value;
 }
 
+/**
+ * Whether the address rule refuses this address (docs/design/
+ * account-self-service.md AS-Q2 (a)): only company email addresses are
+ * accepted, and this is a free mail address.
+ *
+ * **The address rule only**, without the invitation rule. Moving an existing
+ * account's sign-in email (plan 0.8.0 Y4) is not a registration, so
+ * `invite_only`, which decides who may create an account, refuses nothing
+ * here. `company_domains` is a rule about addresses, so it holds for a moved
+ * address as it does for a new one.
+ */
+export async function addressRuleRefuses(
+  pool: Pool,
+  email: string,
+  environment: Environment = process.env,
+): Promise<boolean> {
+  if (!isFreeMailAddress(email)) {
+    return false;
+  }
+  return (await policyInForce(pool, environment)) === "company_domains";
+}
+
 /** Whether anybody at all may register, whatever their address. */
 export async function isRegistrationOpen(
   pool: Pool,

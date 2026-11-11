@@ -68,7 +68,7 @@ export const AUTH_ENDPOINTS: readonly AuthEndpoint[] = [
   off(
     "/change-email",
     ["POST"],
-    "Asks for no password; Y4 calls auth.api.changeEmail from a server action (D15)",
+    "Asks for no password; Your account's server action calls auth.api.changeEmail after its own refusals and the password, where mail can be sent (D14, D15)",
   ),
   off(
     "/verify-password",

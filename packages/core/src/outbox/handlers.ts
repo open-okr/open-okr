@@ -46,6 +46,11 @@ import {
   parseAgentRunStepJob,
 } from "../agents/run-steps.ts";
 import {
+  CHANGE_EMAIL_TOPIC,
+  EMAIL_CHANGE_NOTICE_TOPIC,
+  EMAIL_CHANGE_TAKEN_TOPIC,
+} from "../auth/email-change.ts";
+import {
   PASSWORD_CHANGE_VIAS,
   PASSWORD_CHANGED_TOPIC,
   type PasswordChangeVia,
@@ -74,7 +79,13 @@ import {
   parseExportJob,
   runExportJob,
 } from "../exports/worker.ts";
-import { passwordChangedMail, verifyEmailMail } from "../mail/account.ts";
+import {
+  changeEmailMail,
+  emailChangeNoticeMail,
+  emailChangeTakenMail,
+  passwordChangedMail,
+  verifyEmailMail,
+} from "../mail/account.ts";
 import {
   closureMail,
   erasureReminderMail,
@@ -559,6 +570,135 @@ const sendPasswordChanged: OutboxHandler = async (delivery, deps) => {
     via: via as PasswordChangeVia,
     otherSessionsEnded: delivery.payload.otherSessionsEnded === true,
     at,
+    baseUrl: deps.baseUrl,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Sends the link that makes a new address the sign-in email (docs/design/
+ * account-self-service.md §4.2, D18, plan 0.8.0 Y4), to that new address.
+ *
+ * **Skips rather than fails** a link nobody can use: no mail configured, the
+ * link expired, the account gone, or its address no longer the one the link
+ * was asked from. Better Auth refuses such a link when it is opened anyway;
+ * this only spares a mail that could do nothing.
+ */
+const sendChangeEmailLink: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const from = asString(delivery.payload.from);
+  const to = asString(delivery.payload.to);
+  const url = asString(delivery.payload.url);
+  const expiresAt = Date.parse(asString(delivery.payload.expiresAt) ?? "");
+  if (!userId || !from || !to || !url || Number.isNaN(expiresAt)) {
+    throw new PermanentDispatchError(
+      "A change-of-email link needs an account, both addresses, a link and when it expires, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  if (expiresAt <= Date.now()) {
+    deps.onSkipped?.(delivery, "the link has expired");
+    return;
+  }
+  // `users` has no tenant policy and no soft delete: an account is there or
+  // it is not.
+  const { rows } = await deps.pool.query<{ email: string }>(
+    "select email from users where id = $1",
+    [userId],
+  );
+  const account = rows[0];
+  if (!account) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+  if (account.email.toLowerCase() !== from.toLowerCase()) {
+    deps.onSkipped?.(delivery, "the account's address has changed");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = changeEmailMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    url,
+    hours: EMAIL_VERIFICATION_LINK_SECONDS / 3600,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells the current address that a new sign-in email was asked for
+ * (account-self-service.md §4.2, D16, AS-Q4 (a)). The same mail whether or
+ * not the new address has an account. Skipped only when the account is gone;
+ * sent even when the address has changed since, because that is exactly
+ * when the old address should hear of it.
+ */
+const sendEmailChangeNotice: OutboxHandler = async (delivery, deps) => {
+  const userId = asString(delivery.payload.userId);
+  const to = asString(delivery.payload.to);
+  const newEmail = asString(delivery.payload.newEmail);
+  const at = new Date(asString(delivery.payload.at) ?? "");
+  if (!userId || !to || !newEmail || Number.isNaN(at.getTime())) {
+    throw new PermanentDispatchError(
+      "A change-of-email notice needs an account, both addresses and when it was asked for, and this row is missing one.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const { rows } = await deps.pool.query<{ id: string }>(
+    "select id from users where id = $1",
+    [userId],
+  );
+  if (rows.length === 0) {
+    deps.onSkipped?.(delivery, "the account is gone");
+    return;
+  }
+
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = emailChangeNoticeMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
+    to,
+    newEmail,
+    at,
+    baseUrl: deps.baseUrl,
+  });
+  await deps.sendMail({ to, ...built });
+};
+
+/**
+ * Tells an address that already has an account that somebody asked to make
+ * it another account's sign-in email, and that nothing changed
+ * (account-self-service.md AS-Q5 (b)). Names no account, so it reads nothing
+ * and is never skipped while mail is configured.
+ */
+const sendEmailChangeTaken: OutboxHandler = async (delivery, deps) => {
+  const to = asString(delivery.payload.to);
+  if (!to) {
+    throw new PermanentDispatchError(
+      "An address-taken notice needs the address, and this row has none.",
+    );
+  }
+  if (!deps.sendMail || !deps.baseUrl) {
+    deps.onSkipped?.(delivery, "no mail transport is configured");
+    return;
+  }
+  const language = await resolveInstanceDefaultLanguage(deps.pool).catch(
+    () => "en",
+  );
+  const built = emailChangeTakenMail({
+    instanceName: instanceNameOr(deps.instanceName),
+    locale: mailLocale(language),
     baseUrl: deps.baseUrl,
   });
   await deps.sendMail({ to, ...built });
@@ -1387,6 +1527,12 @@ export const OUTBOX_HANDLERS: Readonly<Record<string, OutboxHandler>> = {
   [VERIFY_EMAIL_TOPIC]: sendVerificationLink,
   // A password was changed, set or reset (account-self-service.md D9).
   [PASSWORD_CHANGED_TOPIC]: sendPasswordChanged,
+  // A change of sign-in email (account-self-service.md §4.2, plan 0.8.0
+  // Y4): the link to the new address, the notice to the current one, and
+  // the mail to an address that already has an account.
+  [CHANGE_EMAIL_TOPIC]: sendChangeEmailLink,
+  [EMAIL_CHANGE_NOTICE_TOPIC]: sendEmailChangeNotice,
+  [EMAIL_CHANGE_TAKEN_TOPIC]: sendEmailChangeTaken,
   // The batch drain's delivery (P6-G01b). `renderDigest` had no caller
   // outside the package barrel from P2-T06 until this row existed.
   [DIGEST_TOPIC]: sendDigest,
@@ -1484,6 +1630,12 @@ export const OUTBOX_REDACT_ON_DELIVERY: Readonly<
   [VERIFY_EMAIL_TOPIC]: ["to", "url"],
   // The address a password notice went to (account-self-service.md §4.2).
   [PASSWORD_CHANGED_TOPIC]: ["to"],
+  // Both addresses and the link of a change of sign-in email, and the
+  // addresses its two notices went to (§4.2). `from` goes too, which the
+  // design's table did not list: an address is no use once delivered.
+  [CHANGE_EMAIL_TOPIC]: ["to", "url", "from"],
+  [EMAIL_CHANGE_NOTICE_TOPIC]: ["to", "newEmail"],
+  [EMAIL_CHANGE_TAKEN_TOPIC]: ["to"],
   // Of a customer the provider no longer has. Nothing needs it once it is gone.
   [ERASE_CUSTOMER_TOPIC]: ["customerRef"],
 };

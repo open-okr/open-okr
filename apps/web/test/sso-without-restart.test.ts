@@ -73,6 +73,8 @@ vi.mock("@openokr/core", () => ({
     heldByCompanyDomains: false,
     companyDomains: false,
   })),
+  resolveCanSendMail: vi.fn(),
+  resolveRequireEmailVerification: vi.fn(),
   SSOConnectionRejected,
   syncAllSamlProviders: syncAllSamlProvidersMock,
   trackSSOProviders: (options: typeof tracked.options) => {

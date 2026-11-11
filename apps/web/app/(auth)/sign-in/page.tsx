@@ -73,6 +73,17 @@ export default function SignInPage() {
   // The instance says it is a demonstration, whether or not it lists anybody
   // to sign in as (plan 0.8.0 D1).
   const [demo, setDemo] = useState(false);
+  // A change-of-email link opened signed out sends the person here, and it
+  // works only inside their session (account-self-service.md D19, plan 0.8.0
+  // Y4). Read from the address bar once, after the first render, so the page
+  // needs no suspense boundary for it.
+  const [openLinkAgain, setOpenLinkAgain] = useState(false);
+  useEffect(() => {
+    setOpenLinkAgain(
+      new URLSearchParams(window.location.search).get("notice") ===
+        "email-change",
+    );
+  }, []);
 
   // Load SSO providers for buttons. Non-blocking: the password form renders
   // immediately and the buttons appear when the fetch completes.
@@ -301,6 +312,16 @@ export default function SignInPage() {
         </>
       }
     >
+      <div role="status" aria-live="polite" className="contents">
+        {openLinkAgain ? (
+          <p
+            data-testid="open-link-again"
+            className="mb-3 rounded-md bg-info-bg px-2.5 py-1.5 text-xs font-medium text-info"
+          >
+            {t("auth.signIn.openTheLinkAgain")}
+          </p>
+        ) : null}
+      </div>
       <form onSubmit={signIn} className="flex flex-col gap-3">
         <EmailInput
           label={t("people.detail.profileForm.email")}

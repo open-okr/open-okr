@@ -28,6 +28,8 @@ vi.mock("@openokr/core", () => ({
     heldByCompanyDomains: false,
     companyDomains: false,
   })),
+  resolveCanSendMail: vi.fn(),
+  resolveRequireEmailVerification: vi.fn(),
   // Builds on every call, which is all these two tests need of it. What it
   // does between calls is `test/sso-without-restart.test.ts`'s subject.
   followSSOProviders: (

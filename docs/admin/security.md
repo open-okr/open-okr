@@ -72,6 +72,25 @@ ten minutes of signing in.
 | Who cannot? | A demonstration account, whose password is published, and an account single sign-on claims, which signs in with its provider anyway. A demonstration account cannot turn a one-time code on either |
 | How often? | Ten requests a minute from one network, counted in the database so every replica shares the count |
 
+### Changing the sign-in email
+
+A signed-in person changes the email they sign in with on Your account: the
+new address and their current password. A link goes to the new address and a
+notice to the current one. **Nothing changes until the link is opened**, in a
+browser where they are signed in to the same account.
+
+| Question | Answer |
+|---|---|
+| When is it offered? | Only where the instance can send mail: `mail.transport` is `smtp`, read when the server starts. Otherwise Your account says the change needs mail. Changing the transport needs a restart before the card follows |
+| Who cannot? | A demonstration account; an account a directory manages (an active member of any workspace with a live SCIM token), because the directory finds people by address; and an account single sign-on claims, because its address is the organisation's. Each is told why before typing anything |
+| Which addresses are refused? | The current one, and a free mail address when registration accepts company addresses only. Invitation-only registration refuses nothing here: it decides who may create an account, not where an existing account's mail goes |
+| What proves it is them? | Their current password, which counts toward the sign-in hold like a wrong sign-in. An account with no password needs a sign-in in the last ten minutes instead |
+| What if the address already has an account? | The answer on the screen is the same. That address is mailed "This address already has an account here, so nothing changed." and no link is sent, so the form cannot be used to find out who has an account |
+| How do I stop a change I did not ask for? | Change the password with "Sign out my other devices" ticked. The link only works inside a signed-in session of the account, so every unopened link stops working |
+| What is recorded? | `auth.email_change_requested` for each accepted request and `auth.email_changed` when a link completes it, on the instance audit chain. Addresses appear as their domain and a keyed hash, never in clear |
+| How often? | Three requests a day from one account, and three a day for one new address from any account, counted in the database |
+| What follows the new address? | Sign-in, every mail, the `userName` SCIM answers, which single sign-on connection claims the account, and trusted-domain offers. Member rows hold no address and are untouched |
+
 ### Authentication endpoints that are off
 
 Everything under `/api/auth` is Better Auth, the sign-in library. It serves
@@ -81,7 +100,7 @@ You do not need to configure this, and nothing in the product stops working.
 | Off | Why |
 |---|---|
 | `/update-user`, `/update-session` | Changed the account's name or picture with no record |
-| `/change-email`, `/verify-password` | Asked for no password, or checked one without counting it toward the hold |
+| `/change-email`, `/verify-password` | Asked for no password, or checked one without counting it toward the hold. Changing the sign-in email goes through Your account instead |
 | `/delete-user`, `/delete-user/callback` | Deleting your own account has its own flow |
 | `/list-sessions`, `/revoke-session`, `/revoke-sessions`, `/revoke-other-sessions` | Security lists and ends sessions from the server. A stolen cookie could have signed the owner out everywhere |
 | `/list-accounts`, `/link-social`, `/unlink-account` | Unlinking removed a password or a provider link with no record |

@@ -49,6 +49,14 @@ import {
   withSealedAccountTokens,
 } from "./account-token-sealing.ts";
 import { callerAddress, callerAddressOptions } from "./caller-address.ts";
+import {
+  completionRefusal,
+  EMAIL_CHANGE_SIGN_IN,
+  queueChangeLink,
+  readChangeLink,
+  recordEmailChanged,
+  tokenOfRequest,
+} from "./email-change.ts";
 import { DISABLED_AUTH_PATHS } from "./endpoints.ts";
 import {
   type AuthLimiterStorage,
@@ -384,6 +392,19 @@ export interface AuthOptions {
    */
   readonly optionalVerificationLinks?: boolean;
   /**
+   * Whether this instance can send mail (docs/design/account-self-service.md
+   * D14, plan 0.8.0 Y4), which turns on Better Auth's change of sign-in
+   * email. The new address has to be proved by a link, so with no mail the
+   * change is not offered at all.
+   *
+   * Resolved by the caller at boot with `resolveCanSendMail`, and the web app
+   * hands Your account the same stored answer, so the page and the endpoint
+   * never disagree. A separate answer from `requireEmailVerification`,
+   * because whether to confirm an address at sign-up may be decided on more
+   * than the transport (plan 0.8.0 S4). Defaults to false: off.
+   */
+  readonly canSendMail?: boolean;
+  /**
    * SSO provider configurations loaded from `sso_connections` (P8-T07). Each
    * OIDC entry becomes a genericOAuth provider that appears on the sign-in
    * page and flows through Better Auth's social-provider path.
@@ -566,6 +587,7 @@ export function createAuth(options: AuthOptions) {
   const requireEmailVerification = options.requireEmailVerification ?? false;
   const optionalVerificationLinks =
     !requireEmailVerification && (options.optionalVerificationLinks ?? false);
+  const canSendMail = options.canSendMail ?? false;
   const rateLimitEnabled = options.rateLimit?.enabled ?? true;
   // Where each address's allowance of confirmation links is counted (D9):
   // the shared storage when there is one, so every replica sees one count.
@@ -615,6 +637,17 @@ export function createAuth(options: AuthOptions) {
     // inventory does not classify. A server call through `auth.api` never
     // meets this list.
     disabledPaths: [...DISABLED_AUTH_PATHS],
+
+    /**
+     * **Changing the sign-in email** (account-self-service.md D14, D15, plan
+     * 0.8.0 Y4): on only where mail can be sent, because nothing changes
+     * until the new address's link is opened. `/change-email` stays off over
+     * HTTP; Your account's server action calls `auth.api.changeEmail` after
+     * its own refusals and the password. No confirmation by the old address
+     * first (AS-Q4 (a)): it is told instead, and an unopened link stops
+     * working once the owner signs every other device out (D19).
+     */
+    user: { changeEmail: { enabled: canSendMail } },
 
     emailAndPassword: {
       enabled: true,
@@ -724,6 +757,24 @@ export function createAuth(options: AuthOptions) {
        * with a console transport it queues nothing.
        */
       sendVerificationEmail: async ({ user, url, token }, request) => {
+        // **A change of sign-in email comes through here too** (account-
+        // self-service.md D18, plan 0.8.0 Y4). Better Auth hands its link to
+        // this callback with the new address as `user.email`, which the
+        // confirmation branch below would skip as an address already
+        // confirmed. Its signed token says which kind it is, and the old and
+        // new addresses come from the token rather than from `user`.
+        const change = await readChangeLink(options.secret, token);
+        if (change) {
+          if (canSendMail) {
+            await queueChangeLink(options.pool, {
+              ...change,
+              url,
+              token,
+              lifetimeSeconds: EMAIL_VERIFICATION_LINK_SECONDS,
+            });
+          }
+          return;
+        }
         // The account that claims the instance is created verified, and a
         // link asking it to confirm again would only confuse (BUG-028).
         if (
@@ -745,11 +796,19 @@ export function createAuth(options: AuthOptions) {
       /**
        * One instance audit row when an address is confirmed by its link
        * (D17). Better Auth calls this only on the change from unconfirmed to
-       * confirmed, so an old link opened again writes nothing. Y4's change of
-       * address reaches this callback too, and adds its own branch when it
-       * lands (account-self-service.md D20).
+       * confirmed, so an old link opened again writes nothing.
+       *
+       * **A completed change of sign-in email reaches this callback too**,
+       * for an account whose old address was confirmed (account-self-
+       * service.md D20, plan 0.8.0 Y4). A change is not a first
+       * confirmation, so it writes no `auth.email_verified` row here; the
+       * user-update hook below records it as `auth.email_changed`, for a
+       * confirmed account and an unconfirmed one alike.
        */
-      afterEmailVerification: async (user) => {
+      afterEmailVerification: async (user, request) => {
+        if (await readChangeLink(options.secret, tokenOfRequest(request))) {
+          return;
+        }
         try {
           await recordInstanceAuditEvent(options.pool, {
             action: "auth.email_verified",
@@ -823,6 +882,53 @@ export function createAuth(options: AuthOptions) {
        * no address.
        */
       before: createAuthMiddleware(async (hookContext) => {
+        /**
+         * **A change link is completed only inside a live session of the
+         * same account** (account-self-service.md D19, plan 0.8.0 Y4).
+         * Better Auth accepts one opened with no session at all, so a thief
+         * who opened their own link would win even after the owner changed
+         * the password and signed every device out. With this, that change
+         * cancels every unopened link.
+         *
+         * Signed out, the link sends the person to sign in and open it
+         * again. A session of another account is left to Better Auth, which
+         * refuses it as `INVALID_USER`, and so is a link that is expired,
+         * forged or already used. For the right account, what refused a
+         * request refuses the change too, checked again now, and so does an
+         * address somebody else signed up with since: each lands on Your
+         * account with its reason, rather than on the unique index.
+         * Confirmation links pass through untouched.
+         */
+        if (hookContext.path === "/verify-email") {
+          const link = await readChangeLink(
+            options.secret,
+            (hookContext.query as { token?: unknown } | undefined)?.token,
+          );
+          if (!link) {
+            return;
+          }
+          const session = await getSessionFromCtx(hookContext);
+          if (!session) {
+            throw hookContext.redirect(EMAIL_CHANGE_SIGN_IN);
+          }
+          const user = session.user as { id: string; email: string };
+          if (
+            user.id !== link.userId ||
+            user.email.toLowerCase() !== link.from
+          ) {
+            return;
+          }
+          const refusal = await completionRefusal(options.pool, {
+            userId: user.id,
+            email: user.email,
+            to: link.to,
+          });
+          if (refusal) {
+            throw hookContext.redirect(`/account?emailChange=${refusal}`);
+          }
+          return;
+        }
+
         /**
          * **Each address's allowance of confirmation links** (email-
          * verification.md D9): one a minute and five a day, whatever network
@@ -1140,6 +1246,37 @@ export function createAuth(options: AuthOptions) {
         },
       },
       user: {
+        update: {
+          /**
+           * **A completed change of sign-in email is recorded once**
+           * (account-self-service.md D20, plan 0.8.0 Y4): one
+           * `auth.email_changed` row, with both addresses as domains and
+           * keys. Better Auth runs this once per real update; a second click
+           * on the same link fails earlier, as `INVALID_TOKEN`, because the
+           * account no longer has the address the token is bound to.
+           *
+           * Here rather than in `afterEmailVerification`, which Better Auth
+           * calls only for an account whose old address was confirmed.
+           */
+          after: async (user, hookContext) => {
+            if (hookContext?.path !== "/verify-email") {
+              return;
+            }
+            const link = await readChangeLink(
+              options.secret,
+              (hookContext.query as { token?: unknown } | undefined)?.token,
+            );
+            const email = (user as { email?: unknown }).email;
+            if (
+              !link ||
+              typeof email !== "string" ||
+              email.toLowerCase() !== link.to
+            ) {
+              return;
+            }
+            await recordEmailChanged(options.pool, options.secret, link);
+          },
+        },
         create: {
           /**
            * The registration policy (§4.14): open until somebody has claimed

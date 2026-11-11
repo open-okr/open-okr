@@ -250,8 +250,10 @@ export const METRIC = {
   /**
    * Account changes whose record could not be written: the audit row and the
    * mail that say a password was changed, by `via` (`change`, `set`,
-   * `reset`) (account-self-service.md D9, plan 0.8.0 Y3). The change itself
-   * stands; any count here is a change nobody was told about.
+   * `reset`) (account-self-service.md D9, plan 0.8.0 Y3), and the link or the
+   * `auth.email_changed` row of a sign-in email change (`email`, D18, D20,
+   * Y4). The change itself stands; any count here is a change nobody was
+   * told about.
    */
   accountChangeRecordFailures: "openokr_account_change_record_failures_total",
 

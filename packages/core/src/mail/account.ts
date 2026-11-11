@@ -1,7 +1,8 @@
 /**
  * The account mails the relay sends: the link that confirms an email address
- * (docs/design/email-verification.md D6, D18; email-templates.md §5), and the
- * notice that a password changed (account-self-service.md D9).
+ * (docs/design/email-verification.md D6, D18; email-templates.md §5), the
+ * notice that a password changed (account-self-service.md D9), and the three
+ * mails of a change of sign-in email (§4.2, plan 0.8.0 Y4).
  *
  * **Built here, not in the web app,** because the relay's handlers live in
  * this package and may not import `apps/web`. The reset and the held-sign-in
@@ -125,16 +126,7 @@ export function passwordChangedMail(input: {
   const instance = input.instanceName;
   const resetUrl = new URL("/forgot-password", input.baseUrl).toString();
   const host = new URL(resetUrl).host;
-  const date = input.at.toLocaleDateString(
-    input.locale === "ms" ? "ms-MY" : "en-GB",
-    { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" },
-  );
-  const time = input.at.toLocaleTimeString("en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    timeZone: "UTC",
-  });
+  const { date, time } = dateAndTime(input.at, input.locale);
   const words = {
     change: {
       subject: t("passwordChanged.subjectChange", { instance }),
@@ -184,4 +176,173 @@ export function passwordChangedMail(input: {
     ],
   );
   return { subject: words.subject, html, text };
+}
+
+/** "11 November 2026" and "07:05", in UTC, as the password notice says them. */
+function dateAndTime(
+  at: Date,
+  locale: MailLocale,
+): { readonly date: string; readonly time: string } {
+  return {
+    date: at.toLocaleDateString(locale === "ms" ? "ms-MY" : "en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      timeZone: "UTC",
+    }),
+    time: at.toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC",
+    }),
+  };
+}
+
+/**
+ * The link that makes a new address the sign-in email (docs/design/
+ * account-self-service.md §4.2, D18, plan 0.8.0 Y4), to that new address.
+ *
+ * It says what opening it does and for how long it works, and that it works
+ * where the person is signed in (D19). Not opening it changes nothing.
+ */
+export function changeEmailMail(input: {
+  readonly instanceName: string;
+  readonly locale: MailLocale;
+  readonly to: string;
+  readonly url: string;
+  /** How long the link works, read from `EMAIL_VERIFICATION_LINK_SECONDS`. */
+  readonly hours: number;
+}): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("changeEmail.preheader"),
+      footer: [t("changeEmail.footer")],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("changeEmail.eyebrow") },
+      { kind: "heading", text: t("changeEmail.heading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("changeEmail.bodyBefore"),
+          { bold: input.to },
+          t("changeEmail.bodyAfter", { instance }),
+        ],
+      },
+      { kind: "action", label: t("changeEmail.action"), href: input.url },
+      {
+        kind: "notice",
+        parts: [t("changeEmail.notice", { hours: input.hours, instance })],
+      },
+    ],
+  );
+  return { subject: t("changeEmail.subject", { instance }), html, text };
+}
+
+/**
+ * The notice to the current address that a new sign-in email was asked for
+ * (account-self-service.md §4.2, D16, AS-Q4 (a)). **The same words whether
+ * or not the new address has an account**, so the notice says nothing about
+ * anybody else. The one button goes to Security, where changing the password
+ * with "Sign out my other devices" stops an unopened link (D19).
+ */
+export function emailChangeNoticeMail(input: {
+  readonly instanceName: string;
+  readonly locale: MailLocale;
+  readonly to: string;
+  readonly newEmail: string;
+  readonly at: Date;
+  /** The instance's public origin, where `/account/security` lives. */
+  readonly baseUrl: string;
+}): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const securityUrl = new URL("/account/security", input.baseUrl).toString();
+  const host = new URL(securityUrl).host;
+  const { date, time } = dateAndTime(input.at, input.locale);
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("emailChangeNotice.preheader"),
+      footer: [t("emailChangeNotice.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("emailChangeNotice.eyebrow") },
+      { kind: "heading", text: t("emailChangeNotice.heading") },
+      {
+        kind: "paragraph",
+        parts: [
+          t("emailChangeNotice.bodyBefore"),
+          { bold: input.newEmail },
+          t("emailChangeNotice.bodyAfter", { date, time }),
+        ],
+      },
+      {
+        kind: "paragraph",
+        parts: [t("emailChangeNotice.ifYou", { to: input.newEmail })],
+      },
+      { kind: "notice", parts: [t("emailChangeNotice.notYou")] },
+      {
+        kind: "action",
+        label: t("emailChangeNotice.action"),
+        href: securityUrl,
+      },
+    ],
+  );
+  return {
+    subject: t("emailChangeNotice.subject", { instance }),
+    html,
+    text,
+  };
+}
+
+/**
+ * What an address that already has an account hears when somebody asks to
+ * make it another account's sign-in email (account-self-service.md AS-Q5
+ * (b)): nothing changed. Nobody waits for a link that never comes, and only
+ * whoever holds the mailbox learns anything, which Forgot password would
+ * tell them anyway.
+ */
+export function emailChangeTakenMail(input: {
+  readonly instanceName: string;
+  readonly locale: MailLocale;
+  /** The instance's public origin, where `/forgot-password` lives. */
+  readonly baseUrl: string;
+}): BuiltMail {
+  const t = mailWords(input.locale);
+  const instance = input.instanceName;
+  const resetUrl = new URL("/forgot-password", input.baseUrl).toString();
+  const host = new URL(resetUrl).host;
+  const { html, text } = renderEmail(
+    {
+      lang: input.locale,
+      brand: { name: instance },
+      preheader: t("emailChangeTaken.preheader"),
+      footer: [t("emailChangeTaken.footer", { instance, host })],
+      labels: { linkFallback: t("linkFallback") },
+    },
+    [
+      { kind: "eyebrow", text: t("emailChangeTaken.eyebrow") },
+      { kind: "heading", text: t("emailChangeTaken.heading") },
+      {
+        kind: "paragraph",
+        parts: [t("emailChangeTaken.body", { instance })],
+      },
+      { kind: "paragraph", parts: [t("emailChangeTaken.forgot")] },
+      { kind: "action", label: t("emailChangeTaken.action"), href: resetUrl },
+    ],
+  );
+  return {
+    subject: t("emailChangeTaken.subject", { instance }),
+    html,
+    text,
+  };
 }
