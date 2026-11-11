@@ -17,7 +17,9 @@ cd deploy/docker
 
 The helper takes the backup, keeps the last three, pulls, and restarts.
 Migrations run in the entrypoint, take an advisory lock, and are safe to
-repeat and safe with more than one replica.
+repeat and safe with more than one replica. Once the instance is healthy
+again it runs the data changes the release brought, to the end, and prints
+what ran ([backfills](#backfills-never-hold-up-a-boot)).
 
 ## If your database is backed up somewhere else
 
@@ -76,11 +78,25 @@ it.
 
 ## Backfills never hold up a boot
 
-Schema migrations run on start. Data changes run separately, on your
-schedule: `./openokr data-change` on Docker Compose, or `pnpm db:change` from
-a checkout. Either runs every script not yet complete and names what it ran,
-or says nothing was left. An upgrade is never held open by a long backfill,
-with one exception.
+Schema migrations run on start. Data changes run separately, once the new
+release is serving: `./openokr data-change` on Docker Compose, or
+`pnpm db:change` from a checkout. Either runs every script not yet complete
+and names what it ran, or says nothing was left. A boot is never held open by
+a long backfill, with one exception below.
+
+**On Docker Compose `./openokr upgrade` runs them for you** (plan 0.8.0 H10g),
+after the health wait, so the instance is already serving the new release
+while they run. To the end rather than to a budget: you are watching the
+terminal, and stopping it with Ctrl-C loses nothing, because each batch
+commits and the next run resumes. A script that fails leaves the upgrade
+done and the instance serving, names the script, and exits non-zero; fix the
+cause and run `./openokr data-change`. To leave them for a quieter hour:
+
+```
+OPENOKR_SKIP_DATA_CHANGE=1 ./openokr upgrade
+```
+
+prints what is pending instead, as `./openokr status` does.
 
 **On Kubernetes the chart runs them for you.** After each install and
 upgrade a Job, `<release>-data-change-<revision>`, runs every script not yet

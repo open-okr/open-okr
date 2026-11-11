@@ -209,17 +209,12 @@ fi
 
 # The data changes too (PLAN §5.1, plan 0.7.0 P9). `status` reads the ledger
 # inside the image and names what has not run; on a fresh instance that is every
-# script. `data-change` runs them all, after which `status` says so.
+# script. They are left pending here on purpose: the upgrade below runs them
+# (plan 0.8.0 H10g), and `data-change` is checked after it.
 if ./openokr status 2>&1 | grep -q "Data changes: .* not complete"; then
   pass "status names the data changes not yet run"
 else
   fail "status does not report the data changes"
-fi
-./openokr data-change >/dev/null 2>&1 || fail "the data changes did not run inside the image"
-if ./openokr status 2>&1 | grep -q "Data changes: all .* complete"; then
-  pass "the data changes run inside the image, and status then says so"
-else
-  fail "status still names pending data changes after they ran"
 fi
 
 # The erasure command too (docs/design/workspace-erasure.md §7), for the same
@@ -373,6 +368,22 @@ printf '%s\n' "$upgrade_log" | grep -qF "./openokr restore ${OPENOKR_BACKUP_DIR}
   || fail "the rollback line does not name the backup it just wrote"
 pass "the upgrade names the image it replaced, in a rollback you can copy"
 
+# **The upgrade runs the data changes, after the instance is healthy again**
+# (plan 0.8.0 H10g). Every script was still pending, so the runner's own
+# account of what it ran comes after the health wait, and status then says
+# every script is complete.
+printf '%s\n' "$upgrade_log" | sed -n '/waiting for the instance to become healthy/,$p' \
+  | grep -q "^Ran [0-9]* script(s):$" \
+  || fail "the upgrade did not run the pending data changes once healthy, or did not say what ran"
+./openokr status 2>&1 | grep -q "Data changes: all .* complete" \
+  || fail "status still names pending data changes after the upgrade ran them"
+pass "the upgrade ran the data changes once healthy, said what ran, and status agrees"
+
+# `data-change` by hand still runs inside the image, and finds nothing left.
+./openokr data-change 2>&1 | grep -q "Nothing to run" \
+  || fail "the data-change command did not run inside the image"
+pass "the data-change command runs inside the image, and finds nothing left after an upgrade"
+
 # **The backup is the rollback** (P7-T09c). Migrations are forward-only, so
 # once one has applied the previous image cannot read the schema and
 # restoring is the only way back. An upgrade that proceeded without a backup
@@ -400,9 +411,17 @@ pass "an upgrade that cannot back up refuses to run"
 # The opt-out still works, for a deployment whose database is backed up
 # elsewhere. It is a variable rather than a flag because it is a thing an
 # operator decides once about their deployment, not per upgrade.
-OPENOKR_SKIP_BACKUP=1 OPENOKR_SKIP_PULL=1 ./openokr upgrade >/dev/null 2>&1 \
+#
+# OPENOKR_SKIP_DATA_CHANGE=1 rides along, for the same reason (plan 0.8.0
+# H10g): it runs none and prints what `./openokr status` prints instead.
+skip_log="$(OPENOKR_SKIP_BACKUP=1 OPENOKR_SKIP_DATA_CHANGE=1 OPENOKR_SKIP_PULL=1 ./openokr upgrade 2>&1)" \
   || fail "the upgrade refused even with OPENOKR_SKIP_BACKUP=1"
 pass "OPENOKR_SKIP_BACKUP=1 upgrades without one"
+printf '%s\n' "$skip_log" | grep -qF "skipping the data changes (OPENOKR_SKIP_DATA_CHANGE=1)" \
+  && printf '%s\n' "$skip_log" | grep -q "^Data changes: all .* complete\.$" \
+  && ! printf '%s\n' "$skip_log" | grep -q "^Ran [0-9]* script(s):$\|^Nothing to run" \
+  || fail "OPENOKR_SKIP_DATA_CHANGE=1 ran the data changes, or did not print what is pending"
+pass "OPENOKR_SKIP_DATA_CHANGE=1 runs none and prints what status prints"
 
 # Restarting is what actually re-runs the entrypoint. `compose up -d` leaves a
 # container alone when its image has not changed, which is right for an
