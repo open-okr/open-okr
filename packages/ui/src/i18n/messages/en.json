@@ -1958,6 +1958,7 @@
   "conflict.takeTheirs": "Take theirs",
   "conflict.yes": "yes",
   "conflict.yoursWas": "You had \"{value}\".",
+  "copy.code": "Copy",
   "copy.copied": "Copied",
   "copy.failed": "Copy failed. Select the text below and copy it by hand.",
   "copy.manualLabel": "Text to copy",

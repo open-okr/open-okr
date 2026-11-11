@@ -870,3 +870,38 @@ describe("the composer (plan 0.8.1 CP6)", () => {
     );
   });
 });
+
+describe("formatted answers (plan 0.8.1 CP4)", () => {
+  test("an answer's bold and list are drawn, and no marker shows", async () => {
+    window.history.replaceState(null, "", `/?copilot=${THREAD}`);
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "How is it going?",
+      messages: [
+        recorded(
+          "q1",
+          "member",
+          "How is it going?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        recorded(
+          "a1",
+          "assistant",
+          "Activation is **on track**.\n\n- Calls\n- Checklist\n- Reviews\n\nSee [the plan](javascript:alert(1)).",
+          "2026-11-12T10:00:05.000Z",
+        ),
+      ],
+    });
+    await render(AVAILABLE);
+    await settle();
+    const answer = panel()?.querySelector("article");
+    expect(answer?.querySelector("strong")?.textContent).toBe("on track");
+    expect(answer?.querySelectorAll("ul > li")).toHaveLength(3);
+    expect(answer?.textContent).not.toContain("**");
+    // The model's link is text, and nothing in the answer links anywhere.
+    expect(answer?.textContent).toContain("[the plan](javascript:alert(1))");
+    expect(answer?.querySelector("a")).toBeNull();
+  });
+});

@@ -14,7 +14,7 @@
  * prose across the panel under its face, the way current chat products set
  * them, because an answer is read and a question is only recognised.
  */
-import { AgentFace, Chip, useTranslations } from "@openokr/ui";
+import { AgentFace, AnswerText, Chip, useTranslations } from "@openokr/ui";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -197,9 +197,13 @@ export function AssistantTurn({
         </p>
       ) : null}
       {text === "" ? null : (
-        <div className="max-w-[68ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-ink">
-          {text}
-        </div>
+        // The subset of formatting the copilot writes, drawn as elements
+        // and never as HTML, with no link from the model's text (plan
+        // 0.8.1 CP4).
+        <AnswerText
+          text={text}
+          className="max-w-[68ch] text-sm leading-relaxed text-ink"
+        />
       )}
       {haltedReason ? (
         <p className="text-xs text-ink-3">{haltedReason}</p>
