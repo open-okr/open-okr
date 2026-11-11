@@ -1,3 +1,4 @@
+import type { AgentDrafter } from "@openokr/core";
 import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { ACTION_MAP, callAction } from "../src/actions/registry.ts";
@@ -7,6 +8,7 @@ import {
   parseCommand,
 } from "../src/channels/commands.ts";
 import { routeCommand } from "../src/channels/router.ts";
+import { runEmbedJob } from "../src/embeddings/worker.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
 
 /**
@@ -409,5 +411,112 @@ describe("what a member may not do", () => {
     });
     expect(reply.text).not.toContain("at ");
     expect(reply.text.length).toBeLessThan(400);
+  });
+});
+
+/**
+ * Ask, from a chat window (AI-NATIVE-PLAN.md §5.3).
+ *
+ * Ask ran `copilot.ask`, which records a question and answers nothing, then
+ * read an `answer` field it never returns. Every Ask in Slack, Teams, WhatsApp
+ * and Telegram got "I have no language model configured", whatever the
+ * workspace had configured. Found on 11 November 2026.
+ */
+describe("asking the copilot from chat", () => {
+  const ask = async (
+    question: string,
+    drafterFor?: Parameters<typeof routeCommand>[0]["drafterFor"],
+  ) => {
+    const wb = await workerDb();
+    const owner = await wb.admin.query(
+      "select id from workspace_members where workspace_id = $1 and user_id = $2",
+      [workspaceId, OWNER],
+    );
+    return routeCommand({
+      pool: wb.appPool,
+      workspaceId,
+      provider: "slack",
+      memberId: owner.rows[0].id as string,
+      userId: OWNER,
+      text: `ask ${question}`,
+      now: NOW,
+      ...(drafterFor ? { drafterFor } : {}),
+    });
+  };
+
+  /** The goal in the copilot's index, as the relay would leave it. */
+  const indexGoal = async () => {
+    const wb = await workerDb();
+    await runEmbedJob(
+      { workspaceId, entityType: "goal", entityId: goalId },
+      { pool: wb.appPool, embed: null },
+    );
+  };
+
+  const answering = (text: string): AgentDrafter =>
+    ({
+      async answerGrounded() {
+        return { text, usedSourceIndexes: [0], model: "test-model" };
+      },
+      spentUsd: () => 0,
+    }) as unknown as AgentDrafter;
+
+  it("replies with the copilot's own answer and the passages it stood on, and records both turns", async () => {
+    await indexGoal();
+    const reply = await ask(
+      "how is the mid-market platform goal doing?",
+      async () => ({
+        drafter: answering(
+          "It is the company objective for mid-market teams [1].",
+        ),
+      }),
+    );
+
+    expect(reply.kind).toBe("done");
+    expect(reply.text).toContain(
+      "It is the company objective for mid-market teams [1].",
+    );
+    expect(reply.text).toContain(
+      "1. Become the preferred platform for mid-market teams",
+    );
+    expect(reply.text).not.toContain("no language model");
+
+    // The same conversation the panel keeps: the question and the answer.
+    const wb = await workerDb();
+    const { rows } = await wb.admin.query<{ role: string }>(
+      "select role from ai_messages where workspace_id = $1 order by created_at",
+      [workspaceId],
+    );
+    expect(rows.map((row) => row.role)).toEqual(["member", "assistant"]);
+  });
+
+  it("says why there is no answer and lists the passages that match, when AI is off", async () => {
+    await indexGoal();
+    const reply = await ask(
+      "what is the mid-market platform goal?",
+      async () => ({
+        off: "no_provider" as const,
+      }),
+    );
+    expect(reply.text).toContain("No AI provider is configured");
+    expect(reply.text).toContain(
+      "1. Become the preferred platform for mid-market teams",
+    );
+  });
+
+  it("says so when nothing matches, rather than sending an empty reply", async () => {
+    const reply = await ask("what about the submarine fleet?", async () => ({
+      off: "no_provider" as const,
+    }));
+    expect(reply.text).toContain("No AI provider is configured");
+    expect(reply.text).toContain("Nothing in this workspace matched");
+  });
+
+  it("answers from passages for a caller that passes no model at all", async () => {
+    await indexGoal();
+    const reply = await ask("what is the mid-market platform goal?");
+    expect(reply.text).toContain(
+      "1. Become the preferred platform for mid-market teams",
+    );
   });
 });

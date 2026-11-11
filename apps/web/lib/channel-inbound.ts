@@ -47,6 +47,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "./cache";
+import { resolveDrafterFor } from "./drafter";
 import { getInstanceName } from "./instance-name";
 import { getPool } from "./pool";
 import { getKeyRing } from "./secrets";
@@ -372,15 +373,24 @@ export async function runInbound(
     return silence();
   }
 
+  // Narrowed here; a closure below would see the wider type again.
+  const userId = outcome.userId;
   const answered = await routeCommand({
     pool: getPool(),
     workspaceId,
     provider,
     memberId: outcome.memberId,
-    userId: outcome.userId,
+    userId,
     text: message.text,
     now,
     conversationMinutes: CONVERSATION_MINUTES,
+    // Ask answers through the copilot, on this member's own key where they
+    // stored one and the workspace's otherwise, as the panel does. Resolved
+    // only when the line is a question.
+    drafterFor: () =>
+      resolveDrafterFor(workspaceId, "balanced", userId, {
+        source: "copilot",
+      }),
   });
   await reply(driver, message.externalSenderId, answered.text);
   return silence();

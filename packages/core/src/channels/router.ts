@@ -22,6 +22,12 @@ import { withWorkspace } from "@openokr/db";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import { type ActionName, callAction } from "../actions/registry.ts";
+import type { AgentDrafter } from "../agents/drafter.ts";
+import { type AIOffReason, aiOffSentence } from "../ai/off-reason.ts";
+import {
+  type AnswerQuestionResult,
+  answerQuestion,
+} from "../copilot/answer.ts";
 import { OperationError } from "../operations/operation.ts";
 import { DEFAULT_CHAT_CONVERSATION_MINUTES } from "../settings/registry.ts";
 import type { ChannelConnectionKey } from "./capabilities.ts";
@@ -69,6 +75,17 @@ export interface RouterRequest {
    * inside its own logic. `snooze` is arithmetic on it.
    */
   readonly now: Date;
+  /**
+   * The model a question is answered with, or why there is none (AI-NATIVE-PLAN
+   * §5.3, the Ask command).
+   *
+   * A function rather than a drafter, so a line that is not a question resolves
+   * no provider. Absent is the same as AI being off: the member still gets the
+   * passages that match, which is what the panel gives with no provider.
+   */
+  readonly drafterFor?: () => Promise<
+    { readonly drafter: AgentDrafter } | { readonly off: AIOffReason }
+  >;
 }
 
 export type RouterReply =
@@ -214,7 +231,92 @@ export async function routeCommand(
     };
   }
 
+  if (command.verb === ASK_COMMAND) {
+    return askCopilot(request, args.question ?? "");
+  }
+
   return runAction(request, command, command.toInput(args, request.now));
+}
+
+/** The verb `commands.ts` gives the copilot. */
+const ASK_COMMAND = "ask";
+
+/** The most passages a chat reply lists. The copilot is shown six. */
+const PASSAGES_IN_A_REPLY = 6;
+
+/**
+ * Asks the copilot, as the member, and words what came back for a chat window.
+ *
+ * **Through `answerQuestion`, the panel's own path**, not through the command's
+ * registry action. `copilot.ask` only records a question; it was called here and
+ * its missing `answer` read, so every Ask was told no model was configured,
+ * whatever the workspace had. `answerQuestion` records the question through
+ * that same action, retrieves as the member, answers and records the answer, so
+ * the conversation is the one the panel shows and the channel is on its audit
+ * row.
+ */
+async function askCopilot(
+  request: RouterRequest,
+  question: string,
+): Promise<RouterReply> {
+  try {
+    const resolved = request.drafterFor
+      ? await request.drafterFor()
+      : ({ off: "no_provider" } as const);
+    const answered = await answerQuestion(
+      {
+        pool: request.pool,
+        workspaceId: request.workspaceId,
+        actor: { kind: "human", userId: request.userId },
+        channel: request.provider,
+        ...("drafter" in resolved
+          ? { drafter: resolved.drafter }
+          : { aiOff: resolved.off }),
+      },
+      { workspaceId: request.workspaceId, question },
+    );
+    return {
+      kind: "done",
+      action: "copilot.ask",
+      text: askReply(answered, "off" in resolved ? resolved.off : null),
+    };
+  } catch (error) {
+    if (error instanceof OperationError) {
+      return { kind: "reply", text: error.message };
+    }
+    return {
+      kind: "reply",
+      text: "Something went wrong on our side. Your question was not answered.",
+    };
+  }
+}
+
+/**
+ * The answer and the passages it stood on, numbered as the answer cites them,
+ * or the reason there is no answer and the passages that match.
+ */
+function askReply(
+  answered: AnswerQuestionResult,
+  off: AIOffReason | null,
+): string {
+  const passages = answered.sources
+    .slice(0, PASSAGES_IN_A_REPLY)
+    .map((source, index) => `${index + 1}. ${source.label}`);
+  if (answered.answer !== null) {
+    return passages.length > 0
+      ? [answered.answer, "", "Sources:", ...passages].join("\n")
+      : answered.answer;
+  }
+  if (passages.length > 0) {
+    return [
+      answered.unavailableReason ?? "The copilot could not answer that.",
+      ...passages,
+    ].join("\n");
+  }
+  // The answer-side sentence promises passages below it, so with none it is
+  // the panel's own, which says what the copilot can and cannot do.
+  const nothing = "Nothing in this workspace matched your question.";
+  return off ? `${aiOffSentence(off, "panel")} ${nothing}` : nothing;
 }
 
 /**
@@ -352,8 +454,8 @@ async function runAction(
 /**
  * The answer a read command has, or the confirmation a write has.
  *
- * Two commands here answer with data a member actually wanted, so those two
- * are rendered; the rest confirm. Rendering is by shape rather than by a
+ * One command here answers with data a member actually wanted, so it is
+ * rendered; the rest confirm. Ask is answered by `askCopilot` instead. Rendering is by shape rather than by a
  * per-action switch, so an action whose output grows a field does not silently
  * stop being rendered.
  */
@@ -377,16 +479,6 @@ function replyFor(command: ChatCommand, result: unknown): string {
         : null,
     ].filter((part): part is string => part !== null);
     return parts.length > 0 ? `${title}: ${parts.join(", ")}.` : `${title}.`;
-  }
-
-  if (command.verb === "ask") {
-    const answer = record.answer;
-    if (typeof answer === "string" && answer.trim() !== "") {
-      return answer;
-    }
-    // The copilot with no provider configured. Said plainly rather than as an
-    // empty message, which reads as the product ignoring somebody.
-    return "I have no language model configured, so I cannot answer that yet.";
   }
 
   return doneText(command);
