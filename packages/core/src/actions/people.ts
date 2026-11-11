@@ -28,6 +28,7 @@
 import {
   accessBindings,
   activeOnly,
+  BUILTIN_ROLE_KEYS,
   softDeleteRows,
   users,
   withContext,
@@ -1202,6 +1203,12 @@ const memberProfile = z.object({
    * beside the person's name, so they know what they should expect to do.
    */
   roleName: z.string().nullable(),
+  /**
+   * The role's built-in key, or null for a role the workspace made. A built-in
+   * role cannot be renamed, so a screen may name it in the reader's language
+   * (UAT 0.8.0, F-08).
+   */
+  roleKey: z.enum(BUILTIN_ROLE_KEYS).nullable(),
 });
 
 /**
@@ -1245,6 +1252,7 @@ export const readMember = defineReadAction({
             density: workspaceMembers.density,
             language: workspaceMembers.language,
             roleName: workspaceRoles.name,
+            roleKey: workspaceRoles.builtinKey,
           })
           .from(workspaceMembers)
           // A removed role names nothing, as no role does.

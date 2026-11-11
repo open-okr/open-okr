@@ -3721,6 +3721,22 @@
                             "string",
                             "null"
                           ]
+                        },
+                        "roleKey": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "owner",
+                                "admin",
+                                "member",
+                                "viewer"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
                         }
                       },
                       "required": [
@@ -3738,7 +3754,8 @@
                         "theme",
                         "density",
                         "language",
-                        "roleName"
+                        "roleName",
+                        "roleKey"
                       ],
                       "additionalProperties": false
                     }

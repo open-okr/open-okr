@@ -151,6 +151,11 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   // Tab titles that are only the workspace term, or "Import", which Malay
   // borrows.
   "pageTitle.adminImports",
+  // The same three words as navigation labels (UAT 0.8.0 F-08): "Import",
+  // which Malay borrows, and the abbreviations AI and OKR.
+  "nav.item.admin-imports",
+  "nav.item.admin-ai",
+  "nav.group.okr",
   "pageTitle.checkIn",
   "pageTitle.cycle",
   "pageTitle.kpi",

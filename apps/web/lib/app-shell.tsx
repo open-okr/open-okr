@@ -51,7 +51,12 @@ import { embedFor } from "./embedder";
 import { readHold } from "./held-by.ts";
 import { loadInboxBadge } from "./inbox-badge.ts";
 import { getInstanceName } from "./instance-name";
-import { navBlocks, navLabel } from "./nav-groups.ts";
+import {
+  builtinRoleLabel,
+  navBlocks,
+  navGroupLabel,
+  navText,
+} from "./nav-groups.ts";
 import { iconFor } from "./nav-icons.tsx";
 import { NavLink } from "./nav-link.tsx";
 import { NewMenu } from "./new-menu.tsx";
@@ -318,10 +323,12 @@ export async function AppShellLayout({
   const groups: SidebarGroup[] = navBlocks(drawnItems, renamed).map(
     (block) => ({
       id: block.id,
-      ...(block.label === undefined ? {} : { label: block.label }),
+      ...(block.label === undefined
+        ? {}
+        : { label: navGroupLabel(block.id, t) ?? block.label }),
       items: block.items.map((item) => ({
         id: item.id,
-        label: navLabel(item, renamed),
+        label: navText(item, t, renamed),
         href: item.href,
         icon: iconFor(item.id),
         active: item.id === active,
@@ -351,13 +358,13 @@ export async function AppShellLayout({
   const paletteDestinations: PaletteDestination[] = [
     ...sidebarItems.map((item) => ({
       id: item.id,
-      label: navLabel(item, renamed),
+      label: navText(item, t, renamed),
       href: item.href,
       area: item.group === "account" ? ("account" as const) : ("page" as const),
     })),
     ...insideItems.map((item) => ({
       id: item.id,
-      label: navLabel(item, renamed),
+      label: navText(item, t, renamed),
       href: item.href,
       area: "page" as const,
     })),
@@ -365,7 +372,7 @@ export async function AppShellLayout({
       .filter((item) => plans || !item.needsPlans)
       .map((item) => ({
         id: item.id,
-        label: item.label,
+        label: navText(item, t),
         href: item.href,
         area: "admin" as const,
       })),
@@ -373,7 +380,7 @@ export async function AppShellLayout({
 
   const tabItems = drawnItems.slice(0, 4).map((item) => ({
     id: item.id,
-    label: navLabel(item, renamed),
+    label: navText(item, t, renamed),
     href: item.href,
     icon: iconFor(item.id),
     active: item.id === active,
@@ -382,7 +389,10 @@ export async function AppShellLayout({
   // Admin is in the avatar menu since the five areas, beside the account
   // rows, for those who reach it.
   const avatarItems = [
-    ...accountItems.map((item) => ({ href: item.href, label: item.label })),
+    ...accountItems.map((item) => ({
+      href: item.href,
+      label: navText(item, t),
+    })),
     ...(adminItems.length > 0
       ? [
           // The first card directly: `/admin` redirects only after the shell
@@ -518,7 +528,7 @@ export async function AppShellLayout({
                       : null
                   }
                   email={session.user.email}
-                  roleName={me.roleName}
+                  roleName={builtinRoleLabel(me.roleKey, me.roleName, t)}
                   badge={
                     await accountBadge(
                       workspace.workspaceId,

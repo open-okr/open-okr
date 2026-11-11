@@ -2,6 +2,7 @@ import { ACCESS_LEVELS, hasPlanScreen, navigationFor } from "@openokr/core";
 import type { ReactNode } from "react";
 import { requireAccessLevel } from "../../lib/access.ts";
 import { AppShellLayout } from "../../lib/app-shell.tsx";
+import { navText } from "../../lib/nav-groups.ts";
 import { getPool } from "../../lib/pool";
 import { getTranslations } from "../../lib/translations";
 import { AdminSections } from "./admin-sections.tsx";
@@ -62,7 +63,7 @@ export default async function AdminLayout({
     .filter((item) => plans || !item.needsPlans)
     .map((item) => ({
       id: item.id,
-      label: item.label,
+      label: navText(item, t),
       href: item.href,
     }));
 

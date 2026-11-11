@@ -264,6 +264,9 @@ describe("reading a member's profile", () => {
       { memberId: ownerMemberId },
     );
     expect(owner.roleName).toBe("Owner");
+    // Built in, so a screen can name it in the reader's language (UAT 0.8.0
+    // F-08).
+    expect(owner.roleKey).toBe("owner");
 
     const member = await addMember("Member");
     await callAction(
@@ -277,6 +280,7 @@ describe("reading a member's profile", () => {
       { memberId: member },
     );
     expect(guest.roleName).toBeNull();
+    expect(guest.roleKey).toBeNull();
   });
 });
 
