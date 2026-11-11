@@ -219,3 +219,34 @@ describe("on a demo and when taken again", () => {
     expect(stepId()).toBe("home");
   });
 });
+
+// UAT 0.8.0 F-02: on a phone the steps light the bottom bar, and the card was
+// drawn below it, off the screen, with everything else dimmed.
+describe("where the card sits", () => {
+  test("above an area in the lower half of the screen", async () => {
+    for (const link of shell.querySelectorAll<HTMLElement>("nav a")) {
+      link.getBoundingClientRect = () =>
+        ({
+          top: window.innerHeight - 50,
+          left: 0,
+          width: 80,
+          height: 40,
+          right: 80,
+          bottom: window.innerHeight - 10,
+        }) as DOMRect;
+    }
+    await render();
+    await press("tour-start");
+    const card = host.querySelector<HTMLElement>('[data-testid="tour-card"]');
+    expect(card?.style.top).toBe("");
+    expect(Number.parseFloat(card?.style.bottom ?? "")).toBeGreaterThan(0);
+  });
+
+  test("below an area in the upper half, as before", async () => {
+    await render();
+    await press("tour-start");
+    const card = host.querySelector<HTMLElement>('[data-testid="tour-card"]');
+    expect(card?.style.bottom).toBe("");
+    expect(Number.parseFloat(card?.style.top ?? "")).toBeGreaterThan(0);
+  });
+});

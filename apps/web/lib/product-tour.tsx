@@ -360,23 +360,34 @@ export function ProductTour({
     return null;
   }
 
-  // Beside a sidebar item, below anything else, and kept on screen.
+  // Beside a sidebar item, below anything else, and kept on screen. An area
+  // in the lower half, such as the bottom bar on a phone, takes the card above
+  // it, anchored by its bottom edge so its height need not be known; below
+  // such an area it was drawn off the screen (UAT 0.8.0, F-02).
   const viewportWidth =
     typeof window === "undefined" ? 1024 : window.innerWidth;
+  const viewportHeight =
+    typeof window === "undefined" ? 768 : window.innerHeight;
   const besideLeft =
     rect !== null &&
     rect.left < viewportWidth / 3 &&
     rect.left + rect.width + GAP + CARD_WIDTH < viewportWidth;
+  const lowerHalf =
+    rect !== null && rect.top + rect.height / 2 > viewportHeight / 2;
+  const cardLeft = rect
+    ? Math.min(Math.max(GAP, rect.left), viewportWidth - CARD_WIDTH - GAP)
+    : 0;
   const cardStyle = rect
     ? besideLeft
-      ? { top: Math.max(GAP, rect.top), left: rect.left + rect.width + GAP }
-      : {
-          top: rect.top + rect.height + GAP,
-          left: Math.min(
-            Math.max(GAP, rect.left),
-            viewportWidth - CARD_WIDTH - GAP,
-          ),
-        }
+      ? lowerHalf
+        ? {
+            bottom: Math.max(GAP, viewportHeight - rect.top - rect.height),
+            left: rect.left + rect.width + GAP,
+          }
+        : { top: Math.max(GAP, rect.top), left: rect.left + rect.width + GAP }
+      : lowerHalf
+        ? { bottom: viewportHeight - rect.top + GAP, left: cardLeft }
+        : { top: rect.top + rect.height + GAP, left: cardLeft }
     : { top: GAP * 6, left: Math.max(GAP, (viewportWidth - CARD_WIDTH) / 2) };
 
   return (
