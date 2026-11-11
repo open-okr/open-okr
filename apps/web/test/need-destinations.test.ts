@@ -28,6 +28,19 @@ describe("needDestination", () => {
     ).toEqual({ kind: "page", href: "/goals/g-1", level: "edit" });
   });
 
+  // UAT 0.8.0 F-06: both led to the roles card and so to its first field,
+  // the Sponsor picker, even for "No facilitator named".
+  test("each role leads to its own picker", () => {
+    const sponsor = needDestination({ key: "role.sponsor", text: "x" });
+    const facilitator = needDestination({ key: "role.facilitator", text: "x" });
+    expect(sponsor.kind === "anchor" && sponsor.anchor).toBe(
+      "need-role-sponsor",
+    );
+    expect(facilitator.kind === "anchor" && facilitator.anchor).toBe(
+      "need-role-facilitator",
+    );
+  });
+
   test("the roles are for whoever can set up the cycle (plan 0.8.0 R1)", () => {
     expect(needDestination({ key: "role.sponsor", text: "x" }).level).toBe(
       "setup",

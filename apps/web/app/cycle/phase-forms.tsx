@@ -107,12 +107,18 @@ export async function CycleSetup({
         >
           <input type="hidden" name="cycleId" value={cycleId} />
           <div className="grid gap-2 sm:grid-cols-2">
-            {picker("sponsorId", t("cycle.setup.sponsor"), sponsorId)}
-            {picker(
-              "facilitatorId",
-              t("cycle.setup.facilitator"),
-              facilitatorId,
-            )}
+            {/* The targets of "No sponsor named" and "No facilitator named"
+                in Still needed here (need-destinations.ts). */}
+            <div id="need-role-sponsor" className="scroll-mt-20">
+              {picker("sponsorId", t("cycle.setup.sponsor"), sponsorId)}
+            </div>
+            <div id="need-role-facilitator" className="scroll-mt-20">
+              {picker(
+                "facilitatorId",
+                t("cycle.setup.facilitator"),
+                facilitatorId,
+              )}
+            </div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {SESSIONS.map((session) => (

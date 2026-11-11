@@ -18,8 +18,10 @@ const DESTINATIONS: Record<
   "frame.strategy": { anchor: "need-frame", level: "setup" },
   "frame.strategyCount": { anchor: "need-frame", level: "setup" },
   "company.objective": { anchor: "need-annual-objectives", level: "setup" },
-  "role.sponsor": { anchor: "need-roles", level: "setup" },
-  "role.facilitator": { anchor: "need-roles", level: "setup" },
+  // Each to its own picker: the card's first field is the Sponsor picker,
+  // so "No facilitator named" focused the wrong one (UAT 0.8.0, F-06).
+  "role.sponsor": { anchor: "need-role-sponsor", level: "setup" },
+  "role.facilitator": { anchor: "need-role-facilitator", level: "setup" },
   "pack.item": { anchor: "need-input-pack", level: "edit" },
   "pack.distribute": { anchor: "pack-distribute", level: "edit" },
   "sessions.dates": { anchor: "need-roles", level: "setup" },
