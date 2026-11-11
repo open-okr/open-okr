@@ -1,5 +1,13 @@
 # @openokr/adapters
 
+## 0.8.1
+
+### Patch Changes
+
+- [#210](https://github.com/open-okr/open-okr/pull/210) [`b30346d`](https://github.com/open-okr/open-okr/commit/b30346db74bdc5cd87d6d920224f915ce466023e) Thanks [@akmalakhpah](https://github.com/akmalakhpah)! - On OpenRouter, the fast and balanced AI tiers now default to GPT-6 Luna, and the deep tier stays on Claude Sonnet 4.5. Luna costs about a thirtieth of Sonnet 4.5 and, run live, passed every capability's evaluation set and filled every copilot proposal. This changes only a workspace or deployment that never chose a model: a model picked on the AI page, or in `ai.deployment.tierModels`, is kept. The recovery-title assist also gets more room to reply, because a reasoning model spends part of that budget thinking and ran out of it.
+- Updated dependencies []:
+  - @openokr/config@0.8.1
+
 ## 0.8.0
 
 ### Minor Changes
