@@ -132,7 +132,10 @@ echo "openokr: starting from nothing"
 cleanup
 started=$(date +%s)
 
-./openokr up >/dev/null
+first_up="$(./openokr up 2>&1)" || {
+  printf '%s\n' "$first_up" >&2
+  fail "the first up failed"
+}
 
 ready=$(date +%s)
 elapsed=$((ready - started))
@@ -340,6 +343,19 @@ pass "the first account was created"
 curl -s -b "$jar" -L "$BASE/" | grep -q "Ada Lovelace" \
   || fail "the admin could not reach a provisioned workspace"
 pass "the admin reached a provisioned workspace"
+
+# --- up says to finish setup only while it is unfinished (plan 0.8.1 Q-10e) --
+# The first boot found nobody, so it said to finish setup. Once the wizard has
+# recorded its completion, an up says where the instance is ready instead.
+printf '%s\n' "$first_up" | grep -q "to finish setup" \
+  || fail "the first up on a fresh instance did not say to finish setup"
+db_query "insert into system_settings (key, value, source) values ('setup.completed_at', to_jsonb(now()::text), 'smoke-test') on conflict (key) do nothing" >/dev/null
+later_up="$(./openokr up 2>&1)" || fail "an up after setup failed"
+printf '%s\n' "$later_up" | grep -q "ready at $BASE" \
+  || fail "an up after setup did not say where the instance is ready"
+printf '%s\n' "$later_up" | grep -q "finish setup" \
+  && fail "an up after setup still said to finish setup"
+pass "up says to finish setup only while it is unfinished"
 
 # The session records the address Caddy saw, as it did before 0.8.0: with
 # nothing set, one forwarded address is read as the caller.
