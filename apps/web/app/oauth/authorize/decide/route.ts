@@ -13,14 +13,28 @@
  * either way, and a page that said "refused" and stopped would leave an agent
  * hanging until it timed out.
  *
+ * **A refusal is only sent to an address the client registered.** The posted
+ * `redirectUri` is a form field, so a refusal that followed it unchecked was an
+ * open redirect behind a signed-in person's click. Both answers now check it
+ * against the client's registered addresses first, and an unregistered one
+ * sends the person back to the screen instead.
+ *
+ * **A post another site caused is refused with a 403**, the same check every
+ * route handler that acts on the session cookie runs.
+ *
  * **The workspace comes from the form, checked against this person's own
  * memberships.** A field naming a workspace is a field somebody could change, so
  * what it selects is one of the memberships the session already proved.
  */
-import { approveAuthorisationForMember, redirectWith } from "@openokr/core";
+import {
+  approveAuthorisationForMember,
+  checkAuthoriseRequestFor,
+  redirectWith,
+} from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { instanceIssuer } from "../../../../lib/issuer";
 import { getPool } from "../../../../lib/pool";
+import { refuseCrossSite } from "../../../../lib/same-origin";
 import { requireWorkspace } from "../../../../lib/workspace";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +56,11 @@ const backToScreen = (request: NextRequest, message: string): Response =>
   );
 
 export async function POST(request: NextRequest): Promise<Response> {
+  const crossSite = refuseCrossSite(request);
+  if (crossSite) {
+    return crossSite;
+  }
+
   const form = await request.formData();
   const value = (key: string) => String(form.get(key) ?? "").trim();
 
@@ -53,7 +72,34 @@ export async function POST(request: NextRequest): Promise<Response> {
     return backToScreen(request, "That request names no address to answer at.");
   }
 
+  const { session, workspace, memberships } = await requireWorkspace();
+  const asked = value("workspaceId");
+  // One of this person's own, never whatever the field said.
+  const chosen =
+    memberships.find((membership) => membership.workspaceId === asked) ??
+    workspace;
+
   if (!approve) {
+    // Only the client's registered addresses may receive even a refusal. A
+    // refusal the request would earn for another reason (no challenge, say)
+    // still goes back: the address is the client's own either way.
+    const check = await checkAuthoriseRequestFor(getPool(), {
+      workspaceId: chosen.workspaceId,
+      request: {
+        clientId: value("clientId"),
+        redirectUri,
+        responseType: "code",
+        codeChallenge: value("codeChallenge"),
+        codeChallengeMethod: value("codeChallengeMethod") || "S256",
+        scope: value("scope"),
+        state,
+        resource: value("resource"),
+      },
+      issuer: instanceIssuer(),
+    });
+    if (check.kind === "refused" && check.refusal.kind === "show") {
+      return backToScreen(request, check.refusal.message);
+    }
     return seeOther(
       redirectWith(redirectUri, {
         error: "access_denied",
@@ -62,13 +108,6 @@ export async function POST(request: NextRequest): Promise<Response> {
       }),
     );
   }
-
-  const { session, workspace, memberships } = await requireWorkspace();
-  const asked = value("workspaceId");
-  // One of this person's own, never whatever the field said.
-  const chosen =
-    memberships.find((membership) => membership.workspaceId === asked) ??
-    workspace;
 
   const outcome = await approveAuthorisationForMember(getPool(), {
     workspaceId: chosen.workspaceId,

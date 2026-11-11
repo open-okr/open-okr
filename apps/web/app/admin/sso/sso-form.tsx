@@ -45,11 +45,17 @@ import { updateSSOConnectionAction } from "./actions";
  */
 export function SSOForm({
   connection,
+  verifiedDomains = [],
   onSaved,
   onCancel,
 }: {
   /** The connection being changed. Absent when adding one. */
   readonly connection?: SSOConnectionDetails;
+  /**
+   * The domains this workspace has proved it owns. Enforcement is offered
+   * only over those (docs/design/sso-domain-verification.md, rule 3).
+   */
+  readonly verifiedDomains?: readonly string[];
   /** Told when an edit landed, so the row can close the form. */
   readonly onSaved?: () => void;
   readonly onCancel?: () => void;
@@ -63,6 +69,21 @@ export function SSOForm({
   const [error, setError] = useState("");
   const [field, setField] = useState("");
   const [success, setSuccess] = useState("");
+  // Watched, not read at submit, because whether enforcement may be turned on
+  // depends on what is listed in the box right now.
+  const [domains, setDomains] = useState<readonly string[]>(() =>
+    (connection?.emailDomains ?? "")
+      .split(",")
+      .map((one) => one.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const [enforce, setEnforce] = useState(connection?.enforce ?? false);
+  const verified = new Set(verifiedDomains);
+  const unverified = domains.filter((one) => !verified.has(one));
+  // A connection that already enforces keeps its box, so an edit never turns
+  // enforcement off behind the person's back (decision 2). Only turning it on
+  // waits for the proof.
+  const enforceBlocked = unverified.length > 0 && !enforce;
 
   // Two forms can be on the screen at once while a connection is edited, so
   // an edit form's ids are its own, or its labels would name the add form's
@@ -141,6 +162,8 @@ export function SSOForm({
     }
     setSuccess(t("admin.sso.ssoForm.providerSaved"));
     element.reset();
+    setDomains([]);
+    setEnforce(false);
     router.refresh();
   };
 
@@ -390,6 +413,9 @@ export function SSOForm({
           .map((one) => one.trim())
           .filter(Boolean)}
         error={errorFor("emailDomains")}
+        onValueChange={(entries) =>
+          setDomains(entries.map((one) => one.toLowerCase()))
+        }
       />
 
       <label className="flex items-center gap-2 text-sm text-ink-2">
@@ -397,10 +423,28 @@ export function SSOForm({
           type="checkbox"
           name="enforce"
           className="rounded"
-          defaultChecked={connection?.enforce}
+          checked={enforce}
+          disabled={enforceBlocked}
+          aria-describedby={idFor("enforceReason")}
+          onChange={(event) => setEnforce(event.currentTarget.checked)}
         />
         {t("admin.sso.ssoForm.enforceSsoForTheEmailDomains")}
       </label>
+      {/* Always on the screen, so that its appearing never moves the buttons
+       * below it: the domain box commits on blur, which is the mouse-down on
+       * "Add provider", and a layout shift there loses the click. */}
+      <p id={idFor("enforceReason")} className="text-sm text-ink-3">
+        {enforceBlocked
+          ? t("admin.sso.ssoForm.enforceNeedsVerification", {
+              domains: unverified.join(", "),
+            })
+          : t("admin.sso.ssoForm.enforceHint")}
+      </p>
+      {errorFor("enforce") ? (
+        <p className="text-sm text-bad" role="alert">
+          {errorFor("enforce")}
+        </p>
+      ) : null}
       <p className="text-sm text-ink-3">
         {t("admin.sso.ssoForm.enforcingRefusesAPassword", {
           column: "enforce",

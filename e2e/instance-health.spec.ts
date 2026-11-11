@@ -7,8 +7,9 @@
  * permission denied for database" and carried on. No browser test had ever
  * run with a live scheduler, and the Compose install, which connected as a
  * superuser, had the opposite problem: a scheduler, and no tenant floor.
- * Neither showed in any check. The health endpoint reports both now, and this
- * holds both at once against a real server.
+ * Neither showed in any check. The scheduler is reported on `/api/status` and
+ * the role on the admin screen (the public health answer says neither), and
+ * this holds the scheduler against a real server.
  */
 import type { APIRequestContext } from "@playwright/test";
 import { expect, test } from "./fixtures.ts";
@@ -23,18 +24,27 @@ test.afterAll(async () => {
   await api?.dispose();
 });
 
+test("the public health answer says only that the instance is up", async () => {
+  const response = await api.get("/api/health");
+  expect(response.status()).toBe(200);
+  expect(await response.json()).toEqual({ status: "ok" });
+});
+
 test("the scheduler starts under a role the tenant floor binds", async () => {
   // The scheduler starts in the background after boot, so the answer is
   // polled rather than read once.
   await expect
     .poll(
       async () => {
-        const response = await api.get("/api/health");
-        return (await response.json()) as Record<string, unknown>;
+        const response = await api.get("/api/status");
+        const body = (await response.json()) as {
+          components: { scheduler: { status: string } };
+        };
+        return body.components.scheduler.status;
       },
       { timeout: 60_000, intervals: [500, 1_000, 2_000] },
     )
-    .toEqual({ status: "ok", scheduler: "running", tenantFloor: "enforced" });
+    .toBe("operational");
 });
 
 test("the status page counts the scheduler as operational", async () => {

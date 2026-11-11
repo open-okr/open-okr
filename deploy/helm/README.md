@@ -70,6 +70,7 @@ That Secret may also hold `metrics-token` (or the key `secrets.metricsTokenKey` 
 | `instance.sourceUrl` | upstream | Where every member is offered the source. Name your own if you changed the code |
 | `instance.termsUrl`, `instance.privacyUrl` | empty | Named on the sign-up page once set |
 | `instance.supportEmail` | empty | Who a customer writes to about their plan |
+| `instance.trustedProxyHops` | 1 | Reverse proxies in front of the application. One ingress controller is 1, a cloud load balancer in front of it is 2, 0 ignores `X-Forwarded-For`. Sign-in limits count the caller this many entries from the right |
 | `cloud.enabled` | false | Tenant records and the operator console, for running this for other people or for several companies of your own |
 | `cloud.plans`, `cloud.defaultPlan`, `cloud.region` | empty | The plan catalogue as JSON, the plan a new workspace starts on, and the region recorded on each tenant |
 | `cloud.erasure.schedule` | empty | A cron schedule for `pnpm cloud:erase --write`, which erases closed workspaces past their retention window. Runs with `database.adminUrl`, the owner role. Nothing is erased while `OPENOKR_CLOUD_CLOSURE_RETENTION_DAYS` is 0, its default |

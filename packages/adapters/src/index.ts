@@ -101,6 +101,11 @@ export {
   whatsAppDeliveryId,
   whatsAppPhoneNumberId,
 } from "./drivers/channel/whatsapp.ts";
+export { FakeDnsResolver } from "./drivers/dns/fake.ts";
+export {
+  NodeDnsResolver,
+  type NodeDnsResolverOptions,
+} from "./drivers/dns/node.ts";
 // The two file drivers the upload path and the relay construct (completeness
 // review M-24). Exported by name, like the storage drivers below: the host
 // builds one, and everything else sees the port.
@@ -213,6 +218,8 @@ export type {
   InboundRequest,
   InboundSubmission,
 } from "./ports/channel.ts";
+export type { DnsResolver } from "./ports/dns.ts";
+export { DnsLookupError } from "./ports/dns.ts";
 export type {
   ErrorEvent,
   ErrorEventFrame,

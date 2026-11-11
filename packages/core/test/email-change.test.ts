@@ -19,9 +19,9 @@ import {
 import { derivedProviderId } from "../src/auth/sso.ts";
 import { DEMO_PERSONAS } from "../src/demo/personas.ts";
 import { directoryManagesAccount } from "../src/directory-sync/managed.ts";
-import { createSCIMToken } from "../src/directory-sync/tokens.ts";
 import { dispatchOutbox } from "../src/outbox/handlers.ts";
 import { encryptSecret, parseKeyRing } from "../src/secrets/key-ring.ts";
+import { createSCIMToken } from "./sso-create-helper.ts";
 
 /**
  * Changing the sign-in email (docs/design/account-self-service.md §8 Y4,

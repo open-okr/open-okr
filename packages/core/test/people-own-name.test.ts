@@ -2,9 +2,9 @@ import { workerDb } from "@openokr/test-support/db";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { callAction } from "../src/actions/registry.ts";
 import { DEMO_PERSONAS } from "../src/demo/personas.ts";
-import { createSCIMToken } from "../src/directory-sync/tokens.ts";
 import { joinWorkspaceForIdentity } from "../src/workspaces/directory-join.ts";
 import { provisionWorkspaceForUser } from "../src/workspaces/provisioning.ts";
+import { createSCIMToken } from "./sso-create-helper.ts";
 
 /**
  * Changing your own name (docs/design/account-self-service.md §8 Y5, D22 to

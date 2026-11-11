@@ -25,10 +25,16 @@ import { EnvironmentError } from "./environment-error.ts";
  */
 
 const TRUSTED_PROXIES_VARIABLE = "OPENOKR_TRUSTED_PROXIES";
+export const TRUSTED_PROXY_HOPS_VARIABLE = "OPENOKR_TRUSTED_PROXY_HOPS";
 export const CLIENT_ADDRESS_HEADER_VARIABLE = "OPENOKR_CLIENT_ADDRESS_HEADER";
 
 export type CallerAddressReading =
-  | { readonly mode: "single_address" }
+  /**
+   * The default: the `X-Forwarded-For` entry that many places from the right,
+   * because the rightmost is the one the nearest proxy wrote (the hardening
+   * batch's hop count, default 1). Zero reads no header at all.
+   */
+  | { readonly mode: "proxy_hops"; readonly hops: number }
   | {
       readonly mode: "trusted_proxies";
       readonly trustedProxies: readonly string[];
@@ -147,6 +153,17 @@ export function parseClientAddressHeader(raw: string): {
 }
 
 /** The sentence for both set, shared by the schema and the reading (D5). */
+export const HOPS_WITH_ANOTHER_PROBLEM = `cannot be set together with ${TRUSTED_PROXIES_VARIABLE} or OPENOKR_CLIENT_ADDRESS_HEADER. Set one: the hop count is the default reading, and the ranges or the header replace it`;
+
+/** The hop count as `env.ts` reads it: a whole number from 0 to 10, default 1. */
+function hopsFrom(raw: string | undefined): number {
+  if (raw === undefined) {
+    return 1;
+  }
+  const value = Number(raw.trim());
+  return Number.isInteger(value) && value >= 0 && value <= 10 ? value : 1;
+}
+
 export const BOTH_SET_PROBLEM = `cannot be set together with ${TRUSTED_PROXIES_VARIABLE}. Set one: the ranges name the proxies in front of the instance, the header names the one your CDN writes`;
 
 /** A variable's value, with blank read as unset, as `env.ts` reads every one. */
@@ -166,6 +183,7 @@ function readCallerAddressSettings(source: Readonly<Record<string, unknown>>): {
   const problems: CallerAddressProblem[] = [];
   const rawProxies = variableValue(source, TRUSTED_PROXIES_VARIABLE);
   const rawHeader = variableValue(source, CLIENT_ADDRESS_HEADER_VARIABLE);
+  const rawHops = variableValue(source, TRUSTED_PROXY_HOPS_VARIABLE);
 
   const proxies =
     rawProxies === undefined ? undefined : parseTrustedProxies(rawProxies);
@@ -187,6 +205,12 @@ function readCallerAddressSettings(source: Readonly<Record<string, unknown>>): {
       message: BOTH_SET_PROBLEM,
     });
   }
+  if (rawHops !== undefined && (ranges.length > 0 || header !== undefined)) {
+    problems.push({
+      variable: TRUSTED_PROXY_HOPS_VARIABLE,
+      message: HOPS_WITH_ANOTHER_PROBLEM,
+    });
+  }
 
   if (header?.header !== undefined) {
     return { reading: { mode: "header", header: header.header }, problems };
@@ -197,7 +221,7 @@ function readCallerAddressSettings(source: Readonly<Record<string, unknown>>): {
       problems,
     };
   }
-  return { reading: { mode: "single_address" }, problems };
+  return { reading: { mode: "proxy_hops", hops: hopsFrom(rawHops) }, problems };
 }
 
 /**
@@ -218,7 +242,7 @@ const cacheHolder = globalThis as {
 export function callerAddressReading(
   source: Readonly<Record<string, unknown>> = process.env,
 ): CallerAddressReading {
-  const key = `${variableValue(source, TRUSTED_PROXIES_VARIABLE) ?? ""}\u0000${variableValue(source, CLIENT_ADDRESS_HEADER_VARIABLE) ?? ""}`;
+  const key = `${variableValue(source, TRUSTED_PROXIES_VARIABLE) ?? ""}\u0000${variableValue(source, CLIENT_ADDRESS_HEADER_VARIABLE) ?? ""}\u0000${variableValue(source, TRUSTED_PROXY_HOPS_VARIABLE) ?? ""}`;
   const cached = cacheHolder[CACHE_KEY];
   if (cached?.key === key) {
     return cached.reading;
@@ -245,8 +269,10 @@ export function describeCallerAddressReading(
   reading: CallerAddressReading,
 ): string {
   switch (reading.mode) {
-    case "single_address":
-      return "caller address: one forwarded address only";
+    case "proxy_hops":
+      return reading.hops === 0
+        ? "caller address: no proxy named, so no header is read"
+        : `caller address: X-Forwarded-For, ${reading.hops} ${reading.hops === 1 ? "proxy" : "proxies"} from the right`;
     case "trusted_proxies": {
       const count = reading.trustedProxies.length;
       return `caller address: X-Forwarded-For, trusting ${count} ${count === 1 ? "range" : "ranges"}`;

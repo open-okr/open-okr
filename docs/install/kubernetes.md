@@ -50,8 +50,8 @@ from a checkout with `helm install openokr ./deploy/helm` and set
    level security is what keeps one workspace out of another's rows, and
    Postgres never applies it to either kind of role. A role that owns the
    database is right: the tables force the policy on their owner too. The
-   instance warns at boot, in `/api/health` and on `/admin/general` when its
-   role bypasses the floor.
+   instance warns at boot and on `/admin/general` when its role bypasses the
+   floor, and the server still starts.
 3. Put the connection string in a Secret rather than on the command line, and
    point `database.existingSecret` at it.
 4. Install the chart, with your ingress host.
@@ -59,8 +59,9 @@ from a checkout with `helm install openokr ./deploy/helm` and set
    on first install and keeps it across upgrades and uninstalls, and it cannot
    recover it. Losing it makes stored credentials unreadable while everything
    else keeps working, which is the worst way to find out.
-6. Open the host. The first-run wizard takes over exactly as it does on a
-   single server.
+6. Open the host and finish setup right after the first start. Until somebody
+   does, anyone who reaches the host can create the owner account. The first-run
+   wizard takes over exactly as it does on a single server.
 
 Migrations run as a job from the same image, before the application rolls,
 and the data changes run as another once it has, so an upgrade is
@@ -192,6 +193,24 @@ Session mode is safe. A setting that sends these to a direct connection while
 the rest goes through a transaction pooler is designed
 ([direct-connection.md](../design/direct-connection.md)) and will be built when
 a deployment needs it.
+
+## Proxies in front of the application
+
+The sign-in limits count each caller by address. The address is the
+`X-Forwarded-For` entry that many places from the right as there are reverse
+proxies in front of the pods, because the entry the nearest proxy wrote is the
+one a caller cannot forge. Set `instance.trustedProxyHops` to match:
+
+| What sits in front of the pods | `instance.trustedProxyHops` |
+|---|---|
+| One ingress controller (the default) | 1 |
+| A cloud load balancer in front of the ingress controller | 2 |
+| Nothing, pods reached directly | 0, which ignores the header and gives every caller one shared limit |
+
+Too low and callers share one limit, so a few bad attempts block everyone.
+Too high and the entry is one the caller wrote, so a caller can pick its own
+limit. Check it once with the address your own request shows in the ingress
+controller's access log.
 
 ## What to check before you call it done
 

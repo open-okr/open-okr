@@ -1,7 +1,8 @@
 /**
  * SCIM bearer token management (P8-T08).
  *
- * Each workspace generates one SCIM token. The identity provider sends it
+ * Each workspace generates one SCIM token, through the `directory.createToken`
+ * action, which is audited. The identity provider sends it
  * on every request. The token is hashed (SHA-256) at rest, following the
  * session-token pattern from P1-T04.
  *
@@ -14,56 +15,19 @@
  */
 
 import { createHash, randomBytes } from "node:crypto";
-import { withDirectoryToken, withWorkspace } from "@openokr/db";
+import { withDirectoryToken } from "@openokr/db";
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 
 /** Hashes a token for storage. Same algorithm as session tokens. */
-function hashToken(token: string): string {
+export function hashSCIMToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
 /** Generates a random bearer token, 32 bytes hex-encoded. */
-function generateToken(): string {
+export function generateSCIMToken(): string {
   return randomBytes(32).toString("hex");
-}
-
-/**
- * Creates a SCIM token for a workspace. Returns the plaintext token once.
- * Revokes any existing live token for the workspace first.
- */
-export async function createSCIMToken(
-  pool: Pool,
-  workspaceId: string,
-  label?: string,
-): Promise<{ token: string; id: string }> {
-  const plaintext = generateToken();
-  const hash = hashToken(plaintext);
-
-  const row = await withWorkspace(drizzle(pool), workspaceId, async (tx) => {
-    // openokr:allow-mutation: token revocation and creation are an
-    // infrastructure operation with no acting member. The admin endpoint
-    // that calls this is access-checked, and the sync log records the
-    // operational fact.
-    await tx.execute(sql`
-      update directory_sync_tokens
-         set revoked_at = now()
-       where workspace_id = ${workspaceId}
-         and revoked_at is null`);
-
-    // openokr:allow-mutation: the same operation, the same transaction. The
-    // revocation above and this insert are the one live token moving, and
-    // splitting them would leave a workspace with none.
-    const inserted = await tx.execute<{ id: string }>(sql`
-      insert into directory_sync_tokens (workspace_id, token_hash, label)
-      values (${workspaceId}, ${hash}, ${label ?? "SCIM token"})
-      returning id`);
-    return inserted.rows[0];
-  });
-
-  if (!row) throw new Error("Token insert returned no row");
-  return { token: plaintext, id: row.id };
 }
 
 /**
@@ -79,7 +43,7 @@ export async function resolveToken(
   pool: Pool,
   token: string,
 ): Promise<{ workspaceId: string; tokenId: string } | null> {
-  const hash = hashToken(token);
+  const hash = hashSCIMToken(token);
   const { rows } = await withDirectoryToken(drizzle(pool), hash, (tx) =>
     tx.execute<{ workspace_id: string; id: string }>(sql`
       select workspace_id, id

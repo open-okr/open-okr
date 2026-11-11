@@ -36,19 +36,21 @@ The instance says the same in three other places:
 
 ## What to set
 
-Two variables, environment only, both empty by default. Set at most one. Both
-set, or a malformed entry, refuses the boot with the entry named.
+Three variables, environment only. Set at most one. Two set, or a malformed
+entry, refuses the boot with the variable named.
 
 | Variable | Helm value | What it does |
 |---|---|---|
+| `OPENOKR_TRUSTED_PROXY_HOPS` | `instance.trustedProxyHops` | **The default, 1.** How many proxies stand in front of the server: the visitor is the `X-Forwarded-For` entry that many places from the right, because each proxy appends what it saw and the rightmost entry is the one the nearest proxy wrote. Set 2 when a cloud load balancer sits in front of the ingress controller. `0` reads no header |
 | `OPENOKR_TRUSTED_PROXIES` | `network.trustedProxies` | The proxies in front of the instance, as addresses or CIDR ranges, separated by commas, spaces or newlines. `X-Forwarded-For` is read from the right: a hop inside a range is skipped and the first address outside every range is the visitor. Entries a caller wrote sit on the left and are never reached |
 | `OPENOKR_CLIENT_ADDRESS_HEADER` | `network.clientAddressHeader` | The one header your CDN writes the visitor's address into, such as `cf-connecting-ip`. Read alone, and only when it holds one address. **Safe only when the server refuses every request that did not come through your own CDN zone**, because anybody who reaches the server another way can write it |
 
-With neither set, `X-Forwarded-For` is read only when it holds exactly one
-address. That is right when the proxy in front replaces the header with the one
-address it saw, as the Caddy in the Compose install does. `X-Real-IP` is never
-read unless you name it: a proxy that writes only that header is named with
-`OPENOKR_CLIENT_ADDRESS_HEADER=x-real-ip`.
+With nothing set the hop count is 1, which is right for both shipped
+installs: Caddy in Compose and one ingress controller in Helm. The ranges or
+the header replace it for a chain whose length varies, or for a CDN that
+writes the visitor's address into a header of its own. `X-Real-IP` is read only
+with one proxy and no `X-Forwarded-For` at all, where that proxy overwrote
+whatever the caller sent.
 
 **Name your proxies' own addresses**, not a broad private range that also
 holds people. A caller whose own address is inside a trusted range can choose
@@ -61,7 +63,7 @@ are refused. Host names are not read.
 | Compose, behind a load balancer you run | `OPENOKR_TRUSTED_PROXIES=10.0.1.0/24` in `secrets/app.env` | The load balancer's own addresses. `./openokr up` hands the same list to Caddy |
 | Compose, behind Cloudflare | `OPENOKR_CLIENT_ADDRESS_HEADER=cf-connecting-ip`, with the server reachable only through your zone | Cloudflare Tunnel is the simplest lock on one server: it opens no port at all |
 | Kubernetes, ingress controller behind a layer-4 load balancer that keeps the source address | Nothing, when the controller writes one address | Check the session address. If it shows the load balancer, use the next row |
-| Kubernetes, ingress controller behind a layer-7 load balancer | Tell the controller to trust that load balancer and add to the header, then `network.trustedProxies` with the load balancer's subnets | The controller's own setting, below |
+| Kubernetes, ingress controller behind a layer-7 load balancer | `instance.trustedProxyHops: 2`, or `network.trustedProxies` with the load balancer's subnets when the chain's length varies | For the ranges, tell the controller to trust that load balancer and add to the header, below |
 | AWS Application Load Balancer straight to pods | `network.trustedProxies` with the load balancer's subnets | Leave `routing.http.xff_client_port.enabled` off, its default: a port in the chain places nobody |
 | Cloudflare, then a load balancer, then pods | `network.clientAddressHeader: cf-connecting-ip`, and a load balancer that refuses requests without a secret header your zone adds | Below |
 

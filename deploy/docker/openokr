@@ -255,6 +255,31 @@ wait_for_health() {
   done
 }
 
+# The address a person types. `${A:-b}` yields A when it is set, so the old
+# one-line form printed the domain twice; this spells out the two cases.
+instance_url() {
+  if [ -n "${OPENOKR_DOMAIN:-}" ]; then
+    echo "https://$OPENOKR_DOMAIN"
+  else
+    echo "http://localhost${OPENOKR_HTTP_PORT:+:$OPENOKR_HTTP_PORT}"
+  fi
+}
+
+# Says to finish setup now when nobody has claimed this instance yet.
+#
+# The first person to open an unclaimed instance creates the owner account, so
+# until somebody does, anyone who can reach the address can be that person.
+# Best effort and quiet: any failure to ask (a database that is not answering
+# yet, a table that is not there) prints nothing extra, and never fails `up`.
+announce_unclaimed() {
+  people="$(compose exec -T db psql -U openokr -d openokr -tAc 'select count(*) from users' 2>/dev/null | tr -d '[:space:]' || true)"
+  [ "$people" = "0" ] || return 0
+  setup_url="$(instance_url)/setup"
+  log "setup link: $setup_url"
+  log "finish setup now. Until then, anyone who reaches this address can claim the instance."
+  return 0
+}
+
 # The origin the browser will use. Passkeys are bound to it, and so are the
 # links in any mail the instance sends, so getting it wrong is not cosmetic.
 #
@@ -420,7 +445,8 @@ case "${1:-help}" in
       exit 1
     fi
 
-    log "ready. Open ${OPENOKR_DOMAIN:+https://$OPENOKR_DOMAIN}${OPENOKR_DOMAIN:-http://localhost${OPENOKR_HTTP_PORT:+:$OPENOKR_HTTP_PORT}} to finish setup."
+    log "ready. Open $(instance_url) to finish setup."
+    announce_unclaimed
     ;;
 
   down)

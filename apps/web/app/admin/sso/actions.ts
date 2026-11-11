@@ -3,13 +3,21 @@
 import { loadEnv } from "@openokr/config";
 import { callAction, SSOConnectionRejected } from "@openokr/core";
 import { revalidatePath } from "next/cache";
+import { getDns } from "../../../lib/dns";
+import { checkOutboundUrl } from "../../../lib/outbound";
 import { getPool } from "../../../lib/pool";
 import { refusalFields } from "../../../lib/refusal";
 import { getKeyRing } from "../../../lib/secrets";
 import { expireSSOProviders } from "../../../lib/sso";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
-import type { SSOEditInput, SSOWriteResult } from "./sso-result.ts";
+import type {
+  SSODomainCheckResult,
+  SSODomainStartResult,
+  SSOEditInput,
+  SSOFailure,
+  SSOWriteResult,
+} from "./sso-result.ts";
 
 /**
  * Changing, switching and removing a single sign-on connection (S-36).
@@ -36,14 +44,16 @@ async function context() {
     actor: { kind: "human" as const, userId: session.user.id },
     ring: getKeyRing(),
     baseUrl: loadEnv().BETTER_AUTH_URL,
+    // Checking a domain looks its record up. Only `sso.verifyDomain` reads it.
+    dns: getDns(),
+    // A changed discovery, token or user-info address is checked by the
+    // outbound guard before it is stored.
+    checkOutboundUrl,
   };
 }
 
 /** A refusal the reader can act on, or a sentence saying nothing changed. */
-async function refusal(
-  error: unknown,
-  action: string,
-): Promise<SSOWriteResult> {
+async function refusal(error: unknown, action: string): Promise<SSOFailure> {
   if (error instanceof SSOConnectionRejected) {
     return { ok: false, message: error.message, field: error.field };
   }
@@ -141,4 +151,61 @@ export async function removeSSOConnectionAction(
     return refusal(error, "sso.removeConnection");
   }
   return saved();
+}
+
+/**
+ * Starts proving a domain (docs/design/sso-domain-verification.md). The
+ * record comes back once: only its hash is stored, so the screen holds the
+ * value in memory for as long as the dialog is open and no longer.
+ */
+export async function startSSODomainVerificationAction(
+  domain: string,
+): Promise<SSODomainStartResult> {
+  try {
+    const result = await callAction(
+      await context(),
+      "sso.startDomainVerification",
+      { domain },
+    );
+    revalidatePath("/admin/sso");
+    return { ok: true, record: result.record };
+  } catch (error) {
+    return refusal(error, "sso.startDomainVerification");
+  }
+}
+
+/** Looks the record up now, instead of waiting for the daily check. */
+export async function verifySSODomainAction(
+  domain: string,
+): Promise<SSODomainCheckResult> {
+  try {
+    const result = await callAction(await context(), "sso.verifyDomain", {
+      domain,
+    });
+    revalidatePath("/admin/sso");
+    return { ok: true, verified: result.verified, reason: result.reason };
+  } catch (error) {
+    return refusal(error, "sso.verifyDomain");
+  }
+}
+
+/**
+ * Marks a domain verified by hand, for an instance with no public DNS. The
+ * action refuses on a managed cloud and wants a reason, so the screen's
+ * decision to show the control is a courtesy and not the rule.
+ */
+export async function markSSODomainVerifiedAction(
+  domain: string,
+  reason: string,
+): Promise<SSOWriteResult> {
+  try {
+    await callAction(await context(), "sso.markDomainVerified", {
+      domain,
+      reason,
+    });
+  } catch (error) {
+    return refusal(error, "sso.markDomainVerified");
+  }
+  revalidatePath("/admin/sso");
+  return { ok: true };
 }

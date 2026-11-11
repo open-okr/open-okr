@@ -17,7 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const BASE_URL = "http://localhost:3000";
 
 const createAuthMock = vi.fn((options: unknown) => ({ options }));
-const createSSOConnectionMock = vi.fn();
+const callActionMock = vi.fn();
 const loadSSOConnectionsMock = vi.fn();
 const syncAllSamlProvidersMock = vi.fn();
 
@@ -57,7 +57,10 @@ vi.mock("@openokr/core", () => ({
   // The shared sign-in limiter (plan 0.7.0 P10b); these tests need none.
   authLimiterStorage: () => undefined,
   createAuth: createAuthMock,
-  createSSOConnection: createSSOConnectionMock,
+  callAction: callActionMock,
+  OperationError: class OperationError extends Error {
+    readonly code = "conflict";
+  },
   followSSOProviders: (tracker: unknown, build: (p: unknown) => unknown) => {
     followed.tracker = tracker;
     followed.build = build;
@@ -77,6 +80,8 @@ vi.mock("@openokr/core", () => ({
   resolveRequireEmailVerification: vi.fn(),
   SSOConnectionRejected,
   syncAllSamlProviders: syncAllSamlProvidersMock,
+  // Read by the same-origin check the route now runs first.
+  withoutTrailingSlashes: (url: string) => url.replace(/\/+$/, ""),
   trackSSOProviders: (options: typeof tracked.options) => {
     tracked.options = options;
     return tracked.tracker;
@@ -96,9 +101,10 @@ vi.mock("better-auth/next-js", () => ({ nextCookies: () => ({}) }));
 vi.mock("../lib/cache", () => ({ getCache: () => undefined }));
 vi.mock("../lib/instance-name", () => ({ getInstanceName: vi.fn() }));
 vi.mock("../lib/pool", () => ({ getPool: () => "the pool" }));
+vi.mock("../lib/outbound", () => ({ checkOutboundUrl: vi.fn() }));
 vi.mock("../lib/secrets", () => ({ getKeyRing: () => "the ring" }));
 vi.mock("../lib/access", () => ({
-  requireAccessLevel: async () => ({ workspaceId: "ws-1" }),
+  requireAccessLevel: async () => ({ workspaceId: "ws-1", userId: "user-1" }),
 }));
 
 const forget = () => {
@@ -221,7 +227,7 @@ describe("saving a connection", () => {
   };
 
   it("has this process look again at its next sign-in", async () => {
-    createSSOConnectionMock.mockResolvedValueOnce({
+    callActionMock.mockResolvedValueOnce({
       id: "row-1",
       providerId: "sso-acme-ws-1",
     });
@@ -233,9 +239,7 @@ describe("saving a connection", () => {
   });
 
   it("changes nothing when the connection is refused", async () => {
-    createSSOConnectionMock.mockRejectedValueOnce(
-      new SSOConnectionRejected("no"),
-    );
+    callActionMock.mockRejectedValueOnce(new SSOConnectionRejected("no"));
 
     const response = await save();
 

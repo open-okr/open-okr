@@ -47,6 +47,7 @@ import {
 } from "@openokr/core";
 import type { NextRequest } from "next/server";
 import { getCache } from "../../../../lib/cache";
+import { getDns } from "../../../../lib/dns";
 import { getInstanceName } from "../../../../lib/instance-name";
 import { checkOutboundUrl } from "../../../../lib/outbound";
 import { getPool } from "../../../../lib/pool";
@@ -238,6 +239,9 @@ async function handle(
       // edit waited for the next reload to reach the plugin's table.
       ring: getKeyRing(),
       baseUrl: loadEnv().BETTER_AUTH_URL,
+      // Proving a domain looks up a DNS record, and the instance's own
+      // resolver does it (sso-domain-verification.md, rule 5).
+      dns: getDns(),
       // A webhook's address is checked by the outbound guard before it is
       // stored, here as on the admin screen (outbound-webhooks.md W7).
       checkOutboundUrl,

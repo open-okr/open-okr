@@ -34,6 +34,9 @@ function payloadOf(reading: CallerAddressReading): Record<string, unknown> {
         ? [...reading.trustedProxies].sort()
         : [],
     header: reading.mode === "header" ? reading.header : null,
+    // The hop count is a reading too (combined with the hardening batch on
+    // 11 November 2026), so going from one proxy to two is a change.
+    hops: reading.mode === "proxy_hops" ? reading.hops : null,
   };
 }
 

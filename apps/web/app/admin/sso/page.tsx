@@ -1,11 +1,16 @@
 import { loadEnv } from "@openokr/config";
-import { callAction, samlServiceProviderUrls } from "@openokr/core";
+import {
+  callAction,
+  isCloudEnabled,
+  samlServiceProviderUrls,
+} from "@openokr/core";
 import { Card, CardBody, CardHeader, Chip } from "@openokr/ui";
 import { getPool } from "../../../lib/auth";
 import { pageTitle } from "../../../lib/page-title.ts";
 import { getTranslations } from "../../../lib/translations";
 import { requireWorkspace } from "../../../lib/workspace";
 import { ConnectionControls } from "./connection-controls";
+import { ConnectionDomains } from "./domain-verification";
 import { SSOForm } from "./sso-form";
 
 export const generateMetadata = pageTitle("pageTitle.adminSso");
@@ -34,15 +39,25 @@ export const generateMetadata = pageTitle("pageTitle.adminSso");
 export default async function SSOPage() {
   const { t } = await getTranslations();
   const { session, workspace } = await requireWorkspace();
-  const connections = await callAction(
-    {
-      pool: getPool(),
-      workspaceId: workspace.workspaceId,
-      actor: { kind: "human", userId: session.user.id },
-    },
-    "sso.listConnections",
-    {},
-  );
+  const pool = getPool();
+  const context = {
+    pool,
+    workspaceId: workspace.workspaceId,
+    actor: { kind: "human" as const, userId: session.user.id },
+  };
+  const [connections, domains, cloud] = await Promise.all([
+    callAction(context, "sso.listConnections", {}),
+    callAction(context, "sso.listDomains", {}),
+    isCloudEnabled(pool),
+  ]);
+  // Marking a domain by hand is the instance administrator's, which on a
+  // managed cloud is the operator and not anybody on this screen.
+  const canMarkByHand = !cloud;
+  const byDomain = new Map(domains.map((d) => [d.domain, d]));
+  // Verified or failing: a failing one is verified until three checks fail.
+  const verifiedDomains = domains
+    .filter((d) => d.status === "verified" || d.status === "failing")
+    .map((d) => d.domain);
   const baseUrl = loadEnv().BETTER_AUTH_URL;
 
   return (
@@ -143,7 +158,18 @@ export default async function SSOPage() {
                         </div>
                       </dl>
                     )}
-                    <ConnectionControls connection={c} />
+                    <ConnectionDomains
+                      canMarkByHand={canMarkByHand}
+                      domains={c.emailDomains
+                        .split(",")
+                        .map((name) => name.trim().toLowerCase())
+                        .filter(Boolean)
+                        .flatMap((name) => byDomain.get(name) ?? [])}
+                    />
+                    <ConnectionControls
+                      connection={c}
+                      verifiedDomains={verifiedDomains}
+                    />
                   </li>
                 );
               })}
@@ -162,7 +188,7 @@ export default async function SSOPage() {
           </p>
         </CardHeader>
         <CardBody>
-          <SSOForm />
+          <SSOForm verifiedDomains={verifiedDomains} />
         </CardBody>
       </Card>
     </div>

@@ -30,8 +30,11 @@ type Mode = "idle" | "editing" | "confirmOff" | "confirmRemove";
  */
 export function ConnectionControls({
   connection,
+  verifiedDomains,
 }: {
   readonly connection: SSOConnectionDetails;
+  /** Domains this workspace has proved, which enforcement needs. */
+  readonly verifiedDomains: readonly string[];
 }) {
   const { t } = useTranslations();
   const { show } = useToast();
@@ -224,6 +227,7 @@ export function ConnectionControls({
         <div className="border-t border-line pt-3">
           <SSOForm
             connection={connection}
+            verifiedDomains={verifiedDomains}
             onSaved={() => {
               setMode("idle");
               setNotice(t("admin.sso.ssoForm.providerSaved"));

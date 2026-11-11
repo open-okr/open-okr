@@ -86,3 +86,19 @@ describe("the scheduler notice", () => {
     expect(await rendered({ scheduler: null })).toBe("");
   });
 });
+
+// The hardening batch's notice (docs/design/hardening-batch-2026-11.md H-B),
+// on the props this component took once plan 0.8.0's notices joined it.
+describe("the instance health notice", () => {
+  it("says isolation is off and how to fix it when the role bypasses the floor", async () => {
+    const html = await rendered({ tenantFloorBypassed: true });
+    expect(html).toContain('data-testid="tenant-floor-notice"');
+    expect(html).toContain("not enforcing workspace isolation");
+    expect(html).toContain("Connect as a role with neither privilege");
+    expect(html).not.toContain("scheduler-notice");
+  });
+
+  it("renders nothing when the floor holds and the scheduler runs", async () => {
+    expect(await rendered({})).toBe("");
+  });
+});

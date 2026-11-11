@@ -34,6 +34,7 @@ never calls out.
 | Chat channels | No Slack, Teams, WhatsApp or Telegram. Nudges arrive in the product |
 | Billing | Off, and the payment SDK is never loaded. It is for a provider selling a cloud, so an air-gapped instance has no reason to turn it on |
 | Single sign-on | Password and passkey sign-in, which is the default anyway |
+| Single sign-on domain proof | A domain is looked up in public DNS (`_openokr-verify.<domain>`, TXT) through the `DnsResolver` port, and an isolated instance's lookup fails. A domain then stays unverified, so enforcement is not turned on for it and a new password sign-up on it is not refused. An instance administrator marks the domain verified by hand, with a reason, and the audit row names who did it |
 | Directory sync | Members are invited rather than provisioned |
 | Update check | **On by default, so turn it off:** set `OPENOKR_UPDATE_CHECK=off`, or untick it in Admin, General. Left on, an isolated instance tries `api.github.com` once an hour, fails within three seconds without delaying any page, and shows only the running version. The request carries nothing about the instance |
 | Virus scanning | No scan, and a file is available as soon as it is uploaded. A clamd on the same isolated network works like any other; its signature updates need a mirror. See [Security](../admin/security.md#uploaded-files) |
