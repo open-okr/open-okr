@@ -71,13 +71,15 @@ export function AvatarForm({
           className="flex flex-wrap items-center gap-2"
           aria-busy={uploading}
         >
-          <label className="flex flex-col gap-1 text-xs text-ink-3">
+          {/* Allowed to shrink: the native control's own width ran 4 px past
+              a 390 px phone (UAT 0.8.0 F-11). */}
+          <label className="flex min-w-0 max-w-full flex-col gap-1 text-xs text-ink-3">
             {t("people.detail.avatarForm.choosePicture")}
             <input
               name="avatar"
               type="file"
               accept="image/png,image/jpeg,image/gif,image/webp"
-              className="text-sm text-ink"
+              className="min-w-0 max-w-full text-sm text-ink"
             />
           </label>
           <Button

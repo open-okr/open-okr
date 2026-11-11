@@ -248,8 +248,10 @@ export function Attachments({
               data-testid="attachment-input"
               // The browser's own "Choose file" drawn as the kit's secondary
               // button, still the native input so keyboard and drop work
-              // (usability review IN3).
-              className="text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4"
+              // (usability review IN3). `min-w-0 max-w-full`: the native
+              // control's own width ran 4 px past a 390 px phone (UAT 0.8.0
+              // F-11).
+              className="min-w-0 max-w-full text-xs text-ink-2 file:mr-2.5 file:cursor-pointer file:rounded-control file:border file:border-line-2 file:bg-surface file:px-2.5 file:py-1 file:text-xs file:font-semibold file:text-ink-2 hover:file:border-ink-4"
             />
             <Button
               type="button"
