@@ -233,7 +233,7 @@ describe("the confirmation mail", () => {
 
 /**
  * The notice that a password changed (account-self-service.md §4.2, D9, D13):
- * when, to the minute in UTC, whether other devices were signed out, and one
+ * when, to the minute in the person's own timezone, whether other devices were signed out, and one
  * button to the page that asks for a reset link. Never the password, and
  * never a link that changes it.
  */
@@ -251,12 +251,34 @@ describe("the password notice", () => {
       ...over,
     });
 
+  // UAT 0.8.0 Q-7: a time in UTC is one more sum for somebody checking
+  // whether it was them, so it is said in their own timezone, named.
+  it("says the time in the person's own timezone, naming it", () => {
+    const built = notice({ timeZone: "Asia/Kuala_Lumpur" });
+    expect(built.text).toContain(
+      "was changed on 11 November 2026 at 15:05 (Asia/Kuala_Lumpur).",
+    );
+    // A day can change with the zone, and the date follows it.
+    expect(
+      notice({
+        at: new Date("2026-11-11T20:30:00Z"),
+        timeZone: "Asia/Jakarta",
+      }).text,
+    ).toContain("on 12 November 2026 at 03:30 (Asia/Jakarta).");
+  });
+
+  it("falls back to UTC for a zone it does not know", () => {
+    expect(notice({ timeZone: "Mars/Olympus_Mons" }).text).toContain(
+      "at 07:05 (UTC).",
+    );
+  });
+
   it("says what changed and when, and links only to the reset request", () => {
     const built = notice({});
     expect(built.subject).toBe("Your Northwind OKR password was changed");
     expect(built.html).toContain("<b>amara@example.com</b>");
     expect(built.text).toContain(
-      "The password for amara@example.com was changed on 11 November 2026 at 07:05 UTC.",
+      "The password for amara@example.com was changed on 11 November 2026 at 07:05 (UTC).",
     );
     expect(built.text).toContain(
       "Your other devices were signed out. API tokens and connected apps keep working.",
@@ -275,7 +297,7 @@ describe("the password notice", () => {
     expect(set.subject).toBe(
       "A password was set on your Northwind OKR account",
     );
-    expect(set.text).toContain("was set on 11 November 2026 at 07:05 UTC.");
+    expect(set.text).toContain("was set on 11 November 2026 at 07:05 (UTC).");
     expect(set.text).toContain("Your other devices stay signed in.");
 
     const reset = notice({ via: "reset" });
@@ -289,7 +311,7 @@ describe("the password notice", () => {
     expect(built.subject).toBe("Kata laluan Northwind OKR anda telah ditukar");
     expect(built.html).toContain('<html lang="ms">');
     expect(built.text).toContain(
-      "telah ditukar pada 11 November 2026 jam 07:05 UTC.",
+      "telah ditukar pada 11 November 2026 jam 07:05 (UTC).",
     );
     expect(built.text).toContain("Tetapkan semula kata laluan");
   });
@@ -341,7 +363,7 @@ describe("a change of sign-in email", () => {
       "A change of sign-in email was asked for on your Northwind OKR account",
     );
     expect(built.text).toContain(
-      "Somebody signed in to your account asked to make amara@new.example its sign-in email, on 11 November 2026 at 07:05 UTC.",
+      "Somebody signed in to your account asked to make amara@new.example its sign-in email, on 11 November 2026 at 07:05 (UTC).",
     );
     expect(built.text).toContain(
       "If that was you, follow the email sent to amara@new.example.",
@@ -391,7 +413,7 @@ describe("a change of sign-in email", () => {
       at: AT,
       baseUrl: BASE,
     });
-    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 UTC.");
+    expect(notice.text).toContain("pada 11 November 2026 jam 07:05 (UTC).");
     const taken = emailChangeTakenMail({
       instanceName: "Northwind OKR",
       locale: "ms",

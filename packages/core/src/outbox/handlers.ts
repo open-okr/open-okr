@@ -143,6 +143,7 @@ import {
   WEBHOOK_TURNED_OFF_TOPIC,
   webhookRetrySeconds,
 } from "../webhooks/jobs.ts";
+import { timezoneForAccount } from "../workspaces/memberships.ts";
 import { PermanentDispatchError } from "./permanent.ts";
 
 /** One delivered outbox row, as a handler sees it. */
@@ -581,6 +582,8 @@ const sendPasswordChanged: OutboxHandler = async (delivery, deps) => {
     via: via as PasswordChangeVia,
     otherSessionsEnded: delivery.payload.otherSessionsEnded === true,
     at,
+    // In the person's own timezone, named (UAT 0.8.0 Q-7).
+    timeZone: await timezoneForAccount(deps.pool, userId).catch(() => "UTC"),
     baseUrl: deps.baseUrl,
   });
   await deps.sendMail({ to, ...built });
@@ -682,6 +685,8 @@ const sendEmailChangeNotice: OutboxHandler = async (delivery, deps) => {
     to,
     newEmail,
     at,
+    // In the person's own timezone, named (UAT 0.8.0 Q-7).
+    timeZone: await timezoneForAccount(deps.pool, userId).catch(() => "UTC"),
     baseUrl: deps.baseUrl,
   });
   await deps.sendMail({ to, ...built });

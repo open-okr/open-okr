@@ -10,7 +10,7 @@ import {
   workspaceMembers,
   workspaces,
 } from "@openokr/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 
@@ -64,6 +64,53 @@ export async function listMembershipsForUser(
       )
       .orderBy(asc(workspaces.createdAt), asc(workspaces.id)),
   );
+}
+
+/**
+ * The timezone an account-level mail tells its time in (UAT 0.8.0 Q-7): the
+ * person's own in their first workspace, then that workspace's, then UTC. An
+ * account belongs to no workspace, so this is the nearest answer the person
+ * gave; a zone the runtime does not know is no answer.
+ */
+export async function timezoneForAccount(
+  pool: Pool,
+  userId: string,
+): Promise<string> {
+  if (userId === "") {
+    return "UTC";
+  }
+  const [first] = await withUser(drizzle(pool), userId, (tx) =>
+    tx
+      .select({
+        member: workspaceMembers.timezone,
+        workspace: sql<string | null>`${workspaces.settings}->>'timezone'`,
+      })
+      .from(workspaceMembers)
+      .innerJoin(workspaces, eq(workspaces.id, workspaceMembers.workspaceId))
+      .where(
+        and(
+          activeOnly(workspaceMembers, eq(workspaceMembers.userId, userId)),
+          activeOnly(workspaces),
+        ),
+      )
+      .orderBy(asc(workspaces.createdAt), asc(workspaces.id))
+      .limit(1),
+  );
+  for (const zone of [first?.member, first?.workspace]) {
+    if (zone && knownZone(zone)) {
+      return zone;
+    }
+  }
+  return "UTC";
+}
+
+function knownZone(zone: string): boolean {
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

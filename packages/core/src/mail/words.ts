@@ -54,9 +54,9 @@ const en = {
   "passwordChanged.headingSet": "A password was set",
   "passwordChanged.headingReset": "Your password was reset",
   "passwordChanged.bodyBefore": "The password for ",
-  "passwordChanged.bodyChange": " was changed on {date} at {time} UTC.",
-  "passwordChanged.bodySet": " was set on {date} at {time} UTC.",
-  "passwordChanged.bodyReset": " was reset on {date} at {time} UTC.",
+  "passwordChanged.bodyChange": " was changed on {date} at {time} ({zone}).",
+  "passwordChanged.bodySet": " was set on {date} at {time} ({zone}).",
+  "passwordChanged.bodyReset": " was reset on {date} at {time} ({zone}).",
   "passwordChanged.signedOutOthers":
     "Your other devices were signed out. API tokens and connected apps keep working.",
   "passwordChanged.signedOutEverywhere":
@@ -102,7 +102,8 @@ const en = {
   "emailChangeNotice.heading": "A new sign-in email was asked for",
   "emailChangeNotice.bodyBefore":
     "Somebody signed in to your account asked to make ",
-  "emailChangeNotice.bodyAfter": " its sign-in email, on {date} at {time} UTC.",
+  "emailChangeNotice.bodyAfter":
+    " its sign-in email, on {date} at {time} ({zone}).",
   "emailChangeNotice.ifYou": "If that was you, follow the email sent to {to}.",
   "emailChangeNotice.notYou":
     "If it was not, change your password and sign out your other devices: an unopened link then stops working.",
@@ -337,10 +338,12 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "passwordChanged.headingSet": "Kata laluan telah ditetapkan",
   "passwordChanged.headingReset": "Kata laluan anda telah ditetapkan semula",
   "passwordChanged.bodyBefore": "Kata laluan bagi ",
-  "passwordChanged.bodyChange": " telah ditukar pada {date} jam {time} UTC.",
-  "passwordChanged.bodySet": " telah ditetapkan pada {date} jam {time} UTC.",
+  "passwordChanged.bodyChange":
+    " telah ditukar pada {date} jam {time} ({zone}).",
+  "passwordChanged.bodySet":
+    " telah ditetapkan pada {date} jam {time} ({zone}).",
   "passwordChanged.bodyReset":
-    " telah ditetapkan semula pada {date} jam {time} UTC.",
+    " telah ditetapkan semula pada {date} jam {time} ({zone}).",
   "passwordChanged.signedOutOthers":
     "Peranti anda yang lain telah dilog keluar. Token API dan aplikasi yang disambungkan terus berfungsi.",
   "passwordChanged.signedOutEverywhere":
@@ -383,7 +386,7 @@ const ms: Readonly<Record<MailWordKey, string>> = {
   "emailChangeNotice.bodyBefore":
     "Seseorang yang log masuk ke akaun anda meminta untuk menjadikan ",
   "emailChangeNotice.bodyAfter":
-    " e-mel log masuknya, pada {date} jam {time} UTC.",
+    " e-mel log masuknya, pada {date} jam {time} ({zone}).",
   "emailChangeNotice.ifYou": "Jika itu anda, ikut e-mel yang dihantar ke {to}.",
   "emailChangeNotice.notYou":
     "Jika bukan, tukar kata laluan anda dan log keluar peranti anda yang lain: pautan yang belum dibuka kemudian tidak lagi berfungsi.",

@@ -107,7 +107,7 @@ export function verifyEmailMail(input: {
  * §4.2, D9, D13): changed while signed in, set where there was none, or reset
  * through the mailbox.
  *
- * It says when, to the minute in UTC, and whether other devices were signed
+ * It says when, to the minute in the person's own timezone, and whether other devices were signed
  * out. **Never the password, and never a link that changes it**: the one
  * button goes to the page that asks for a reset link, as the held-sign-in
  * notice does, so the mail itself is no credential.
@@ -119,6 +119,8 @@ export function passwordChangedMail(input: {
   readonly via: "change" | "set" | "reset";
   readonly otherSessionsEnded: boolean;
   readonly at: Date;
+  /** The person's timezone, from `timezoneForAccount`; UTC when absent. */
+  readonly timeZone?: string;
   /** The instance's public origin, where `/forgot-password` lives. */
   readonly baseUrl: string;
 }): BuiltMail {
@@ -126,22 +128,26 @@ export function passwordChangedMail(input: {
   const instance = input.instanceName;
   const resetUrl = new URL("/forgot-password", input.baseUrl).toString();
   const host = new URL(resetUrl).host;
-  const { date, time } = dateAndTime(input.at, input.locale);
+  const { date, time, zone } = dateAndTime(
+    input.at,
+    input.locale,
+    input.timeZone,
+  );
   const words = {
     change: {
       subject: t("passwordChanged.subjectChange", { instance }),
       heading: t("passwordChanged.headingChange"),
-      body: t("passwordChanged.bodyChange", { date, time }),
+      body: t("passwordChanged.bodyChange", { date, time, zone }),
     },
     set: {
       subject: t("passwordChanged.subjectSet", { instance }),
       heading: t("passwordChanged.headingSet"),
-      body: t("passwordChanged.bodySet", { date, time }),
+      body: t("passwordChanged.bodySet", { date, time, zone }),
     },
     reset: {
       subject: t("passwordChanged.subjectReset", { instance }),
       heading: t("passwordChanged.headingReset"),
-      body: t("passwordChanged.bodyReset", { date, time }),
+      body: t("passwordChanged.bodyReset", { date, time, zone }),
     },
   }[input.via];
   // A reset ends every session, the one that asked included; a change with
@@ -178,24 +184,37 @@ export function passwordChangedMail(input: {
   return { subject: words.subject, html, text };
 }
 
-/** "11 November 2026" and "07:05", in UTC, as the password notice says them. */
+/**
+ * "11 November 2026", "15:05" and the zone they are in, as the password and
+ * email-change notices say them. In the person's own timezone, named, so
+ * somebody checking whether it was them does no sum (UAT 0.8.0 Q-7); UTC
+ * when there is none or the runtime does not know it.
+ */
 function dateAndTime(
   at: Date,
   locale: MailLocale,
-): { readonly date: string; readonly time: string } {
+  timeZone = "UTC",
+): { readonly date: string; readonly time: string; readonly zone: string } {
+  let zone = timeZone;
+  try {
+    new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+  } catch {
+    zone = "UTC";
+  }
   return {
     date: at.toLocaleDateString(locale === "ms" ? "ms-MY" : "en-GB", {
       day: "numeric",
       month: "long",
       year: "numeric",
-      timeZone: "UTC",
+      timeZone: zone,
     }),
     time: at.toLocaleTimeString("en-GB", {
       hour: "2-digit",
       minute: "2-digit",
       hourCycle: "h23",
-      timeZone: "UTC",
+      timeZone: zone,
     }),
+    zone,
   };
 }
 
@@ -258,6 +277,8 @@ export function emailChangeNoticeMail(input: {
   readonly to: string;
   readonly newEmail: string;
   readonly at: Date;
+  /** The person's timezone, from `timezoneForAccount`; UTC when absent. */
+  readonly timeZone?: string;
   /** The instance's public origin, where `/account/security` lives. */
   readonly baseUrl: string;
 }): BuiltMail {
@@ -265,7 +286,11 @@ export function emailChangeNoticeMail(input: {
   const instance = input.instanceName;
   const securityUrl = new URL("/account/security", input.baseUrl).toString();
   const host = new URL(securityUrl).host;
-  const { date, time } = dateAndTime(input.at, input.locale);
+  const { date, time, zone } = dateAndTime(
+    input.at,
+    input.locale,
+    input.timeZone,
+  );
   const { html, text } = renderEmail(
     {
       lang: input.locale,
@@ -282,7 +307,7 @@ export function emailChangeNoticeMail(input: {
         parts: [
           t("emailChangeNotice.bodyBefore"),
           { bold: input.newEmail },
-          t("emailChangeNotice.bodyAfter", { date, time }),
+          t("emailChangeNotice.bodyAfter", { date, time, zone }),
         ],
       },
       {
