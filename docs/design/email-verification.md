@@ -220,3 +220,113 @@ Built on 11 November 2026 as plan row S3, carrying H1. Where the build reads the
 | The expired page's support line | "Still stuck? Write to *address*", or, with no support address, "Still stuck? Ask whoever runs this instance." |
 | The first account | The account that claims the instance arrives confirmed (BUG-028), so nothing is queued for it |
 | Y4's change of address | Better Auth calls the same `afterEmailVerification` for a completed change of address. Y4 adds its branch there, so a change writes its own row rather than `auth.email_verified` (account-self-service.md D20) |
+
+## 11. Turning confirmation off (plan 0.8.0 S4)
+
+Asked for by Akmal on 11 November 2026, with Q10 to Q13 of the plan's
+section 8.4 decided the same day as recommended, and one requirement of his
+own for the screen after sign-up. Security, so this section needs "design
+approved" before the code.
+
+### 11.1 The setting
+
+| Field | Value |
+|---|---|
+| Key | `auth.emailVerification`, an instance setting (TECHNICAL-PLAN §4.14) |
+| Values | `auto`, the default (Q10): today's rule, required exactly when the instance can deliver mail (`resolveRequireEmailVerification`). `off`: never required |
+| Environment | `OPENOKR_EMAIL_VERIFICATION`, `auto` or `off`; anything else refused at boot, naming the variable |
+| Who sets it | A self-hosted or group instance: an administrator, on Admin, General, a card beside Registration. A cloud: the operator only, on the console's Instance screen, beside the registration policy; a customer's Admin, General does not show it (Q12) |
+| Refused combination | With the registration policy at `company_domains`, confirmation stays required whatever this says (Q13). The card shows `off` as unavailable with the sentence "Registration is limited to your company's domains, which needs a confirmed address." |
+| A change | Written with an instance audit event `instance.email_verification_set` (from, to, by). Takes effect without a restart: the auth instance is rebuilt on the change, as it already is when single sign-on providers change (L-15) |
+
+The rule becomes one function, `emailConfirmationRequired(pool)`: false when
+the setting is `off` and the policy is not `company_domains`; otherwise
+today's rule. Better Auth's `requireEmailVerification` and
+`sendOnSignUp` both read it, so they cannot disagree.
+
+### 11.2 What a person sees
+
+**No notice about confirming, anywhere, when confirmation is not required.**
+In place of S1's check-your-email card, sign-up shows a card built like S2's
+confirmed page:
+
+| Part | Text |
+|---|---|
+| Title | "Welcome to {instance}" (S2's own title) |
+| Body | "Your account has been created. You can use it right away." |
+| Button | "Get started", to the home page and the onboarding behind it |
+
+The person is already signed in, because Better Auth gives a session when
+confirmation is not required, so the button goes straight in rather than to
+sign-in. The same card shows on an instance that cannot send mail, which
+also requires no confirmation, so sign-up ends one way wherever nothing is
+required. Before S4 those people were sent to the home page with no word.
+
+Nothing else nags: no banner, no "confirm your email" on sign-in, no hint on
+Your account. Sign-in never says "Confirm your email first" while
+confirmation is not required.
+
+### 11.3 The mail (Q11)
+
+Where the instance can send mail, a link is still sent, without blocking
+anything, because joining a workspace by trusted domain needs a confirmed
+address. Its words must not read as a demand:
+
+| Part | Text |
+|---|---|
+| Subject | "Your account on {instance} is ready" |
+| Body | "You can use your account now. If you would like to, confirm this address with the link below. It lets you join workspaces that admit people by their company's email domain." |
+
+It goes through the outbox like S3's mail, with S3's link lifetime, and is
+not sent where the instance cannot send mail.
+
+### 11.4 What stays as it is
+
+- An address an account already holds is refused at sign-up as today.
+- `trustedDomainOffers` still refuses an unconfirmed address
+  (`packages/core/src/invitations/trusted-domain.ts`).
+- An invitation link proves the mailbox by itself.
+- Changing a sign-in email (Y4) still confirms the new address.
+- Forgot password still confirms the address and signs every other device
+  out (S3).
+
+### 11.5 Acceptance criteria
+
+```
+Given confirmation is off and the policy is open
+When somebody signs up with an address no account holds
+Then they are signed in, see "Welcome to {instance}" and "Your account has
+been created. You can use it right away." with Get started, and see no word
+about confirming
+And a mail "Your account on {instance} is ready" is queued where mail can
+be sent
+
+Given confirmation is off
+When they press Get started
+Then they reach the home page and its onboarding without signing in again
+
+Given the policy is company_domains
+When an administrator chooses off
+Then it is refused with the sentence in 11.1, and confirmation stays required
+
+Given a cloud
+Then a customer's Admin, General shows no confirmation card, and the
+operator's Instance screen does
+
+Given the setting changes
+Then the next sign-up follows it without a restart, and the instance chain
+holds instance.email_verification_set
+
+Given an instance that cannot send mail
+When somebody signs up
+Then they see the same welcome card, and no mail is queued
+```
+
+### 11.6 Tests
+
+| Test | Kind |
+|---|---|
+| `emailConfirmationRequired` across `auto` and `off`, with and without delivering mail, and under `company_domains` | Core, against a real database |
+| The setting's writer, its audit event and the refused combination | Same |
+| The welcome card and no confirming notice; the mail's words | Unit, `apps/web/test` |
+| Sign-up with confirmation off, then Get started | End to end, `e2e/s35g-confirmation-off.spec.ts` |
