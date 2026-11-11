@@ -39,7 +39,7 @@ dump() {
   echo "--- worker ----------------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" -l app.kubernetes.io/name=openokr-worker --tail=40 2>&1 >&2 || true
   echo "--- object store ----------------------------------------------" >&2
-  kubectl logs -n "$NAMESPACE" deploy/minio --tail=20 2>&1 >&2 || true
+  kubectl logs -n "$NAMESPACE" deploy/object-store --tail=20 2>&1 >&2 || true
   echo "--- request loop ----------------------------------------------" >&2
   kubectl logs -n "$NAMESPACE" pod/probe-loop --tail=10 2>&1 >&2 || true
   echo "---------------------------------------------------------------" >&2
@@ -366,47 +366,45 @@ pass "the backup restored into a scratch database and verified"
 # pod shares, so a stand-in object store comes first: like the stand-in
 # Postgres, not part of the chart. Then an upgrade that keeps every value and
 # turns the worker on, which is how an operator would do it.
-MINIO_IMAGE="quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z"
+# SeaweedFS, because MinIO stopped publishing images it could pull: quay.io
+# answers 401 and Docker Hub has none. It serves S3 on 8333 and, with no
+# identities configured, accepts any key, which is all a stand-in needs.
+OBJECT_STORE_IMAGE="chrislusf/seaweedfs:3.85"
 kubectl apply -n "$NAMESPACE" -f - >/dev/null <<YAML
 apiVersion: v1
 kind: Service
 metadata:
-  name: minio
+  name: object-store
 spec:
   ports:
-    - port: 9000
+    - port: 8333
   selector:
-    app: minio
+    app: object-store
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: minio
+  name: object-store
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: minio
+      app: object-store
   template:
     metadata:
       labels:
-        app: minio
+        app: object-store
     spec:
       containers:
-        - name: minio
-          image: $MINIO_IMAGE
-          args: ["server", "/data"]
-          env:
-            - name: MINIO_ROOT_USER
-              value: test-only-user
-            - name: MINIO_ROOT_PASSWORD
-              value: test-only-password
+        - name: object-store
+          image: $OBJECT_STORE_IMAGE
+          args: ["server", "-s3", "-dir=/data"]
           ports:
-            - containerPort: 9000
+            - containerPort: 8333
           readinessProbe:
             httpGet:
-              path: /minio/health/ready
-              port: 9000
+              path: /
+              port: 8333
             periodSeconds: 3
           volumeMounts:
             - name: data
@@ -415,12 +413,14 @@ spec:
         - name: data
           emptyDir: {}
 YAML
-kubectl wait -n "$NAMESPACE" --for=condition=available deployment/minio --timeout=180s >/dev/null \
+kubectl wait -n "$NAMESPACE" --for=condition=available deployment/object-store --timeout=180s >/dev/null \
   || fail "the stand-in object store never became available"
-# The driver never creates a bucket (storage-s3.test.ts says why), so the
-# stand-in's own client makes it, as an operator makes theirs.
-kubectl run make-bucket -n "$NAMESPACE" --restart=Never --image="$MINIO_IMAGE" \
-  --command -- sh -c "mc alias set stand-in http://minio:9000 test-only-user test-only-password >/dev/null && mc mb --ignore-existing stand-in/openokr-files" >/dev/null \
+# The driver never creates a bucket (storage-s3.test.ts says why), so a
+# one-off pod makes it, as an operator makes theirs. The application's own
+# image is already in the cluster and has fetch, so nothing else is pulled.
+kubectl run make-bucket -n "$NAMESPACE" --restart=Never --image="$OPENOKR_IMAGE_REPO:$OPENOKR_IMAGE_TAG" \
+  --image-pull-policy=Never --command -- node -e \
+  "fetch('http://object-store:8333/openokr-files',{method:'PUT'}).then((r)=>{if(!r.ok){console.error(r.status);process.exit(1)}})" >/dev/null \
   || fail "the bucket could not be made"
 waited=0
 while :; do
@@ -440,7 +440,7 @@ helm upgrade "$RELEASE" . \
   --reuse-values \
   --set worker.enabled=true \
   --set storage.s3.bucket=openokr-files \
-  --set storage.s3.endpoint=http://minio:9000 \
+  --set storage.s3.endpoint=http://object-store:8333 \
   --set storage.s3.existingSecret=okr-s3 \
   --wait --timeout 5m >/dev/null \
   || fail "turning the worker on did not upgrade cleanly"
