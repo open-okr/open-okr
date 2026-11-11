@@ -999,6 +999,7 @@
   "admin.plan.current": "Current plan",
   "admin.plan.everySeatTaken": "Every seat is taken. Free one, or move to a larger plan, before inviting anybody else.",
   "admin.plan.free": "Free",
+  "admin.plan.none": "No plan",
   "admin.plan.holderInvited": "invited",
   "admin.plan.holders": "Who holds a seat",
   "admin.plan.intro": "Every plan includes every feature. What changes is how many people can be here and how much the AI may spend.",

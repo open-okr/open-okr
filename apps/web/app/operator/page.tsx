@@ -261,7 +261,11 @@ export default async function OperatorWorkspacesPage({
             >
               <option value="">{t("operator.workspaces.filterPlanAny")}</option>
               <option value={planFilterValue(null)}>
-                {t("operator.workspaces.filterPlanNone")}
+                {/* "Free (no plan)" beside a catalogue's own Free could not
+                    be told apart from it (UAT 0.8.0 F-05). */}
+                {noPlanCostsAI
+                  ? t("operator.workspaces.noPlan")
+                  : t("operator.workspaces.filterPlanNone")}
               </option>
               {planOptions.map((plan) => (
                 <option key={plan.key} value={planFilterValue(plan.key)}>

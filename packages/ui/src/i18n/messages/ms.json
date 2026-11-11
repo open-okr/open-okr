@@ -999,6 +999,7 @@
   "admin.plan.current": "Pelan semasa",
   "admin.plan.everySeatTaken": "Semua tempat duduk telah diisi. Kosongkan satu, atau tukar ke pelan yang lebih besar, sebelum menjemput sesiapa lagi.",
   "admin.plan.free": "Percuma",
+  "admin.plan.none": "Tiada pelan",
   "admin.plan.holderInvited": "dijemput",
   "admin.plan.holders": "Siapa memegang tempat duduk",
   "admin.plan.intro": "Setiap pelan merangkumi setiap ciri. Yang berubah ialah berapa ramai orang boleh berada di sini dan berapa banyak AI boleh berbelanja.",

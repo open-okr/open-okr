@@ -372,7 +372,14 @@ export default async function OperatorWorkspacePage({
         <dl className="grid grid-cols-[auto_1fr] gap-x-8 gap-y-2 rounded-lg border border-line bg-surface px-4 py-3">
           <Fact
             label={t("operator.workspace.factPlan")}
-            value={tenant.planKey ?? t("operator.workspace.planFree")}
+            // With a catalogue, "free" read as its Free plan (UAT 0.8.0
+            // F-05); without one, Free is the only plan there is.
+            value={
+              tenant.planKey ??
+              (plans.length > 0
+                ? t("operator.workspaces.noPlan")
+                : t("operator.workspace.planFree"))
+            }
           />
           {/* With a catalogue, no plan means no AI on the provider's key
            * (ai-credits.md §3, plan 0.8.0 O2). */}

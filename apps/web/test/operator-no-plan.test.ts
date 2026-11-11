@@ -50,3 +50,29 @@ describe("a workspace with no plan, on the console", () => {
     );
   });
 });
+
+// UAT 0.8.0 F-05: with a catalogue, a workspace with no plan read "free" on
+// its console page and "Free" on its own Plan page, the same word as a plan in
+// the catalogue, so nobody could tell the two apart. Without a catalogue the
+// only plan is Free, and the word stays.
+describe("a workspace with no plan is called that", () => {
+  const plan = at("../app/admin/plan/page.tsx");
+
+  test("on its console page, when there is a catalogue", () => {
+    expect(detail).toContain(
+      'tenant.planKey ??\n              (plans.length > 0\n                ? t("operator.workspaces.noPlan")\n                : t("operator.workspace.planFree"))',
+    );
+  });
+
+  test("in the console's plan filter, when there is a catalogue", () => {
+    expect(list).toContain(
+      'noPlanCostsAI\n                  ? t("operator.workspaces.noPlan")\n                  : t("operator.workspaces.filterPlanNone")',
+    );
+  });
+
+  test("on the workspace's own Plan page, which exists only with a catalogue", () => {
+    expect(plan).toContain('currentKey ??\n    t("admin.plan.none")');
+    expect(translate(CATALOGUES.en, "admin.plan.none")).toBe("No plan");
+    expect(translate(CATALOGUES.ms, "admin.plan.none")).not.toBe("No plan");
+  });
+});
