@@ -9,7 +9,7 @@ A quick patch release. It ships what was found after 0.8.0 was cut: the copilot'
 It holds eight things:
 
 1. **Already on `main`**: PR #210's three copilot bug fixes and the GPT-6 Luna default. Shipped by 0.8.1 with no further work. Section 1.
-2. **The copilot**: three small fixes not in any plan yet (A1 to A3), and L7, the prompts tuned to Luna. Asked for by Akmal on 11 November 2026. Section 2.
+2. **The copilot**: three small fixes not in any plan yet (A1 to A3), and L7, the prompts tuned to Luna. Asked for by Akmal on 11 November 2026. On 12 November he added W1 to W3: the answer streams in, the copilot says which step it is on, and the panel looks and behaves like a current chat product. Section 2.
 3. **The cycle page**: a first note gathers an input-pack item, and the box reads as a checkbox (PR #211). Asked for by Akmal. Section 3.
 4. **Dependencies**: one alert in code that ships, ten in development tools. Section 4.
 5. **Upgrades and the demo**: what the demo server's 0.8.0 upgrade found on 11 November 2026. Section 5.
@@ -82,6 +82,29 @@ What the live run should show after 0.8.1, so nobody expects more:
 | An objective's progress and health, a KPI's latest value, an initiative's status, a task's owner | Still weak or not found: these need the read loop (L1 to L3, 0.9.0) |
 | Create an objective, a key result, an initiative, a task | A card each (M2, A1), and an answer that refers to it (A2) |
 | Rename, check in, record a KPI value, move a task, change an initiative's status | No card: these are L4, 0.9.0. The answer says so plainly (A2) |
+
+### 2.3 Watching the copilot work
+
+Asked for by Akmal on 12 November 2026, during the build: the answer should stream in as it is written, the way ChatGPT and Claude show it; while it works, the copilot should say which step it is on; and the panel should look and behave like a current chat product.
+
+**Why the answer arrives all at once today.** The inline path streams, but it only runs where nothing drains the queue (`OPENOKR_RELAY=off`). Every other deployment answers through the background run (P4-T14b-b), and that run called the whole-answer method and published one `copilot.text` with all of it. The panel and both routes already append text as it arrives, so the fix is on the server.
+
+| # | What | Effect today | Change | Size |
+|---|---|---|---|---|
+| W1 | **Stream the background answer** | On every deployment that drains its queue, the reader sees nothing for several seconds and then the whole answer | `runCopilotAnswer` calls `streamGrounded` when the drafter has it and publishes the words as they come, joined for up to 60 ms or 1,000 characters so a token is not a NOTIFY of its own. Recorded once at the end, as now. A streamed answer now carries the token count and cost the provider reports when its stream ends, so streaming loses no cost record. A stream that stops partway keeps what arrived and says so. `docs/design/copilot-background-runs.md` updated | S |
+| W2 | **Say which step the copilot is on** | The panel shows an empty bubble until words arrive; with A2 the first word comes one to three seconds later | A `step` event, from the run itself, for each thing it really does: searching the workspace, found N passages, preparing a change, writing the answer. Fixed keys with words from the catalogues in English and Malay, never a model's text. The panel shows the current step as one live line (a polite live region), then folds the finished steps into a one-line summary above the answer. L2's read tools (0.9.0) add their own steps to the same line, "Reading New accounts reach value in their first week", which is design §3's reading status line arriving early | S |
+| W3 | **The panel, as a current chat product** | See the review | Rows W3a and on, from a review of S-39 against current chat products, run during the build. Added to this plan when it lands, with any decision it needs | To come |
+
+**W2-Q: are the steps stored with the answer? Recommended: no, live only.** Storing them is a column on `ai_messages`, which is a migration, and this release has none. After a reload, the finished answer still shows its sources and its card, which say the same thing.
+
+Acceptance criteria:
+
+| Row | Given | When | Then |
+|---|---|---|---|
+| W1 | A deployment that drains its queue and a provider that streams | A member asks the copilot | The words appear as they are written, and the answer recorded at the end is the whole of it, with its token count and cost |
+| W1 | A provider that falls over after some words | The run ends | The words that arrived are kept, and the panel says the answer stopped partway |
+| W2 | Any question, with AI on | The member asks | Before the first word, the panel names each step as it happens: searching, what was found, preparing a change when it does, writing |
+| W2 | AI off | The member asks | Searching and what was found, then the passages, with no step that implies a model |
 
 ## 3. The cycle page
 
@@ -164,7 +187,7 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 
 ## 9. Decisions
 
-Akmal answered all five on 12 November 2026, each as recommended.
+Akmal answered the first five on 12 November 2026, each as recommended. W2-Q came with the rows he added during the build.
 
 | # | Question | Recommended | Akmal's answer |
 |---|---|---|---|
@@ -173,13 +196,14 @@ Akmal answered all five on 12 November 2026, each as recommended.
 | U1-Q | Does `pnpm db:change` accept `run` again? | Yes | **Yes** |
 | Q-8-Q | On signed-out pages, does the browser's language win over the instance's when the product ships it? | Yes | **Yes** |
 | S5-R | Write S5-R's short design now, for 0.8.1? | Yes. It is small, and the gap is an address counted unconfirmed on three surfaces | **Yes**. The design is written next and needs its own "design approved" |
+| W2-Q | Are the copilot's steps stored with the answer? | No, live only: storing them is a migration, and the finished answer's sources and card say the same | Open |
 
 ## 10. Suggested order
 
 1. **K1**: PR #211 is built and its CI is running. Review and merge it first.
 2. **P1 and P2**: lockfile only, and they clear the open alerts before anything else lands.
 3. **A3**, so every later copilot change shows why a proposal was dropped. Then **A1** and **A2**.
-4. **L7** last among the copilot rows, so the prompts are tuned against the behaviour A1 and A2 settled.
+4. **W1 and W2**, on the answer flow A2 settled, then the **W3** rows. **L7** last among the copilot rows, so the prompts are tuned against the behaviour A1, A2 and W1 settled.
 5. **U1, U2, U3**. U3 is written last, once the other rows are known.
 6. **Q-10a to Q-10e, Q-9 and Q-8**: small, independent and parallel.
 7. **S5-R**: its design, then the code.
@@ -197,6 +221,9 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | A2 | done | Server side rather than in the panel: a new conversation has no thread until the answer route makes one, so `streamAnswer` and the background run call `proposeBeforeAnswering` after recording the question and pass a `ProposalNote` to the answer prompt. A `proposal` event shows the card before the words. The panel's own `proposeFromCopilotAction` is gone. A redelivered background run now stops before proposing, so it makes no second card. Core 54, agents 54, web 39 |
 | A3 | done | `ProposalDrop` on the drafter port (`onDropped`, plus the drafter's `identity`); core's `proposal-drops.ts` writes `copilot.proposal_dropped` lines; the evaluation runner prints the reason. Core 34, agents 72 tests, `pnpm ai:evaluate` 24 sets |
 | L7 | to do | After A1 and A2. The split is approved |
+| W1 | to do | Added by Akmal on 12 November 2026 |
+| W2 | to do | W2-Q: live only, recommended |
+| W3 | to do | Rows from the S-39 review, to come |
 | K1 | merged | PR #211, `079d37d5`, before this build started |
 | K2 | to do | |
 | K3 | to do | |
