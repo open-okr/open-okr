@@ -225,8 +225,8 @@ Built on 11 November 2026 as plan row S3, carrying H1. Where the build reads the
 
 Asked for by Akmal on 11 November 2026, with Q10 to Q13 of the plan's
 section 8.4 decided the same day as recommended, and one requirement of his
-own for the screen after sign-up. Security, so this section needs "design
-approved" before the code.
+own for the screen after sign-up. **Approved by Akmal on 11 November 2026**
+("design approved").
 
 ### 11.1 The setting
 
