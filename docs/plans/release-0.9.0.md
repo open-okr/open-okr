@@ -2,7 +2,7 @@
 
 Owner: Akmal. Started 12 November 2026, the day 0.8.1 was published and deployed to app, staging and demo.okrgoal.com, against `main` at `7e2b847b` (the v0.8.1 tag).
 
-Status: **decided**. Akmal answered every question in section 10 on 12 November 2026, each as recommended except two: the acceptance test may be run by anyone (UAT-Q), and the input pack's access rule comes into this release (Q-4, row G8). The same day he approved the recommended direction of five designs, A4, FB1, G1, G2 and G8 ("all the recommended six designs are approved", section 10). Each design document is written from that direction before its code, and a question it does not answer goes back to him first. The sixth, G3, needs no design: 0.7.0 built it. One question is open, G11-Q.
+Status: **decided**. Akmal answered every question in section 10 on 12 November 2026, each as recommended except two: the acceptance test may be run by anyone (UAT-Q), and the input pack's access rule comes into this release (Q-4, row G8). The same day he approved the recommended direction of five designs, A4, FB1, G1, G2 and G8 ("all the recommended six designs are approved", section 10). Each design document is written from that direction before its code, and a question it does not answer goes back to him first. The sixth, G3, needs no design: 0.7.0 built it. No question is open.
 
 A minor release. Its centre is the copilot reading live data: `docs/design/copilot-live-data.md`, approved by Akmal on 11 November 2026 ("design approved for all"), whose decision D9 put rows L1 to L6 and the tool loop's prompt (L7b) in 0.9.0. Today the copilot reads six passages from the search index, so it cannot say a key result's value, an objective's health or who owns a task. After 0.9.0 it reads through the product's own read actions, as the member asking, and it can propose five edits as well as four creates.
 
@@ -124,7 +124,7 @@ Work an earlier design or decision named "for a later release", or left on a loc
 | G8 | **Only the Owner, an Admin and the cycle's named facilitator may change the input pack.** Today any Member can mark an item gathered, write its note and press Confirm distribution | Obed's 0.8.0 acceptance test, Q-4. Akmal on 12 November 2026: in this release, limited to those three | `workflow.setPackItem` and Confirm distribution refuse anybody else, through the access check and not the screen alone. Everybody else sees the input pack read only, with a line naming who may change it | S | **Design first**: access. Direction approved 12 November 2026 (section 10) |
 | G9 | **OKRGoal's own choices leave the public docs.** `docs/design/error-reporting.md` says OKRGoal uses Sentry (its E4 rows, §4's OKRGoal table with releases and the privacy line, Q3 and G3), and `docs/runbooks/observability.md` waits for "OKRGoal's project". Neither is true any more, and neither is the open-source product's business | Akmal on 12 November 2026: remove OKRGoal's choice entirely | Rewrite those passages for any operator: a tracker that speaks Sentry's protocol, and how to point the instance at it. Remove Q3 and G3 there. The trackers checked by hand: Bugsink, on a live instance on 10 November 2026, without saying whose; Sentry and GlitchTip speak the protocol and were not checked by hand (G9-Q) | S | None. Docs only |
 | G10 | **The channel messages list on Admin, Channels keys each row by its time and provider**, so two messages in the same millisecond from one provider share a key and React warns. Obed fixed it on 29 September on branch `origin/obed` and it never reached `main` | `origin/obed`, one commit, two lines | Key each row by the message's own id where it has one, otherwise as Obed's fix did. Then the branch can go | S | None |
-| G11 | **OKRGoal's website copy leaves this repository.** `docs/okr-goal/` holds the site's page copy, messaging and claims, and the okr-goal repository already keeps the live copy | Found while scoping G9: OKRGoal appears 335 times in 62 public docs. Most are a design using it as the example of a cloud operator, which explains why the feature exists and stays | Move the folder into the okr-goal repository and leave a one-line pointer | S | **Yours**: G11-Q |
+| G11 | **OKRGoal's website copy leaves this repository.** `docs/okr-goal/` holds the site's page copy, messaging and claims, and the okr-goal repository already keeps the live copy | Found while scoping G9: OKRGoal appears 335 times in 62 public docs. Most are a design using it as the example of a cloud operator, which explains why the feature exists and stays | Move the folder into the okr-goal repository: merge this copy's later edits into that one, point its links into open-okr at GitHub, then remove the folder here | S | None: G11-Q decided |
 
 Acceptance criteria:
 
@@ -231,7 +231,7 @@ Akmal answered every question on 12 November 2026.
 | X-Q | The three production actions carried from 0.8.1 | Akmal's, at any time | **In this release.** Then all three done on 12 November 2026 (section 8) |
 | G9-Q | How far G9 goes, and which trackers count as checked | The tracker only. Bugsink checked on a live instance; Sentry and GlitchTip not by hand | **As recommended** |
 | X3-Q | If production pins its AI models, clear the pin or set Luna? | Clear it, so production follows the default | **Clear it.** Nothing was pinned, so nothing changed |
-| G11-Q | Move `docs/okr-goal/` into the okr-goal repository? | Yes. It is the site's copy, and the site keeps its own | Open |
+| G11-Q | Move `docs/okr-goal/` into the okr-goal repository? | Yes. It is the site's copy, and the site keeps its own | **Yes**, and done the same day (G11) |
 
 **Design directions, approved by Akmal on 12 November 2026** ("all the recommended six designs are approved"). Each design document is written from its direction before any code. A question the direction does not answer goes back to Akmal first.
 
@@ -298,7 +298,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | G8 | to do | Direction approved 12 November 2026; the design, then the code |
 | G9 | to do | G9-Q decided |
 | G10 | to do | Then `origin/obed` can be deleted |
-| G11 | yours | G11-Q |
+| G11 | done | 12 November 2026. okr-goal took the copy with open-okr's three later edits merged in (four conflicts settled against the live site) and 40 links pointed at GitHub, by pull request in that repository; the folder is removed here in this pull request |
 | U1 | to do | Last |
 | X1 | done | 12 November 2026, by Akmal |
 | X2 | done | 12 November 2026, by Akmal |

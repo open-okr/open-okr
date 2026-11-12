@@ -253,8 +253,8 @@ Written as the test plan P8-T05 inherits.
 ## 9. Decided on 7 November 2026
 
 By the project owner. The later designs build on these: `billing.md` and
-`ai-credits.md`. One provider's own commercial terms are not here: OKRGoal's are in
-`docs/okr-goal/pages/pricing.md`.
+`ai-credits.md`. One provider's own commercial terms are not here: OKRGoal's are kept
+with its website, outside this repository.
 
 | Decision | Detail |
 |---|---|
