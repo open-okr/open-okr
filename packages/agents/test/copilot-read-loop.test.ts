@@ -89,6 +89,34 @@ describe("the read loop", () => {
     expect(system).toContain("stop calling tools");
   });
 
+  it("Given an asker, When the loop reads, Then a system message names them; given none, it does not", async () => {
+    const systemOf = async (asker?: string) => {
+      const provider = new MockAIProvider({ toolRounds: [[call("a")]] });
+      await drafterOver(provider).chooseReads?.(
+        asker === undefined ? ask : { ...ask, asker },
+        TOOLS,
+        async () => "ok",
+        yes,
+      );
+      const first = readsOf(provider)[0];
+      if (first?.method !== "chatWithTools") {
+        throw new Error("expected a tool round");
+      }
+      return first.request.messages
+        .filter((message) => message.role === "system")
+        .map((message) => message.content);
+    };
+    const withAsker = await systemOf("Priya Raman");
+    expect(
+      withAsker.filter((note) =>
+        note.includes("The person asking is Priya Raman."),
+      ),
+    ).toHaveLength(1);
+    const without = await systemOf();
+    expect(without).toHaveLength(1);
+    expect(without.join("")).not.toContain("The person asking is");
+  });
+
   it("runs six reads in a round and answers the rest with the limit", async () => {
     const calls = Array.from({ length: 8 }, (_, index) => call(`c${index}`));
     const provider = new MockAIProvider({ toolRounds: [calls] });

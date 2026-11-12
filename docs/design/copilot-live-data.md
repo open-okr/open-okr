@@ -85,6 +85,8 @@ A curated list, not the whole registry. The 38 reads in the agent surface's `cor
 | `review.inbox` | What is waiting on me |
 | `passages` | Prose: what did anybody say about onboarding. Today's retrieval (`EmbeddingService.retrieve`, access-filtered, hybrid where vectors exist), offered as one tool among many rather than run before every answer. The index the indexing fix repairs |
 
+Each objective in a result names its cycle and the cycle's status (`cycle: Q4 2026 (active)`), because the same title can appear in a past cycle and the current one. `goals.list` shows objectives in the active cycle first, so a cut at the size limit drops past cycles before it drops this quarter. A plain list in a result (a KPI's records, for example) follows the entity it belongs to, under its own heading, before any related entities, so its lines are never read as a related entity's.
+
 Each tool's description and input schema come from the action's own registry entry, projected the way the agent surface projects them (catalogue.ts). Tool names are the action names with the dot replaced, `goals_read`, because Anthropic and OpenAI accept only letters, digits, `_` and `-` in a tool name.
 
 ### 3.3 Citations
@@ -264,6 +266,23 @@ answers about values, health, owners and statuses still say the passages do
 not hold them, which is L1 to L3's work. The first word arrives six to ten
 seconds after the question on Luna, most of it the proposal call A2 put first;
 the W2 step line says what is happening meanwhile.
+
+**L7b as built, 13 November 2026.** Run live as Priya on a freshly seeded
+Northwind year, seven of the §1 reading questions through the real path, on
+`openai/gpt-6-luna`. Before: 2 of 7 right. After: 5 of 7. Most of the misreads
+were not the loop's prompt but what the answer could see:
+
+| Misread on Luna | Cause | Change | After |
+|---|---|---|---|
+| "My objective this quarter" answered from the yearly objective with the same title | Nothing named a goal's cycle, and `goals.list` cut Priya's thirteen objectives at four, oldest cycles first | Each objective names its cycle and status; active cycles first (§3.2) | Names the cycle it read; still did not reach the Q4 objective (open) |
+| A key result's value, target and confidence "not found" | Each record was clipped to 700 characters before the answer | 1,600 characters per record | 64.64 of 68, confidence 0.6 |
+| "What did my last check-in say?" quoted another member's | The model did not know who was asking | The asker's name goes to the loop and the answer, as names in records already do | Priya's 9 November check-in, quoted |
+| A KPI's latest value "not provided" | Its records were printed after a related KPI, and clipped | Records follow the KPI they belong to | 64, healthy |
+| "Which of my key results are behind?" gave no answer | Open | | |
+
+The loop's prompt also says what my and mine mean, how to choose between
+records that share a title, and that a key result's number is not an
+objective's.
 
 ## 9. Acceptance criteria
 

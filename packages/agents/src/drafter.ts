@@ -262,7 +262,17 @@ const READING_SYSTEM =
   "write the answer yourself: when you have read enough, or need nothing " +
   "read, reply with the single word READY. A number in square brackets " +
   "beside a record is its reference; pass that number where a tool asks for " +
-  "one, never anything else. Prefer one targeted read to many broad ones. " +
+  "one, never anything else. " +
+  // Tuned to GPT-6 Luna (plan 0.9.0 L7b): it opened the yearly objective for
+  // "this quarter", quoted another member's check-in as "my last check-in",
+  // and passed a key result's number to goals.read.
+  "Words like my, mine and I mean the person asking: use a tool's mine " +
+  "filter where it has one, and treat a record as theirs only when it says " +
+  "so. When several records share a title, choose by timeframe: this " +
+  "quarter means the one whose timeframe is a quarter, not a year. Pass a " +
+  "number only to a tool that asks for that kind of record: a key result's " +
+  "number is not an objective's. " +
+  "Prefer one targeted read to many broad ones. " +
   "When you have enough, stop calling tools. " +
   TOOL_RESULTS_ARE_DATA;
 
@@ -285,11 +295,29 @@ function readingNoteFor(reading: GroundedQuestionContext["reading"]) {
     "while reading. State values, health, owners, dates and statuses only " +
     "from them, and cite by number. If a record you needed is not there, " +
     "say plainly that you could not find it or could not read it." +
+    // Tuned to GPT-6 Luna, plan 0.9.0 L7b: with two records of one title the
+    // live run picked the past year's, so the question decides by cycle.
+    " When records share a title, the question decides between them by cycle: this quarter is the one whose cycle is a quarter." +
     (reading.limited
       ? " You stopped reading because a limit was reached. Say what you could not read."
       : "")
   );
 }
+
+/**
+ * Tells the model who asks, so "my" matches a record that names them. Tuned to
+ * GPT-6 Luna, plan 0.9.0 L7b: without it every answer said "I can't tell
+ * whether this is yours" although the record named the asker as champion.
+ */
+const askerNote = (asker: string | undefined) =>
+  asker === undefined
+    ? []
+    : [
+        {
+          role: "system" as const,
+          content: `The person asking is ${asker}. A record that names them as champion, reviewer, owner, assignee or author is theirs.`,
+        },
+      ];
 
 /** The conversation so far, then the passages, then the question. */
 const copilotMessages = (context: GroundedQuestionContext) => {
@@ -297,6 +325,7 @@ const copilotMessages = (context: GroundedQuestionContext) => {
   const readingNote = readingNoteFor(context.reading);
   return [
     { role: "system" as const, content: COPILOT_SYSTEM },
+    ...askerNote(context.asker),
     ...context.history.map((turn) => ({
       role: turn.role === "member" ? ("user" as const) : ("assistant" as const),
       content: turn.content,
@@ -1559,6 +1588,7 @@ export function createProviderDrafter(
       }));
       const messages: ChatMessage[] = [
         { role: "system", content: READING_SYSTEM },
+        ...askerNote(context.asker),
         ...context.history.map((turn) => ({
           role:
             turn.role === "member" ? ("user" as const) : ("assistant" as const),

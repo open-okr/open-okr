@@ -120,6 +120,11 @@ export interface GroundedQuestionContext {
   /** What retrieval found. An empty list means answer from nothing. */
   readonly sources: readonly GroundingSource[];
   /**
+   * The asking member's name, so "my" can be matched to records that name
+   * them. The same names tool results already carry. Absent when none is found.
+   */
+  readonly asker?: string;
+  /**
    * Whether a change card was made for this question, asked before the answer
    * (plan 0.8.1 A2). Absent where no card can be shown, such as a chat
    * channel's Ask, and the answer then says nothing about cards either way.
@@ -150,6 +155,11 @@ export interface ReadingTool {
 export interface ReadingContext {
   readonly question: string;
   readonly history: GroundedQuestionContext["history"];
+  /**
+   * The asking member's name, so "my" can be matched to records that name
+   * them. The same names tool results already carry. Absent when none is found.
+   */
+  readonly asker?: string;
 }
 
 /**

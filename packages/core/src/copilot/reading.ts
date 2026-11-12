@@ -49,8 +49,14 @@ export const COPILOT_MAX_READS_PER_ROUND = 6;
 /** The longest subject a step may carry, so a title never floods the line. */
 const SUBJECT_MAX = 120;
 
-/** Characters of one record the final answer is shown. */
-const SOURCE_CHARS = 700;
+/**
+ * Characters of one record the final answer is shown. A KPI block with its
+ * recent records, or an objective with its fields, runs to about 600
+ * characters before the values that matter come last. At 700 the actual and
+ * target were clipped and the answer said the latest value was not provided
+ * (plan 0.9.0 L7b live run, 2 of 7 right).
+ */
+const SOURCE_CHARS = 1600;
 
 /** Characters of all records together. Later ones keep a label only. */
 const SOURCES_BUDGET_CHARS = 24_000;
@@ -227,7 +233,7 @@ export async function* readLiveData(
   const running = Promise.resolve()
     .then(() =>
       drafter.chooseReads?.(
-        { question: ask.question, history: ask.history },
+        { question: ask.question, history: ask.history, asker: ask.asker },
         toolsFor(),
         read,
         beforeRound,

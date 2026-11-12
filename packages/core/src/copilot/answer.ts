@@ -21,6 +21,9 @@
  * and records what arrived even when the reader stops it halfway.
  */
 
+import { activeOnly, withWorkspace, workspaceMembers } from "@openokr/db";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
 import type { Pool } from "pg";
 import {
   askingMemberId,
@@ -186,6 +189,7 @@ export async function groundQuestion(
   const pool: Pool = context.pool;
   const input = { question: asked.question, workspaceId: context.workspaceId };
   const memberId = await askingMemberId(context);
+  const asker = await askerName(context, memberId);
 
   // Retrieval runs whether or not there is a model: with no provider this is
   // the whole answer.
@@ -249,9 +253,43 @@ export async function groundQuestion(
         asked.questionMessageId,
       ),
       sources: hits.map(sourceFor),
+      ...(asker === null ? {} : { asker }),
     },
     unavailableReason: null,
   };
+}
+
+/**
+ * The asking member's name, or null. The model needs it to match "my" to a
+ * record that names the person; the same directory names tool results carry.
+ * A decoration: a failure leaves the name out and the answer still runs.
+ */
+async function askerName(
+  context: ActionCallContext,
+  memberId: string,
+): Promise<string | null> {
+  try {
+    return await withWorkspace(
+      drizzle(context.pool),
+      context.workspaceId,
+      async (tx) => {
+        const rows = await tx
+          .select({ name: workspaceMembers.name })
+          .from(workspaceMembers)
+          .where(
+            activeOnly(
+              workspaceMembers,
+              eq(workspaceMembers.workspaceId, context.workspaceId),
+              eq(workspaceMembers.id, memberId),
+            ),
+          );
+        const name = rows[0]?.name?.trim();
+        return name ? name : null;
+      },
+    );
+  } catch {
+    return null;
+  }
 }
 
 /** Asks, grounds, answers and records, waiting for the whole answer. */
