@@ -34,6 +34,7 @@ import {
   changedSinceApplied,
   isEdit,
   reversalFor,
+  settleReverse,
 } from "../copilot/proposals.ts";
 import { subjectPath } from "../notifications/links.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
@@ -125,6 +126,16 @@ function madeHref(
       return subjectPath("initiative", id);
     case "goals.update":
       return subjectPath("goal", id);
+    case "goals.publishDraftedCheckIn":
+      return subjectPath(
+        "goal",
+        typeof payload.goalId === "string" ? payload.goalId : null,
+      );
+    case "kpis.record":
+      return subjectPath(
+        "kpi",
+        typeof payload.kpiId === "string" ? payload.kpiId : null,
+      );
     default:
       return null;
   }
@@ -479,7 +490,7 @@ export const applyProposal = defineWriteAction({
 
       // An edit returns only an id, so the values from before are read now,
       // as the member, just before the action's own transaction (design §4.2).
-      const reverse = await captureReverse(
+      const captured = await captureReverse(
         callContext,
         proposal.action,
         actionPayload,
@@ -492,6 +503,13 @@ export const applyProposal = defineWriteAction({
         proposal.action as never,
         actionPayload as never,
       )) as Record<string, unknown>;
+
+      // A reverse that needs what the action created, a new check-in's id or a
+      // new KPI value's id, is completed now that it exists.
+      const reverse =
+        captured === null
+          ? null
+          : settleReverse(proposal.action, captured, result);
 
       await tx
         .update(proposedChanges)

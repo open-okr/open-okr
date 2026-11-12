@@ -266,7 +266,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 
 | Row | Status | Note |
 |---|---|---|
-| L4 | in progress | Design approved 11 November 2026. Split L4a/L4b/L4c; L4a and L4b done. L4c next, and it must keep the value it recorded and refuse an undo when the period was edited since. Follow-ups from its review: the status words in an edit's preview (`To do`, `Done`, `(empty)`) are stored in English, so a Malay reader sees them untranslated; store the raw values and translate on the card. The reason a person types is saved in the payload but not shown on the applied card. Follow-up from L4b: a webhook event for a removed KPI value, not in 0.9.0 |
+| L4 | done | Design approved 11 November 2026. L4a, L4b and L4c committed. L4c keeps the value it recorded and refuses an undo when the period was edited since, and refuses a check-in's undo once a newer one exists. Follow-ups from its review: the status words in an edit's preview (`To do`, `Done`, `(empty)`) are stored in English, so a Malay reader sees them untranslated, and so are the check-in status words (`On track`, `Caution`, `Off track`); store the raw values and translate on the card. The reason a person types is saved in the payload but not shown on the applied card. Follow-up from L4b: a webhook event for a removed KPI value, not in 0.9.0 |
 | L1 | to do | |
 | L2 | to do | |
 | L3 | to do | |

@@ -432,7 +432,9 @@ const PROPOSAL_SYSTEM =
   "rather than choosing the nearest one. Fill in the fields the " +
   "action you chose takes, and set every other field to null. Write a " +
   "reason only from the person's own words saying why the change is wanted " +
-  "now, and leave it out when they did not say. Say in one " +
+  "now, and leave it out when they did not say. For a check-in, give a key " +
+  "result a value only when the person's words state a number, and write " +
+  "every confidence as a number from 0 to 1. Say in one " +
   `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */
@@ -1495,7 +1497,8 @@ export function createProviderDrafter(
           model: options.model,
           schema: PROPOSAL_SHAPE,
           jsonSchema: proposalJsonSchema(context.options),
-          maxTokens: 500,
+          // A check-in carries a narrative and a value per key result.
+          maxTokens: 900,
           onUsage: charge,
           messages: [
             { role: "system", content: PROPOSAL_SYSTEM },

@@ -41,6 +41,8 @@ const OPEN_KEYS: Readonly<Record<string, string>> = {
   "goals.update": "copilot.copilotPanel.open.objective",
   "tasks.move": "copilot.copilotPanel.open.task",
   "initiatives.update": "copilot.copilotPanel.open.initiative",
+  "goals.publishDraftedCheckIn": "copilot.copilotPanel.open.objective",
+  "kpis.record": "copilot.copilotPanel.open.kpi",
 };
 
 /**
@@ -60,6 +62,8 @@ const ACTION_NAME_KEYS: Readonly<Record<string, string>> = {
   "goals.update": "copilot.copilotPanel.actions.editObjective",
   "tasks.move": "copilot.copilotPanel.actions.moveTask",
   "initiatives.update": "copilot.copilotPanel.actions.changeInitiative",
+  "goals.publishDraftedCheckIn": "common.checkIn",
+  "kpis.record": "copilot.copilotPanel.actions.recordKpiValue",
 };
 
 /**
@@ -85,6 +89,12 @@ const PREVIEW_LABEL_KEYS: Readonly<Record<string, string>> = {
   Title: "copilot.copilotPanel.preview.title",
   Status: "copilot.copilotPanel.preview.status",
   Reason: "copilot.copilotPanel.preview.reason",
+  Confidence: "common.confidence",
+  Narrative: "checkIn.timeline.narrative",
+  KPI: "kpis.grid.kpi",
+  Period: "common.period",
+  Value: "copilot.copilotPanel.preview.value",
+  Remark: "copilot.copilotPanel.preview.remark",
 };
 
 /**
@@ -148,8 +158,10 @@ export function ProposalCard({
       <p className="mt-2 text-xs text-ink-3">{proposal.why}</p>
       <dl className="mt-2 flex flex-col gap-1">
         {proposal.preview.map((row) => (
-          <div key={row.label} className="flex gap-2 text-xs">
-            <dt className="w-20 flex-none text-ink-4">
+          // A check-in lists one row per key result, labelled with its title,
+          // and two can share a title but not a title and a value.
+          <div key={`${row.label}:${row.value}`} className="flex gap-2 text-xs">
+            <dt className="w-20 flex-none break-words text-ink-4">
               {PREVIEW_LABEL_KEYS[row.label]
                 ? t(PREVIEW_LABEL_KEYS[row.label] as string)
                 : row.label}

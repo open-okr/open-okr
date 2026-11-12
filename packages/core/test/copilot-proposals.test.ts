@@ -648,6 +648,7 @@ describe("the rest of the catalogue", () => {
       "initiatives.create",
       "tasks.create",
       "goals.update",
+      "goals.publishDraftedCheckIn",
     ]);
     const choices = Object.fromEntries(
       (shown?.options ?? []).map((option) => [option.action, option.choices]),
@@ -1223,5 +1224,423 @@ describe("edits (plan 0.9.0 L4a)", () => {
       const [card] = await listed();
       expect(card?.needsReason).toBe(false);
     });
+  });
+});
+
+describe("a check-in and a KPI value (plan 0.9.0 L4c)", () => {
+  let goalId: string;
+  let keyResultId: string;
+  let kpiId: string;
+  const SAD =
+    "This changed after it was applied, so undoing it would overwrite the later change.";
+
+  const apply = async (id: string) =>
+    call("copilot.applyProposal", { id }) as Promise<{
+      result: Record<string, unknown> | null;
+    }>;
+  const undo = async (id: string) => call("copilot.undoProposal", { id });
+  const listed = async () =>
+    (await call("copilot.proposals", { threadId })) as {
+      preview: { label: string; value: string }[];
+      reversible: boolean;
+      href: string | null;
+    }[];
+
+  const checkInFields = (fields: Record<string, unknown> = {}) => ({
+    action: "goals.publishDraftedCheckIn",
+    fields: {
+      objectiveNumber: 1,
+      checkInStatus: "on_track",
+      confidence: 0.8,
+      narrative: "We shipped the new trial flow.",
+      keyResultValues: [{ keyResultNumber: 1, value: 25, confidence: null }],
+      ...fields,
+    },
+    why: "You gave a status and the new conversion.",
+  });
+  const kpiFields = (fields: Record<string, unknown> = {}) => ({
+    action: "kpis.record",
+    fields: {
+      kpiNumber: 1,
+      periodDate: "2026-11-12",
+      actualValue: 45,
+      ...fields,
+    },
+    why: "You gave the value for this month.",
+  });
+
+  const checkIns = async () =>
+    (
+      (await call("goals.checkIns", { goalId, includeDrafts: false })) as {
+        checkIns: { id: string; state: string; author: { id: string } }[];
+      }
+    ).checkIns;
+  const keyResultNow = async () => {
+    const goal = (await call("goals.read", { id: goalId })) as {
+      keyResults: { id: string; currentValue: number }[];
+    };
+    return goal.keyResults.find((entry) => entry.id === keyResultId)
+      ?.currentValue;
+  };
+  const periodValue = async () => {
+    const detail = (await call("kpis.detail", { kpiId })) as {
+      records: { periodStart: string; actualValue: number | null }[];
+    };
+    return detail.records.find((entry) => entry.periodStart === "2026-11-01")
+      ?.actualValue;
+  };
+  const recordPeriod = (actualValue: number) =>
+    call("kpis.record", { kpiId, on: "2026-11-12", actualValue });
+
+  beforeEach(async () => {
+    const spaceId = ((await call("spaces.list", {})) as { id: string }[])[0]
+      ?.id as string;
+    const cycle = (await call("cycles.current", { mode: "quarterly" })) as {
+      id: string;
+    };
+    goalId = (
+      (await call("goals.create", {
+        title: "Raise mid-market activation",
+        cycleId: cycle.id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    keyResultId = (
+      (await call("goals.addKeyResult", {
+        goalId,
+        title: "Trial to paid conversion from 18% to 30%",
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 18,
+        targetValue: 30,
+        weight: 1,
+      })) as { id: string }
+    ).id;
+    kpiId = (
+      (await call("kpis.create", {
+        title: "Weekly signups",
+        frequency: "monthly",
+        unit: "signups",
+        targetDefault: 100,
+      })) as { id: string }
+    ).id;
+  });
+
+  describe("recording a KPI value", () => {
+    it("shows the KPI by label and today's date, with no identifier", async () => {
+      const drafter = new ProposingDrafter(null);
+      await propose(drafter);
+      const offer = drafter.seen[0]?.options.find(
+        (option) => option.action === "kpis.record",
+      );
+      expect(offer?.choices.kpis).toEqual([
+        "Weekly signups (monthly, signups)",
+      ]);
+      expect(offer?.whatItDoes).toMatch(/Today is \d{4}-\d{2}-\d{2}\./);
+      expect(JSON.stringify(drafter.seen[0]?.options)).not.toContain(kpiId);
+    });
+
+    it("does not offer a calculated KPI", async () => {
+      const sum = (await call("kpis.create", {
+        title: "All signups",
+        frequency: "monthly",
+      })) as { id: string };
+      await call("kpis.setFormula", {
+        kpiId: sum.id,
+        formula: { op: "add", l: { k: kpiId }, r: { k: kpiId } },
+        on: "2026-11-12",
+      });
+      const drafter = new ProposingDrafter(null);
+      await propose(drafter);
+      const offer = drafter.seen[0]?.options.find(
+        (option) => option.action === "kpis.record",
+      );
+      expect(offer?.choices.kpis).toEqual([
+        "Weekly signups (monthly, signups)",
+      ]);
+    });
+
+    it("records a value for a period with none, and undo removes it", async () => {
+      const proposed = await propose(new ProposingDrafter(kpiFields()));
+      expect(proposed?.action).toBe("kpis.record");
+      const [card] = await listed();
+      expect(card?.preview).toContainEqual({
+        label: "Value",
+        value: "(none) -> 45",
+      });
+      expect(card?.reversible).toBe(true);
+
+      await apply(proposed?.id as string);
+      expect(await periodValue()).toBe(45);
+      expect((await listed())[0]?.href).toBe(`/kpis/${kpiId}`);
+
+      await undo(proposed?.id as string);
+      expect(await periodValue()).toBeUndefined();
+      expect((await storedProposals())[0]?.undone_at).not.toBeNull();
+    });
+
+    it("puts the earlier value back when the period had one", async () => {
+      await recordPeriod(30);
+      const proposed = await propose(
+        new ProposingDrafter(kpiFields({ remark: "Counted on the 12th" })),
+      );
+      const [card] = await listed();
+      expect(card?.preview).toContainEqual({
+        label: "Value",
+        value: "30 -> 45",
+      });
+      await apply(proposed?.id as string);
+      expect(await periodValue()).toBe(45);
+      await undo(proposed?.id as string);
+      expect(await periodValue()).toBe(30);
+    });
+
+    it("refuses to undo when somebody changed the period after", async () => {
+      const proposed = await propose(new ProposingDrafter(kpiFields()));
+      await apply(proposed?.id as string);
+      await recordPeriod(50);
+      await expect(undo(proposed?.id as string)).rejects.toThrow(SAD);
+      // The later figure stays and the proposal is not marked undone.
+      expect(await periodValue()).toBe(50);
+      expect((await storedProposals())[0]?.undone_at).toBeNull();
+    });
+
+    it("refuses to restore an earlier value over a later one", async () => {
+      await recordPeriod(30);
+      const proposed = await propose(new ProposingDrafter(kpiFields()));
+      await apply(proposed?.id as string);
+      await recordPeriod(50);
+      await expect(undo(proposed?.id as string)).rejects.toThrow(SAD);
+      expect(await periodValue()).toBe(50);
+    });
+
+    it("refuses to undo when a person added a remark to a value recorded with none", async () => {
+      const proposed = await propose(new ProposingDrafter(kpiFields()));
+      await apply(proposed?.id as string);
+      await call("kpis.record", {
+        kpiId,
+        on: "2026-11-12",
+        remark: "Counted twice, checking",
+      });
+      await expect(undo(proposed?.id as string)).rejects.toThrow(SAD);
+      // The value and the remark are both still there.
+      expect(await periodValue()).toBe(45);
+    });
+
+    it("proposes nothing for a date that is not on the calendar", async () => {
+      expect(
+        await propose(
+          new ProposingDrafter(kpiFields({ periodDate: "2026-02-31" })),
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe("checking in", () => {
+    it("shows the key result by label with its value, and a preview of old to new", async () => {
+      const drafter = new ProposingDrafter(checkInFields());
+      const proposed = await propose(drafter, "Check in on activation");
+      expect(proposed?.action).toBe("goals.publishDraftedCheckIn");
+      const offer = drafter.seen[0]?.options.find(
+        (option) => option.action === "goals.publishDraftedCheckIn",
+      );
+      expect(offer?.choices.keyResults?.[0]).toContain("now 18");
+      expect(JSON.stringify(drafter.seen[0]?.options)).not.toContain(
+        keyResultId,
+      );
+      const [card] = await listed();
+      expect(card?.preview).toContainEqual({
+        label: "Trial to paid conversion from 18% to 30%",
+        value: "18 -> 25",
+      });
+      expect(card?.preview).toContainEqual({
+        label: "Status",
+        value: "On track",
+      });
+      expect(card?.reversible).toBe(true);
+    });
+
+    it("publishes it as the member, and undo deletes it while it is the latest", async () => {
+      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      await apply(proposed?.id as string);
+      const [published] = await checkIns();
+      expect(published?.state).toBe("published");
+      expect(published?.author.id).toBe(ownerMemberId);
+      expect(await keyResultNow()).toBe(25);
+      expect((await listed())[0]?.href).toBe(`/goals/${goalId}`);
+
+      await undo(proposed?.id as string);
+      expect(await checkIns()).toEqual([]);
+      expect(await keyResultNow()).toBe(18);
+      expect((await storedProposals())[0]?.undone_at).not.toBeNull();
+    });
+
+    it("refuses to undo once a newer check-in exists", async () => {
+      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      await apply(proposed?.id as string);
+      const newer = (await call("goals.publishDraftedCheckIn", {
+        goalId,
+        status: "caution",
+        confidence: 0.5,
+        narrative: {
+          type: "doc",
+          content: [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: "Slipping" }],
+            },
+          ],
+        },
+        values: [{ keyResultId, value: 26 }],
+      })) as { id: string };
+
+      await expect(undo(proposed?.id as string)).rejects.toThrow(SAD);
+      const remaining = await checkIns();
+      expect(remaining.map((entry) => entry.id)).toContain(newer.id);
+      expect(remaining).toHaveLength(2);
+      expect(await keyResultNow()).toBe(26);
+    });
+
+    it("refuses to undo a check-in a person edited after it was applied", async () => {
+      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      await apply(proposed?.id as string);
+      const [published] = await checkIns();
+      await call("goals.editCheckIn", {
+        id: published?.id as string,
+        status: "caution",
+      });
+      await expect(undo(proposed?.id as string)).rejects.toThrow(SAD);
+      expect(await checkIns()).toHaveLength(1);
+      expect((await storedProposals())[0]?.undone_at).toBeNull();
+    });
+
+    it("proposes nothing over the member's own open draft", async () => {
+      await call("goals.startCheckIn", { goalId });
+      expect(await propose(new ProposingDrafter(checkInFields()))).toBeNull();
+      expect(await storedProposals()).toEqual([]);
+    });
+
+    it("refuses Apply when a draft appeared after the proposal, and leaves the draft alone", async () => {
+      const proposed = await propose(new ProposingDrafter(checkInFields()));
+      const started = (await call("goals.startCheckIn", { goalId })) as {
+        id: string;
+      };
+      await expect(apply(proposed?.id as string)).rejects.toThrow(
+        "You already have a draft check-in on this objective. Finish or discard it first.",
+      );
+      const all = (await call("goals.checkIns", {
+        goalId,
+        includeDrafts: true,
+      })) as { checkIns: { id: string; state: string }[] };
+      expect(all.checkIns).toEqual([
+        expect.objectContaining({ id: started.id, state: "draft" }),
+      ]);
+      expect((await storedProposals())[0]?.status).toBe("pending");
+    });
+
+    it("refuses a key result that is not under the objective chosen", async () => {
+      // A second objective, so number 2 of the key results is somebody else's.
+      const spaceId = ((await call("spaces.list", {})) as { id: string }[])[0]
+        ?.id as string;
+      const cycle = (await call("cycles.current", { mode: "quarterly" })) as {
+        id: string;
+      };
+      const other = (await call("goals.create", {
+        title: "Another objective",
+        cycleId: cycle.id,
+        spaceId,
+        level: "team",
+        ownerKind: "space",
+        championId: ownerMemberId,
+        reviewerId: ownerMemberId,
+        weight: 1,
+      })) as { id: string };
+      await call("goals.addKeyResult", {
+        goalId: other.id,
+        title: "A different measure",
+        direction: "increase",
+        indicatorType: "lagging",
+        baselineValue: 1,
+        targetValue: 5,
+        weight: 1,
+      });
+      const drafter = new ProposingDrafter(
+        checkInFields({
+          keyResultValues: [{ keyResultNumber: 2, value: 3, confidence: null }],
+        }),
+      );
+      expect(await propose(drafter)).toBeNull();
+      expect(await storedProposals()).toEqual([]);
+    });
+  });
+
+  it("offers nothing to a member whose role cannot edit, and asks no model", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('viewer-only', 'Viewer', 'viewer-only@example.com')",
+    );
+    const viewer = await wb.admin.query<{ id: string }>(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, 'viewer-only', 'Viewer', 'active') returning id`,
+      [workspaceId],
+    );
+    const { roles } = (await call("roles.list", {})) as {
+      roles: { id: string; builtinKey: string | null }[];
+    };
+    await call("roles.assign", {
+      memberId: viewer.rows[0]?.id as string,
+      roleId: roles.find((entry) => entry.builtinKey === "viewer")?.id,
+    });
+
+    const drafter = new ProposingDrafter(kpiFields());
+    expect(
+      await proposeFromRequest(await contextFor("viewer-only", drafter), {
+        threadId,
+        request: "Record 45 weekly signups for this month",
+      }),
+    ).toBeNull();
+    // A viewer is offered nothing, so no model is asked.
+    expect(drafter.seen).toEqual([]);
+    expect(await storedProposals()).toEqual([]);
+  });
+
+  it("offers the check-in but not a KPI value when the role may edit goals and only read KPIs", async () => {
+    const wb = await workerDb();
+    await wb.admin.query(
+      "insert into users (id, name, email) values ('goal-editor', 'Editor', 'goal-editor@example.com')",
+    );
+    const editor = await wb.admin.query<{ id: string }>(
+      `insert into workspace_members (id, workspace_id, user_id, name, status)
+       values (gen_random_uuid(), $1, 'goal-editor', 'Editor', 'active') returning id`,
+      [workspaceId],
+    );
+    const role = (await call("roles.create", { name: "Goal editor" })) as {
+      id: string;
+    };
+    for (const [domain, level] of [
+      ["goal", 70],
+      ["space", 70],
+      ["kpi", 10],
+    ] as const) {
+      await call("roles.setPermission", { roleId: role.id, domain, level });
+    }
+    await call("roles.assign", {
+      memberId: editor.rows[0]?.id as string,
+      roleId: role.id,
+    });
+
+    const drafter = new ProposingDrafter(null);
+    await proposeFromRequest(await contextFor("goal-editor", drafter), {
+      threadId,
+      request: "Record 45 weekly signups for this month",
+    });
+    const offered = drafter.seen[0]?.options.map((option) => option.action);
+    expect(offered).toContain("goals.publishDraftedCheckIn");
+    expect(offered).not.toContain("kpis.record");
   });
 });

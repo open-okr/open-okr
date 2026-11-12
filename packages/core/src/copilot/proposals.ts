@@ -37,14 +37,26 @@
  * actions, as the member, just before the action runs (`capture`), and undo
  * checks the record still holds what the edit left (`current`) before it puts
  * the old values back. Deletes are not on this list and never will be.
+ *
+ * **Two more join them (plan 0.9.0 L4c):** a check-in and a KPI value. Their
+ * undo needs what applying returned, the new check-in's id or the new KPI
+ * value's id, which does not exist until the action has run. `capture` reads
+ * the values from before, and `settle` fills in the id from the result. A
+ * check-in's undo is refused unless it is still the goal's latest, and a KPI
+ * value's undo is refused unless the period still holds what the copilot
+ * recorded, so an undo never removes or overwrites what a person did after.
  */
+
 import {
+  CHECK_IN_STATUSES,
   INDICATOR_TYPES,
   INITIATIVE_STATUSES,
   KEY_RESULT_DIRECTIONS,
   TASK_STATUSES,
   withContext,
 } from "@openokr/db";
+import { LOCAL_DATE_PATTERN } from "@openokr/formats";
+import { type KpiFrequency, normalisePeriod } from "@openokr/method";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -52,7 +64,14 @@ import { visibleResourceIds } from "../access/reads.ts";
 import type { ActionCallContext } from "../actions/define.ts";
 import { callAction } from "../actions/registry.ts";
 import type { ProposalDrop, ProposalNote } from "../agents/drafter.ts";
+import { formatLocalDate, localDateIn } from "../cycles/generation.ts";
 import { cyclesOpenForWork } from "../cycles/open-for-work.ts";
+import { workspaceTimeZone } from "../cycles/service.ts";
+import {
+  OperationError,
+  type OperationTx,
+  writeFloorFor,
+} from "../operations/operation.ts";
 import { excerptRichText } from "../rich-text/excerpt.ts";
 import { richTextFromPlainText } from "../rich-text/from-text.ts";
 import type { RichTextDocument } from "../rich-text/schema.ts";
@@ -139,8 +158,19 @@ interface ProposableAction {
     fields: Record<string, unknown>,
     choices: ProposalOffer["choices"],
   ): Promise<BuiltProposal>;
+  /**
+   * One more sentence for the model about this offer, read as the member:
+   * today's date, for an action that takes a period.
+   */
+  note?(scope: OfferScope): Promise<string>;
   /** The reverse, given what applying it returned. */
   reverse(result: Record<string, unknown>): Reversal | null;
+  /**
+   * An edit only: completes what `capture` read once the action has run, for
+   * a reverse that needs what the action created. Null means it cannot be put
+   * back after all.
+   */
+  settle?(captured: Captured, result: Record<string, unknown>): Captured | null;
   /**
    * An edit only: reads the values from before, as the member, to build the
    * reverse. Called just before the action runs, with the payload it will run.
@@ -841,6 +871,513 @@ const changeInitiativeStatus: ProposableAction = {
   },
 };
 
+const OPEN_DRAFT_REFUSAL =
+  "You already have a draft check-in on this objective. Finish or discard it first.";
+
+/**
+ * Whether the asking member has an open draft check-in on a goal, read through
+ * `goals.checkIns` as the member. `goals.publishDraftedCheckIn` reuses an
+ * author's open draft, so proposing over one would publish what the person
+ * had been writing, and a person's draft is never touched.
+ */
+async function hasOpenDraft(
+  context: ActionCallContext,
+  goalId: string,
+): Promise<boolean> {
+  const memberId = await askingMember(context);
+  const { checkIns } = await callAction(context, "goals.checkIns", {
+    goalId,
+    includeDrafts: true,
+  });
+  return checkIns.some(
+    (entry) => entry.state === "draft" && entry.author.id === memberId,
+  );
+}
+
+const CHECK_IN_STATUS_WORD: Readonly<Record<string, string>> = {
+  on_track: "On track",
+  caution: "Caution",
+  off_track: "Off track",
+};
+
+/**
+ * Checking in on an objective (plan 0.9.0 L4c).
+ *
+ * The model writes the status, an overall confidence, the narrative and, for
+ * the key results the person gave a number for, a value and a confidence. It
+ * picks the objective and each key result by number. A key result must sit
+ * under the objective picked, so a number that points somewhere else is
+ * refused rather than written onto another objective.
+ *
+ * **One action, no draft to supply.** `goals.publishDraftedCheckIn` opens the
+ * author's own draft and publishes it as the member in one step, which is what
+ * a proposal row can hold (it keeps one action and one payload). The preview
+ * reads `64.6 -> 65` for each value, with the old value read when the model
+ * was offered the list.
+ *
+ * **Undo is `goals.deleteCheckIn`, only while this is still the latest.** That
+ * action rolls the goal back only for the latest check-in and does not check
+ * it itself, so `expect` holds this check-in's id and undo refuses once a
+ * newer one is the latest. Only metric and maintain key results are offered:
+ * a milestone is checked in as done, not as a number.
+ */
+const checkIn: ProposableAction = {
+  action: "goals.publishDraftedCheckIn",
+  label: "Check in on an objective",
+  whatItDoes:
+    "Publishes a check-in on one objective the person may edit: a status, an overall confidence from 0 to 1, a narrative and, only where the person gave a number, a key result's new value and confidence from 0 to 1.",
+  authored: z.object({
+    /** One-based, into the `objectives` list the model was shown. */
+    objectiveNumber: z.number().int().min(1),
+    checkInStatus: z.enum(CHECK_IN_STATUSES),
+    confidence: z.number().min(0).max(1),
+    narrative: z.string().trim().min(1).max(2000),
+    keyResultValues: z
+      .array(
+        z.object({
+          /** One-based, into the `keyResults` list the model was shown. */
+          keyResultNumber: z.number().int().min(1),
+          value: z.number().finite().nullable().optional(),
+          confidence: z.number().min(0).max(1).nullable().optional(),
+        }),
+      )
+      .max(8)
+      .optional(),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["objectiveNumber", "checkInStatus", "confidence", "narrative"],
+    properties: {
+      objectiveNumber: { type: "integer", minimum: 1 },
+      checkInStatus: { type: "string", enum: [...CHECK_IN_STATUSES] },
+      confidence: { type: "number", minimum: 0, maximum: 1 },
+      narrative: { type: "string", maxLength: 2000 },
+      keyResultValues: {
+        type: "array",
+        maxItems: 8,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["keyResultNumber", "value", "confidence"],
+          properties: {
+            keyResultNumber: { type: "integer", minimum: 1 },
+            value: { anyOf: [{ type: "number" }, { type: "null" }] },
+            confidence: {
+              anyOf: [
+                { type: "number", minimum: 0, maximum: 1 },
+                { type: "null" },
+              ],
+            },
+          },
+        },
+      },
+    },
+  },
+  async offer(scope) {
+    return {
+      objectives: await scope.editableObjectives(),
+      keyResults: await scope.checkInKeyResults(),
+    };
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      objectiveNumber: number;
+      checkInStatus: (typeof CHECK_IN_STATUSES)[number];
+      confidence: number;
+      narrative: string;
+      keyResultValues?: {
+        keyResultNumber: number;
+        value?: number | null;
+        confidence?: number | null;
+      }[];
+    };
+    const objective = picked(choices, "objectives", authored.objectiveNumber);
+    if (await hasOpenDraft(context, objective.id)) {
+      throw new Error(OPEN_DRAFT_REFUSAL);
+    }
+    const seen = new Set<string>();
+    const values: {
+      keyResultId: string;
+      value?: number;
+      confidence?: number;
+    }[] = [];
+    const rows: { label: string; value: string }[] = [];
+    for (const entry of authored.keyResultValues ?? []) {
+      const keyResult = picked(choices, "keyResults", entry.keyResultNumber);
+      if (carried(keyResult, "goalId") !== objective.id) {
+        // A number that points at another objective's key result. Refused
+        // rather than written onto an objective nobody checked in on.
+        throw new Error("That key result is not under that objective.");
+      }
+      if (seen.has(keyResult.id)) {
+        throw new Error("A key result is listed twice.");
+      }
+      seen.add(keyResult.id);
+      const value = entry.value ?? undefined;
+      const confidence = entry.confidence ?? undefined;
+      if (value === undefined && confidence === undefined) {
+        continue;
+      }
+      values.push({
+        keyResultId: keyResult.id,
+        ...(value === undefined ? {} : { value }),
+        ...(confidence === undefined ? {} : { confidence }),
+      });
+      const shown = [
+        ...(value === undefined
+          ? []
+          : [`${carried(keyResult, "current")} -> ${value}`]),
+        ...(confidence === undefined ? [] : [`confidence ${confidence}`]),
+      ];
+      rows.push({
+        label: carried(keyResult, "title"),
+        value: shown.join(", "),
+      });
+    }
+    return {
+      action: "goals.publishDraftedCheckIn",
+      payload: {
+        goalId: objective.id,
+        status: authored.checkInStatus,
+        confidence: authored.confidence,
+        narrative: richTextFromPlainText(authored.narrative),
+        values,
+      },
+      preview: [
+        { label: "Objective", value: objective.label },
+        {
+          label: "Status",
+          value:
+            CHECK_IN_STATUS_WORD[authored.checkInStatus] ??
+            authored.checkInStatus,
+        },
+        { label: "Confidence", value: String(authored.confidence) },
+        { label: "Narrative", value: authored.narrative },
+        ...rows,
+      ],
+      subjectType: "goal",
+      subjectId: objective.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    // A draft that appeared since the proposal was made is the person's, and
+    // applying would publish it. Refused before the action runs.
+    if (await hasOpenDraft(context, String(payload.goalId))) {
+      throw new OperationError("forbidden", OPEN_DRAFT_REFUSAL);
+    }
+    // Nothing else to read first: undo deletes the check-in this creates, and its
+    // id is known only once it exists, in `settle`. `expect` is what the
+    // check-in holds when it is published, so undo refuses a check-in a person
+    // edited or a reviewer acknowledged since.
+    const values = (payload.values ?? []) as {
+      keyResultId: string;
+      value?: number;
+      confidence?: number;
+    }[];
+    return {
+      reverse: { action: "goals.deleteCheckIn", payload: {} },
+      expect: {
+        status: payload.status,
+        confidence: payload.confidence,
+        narrative: narrativeLine(payload.narrative),
+        acknowledgedAt: null,
+        values: Object.fromEntries(
+          values.map((entry) => [
+            entry.keyResultId,
+            {
+              ...(entry.value === undefined ? {} : { value: entry.value }),
+              ...(entry.confidence === undefined
+                ? {}
+                : { confidence: entry.confidence }),
+            },
+          ]),
+        ),
+      },
+    };
+  },
+  settle(captured, result) {
+    const id = result.id;
+    if (typeof id !== "string") {
+      return null;
+    }
+    return {
+      reverse: { ...captured.reverse, payload: { id } },
+      expect: { ...captured.expect, latestCheckInId: id },
+    };
+  },
+  async current(context, payload) {
+    const { checkIns } = await callAction(context, "goals.checkIns", {
+      goalId: String(payload.goalId),
+      includeDrafts: false,
+    });
+    const latest = checkIns[0];
+    if (!latest) {
+      return { latestCheckInId: null };
+    }
+    // Only the key results this check-in wrote, read from the snapshot of
+    // whatever the latest check-in holds now.
+    const wrote = (
+      (payload.values ?? []) as {
+        keyResultId: string;
+        value?: number;
+        confidence?: number;
+      }[]
+    ).map((entry) => entry.keyResultId);
+    const values = Object.fromEntries(
+      wrote.map((keyResultId) => {
+        const entry = latest.entries.find(
+          (candidate) => candidate.keyResultId === keyResultId,
+        );
+        const written = (
+          payload.values as {
+            keyResultId: string;
+            value?: number;
+            confidence?: number;
+          }[]
+        ).find((candidate) => candidate.keyResultId === keyResultId);
+        return [
+          keyResultId,
+          {
+            ...(written?.value === undefined
+              ? {}
+              : { value: entry?.value ?? null }),
+            ...(written?.confidence === undefined
+              ? {}
+              : { confidence: entry?.confidence ?? null }),
+          },
+        ];
+      }),
+    );
+    return {
+      latestCheckInId: latest.id,
+      status: latest.status,
+      confidence: latest.confidence,
+      narrative: narrativeLine(latest.narrative),
+      acknowledgedAt: latest.acknowledgedAt,
+      values,
+    };
+  },
+};
+
+/** A narrative as the one line two readings of it compare on. */
+function narrativeLine(narrative: unknown): string {
+  if (typeof narrative !== "object" || narrative === null) {
+    return "";
+  }
+  try {
+    return excerptRichText(narrative as RichTextDocument, 2000);
+  } catch {
+    return "";
+  }
+}
+
+/** How many periods `kpis.detail` is asked for when looking up one. */
+const KPI_PERIOD_WINDOW = 48;
+
+/** One KPI's period, and the value it holds now, or null when it has none. */
+interface KpiPeriod {
+  readonly periodStart: string;
+  readonly record: {
+    readonly actualValue: number | null;
+    readonly remark: string | null;
+  } | null;
+}
+
+/**
+ * The record a date's period holds, read as the member.
+ *
+ * `kpis.detail` returns the newest periods only. A period older than the
+ * oldest it returned might hold a value this cannot see, and treating that as
+ * "no value" would make undo delete what was there before, so it is refused.
+ */
+async function kpiPeriod(
+  context: ActionCallContext,
+  kpiId: string,
+  on: string,
+): Promise<KpiPeriod> {
+  const detail = await callAction(context, "kpis.detail", {
+    kpiId,
+    periods: KPI_PERIOD_WINDOW,
+  });
+  const periodStart = normalisePeriod(detail.kpi.frequency as KpiFrequency, on);
+  const found = detail.records.find(
+    (entry) => entry.periodStart === periodStart,
+  );
+  const oldest = detail.records[detail.records.length - 1]?.periodStart ?? "";
+  if (
+    !found &&
+    detail.records.length >= KPI_PERIOD_WINDOW &&
+    oldest > periodStart
+  ) {
+    throw new Error("That period is too far back to propose a value for.");
+  }
+  return {
+    periodStart,
+    record: found
+      ? { actualValue: found.actualValue, remark: found.remark }
+      : null,
+  };
+}
+
+/** True for a date that exists on the calendar, not only one that is shaped like it. */
+function isCalendarDate(value: string): boolean {
+  if (!LOCAL_DATE_PATTERN.test(value)) {
+    return false;
+  }
+  const at = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(at.getTime()) && at.toISOString().slice(0, 10) === value;
+}
+
+/**
+ * Recording a KPI's value for a period (plan 0.9.0 L4c).
+ *
+ * The model writes a date inside the period, the actual value and, if the
+ * person said one, a remark. It picks the KPI by number from the ones this
+ * member may edit, calculated KPIs left out because `kpis.record` refuses
+ * them. The model is told today's date, because "this month" means nothing
+ * without it.
+ *
+ * **Undo depends on what the period held.** With a value before, undo records
+ * that value again. With none, undo removes the one this recorded
+ * (`kpis.deleteRecord`, which is never proposable and exists for this). Either
+ * way `expect` holds the value this recorded and undo is refused when the
+ * period no longer holds it, so a figure somebody typed after is never removed
+ * or overwritten.
+ */
+const recordKpiValue: ProposableAction = {
+  action: "kpis.record",
+  label: "Record a KPI value",
+  whatItDoes:
+    "Records the actual value of one KPI the person may edit for one period. periodDate is any date inside that period, written YYYY-MM-DD. A value already recorded for that period is replaced.",
+  authored: z.object({
+    /** One-based, into the `kpis` list the model was shown. */
+    kpiNumber: z.number().int().min(1),
+    periodDate: z.string().refine(isCalendarDate, "not a calendar date"),
+    actualValue: z.number().finite(),
+    remark: z.string().trim().max(500).optional(),
+  }) as unknown as z.ZodType<Record<string, unknown>>,
+  fields: {
+    type: "object",
+    additionalProperties: false,
+    required: ["kpiNumber", "periodDate", "actualValue"],
+    properties: {
+      kpiNumber: { type: "integer", minimum: 1 },
+      periodDate: { type: "string", maxLength: 10 },
+      actualValue: { type: "number" },
+      remark: { type: "string", maxLength: 500 },
+    },
+  },
+  async offer(scope) {
+    return { kpis: await scope.editableKpis() };
+  },
+  async note(scope) {
+    return `Today is ${await scope.today()}.`;
+  },
+  async build(context, fields, choices) {
+    const authored = fields as {
+      kpiNumber: number;
+      periodDate: string;
+      actualValue: number;
+      remark?: string;
+    };
+    const kpi = picked(choices, "kpis", authored.kpiNumber);
+    const period = await kpiPeriod(context, kpi.id, authored.periodDate);
+    if (period.record?.actualValue === authored.actualValue) {
+      // The period already holds it. No card rather than a change of nothing.
+      throw new Error("That value is already recorded.");
+    }
+    const before =
+      period.record?.actualValue === null ||
+      period.record?.actualValue === undefined
+        ? "(none)"
+        : String(period.record.actualValue);
+    return {
+      action: "kpis.record",
+      payload: {
+        kpiId: kpi.id,
+        on: period.periodStart,
+        actualValue: authored.actualValue,
+        ...(authored.remark ? { remark: authored.remark } : {}),
+      },
+      preview: [
+        { label: "KPI", value: carried(kpi, "title") },
+        { label: "Period", value: period.periodStart },
+        { label: "Value", value: `${before} -> ${authored.actualValue}` },
+        ...(authored.remark
+          ? [{ label: "Remark", value: authored.remark }]
+          : []),
+      ],
+      subjectType: "kpi",
+      subjectId: kpi.id,
+    };
+  },
+  reverse() {
+    return null;
+  },
+  async capture(context, payload) {
+    const kpiId = String(payload.kpiId);
+    const wroteRemark = payload.remark !== undefined;
+    let period: KpiPeriod;
+    try {
+      period = await kpiPeriod(context, kpiId, String(payload.on));
+    } catch {
+      // A period too far back to see what it held: no undo, said on the card.
+      return null;
+    }
+    // The remark is always compared, even when the copilot wrote none: a
+    // remark a person adds afterwards by recording the period again would
+    // otherwise be removed with the value by an undo. When it wrote none, the
+    // remark the period already held is what it leaves.
+    const expect: Fields = {
+      actualValue: payload.actualValue,
+      remark: wroteRemark ? payload.remark : (period.record?.remark ?? null),
+    };
+    if (period.record === null) {
+      // Nothing there before. The new record's id is known in `settle`.
+      return { reverse: { action: "kpis.deleteRecord", payload: {} }, expect };
+    }
+    return {
+      reverse: {
+        action: "kpis.record",
+        payload: {
+          kpiId,
+          on: period.periodStart,
+          actualValue: period.record.actualValue,
+          ...(wroteRemark ? { remark: period.record.remark } : {}),
+        },
+      },
+      expect,
+    };
+  },
+  settle(captured, result) {
+    if (captured.reverse.action !== "kpis.deleteRecord") {
+      return captured;
+    }
+    const id = result.id;
+    return typeof id === "string"
+      ? {
+          reverse: { ...captured.reverse, payload: { id } },
+          expect: captured.expect,
+        }
+      : null;
+  },
+  async current(context, payload) {
+    const period = await kpiPeriod(
+      context,
+      String(payload.kpiId),
+      String(payload.on),
+    );
+    return {
+      actualValue: period.record?.actualValue ?? null,
+      remark: period.record?.remark ?? null,
+    };
+  },
+};
+
 /** Every action the copilot may propose, by registry name. */
 export const PROPOSABLE_ACTIONS: readonly ProposableAction[] = [
   createObjective,
@@ -850,6 +1387,8 @@ export const PROPOSABLE_ACTIONS: readonly ProposableAction[] = [
   editObjective,
   moveTask,
   changeInitiativeStatus,
+  checkIn,
+  recordKpiValue,
 ];
 
 /** How many objectives or key results a model is shown at once. */
@@ -871,6 +1410,15 @@ interface OfferScope {
   editableTasks(): Promise<NumberedChoice[]>;
   /** Initiatives the member may edit, with their status in the label. */
   editableInitiatives(): Promise<NumberedChoice[]>;
+  /**
+   * Metric and maintain key results under the editable objectives, with the
+   * value they hold now beside the label.
+   */
+  checkInKeyResults(): Promise<NumberedChoice[]>;
+  /** Non-calculated KPIs, when the member's role lets them record values. */
+  editableKpis(): Promise<NumberedChoice[]>;
+  /** Today in the workspace's calendar, as YYYY-MM-DD. */
+  today(): Promise<string>;
 }
 
 function offerScope(context: ActionCallContext): OfferScope {
@@ -981,9 +1529,82 @@ function offerScope(context: ActionCallContext): OfferScope {
       }));
   });
 
+  const kpiChoices = once(async () => {
+    // KPIs sit at the workspace floor and `kpis.record` is measured on the
+    // member's role for that domain, so the offer asks the same question.
+    const level = await withContext(
+      drizzle(context.pool),
+      { workspaceId: context.workspaceId, userId: context.actor.userId ?? "" },
+      (tx) =>
+        writeFloorFor(tx as OperationTx, {
+          workspaceId: context.workspaceId,
+          actor: context.actor,
+          domain: "kpi",
+        }),
+    );
+    if (level < ACCESS_LEVELS.edit) {
+      return [];
+    }
+    const { kpis } = await callAction(context, "kpis.list", {});
+    return (
+      kpis
+        // `kpis.record` refuses a calculated KPI, so it is never offered.
+        .filter((kpi) => !kpi.isCalculated)
+        .slice(0, CHOICE_LIMIT)
+        .map((kpi) => ({
+          id: kpi.id,
+          label: `${kpi.title} (${kpi.frequency}${kpi.unit ? `, ${kpi.unit}` : ""})`,
+          with: { title: kpi.title, frequency: kpi.frequency },
+        }))
+    );
+  });
+
   return {
     editableTasks: tasks,
     editableInitiatives: initiatives,
+    editableKpis: kpiChoices,
+    today: once(async () =>
+      withContext(
+        drizzle(context.pool),
+        {
+          workspaceId: context.workspaceId,
+          userId: context.actor.userId ?? "",
+        },
+        async (tx) =>
+          formatLocalDate(
+            localDateIn(
+              new Date(),
+              await workspaceTimeZone(tx as OperationTx, context.workspaceId),
+            ),
+          ),
+      ),
+    ),
+    checkInKeyResults: once(async () => {
+      const choices: NumberedChoice[] = [];
+      for (const { goal } of await objectives()) {
+        for (const keyResult of goal.keyResults) {
+          // A milestone is checked in as done and a baseline as recorded, not
+          // as a number the model could write.
+          if (keyResult.kind !== "metric" && keyResult.kind !== "maintain") {
+            continue;
+          }
+          const unit = keyResult.unit ? ` ${keyResult.unit}` : "";
+          choices.push({
+            id: keyResult.id,
+            label: `${keyResult.title} (${goal.title}, now ${keyResult.currentValue}${unit})`,
+            with: {
+              goalId: goal.id,
+              title: keyResult.title,
+              current: String(keyResult.currentValue),
+            },
+          });
+          if (choices.length >= CHOICE_LIMIT) {
+            return choices;
+          }
+        }
+      }
+      return choices;
+    }),
     editableSpaces: spaces,
     editableObjectives: once(async () =>
       (await objectives()).map(({ goal, cycleEndsOn }) => ({
@@ -1075,6 +1696,30 @@ export async function captureReverse(
   return captured ? { ...captured.reverse, expect: captured.expect } : null;
 }
 
+/**
+ * Completes a captured reverse with what the action returned, for an undo that
+ * needs the id of what was created. Null when it cannot be completed, which
+ * leaves the proposal applied with no undo, as a create with no reverse is.
+ */
+export function settleReverse(
+  action: string,
+  stored: StoredReverse,
+  result: Record<string, unknown>,
+): StoredReverse | null {
+  const entry = proposableAction(action);
+  if (!entry?.settle) {
+    return stored;
+  }
+  const settled = entry.settle(
+    {
+      reverse: { action: stored.action, payload: stored.payload },
+      expect: stored.expect,
+    },
+    result,
+  );
+  return settled ? { ...settled.reverse, expect: settled.expect } : null;
+}
+
 /** One spelling of a value, keys sorted, so two readings of it compare. */
 function stable(value: unknown): string {
   if (Array.isArray(value)) {
@@ -1134,10 +1779,11 @@ export async function proposalOffers(
     if (Object.values(choices).some((list) => list.length === 0)) {
       continue;
     }
+    const note = entry.note ? ` ${await entry.note(scope)}` : "";
     offers.push({
       action: entry.action,
       label: entry.label,
-      whatItDoes: entry.whatItDoes,
+      whatItDoes: `${entry.whatItDoes}${note}`,
       fields: entry.fields,
       choices,
     });

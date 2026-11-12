@@ -1049,6 +1049,67 @@ const EDIT_OPTIONS: ProposalRequestContext["options"] = [
   },
 ];
 
+/**
+ * The check-in and the KPI value (plan 0.9.0 L4c). The model points at an
+ * objective, a key result and a KPI by number, and writes a value only where
+ * the person's words give one.
+ */
+const RECORD_OPTIONS: ProposalRequestContext["options"] = [
+  {
+    action: "goals.publishDraftedCheckIn",
+    label: "Check in on an objective",
+    whatItDoes: "Publishes a check-in on one objective.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["objectiveNumber", "checkInStatus", "confidence", "narrative"],
+      properties: {
+        objectiveNumber: { type: "integer" },
+        checkInStatus: { type: "string" },
+        confidence: { type: "number" },
+        narrative: { type: "string" },
+        keyResultValues: {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: ["keyResultNumber", "value", "confidence"],
+            properties: {
+              keyResultNumber: { type: "integer" },
+              value: { type: ["number", "null"] },
+              confidence: { type: ["number", "null"] },
+            },
+          },
+        },
+      },
+    },
+    choices: {
+      objectives: ["Raise mid-market activation"],
+      keyResults: [
+        "Trial to paid conversion (Raise mid-market activation, now 64.6 %)",
+      ],
+    },
+  },
+  {
+    action: "kpis.record",
+    label: "Record a KPI value",
+    whatItDoes:
+      "Records the actual value of one KPI for one period. Today is 2026-11-12.",
+    fields: {
+      type: "object",
+      additionalProperties: false,
+      required: ["kpiNumber", "periodDate", "actualValue"],
+      properties: {
+        kpiNumber: { type: "integer" },
+        periodDate: { type: "string" },
+        actualValue: { type: "number" },
+        remark: { type: "string" },
+      },
+    },
+    choices: { kpis: ["Weekly signups (monthly, signups)"] },
+  },
+];
+
 /** An objective that takes a reason, as core offers it. */
 const REASON_OPTIONS: ProposalRequestContext["options"] = [
   {
@@ -1224,6 +1285,73 @@ const proposeAction = evaluationSet<ProposalRequestContext>({
         fields: { title: "Onboard partners", spaceNumber: 1 },
         why: "You asked for this objective.",
       },
+    },
+    {
+      name: "a request to check in with a key result's number",
+      context: {
+        request:
+          "Check in on activation: on track, confidence 0.8. Conversion is now 65%, we shipped the new trial flow.",
+        options: RECORD_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "goals.publishDraftedCheckIn",
+        fields: {
+          objectiveNumber: 1,
+          checkInStatus: "on_track",
+          confidence: 0.8,
+          narrative: "We shipped the new trial flow.",
+          keyResultValues: [
+            { keyResultNumber: 1, value: 65, confidence: null },
+          ],
+        },
+        why: "You gave a status, a confidence and the new conversion.",
+      }),
+      expected: {
+        action: "goals.publishDraftedCheckIn",
+        fields: {
+          objectiveNumber: 1,
+          checkInStatus: "on_track",
+          confidence: 0.8,
+          narrative: "We shipped the new trial flow.",
+          keyResultValues: [
+            { keyResultNumber: 1, value: 65, confidence: null },
+          ],
+        },
+        why: "You gave a status, a confidence and the new conversion.",
+      },
+    },
+    {
+      name: "a request to record a KPI value for a period",
+      context: {
+        request: "Record 45 weekly signups for this month",
+        options: RECORD_OPTIONS,
+        sources: [],
+      },
+      reply: json({
+        propose: true,
+        action: "kpis.record",
+        fields: { kpiNumber: 1, periodDate: "2026-11-01", actualValue: 45 },
+        why: "You gave the value for this month.",
+      }),
+      expected: {
+        action: "kpis.record",
+        fields: { kpiNumber: 1, periodDate: "2026-11-01", actualValue: 45 },
+        why: "You gave the value for this month.",
+      },
+    },
+    {
+      // No number in the request: the model proposes nothing rather than
+      // inventing a value.
+      name: "a KPI request with no number stays proposal-free",
+      context: {
+        request: "Record the weekly signups for this month",
+        options: RECORD_OPTIONS,
+        sources: [],
+      },
+      reply: json({ propose: false, action: "none", fields: {}, why: "" }),
+      expected: null,
     },
     {
       // Found live on GPT-6 Luna (plan 0.8.1 L7): asked for work behind a
