@@ -335,7 +335,7 @@ export const TABLE_POLICY: readonly TablePolicy[] = [
     table: "ai_tool_calls",
     decision: "exclude",
     reason:
-      "A record of the calls external agents made, naming grants and tokens the receiving instance does not have (agent-tool-calls.md D18).",
+      "A record of the calls external agents made, naming grants and tokens the receiving instance does not have (agent-tool-calls.md D18), and of the reads the copilot made for members, an operational log with a retention window that the receiving instance starts fresh (copilot-live-data.md 3.6).",
   },
 
   // ── The audit chain ──────────────────────────────────────────────────

@@ -349,7 +349,7 @@ Conventions from TECHNICAL-PLAN.md §3 and §4 apply. Credentials and token hash
 | `ai_feature_settings` | feature key, enabled, tier override, quota |
 | `ai_prompts` | feature key or agent identifier and phase, version, system prompt, default flag |
 | `ai_threads` / `ai_messages` | Copilot and agent conversations anchored to a subject, roles, tokens, cost |
-| `ai_tool_calls` | member, the grant or agent token it came through, tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default |
+| `ai_tool_calls` | member, the grant or agent token it came through (none for the copilot's own reads, `source = 'copilot'`, 0.9.0), tool, the scope it needed, outcome (where the call stopped), refusal code, up to five ids the input named, duration. **Never an input value, an output or a refusal sentence** (changed in 0.7.0 with Akmal's approval: docs/design/agent-tool-calls.md). Kept 90 days by default. An administrator sees each copilot read with the member it was made for |
 | `ai_usage_events` | member or agent, feature, source (copilot, mcp, assist, agent, rest, channel), provider, model, tokens, cost, latency, status, flagged |
 | `embeddings` | subject, chunk, content, vector, model, content hash |
 | `agents` | member reference, definition, planning instructions, execution instructions, provider and tier, schedule, autonomy (`sandbox` / `propose` / `scoped_direct`), scope, enabled, built-in kind (`coach` / `champion` / `custom`) |

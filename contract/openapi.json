@@ -8952,7 +8952,7 @@
     "/ai/readToolCallSummary": {
       "get": {
         "operationId": "ai.readToolCallSummary",
-        "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named.",
+        "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
         "tags": [
           "ai"
         ],
@@ -8999,12 +8999,64 @@
                             ],
                             "additionalProperties": false
                           }
+                        },
+                        "copilot": {
+                          "type": "object",
+                          "properties": {
+                            "calls": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "refused": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "recent": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "member": {
+                                    "type": "string"
+                                  },
+                                  "tool": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "outcome": {
+                                    "type": "string"
+                                  },
+                                  "calledAt": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "member",
+                                  "tool",
+                                  "outcome",
+                                  "calledAt"
+                                ],
+                                "additionalProperties": false
+                              }
+                            }
+                          },
+                          "required": [
+                            "calls",
+                            "refused",
+                            "recent"
+                          ],
+                          "additionalProperties": false
                         }
                       },
                       "required": [
                         "calls",
                         "refused",
-                        "busiestTools"
+                        "busiestTools",
+                        "copilot"
                       ],
                       "additionalProperties": false
                     }
@@ -10299,6 +10351,11 @@
                                   "null"
                                 ]
                               },
+                              "readCount": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
                               "createdAt": {
                                 "type": "string"
                               }
@@ -10315,6 +10372,7 @@
                               "stopped",
                               "running",
                               "haltedReason",
+                              "readCount",
                               "createdAt"
                             ],
                             "additionalProperties": false

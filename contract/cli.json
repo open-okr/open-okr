@@ -1387,7 +1387,7 @@
       "method": "GET",
       "path": "/ai/readToolCallSummary",
       "scope": "read",
-      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named.",
+      "summary": "How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for.",
       "flags": [],
       "pages": false
     },

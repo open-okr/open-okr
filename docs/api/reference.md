@@ -115,7 +115,7 @@ the machine-readable document.
 | `ai.readPrompt`<br/>The current system prompt for a feature or agent phase, and every prior version. | `GET /api/v1/ai/readPrompt` | reads |
 | `ai.readProviderConfig`<br/>Every provider's admin configuration, with a masked hint for its workspace key. | `GET /api/v1/ai/readProviderConfig` | reads |
 | `ai.readTierRouting`<br/>Every tier's effective route: an explicit policy, or the seeded default for whatever this workspace has enabled. | `GET /api/v1/ai/readTierRouting` | reads |
-| `ai.readToolCallSummary`<br/>How much external agents were used in this workspace over 30 days, and how often refused, with no member named. | `GET /api/v1/ai/readToolCallSummary` | reads |
+| `ai.readToolCallSummary`<br/>How much external agents were used in this workspace over 30 days, and how often refused, with no member named, and the copilot's reads over the same days with the member each was made for. | `GET /api/v1/ai/readToolCallSummary` | reads |
 | `ai.readUsageSummary`<br/>Total calls, tokens, cost and flagged calls for this workspace since a given date. | `GET /api/v1/ai/readUsageSummary` | reads |
 | `ai.recordCredentialCheck`<br/>Records the result of a live connection test on the workspace's key for a provider. | `POST /api/v1/ai/recordCredentialCheck` | writes |
 | `ai.removeBudget`<br/>Removes a budget. | `POST /api/v1/ai/removeBudget` | destroys |

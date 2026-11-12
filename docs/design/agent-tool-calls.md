@@ -37,9 +37,9 @@ A new document rather than a section of [agent-surface.md](agent-surface.md), wh
 | D12 | Swept by `connections.sweepToolCalls`: a pipeline write, `full`, `agentSurface: false`, scheduled daily at 04:20 UTC after the outbox purge, auditing the count and the window | The `channels.sweepMessageLog` shape. A retention delete is the deletion nobody watches, so its audit row is the evidence |
 | D13 | The field sits on the admin card B10 builds for `messageLogRetentionDays` | One place for retention, and no setting without a screen (B10) |
 | D14 | **A member sees their own**: the last 50 calls and the week's counts, beside each grant on `/account/connections` and each agent token on `/account/api-tokens`, through `connections.toolCalls`. It takes a grant or a token id and answers not-found for one that is not theirs | Their agent, their record, on the screens that already show its last use |
-| D15 | **An admin with `full` sees totals** on the S-37 usage card: calls and refusals in the last 30 days and the five busiest tools, through `ai.readToolCallSummary`. No member is named | Another member's list is A4's question, which needs its own access design. Totals answer "are agents used, and refused" |
+| D15 | **An admin with `full` sees totals** on the S-37 usage card: calls and refusals in the last 30 days and the five busiest tools, through `ai.readToolCallSummary`. No member is named for external agents. **Changed in 0.9.0 (L3):** the same card lists the copilot's latest reads with the member, tool, outcome and time (see "The copilot's reads" below) | Another member's list is A4's question, which needs its own access design. Totals answer "are agents used, and refused" |
 | D16 | Writes and scope refusals stay in the audit log screen | Unchanged, and A3 adds the refusals |
-| D17 | Personal export: exported as "Calls your connected agents made". Erasure deletes the member's rows first and counts them in `removed.agentToolCalls` | A record of what somebody's agent read is about them. Their writes stay attributable in the audit trail, as for every erasure |
+| D17 | Personal export: exported as "Calls your connected agents and the copilot made" (the label was "Calls your connected agents made" until 0.9.0). Erasure deletes the member's rows first and counts them in `removed.agentToolCalls` | A record of what somebody's agent read is about them. Their writes stay attributable in the audit trail, as for every erasure |
 | D18 | Workspace archive: excluded | It names grants and tokens the receiving instance does not have, the reason `mcp_sessions` is excluded |
 | D19 | Importer: no legacy source | Nothing in FlowyTeam or a spreadsheet records an agent's call to this instance |
 
@@ -54,7 +54,7 @@ One migration, the next free number (0151 when this was written), with its polic
 | `member_id` | `uuid not null`, references `workspace_members` | Whom the agent acted as |
 | `grant_id` | `uuid`, references `oauth_grants` on delete cascade | A hosted agent |
 | `token_id` | `uuid`, references `api_tokens` on delete cascade | A local agent |
-| `source` | `text not null default 'mcp'`, checked in `('mcp')` | Widened, as migration 0073 widened a check, when the copilot or agent runs record here |
+| `source` | `text not null default 'mcp'`, checked in `('mcp', 'copilot')` | Widened by migration 0169 (0.9.0, L3) for the copilot. Agent runs still record in `agent_runs` |
 | `tool` | `text` | The catalogue's name. Null for a tool this server does not have: that text is the agent's, and is not kept |
 | `scope` | `text`, checked in `read`, `write`, `destructive` | What the tool needed at the time. Null with `tool` |
 | `outcome` | `text not null`, checked against §2.1 | |
@@ -63,7 +63,7 @@ One migration, the next free number (0151 when this was written), with its polic
 | `duration_ms` | `integer not null` | Around the dispatch |
 | `called_at` | `timestamptz not null default now()` | |
 
-- `check ((grant_id is null) <> (token_id is null))`: exactly one connection. Revisited when `source` widens.
+- Exactly one connection for an agent row, none for a copilot row. Until 0.9.0: `check ((grant_id is null) <> (token_id is null))`. Migration 0169 makes it `check ((source = 'mcp' and (grant_id is null) <> (token_id is null)) or (source = 'copilot' and grant_id is null and token_id is null))`.
 - `-- openokr:hard-delete:` with its reason: retention removes rows and nothing restores them.
 - `enable` and `force row level security`, and the `tenant_isolation` policy every table has, in the same migration.
 - Indexes on `(workspace_id, member_id, called_at desc)` for the member's list and `(workspace_id, called_at)` for the sweep and the totals.
@@ -139,9 +139,24 @@ One migration, the next free number (0151 when this was written), with its polic
 
 ## 8. What this does not do
 
-- It does not record the copilot's or an agent run's tool calls. `agent_runs` keeps its own log; `source` is where they would join.
+- It does not record an agent run's tool calls. `agent_runs` keeps its own log. (The copilot's reads are recorded since 0.9.0: next section.)
 - It does not record REST or command-line calls. A token's last use stays the only trace of a read there.
-- It does not show an admin another member's calls. That is A4.
+- It does not show an admin another member's agent calls. That is A4. It does show the copilot's reads with the member (next section).
 - It does not price, cap or budget agent calls. `ai_budgets` is not consulted.
 - It keeps no arguments, so no call can be replayed from it.
 - It adds no command for `OPENOKR_SCHEDULER=off`. Rows are kept until a scheduler runs.
+
+## 9. The copilot's reads (plan 0.9.0 L3)
+
+Designed in [copilot-live-data.md](copilot-live-data.md) 3.6, decision D6, approved by Akmal on 11 November 2026. The owner decided on 12 November 2026 that an administrator sees each read with the member, which changes D15's "no member is named" for this source only.
+
+| Question | Answer |
+|---|---|
+| What is recorded | One row for every read the copilot's loop makes, `source = 'copilot'`, `scope = 'read'`, the asking member, and neither a grant nor a token. The tool, the outcome (same vocabulary as §2.1), the refusal code and the duration. `target_ids` holds the one record a single-record read opened, and is empty for a list or a search |
+| What is never recorded | The same as §1 D2: no argument the model sent, no result text, no refusal sentence. A tool name the model made up is stored as null, as an unknown agent tool is |
+| Why the administrator sees the member | The copilot reads as a person, so who it read for is the question an administrator asks. Reads are listed with the tool and the outcome, not with what was asked or returned |
+| Written how | The same way as an agent call (D5, D6, D7): outside the Operation pipeline, one insert in its own transaction, a failed insert counted in `openokr_agent_tool_call_record_failures_total` and never changing the answer |
+| Tied to an answer how | By nothing in the row (decision W2-Q: no new column). `copilot.thread` counts, for each answer, the member's copilot rows from the time its question was recorded to the last time the answer's own row was written. A run still in flight ends its window at the next question in the same thread. Only rows with a tool count (a name the model made up is stored as null), as the live line labels only known tools. Two questions one member runs at the same moment in two threads share a window and so share a count. Known limit: `called_at` is set by the database and `run_completed_at` and `updated_at` by the app server, so a few seconds of clock skew can drop the last read |
+| Where an administrator sees it | The agent calls card on S-37 (`ai.readToolCallSummary`): the 30-day count and refusals, and the latest 20 reads with member, tool, outcome and time. External agents' totals no longer include copilot rows |
+| Retention | The same `agentToolCallRetentionDays` (90 days by default) and the same sweep, because the sweep deletes by age and does not look at `source`. After the window an old answer's read line disappears, because it is rebuilt from these rows |
+| Export, erasure, archive | Export: the one "Calls your connected agents and the copilot made" label covers both, by `member_id`. Erasure deletes by member, so a copilot row goes with the member, counted in `removed.agentToolCalls`. Archive: still excluded |

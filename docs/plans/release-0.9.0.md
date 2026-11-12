@@ -267,9 +267,9 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | Row | Status | Note |
 |---|---|---|
 | L4 | done | Design approved 11 November 2026. L4a, L4b and L4c committed. L4c keeps the value it recorded and refuses an undo when the period was edited since, and refuses a check-in's undo once a newer one exists. Follow-ups from its review: the status words in an edit's preview (`To do`, `Done`, `(empty)`) are stored in English, so a Malay reader sees them untranslated, and so are the check-in status words (`On track`, `Caution`, `Off track`); store the raw values and translate on the card. The reason a person types is saved in the payload but not shown on the applied card. Follow-up from L4b: a webhook event for a removed KPI value, not in 0.9.0 |
-| L1 | to do | |
-| L2 | done | L2a (the read tools) and L2b (the loop and the panel) done, uncommitted until Agung approves. L3 (recording the reads) is still to do, so the "Searched, read N" line is live only. A check-in citation is not linked yet: it has no page and a citation carries no objective id (CP5) |
-| L3 | to do | |
+| L1 | done | The port: tool-call turns in every driver. Committed |
+| L2 | done | L2a (the read tools) and L2b (the loop and the panel) done, uncommitted until Agung approves. L3 (recording the reads) is done below, so the "Searched, read N" line survives a reload. A check-in citation is not linked yet: it has no page and a citation carries no objective id (CP5) |
+| L3 | done | Migration 0169 (source `copilot`, one-connection check widened). Every read the loop makes is a row: `recordCopilotRead`. `copilot.thread` returns `readCount` per answer, rebuilt from the member and the time (no new column, W2-Q); the panel shows the line after a reload. Admin, AI lists each copilot read with the member, tool, outcome and time. Uncommitted until Agung approves. Known limit: two questions one member runs at the same moment in two threads share a count. `pnpm db:lint` fails on `read-tools.ts:537` (`from(workspaceMembers)` without a soft-delete scope), which L2a added |
 | L5 | to do | |
 | L6 | to do | |
 | L7b | to do | |

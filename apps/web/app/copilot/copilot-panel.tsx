@@ -1186,6 +1186,7 @@ export function CopilotPanel({
                                 citations={answer?.citations ?? []}
                                 kept={extra}
                                 cards={cardsFor(turn.proposals)}
+                                readCount={answer?.readCount ?? 0}
                                 copyText={
                                   !live &&
                                   answer &&

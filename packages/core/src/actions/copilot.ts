@@ -27,10 +27,11 @@ import {
   activeOnly,
   aiMessages,
   aiThreads,
+  aiToolCalls,
   withContext,
   workspaceMembers,
 } from "@openokr/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
@@ -809,8 +810,72 @@ const messageOutput = z.object({
   running: z.boolean(),
   /** Why the run stopped early, in words for the reader. Null when it did not. */
   haltedReason: z.string().nullable(),
+  /**
+   * How many live reads the copilot made for this answer, rebuilt from the
+   * record of its reads (plan 0.9.0 L3, decision W2-Q). 0 for a member's
+   * question, for an answer that read nothing and for one written before
+   * reads were recorded.
+   */
+  readCount: z.number().int(),
   createdAt: z.string(),
 });
+
+/**
+ * How many reads fall inside each answer's window.
+ *
+ * **No column ties a read to an answer** (decision W2-Q: no new column), so
+ * the answer's window is what the rows already say: from the question the
+ * answer follows to the last time the answer's own row was written. A read
+ * recorded in between, by this member, is the answer's. A run still in flight
+ * ends at the next question in the thread, or has no end when it is the last. Two questions this member has running at the same moment, in
+ * two threads, share a window and so share a count; the count is a line under
+ * an answer and never a decision.
+ *
+ * The question is found by time, not by its place in the list: a background
+ * run's question and its empty answer are written in one transaction and so
+ * carry the same `created_at`, and the list breaks that tie by id.
+ */
+function readsPerAnswer(
+  rows: readonly {
+    readonly role: string;
+    readonly createdAt: Date;
+    readonly updatedAt: Date;
+    readonly runCompletedAt: Date | null;
+    readonly stoppedAt: Date | null;
+    readonly running: boolean;
+  }[],
+  calledAt: readonly Date[],
+): number[] {
+  const asked = rows
+    .filter((row) => row.role === "member")
+    .map((row) => row.createdAt.getTime())
+    .sort((a, b) => a - b);
+  return rows.map((row) => {
+    if (row.role === "member") {
+      return 0;
+    }
+    // The latest question at or before this answer was written.
+    const before = asked.filter((at) => at <= row.createdAt.getTime());
+    if (before.length === 0) {
+      return 0;
+    }
+    const from = Math.max(...before);
+    // A run still in flight ends at the next question in this thread, so a
+    // process that died mid-run cannot claim every later read the member
+    // makes. Only the last answer has no end.
+    const next = asked.find((at) => at > from);
+    const to = row.running
+      ? (next ?? Number.POSITIVE_INFINITY)
+      : Math.max(
+          row.createdAt.getTime(),
+          row.updatedAt.getTime(),
+          row.runCompletedAt?.getTime() ?? 0,
+          row.stoppedAt?.getTime() ?? 0,
+        );
+    return calledAt.filter((at) => at.getTime() >= from && at.getTime() <= to)
+      .length;
+  });
+}
 
 /** One conversation, with its citations resolved against the reader's access now. */
 export const readThread = defineReadAction({
@@ -855,6 +920,7 @@ export const readThread = defineReadAction({
             runCompletedAt: aiMessages.runCompletedAt,
             runHaltedReason: aiMessages.runHaltedReason,
             createdAt: aiMessages.createdAt,
+            updatedAt: aiMessages.updatedAt,
           })
           .from(aiMessages)
           .where(
@@ -866,8 +932,42 @@ export const readThread = defineReadAction({
           )
           .orderBy(aiMessages.createdAt, aiMessages.id);
 
+        // This member's recorded reads since the conversation began, which
+        // the answers' windows are counted from (plan 0.9.0 L3).
+        const first = rows[0]?.createdAt;
+        const recorded = first
+          ? await tx
+              .select({ calledAt: aiToolCalls.calledAt })
+              .from(aiToolCalls)
+              .where(
+                and(
+                  eq(aiToolCalls.workspaceId, context.workspaceId),
+                  eq(aiToolCalls.memberId, memberId),
+                  eq(aiToolCalls.source, "copilot"),
+                  // Only the copilot's own tools, as the live line labels
+                  // only those: an unknown tool's row has a null tool.
+                  isNotNull(aiToolCalls.tool),
+                  gte(aiToolCalls.calledAt, first),
+                ),
+              )
+          : [];
+        const readCounts = readsPerAnswer(
+          rows.map((row) => ({
+            role: row.role,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+            runCompletedAt: row.runCompletedAt,
+            stoppedAt: row.stoppedAt,
+            running:
+              row.runStartedAt !== null &&
+              row.runCompletedAt === null &&
+              row.stoppedAt === null,
+          })),
+          recorded.map((call) => call.calledAt),
+        );
+
         const messages = [];
-        for (const row of rows) {
+        for (const [index, row] of rows.entries()) {
           messages.push({
             id: row.id,
             role: row.role,
@@ -889,6 +989,7 @@ export const readThread = defineReadAction({
               row.runCompletedAt === null &&
               row.stoppedAt === null,
             haltedReason: row.runHaltedReason,
+            readCount: readCounts[index] ?? 0,
             createdAt: row.createdAt.toISOString(),
           });
         }

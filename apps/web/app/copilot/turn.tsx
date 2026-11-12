@@ -25,7 +25,7 @@ import {
 import { Copy, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { StepLine, StepSummary } from "./step-line";
+import { ReadCountLine, StepLine, StepSummary } from "./step-line";
 
 export interface Citation {
   readonly entityType: string;
@@ -45,6 +45,8 @@ export interface Message {
   readonly running?: boolean;
   /** Why the run stopped early, in words. Null when it did not. */
   readonly haltedReason?: string | null;
+  /** How many live reads the answer rests on, from the record of them (L3). */
+  readonly readCount?: number;
   readonly createdAt: string;
 }
 
@@ -226,6 +228,7 @@ export function AssistantTurn({
   citations,
   kept,
   cards,
+  readCount = 0,
   copyText = null,
   onRetry = null,
   retryDisabled = false,
@@ -246,6 +249,8 @@ export function AssistantTurn({
   /** The passages and reason kept for this question with AI off (CP8). */
   readonly kept: Kept | null;
   readonly cards: ReactNode;
+  /** The reads behind a recorded answer, for the line after a reload (L3). */
+  readonly readCount?: number;
   /** The finished answer, offered to Copy (plan 0.8.1 CP7). */
   readonly copyText?: string | null;
   /** Asks the same question again, on the last answer when it fell short. */
@@ -284,6 +289,8 @@ export function AssistantTurn({
       ) : null}
       {text !== "" && steps && steps.length > 0 ? (
         <StepSummary steps={steps} />
+      ) : text !== "" && !arriving ? (
+        <ReadCountLine count={readCount} />
       ) : null}
       {text === "" ? null : (
         // The subset of formatting the copilot writes, drawn as elements

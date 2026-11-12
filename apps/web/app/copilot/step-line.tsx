@@ -12,7 +12,8 @@
  * **It folds once words arrive.** The answer is what the reader came for, so
  * the steps become one quiet line above it, a disclosure listing each with a
  * check, closed by default. Live only: the run's steps are not stored (plan
- * 0.8.1 W2-Q), so after a reload the sources and the card say the same.
+ * 0.8.1 W2-Q), so after a reload the sources and the card say the same, and
+ * the count of reads comes back as `ReadCountLine` (plan 0.9.0 L3).
  *
  * **Motion.** A slow shimmer across the working line while motion is allowed;
  * under reduced motion it is plain text (UIUX-PLAN §2).
@@ -84,6 +85,26 @@ export function StepLine({ steps }: { readonly steps: readonly Step[] }) {
   return (
     <p className="copilot-shimmer text-sm text-ink-3">
       {t("copilot.copilotPanel.step.working", { step: stepWords(step, t) })}
+    </p>
+  );
+}
+
+/**
+ * The same quiet line after a reload, when the steps are gone and only the
+ * count of reads is left (plan 0.9.0 L3, W2-Q): the count is rebuilt from the
+ * record of the copilot's reads, so the line says what it did without listing
+ * each read.
+ */
+export function ReadCountLine({ count }: { readonly count: number }) {
+  const { t } = useTranslations();
+  if (count <= 0) {
+    return null;
+  }
+  return (
+    <p className="text-xs text-ink-3">
+      {count === 1
+        ? t("copilot.copilotPanel.step.summaryReadOne", { count })
+        : t("copilot.copilotPanel.step.summaryReadOther", { count })}
     </p>
   );
 }

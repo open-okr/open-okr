@@ -151,9 +151,12 @@ export async function sweepPersonalData(
     )
     .returning({ id: channelMessages.id });
 
-  // The record of what the member's agents did (agent-tool-calls.md D17),
-  // first, by member: deleting the tokens and grants below would cascade to
-  // most of it, but uncounted, and a count is the evidence the member gets.
+  // The record of what the member's agents did (agent-tool-calls.md D17) and
+  // of what the copilot read for them (plan 0.9.0 L3), first, by member: the
+  // copilot's rows have no token or grant to cascade from, so this delete is
+  // the only thing that removes them. Deleting the tokens and grants below
+  // would cascade to the agents' rows, but uncounted, and a count is the
+  // evidence the member gets.
   // openokr:allow-mutation: the calling Operation's own transaction.
   const toolCalls = await tx
     .delete(aiToolCalls)

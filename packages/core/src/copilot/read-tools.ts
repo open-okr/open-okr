@@ -22,11 +22,12 @@
  * model about it is `TOOL_RESULTS_ARE_DATA`.
  */
 import {
+  activeOnly,
   type ToolCallOutcome,
   withWorkspace,
   workspaceMembers,
 } from "@openokr/db";
-import { and, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { ZodError } from "zod";
 import { askingMemberId } from "../actions/copilot.ts";
@@ -536,7 +537,8 @@ async function lookupNames(
             .select({ id: workspaceMembers.id, name: workspaceMembers.name })
             .from(workspaceMembers)
             .where(
-              and(
+              activeOnly(
+                workspaceMembers,
                 eq(workspaceMembers.workspaceId, context.workspaceId),
                 inArray(workspaceMembers.id, [...memberIds]),
               ),

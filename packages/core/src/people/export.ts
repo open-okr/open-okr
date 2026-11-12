@@ -111,10 +111,12 @@ export const EXPORT_MANIFEST: readonly ExportTable[] = [
   },
   {
     // Plan 0.7.0 A2 (agent-tool-calls.md D17): a record of what somebody's
-    // agent did is about them. Tool, outcome and ids only; no argument text.
+    // agent did is about them. Plan 0.9.0 L3 adds the copilot's reads, kept
+    // as the member's own (copilot-live-data.md 3.6), so the same member
+    // column covers them. Tool, outcome and ids only; no argument text.
     table: "ai_tool_calls",
     column: "member_id",
-    label: "Calls your connected agents made",
+    label: "Calls your connected agents and the copilot made",
   },
   {
     table: "api_tokens",

@@ -32,6 +32,7 @@ import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import type { AnswerSource, CopilotStep, Prepared } from "./answer.ts";
 import { isCitableType } from "./citations.ts";
+import { recordCopilotRead } from "./read-record.ts";
 import {
   COPILOT_READS,
   createRefTable,
@@ -187,6 +188,13 @@ export async function* readLiveData(
 
   const read = async (name: string, args: unknown): Promise<string> => {
     const result = await runRead(context, refs, name, args);
+    // Every read, including a refused or unknown one, is written down as the
+    // member's (design 3.6). Never in the way of the answer.
+    await recordCopilotRead(context.pool, {
+      workspaceId: context.workspaceId,
+      memberId,
+      result,
+    });
     collectSegments(result.text, segments);
     if ((COPILOT_READS as readonly string[]).includes(name)) {
       const label = SINGLE_RECORD_TOOLS.has(name)

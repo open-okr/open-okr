@@ -665,6 +665,10 @@ export default async function AdminAIPage() {
       {/* Plan 0.7.0 A2: external agents' calls, totals only. */}
       <AgentCallsCard
         summary={await callAction(context, "ai.readToolCallSummary", {})}
+        timeZone={String(
+          (await callAction(context, "settings.readForMember", {})).settings
+            .timezone ?? "UTC",
+        )}
       />
       <BudgetsCard
         budgets={budgets}
