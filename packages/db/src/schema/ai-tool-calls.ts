@@ -30,9 +30,7 @@ export type ToolCallOutcome = (typeof TOOL_CALL_OUTCOMES)[number];
  * token; `copilot` is the member's own copilot reading as them, with neither
  * (migration 0169, docs/design/copilot-live-data.md 3.6).
  */
-export const AI_TOOL_CALL_SOURCES = ["mcp", "copilot"] as const;
-
-export type AiToolCallSource = (typeof AI_TOOL_CALL_SOURCES)[number];
+const AI_TOOL_CALL_SOURCES = ["mcp", "copilot"] as const;
 
 export const aiToolCalls = pgTable("ai_tool_calls", {
   id: uuid("id").primaryKey().$defaultFn(newId),

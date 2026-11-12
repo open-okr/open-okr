@@ -60,14 +60,14 @@ export const COPILOT_READS = [
   "passages",
 ] as const;
 
-export type CopilotRead = (typeof COPILOT_READS)[number];
+type CopilotRead = (typeof COPILOT_READS)[number];
 
 /** Largest result sent back to the model, in characters (design 3.1). */
 export const MAX_RESULT_CHARS = 6000;
 
 /** The most rows a list tool may be asked for, and what it gives when not asked. */
-export const MAX_LIST_LIMIT = 50;
-export const DEFAULT_LIST_LIMIT = 25;
+const MAX_LIST_LIMIT = 50;
+const DEFAULT_LIST_LIMIT = 25;
 
 /** The most passages one search returns, which is what the answer path grounds on. */
 const MAX_PASSAGES = 10;
@@ -319,7 +319,7 @@ const isCopilotRead = (name: string): name is CopilotRead =>
 
 // ── The numbers ──────────────────────────────────────────────────────────
 
-export interface RefEntry {
+interface RefEntry {
   readonly ref: number;
   readonly entityType: string;
   readonly entityId: string;

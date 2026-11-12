@@ -58,6 +58,8 @@ const SAME_IN_MALAY: ReadonlySet<string> = new Set([
   "admin.ai.providerOllama",
   "admin.ai.providerOpenai",
   "admin.ai.providerOpenrouter",
+  // Only holes and punctuation: when, who and the outcome (plan 0.9.0 L3).
+  "admin.ai.agentCalls.copilotRead",
   "admin.sso.oidc",
   "admin.sso.saml2",
   "admin.sso.ssoForm.oidcOpenIdConnect",

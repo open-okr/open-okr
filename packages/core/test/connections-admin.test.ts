@@ -318,6 +318,7 @@ describe("reading the agent call record", () => {
         { tool: "cycles.list", calls: 2 },
         { tool: "goals.read", calls: 1 },
       ],
+      copilot: { calls: 0, recent: [], refused: 0 },
     });
     expect(JSON.stringify(summary)).not.toContain(memberId);
   });
