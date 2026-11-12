@@ -173,7 +173,7 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 | Production's AI models | Akmal | If `ai.deployment.tierModels` is set there, it did not move to Luna with 0.8.1 |
 | Lock the origin to Cloudflare with a secret header, then read `cf-connecting-ip` | Me, then Akmal | Carried from 0.8.1 |
 | A clean Compose install from the quickstart, and a Compose upgrade from 0.8.1 with data in it | Me | The after-release checks the release skill leaves undone |
-| okrgoal.com: the 12 rows of `docs/site-changes-2026-11-03.md` marked "Next release" | The site session | Check each against 0.8.0, 0.8.1 and 0.9.0 |
+| okrgoal.com: the 12 rows of `docs/site-changes-2026-11-03.md` marked "Next release" | Done | Each checked against v0.8.1 and applied on 12 November 2026 (okr-goal `95fdd6d`), live the same minute |
 | Remove the 0.8.1 build worktree and branch (`open-okr-release-0.8.1`, `release-0.8.1`) | Me | Merged as #212 |
 | Remove the other stale local worktrees and branches | Me | Worktrees `open-okr-copilot-combined`, `open-okr-input-pack`, `open-okr-plan-0.8.1` and `open-okr-resend-invite`, all merged or superseded. Branches: 29 `worktree-agent-*` from the September completeness review, whose rows reached `main` by pull request under other commits; the release, phase and October fix branches already merged; and `docs/site-copy-2026-11-03`, whose brief now lives in the okr-goal repository. Local only, and each checked against `main` before it goes. G5's and G7's branches stay until their rows land |
 | Delete two stale remote branches | Akmal's call | `origin/obed` (29 September, superseded) and `origin/backup/pre-signoff-2026-08-18`. Deleting a branch on GitHub cannot be undone from here |
