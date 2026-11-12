@@ -178,7 +178,11 @@ async function streamAnswer(
     label: one[2] ?? "",
     content: (one[3] ?? "").replace(/\s+/g, " ").trim(),
   }));
-  const keyResult = passages.find((one) => one.label === KR_TITLE);
+  // The goals list shows this member's own key result too, so the secret
+  // question must be answered as not found whatever the passages hold.
+  const keyResult = prompt.includes("secret restructuring")
+    ? undefined
+    : passages.find((one) => one.label === KR_TITLE);
   const text = keyResult
     ? `${keyResult.content} [${keyResult.index}]\nSOURCES: ${keyResult.index}`
     : "I could not find that objective, so I cannot say how it is doing.\nSOURCES: none";
