@@ -9514,6 +9514,23 @@
       "pages": false
     },
     {
+      "name": "kpis deleteRecord",
+      "action": "kpis.deleteRecord",
+      "method": "POST",
+      "path": "/kpis/deleteRecord",
+      "scope": "destructive",
+      "summary": "Removes one period's value from a KPI. Recording the same period again brings it back.",
+      "flags": [
+        {
+          "name": "id",
+          "field": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "pages": false
+    },
+    {
       "name": "kpis grid",
       "action": "kpis.grid",
       "method": "GET",

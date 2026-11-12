@@ -307,7 +307,7 @@ a task are left as they are, because the role already reaches them there.
 | Domain | Actions |
 |---|---|
 | comment | `comments.create`, `comments.update`, `reactions.add` |
-| kpi | `kpis.create`, `kpis.createCategory`, `kpis.createTree`, `kpis.record`, `kpis.update`, `kpis.setFormula`, `kpis.launchRecovery`, `kpis.recordResponse` |
+| kpi | `kpis.create`, `kpis.createCategory`, `kpis.createTree`, `kpis.record`, `kpis.deleteRecord`, `kpis.update`, `kpis.setFormula`, `kpis.launchRecovery`, `kpis.recordResponse` |
 | initiative | `initiatives.create`, `initiatives.linkKeyResult`, `initiatives.unlinkKeyResult` |
 | Unchanged (self-service on the workspace) | `people.updateOwnProfile`, `people.setLeave`, `people.finishOwnTour`, `notifications.*`, `subscriptions.toggle`, `tokens.*`, `connections.revoke`, `ai.setPersonalCredential`, `ai.removePersonalCredential`, `channels.*Link*`, `nudges.snooze`, `copilot.*`, `invitations.acceptLink`, `invitations.joinByTrustedDomain` |
 

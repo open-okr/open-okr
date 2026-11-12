@@ -135,6 +135,8 @@ While reads run, the answer area shows what is being read in words ("Reading New
 | **Move a task** | `tasks.move` | Status | `tasks.move` back |
 | **Change an initiative's status** | `initiatives.update` | Status | `initiatives.update` back |
 
+The undo for a new KPI period is `kpis.deleteRecord` (kpi-engine.md §12). Deletes stay unproposable, and this one exists for undo only: it is off the agent surface and never a proposable action.
+
 Not proposable, on purpose: any delete, anything about people, roles, access, settings, cycles or agents. A copilot that may propose `people.erase` is one a person cannot trust with the apply button.
 
 The model still picks what to change by number from a list, never by identifier. Today the lists are every space, objective and key result the member may edit. With reads, the list for an edit is what the run read and the member may edit, so "move the checklist task to done" points at the task the run just read.

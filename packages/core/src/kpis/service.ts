@@ -6,6 +6,7 @@ import {
   kpiRecords,
   kpis,
   newId,
+  softDeleteRows,
   tasks,
   type WorkspaceTx,
 } from "@openokr/db";
@@ -25,7 +26,16 @@ import {
   shouldProposeRecoveryClose,
   targetTypeOfDirection,
 } from "@openokr/method";
-import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  or,
+  type SQL,
+} from "drizzle-orm";
 import { visibleResourceIds } from "../access/reads.ts";
 import { resolveRhythm } from "../cycles/rhythm.ts";
 import { readRhythmRow } from "../cycles/service.ts";
@@ -444,6 +454,69 @@ export async function upsertKpiRecord(
     periodStart,
     created: row?.id === id,
   };
+}
+
+export interface SoftDeletedKpiRecord {
+  readonly id: string;
+  readonly kpiId: string;
+  readonly periodStart: string;
+  readonly isCalculated: boolean;
+}
+
+/**
+ * Soft-deletes one live period record, the inverse of `upsertKpiRecord`.
+ *
+ * Returns what the caller needs to recompute, or null when the record is
+ * missing or already deleted. A calculated KPI's record is returned without
+ * being deleted: the caller refuses it, and a refusal must leave the row alone.
+ * The row stays in place with `deleted_at` set, so recording the same period
+ * again revives it through the upsert's conflict path rather than inserting.
+ */
+export async function softDeleteKpiRecord(
+  tx: OperationTx,
+  workspaceId: string,
+  recordId: string,
+): Promise<SoftDeletedKpiRecord | null> {
+  const [row] = await tx
+    .select({
+      id: kpiRecords.id,
+      kpiId: kpiRecords.kpiId,
+      periodStart: kpiRecords.periodStart,
+      isCalculated: kpis.isCalculated,
+    })
+    .from(kpiRecords)
+    .innerJoin(kpis, eq(kpis.id, kpiRecords.kpiId))
+    .where(
+      activeOnly(
+        kpiRecords,
+        eq(kpiRecords.workspaceId, workspaceId),
+        eq(kpiRecords.id, recordId),
+        isNull(kpis.deletedAt),
+      ),
+    )
+    .limit(1);
+  if (!row) {
+    return null;
+  }
+  const found: SoftDeletedKpiRecord = {
+    id: row.id,
+    kpiId: row.kpiId,
+    periodStart: String(row.periodStart),
+    isCalculated: row.isCalculated,
+  };
+  if (found.isCalculated) {
+    return found;
+  }
+  // openokr:allow-mutation: the calling Operation's own transaction.
+  await softDeleteRows(
+    tx,
+    kpiRecords,
+    and(
+      eq(kpiRecords.workspaceId, workspaceId),
+      eq(kpiRecords.id, recordId),
+    ) as SQL,
+  );
+  return found;
 }
 
 export interface KpiReading {

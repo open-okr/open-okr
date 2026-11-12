@@ -544,6 +544,8 @@ export const ACTIVITY_RENDERERS: Record<ActivityKind, ActivityRenderer> = {
     p.created
       ? `A value was recorded for the period beginning ${String(p.periodStart ?? "")}`
       : `The value for the period beginning ${String(p.periodStart ?? "")} was updated`,
+  "kpi.value_removed": (p) =>
+    `The value for the period beginning ${String(p.periodStart ?? "")} was removed`,
   "kpi.formula_set": (p) =>
     `A KPI became calculated from ${Number(p.references ?? 0)} other measure(s)`,
   "kpi.tree_created": (p) => `A KPI tree "${String(p.name ?? "")}" was named`,

@@ -230,6 +230,7 @@ describe("writes below full", () => {
       "kpis.createCategory": "kpi",
       "kpis.createTree": "kpi",
       "kpis.launchRecovery": "kpi",
+      "kpis.deleteRecord": "kpi",
       "kpis.record": "kpi",
       "kpis.recordResponse": "kpi",
       "kpis.setFormula": "kpi",

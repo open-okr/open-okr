@@ -637,6 +637,9 @@ export const ACTIVITY_PAYLOAD_SCHEMAS = {
     periodStart: z.string(),
     created: z.boolean(),
   }),
+  // Undo of a value the copilot recorded for a period that had none. Not a
+  // webhook event: absent from the route table, so nothing is sent.
+  "kpi.value_removed": z.object({ periodStart: z.string() }),
   "kpi.formula_set": z.object({ references: z.number().int() }),
   // The recovery loop (P3-T14). Launching one is a commitment by the team, so
   // it belongs in the feed beside the objectives it creates.
