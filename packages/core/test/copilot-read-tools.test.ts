@@ -247,6 +247,53 @@ describe("numbered refs", () => {
     expect(listed.text).not.toMatch(UUID);
   });
 
+  it("names each goal's cycle and shows the active cycle's goals first", async () => {
+    // The older cycle is created first so the action's own order puts it
+    // first. Its goal is made before the cycle is closed, because a closed
+    // cycle takes no new goals.
+    const year = (await call("cycles.create", {
+      on: `${new Date().getUTCFullYear()}-06-30`,
+      mode: "annual",
+    })) as { id: string };
+    await call("goals.create", {
+      title: "Past year objective",
+      cycleId: year.id,
+      level: "company",
+      ownerKind: "workspace",
+      championId: priyaMemberId,
+      reviewerId: priyaMemberId,
+      weight: 1,
+    });
+    await createGoal("Current quarter objective");
+    const wb = await workerDb();
+    await wb.admin.query(`update cycles set status = 'closed' where id = $1`, [
+      year.id,
+    ]);
+    // A fresh quarter starts in planning, which is not the cycle in play.
+    await wb.admin.query(`update cycles set status = 'active' where id = $1`, [
+      cycleId,
+    ]);
+    const all = (await call("cycles.list", {})) as {
+      id: string;
+      name: string;
+      status: string;
+    }[];
+    const past = all.find((cycle) => cycle.id === year.id);
+    const current = all.find((cycle) => cycle.id === cycleId);
+
+    const listed = await read(createRefTable(), "goals.list", {});
+
+    expect(listed.text).toContain(`cycle: ${past?.name} (closed)`);
+    expect(listed.text).toContain(
+      `cycle: ${current?.name} (${current?.status})`,
+    );
+    expect(current?.status).toBe("active");
+    expect(listed.text.indexOf("Current quarter objective")).toBeLessThan(
+      listed.text.indexOf("Past year objective"),
+    );
+    expect(listed.text).not.toMatch(UUID);
+  });
+
   it("answers an invented ref without calling anything", async () => {
     const refs = createRefTable();
     const result = await read(refs, "goals.read", { id: 99 });

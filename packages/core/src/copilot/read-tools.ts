@@ -470,6 +470,10 @@ const MEMBER_KEYS = new Set([
 interface Names {
   readonly members: ReadonlyMap<string, string>;
   readonly spaces: ReadonlyMap<string, string>;
+  readonly cycles: ReadonlyMap<
+    string,
+    { readonly name: string; readonly status: string }
+  >;
 }
 
 /** The ids of people and spaces an output names without naming, so one query can name them. */
@@ -477,10 +481,11 @@ function collectIds(
   node: unknown,
   members: Set<string>,
   spaceIds: Set<string>,
+  cycleIds: Set<string>,
 ): void {
   if (Array.isArray(node)) {
     for (const item of node) {
-      collectIds(item, members, spaceIds);
+      collectIds(item, members, spaceIds, cycleIds);
     }
     return;
   }
@@ -492,8 +497,10 @@ function collectIds(
       members.add(value);
     } else if (key === "spaceId" && isUuid(value)) {
       spaceIds.add(value);
+    } else if (key === "cycleId" && isUuid(value)) {
+      cycleIds.add(value);
     } else {
-      collectIds(value, members, spaceIds);
+      collectIds(value, members, spaceIds, cycleIds);
     }
   }
 }
@@ -505,11 +512,13 @@ async function lookupNames(
 ): Promise<Names> {
   const memberIds = new Set<string>();
   const spaceIds = new Set<string>();
-  collectIds(output, memberIds, spaceIds);
+  const cycleIds = new Set<string>();
+  collectIds(output, memberIds, spaceIds, cycleIds);
   const members = new Map<string, string>();
   const spaceNames = new Map<string, string>();
-  if (memberIds.size === 0 && spaceIds.size === 0) {
-    return { members, spaces: spaceNames };
+  const cycleNames = new Map<string, { name: string; status: string }>();
+  if (memberIds.size === 0 && spaceIds.size === 0 && cycleIds.size === 0) {
+    return { members, spaces: spaceNames, cycles: cycleNames };
   }
   try {
     // Space names come from `spaces.list` as the member, not from the table:
@@ -523,6 +532,19 @@ async function lookupNames(
       for (const space of visible) {
         if (spaceIds.has(space.id)) {
           spaceNames.set(space.id, space.name);
+        }
+      }
+    }
+    // Cycles the same way: so the model can tell this quarter from a past one.
+    if (cycleIds.size > 0) {
+      const all = (await callAction(
+        { ...context, scopes: ["read"] },
+        "cycles.list",
+        {},
+      )) as { id: string; name: string; status: string }[];
+      for (const cycle of all) {
+        if (cycleIds.has(cycle.id)) {
+          cycleNames.set(cycle.id, { name: cycle.name, status: cycle.status });
         }
       }
     }
@@ -552,7 +574,7 @@ async function lookupNames(
   } catch {
     // Names are a convenience. The item is still shown without one.
   }
-  return { members, spaces: spaceNames };
+  return { members, spaces: spaceNames, cycles: cycleNames };
 }
 
 const scrub = (text: string): string => text.replace(UUID_ANYWHERE, "");
@@ -678,6 +700,11 @@ class Renderer {
       lines.push(`${pad}  space: ${space.entity.label} [${space.ref}]`);
     }
 
+    const cycle = this.cycleOf(obj);
+    if (cycle) {
+      lines.push(`${pad}  cycle: ${clip(cycle.name, 160)} (${cycle.status})`);
+    }
+
     for (const [key, value] of Object.entries(obj)) {
       if (SKIP_KEYS.has(key)) {
         continue;
@@ -718,6 +745,20 @@ class Renderer {
       this.entityBlocks(child.obj, child.kind, depth + 1, into);
     }
     return true;
+  }
+
+  /** The cycle an object belongs to, when `cycles.list` named it for this member. */
+  private cycleOf(
+    obj: JsonObject,
+  ): { readonly name: string; readonly status: string } | null {
+    return isUuid(obj.cycleId)
+      ? (this.names.cycles.get(obj.cycleId) ?? null)
+      : null;
+  }
+
+  /** Whether the object sits in the active cycle: what "this quarter" means. */
+  inActiveCycle(obj: JsonObject): boolean {
+    return this.cycleOf(obj)?.status === "active";
   }
 
   /** A space named by the object, as an entity of its own, when its name is known. */
@@ -877,16 +918,58 @@ function groupsOf(
       push(renderer.plainGroup(`${words(key)}: ${text}`));
     }
   }
-  for (const [key, value] of lists) {
+  // A plain list (records, links) follows the entity it belongs to and sits
+  // before any list of entities, so its lines do not read as the last entity's.
+  const rank = ([key, value]: [string, unknown]): number =>
+    ENTITY_OBJECTS[key] && isObject(value)
+      ? // A parent is a related entity, so it comes after the plain lists too.
+        key === "parent"
+        ? 2
+        : 0
+      : ENTITY_ARRAYS[key]
+        ? 2
+        : 1;
+  const ordered = lists
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => rank(a.entry) - rank(b.entry) || a.index - b.index)
+    .map(({ entry }) => entry);
+  for (const [key, value] of ordered) {
     const kind = ENTITY_ARRAYS[key] ?? ENTITY_OBJECTS[key];
-    const items = Array.isArray(value) ? value : [value];
+    let items = Array.isArray(value) ? value : [value];
+    if (tool === "goals.list" && key === "goals") {
+      // `goals.list` answers oldest cycles first. A cut at the size limit
+      // takes the tail, so the active cycle is read before past ones.
+      items = [
+        ...items.filter(
+          (item) => isObject(item) && renderer.inActiveCycle(item),
+        ),
+        ...items.filter(
+          (item) => !(isObject(item) && renderer.inActiveCycle(item)),
+        ),
+      ];
+    }
+    const shown: Group[] = [];
     for (const item of items) {
-      push(
+      const group =
         kind && isObject(item)
           ? (renderer.entityGroup(item, kind) ?? renderer.plainItem(item))
-          : renderer.plainItem(item),
-      );
+          : renderer.plainItem(item);
+      if (group) {
+        shown.push(group);
+      }
     }
+    const first = shown[0];
+    if (!kind && first) {
+      // The heading rides with the first line, so a cut cannot strand it.
+      shown[0] = {
+        ...first,
+        blocks: [
+          { text: `${words(key)}:`, size: first.mark, entities: [] },
+          ...first.blocks,
+        ],
+      };
+    }
+    groups.push(...shown);
   }
   return groups;
 }
@@ -1115,7 +1198,7 @@ export async function runRead(
         query,
         limit: Number(prepared.input.limit),
       });
-      names = { members: new Map(), spaces: new Map() };
+      names = { members: new Map(), spaces: new Map(), cycles: new Map() };
       groups = [];
       for (const hit of hits) {
         const label = clip(citationLabel(hit.content), 160);
