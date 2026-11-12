@@ -2,7 +2,7 @@
 
 Owner: Akmal. Started 12 November 2026, the day 0.8.1 was published and deployed to app, staging and demo.okrgoal.com, against `main` at `7e2b847b` (the v0.8.1 tag).
 
-Status: **draft**, waiting for Akmal's approval and the decisions in section 10.
+Status: **decided**. Akmal answered every question in section 10 on 12 November 2026, each as recommended except two: the acceptance test may be run by anyone (UAT-Q), and the input pack's access rule comes into this release (Q-4, row G8). Six rows start with a design that waits for its own "design approved": A4 (an addition to the copilot design), FB1, G1, G2, G3 and G8.
 
 A minor release. Its centre is the copilot reading live data: `docs/design/copilot-live-data.md`, approved by Akmal on 11 November 2026 ("design approved for all"), whose decision D9 put rows L1 to L6 and the tool loop's prompt (L7b) in 0.9.0. Today the copilot reads six passages from the search index, so it cannot say a key result's value, an objective's health or who owns a task. After 0.9.0 it reads through the product's own read actions, as the member asking, and it can propose five edits as well as four creates.
 
@@ -16,10 +16,10 @@ It holds nine things:
 2. **The copilot panel, the rest**: citation chips, reason codes, "Ask about this page", the panel's specification and mockup, and the first word arriving sooner. Section 2.
 3. **What 0.8.1 found**: three test and CI defects, the seed, the chart's notes. Section 3.
 4. **Security findings and dependencies**: one high and two medium CodeQL alerts, nine warnings, Better Auth. Section 4.
-5. **Owed from earlier releases**: a setup code to claim an instance, recent items in the command palette, API tokens on the agent connections screen, KPI sharing from FlowyTeam, the profiles' source links, the mockups, and the commit attribution setting. Section 5.
+5. **Owed from earlier releases**: a setup code to claim an instance, recent items in the command palette, API tokens on the agent connections screen, KPI sharing from FlowyTeam, the profiles' source links, the mockups, the commit attribution setting, who may change the input pack, OKRGoal's choices out of the public docs, and a fix left on Obed's branch. Section 5.
 6. **Upgrades**: the upgrade notes. Section 6.
 7. **Checks before the release**: the retests and browser checks carried from 0.8.1, a live copilot run, and an acceptance test. Section 7.
-8. **Outside the release**: operations on the three servers, the mail sender, the site and local clean-up. Section 8.
+8. **Outside the release**: operations on the three servers, three of them done at the 0.9.0 deployment, the mail sender, and clean-up. Section 8.
 9. **Left out on purpose**, and why. Section 9.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. Sizes are rough: **S** is under a day, **M** is a few days, **L** is a week or more.
@@ -59,20 +59,20 @@ From `docs/report/copilot-panel-review-0.8.1.md`, the rows its decision Q7 left 
 | CP10 | **Reasons as codes.** The server sends a reason code (AI off, no plan, capped, provider error, stopped partway) and the panel words it from the catalogue in English and Malay. Today some reasons reach a Malay reader in English | Review F15 | | S |
 | CP11 | **Ask about this page.** On an objective, key result, KPI, initiative or task page, the panel offers to ask about it. The panel sends only the page's entity id; the copilot reads it through L2's tools as the member, so nothing the member cannot see reaches the model. Decided in CP11-Q | Review F12 | L2 | M |
 | CP12 | **The panel's specification and mockup.** UIUX-PLAN S-39 describes the panel as 0.8.1 built it and 0.9.0 extends it. A new mockup, `docs/mockups/src/13-copilot.html`, with its PNG, shows the empty state, a streaming answer with the step line, an answer with citation chips and a card, and AI off. Neither landed in 0.8.1 | Review §4 | CP5 | S |
-| A4 | **The first word sooner.** On Luna the first word arrives six to ten seconds after the question, most of it the proposal call that A2 put first in 0.8.1. The step line explains the wait, but six seconds is slow next to ChatGPT and Claude. Decided in A4-Q | Live run, 12 November 2026 | L2 | M |
-| FB1 | **Thumbs up and down on an answer**, kept with the answer and read by L5's evaluation, so a poor answer becomes a fixture. A new table, so a short design first. Only if FB-Q says so | Review Q5 | L5 | M |
+| A4 | **The first word sooner.** On Luna the first word arrives six to ten seconds after the question, most of it the proposal call that A2 put first in 0.8.1. The step line explains the wait, but six seconds is slow next to ChatGPT and Claude. Decided in A4-Q: the proposal becomes one of the loop's tools. A short addition to `copilot-live-data.md` first, and "design approved" on it | Live run, 12 November 2026 | L2 | M |
+| FB1 | **Thumbs up and down on an answer**, kept with the answer and read by L5's evaluation, so a poor answer becomes a fixture. A new table, so a short design first. Decided in FB-Q: in 0.9.0 | Review Q5 | L5 | M |
 
-**A4-Q: how the first word comes sooner. Recommended: the proposal becomes a tool inside L2's loop.**
+**A4-Q: how the first word comes sooner. Decided by Akmal on 12 November 2026: the proposal becomes a tool inside L2's loop.**
 
 | Option | Cost | Outcome |
 |---|---|---|
-| **The proposal is one of the loop's tools.** The model calls "propose a change" when the question asks for one, in the same rounds as its reads | Changes the design's §4 path, so a short addition to `copilot-live-data.md` and "design approved". L5 needs a fixture for when it should and should not propose | **Recommended.** A question with no change in it pays nothing for proposals, and the answer still knows whether a card was made. This is how ChatGPT and Claude call their tools |
-| Ask for a proposal only when the question reads as a request, by a fixed word list | Small, deterministic | Misses requests worded as questions ("can you add a key result for…?"), and a word list in English fails Malay |
-| Run the proposal and the answer at the same time again | None | Undoes A2: the answer can again deny a card that is on screen |
+| **The proposal is one of the loop's tools.** The model calls "propose a change" when the question asks for one, in the same rounds as its reads | Changes the design's §4 path, so a short addition to `copilot-live-data.md` and "design approved". L5 needs a fixture for when it should and should not propose | **Chosen.** A question with no change in it pays nothing for proposals, and the answer still knows whether a card was made. This is how ChatGPT and Claude call their tools |
+| Ask for a proposal only when the question reads as a request, by a fixed word list | Small, deterministic | Not chosen. Misses requests worded as questions ("can you add a key result for…?"), and a word list in English fails Malay |
+| Run the proposal and the answer at the same time again | None | Not chosen. Undoes A2: the answer can again deny a card that is on screen |
 
-**CP11-Q: what "Ask about this page" sends. Recommended: the entity's id only.** The copilot reads it through its tools as the member. The alternative, the page's visible text, sends whatever is on screen, including what the copilot's own reads would have refused, and it goes stale.
+**CP11-Q: what "Ask about this page" sends. Decided by Akmal on 12 November 2026: the entity's id only.** The copilot reads it through its tools as the member. The alternative, the page's visible text, sends whatever is on screen, including what the copilot's own reads would have refused, and it goes stale.
 
-**FB-Q: thumbs up and down in 0.9.0? Recommended: yes, after L5, as the last copilot row.** It is a table, so it needs a short design: what is kept (the answer's id, the rating, an optional note), who can read it (the workspace's AI administrators, never other members), and how L5 turns it into fixtures. The alternative is a later release: the panel then has no way to say an answer was wrong.
+**FB-Q: thumbs up and down in 0.9.0? Decided by Akmal on 12 November 2026: yes, after L5, as the last copilot row.** It is a table, so it needs a short design: what is kept (the answer's id, the rating, an optional note), who can read it (the workspace's AI administrators, never other members), and how L5 turns it into fixtures.
 
 ## 3. What 0.8.1 found
 
@@ -104,7 +104,9 @@ Acceptance criteria:
 | C3 | Nine warnings and notes: trailing arguments, trivial conditionals, an unused variable, defensive code that cannot run | CodeQL, none a security finding | One tidy-up change | S |
 | P1 | Better Auth 1.7.18 to the newest 1.7 patch | Left out of 0.8.1 on purpose | Its own change: the lockfile, then the auth, SSO, SCIM and invitation suites and the sign-up and sign-in specs. Read its changelog for anything that touches sessions, email confirmation or the SSO callback | S |
 
-**C2-Q: fix `okr mcp`, or dismiss the two alerts as they are? Recommended: fix, then dismiss.** Today a profile edited to name another server sends it the token. The check is a few lines. Dismissing without it leaves the alerts right.
+**C2-Q: fix `okr mcp`, or dismiss the two alerts as they are? Decided by Akmal on 12 November 2026: fix, then dismiss.** Today a profile edited to name another server sends it the token. The check is a few lines. Dismissing without it would leave the alerts right.
+
+**P1-Q: upgrade Better Auth in 0.9.0? Decided by Akmal on 12 November 2026: yes, to the newest 1.7 patch.**
 
 ## 5. Owed from earlier releases
 
@@ -115,10 +117,13 @@ Work an earlier design or decision named "for a later release", or left on a loc
 | G1 | **A setup code to claim a new instance.** Today the first person to reach `/setup` owns the instance, and certificate transparency logs publish a new hostname within minutes. OKRGoal kept its new instances behind Cloudflare until claimed for this reason | `registration-policy.md`, H3-Q1: "not in 0.8.0; a row for a later release" (Akmal, 11 November 2026) | `./openokr up` and the Helm notes print a one-time code, and the setup wizard asks for it before the first account. The code is single use and stored hashed. An instance already claimed is unaffected | M | **Design first**: a new security mechanism |
 | G2 | **Recent items in the command palette and search.** Nothing records what a member opened, so the palette has no recents, recents do not lift the ranking, and the palette has no scoped tabs (the search page has them as type filters) | `work-layer.md`, "Not built, and still owed to UIUX-PLAN §3 and S-32" | A per-member record of recently opened objects, read by the palette's empty state and its ranking, and scoped tabs in the palette | M | **Design first**: a new table |
 | G3 | **API tokens for agents on the agent connections screen.** An agent can connect with an API token whose audience is `mcp`. Those tokens are not grants, so the admin screen does not list them, and an administrator cannot see or end one | `agent-connections-admin.md`, Q2: "list them in the same screen in a later change" | List them beside the grants. Ending one for somebody else records a reason, so its owner's page can say why it stopped | S | **Design first**: the reason needs a column on `api_tokens` |
-| G4 | **KPI sharing from FlowyTeam.** The importer does not read `indicator_accesses` (a member, `read` or `update`, a view option and a view frequency). Every run reports its rows as not imported | TECHNICAL-PLAN §7.2, completeness review M-16: "Pending a decision" since September | Decided in G4-Q. If imported: each row becomes a `kpi_shares` row (member and level), and the view option and frequency, which have no home, go in the import report by name | S | **Yours**: dropping or approximating source data is your decision (CLAUDE.md) |
-| G5 | **The Google-style and Radical Focus profiles link to their sources.** Built on 3 November 2026 on branch `feat/profile-source-links` and never opened as a pull request. The practice screen links the work each profile follows, and METHOD.md §12.2 carries the link, compared word for word by `method:check` | The branch, one commit, 13 files | Rebase onto `main`, run `pnpm method:check`, open the pull request | S | **Yours**: it changes METHOD.md (G5-Q) |
+| G4 | **KPI sharing from FlowyTeam.** The importer does not read `indicator_accesses` (a member, `read` or `update`, a view option and a view frequency). Every run reports its rows as not imported | TECHNICAL-PLAN §7.2, completeness review M-16: "Pending a decision" since September | Decided in G4-Q: import. Each row becomes a `kpi_shares` row (member and level), and the view option and frequency, which have no home, go in the import report by name. TECHNICAL-PLAN §7.2's two rows say so in the same change | S | None: decided |
+| G5 | **The Google-style and Radical Focus profiles link to their sources.** Built on 3 November 2026 on branch `feat/profile-source-links` and never opened as a pull request. The practice screen links the work each profile follows, and METHOD.md §12.2 carries the link, compared word for word by `method:check` | The branch, one commit, 13 files | Rebase onto `main`, run `pnpm method:check`, open the pull request | S | None: G5-Q allows the METHOD.md change |
 | G6 | **The reference mockups catch up.** Eleven still draw an agent as the gradient `.av.bot` circle: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10 and 12. `guided-inputs.md` also asks 03, 07, 08, 12 and 12b to be checked for the fields it changed | `agent-faces.md` (the reference mockups row), `guided-inputs.md` §6 | Redraw the agents' faces and any changed field, then render the PNGs. Docs only | S | None |
 | G7 | **The repository turns off the assistant's commit attribution.** CLAUDE.md forbids a co-author trailer or a generated-with line, but the assistant's own configuration still asks for one, and on 11 November 2026 a harness reminder did again. Branch `ci/no-assistant-attribution` (23 September 2026) added the switch to `.claude/settings.json` and never merged | The branch, one commit | Commit the project setting, under the name the current Claude Code release uses for it | S | None. No changeset: nothing a running instance does |
+| G8 | **Only the Owner, an Admin and the cycle's named facilitator may change the input pack.** Today any Member can mark an item gathered, write its note and press Confirm distribution | Obed's 0.8.0 acceptance test, Q-4. Akmal on 12 November 2026: in this release, limited to those three | `workflow.setPackItem` and Confirm distribution refuse anybody else, through the access check and not the screen alone. Everybody else sees the input pack read only, with a line naming who may change it | S | **Design first**: access |
+| G9 | **OKRGoal's own choices leave the public docs.** `docs/design/error-reporting.md` says OKRGoal uses Sentry (its E4 rows, §4's OKRGoal table with releases and the privacy line, Q3 and G3), and `docs/runbooks/observability.md` waits for "OKRGoal's project". Neither is true any more, and neither is the open-source product's business | Akmal on 12 November 2026: remove OKRGoal's choice entirely | Rewrite those passages for any operator: a tracker that speaks Sentry's protocol, how to point the instance at it. Keep the list of trackers checked by hand only for those actually checked; GlitchTip never was | S | None. Docs only |
+| G10 | **The channel messages list on Admin, Channels keys each row by its time and provider**, so two messages in the same millisecond from one provider share a key and React warns. Obed fixed it on 29 September on branch `origin/obed` and it never reached `main` | `origin/obed`, one commit, two lines | Key each row by the message's own id where it has one, otherwise as Obed's fix did. Then the branch can go | S | None |
 
 Acceptance criteria:
 
@@ -128,17 +133,19 @@ Acceptance criteria:
 | G1 | The same instance | The operator enters the code `up` printed | The wizard creates the owner, and the code no longer works |
 | G2 | Priya opened two objectives and a task today | She opens the command palette | The three are listed first, newest first, and only objects she may still read appear |
 | G3 | A member connected an agent with an `mcp` API token | An administrator opens the agent connections screen and ends it with a reason | The token stops working, and the member's own page says why |
-| G4 | A FlowyTeam source with KPI shares, and G4-Q answered "import" | A dry run of the importer | The report counts the shares it will write and names the view options and frequencies it cannot keep |
+| G4 | A FlowyTeam source with KPI shares | A dry run of the importer | The report counts the shares it will write and names the view options and frequencies it cannot keep |
+| G8 | A Member who is not the cycle's facilitator | They open the input pack, or call `workflow.setPackItem` through REST | The screen is read only and names who may change it; the call is refused |
+| G8 | The cycle's named facilitator, who is a Member | They mark an item gathered | It is saved |
 
-**G4-Q: import FlowyTeam's KPI shares? Recommended: yes, as `kpi_shares`, with the view option and frequency named in the report.** A member who could read or update a KPI in FlowyTeam keeps that access. Not importing leaves every shared KPI visible only to its owner after a migration.
+**G4-Q: import FlowyTeam's KPI shares? Decided by Akmal on 12 November 2026: yes, as `kpi_shares`, with the view option and frequency named in the report.** A member who could read or update a KPI in FlowyTeam keeps that access.
 
-**G5-Q: may the profiles' source links go into METHOD.md? Recommended: yes.** They add a link to two sources the method already names and change no rule.
+**G5-Q: may the profiles' source links go into METHOD.md? Decided by Akmal on 12 November 2026: yes.** They add a link to two sources the method already names and change no rule.
 
 ## 6. Upgrades
 
 | # | What | Change | Size |
 |---|---|---|---|
-| U1 | The upgrade notes for 0.9.0 | `docs/runbooks/upgrade.md`, "0.8 to 0.9": the two migrations (L3, L4) and that both are additive; any data change a row adds; the copilot's new reads and what they cost (design §6: about a thirtieth of Sonnet on Luna, a five-call run well under a cent); the chart note (H1); the setup code (G1), which a new install now needs before the wizard; and the new tables G2 and G3 add, if they land. Written last, once the other rows are known | S |
+| U1 | The upgrade notes for 0.9.0 | `docs/runbooks/upgrade.md`, "0.8 to 0.9": the two migrations (L3, L4) and that both are additive; any data change a row adds; the copilot's new reads and what they cost (design §6: about a thirtieth of Sonnet on Luna, a five-call run well under a cent); the chart note (H1); the setup code (G1), which a new install now needs before the wizard; who may change the input pack now (G8); and the new tables G2 and G3 add, if they land. Written last, once the other rows are known | S |
 
 The release skill asks for this section before it tags, so it must exist before `/release`.
 
@@ -152,10 +159,10 @@ Carried from 0.8.1 and still open, plus what 0.9.0 itself needs.
 | F-08: the Malay wording reviewed by a native speaker, including 0.8.1's and 0.9.0's new copilot strings | A Malay speaker | 0.8.1 added the step line, the panel's controls and the reasons; 0.9.0 adds the reading line, the edit cards and CP10's reasons |
 | The copilot panel in Safari, Firefox, on a phone, and with a screen reader | Me, then Akmal for the screen reader | Never checked for 0.8.1 |
 | A live copilot run on a 0.9.0 image, as Priya on a fresh Northwind year, the design's §1 questions | Me | The same run as L7, with the read loop on |
-| An acceptance test of 0.9.0, as Obed ran for 0.8.0 | Obed, if Akmal agrees | Decided in UAT-Q |
+| An acceptance test of 0.9.0, as Obed ran for 0.8.0 | Anyone Akmal names | Decided in UAT-Q |
 | The Goals page's pending marks on a 1,000-row list: whether `usePendingOkrIds` costs a visible render delay | Me | Open since the pending-indicators review (its Q7). `pnpm perf:budgets` measures the server, not the browser. Measure on the large dataset; change it only if it is slow |
 
-**UAT-Q: an acceptance test before 0.9.0 ships? Recommended: yes.** This release changes what the copilot can read and what it can propose to change. Obed's test of 0.8.0 found eleven things no suite had.
+**UAT-Q: an acceptance test before 0.9.0 ships? Decided by Akmal on 12 November 2026: yes, by anyone, not necessarily Obed.** This release changes what the copilot can read and what it can propose to change. Obed's test of 0.8.0 found eleven things no suite had. Whoever runs it uses a 0.9.0 image and writes the report beside `docs/report/uat-0.8.0-report.md`.
 
 ## 8. Outside the release
 
@@ -165,19 +172,23 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 |---|---|---|
 | Push `okrgoal-infra` | Done | Pushed by 12 November 2026; nothing is ahead of origin |
 | Move production mail off the temporary sender | Akmal, then me | Since 10 November 2026 production sends as `hello@okrinstitute.org` through SES in us-east-1, in an AWS account shared with other products. Move to okrgoal.com's own SES in eu-west-1 once its production access is granted, matching the legal page's "delivered from Ireland" |
-| OKRGoal's error tracker in the docs | Akmal's call | `docs/design/error-reporting.md` and its runbook still say OKRGoal uses Sentry EU; it has used Bugsink since 10 November 2026. Also E4's check by hand against GlitchTip, never done. Update both only if you want OKRGoal's choice in the public docs |
 | Check that production's nightly erase job succeeds | Me | It failed twice on 0.7.0's chart; 0.8.0's chart carries the fix but had not run on it by 12 November. Its first run on the fixed chart was 03:30 UTC that day |
 | Move okrgoal's values from `database.adminUrl` to `database.existingSecretAdminKey` | Me | Both deploys print the chart's warning about it. The chart already supports the key |
-| Put the planless workspaces on production on Free | Akmal | `/operator/default-plan` on app.okrgoal.com. Carried from 0.8.1 |
-| Check that a session on production shows your own address, not a Cloudflare one | Akmal | Confirms `trustedProxyHops: 2`. Carried from 0.8.1 |
-| Production's AI models | Akmal | If `ai.deployment.tierModels` is set there, it did not move to Luna with 0.8.1 |
 | Lock the origin to Cloudflare with a secret header, then read `cf-connecting-ip` | Me, then Akmal | Carried from 0.8.1 |
 | A clean Compose install from the quickstart, and a Compose upgrade from 0.8.1 with data in it | Me | The after-release checks the release skill leaves undone |
 | okrgoal.com: the 12 rows of `docs/site-changes-2026-11-03.md` marked "Next release" | Done | Each checked against v0.8.1 and applied on 12 November 2026 (okr-goal `95fdd6d`), live the same minute |
 | Remove the 0.8.1 build worktree and branch (`open-okr-release-0.8.1`, `release-0.8.1`) | Me | Merged as #212 |
 | Remove the other stale local worktrees and branches | Me | Worktrees `open-okr-copilot-combined`, `open-okr-input-pack`, `open-okr-plan-0.8.1` and `open-okr-resend-invite`, all merged or superseded. Branches: 29 `worktree-agent-*` from the September completeness review, whose rows reached `main` by pull request under other commits; the release, phase and October fix branches already merged; and `docs/site-copy-2026-11-03`, whose brief now lives in the okr-goal repository. Local only, and each checked against `main` before it goes. G5's and G7's branches stay until their rows land |
-| Delete two stale remote branches | Akmal's call | `origin/obed` (29 September, superseded) and `origin/backup/pre-signoff-2026-08-18`. Deleting a branch on GitHub cannot be undone from here |
+| Delete two stale remote branches | Half done | Akmal said delete both on 12 November 2026. `origin/backup/pre-signoff-2026-08-18` was deleted that day: every one of its 35 commits has an equivalent on `main`. `origin/obed` was kept, because its one commit is a fix `main` still lacks (G10). It goes once G10 lands, on Akmal's word |
 | Put the main checkout back on `main` | Me, when no session is using it | `/Users/akmal/Documents/Work/github/open-okr` still sits on `docs/plan-0.8.0-your-account`, merged long ago |
+
+**At the 0.9.0 deployment.** Three actions carried from 0.8.1, which Akmal put into this release on 12 November 2026. They run when 0.9.0 is deployed to production, after the upgrade and its data changes.
+
+| # | What | Who | How |
+|---|---|---|---|
+| X1 | **Put the workspaces with no plan on Free** | Akmal, signed in as the operator | `/operator/default-plan` on app.okrgoal.com, with a reason (the bulk action asks for one since 0.8.0). Before it, I list how many have no plan; after it, I check none is left |
+| X2 | **Check that production records each visitor's own address**, not a Cloudflare one | Me, then Akmal | I read the addresses of the newest sessions through `kubectl`, read only, and check none falls in Cloudflare's ranges. Then Akmal confirms his own on Security. This proves `trustedProxyHops: 2` |
+| X3 | **Production's AI models** | Me | Read whether `ai.deployment.tierModels` is set on production. If it is, it never moved to GPT-6 Luna with 0.8.1, and it is set to Luna for `fast` and `balanced` and Claude Sonnet 4.5 for `deep`, as the copilot design's D8 chose. If it is not set, production already follows the default and nothing changes |
 
 ## 9. Left out on purpose
 
@@ -187,7 +198,6 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 | More edits than L4's five, such as reassigning an owner | D3: it changes somebody else's work, so it stays a person's act |
 | A full `/copilot` page | W3-Q1, 0.8.1: the side panel with Expand, and a page later if people ask |
 | Renaming a conversation | W3-Q4, 0.8.1: delete now, rename later |
-| Q-4: only the Owner, an Admin and the named facilitator may change the input pack | Akmal, 11 November 2026: "for later". It changes access, so it needs a design first. Say if 0.9.0 is later enough |
 | `DATABASE_DIRECT_URL` and the vector index | Decided in 0.8.0 (H7, H5-Q4): built when a deployment needs them. None does yet |
 | A mail driver for the SES API | Production sends through SES over SMTP, which works. A driver would add the AWS SDK, a new runtime dependency that needs asking |
 | SAML requests signed by the product | `saml.md`: built when a customer's identity provider requires it, together with the key handling. Storing a key nothing uses is worse than none |
@@ -200,21 +210,26 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 
 ## 10. Decisions
 
+Akmal answered every question on 12 November 2026.
+
 | # | Question | Recommended | Akmal's answer |
 |---|---|---|---|
-| 0.9-Q1 | Is the copilot reading live data (L1 to L6, L7b) the centre of 0.9.0, with CP5, CP10, CP11 and CP12? | Yes. The design is approved, and its D9 put these rows here | Open |
-| A4-Q | How does the first word come sooner? | The proposal becomes a tool inside L2's loop, after a short addition to the design and "design approved" | Open |
-| CP11-Q | What does "Ask about this page" send the copilot? | The entity's id only; the copilot reads it as the member | Open |
-| FB-Q | Thumbs up and down on answers in 0.9.0? | Yes, after L5, design first (a new table) | Open |
-| W2-Q | Are the copilot's steps stored? (open since 0.8.1) | No new column: L3 records the reads, and the line under an answer is rebuilt from them | Open |
-| C2-Q | Fix `okr mcp`'s URL check, or dismiss the alerts as they are? | Fix, then dismiss | Open |
-| P1-Q | Upgrade Better Auth in 0.9.0? | Yes, as its own change with the auth suites | Open |
-| UAT-Q | An acceptance test before 0.9.0 ships? | Yes, by Obed if he is free | Open |
-| Q-4 | Does the input-pack access rule come into 0.9.0? | No, still later, unless you say otherwise. It needs a design | Open |
-| G4-Q | Import FlowyTeam's KPI shares as `kpi_shares`? | Yes, with the view option and frequency named in the import report | Open |
-| G5-Q | May the profiles' source links go into METHOD.md? | Yes. They add links and change no rule | Open |
+| 0.9-Q1 | Is the copilot reading live data (L1 to L6, L7b) the centre of 0.9.0, with CP5, CP10, CP11 and CP12? | Yes. The design is approved, and its D9 put these rows here | **Yes** |
+| A4-Q | How does the first word come sooner? | The proposal becomes a tool inside L2's loop, after a short addition to the design and "design approved" | **As recommended** |
+| CP11-Q | What does "Ask about this page" send the copilot? | The entity's id only; the copilot reads it as the member | **The entity's id only** |
+| FB-Q | Thumbs up and down on answers in 0.9.0? | Yes, after L5, design first (a new table) | **Yes** |
+| W2-Q | Are the copilot's steps stored? (open since 0.8.1) | No new column: L3 records the reads, and the line under an answer is rebuilt from them | **No new column** |
+| C2-Q | Fix `okr mcp`'s URL check, or dismiss the alerts as they are? | Fix, then dismiss | **Fix, then dismiss** |
+| P1-Q | Upgrade Better Auth in 0.9.0? | Yes, as its own change with the auth suites | **Yes, to the newest 1.7 patch** |
+| UAT-Q | An acceptance test before 0.9.0 ships? | Yes, by Obed if he is free | **Yes, by anyone, not necessarily Obed** |
+| Q-4 | Does the input-pack access rule come into 0.9.0? | No, still later. It needs a design | **Yes, in this release: the Owner, Admins and the named facilitator only** (G8) |
+| G4-Q | Import FlowyTeam's KPI shares as `kpi_shares`? | Yes, with the view option and frequency named in the import report | **As recommended** |
+| G5-Q | May the profiles' source links go into METHOD.md? | Yes. They add links and change no rule | **Yes** |
+| E-Q | OKRGoal's error tracker in the public docs: record Bugsink, leave it, or remove OKRGoal's choice? | Record Bugsink in one line | **Remove OKRGoal's choice from the public docs entirely** (G9) |
+| B-Q | Delete the two stale branches on GitHub? | Delete both | **Delete both.** One deleted; `origin/obed` held for G10 (section 8) |
+| X-Q | The three production actions carried from 0.8.1 | Akmal's, at any time | **In this release**, at the 0.9.0 deployment (X1 to X3, section 8) |
 
-G1, G2 and G3 need no question here. Each starts with its design, and its code waits for "design approved" on that design.
+G1, G2, G3 and G8 need no question here. Each starts with its design, and its code waits for "design approved" on that design.
 
 ## 11. Suggested order
 
@@ -223,12 +238,13 @@ G1, G2 and G3 need no question here. Each starts with its design, and its code w
 3. **L1, L2, L3**: the port, the loop, then migration 1. **CP5** once L3 records the reads.
 4. **A4**, once its design addition is approved, because it changes the loop L2 built.
 5. **L5, L6**, then **L7b**: tuning comes last, against the loop as it will ship.
-6. **CP10, CP11, CP12**, then **FB1** if FB-Q says so.
+6. **CP10, CP11, CP12**, then **FB1** once its design is approved.
 7. **D1, H1, P1**: independent, at any point.
-8. **G7, G6**, small and independent; **G5** and **G4** once G5-Q and G4-Q are answered.
-9. The designs for **G1**, **G3** and **G2**, written early so their approval does not hold the release; the code once each is approved. G1 first, because every new install meets it.
+8. **G7, G6, G9, G10**, small and independent; **G5** and **G4**.
+9. The designs for **G1**, **G8**, **G3** and **G2**, together with A4's and FB1's, written early so their approval does not hold the release; the code once each is approved. G1 first, because every new install meets it, then G8.
 10. **U1**, written last.
 11. The checks in section 7, then `/release`.
+12. The deployment, then **X1, X2 and X3** on production.
 
 If 0.9.0 grows too large, G2 and G3 are the rows to move to the next release: neither fixes something broken, and the copilot is this release's centre.
 
@@ -249,23 +265,29 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | CP10 | to do | |
 | CP11 | to do | |
 | CP12 | to do | |
-| A4 | yours | A4-Q, then a design addition |
-| FB1 | yours | FB-Q, then a design |
+| A4 | to do | A4-Q decided: the proposal as a tool. Design addition first |
+| FB1 | to do | FB-Q decided: yes. Design first |
 | T1 | to do | |
 | T2 | to do | |
 | T3 | to do | |
 | D1 | to do | |
 | H1 | to do | |
 | C1 | to do | |
-| C2 | yours | C2-Q |
+| C2 | to do | C2-Q decided: fix, then dismiss |
 | C3 | to do | |
-| P1 | yours | P1-Q |
+| P1 | to do | P1-Q decided: the newest 1.7 patch |
 | G1 | to do | Design first |
 | G2 | to do | Design first |
 | G3 | to do | Design first |
-| G4 | yours | G4-Q |
-| G5 | yours | G5-Q |
+| G4 | to do | G4-Q decided: import |
+| G5 | to do | G5-Q decided: yes |
 | G6 | to do | |
 | G7 | to do | |
+| G8 | to do | Q-4 decided: in this release. Design first |
+| G9 | to do | |
+| G10 | to do | Then `origin/obed` can be deleted |
 | U1 | to do | Last |
-| Decisions | yours | Section 10 |
+| X1 | to do | At the deployment. Akmal |
+| X2 | to do | At the deployment |
+| X3 | to do | At the deployment |
+| Decisions | decided | 12 November 2026, section 10 |
