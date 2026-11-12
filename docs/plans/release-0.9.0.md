@@ -2,7 +2,7 @@
 
 Owner: Akmal. Started 12 November 2026, the day 0.8.1 was published and deployed to app, staging and demo.okrgoal.com, against `main` at `7e2b847b` (the v0.8.1 tag).
 
-Status: **decided**. Akmal answered every question in section 10 on 12 November 2026, each as recommended except two: the acceptance test may be run by anyone (UAT-Q), and the input pack's access rule comes into this release (Q-4, row G8). Six rows start with a design that waits for its own "design approved": A4 (an addition to the copilot design), FB1, G1, G2, G3 and G8.
+Status: **decided**. Akmal answered every question in section 10 on 12 November 2026, each as recommended except two: the acceptance test may be run by anyone (UAT-Q), and the input pack's access rule comes into this release (Q-4, row G8). The same day he approved the recommended direction of five designs, A4, FB1, G1, G2 and G8 ("all the recommended six designs are approved", section 10). Each design document is written from that direction before its code, and a question it does not answer goes back to him first. The sixth, G3, needs no design: 0.7.0 built it. One question is open, G11-Q.
 
 A minor release. Its centre is the copilot reading live data: `docs/design/copilot-live-data.md`, approved by Akmal on 11 November 2026 ("design approved for all"), whose decision D9 put rows L1 to L6 and the tool loop's prompt (L7b) in 0.9.0. Today the copilot reads six passages from the search index, so it cannot say a key result's value, an objective's health or who owns a task. After 0.9.0 it reads through the product's own read actions, as the member asking, and it can propose five edits as well as four creates.
 
@@ -16,10 +16,10 @@ It holds nine things:
 2. **The copilot panel, the rest**: citation chips, reason codes, "Ask about this page", the panel's specification and mockup, and the first word arriving sooner. Section 2.
 3. **What 0.8.1 found**: three test and CI defects, the seed, the chart's notes. Section 3.
 4. **Security findings and dependencies**: one high and two medium CodeQL alerts, nine warnings, Better Auth. Section 4.
-5. **Owed from earlier releases**: a setup code to claim an instance, recent items in the command palette, API tokens on the agent connections screen, KPI sharing from FlowyTeam, the profiles' source links, the mockups, the commit attribution setting, who may change the input pack, OKRGoal's choices out of the public docs, and a fix left on Obed's branch. Section 5.
+5. **Owed from earlier releases**: a setup code to claim an instance, recent items in the command palette, API tokens on the agent connections screen (built in 0.7.0; its design catches up), KPI sharing from FlowyTeam, the profiles' source links, the mockups, the commit attribution setting, who may change the input pack, OKRGoal's choices out of the public docs, a fix left on Obed's branch, and OKRGoal's website copy out of this repository. Section 5.
 6. **Upgrades**: the upgrade notes. Section 6.
 7. **Checks before the release**: the retests and browser checks carried from 0.8.1, a live copilot run, and an acceptance test. Section 7.
-8. **Outside the release**: operations on the three servers, three of them done at the 0.9.0 deployment, the mail sender, and clean-up. Section 8.
+8. **Outside the release**: operations on the three servers, the three carried from 0.8.1 done on 12 November 2026, the mail sender, and clean-up, mostly done. Section 8.
 9. **Left out on purpose**, and why. Section 9.
 
 Each row is one change in the CLAUDE.md change loop: one branch, one commit, one pull request. Sizes are rough: **S** is under a day, **M** is a few days, **L** is a week or more.
@@ -114,16 +114,17 @@ Work an earlier design or decision named "for a later release", or left on a loc
 
 | # | What | Owed by | Change | Size | Gate |
 |---|---|---|---|---|---|
-| G1 | **A setup code to claim a new instance.** Today the first person to reach `/setup` owns the instance, and certificate transparency logs publish a new hostname within minutes. OKRGoal kept its new instances behind Cloudflare until claimed for this reason | `registration-policy.md`, H3-Q1: "not in 0.8.0; a row for a later release" (Akmal, 11 November 2026) | `./openokr up` and the Helm notes print a one-time code, and the setup wizard asks for it before the first account. The code is single use and stored hashed. An instance already claimed is unaffected | M | **Design first**: a new security mechanism |
-| G2 | **Recent items in the command palette and search.** Nothing records what a member opened, so the palette has no recents, recents do not lift the ranking, and the palette has no scoped tabs (the search page has them as type filters) | `work-layer.md`, "Not built, and still owed to UIUX-PLAN §3 and S-32" | A per-member record of recently opened objects, read by the palette's empty state and its ranking, and scoped tabs in the palette | M | **Design first**: a new table |
-| G3 | **API tokens for agents on the agent connections screen.** An agent can connect with an API token whose audience is `mcp`. Those tokens are not grants, so the admin screen does not list them, and an administrator cannot see or end one | `agent-connections-admin.md`, Q2: "list them in the same screen in a later change" | List them beside the grants. Ending one for somebody else records a reason, so its owner's page can say why it stopped | S | **Design first**: the reason needs a column on `api_tokens` |
+| G1 | **A setup code to claim a new instance.** Today the first person to reach `/setup` owns the instance, and certificate transparency logs publish a new hostname within minutes. OKRGoal kept its new instances behind Cloudflare until claimed for this reason | `registration-policy.md`, H3-Q1: "not in 0.8.0; a row for a later release" (Akmal, 11 November 2026) | `./openokr up` and the Helm notes print a one-time code, and the setup wizard asks for it before the first account. The code is single use and stored hashed. An instance already claimed is unaffected | M | **Design first**: a new security mechanism. Direction approved 12 November 2026 (section 10) |
+| G2 | **Recent items in the command palette and search.** Nothing records what a member opened, so the palette has no recents, recents do not lift the ranking, and the palette has no scoped tabs (the search page has them as type filters) | `work-layer.md`, "Not built, and still owed to UIUX-PLAN §3 and S-32" | Recents kept in the browser, per device, and re-read through the access-scoped reads; a new device starts from what the member changed recently; scoped tabs in the palette (section 10) | M | A short design note in `work-layer.md`, since there is no table. Direction approved 12 November 2026 |
+| G3 | **API tokens for agents on the agent connections screen: built in 0.7.0, though its design says otherwise.** Row A4 (`cecabbab`, 9 November 2026) made `connections.list` return `mcp` tokens and `connections.revokeAsAdmin` end "a member's agent connection or agent token", with `api_tokens.revoked_reason` from migration 0152. The design still calls it "a later change" and says it "does not list or end API tokens" | `agent-connections-admin.md`, Q2 and its list of what it does not do | Correct the design to what was built, and check in a browser that `/admin/connections` draws a token's row and ends it | S | None. Docs and a check |
 | G4 | **KPI sharing from FlowyTeam.** The importer does not read `indicator_accesses` (a member, `read` or `update`, a view option and a view frequency). Every run reports its rows as not imported | TECHNICAL-PLAN §7.2, completeness review M-16: "Pending a decision" since September | Decided in G4-Q: import. Each row becomes a `kpi_shares` row (member and level), and the view option and frequency, which have no home, go in the import report by name. TECHNICAL-PLAN §7.2's two rows say so in the same change | S | None: decided |
 | G5 | **The Google-style and Radical Focus profiles link to their sources.** Built on 3 November 2026 on branch `feat/profile-source-links` and never opened as a pull request. The practice screen links the work each profile follows, and METHOD.md §12.2 carries the link, compared word for word by `method:check` | The branch, one commit, 13 files | Rebase onto `main`, run `pnpm method:check`, open the pull request | S | None: G5-Q allows the METHOD.md change |
 | G6 | **The reference mockups catch up.** Eleven still draw an agent as the gradient `.av.bot` circle: 01, 02, 03, 04, 05, 06, 07, 08, 09, 10 and 12. `guided-inputs.md` also asks 03, 07, 08, 12 and 12b to be checked for the fields it changed | `agent-faces.md` (the reference mockups row), `guided-inputs.md` §6 | Redraw the agents' faces and any changed field, then render the PNGs. Docs only | S | None |
 | G7 | **The repository turns off the assistant's commit attribution.** CLAUDE.md forbids a co-author trailer or a generated-with line, but the assistant's own configuration still asks for one, and on 11 November 2026 a harness reminder did again. Branch `ci/no-assistant-attribution` (23 September 2026) added the switch to `.claude/settings.json` and never merged | The branch, one commit | Commit the project setting, under the name the current Claude Code release uses for it | S | None. No changeset: nothing a running instance does |
-| G8 | **Only the Owner, an Admin and the cycle's named facilitator may change the input pack.** Today any Member can mark an item gathered, write its note and press Confirm distribution | Obed's 0.8.0 acceptance test, Q-4. Akmal on 12 November 2026: in this release, limited to those three | `workflow.setPackItem` and Confirm distribution refuse anybody else, through the access check and not the screen alone. Everybody else sees the input pack read only, with a line naming who may change it | S | **Design first**: access |
-| G9 | **OKRGoal's own choices leave the public docs.** `docs/design/error-reporting.md` says OKRGoal uses Sentry (its E4 rows, §4's OKRGoal table with releases and the privacy line, Q3 and G3), and `docs/runbooks/observability.md` waits for "OKRGoal's project". Neither is true any more, and neither is the open-source product's business | Akmal on 12 November 2026: remove OKRGoal's choice entirely | Rewrite those passages for any operator: a tracker that speaks Sentry's protocol, how to point the instance at it. Keep the list of trackers checked by hand only for those actually checked; GlitchTip never was | S | None. Docs only |
+| G8 | **Only the Owner, an Admin and the cycle's named facilitator may change the input pack.** Today any Member can mark an item gathered, write its note and press Confirm distribution | Obed's 0.8.0 acceptance test, Q-4. Akmal on 12 November 2026: in this release, limited to those three | `workflow.setPackItem` and Confirm distribution refuse anybody else, through the access check and not the screen alone. Everybody else sees the input pack read only, with a line naming who may change it | S | **Design first**: access. Direction approved 12 November 2026 (section 10) |
+| G9 | **OKRGoal's own choices leave the public docs.** `docs/design/error-reporting.md` says OKRGoal uses Sentry (its E4 rows, §4's OKRGoal table with releases and the privacy line, Q3 and G3), and `docs/runbooks/observability.md` waits for "OKRGoal's project". Neither is true any more, and neither is the open-source product's business | Akmal on 12 November 2026: remove OKRGoal's choice entirely | Rewrite those passages for any operator: a tracker that speaks Sentry's protocol, and how to point the instance at it. Remove Q3 and G3 there. The trackers checked by hand: Bugsink, on a live instance on 10 November 2026, without saying whose; Sentry and GlitchTip speak the protocol and were not checked by hand (G9-Q) | S | None. Docs only |
 | G10 | **The channel messages list on Admin, Channels keys each row by its time and provider**, so two messages in the same millisecond from one provider share a key and React warns. Obed fixed it on 29 September on branch `origin/obed` and it never reached `main` | `origin/obed`, one commit, two lines | Key each row by the message's own id where it has one, otherwise as Obed's fix did. Then the branch can go | S | None |
+| G11 | **OKRGoal's website copy leaves this repository.** `docs/okr-goal/` holds the site's page copy, messaging and claims, and the okr-goal repository already keeps the live copy | Found while scoping G9: OKRGoal appears 335 times in 62 public docs. Most are a design using it as the example of a cloud operator, which explains why the feature exists and stays | Move the folder into the okr-goal repository and leave a one-line pointer | S | **Yours**: G11-Q |
 
 Acceptance criteria:
 
@@ -145,7 +146,7 @@ Acceptance criteria:
 
 | # | What | Change | Size |
 |---|---|---|---|
-| U1 | The upgrade notes for 0.9.0 | `docs/runbooks/upgrade.md`, "0.8 to 0.9": the two migrations (L3, L4) and that both are additive; any data change a row adds; the copilot's new reads and what they cost (design §6: about a thirtieth of Sonnet on Luna, a five-call run well under a cent); the chart note (H1); the setup code (G1), which a new install now needs before the wizard; who may change the input pack now (G8); and the new tables G2 and G3 add, if they land. Written last, once the other rows are known | S |
+| U1 | The upgrade notes for 0.9.0 | `docs/runbooks/upgrade.md`, "0.8 to 0.9": the two migrations (L3, L4) and that both are additive; any data change a row adds; the copilot's new reads and what they cost (design §6: about a thirtieth of Sonnet on Luna, a five-call run well under a cent); the chart note (H1); the setup code (G1), which a new install now needs before the wizard; who may change the input pack now (G8); and FB1's new table. Written last, once the other rows are known | S |
 
 The release skill asks for this section before it tags, so it must exist before `/release`.
 
@@ -177,18 +178,18 @@ Not code in this repository, so no row and no commit here. Listed so nothing fou
 | Lock the origin to Cloudflare with a secret header, then read `cf-connecting-ip` | Me, then Akmal | Carried from 0.8.1 |
 | A clean Compose install from the quickstart, and a Compose upgrade from 0.8.1 with data in it | Me | The after-release checks the release skill leaves undone |
 | okrgoal.com: the 12 rows of `docs/site-changes-2026-11-03.md` marked "Next release" | Done | Each checked against v0.8.1 and applied on 12 November 2026 (okr-goal `95fdd6d`), live the same minute |
-| Remove the 0.8.1 build worktree and branch (`open-okr-release-0.8.1`, `release-0.8.1`) | Me | Merged as #212 |
-| Remove the other stale local worktrees and branches | Me | Worktrees `open-okr-copilot-combined`, `open-okr-input-pack`, `open-okr-plan-0.8.1` and `open-okr-resend-invite`, all merged or superseded. Branches: 29 `worktree-agent-*` from the September completeness review, whose rows reached `main` by pull request under other commits; the release, phase and October fix branches already merged; and `docs/site-copy-2026-11-03`, whose brief now lives in the okr-goal repository. Local only, and each checked against `main` before it goes. G5's and G7's branches stay until their rows land |
-| Delete two stale remote branches | Half done | Akmal said delete both on 12 November 2026. `origin/backup/pre-signoff-2026-08-18` was deleted that day: every one of its 35 commits has an equivalent on `main`. `origin/obed` was kept, because its one commit is a fix `main` still lacks (G10). It goes once G10 lands, on Akmal's word |
-| Put the main checkout back on `main` | Me, when no session is using it | `/Users/akmal/Documents/Work/github/open-okr` still sits on `docs/plan-0.8.0-your-account`, merged long ago |
+| Remove the 0.8.1 build worktree and branch (`open-okr-release-0.8.1`, `release-0.8.1`) | Done | 12 November 2026, by a clean-up session Akmal started |
+| Remove the other stale local worktrees and branches | Done | 12 November 2026, by the same session: 5 old worktrees and 103 stale local branches. The 28 it could not prove are on `main` are kept in `open-okr-branch-archive-2026-11-12.bundle` beside the checkout. G5's and G7's branches were kept |
+| Delete stale remote branches | Done but one | `origin/backup/pre-signoff-2026-08-18` was deleted on 12 November 2026; every one of its 35 commits has an equivalent on `main`. The clean-up session deleted 40 more merged branches and turned on GitHub's automatic deletion of merged pull request branches. `origin/obed` stays until G10 lands, then goes on Akmal's word. `origin/agung` stays as Agung's |
+| Put the main checkout back on `main` | Done | 12 November 2026, by the clean-up session |
 
-**At the 0.9.0 deployment.** Three actions carried from 0.8.1, which Akmal put into this release on 12 November 2026. They run when 0.9.0 is deployed to production, after the upgrade and its data changes.
+**Carried from 0.8.1, done on 12 November 2026.** Akmal put these three into this release, then did them the same day rather than at the deployment: none waits on 0.9.0's code, and with a plan catalogue a workspace with no plan has no AI on the provider's key, so X1 was costing those workspaces their copilot.
 
-| # | What | Who | How |
+| # | What | Done by | Outcome |
 |---|---|---|---|
-| X1 | **Put the workspaces with no plan on Free** | Akmal, signed in as the operator | `/operator/default-plan` on app.okrgoal.com, with a reason (the bulk action asks for one since 0.8.0). Before it, I list how many have no plan; after it, I check none is left |
-| X2 | **Check that production records each visitor's own address**, not a Cloudflare one | Me, then Akmal | I read the addresses of the newest sessions through `kubectl`, read only, and check none falls in Cloudflare's ranges. Then Akmal confirms his own on Security. This proves `trustedProxyHops: 2` |
-| X3 | **Production's AI models** | Me | Read whether `ai.deployment.tierModels` is set on production. If it is, it never moved to GPT-6 Luna with 0.8.1, and it is set to Luna for `fast` and `balanced` and Claude Sonnet 4.5 for `deep`, as the copilot design's D8 chose. If it is not set, production already follows the default and nothing changes |
+| X1 | **Put the workspaces with no plan on Free** | Akmal, as the operator | Done through `/operator/default-plan` on app.okrgoal.com. Not counted from outside: the application's own database role cannot see tenant rows, so only the operator console could count them |
+| X2 | **Check that production records each visitor's own address**, not a Cloudflare one | Akmal | Done: his session shows his real address. `trustedProxyHops: 2` works |
+| X3 | **Production's AI models** | Me, read only | Nothing to change. `system_settings` holds no `ai.deployment.tierModels` (its read policy shows every row, and none is `ai.*`), and `OPENOKR_AI_TIER_MODELS` is not set. Production already follows the default, GPT-6 Luna for `fast` and `balanced` (X3-Q: clear any pin) |
 
 ## 9. Left out on purpose
 
@@ -227,9 +228,21 @@ Akmal answered every question on 12 November 2026.
 | G5-Q | May the profiles' source links go into METHOD.md? | Yes. They add links and change no rule | **Yes** |
 | E-Q | OKRGoal's error tracker in the public docs: record Bugsink, leave it, or remove OKRGoal's choice? | Record Bugsink in one line | **Remove OKRGoal's choice from the public docs entirely** (G9) |
 | B-Q | Delete the two stale branches on GitHub? | Delete both | **Delete both.** One deleted; `origin/obed` held for G10 (section 8) |
-| X-Q | The three production actions carried from 0.8.1 | Akmal's, at any time | **In this release**, at the 0.9.0 deployment (X1 to X3, section 8) |
+| X-Q | The three production actions carried from 0.8.1 | Akmal's, at any time | **In this release.** Then all three done on 12 November 2026 (section 8) |
+| G9-Q | How far G9 goes, and which trackers count as checked | The tracker only. Bugsink checked on a live instance; Sentry and GlitchTip not by hand | **As recommended** |
+| X3-Q | If production pins its AI models, clear the pin or set Luna? | Clear it, so production follows the default | **Clear it.** Nothing was pinned, so nothing changed |
+| G11-Q | Move `docs/okr-goal/` into the okr-goal repository? | Yes. It is the site's copy, and the site keeps its own | Open |
 
-G1, G2, G3 and G8 need no question here. Each starts with its design, and its code waits for "design approved" on that design.
+**Design directions, approved by Akmal on 12 November 2026** ("all the recommended six designs are approved"). Each design document is written from its direction before any code. A question the direction does not answer goes back to Akmal first.
+
+| Design | Approved direction |
+|---|---|
+| A4 | A `propose_change` tool beside the read tools, taking today's proposal shape and checked by the same code. At most one card per answer. Only the member's own words may start a proposal, never text the copilot read, and an injection fixture proves it. The card appears when the tool call finishes, while the answer streams. A provider that cannot call tools keeps 0.8.1's proposal-first path, and AI off is unchanged. Target: a question that asks for no change shows its first word within about 2 seconds on Luna, measured before and after |
+| FB1 | One rating per member per answer: up or down, an optional note of at most 500 characters, and "Share this conversation". The member sees their own. The workspace's AI administrators see the rating, the note, the model and what was read, and the question and answer only when shared. A command lists shared thumbs-down answers for a person to turn into fixtures by hand, with names and numbers replaced; never automatically, because fixtures are committed to a public repository. Kept 90 days, like tool calls. Nothing leaves the instance. Hidden with AI off; English and Malay |
+| G1 | The deployment generates the code like every other secret: `./openokr up` writes it to `secrets/app.env` and prints it, and the chart makes a Secret whose notes say how to read it. With neither, as with a bare `docker run`, the server makes one at first boot, keeps only its hash, and writes the code to a file on the storage volume, deleted when setup finishes; the wizard says where. Never logged. Twelve characters in three groups with no look-alike letters, behind the sign-in rate limit, valid until setup finishes. Instances already claimed and sign-ups on a cloud are unaffected. The demo reset, the staging seed and the end-to-end suite read the code from the secrets |
+| G2 | Recents in the browser, per device: the last 20 objects opened, re-read through the access-scoped reads, so an object the member can no longer see drops out. A new device starts from what the member changed recently, from the activity the product already records. No table, and no server record of what anybody reads. With an empty query recents come first; with a query a recent match is lifted, never above an exact title match. Scoped tabs: All, Objectives, Key results, KPIs, Initiatives, Tasks, People, the search page's filters |
+| G3 | No design: built in 0.7.0 (row G3) |
+| G8 | The Owner and Admins, by R1's workspace-role check, and the member named as the cycle's facilitator; not the sponsor. With no facilitator, or a suspended one, the Owner and Admins only. It covers marking an item gathered or missing, its note, and Confirm distribution. Enforced in `workflow.setPackItem` and `workflow.distributePack`, so REST, the command line and agents are refused alike, with a new read telling the screen. Everybody else sees the pack read only, naming who may change it. No migration, and marks already made stay |
 
 ## 11. Suggested order
 
@@ -240,13 +253,12 @@ G1, G2, G3 and G8 need no question here. Each starts with its design, and its co
 5. **L5, L6**, then **L7b**: tuning comes last, against the loop as it will ship.
 6. **CP10, CP11, CP12**, then **FB1** once its design is approved.
 7. **D1, H1, P1**: independent, at any point.
-8. **G7, G6, G9, G10**, small and independent; **G5** and **G4**.
-9. The designs for **G1**, **G8**, **G3** and **G2**, together with A4's and FB1's, written early so their approval does not hold the release; the code once each is approved. G1 first, because every new install meets it, then G8.
+8. **G7, G6, G9, G10, G3**, small and independent; **G5** and **G4**; **G11** if G11-Q says so.
+9. The design documents for **G1**, **G8**, **A4**, **FB1** and **G2**, written early from their approved directions, each followed by its code. G1 first, because every new install meets it, then G8.
 10. **U1**, written last.
-11. The checks in section 7, then `/release`.
-12. The deployment, then **X1, X2 and X3** on production.
+11. The checks in section 7, then `/release`, then the deployment. X1 to X3 are already done.
 
-If 0.9.0 grows too large, G2 and G3 are the rows to move to the next release: neither fixes something broken, and the copilot is this release's centre.
+If 0.9.0 grows too large, G2 is the row to move to the next release: it fixes nothing broken, and the copilot is this release's centre.
 
 ## 12. Build log
 
@@ -265,8 +277,8 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | CP10 | to do | |
 | CP11 | to do | |
 | CP12 | to do | |
-| A4 | to do | A4-Q decided: the proposal as a tool. Design addition first |
-| FB1 | to do | FB-Q decided: yes. Design first |
+| A4 | to do | Direction approved 12 November 2026; the design addition, then the code |
+| FB1 | to do | Direction approved 12 November 2026; the design, then the code |
 | T1 | to do | |
 | T2 | to do | |
 | T3 | to do | |
@@ -276,18 +288,19 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | C2 | to do | C2-Q decided: fix, then dismiss |
 | C3 | to do | |
 | P1 | to do | P1-Q decided: the newest 1.7 patch |
-| G1 | to do | Design first |
-| G2 | to do | Design first |
-| G3 | to do | Design first |
+| G1 | to do | Direction approved 12 November 2026; the design, then the code |
+| G2 | to do | Direction approved 12 November 2026; a design note, then the code |
+| G3 | to do | Built in 0.7.0; the design's correction and a browser check |
 | G4 | to do | G4-Q decided: import |
 | G5 | to do | G5-Q decided: yes |
 | G6 | to do | |
 | G7 | to do | |
-| G8 | to do | Q-4 decided: in this release. Design first |
-| G9 | to do | |
+| G8 | to do | Direction approved 12 November 2026; the design, then the code |
+| G9 | to do | G9-Q decided |
 | G10 | to do | Then `origin/obed` can be deleted |
+| G11 | yours | G11-Q |
 | U1 | to do | Last |
-| X1 | to do | At the deployment. Akmal |
-| X2 | to do | At the deployment |
-| X3 | to do | At the deployment |
+| X1 | done | 12 November 2026, by Akmal |
+| X2 | done | 12 November 2026, by Akmal |
+| X3 | done | 12 November 2026: nothing was pinned |
 | Decisions | decided | 12 November 2026, section 10 |
