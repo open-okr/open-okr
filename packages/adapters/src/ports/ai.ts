@@ -14,6 +14,12 @@ export interface ChatMessage {
   readonly content: string;
   /** Set on `tool` messages: which call this answers. */
   readonly toolCallId?: string;
+  /**
+   * Set on `assistant` messages: the calls that turn made, sent back so the
+   * model sees its own request before the results. Without it a loop cannot
+   * run past one round.
+   */
+  readonly toolCalls?: readonly ToolCall[];
 }
 
 export interface ToolDefinition {
@@ -27,6 +33,12 @@ export interface ToolCall {
   readonly id: string;
   readonly name: string;
   readonly arguments: Record<string, unknown>;
+  /**
+   * Opaque and owned by the driver that produced the call (Gemini's
+   * `thoughtSignature`). A caller keeps it on the call and sends it back
+   * unread.
+   */
+  readonly providerData?: Readonly<Record<string, unknown>>;
 }
 
 /**

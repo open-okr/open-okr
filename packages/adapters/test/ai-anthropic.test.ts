@@ -137,6 +137,95 @@ describe("chatWithTools", () => {
   });
 });
 
+describe("chatWithTools history", () => {
+  const tools = [
+    {
+      name: "goals.read",
+      description: "Read goals.",
+      parameters: { type: "object", properties: {} },
+    },
+  ];
+  const history = [
+    { role: "user" as const, content: "how are we doing?" },
+    {
+      role: "assistant" as const,
+      content: "Let me look.",
+      toolCalls: [
+        { id: "toolu_a", name: "goals.read", arguments: { id: 1 } },
+        { id: "toolu_b", name: "goals.read", arguments: { id: 2 } },
+      ],
+    },
+    { role: "tool" as const, content: "result a", toolCallId: "toolu_a" },
+    { role: "tool" as const, content: "result b", toolCallId: "toolu_b" },
+  ];
+
+  it("sends tool calls as tool_use blocks and groups tool results into one user turn", async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    const client = provider(async (_url, init) => {
+      capturedBody = JSON.parse(String(init?.body));
+      return new Response(
+        JSON.stringify({
+          id: "msg_3",
+          type: "message",
+          role: "assistant",
+          model: "claude-sonnet-5",
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_c",
+              name: "goals_read",
+              input: { id: 3 },
+            },
+          ],
+          stop_reason: "tool_use",
+          usage: { input_tokens: 1, output_tokens: 1 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const response = await client.chatWithTools({
+      model: "claude-sonnet-5",
+      messages: history,
+      tools,
+    });
+
+    expect(capturedBody?.messages).toEqual([
+      { role: "user", content: "how are we doing?" },
+      {
+        role: "assistant",
+        content: [
+          { type: "text", text: "Let me look." },
+          {
+            type: "tool_use",
+            id: "toolu_a",
+            name: "goals_read",
+            input: { id: 1 },
+          },
+          {
+            type: "tool_use",
+            id: "toolu_b",
+            name: "goals_read",
+            input: { id: 2 },
+          },
+        ],
+      },
+      {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "toolu_a", content: "result a" },
+          { type: "tool_result", tool_use_id: "toolu_b", content: "result b" },
+        ],
+      },
+    ]);
+    const sentTools = (capturedBody?.tools ?? []) as { name: string }[];
+    expect(sentTools[0]?.name).toBe("goals_read");
+    expect(response.toolCalls).toEqual([
+      { id: "toolu_c", name: "goals.read", arguments: { id: 3 } },
+    ]);
+  });
+});
+
 describe("extract", () => {
   /** Captures the request body the driver sent, and answers with `body`. */
   function capturing(body: unknown) {

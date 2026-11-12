@@ -54,7 +54,7 @@ describe("chat", () => {
 });
 
 describe("chatWithTools", () => {
-  it("parses a function call, synthesising a stable id", async () => {
+  it("parses a function call, synthesising an id", async () => {
     const generateContent = vi.fn().mockResolvedValue({
       text: "",
       functionCalls: [{ name: "get_weather", args: { city: "Paris" } }],
@@ -80,7 +80,11 @@ describe("chatWithTools", () => {
     });
 
     expect(response.toolCalls).toEqual([
-      { id: "0", name: "get_weather", arguments: { city: "Paris" } },
+      {
+        id: expect.stringMatching(/^gemini-call-/),
+        name: "get_weather",
+        arguments: { city: "Paris" },
+      },
     ]);
     const call = generateContent.mock.calls[0]?.[0];
     expect(call.config.tools).toEqual([
@@ -97,6 +101,130 @@ describe("chatWithTools", () => {
         ],
       },
     ]);
+  });
+});
+
+describe("chatWithTools history", () => {
+  it("sends functionCall then functionResponse parts, keeps thoughtSignature and maps names back", async () => {
+    const generateContent = vi.fn().mockResolvedValue({
+      text: "",
+      functionCalls: [{ name: "goals_read", args: { id: 3 } }],
+      candidates: [
+        {
+          content: {
+            parts: [
+              {
+                functionCall: { name: "goals_read", args: { id: 3 } },
+                thoughtSignature: "sig-3",
+              },
+            ],
+          },
+        },
+      ],
+      usageMetadata: { promptTokenCount: 1, candidatesTokenCount: 1 },
+    });
+    const provider = new GoogleProvider({
+      client: fakeClient({ generateContent }),
+    });
+
+    const response = await provider.chatWithTools({
+      model: "gemini-2.5-flash",
+      messages: [
+        { role: "user", content: "how are we doing?" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            {
+              id: "a",
+              name: "goals.read",
+              arguments: { id: 1 },
+              providerData: { thoughtSignature: "sig-1" },
+            },
+            { id: "b", name: "goals.read", arguments: { id: 2 } },
+          ],
+        },
+        { role: "tool", content: "result a", toolCallId: "a" },
+        { role: "tool", content: "result b", toolCallId: "b" },
+      ],
+      tools: [
+        {
+          name: "goals.read",
+          description: "Read goals.",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+    });
+
+    const call = generateContent.mock.calls[0]?.[0];
+    expect(call.contents).toEqual([
+      { role: "user", parts: [{ text: "how are we doing?" }] },
+      {
+        role: "model",
+        parts: [
+          {
+            functionCall: { name: "goals_read", args: { id: 1 }, id: "a" },
+            thoughtSignature: "sig-1",
+          },
+          { functionCall: { name: "goals_read", args: { id: 2 }, id: "b" } },
+        ],
+      },
+      {
+        role: "user",
+        parts: [
+          {
+            functionResponse: {
+              name: "goals_read",
+              id: "a",
+              response: { content: "result a" },
+            },
+          },
+          {
+            functionResponse: {
+              name: "goals_read",
+              id: "b",
+              response: { content: "result b" },
+            },
+          },
+        ],
+      },
+    ]);
+    expect(call.config.tools[0].functionDeclarations[0].name).toBe(
+      "goals_read",
+    );
+    expect(response.toolCalls).toEqual([
+      {
+        id: expect.stringMatching(/^gemini-call-/),
+        name: "goals.read",
+        arguments: { id: 3 },
+        providerData: { thoughtSignature: "sig-3" },
+      },
+    ]);
+  });
+
+  it("keeps the id Gemini gave a call, and never reuses one across rounds", async () => {
+    const generateContent = vi.fn().mockResolvedValue({
+      text: "",
+      functionCalls: [{ name: "x", args: {} }],
+    });
+    const provider = new GoogleProvider({
+      client: fakeClient({ generateContent }),
+    });
+    const request = {
+      model: "gemini-2.5-flash",
+      messages: [{ role: "user" as const, content: "hi" }],
+      tools: [],
+    };
+    const first = await provider.chatWithTools(request);
+    const second = await provider.chatWithTools(request);
+    expect(first.toolCalls?.[0]?.id).not.toBe(second.toolCalls?.[0]?.id);
+
+    generateContent.mockResolvedValueOnce({
+      text: "",
+      functionCalls: [{ id: "own-id", name: "x", args: {} }],
+    });
+    const third = await provider.chatWithTools(request);
+    expect(third.toolCalls?.[0]?.id).toBe("own-id");
   });
 });
 

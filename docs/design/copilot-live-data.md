@@ -111,6 +111,8 @@ The research for this design found the port cannot run a loop yet.
 | The Google driver turns a tool result into plain user text | It sends a `functionResponse` part |
 | `chatWithTools` has no streaming | The rounds are not streamed. The final answer is one more round with no tools, and that one streams as today |
 
+**As built (L1):** `ToolCall` also gains `providerData`, opaque and driver-owned, which carries Gemini's `thoughtSignature` (read from the response parts, because `functionCalls` drops it). Drivers send tool names with every character outside letters, digits, `_` and `-` replaced by `_` (providers reject dots) and map them back by lookup against the offered tools. Consecutive tool messages go out as one user turn on Anthropic and Google. A Gemini call with no id gets a generated one, unique across rounds. The mock driver takes `toolRounds`, one entry per `chatWithTools` call.
+
 ### 3.6 Recording what was read
 
 `ai_tool_calls` records the agent surface's calls only: its migration allows `source = 'mcp'` and requires a grant or a token. The copilot's reads are recorded there too, as `source = 'copilot'` with the member and no grant. **Migration 1** widens the two checks. It keeps the trail an administrator already reads in one place: what the model looked at, for whom, and when.

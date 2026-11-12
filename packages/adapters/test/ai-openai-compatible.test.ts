@@ -115,6 +115,91 @@ describe("chatWithTools", () => {
   });
 });
 
+describe("chatWithTools history", () => {
+  it("sends tool calls on the assistant turn and one role:tool message per result", async () => {
+    let capturedBody: Record<string, unknown> | undefined;
+    const client = provider(async (_url, init) => {
+      capturedBody = JSON.parse(String(init?.body));
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              index: 0,
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "call_c",
+                    type: "function",
+                    function: { name: "goals_read", arguments: '{"id":3}' },
+                  },
+                ],
+              },
+              finish_reason: "tool_calls",
+            },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const response = await client.chatWithTools({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "user", content: "how are we doing?" },
+        {
+          role: "assistant",
+          content: "",
+          toolCalls: [
+            { id: "call_a", name: "goals.read", arguments: { id: 1 } },
+            { id: "call_b", name: "goals.read", arguments: { id: 2 } },
+          ],
+        },
+        { role: "tool", content: "result a", toolCallId: "call_a" },
+        { role: "tool", content: "result b", toolCallId: "call_b" },
+      ],
+      tools: [
+        {
+          name: "goals.read",
+          description: "Read goals.",
+          parameters: { type: "object", properties: {} },
+        },
+      ],
+    });
+
+    expect(capturedBody?.messages).toEqual([
+      { role: "user", content: "how are we doing?" },
+      {
+        role: "assistant",
+        content: null,
+        tool_calls: [
+          {
+            id: "call_a",
+            type: "function",
+            function: { name: "goals_read", arguments: '{"id":1}' },
+          },
+          {
+            id: "call_b",
+            type: "function",
+            function: { name: "goals_read", arguments: '{"id":2}' },
+          },
+        ],
+      },
+      { role: "tool", tool_call_id: "call_a", content: "result a" },
+      { role: "tool", tool_call_id: "call_b", content: "result b" },
+    ]);
+    const sentTools = (capturedBody?.tools ?? []) as {
+      function: { name: string };
+    }[];
+    expect(sentTools[0]?.function.name).toBe("goals_read");
+    expect(response.toolCalls).toEqual([
+      { id: "call_c", name: "goals.read", arguments: { id: 3 } },
+    ]);
+  });
+});
+
 describe("embed", () => {
   it("parses embedding vectors and their dimensions", async () => {
     const client = provider(
