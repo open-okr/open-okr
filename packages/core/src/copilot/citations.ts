@@ -14,13 +14,78 @@
  * withheld" is itself a fact about a thing they cannot see, and a count of
  * hidden goals in a space is worth guessing at.
  */
-import type { AiCitation } from "@openokr/db";
+import { type AiCitation, activeOnly, initiatives, tasks } from "@openokr/db";
+import { eq } from "drizzle-orm";
+import { ACCESS_LEVELS } from "../access/levels.ts";
+import { getAccessScoped } from "../access/reads.ts";
 import { mayRead } from "../embeddings/governing.ts";
 import {
   embeddableTextInTx,
   isEmbeddableType,
 } from "../embeddings/subjects.ts";
 import type { OperationTx } from "../operations/operation.ts";
+
+/**
+ * Entity types a citation may name that are not embedded (plan 0.9.0 L2).
+ *
+ * The copilot's read tools show initiatives and tasks, so an answer may cite
+ * them, and nothing about what is indexed changes: these two are read live,
+ * through the access getter, at the moment a citation is shown.
+ */
+const READ_ONLY_CITABLE = ["initiative", "task"] as const;
+
+/** True for a type a citation may name: everything embeddable, plus the two above. */
+export function isCitableType(value: string): boolean {
+  return (
+    isEmbeddableType(value) ||
+    (READ_ONLY_CITABLE as readonly string[]).includes(value)
+  );
+}
+
+/**
+ * The title of an initiative or a task this reader may see, or null.
+ *
+ * Access first and title second, so a title is only ever read for somebody the
+ * getter has already let in. The getter answers not-found for forbidden, and a
+ * row deleted since the citation was stored has no title to show: both are
+ * "not there for this reader".
+ */
+async function readableTitle(
+  tx: OperationTx,
+  input: {
+    readonly workspaceId: string;
+    readonly memberId: string;
+    readonly entityType: "initiative" | "task";
+    readonly entityId: string;
+  },
+): Promise<string | null> {
+  try {
+    await getAccessScoped(tx, {
+      workspaceId: input.workspaceId,
+      memberId: input.memberId,
+      resourceType: input.entityType,
+      resourceId: input.entityId,
+      // The getter's `requires` type is narrower than the constant's; the
+      // same cast `mayRead` makes in embeddings/governing.ts.
+      requires: ACCESS_LEVELS.view as never,
+    });
+  } catch {
+    return null;
+  }
+  const table = input.entityType === "task" ? tasks : initiatives;
+  const [row] = await tx
+    .select({ title: table.title })
+    .from(table)
+    .where(
+      activeOnly(
+        table,
+        eq(table.workspaceId, input.workspaceId),
+        eq(table.id, input.entityId),
+      ),
+    )
+    .limit(1);
+  return row ? row.title : null;
+}
 
 /** One citation a reader is allowed to see, with something to show for it. */
 export interface ResolvedCitation {
@@ -65,7 +130,26 @@ export async function readableCitations(
 ): Promise<ResolvedCitation[]> {
   const resolved: ResolvedCitation[] = [];
   for (const citation of input.citations) {
-    // A type outside the embeddable set cannot be labelled and, by `mayRead`'s
+    if (
+      citation.entityType === "initiative" ||
+      citation.entityType === "task"
+    ) {
+      const title = await readableTitle(tx, {
+        workspaceId: input.workspaceId,
+        memberId: input.memberId,
+        entityType: citation.entityType,
+        entityId: citation.entityId,
+      });
+      if (title !== null) {
+        resolved.push({
+          entityType: citation.entityType,
+          entityId: citation.entityId,
+          label: citationLabel(title),
+        });
+      }
+      continue;
+    }
+    // A type outside the citable set cannot be labelled and, by `mayRead`'s
     // own default, cannot be authorised either. Both answers are "not shown".
     if (!isEmbeddableType(citation.entityType)) {
       continue;

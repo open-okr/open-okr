@@ -36,8 +36,7 @@ import { z } from "zod";
 import { ACCESS_LEVELS } from "../access/levels.ts";
 import { checkFeatureAvailability } from "../ai/budgets.ts";
 import { aiOffSentence } from "../ai/off-reason.ts";
-import { readableCitations } from "../copilot/citations.ts";
-import { isEmbeddableType } from "../embeddings/subjects.ts";
+import { isCitableType, readableCitations } from "../copilot/citations.ts";
 import { subjectAddress } from "../ids/address.ts";
 import { OperationError, type OperationTx } from "../operations/operation.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
@@ -441,7 +440,7 @@ export const completeRun = defineWriteAction({
       }
 
       const citations: AiCitation[] = input.citations.filter((citation) =>
-        isEmbeddableType(citation.entityType),
+        isCitableType(citation.entityType),
       );
 
       await tx
@@ -655,7 +654,7 @@ export const recordAnswer = defineWriteAction({
       }
 
       const citations: AiCitation[] = input.citations.filter((citation) =>
-        isEmbeddableType(citation.entityType),
+        isCitableType(citation.entityType),
       );
 
       const [message] = await tx
