@@ -483,13 +483,20 @@ const PROPOSAL_SYSTEM =
   // "my activation key result" when no activation key result was on the
   // list, it chose the nearest one, a different measure.
   "When the request names an item that is not on the list, propose nothing " +
-  "rather than choosing the nearest one. Fill in the fields the " +
-  "action you chose takes, and set every other field to null. Write a " +
-  "reason only from the person's own words saying why the change is wanted " +
-  "now, and leave it out when they did not say. For a check-in, give a key " +
-  "result a value only when the person's words state a number, and write " +
-  "every confidence as a number from 0 to 1. Say in one " +
-  `sentence why this change, now. When you propose nothing, the action is "${NO_ACTION}".`;
+  "rather than choosing the nearest one. Fill in the fields the action you " +
+  "chose takes, and set every other field to null. " +
+  // Tuned to GPT-6 Luna, 12 November 2026: one sentence asked to leave a
+  // reason out and another to give one, so Luna left the top-level why empty
+  // and every proposal for a request without a stated reason was dropped as
+  // no_reason.
+  "A field called reason is the person's own reason: fill it only from their " +
+  "words saying why the change is wanted now, and set it to null when they " +
+  "did not say. The top-level why is separate and is always one sentence of " +
+  "your own saying why this change answers this request. It is never empty " +
+  "when you propose. For a check-in, give a key result a value only when the " +
+  "person's words state a number, and write every confidence as a number " +
+  "from 0 to 1. " +
+  `When you propose nothing, the action is "${NO_ACTION}".`;
 
 /** The offered actions, their fields and their numbered choices, as text. */
 const optionsFor = (context: ProposalRequestContext): string =>

@@ -256,6 +256,7 @@ proposal first, the streamed answer), before and after:
 | "What did my last check-in say?" answered with somebody else's check-in, as "your last check-in said" | A passage is nobody's in particular unless it says so; say when the passages do not show which is theirs | "The passages don't identify which check-in is yours" |
 | With a card on screen: "the passages don't specify an objective" | The product's note about a card is true; a card means the change is prepared for review, said first | "A change card is prepared for your review" on every card |
 | A request naming a key result not on the list got a card on the nearest one | Propose nothing when the request names an item that is not on the list | Requests that name what is on the list get exactly that card; "my activation key result" with none open still maps to the setup key result, a defensible reading the answer names |
+| A request with no stated reason ("Move the handover note task to done") got no card: `why` came back empty and the proposal was dropped as `no_reason` | The person's `reason` field may be null; the top-level `why` is the model's own one sentence and never empty | `proposeAction` passes its 8 fixtures live |
 | Answers wrote Markdown the panel showed raw | The answer may use bold, italics, lists and inline code, never headings, tables or links (rendered by CP4) | |
 
 Each misread is a fixture in `packages/agents/src/evaluation/sets.ts`. Reading
