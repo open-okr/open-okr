@@ -270,7 +270,7 @@ Statuses: **to do**; **design written**, waiting for "design approved"; **done**
 | L1 | done | The port: tool-call turns in every driver. Committed |
 | L2 | done | L2a (the read tools) and L2b (the loop and the panel) done, uncommitted until Agung approves. L3 (recording the reads) is done below, so the "Searched, read N" line survives a reload. A check-in citation is not linked yet: it has no page and a citation carries no objective id (CP5) |
 | L3 | done | Migration 0169 (source `copilot`, one-connection check widened). Every read the loop makes is a row: `recordCopilotRead`. `copilot.thread` returns `readCount` per answer, rebuilt from the member and the time (no new column, W2-Q); the panel shows the line after a reload. Admin, AI lists each copilot read with the member, tool, outcome and time. Uncommitted until Agung approves. Known limit: two questions one member runs at the same moment in two threads share a count. `pnpm db:lint` fails on `read-tools.ts:537` (`from(workspaceMembers)` without a soft-delete scope), which L2a added |
-| L5 | to do | |
+| L5 | done | Set `chooseReads` in `packages/agents/src/evaluation/sets.ts`, nine fixtures: tool choice, injection, two-round, the four-round and six-read limits, no tools. The runner gained `toolRounds`, `tools` and a view of the requests sent. Design in `docs/design/ai-evaluation.md` §5.1. Uncommitted. Live smoke test: yours |
 | L6 | to do | |
 | L7b | to do | |
 | CP5 | to do | |

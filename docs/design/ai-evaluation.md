@@ -59,11 +59,11 @@ Every fixture runs these checks. A failure names the check, the capability and t
 
 Against the mock, latency is the product's own time around the call: building the request and checking the reply. The check catches a capability that waits on something it should not. A model's latency grows with what it is sent, so the budget is the check a prompt can fail.
 
-**Tool selection.** The product makes no native tool calls today: `chatWithTools` has no caller. The choice a model makes among offered tools is the copilot's proposal, `proposeAction`, which picks one offered action or none. Its set checks that the product takes an offered action, and refuses one that was not offered and one with no reason given.
+**Tool selection.** The choice a model makes among offered actions is the copilot's proposal, `proposeAction`, which picks one offered action or none. Its set checks that the product takes an offered action, and refuses one that was not offered and one with no reason given. The copilot's read loop, `chooseReads`, is the only caller of `chatWithTools`; its set is in §5.1.
 
 ## 5. The sets, and each one's pass bar
 
-One set per capability, named by the drafter method, which is also the `feature` on its usage row. Each set holds at least two fixtures: a reply the product accepts, and one it must refuse wherever the capability can refuse. The streamed copilot answer always ends on an answer; its refusal is keeping the sources line from the reader, which its first fixture proves. At 0.7.0 that is 23 sets and 56 fixtures, and `pnpm ai:evaluate` prints the count per set.
+One set per capability, named by the drafter method, which is also the `feature` on its usage row. Each set holds at least two fixtures: a reply the product accepts, and one it must refuse wherever the capability can refuse. The streamed copilot answer always ends on an answer; its refusal is keeping the sources line from the reader, which its first fixture proves. At 0.7.0 that was 23 sets and 56 fixtures; it is now 25 sets and 80 fixtures, including the read loop's (§5.1), and `pnpm ai:evaluate` prints the count per set.
 
 **Pass bar, decision A4: every fixture in the set passes against the mock.** Proposed to Akmal on 9 November 2026 with no objection. A set either passes whole or the gate refuses: there is no partial score to argue with.
 
@@ -89,11 +89,32 @@ One set per capability, named by the drafter method, which is also the `feature`
 | `parseListFilter` | Built in | 2,000 | Every fixture |
 | `proposeImportMapping` | Built in | 2,000 | Every fixture |
 | `proposeAction` | Built in | 4,000 | Every fixture |
+| `chooseReads` (usage feature `copilotReads`) | Built in | 2,000 | Every fixture, see §5.1 |
 | `answerGrounded` | Built in | 4,000 | Every fixture |
 | `streamGrounded` | Built in | 4,000 | Every fixture |
 | `reviewAlignment` | Built in | 4,000 | Every fixture |
 
 **Why 2,000.** Every fixture's request is under 300 estimated tokens today, and the longest built-in prompt is about 100. 2,000 leaves room for a prompt many times that, and stops a pasted document from multiplying the cost and the wait of every call. The four at 4,000 carry passages, offered actions with their schemas, or a list of goals. A budget is a check on a representative request, not a production guard: the context-window guard (`packages/core/src/ai/context-guard.ts`) is that.
+
+### 5.1 The read loop's set (plan 0.9.0 L5)
+
+`chooseReads` has a built-in prompt and the default 2,000-token budget. A fixture scripts the model's tool calls round by round (`toolRounds` on the mock driver) and gives the loop a fake `read` that stands in for the host. The result it compares is the loop's own account of the run: reads, whether a limit cut it short, the rounds the provider was called, each call with its argument names and any required argument missing, and what the model was sent back. Each fixture also checks that the system message names TOOL_RESULTS_ARE_DATA, the word READY and the reference rule, that every tool was offered whole, and that the system message and the tools did not change from one round to the next.
+
+| Fixture | Proves |
+|---|---|
+| How is my activation key result doing | One targeted read of the member's own goals |
+| Which key results are behind | A read filtered by health |
+| Who owns the checkout task | Two rounds: find with `passages`, open with `tasks.read`, then stop |
+| What did my last check-in say | Two rounds: my goals, then that goal's check-ins |
+| A check-in that tells the model to call a tool it was not offered | The call is answered "That tool is not available.", the sentence stays in a tool message, the system message and tools do not change |
+| A model that keeps asking | Four rounds, then no fifth call, marked limited |
+| Eight reads in one round | Six run, two are answered "Limit reached", marked limited |
+| A model that needs nothing read | Zero reads and not limited; the caller then answers from passages |
+| A model that cannot call tools | Null, and no request is sent |
+
+**What it cannot judge.** The model is scripted, so the set checks the prompt's contract, the loop and what it does with a result. It does not show that a real model picks the right tool. The refusal of a tool outside the offered list is `runRead`'s in core; the fixture's fake host answers with the same sentence, and its list of thirteen tools is copied from `packages/core/src/copilot/read-tools.ts`.
+
+**Live smoke test for this set.** `pnpm ai:evaluate --provider openrouter --model <id>` with `OPENOKR_AI_API_KEY` sends each fixture that expects a result to the model, which then chooses its own calls against the fake host. It costs real money, is for a person to read and never runs in CI. L7b tunes the prompt against it.
 
 ## 6. Prompts become real
 
