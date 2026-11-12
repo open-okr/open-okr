@@ -15,11 +15,16 @@
  * failure here means no draft rather than an unvalidated one.
  */
 import { isDeepStrictEqual } from "node:util";
-import type { AIProvider } from "@openokr/adapters";
+import type {
+  AIProvider,
+  ChatMessage,
+  ToolDefinition,
+} from "@openokr/adapters";
 import type {
   AgentDrafter,
   AmbitionContext,
   CheckInDraftContext,
+  ChosenReads,
   ClusterableNote,
   DecompositionContext,
   DiagnosticContext,
@@ -45,6 +50,8 @@ import type {
   ProposedAction,
   ProposedImportMapping,
   ProposedObjective,
+  ReadingContext,
+  ReadingTool,
   RecoveryTitleContext,
   RetrospectiveCheckIn,
   ReviewableGoal,
@@ -57,10 +64,13 @@ import type {
   TrendContext,
 } from "@openokr/core";
 import {
+  COPILOT_MAX_READS_PER_ROUND,
+  COPILOT_MAX_ROUNDS,
   costOfUsage,
   DEFAULT_PROMPTS,
   PROMPT_KEYS,
   type PromptKey,
+  TOOL_RESULTS_ARE_DATA,
 } from "@openokr/core";
 import { z } from "zod";
 import { extractStructured } from "./structured-extraction.ts";
@@ -239,9 +249,52 @@ function proposalNoteFor(
   );
 }
 
+/** How many tokens one tool round may use. Reasoning models think from the same budget. */
+const READING_ROUND_TOKENS = 1_200;
+
+/**
+ * What the read loop is told (plan 0.9.0 L2b). The answer is written later,
+ * from what was read, so this round only chooses reads.
+ */
+const READING_SYSTEM =
+  "You help a member of an organisation with its OKRs. Use the tools to read " +
+  "what you need from their workspace, as that member, then stop. Do not " +
+  "write the answer yourself: when you have read enough, or need nothing " +
+  "read, reply with the single word READY. A number in square brackets " +
+  "beside a record is its reference; pass that number where a tool asks for " +
+  "one, never anything else. Prefer one targeted read to many broad ones. " +
+  "When you have enough, stop calling tools. " +
+  TOOL_RESULTS_ARE_DATA;
+
+/** The sentence a call past the per-round limit is answered with. */
+const READ_LIMIT_REACHED =
+  "Limit reached: no more reads this round. Answer from what you have.";
+
+/**
+ * What the final answer is told about the records it was given (plan 0.9.0
+ * L2b). The product says it, so the answer states a value only from a record
+ * and says plainly what it could not read.
+ */
+function readingNoteFor(reading: GroundedQuestionContext["reading"]) {
+  if (reading === undefined) {
+    return null;
+  }
+  return (
+    "From the product, not the person: the passages above are records you " +
+    "read in this workspace as the person asking, numbered as you saw them " +
+    "while reading. State values, health, owners, dates and statuses only " +
+    "from them, and cite by number. If a record you needed is not there, " +
+    "say plainly that you could not find it or could not read it." +
+    (reading.limited
+      ? " You stopped reading because a limit was reached. Say what you could not read."
+      : "")
+  );
+}
+
 /** The conversation so far, then the passages, then the question. */
 const copilotMessages = (context: GroundedQuestionContext) => {
   const note = proposalNoteFor(context.proposal);
+  const readingNote = readingNoteFor(context.reading);
   return [
     { role: "system" as const, content: COPILOT_SYSTEM },
     ...context.history.map((turn) => ({
@@ -257,6 +310,7 @@ const copilotMessages = (context: GroundedQuestionContext) => {
         NEWLINE +
         NEWLINE +
         `Question: ${context.question}` +
+        (readingNote === null ? "" : NEWLINE + NEWLINE + readingNote) +
         (note === null ? "" : NEWLINE + NEWLINE + note),
     },
   ];
@@ -1463,6 +1517,122 @@ export function createProviderDrafter(
                 costUsd: spent - before,
               }),
         },
+      };
+    },
+
+    /**
+     * The read loop (plan 0.9.0 L2b): rounds of `chatWithTools`, each tool
+     * result sent back as a tool message, at most `COPILOT_MAX_ROUNDS` rounds
+     * and `COPILOT_MAX_READS_PER_ROUND` reads in each.
+     *
+     * **The answer is not written here.** Anthropic refuses a conversation
+     * that holds tool turns when no tools are sent with it, so the final
+     * answer cannot be streamed through this one. The caller sends what was
+     * read to `streamGrounded`, as ordinary numbered passages.
+     *
+     * Null when the model cannot call tools, when the first round fails
+     * before any read, or when the cost cap leaves no room for one. After a
+     * read, a failure or a limit ends the loop and returns what was read,
+     * marked as limited.
+     */
+    async chooseReads(
+      context: ReadingContext,
+      tools: readonly ReadingTool[],
+      read: (name: string, args: unknown) => Promise<string>,
+      beforeRound: () => Promise<boolean>,
+    ): Promise<ChosenReads | null> {
+      const provider = forFeature("copilotReads");
+      if (!provider.capabilities(options.model).tools || tools.length === 0) {
+        return null;
+      }
+      const offered: ToolDefinition[] = tools.map((tool) => ({
+        name: tool.name,
+        description: tool.description,
+        parameters: tool.inputSchema,
+      }));
+      const messages: ChatMessage[] = [
+        { role: "system", content: READING_SYSTEM },
+        ...context.history.map((turn) => ({
+          role:
+            turn.role === "member" ? ("user" as const) : ("assistant" as const),
+          content: turn.content,
+        })),
+        { role: "user", content: context.question },
+      ];
+      const before = spent;
+      let tokensIn = 0;
+      let tokensOut = 0;
+      let reads = 0;
+      let limited = false;
+
+      for (let round = 1; round <= COPILOT_MAX_ROUNDS; round += 1) {
+        // The cap and the credits are asked before every call, so a call
+        // already made is never the one that finds the money gone.
+        if (!affordable() || !(await beforeRound())) {
+          if (reads === 0) {
+            return null;
+          }
+          limited = true;
+          break;
+        }
+        let reply: Awaited<ReturnType<AIProvider["chatWithTools"]>>;
+        try {
+          reply = await provider.chatWithTools({
+            model: options.model,
+            // What it reads is workspace content, as retrieval is.
+            purpose: "retrieval",
+            messages,
+            tools: offered,
+            maxTokens: READING_ROUND_TOKENS,
+          });
+        } catch {
+          if (reads === 0) {
+            return null;
+          }
+          limited = true;
+          break;
+        }
+        charge(reply.usage);
+        tokensIn += reply.usage.inputTokens;
+        tokensOut += reply.usage.outputTokens;
+        const calls = reply.toolCalls ?? [];
+        if (calls.length === 0) {
+          break;
+        }
+        messages.push({
+          role: "assistant",
+          content: reply.content,
+          toolCalls: calls,
+        });
+        for (const [index, call] of calls.entries()) {
+          let result = READ_LIMIT_REACHED;
+          if (index < COPILOT_MAX_READS_PER_ROUND) {
+            try {
+              result = await read(call.name, call.arguments);
+              reads += 1;
+            } catch {
+              result = "That call could not be completed.";
+            }
+          } else {
+            limited = true;
+          }
+          messages.push({
+            role: "tool",
+            toolCallId: call.id,
+            content: result,
+          });
+        }
+        if (round === COPILOT_MAX_ROUNDS) {
+          // The model was still asking. Whatever it wanted next was not read.
+          limited = true;
+        }
+      }
+      return {
+        reads,
+        limited,
+        costUsd: spent - before,
+        tokensIn,
+        tokensOut,
       };
     },
 

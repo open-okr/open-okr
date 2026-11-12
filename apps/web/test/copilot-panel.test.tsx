@@ -1194,6 +1194,105 @@ describe("the streaming look (plan 0.8.1 CP9)", () => {
     await settle();
   });
 
+  test("says what it is reading, folds the reads into one line, and links what it read", async () => {
+    const stream = feed();
+    fetchMock.mockResolvedValue(stream.response);
+    await render(AVAILABLE);
+    await open();
+    await ask("How is the activation objective doing?");
+    await settle();
+    stream.push({
+      kind: "thread",
+      threadId: THREAD,
+      questionMessageId: QUESTION_ID,
+    });
+    stream.push({ kind: "step", step: "found", count: 0 });
+    stream.push({ kind: "step", step: "reading", tool: "goals.list" });
+    stream.push({
+      kind: "step",
+      step: "reading",
+      tool: "goals.read",
+      subject: "Raise activation for mid-market teams",
+    });
+    // Longer than every step's dwell, so the line has reached the last one.
+    for (let wait = 0; wait < 5; wait += 1) {
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 450));
+      });
+    }
+    expect(panel()?.querySelector("article")?.textContent).toContain(
+      "Reading Raise activation for mid-market teams…",
+    );
+
+    stream.push({ kind: "step", step: "writing" });
+    stream.push({ kind: "text", text: "It is on track. " });
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    expect(turn?.querySelector("details > summary")?.textContent).toBe(
+      "Searched your workspace, made 2 reads",
+    );
+    stream.end();
+    await settle();
+  });
+
+  test("links an answer's sources to the key result, initiative and task it read", async () => {
+    fetchMock.mockResolvedValue(
+      streamOf([
+        { kind: "thread", threadId: THREAD, questionMessageId: QUESTION_ID },
+        { kind: "text", text: "It is on track." },
+        { kind: "done", answerMessageId: "a1", stopped: false },
+      ]),
+    );
+    actions.readCopilotThreadAction.mockResolvedValue({
+      id: THREAD,
+      subjectType: null,
+      subjectId: null,
+      title: "How is activation?",
+      messages: [
+        recorded(
+          QUESTION_ID,
+          "member",
+          "How is activation?",
+          "2026-11-12T10:00:00.000Z",
+        ),
+        {
+          ...recorded(
+            "a1",
+            "assistant",
+            "It is on track.",
+            "2026-11-12T10:00:04.000Z",
+          ),
+          citations: [
+            { entityType: "key_result", entityId: "kr-1", label: "Rate" },
+            { entityType: "initiative", entityId: "in-1", label: "Setup" },
+            { entityType: "task", entityId: "t-1", label: "Checklist" },
+            { entityType: "check_in", entityId: "ci-1", label: "Check-in" },
+          ],
+        },
+      ],
+    });
+    await render(AVAILABLE);
+    await open();
+    await ask("How is activation?");
+    await settle();
+
+    const turn = panel()?.querySelector("article");
+    const hrefs = [...(turn?.querySelectorAll("a") ?? [])].map((link) =>
+      link.getAttribute("href"),
+    );
+    expect(hrefs).toEqual(
+      expect.arrayContaining([
+        "/key-results/kr-1",
+        "/initiatives/in-1",
+        "/tasks/t-1",
+      ]),
+    );
+    // A check-in has no page of its own, so it is named and not linked.
+    expect(turn?.textContent).toContain("Check-in");
+    expect(hrefs.some((href) => href?.includes("ci-1"))).toBe(false);
+  });
+
   test("moves on from a step no sooner than 400 milliseconds", () => {
     expect(nextShownStep(3, -1, 0)).toBe(0);
     expect(nextShownStep(3, 0, 120)).toBe(0);

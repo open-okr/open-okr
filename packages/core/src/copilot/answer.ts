@@ -40,6 +40,8 @@ import { EmbeddingService, type RetrievalHit } from "../embeddings/service.ts";
 import { creditsPausedReason } from "../tenancy/index.ts";
 import { citationLabel } from "./citations.ts";
 import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import { COPILOT_READS } from "./read-tools.ts";
+import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
 
 /**
  * How many passages a grounded answer is given.
@@ -99,7 +101,7 @@ const sourceFor = (hit: RetrievalHit): GroundingSource => ({
  * and the citation it would have produced does not exist.
  */
 export const citationsFrom = (
-  hits: readonly RetrievalHit[],
+  hits: readonly { readonly entityType: string; readonly entityId: string }[],
   indexes: readonly number[],
 ) =>
   [...new Set(indexes)]
@@ -107,13 +109,22 @@ export const citationsFrom = (
       (index) => Number.isInteger(index) && index >= 0 && index < hits.length,
     )
     .map((index) => hits[index])
-    .filter((hit): hit is RetrievalHit => hit !== undefined)
+    .filter((hit): hit is NonNullable<typeof hit> => hit !== undefined)
     .map((hit) => ({ entityType: hit.entityType, entityId: hit.entityId }));
 
 export interface Prepared {
   readonly threadId: string;
   readonly questionMessageId: string;
   readonly hits: readonly RetrievalHit[];
+  /**
+   * What a citation index points at, by position. Retrieval's hits until the
+   * read loop replaces them with the records it read, in the order the model
+   * was shown their numbers (plan 0.9.0 L2b).
+   */
+  readonly cite: readonly {
+    readonly entityType: string;
+    readonly entityId: string;
+  }[];
   readonly sources: readonly AnswerSource[];
   /** Null when there is nothing that can answer. */
   readonly ask: GroundedQuestionContext | null;
@@ -196,6 +207,7 @@ export async function groundQuestion(
     threadId: asked.threadId,
     questionMessageId: asked.questionMessageId,
     hits,
+    cite: hits,
     sources,
     ask: null,
     unavailableReason: reason,
@@ -227,6 +239,7 @@ export async function groundQuestion(
     threadId: asked.threadId,
     questionMessageId: asked.questionMessageId,
     hits,
+    cite: hits,
     sources,
     ask: {
       question: input.question,
@@ -246,9 +259,12 @@ export async function answerQuestion(
   context: ActionCallContext,
   input: AnswerQuestionInput,
 ): Promise<AnswerQuestionResult> {
-  const prepared = await prepare(context, input, (drafter) =>
+  const groundedFirst = await prepare(context, input, (drafter) =>
     Boolean(drafter.answerGrounded),
   );
+  // The read loop, which leaves the passages as they were when it cannot run.
+  const reading = await drainReading(readLiveData(context, groundedFirst));
+  const prepared = reading?.prepared ?? groundedFirst;
   const nothing = (reason: string): AnswerQuestionResult => ({
     threadId: prepared.threadId,
     questionMessageId: prepared.questionMessageId,
@@ -264,6 +280,9 @@ export async function answerQuestion(
   // did not answer", and a working provider reads as an absent one. Cost an
   // afternoon once.
   const drafter = context.drafter;
+  if (reading?.blockedReason) {
+    return nothing(reading.blockedReason);
+  }
   if (!prepared.ask || !drafter?.answerGrounded) {
     return nothing(
       prepared.unavailableReason ??
@@ -287,14 +306,15 @@ export async function answerQuestion(
     );
   }
 
+  const spent = withReadingCost(answer, reading);
   const recorded = await callAction(context, "copilot.recordAnswer", {
     threadId: prepared.threadId,
     text: answer.text,
-    citations: citationsFrom(prepared.hits, answer.usedSourceIndexes),
+    citations: citationsFrom(prepared.cite, answer.usedSourceIndexes),
     model: answer.model,
-    tokensIn: answer.tokensIn,
-    tokensOut: answer.tokensOut,
-    cost: answer.costUsd,
+    tokensIn: spent.tokensIn,
+    tokensOut: spent.tokensOut,
+    cost: spent.costUsd,
     stopped: false,
   });
 
@@ -319,6 +339,16 @@ export async function answerQuestion(
 export type CopilotStep =
   | { readonly step: "searching" }
   | { readonly step: "found"; readonly count: number }
+  /**
+   * One read the loop ran (plan 0.9.0 L2b). `tool` is one of the copilot's
+   * dotted read names, and `subject` is the title of the one record a read of
+   * a single record opened, so the panel can say "Reading <title>".
+   */
+  | {
+      readonly step: "reading";
+      readonly tool: string;
+      readonly subject?: string;
+    }
   | { readonly step: "proposing" }
   | { readonly step: "writing" };
 
@@ -340,6 +370,25 @@ export function copilotStepFrom(
         data.count >= 0
         ? { step: "found", count: data.count }
         : null;
+    case "reading": {
+      // Bounded, and only the tools the copilot has: a payload off the wire
+      // never puts its own words on a reader's screen.
+      if (
+        typeof data.tool !== "string" ||
+        !(COPILOT_READS as readonly string[]).includes(data.tool)
+      ) {
+        return null;
+      }
+      const subject =
+        typeof data.subject === "string" && data.subject.trim() !== ""
+          ? data.subject.slice(0, 120)
+          : undefined;
+      return {
+        step: "reading",
+        tool: data.tool,
+        ...(subject === undefined ? {} : { subject }),
+      };
+    }
     default:
       return null;
   }
@@ -412,7 +461,7 @@ export async function* streamAnswer(
     questionMessageId: asked.messageId,
   };
   yield { kind: "step", step: "searching" };
-  const prepared = await groundQuestion(
+  const groundedFirst = await groundQuestion(
     context,
     {
       threadId: asked.threadId,
@@ -421,15 +470,33 @@ export async function* streamAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded),
   );
-  yield { kind: "step", step: "found", count: prepared.sources.length };
-  yield { kind: "sources", sources: prepared.sources };
+  yield { kind: "step", step: "found", count: groundedFirst.sources.length };
+  yield { kind: "sources", sources: groundedFirst.sources };
+
+  // The read loop: one step per read, then the records it read replace the
+  // passages as the sources. It leaves the passages when it cannot run.
+  // `proceed` ends the loop when the reader has gone, before the next round.
+  const readingRun = readLiveData(context, groundedFirst, {
+    proceed: async () => !signal?.aborted,
+  });
+  let readingNext = await readingRun.next();
+  while (!readingNext.done) {
+    yield { kind: "step", ...readingNext.value };
+    readingNext = await readingRun.next();
+  }
+  const reading = readingNext.value;
+  const prepared = reading?.prepared ?? groundedFirst;
+  if (prepared !== groundedFirst) {
+    yield { kind: "sources", sources: prepared.sources };
+  }
 
   // Through the drafter, for the reason `answerQuestion` records above.
   const drafter = context.drafter;
-  if (!prepared.ask || !drafter?.streamGrounded) {
+  if (reading?.blockedReason || !prepared.ask || !drafter?.streamGrounded) {
     yield {
       kind: "unavailable",
       reason:
+        reading?.blockedReason ??
         prepared.unavailableReason ??
         aiOffSentence(context.aiOff ?? "no_provider", "answer"),
     };
@@ -471,17 +538,21 @@ export async function* streamAnswer(
     if (text.trim() === "") {
       return;
     }
+    const spent = withReadingCost(
+      { costUsd: cost, tokensIn, tokensOut },
+      reading,
+    );
     const written = await callAction(context, "copilot.recordAnswer", {
       threadId: prepared.threadId,
       text,
       // No `done` chunk means no citation list: the model never said which
       // passages its unfinished sentence rested on, and guessing would be
       // inventing the one thing this feature promises not to invent.
-      citations: cited ? citationsFrom(prepared.hits, cited) : [],
+      citations: cited ? citationsFrom(prepared.cite, cited) : [],
       model,
-      tokensIn,
-      tokensOut,
-      cost,
+      tokensIn: spent.tokensIn,
+      tokensOut: spent.tokensOut,
+      cost: spent.costUsd,
       stopped: cited === null,
     });
     answerMessageId = written.messageId;

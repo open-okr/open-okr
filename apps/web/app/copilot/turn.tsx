@@ -52,8 +52,57 @@ export interface Message {
 export type Step =
   | { readonly step: "searching" }
   | { readonly step: "found"; readonly count: number }
+  | {
+      readonly step: "reading";
+      readonly tool: string;
+      readonly subject?: string;
+    }
   | { readonly step: "proposing" }
   | { readonly step: "writing" };
+
+/**
+ * A read in the reader's words. A read of one record names it, and the name
+ * is the record's own title, which the product sent and the model did not
+ * write. Written out tool by tool so each key is found by a search.
+ */
+function readingWords(
+  step: Extract<Step, { step: "reading" }>,
+  t: ReturnType<typeof useTranslations>["t"],
+): string {
+  if (step.subject) {
+    return t("copilot.copilotPanel.step.reading.subject", {
+      subject: step.subject,
+    });
+  }
+  switch (step.tool) {
+    case "goals.list":
+      return t("copilot.copilotPanel.step.reading.goalsList");
+    case "goals.read":
+      return t("copilot.copilotPanel.step.reading.goalsRead");
+    case "goals.checkIns":
+      return t("copilot.copilotPanel.step.reading.goalsCheckIns");
+    case "goals.keyResultHistory":
+      return t("copilot.copilotPanel.step.reading.goalsKeyResultHistory");
+    case "kpis.list":
+      return t("copilot.copilotPanel.step.reading.kpisList");
+    case "kpis.detail":
+      return t("copilot.copilotPanel.step.reading.kpisDetail");
+    case "initiatives.list":
+      return t("copilot.copilotPanel.step.reading.initiativesList");
+    case "initiatives.read":
+      return t("copilot.copilotPanel.step.reading.initiativesRead");
+    case "tasks.list":
+      return t("copilot.copilotPanel.step.reading.tasksList");
+    case "tasks.read":
+      return t("copilot.copilotPanel.step.reading.tasksRead");
+    case "blockers.board":
+      return t("copilot.copilotPanel.step.reading.blockersBoard");
+    case "review.inbox":
+      return t("copilot.copilotPanel.step.reading.reviewInbox");
+    default:
+      return t("copilot.copilotPanel.step.reading.passages");
+  }
+}
 
 /** A step in the reader's words, from the catalogue and never from a model. */
 export function stepWords(
@@ -69,6 +118,8 @@ export function stepWords(
         : step.count === 1
           ? t("copilot.copilotPanel.step.foundOne", { count: step.count })
           : t("copilot.copilotPanel.step.foundOther", { count: step.count });
+    case "reading":
+      return readingWords(step, t);
     case "proposing":
       return t("copilot.copilotPanel.step.proposing");
     case "writing":
@@ -89,6 +140,12 @@ function hrefFor(entityType: string, entityId: string): string | null {
       return `/goals/${entityId}`;
     case "kpi":
       return `/kpis/${entityId}`;
+    case "key_result":
+      return `/key-results/${entityId}`;
+    case "initiative":
+      return `/initiatives/${entityId}`;
+    case "task":
+      return `/tasks/${entityId}`;
     default:
       return null;
   }

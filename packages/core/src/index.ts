@@ -107,6 +107,7 @@ export type {
   AgentDrafter,
   AmbitionContext,
   CheckInDraftContext,
+  ChosenReads,
   ClusterableNote,
   DecompositionContext,
   DiagnosticContext,
@@ -137,6 +138,8 @@ export type {
   ProposedAction,
   ProposedImportMapping,
   ProposedObjective,
+  ReadingContext,
+  ReadingTool,
   RecoveryTitleContext,
   RetrospectiveCheckIn,
   ReviewableGoal,
@@ -856,6 +859,11 @@ export {
   type Reversal,
   reversalFor,
 } from "./copilot/proposals.ts";
+export { TOOL_RESULTS_ARE_DATA } from "./copilot/read-tools.ts";
+export {
+  COPILOT_MAX_READS_PER_ROUND,
+  COPILOT_MAX_ROUNDS,
+} from "./copilot/reading.ts";
 export { sweepEndedCycles } from "./cycles/closing.ts";
 export { cyclesOpenForWork, openForWork } from "./cycles/open-for-work.ts";
 export {

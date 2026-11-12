@@ -51,6 +51,7 @@ import {
   groundQuestion,
 } from "./answer.ts";
 import { offersToPropose, proposeBeforeAnswering } from "./proposals.ts";
+import { drainReading, readLiveData, withReadingCost } from "./reading.ts";
 
 /** The channel one copilot conversation's prose is published on. */
 export function copilotThreadChannel(
@@ -189,7 +190,7 @@ export async function runCopilotAnswer(
     publish("copilot.step", { answerMessageId: job.answerMessageId, ...data });
 
   await step({ step: "searching" });
-  const prepared = await groundQuestion(
+  const groundedFirst = await groundQuestion(
     context,
     {
       threadId: job.threadId,
@@ -198,20 +199,49 @@ export async function runCopilotAnswer(
     },
     (drafter) => Boolean(drafter.streamGrounded ?? drafter.answerGrounded),
   );
-  await step({ step: "found", count: prepared.sources.length });
+  await step({ step: "found", count: groundedFirst.sources.length });
   await publish("copilot.sources", {
     answerMessageId: job.answerMessageId,
-    sources: prepared.sources,
+    sources: groundedFirst.sources,
   });
 
   const drafter = context.drafter;
-  if (!prepared.ask || !(drafter?.streamGrounded ?? drafter?.answerGrounded)) {
+  if (
+    !groundedFirst.ask ||
+    !(drafter?.streamGrounded ?? drafter?.answerGrounded)
+  ) {
     // The relay passes no reason, so this reads as no provider, as before. It
     // only happens when AI went off between the question and this run.
     return halt(
-      prepared.unavailableReason ??
+      groundedFirst.unavailableReason ??
         aiOffSentence(context.aiOff ?? "no_provider", "answer"),
     );
+  }
+
+  // A member may stop the run while it works (plan 0.8.1 W4). Asked between
+  // pieces, at most every `STOP_CHECK_EVERY_MS`, and once more before the
+  // answer starts, since a stop pressed during the search lands here first.
+  const stopped = stopCheck(context, job);
+
+  // The read loop (plan 0.9.0 L2b): one step per read, and a Stop pressed
+  // while it reads ends it before the next model call. It leaves the
+  // passages in place when it cannot run.
+  const reading = await drainReading(
+    readLiveData(context, groundedFirst, {
+      proceed: async () => !(await stopped()),
+    }),
+    step,
+  );
+  const prepared = reading?.prepared ?? groundedFirst;
+  if (reading?.blockedReason) {
+    // The rounds used up what the answer needed: say so, and do not call it.
+    return halt(reading.blockedReason);
+  }
+  if (prepared !== groundedFirst) {
+    await publish("copilot.sources", {
+      answerMessageId: job.answerMessageId,
+      sources: prepared.sources,
+    });
   }
 
   // The proposal first, so the answer is told whether a card exists (A2).
@@ -230,13 +260,12 @@ export async function runCopilotAnswer(
       proposalId: proposal.proposalId,
     });
   }
-  const ask = { ...prepared.ask, proposal: proposal.note };
+  const ask = {
+    ...(prepared.ask ?? groundedFirst.ask),
+    proposal: proposal.note,
+  };
   await step({ step: "writing" });
 
-  // A member may stop the run while it works (plan 0.8.1 W4). Asked between
-  // pieces, at most every `STOP_CHECK_EVERY_MS`, and once more before the
-  // answer starts, since a stop pressed during the search lands here first.
-  const stopped = stopCheck(context, job);
   const answered = (await stopped(true))
     ? ({ kind: "stopped", text: "" } as const)
     : drafter?.streamGrounded
@@ -284,7 +313,8 @@ export async function runCopilotAnswer(
   }
 
   const answer = answered.answer;
-  const spent = answer.costUsd ?? 0;
+  const totals = withReadingCost(answer, reading);
+  const spent = totals.costUsd ?? 0;
   const overBudget = spent > capUsd;
   const stoppedPartway =
     answered.kind === "partial"
@@ -294,11 +324,11 @@ export async function runCopilotAnswer(
   await callAction(context, "copilot.completeRun", {
     answerMessageId: job.answerMessageId,
     text: answer.text,
-    citations: citationsFrom(prepared.hits, answer.usedSourceIndexes),
+    citations: citationsFrom(prepared.cite, answer.usedSourceIndexes),
     ...(answer.model ? { model: answer.model } : {}),
-    ...(answer.tokensIn === undefined ? {} : { tokensIn: answer.tokensIn }),
-    ...(answer.tokensOut === undefined ? {} : { tokensOut: answer.tokensOut }),
-    ...(answer.costUsd === undefined ? {} : { cost: answer.costUsd }),
+    ...(totals.tokensIn === undefined ? {} : { tokensIn: totals.tokensIn }),
+    ...(totals.tokensOut === undefined ? {} : { tokensOut: totals.tokensOut }),
+    ...(totals.costUsd === undefined ? {} : { cost: totals.costUsd }),
     ...(overBudget
       ? {
           haltedReason:

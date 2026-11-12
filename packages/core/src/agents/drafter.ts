@@ -125,6 +125,44 @@ export interface GroundedQuestionContext {
    * channel's Ask, and the answer then says nothing about cards either way.
    */
   readonly proposal?: ProposalNote;
+  /**
+   * Set when `sources` is what a read loop collected rather than what search
+   * found (plan 0.9.0 L2b). The numbers on the sources are the ones the model
+   * saw while it read, so the answer cites them unchanged. `limited` is true
+   * when a limit stopped the reading, and the answer then says what it could
+   * not read.
+   */
+  readonly reading?: {
+    readonly reads: number;
+    readonly limited: boolean;
+  };
+}
+
+/** One read the model may ask for, as a provider is offered it. */
+export interface ReadingTool {
+  /** Dotted, as the action registry names it. The driver sends a wire name. */
+  readonly name: string;
+  readonly description: string;
+  readonly inputSchema: Record<string, unknown>;
+}
+
+/** What the read loop is asked, before any answer is written. */
+export interface ReadingContext {
+  readonly question: string;
+  readonly history: GroundedQuestionContext["history"];
+}
+
+/**
+ * What a read loop did. The entities it read stay with the caller, which owns
+ * the numbered table behind `read`; this is only what the provider reports.
+ */
+export interface ChosenReads {
+  readonly reads: number;
+  /** True when a limit (rounds, reads in a round, cost, credits) cut it short. */
+  readonly limited: boolean;
+  readonly costUsd: number;
+  readonly tokensIn: number;
+  readonly tokensOut: number;
 }
 
 /**
@@ -671,6 +709,25 @@ export interface AgentDrafter {
     context: GroundedQuestionContext,
     signal?: AbortSignal,
   ): AsyncIterable<GroundedChunk>;
+  /**
+   * The copilot's read loop (plan 0.9.0 L2b, docs/design/copilot-live-data.md
+   * section 3.1): the model asks for reads, the product runs them as the
+   * member through `read` and sends the results back, for a few rounds.
+   *
+   * Null when the provider cannot call tools or when the first round fails
+   * before any read. A caller that gets null answers from passages, as it
+   * always has, and so does one told `reads: 0` (the model needed nothing
+   * read), which still reports what the rounds cost. `beforeRound` is asked
+   * before every model call and returns false when credits or the budget no
+   * longer allow one. The final answer is not written here: the caller sends
+   * what was read to `answerGrounded` or `streamGrounded`.
+   */
+  chooseReads?(
+    context: ReadingContext,
+    tools: readonly ReadingTool[],
+    read: (name: string, args: unknown) => Promise<string>,
+    beforeRound: () => Promise<boolean>,
+  ): Promise<ChosenReads | null>;
   /**
    * A proposal from a request, chosen from a curated list (P4-T14b-a).
    *

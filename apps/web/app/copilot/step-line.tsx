@@ -90,7 +90,9 @@ export function StepLine({ steps }: { readonly steps: readonly Step[] }) {
 
 /**
  * The steps, folded into one quiet line once the answer has started:
- * "Searched your workspace, found 3 passages", closed by default.
+ * "Searched your workspace, found 3 passages", closed by default. A run that
+ * read live records says "Searched your workspace, made 2 reads" instead
+ * (plan 0.9.0 L2b).
  */
 export function StepSummary({ steps }: { readonly steps: readonly Step[] }) {
   const { t } = useTranslations();
@@ -102,14 +104,23 @@ export function StepSummary({ steps }: { readonly steps: readonly Step[] }) {
     .find(
       (step): step is Extract<Step, { step: "found" }> => step.step === "found",
     );
+  // Reads of live records, when the run made any, are what the answer rests
+  // on, so they are what the line counts.
+  const reads = steps.filter((step) => step.step === "reading").length;
   const summary =
-    found === undefined
-      ? t("copilot.copilotPanel.step.summarySearched")
-      : found.count === 0
-        ? t("copilot.copilotPanel.step.summaryNone")
-        : found.count === 1
-          ? t("copilot.copilotPanel.step.summaryOne", { count: found.count })
-          : t("copilot.copilotPanel.step.summaryOther", { count: found.count });
+    reads > 0
+      ? reads === 1
+        ? t("copilot.copilotPanel.step.summaryReadOne", { count: reads })
+        : t("copilot.copilotPanel.step.summaryReadOther", { count: reads })
+      : found === undefined
+        ? t("copilot.copilotPanel.step.summarySearched")
+        : found.count === 0
+          ? t("copilot.copilotPanel.step.summaryNone")
+          : found.count === 1
+            ? t("copilot.copilotPanel.step.summaryOne", { count: found.count })
+            : t("copilot.copilotPanel.step.summaryOther", {
+                count: found.count,
+              });
   return (
     <details className="group text-xs text-ink-3">
       <summary className="w-fit cursor-pointer rounded-control hover:text-ink-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-strong">

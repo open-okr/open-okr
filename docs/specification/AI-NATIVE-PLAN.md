@@ -62,7 +62,7 @@ Each capability accelerates an existing manual action, is independently toggleab
 | Capability | Kind | Degrades to |
 |---|---|---|
 | Decompose a key result into initiatives and tasks | write | Manual creation |
-| Grounded question answering across everything the user may see, with citations | read | Full-text search |
+| Grounded question answering across everything the user may see, with citations. It reads through the member's own read actions (values, health, owners, check-ins, tasks), as that member and with read scope, and cites what it read | read | Full-text search |
 | Turn a sentence into a validated list filter | read | Manual filters |
 | Summarise a thread or a document | read | Read it |
 | Map spreadsheet columns to import fields | write | Manual mapping |
@@ -393,6 +393,8 @@ Any external agent drives OpenOKR as the authenticated user.
 
 pgvector with no new service. An outbox-driven worker chunks and embeds goals, key results, check-ins, blockers, sessions, documents, comments and cycle artifacts on write, keyed by content hash. Retrieval is always access-filtered through the same layer as reads, with hybrid ranking against full text. Local embeddings keep retrieval air-gap safe. Chunks are passed as cited, untrusted data. Where pgvector is unavailable, semantic features degrade to full text and everything still works.
 
+**Retrieval is one of the copilot's tools (plan 0.9.0 L2b).** The copilot no longer learns about the workspace from retrieval alone. It calls a curated set of the product's own read actions in a loop, as the asking member, and `passages` (this section's retrieval, access-filtered as before) is one tool among them. Retrieval still runs first, so a provider that cannot call tools, or a first round that fails, answers from passages exactly as before. See [copilot-live-data](../design/copilot-live-data.md) section 3.
+
 **As built at 0.7.0 (plan A10).** A document is embedded once it is published, never as a draft. A session is embedded as its shared record: its title, the wins it named and the shifts it agreed, never the facilitator's per-stage notes, which are private by design. KPIs are embedded too, by title and description, and like their search rows every member reads them. "Cycle artifacts" are the learnings and next-cycle drafts; a cycle itself is a period with a name and no prose, so it is not embedded. Rows written before 0.7.0 are embedded on their next write, as nothing reindexes the past.
 
 ## 10. Evaluation, quality and degradation
@@ -418,3 +420,16 @@ pgvector with no new service. An outbox-driven worker chunks and embeds goals, k
 | A6 | Embedding model and dimension | Open. The column is kept swappable |
 | A7 | Nudge volume ceiling per member per week | Five. A workspace setting in the METHOD.md §11 registry; anything past it waits for the member's next daily digest, which is not itself held or counted. |
 | A8 | Outbound MCP, meaning the copilot calling external tools | Later. The registry is designed so it bolts on |
+
+**Copilot live data.** Decided by Akmal on 11 November 2026, "design approved for all", with the model changed by him in D8. The reasons are in [copilot-live-data](../design/copilot-live-data.md) section 10.
+
+| # | Decision | Position |
+|---|---|---|
+| D1 | How the copilot learns about data | It reads through the product's own actions, as the member |
+| D2 | Which reads it may call | A curated dozen and `passages`, not the agent surface's whole core toolset |
+| D3 | Which edits become proposable | Five more edits, in design section 4.1 |
+| D4 | Whether any write may skip the apply step | No. Every change stays a proposal the member applies |
+| D5 | Undo for edits | The before values are stored when a proposal is applied (migration 2) |
+| D6 | Recording the copilot's reads | In `ai_tool_calls` beside the agent surface's (migration 1, L3) |
+| D7 | Limits | Fixed: 4 rounds, 6 reads a round, 6,000 characters a result. Not settings |
+| D8 | Model | GPT-6 Luna is the default for `fast` and `balanced` on OpenRouter. Sonnet 5.5 was the recommendation |
